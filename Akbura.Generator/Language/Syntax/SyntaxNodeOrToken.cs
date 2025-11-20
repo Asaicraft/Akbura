@@ -382,7 +382,7 @@ internal readonly struct SyntaxNodeOrToken : IEquatable<SyntaxNodeOrToken>
 
         if (_nodeOrParent != null)
         {
-            return _nodeOrParent.WithLeadingTrivia(trivia);
+            return _nodeOrParent.WithLeadingTrivia(SyntaxTriviaList.Create(trivia));
         }
 
         return this;
@@ -402,7 +402,7 @@ internal readonly struct SyntaxNodeOrToken : IEquatable<SyntaxNodeOrToken>
 
         if (_nodeOrParent != null)
         {
-            return _nodeOrParent.WithTrailingTrivia(trivia);
+            return _nodeOrParent.WithTrailingTrivia(SyntaxTriviaList.Create(trivia));
         }
 
         return this;

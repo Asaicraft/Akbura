@@ -273,7 +273,7 @@ node MarkupStartTagSyntax : MarkupSyntaxNode {
 node MarkupEndTagSyntax : MarkupSyntaxNode {
     LessSlashToken : LessSlashToken;     // "</"
     Name           : SimpleName;
-    GreaterToken   : GreaterThanToken2;  // ">"
+    GreaterToken   : GreaterThanToken;  // ">"
 }
 
 

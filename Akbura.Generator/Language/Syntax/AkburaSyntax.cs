@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
+using System.Xml.Linq;
 
 namespace Akbura.Language.Syntax;
 
@@ -996,10 +997,63 @@ internal abstract partial class AkburaSyntax
         return SyntaxReplacer.InsertTriviaInList(this, originalTrivia, newTrivia, insertBefore);
     }
 
+    /// <summary>
+    /// Creates a new tree of nodes with the specified old token replaced with a new token.
+    /// </summary>
+    /// <typeparam name="TRoot">The type of the root node.</typeparam>
+    /// <param name="root">The root node of the tree of nodes.</param>
+    /// <param name="oldToken">The token to be replaced.</param>
+    /// <param name="newToken">The new token to use in the new tree in place of the old
+    /// token.</param>
+    public AkburaSyntax? ReplaceToken(SyntaxToken oldToken, SyntaxToken newToken)
+    {
+        return Replace<AkburaSyntax>(tokens: [oldToken], computeReplacementToken: (o, r) => newToken);
+    }
+
+    /// <summary>
+    /// Creates a new tree of nodes with the specified trivia replaced with new trivia.
+    /// </summary>
+    /// <typeparam name="TRoot">The type of the root node.</typeparam>
+    /// <param name="root">The root node of the tree of nodes.</param>
+    /// <param name="trivia">The trivia to be replaced; descendants of the root node.</param>
+    /// <param name="computeReplacementTrivia">A function that computes replacement trivia for
+    /// the specified arguments. The first argument is the original trivia. The second argument is
+    /// the same trivia with potentially rewritten sub structure.</param>
+    public AkburaSyntax ReplaceTrivia(IEnumerable<SyntaxTrivia> trivia, Func<SyntaxTrivia, SyntaxTrivia, SyntaxTrivia> computeReplacementTrivia)
+    {
+        return Replace<AkburaSyntax>(trivia: trivia, computeReplacementTrivia: computeReplacementTrivia);
+    }
+
+    /// <summary>
+    /// Creates a new tree of nodes with the specified trivia replaced with new trivia.
+    /// </summary>
+    /// <typeparam name="TRoot">The type of the root node.</typeparam>
+    /// <param name="root">The root node of the tree of nodes.</param>
+    /// <param name="trivia">The trivia to be replaced.</param>
+    /// <param name="newTrivia">The new trivia to use in the new tree in place of the old trivia.</param>
+    public AkburaSyntax ReplaceTrivia(SyntaxTrivia trivia, SyntaxTrivia newTrivia)
+    {
+        return Replace<AkburaSyntax>(trivia: [trivia], computeReplacementTrivia: (o, r) => newTrivia);
+    }
+
     public AkburaSyntax? RemoveNodes(IEnumerable<AkburaSyntax> nodes, SyntaxRemoveOptions options)
     {
-        return SyntaxReplacer.RemoveNodes(this, nodes, options);
+        return SyntaxNodeRemover.RemoveNodes(this, nodes, options);
     }
 
     #endregion
+
+    public AkburaSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+    {
+        var last = GetLastToken(includeZeroWidth: true);
+        var newLast = last.WithTrailingTrivia(trivia);
+        return ReplaceToken(last, newLast)!;
+    }
+
+    public AkburaSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+    {
+        var first = GetFirstToken(includeZeroWidth: true);
+        var newFirst = first.WithLeadingTrivia(trivia);
+        return ReplaceToken(first, newFirst)!;
+    }
 }

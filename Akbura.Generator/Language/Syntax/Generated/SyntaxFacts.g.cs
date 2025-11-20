@@ -2,7 +2,7 @@
 
 namespace Akbura.Language.Syntax
 {
-    internal static partial class SyntaxFacts
+    static partial class SyntaxFacts
     {
         public static partial bool IsLiteral(SyntaxKind kind)
         {

@@ -33,7 +33,7 @@ namespace Akbura.Language.Syntax.Green
             AkburaDebug.Assert(this.GreaterToken != null);
 
             AkburaDebug.Assert(this.LessSlashToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.LessSlashToken);
-            AkburaDebug.Assert(this.GreaterToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.GreaterThanToken2);
+            AkburaDebug.Assert(this.GreaterToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.GreaterThanToken);
 
             var flags = Flags;
             var fullWidth = FullWidth;
@@ -151,7 +151,7 @@ namespace Akbura.Language.Syntax.Green
                 lessSlashToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.LessSlashToken ||
                 false);
             AkburaDebug.Assert(
-                greaterToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.GreaterThanToken2 ||
+                greaterToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.GreaterThanToken ||
                 false);
 
             var kind = global::Akbura.Language.Syntax.SyntaxKind.MarkupEndTagSyntax;
@@ -350,9 +350,9 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentException(nameof(lessSlashToken), message: $"lessSlashToken must be SyntaxKind.LessSlashToken");
             }
 
-            if (greaterToken.RawKind != (ushort)SyntaxKind.GreaterThanToken2)
+            if (greaterToken.RawKind != (ushort)SyntaxKind.GreaterThanToken)
             {
-                ThrowHelper.ThrowArgumentException(nameof(greaterToken), message: $"greaterToken must be SyntaxKind.GreaterThanToken2");
+                ThrowHelper.ThrowArgumentException(nameof(greaterToken), message: $"greaterToken must be SyntaxKind.GreaterThanToken");
             }
 
             if (name is null)

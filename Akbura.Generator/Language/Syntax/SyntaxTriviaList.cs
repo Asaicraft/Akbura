@@ -66,6 +66,24 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
         return trivias.Length == 0 ? default : new(token: default, CreateNodeFromSpan(trivias), position: 0, index: 0);
     }
 
+    public static SyntaxTriviaList Create(IEnumerable<SyntaxTrivia> trivias)
+    {
+        if (trivias == null)
+        {
+            return default;
+        }
+        var builder = GetBuilder();
+        try
+        {
+            builder.AddRange(trivias);
+            return builder.Count == 0 ? default : builder.ToList();
+        }
+        finally
+        {
+            ClearAndFreeBuilder(builder);
+        }
+    }
+
     private static GreenNode? CreateNodeFromSpan(ReadOnlySpan<SyntaxTrivia> trivias)
     {
         switch (trivias.Length)
@@ -202,6 +220,41 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     public bool Any()
     {
         return Node != null;
+    }
+
+    public SyntaxTriviaList Concat(SyntaxTriviaList list)
+    {
+        if (!Any())
+        {
+            return list;
+        }
+
+        if (!list.Any())
+        {
+            return this;
+        }
+
+        var builder = GetBuilder();
+        try
+        {
+            var thisCount = Count;
+            for (var i = 0; i < thisCount; i++)
+            {
+                builder.Add(this[i]);
+            }
+
+            var otherCount = list.Count;
+            for (var i = 0; i < otherCount; i++)
+            {
+                builder.Add(list[i]);
+            }
+
+            return builder.ToList();
+        }
+        finally
+        {
+            ClearAndFreeBuilder(builder);
+        }
     }
 
     public Enumerator GetEnumerator()

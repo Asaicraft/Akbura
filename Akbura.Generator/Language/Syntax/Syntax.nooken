@@ -363,6 +363,7 @@ node MarkupDynamicAttributeValueSyntax : MarkupAttributeValueSyntax {
 // IDENTIFIERS AND TYPES
 // ─────────────────────────────────────────────────────────────
 
+[id 600]
 abstract node Type;
 
 abstract node Name: Type;

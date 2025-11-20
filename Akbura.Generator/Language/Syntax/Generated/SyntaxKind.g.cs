@@ -129,9 +129,9 @@
         MarkupLiteralAttributeValueSyntax = 528,
         MarkupDynamicAttributeValueSyntax = 529,
 
-        Type = 530,
-        Name = 531,
-        SimpleName = 532,
-        IdentifierName = 533,
+        Type = 600,
+        Name = 601,
+        SimpleName = 602,
+        IdentifierName = 603,
     }
 }

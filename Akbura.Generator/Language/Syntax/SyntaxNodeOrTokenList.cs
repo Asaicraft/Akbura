@@ -84,7 +84,7 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
             case 0: return null;
             case 1:
                 return nodesAndTokens[0].IsToken
-                    ? GreenSyntaxList.List([nodesAndTokens[0].UnderlyingNode]).CreateRed()
+                    ? GreenSyntaxList.List([nodesAndTokens[0].UnderlyingNode!]).CreateRed()
                     : nodesAndTokens[0].AsNode();
             case 2: return GreenSyntaxList.List(nodesAndTokens[0].UnderlyingNode!, nodesAndTokens[1].UnderlyingNode!).CreateRed();
             case 3: return GreenSyntaxList.List(nodesAndTokens[0].UnderlyingNode!, nodesAndTokens[1].UnderlyingNode!, nodesAndTokens[2].UnderlyingNode!).CreateRed();

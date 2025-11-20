@@ -63,7 +63,7 @@ partial class AkburaSyntax
 
         public bool TryGetNextInSpan(in TextSpan span, out SyntaxNodeOrToken value)
         {
-            Debug.Assert(_stack is not null);
+            AkburaDebug.Assert(_stack is not null);
             while (_stack[_stackPtr].TryMoveNextAndGetCurrent(out value))
             {
                 if (IsInSpan(in span, value.FullSpan))
@@ -78,7 +78,7 @@ partial class AkburaSyntax
 
         public AkburaSyntax? TryGetNextAsNodeInSpan(in TextSpan span)
         {
-            Debug.Assert(_stack is not null);
+            AkburaDebug.Assert(_stack is not null);
             AkburaSyntax? nodeValue;
             while ((nodeValue = _stack[_stackPtr].TryMoveNextAndGetCurrentAsNode()) != null)
             {
@@ -94,7 +94,7 @@ partial class AkburaSyntax
 
         public void PushChildren(AkburaSyntax node)
         {
-            Debug.Assert(_stack is not null);
+            AkburaDebug.Assert(_stack is not null);
             if (++_stackPtr >= _stack.Length)
             {
                 // Geometric growth
@@ -210,7 +210,7 @@ partial class AkburaSyntax
 
         public readonly Which PeekNext()
         {
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             return _discriminatorStack.Peek();
         }
 
@@ -221,7 +221,7 @@ partial class AkburaSyntax
                 return true;
             }
 
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _discriminatorStack.Pop();
             return false;
         }
@@ -233,7 +233,7 @@ partial class AkburaSyntax
                 return true;
             }
 
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _discriminatorStack.Pop();
             return false;
         }
@@ -242,7 +242,7 @@ partial class AkburaSyntax
         {
             if (descendIntoChildren == null || descendIntoChildren(node))
             {
-                Debug.Assert(_discriminatorStack is not null);
+                AkburaDebug.Assert(_discriminatorStack is not null);
                 _nodeStack.PushChildren(node);
                 _discriminatorStack.Push(Which.Node);
             }
@@ -250,14 +250,14 @@ partial class AkburaSyntax
 
         public void PushLeadingTrivia(in SyntaxToken token)
         {
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _triviaStack.PushLeadingTrivia(in token);
             _discriminatorStack.Push(Which.Trivia);
         }
 
         public void PushTrailingTrivia(in SyntaxToken token)
         {
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _triviaStack.PushTrailingTrivia(in token);
             _discriminatorStack.Push(Which.Trivia);
         }
@@ -305,7 +305,7 @@ partial class AkburaSyntax
 
         public readonly Which PeekNext()
         {
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             return _discriminatorStack.Peek();
         }
 
@@ -316,7 +316,7 @@ partial class AkburaSyntax
                 return true;
             }
 
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _discriminatorStack.Pop();
             return false;
         }
@@ -328,15 +328,15 @@ partial class AkburaSyntax
                 return true;
             }
 
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _discriminatorStack.Pop();
             return false;
         }
 
         public readonly SyntaxNodeOrToken PopToken()
         {
-            Debug.Assert(_discriminatorStack is not null);
-            Debug.Assert(_tokenStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_tokenStack is not null);
             _discriminatorStack.Pop();
             return _tokenStack.Pop();
         }
@@ -345,7 +345,7 @@ partial class AkburaSyntax
         {
             if (descendIntoChildren == null || descendIntoChildren(node))
             {
-                Debug.Assert(_discriminatorStack is not null);
+                AkburaDebug.Assert(_discriminatorStack is not null);
                 _nodeStack.PushChildren(node);
                 _discriminatorStack.Push(Which.Node);
             }
@@ -353,22 +353,22 @@ partial class AkburaSyntax
 
         public void PushLeadingTrivia(in SyntaxToken token)
         {
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _triviaStack.PushLeadingTrivia(in token);
             _discriminatorStack.Push(Which.Trivia);
         }
 
         public void PushTrailingTrivia(in SyntaxToken token)
         {
-            Debug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
             _triviaStack.PushTrailingTrivia(in token);
             _discriminatorStack.Push(Which.Trivia);
         }
 
         public readonly void PushToken(in SyntaxNodeOrToken value)
         {
-            Debug.Assert(_discriminatorStack is not null);
-            Debug.Assert(_tokenStack is not null);
+            AkburaDebug.Assert(_discriminatorStack is not null);
+            AkburaDebug.Assert(_tokenStack is not null);
             _tokenStack.Push(value);
             _discriminatorStack.Push(Which.Token);
         }

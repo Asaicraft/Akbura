@@ -23,8 +23,8 @@ internal abstract partial class GreenSyntaxList : GreenNode
 
     public static WithTwoChildrenGreen List(GreenNode child0, GreenNode child1)
     {
-        Debug.Assert(child0 != null);
-        Debug.Assert(child1 != null);
+        AkburaDebug.Assert(child0 != null);
+        AkburaDebug.Assert(child1 != null);
 
         var cached = GreenNodeCache.TryGetNode(ListKind, child0, child1, out var hash);
 
@@ -44,9 +44,9 @@ internal abstract partial class GreenSyntaxList : GreenNode
 
     public static WithThreeChildrenGreen List(GreenNode child0, GreenNode child1, GreenNode child2)
     {
-        Debug.Assert(child0 != null);
-        Debug.Assert(child1 != null);
-        Debug.Assert(child2 != null);
+        AkburaDebug.Assert(child0 != null);
+        AkburaDebug.Assert(child1 != null);
+        AkburaDebug.Assert(child2 != null);
 
         var cached = GreenNodeCache.TryGetNode(ListKind, child0, child1, child2, out var hash);
 
@@ -76,7 +76,7 @@ internal abstract partial class GreenSyntaxList : GreenNode
         for (var i = 0; i < count; i++)
         {
             var node = nodes[i];
-            Debug.Assert(node is not null);
+            AkburaDebug.Assert(node is not null);
             array[i].Value = node;
         }
 
@@ -94,7 +94,7 @@ internal abstract partial class GreenSyntaxList : GreenNode
         for (var i = 0; i < count; i++)
         {
             var node = nodes[i];
-            Debug.Assert(node is not null);
+            AkburaDebug.Assert(node is not null);
             array[i].Value = node;
         }
 

@@ -391,7 +391,7 @@ internal readonly partial struct ChildSyntaxList : IEquatable<ChildSyntaxList>, 
     /// <returns><see cref="Reversed"/> which contains all children of <see cref="ChildSyntaxList"/> in reversed order</returns>
     public Reversed Reverse()
     {
-        Debug.Assert(_node is not null);
+        AkburaDebug.Assert(_node is not null);
         return new Reversed(_node, _count);
     }
 

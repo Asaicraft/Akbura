@@ -414,7 +414,7 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
         if (insertionIndex < nodesWithSeps.Count && nodesWithSeps[insertionIndex] is { IsNode: true } nodeOrToken)
         {
             var node = nodesWithSeps[insertionIndex].AsNode();
-            Debug.Assert(node is not null);
+            AkburaDebug.Assert(node is not null);
             nodesToInsertWithSeparators.Add(node.Green.CreateSeparator(node)); // separator
         }
 #pragma warning restore IDE0059 // Unnecessary assignment of a value
@@ -428,7 +428,7 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
         // then it should stay associated with previous node
         foreach (var tr in separator.TrailingTrivia)
         {
-            Debug.Assert(tr.UnderlyingNode is not null);
+            AkburaDebug.Assert(tr.UnderlyingNode is not null);
             if (tr.UnderlyingNode.IsTriviaWithEndOfLine())
             {
                 return true;

@@ -165,7 +165,7 @@ public static class ArrayExtensions
 
     public static bool SequenceEqual<T>(this T[]? first, T[]? second, Func<T, T, bool> comparer)
     {
-        Debug.Assert(comparer != null);
+        AkburaDebug.Assert(comparer != null);
 
         if (first == second)
         {

@@ -100,7 +100,7 @@ internal readonly partial struct GreenSyntaxList<TNode> : IEquatable<GreenSyntax
     {
         get
         {
-            Debug.Assert(_node is not null);
+            AkburaDebug.Assert(_node is not null);
             var node = _node;
             if (node.IsList)
             {

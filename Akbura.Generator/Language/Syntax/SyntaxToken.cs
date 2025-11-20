@@ -70,7 +70,7 @@ internal readonly struct SyntaxToken : IEquatable<SyntaxToken>
     {
         get
         {
-            Debug.Assert(Node is not null);
+            AkburaDebug.Assert(Node is not null);
             return Node;
         }
     }

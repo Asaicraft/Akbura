@@ -96,7 +96,7 @@ internal class SyntaxTokenListBuilder
                     Debug.Assert(_nodes[2] is not null);
                     return new SyntaxTokenList(null, GreenSyntaxList.List(_nodes[0]!, _nodes[1]!, _nodes[2]!), 0, 0);
                 default:
-                    return new SyntaxTokenList(null, GreenSyntaxList.List(_nodes, _count), 0, 0);
+                    return new SyntaxTokenList(null, GreenSyntaxList.List(_nodes!, _count), 0, 0);
             }
         }
         else

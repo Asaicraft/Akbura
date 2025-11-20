@@ -177,8 +177,6 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class MarkupTextLiteralSyntax : global::Akbura.Language.Syntax.MarkupContentSyntax
     {
-        private AkburaSyntax? _textTokens;
-
         public MarkupTextLiteralSyntax(
             global::Akbura.Language.Syntax.Green.GreenMarkupTextLiteralSyntax greenNode,
             global::Akbura.Language.Syntax.AkburaSyntax? parent,

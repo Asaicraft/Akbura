@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Akbura.Pools;
+using Akbura;
 
 namespace Akbura.Collections
 {
@@ -867,7 +868,7 @@ namespace System.Linq
     {
         public static bool SequenceEqual<T>(this IEnumerable<T>? first, IEnumerable<T>? second, Func<T, T, bool> comparer)
         {
-            Debug.Assert(comparer != null);
+            AkburaDebug.Assert(comparer != null);
 
             if (first == second)
             {

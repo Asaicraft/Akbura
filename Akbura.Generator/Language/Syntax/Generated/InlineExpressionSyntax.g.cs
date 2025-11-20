@@ -137,13 +137,13 @@ namespace Akbura.Language.Syntax.Green
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
         {
-            Debug.Assert(openBrace != null);
-            Debug.Assert(expression != null);
-            Debug.Assert(closeBrace != null);
-            Debug.Assert(
+            AkburaDebug.Assert(openBrace != null);
+            AkburaDebug.Assert(expression != null);
+            AkburaDebug.Assert(closeBrace != null);
+            AkburaDebug.Assert(
                 openBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenBraceToken ||
                 false);
-            Debug.Assert(
+            AkburaDebug.Assert(
                 closeBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseBraceToken ||
                 false);
 

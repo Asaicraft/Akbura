@@ -112,7 +112,7 @@ internal readonly struct SyntaxNodeOrToken : IEquatable<SyntaxNodeOrToken>
     {
         get
         {
-            Debug.Assert(UnderlyingNode is not null);
+            AkburaDebug.Assert(UnderlyingNode is not null);
             return UnderlyingNode;
         }
     }

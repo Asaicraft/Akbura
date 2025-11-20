@@ -79,7 +79,7 @@ namespace Akbura.Language.Syntax.Green
             Flags = flags;
         }
 
-        public SeparatedGreenSyntaxList<GreenParameterSyntax> Parameters => new(_parameters);
+        public SeparatedGreenSyntaxList<GreenParameterSyntax> Parameters => _parameters.ToGreenSeparatedList<GreenParameterSyntax>();
 
         public GreenFunctionDeclarationSyntax UpdateFunctionDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken? asyncKeyword,

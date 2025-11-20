@@ -138,7 +138,7 @@ internal sealed class SyntaxListBuilder
 
     public void AddRange(SyntaxTokenList list, int offset, int length)
     {
-        Debug.Assert(list.Node is not null);
+        AkburaDebug.Assert(list.Node is not null);
         AddRange(new SyntaxList<AkburaSyntax>(list.Node.CreateRed()), offset, length);
     }
 

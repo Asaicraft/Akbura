@@ -1,0 +1,15 @@
+[x:intrinsic]
+
+param bool When = false;
+param bool KeepAlive = false;
+param double? ReserveHeight = null;
+
+slot Fallback;
+slot Child; // default slot
+
+state active = When ? 1 : 0;
+
+<x:Region KeepAlive={KeepAlive} ReserveHeight={ReserveHeight} ActiveIndex={active}>
+    <Slot name="Fallback" />
+    <Slot name="Child" />
+</x:Region>

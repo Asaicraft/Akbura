@@ -1,0 +1,374 @@
+﻿
+// ─────────────────────────────────────────────────────────────
+// TOKENS  (well-known text; must remain contiguous)
+// ─────────────────────────────────────────────────────────────
+
+[id 100]
+token InjectKeyword      = "inject";
+token ParamKeyword       = "param";
+token StateKeyword       = "state";
+token UseEffectKeyword   = "useEffect";
+token SuppressKeyword    = "suppress";
+token CancelKeyword      = "cancel";
+token FinallyKeyword     = "finally";
+token AsyncKeyword       = "async";
+token VoidKeyword        = "void";
+
+token NewKeyword         = "new";
+token ReactListKeyword   = "ReactList";
+
+token IfKeyword          = "if";
+token ElseKeyword        = "else";
+token ReturnKeyword      = "return";
+token ForKeyword         = "for";
+
+token TrueKeyword        = "true"  return true;
+token FalseKeyword       = "false" return false;
+token NullKeyword        = "null"  return null;
+
+// operators & punctuation
+token PlusToken          = "+";
+token MinusToken         = "-";
+token AsteriskToken      = "*";
+token SlashToken         = "/";
+token PercentToken       = "%";
+token CaretToken         = "^";
+token BarToken           = "|";
+token AmpersandToken     = "&";
+token QuestionToken      = "?";
+token ColonToken         = ":";
+token SemicolonToken     = ";";
+token CommaToken         = ",";
+token DotToken           = ".";
+token DoubleDotToken     = "..";
+token EqualsToken        = "=";
+token BangToken          = "!";
+token EqualsEqualsToken  = "==";
+token BangEqualsToken    = "!=";
+token GreaterThanToken   = ">";
+token LessThanToken      = "<";
+token GreaterEqualsToken = ">=";
+token LessEqualsToken    = "<=";
+token ArrowToken         = "=>";
+token HashToken          = "#";
+
+token OpenBraceToken     = "{";
+token CloseBraceToken    = "}";
+token OpenBracketToken   = "[";
+token CloseBracketToken  = "]";
+token OpenParenToken     = "(";
+token CloseParenToken    = ")";
+
+// markup tokens
+token LessSlashToken     = "</";
+token SlashGreaterToken  = "/>";
+
+token SingleQuoteToken   = "'";
+token DoubleQuoteToken   = "\"";
+
+token AtToken            = "@";
+
+[id 200]
+/*
+    Built-in literal tokens (StringLiteralToken / NumericLiteralToken / etc.)
+    already exist at the token layer. Here we only declare DSL-specific
+    literals when we want distinct AST-level categories.
+*/
+
+// Raw text used as markup content between tags.
+literal AkTextLiteral : string;
+
+
+
+[id 500]
+
+// ─────────────────────────────────────────────────────────────
+// BASE NODE ABSTRACTIONS
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Any construct allowed at file top-level (inject/param/state/useEffect/func/markup).
+/// Base type AkburaSyntaxNode is implicit.
+/// </summary>
+abstract node AkTopLevelMember;
+
+// ─────────────────────────────────────────────────────────────
+// EMBEDDED C# SYNTAX NODES
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// C# type reference (ILogger<T>, int, ReactList<Task>, etc.).
+/// Represented as a flat TokenList, left to a C# sub-parser.
+/// </summary>
+node CSharpTypeSyntax {
+    Tokens : TokenList;
+}
+
+/// <summary>
+/// C# expression fragment.
+/// </summary>
+node CSharpExpressionSyntax {
+    Tokens : TokenList;
+}
+
+/// <summary>
+/// C# block enclosed in braces: { ... }.
+/// </summary>
+node CSharpBlockSyntax {
+    OpenBrace  : OpenBraceToken;
+    Tokens     : TokenList;      // contents without the outer braces
+    CloseBrace : CloseBraceToken;
+}
+
+/// <summary>
+/// Inline expression used in markup: { expr }.
+/// </summary>
+node InlineExpressionSyntax {
+    OpenBrace  : OpenBraceToken;
+    Expression : CSharpExpressionSyntax;
+    CloseBrace : CloseBraceToken;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DOCUMENT ROOT
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Entire .akbura compilation unit.
+/// </summary>
+node AkburaDocumentSyntax {
+    Members   : syntaxlist<AkTopLevelMember>;
+    /// <summary> 
+    /// End-of-file token provided by the host; we reference it as a generic Token.
+    /// </summary>
+    EndOfFile : Token;
+}
+
+// ─────────────────────────────────────────────────────────────
+// INJECT / PARAM / STATE DECLARATIONS
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>inject ILogger&lt;ProfileWithTasks&gt; log;</summary>
+node InjectDeclarationSyntax : AkTopLevelMember {
+    InjectKeyword : InjectKeyword;
+    Type          : CSharpTypeSyntax;
+    Name          : SimpleName;
+    Semicolon     : SemicolonToken;
+}
+
+/// <summary>param int UserId = 1;</summary>
+node ParamDeclarationSyntax : AkTopLevelMember {
+    ParamKeyword  : ParamKeyword;
+    Type?         : CSharpTypeSyntax;
+    Name          : SimpleName;
+    Equals?       : EqualsToken;
+    DefaultValue? : CSharpExpressionSyntax;
+    Semicolon     : SemicolonToken;
+}
+
+/// <summary>state count = 0; / state ReactList tasks = [];</summary>
+node StateDeclarationSyntax : AkTopLevelMember {
+    StateKeyword : StateKeyword;
+    Type?        : CSharpTypeSyntax;
+    Name         : SimpleName;
+    Equals       : EqualsToken;
+    Initializer  : CSharpExpressionSyntax;
+    Semicolon    : SemicolonToken;
+}
+
+// ─────────────────────────────────────────────────────────────
+// useEffect DECLARATION (+ cancel / finally blocks)
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// useEffect($cancel, UserId, tasks) { ... }
+/// cancel { ... }
+/// finally { ... }
+/// </summary>
+node UseEffectDeclarationSyntax : AkTopLevelMember {
+    UseEffectKeyword : UseEffectKeyword;
+    OpenParen        : OpenParenToken;
+    // Dependency list: e.g., $cancel, UserId, tasks
+    Parameters       : syntaxlist<SimpleName, CommaToken>;
+    CloseParen       : CloseParenToken;
+    Body             : CSharpBlockSyntax;
+    CancelBlock?     : EffectCancelBlockSyntax;
+    FinallyBlock?    : EffectFinallyBlockSyntax;
+}
+
+node EffectCancelBlockSyntax {
+    CancelKeyword : CancelKeyword;
+    Body          : CSharpBlockSyntax;
+}
+
+node EffectFinallyBlockSyntax {
+    FinallyKeyword : FinallyKeyword;
+    Body           : CSharpBlockSyntax;
+}
+
+// ─────────────────────────────────────────────────────────────
+// FUNCTION DECLARATIONS (async void SaveNew(...){})
+// ─────────────────────────────────────────────────────────────
+
+node FunctionDeclarationSyntax : AkTopLevelMember {
+    AsyncKeyword? : AsyncKeyword;          // "async" if present
+    ReturnType    : CSharpTypeSyntax;      // e.g. "void", "Task", "Task<Result>"
+    Name          : SimpleName;
+    OpenParen     : OpenParenToken;
+    Parameters    : syntaxlist<ParameterSyntax, CommaToken>;
+    CloseParen    : CloseParenToken;
+    Body          : CSharpBlockSyntax;
+}
+
+node ParameterSyntax {
+    Type       : CSharpTypeSyntax;
+    Identifier : SimpleName;
+}
+
+// ─────────────────────────────────────────────────────────────
+// MARKUP TREE (Razor-style component markup)
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Base category for all markup-related nodes.
+/// </summary>
+abstract node MarkupSyntaxNode;
+
+/// <summary>
+/// Top-level markup root: a single element at the end of the file.
+/// </summary>
+node MarkupRootSyntax : AkTopLevelMember {
+    Element : MarkupElementSyntax;
+}
+
+/// <summary>
+/// Base class for any node that can appear inside markup content.
+/// </summary>
+abstract node MarkupNodeSyntax : MarkupSyntaxNode;
+
+/// <summary>
+/// Generic element: &lt;Stack Gap="16"&gt; ... &lt;/Stack&gt;.
+/// Allows optional StartTag/EndTag to support fragments and self-closing tags.
+/// </summary>
+node MarkupElementSyntax : MarkupNodeSyntax {
+    StartTag? : MarkupStartTagSyntax;
+    Body      : syntaxlist<MarkupContentSyntax>;
+    EndTag?   : MarkupEndTagSyntax;
+}
+
+/// <summary>
+/// Opening tag.
+/// </summary>
+node MarkupStartTagSyntax : MarkupSyntaxNode {
+    LessToken  : LessThanToken;          // "<"
+    Name       : SimpleName;        // element name (Stack, Row, Button, ...)
+    Attributes : syntaxlist<MarkupAttributeSyntax>;
+    // Either ">" or "/>".
+    CloseToken : GreaterThanToken | SlashGreaterToken;
+}
+
+/// <summary>
+/// Closing tag.
+/// </summary>
+node MarkupEndTagSyntax : MarkupSyntaxNode {
+    LessSlashToken : LessSlashToken;     // "</"
+    Name           : SimpleName;
+    GreaterToken   : GreaterThanToken2;  // ">"
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// MARKUP CONTENT NODES
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Base type for all markup content forms (text, element, inline expression).
+/// </summary>
+abstract node MarkupContentSyntax : MarkupNodeSyntax;
+
+/// <summary>
+/// Raw text between tags.
+/// </summary>
+node MarkupTextLiteralSyntax : MarkupContentSyntax {
+    TextTokens : syntaxlist<AkTextLiteral>;
+}
+
+/// <summary>
+/// Nested element content.
+/// </summary>
+node MarkupElementContentSyntax : MarkupContentSyntax {
+    Element : MarkupElementSyntax;
+}
+
+/// <summary>
+/// Inline expression content: { expr }.
+/// </summary>
+node MarkupInlineExpressionSyntax : MarkupContentSyntax {
+    Expression : InlineExpressionSyntax;
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// MARKUP ATTRIBUTES
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Base type for tag attributes.
+/// </summary>
+abstract node MarkupAttributeSyntax : MarkupSyntaxNode;
+
+/// <summary>
+/// Plain attribute: Name="Value".
+/// </summary>
+node MarkupPlainAttributeSyntax : MarkupAttributeSyntax {
+    Name        : IdentifierToken;
+    EqualsToken : EqualsToken;
+    Value?      : MarkupAttributeValueSyntax;
+}
+
+/// <summary>
+/// Prefixed attribute: Prefix:Name="Value"
+/// (e.g. bind:Text=..., react={...}, OnClose={...}).
+/// </summary>
+node MarkupPrefixedAttributeSyntax : MarkupAttributeSyntax {
+    Prefix      : IdentifierToken;
+    Colon       : ColonToken;
+    Name        : IdentifierToken;
+    EqualsToken : EqualsToken;
+    Value?      : MarkupAttributeValueSyntax;
+}
+
+/// <summary>
+/// Base type for attribute values.
+/// </summary>
+abstract node MarkupAttributeValueSyntax : MarkupSyntaxNode;
+
+/// <summary>
+/// Literal attribute value, e.g. "User dashboard".
+/// </summary>
+node MarkupLiteralAttributeValueSyntax : MarkupAttributeValueSyntax {
+    Prefix? : MarkupTextLiteralSyntax;
+    Value?  : MarkupTextLiteralSyntax;
+}
+
+/// <summary>
+/// Dynamic attribute value, e.g. { search } or { () => SaveNew() }.
+/// </summary>
+node MarkupDynamicAttributeValueSyntax : MarkupAttributeValueSyntax {
+    Prefix?    : MarkupTextLiteralSyntax;
+    Expression : InlineExpressionSyntax;
+}
+
+// ─────────────────────────────────────────────────────────────
+// IDENTIFIERS AND TYPES
+// ─────────────────────────────────────────────────────────────
+
+abstract node Type;
+
+abstract node Name: Type;
+
+abstract node SimpleName: Name {
+	Identifier: IdentifierToken;
+}
+
+node IdentifierName: SimpleName;

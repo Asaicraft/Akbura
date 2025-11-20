@@ -1,0 +1,217 @@
+inject ILogger<ProfileWithTasks> log;
+
+param int UserId;
+
+state user    = null;
+state stats   = new { Open = 0, Done = 0 };
+state ReactList tasks = [];
+
+state isSaving = false;
+state showForm = false;
+
+state form = new { Title = "", Desc = "", Urgent = false };
+state isValid = false;
+
+state search = "";
+state ReactList visible = [];
+
+// --- Validation ---
+useEffect(form.Title)
+{
+    var ok = !string.IsNullOrWhiteSpace(form.Title?.Trim());
+    isValid = ok;
+}
+
+// --- Initial load with suppress transaction ---
+useEffect($cancel, UserId)
+{
+    suppress(onCancel=discard, onError=discard)
+    {
+        var uTask = api.LoadUser(UserId, $cancel);
+        var tTask = api.LoadTasks(UserId, $cancel);
+
+        var s = new { Open = 0, Done = 0 };
+
+        var u = await uTask;
+        if ($cancel.IsCancellationRequested) return;
+
+        var ts = await tTask;
+        if ($cancel.IsCancellationRequested) return;
+
+        foreach (var it in ts)
+        {
+            if (it.Done) s = new { Open = s.Open, Done = s.Done + 1 };
+            else         s = new { Open = s.Open + 1, Done = s.Done };
+        }
+
+        user = u;
+        stats = s;
+        tasks.ReplaceAll(ts);
+        visible.ReplaceAll(ts);
+    }
+}
+cancel
+{
+    log.LogInformation("Load cancelled for UserId={UserId}", UserId);
+}
+finally
+{
+    App.Busy = false;
+}
+
+// --- Search (standard batched effect) ---
+useEffect($cancel, search, tasks)
+{
+    visible.ReplaceAll(tasks.ToList());
+    await Delay(250, $cancel);
+    if ($cancel.IsCancellationRequested) return;
+
+    var q = search?.Trim()?.ToLowerInvariant() ?? "";
+    if (q.Length == 0) return;
+
+    var filtered = tasks.Where(t => t.Title.ToLowerInvariant().Contains(q)).ToList();
+    visible.ReplaceAll(filtered);
+}
+
+// --- Save new task with suppress transaction ---
+async void SaveNew()
+{
+    if (!isValid || isSaving) return;
+
+    isSaving = true;
+
+    try
+    {
+        suppress(onCancel=discard, onError=discard)
+        {
+            var dto = new { Title = form.Title, Desc = form.Desc, Urgent = form.Urgent, Done = false };
+
+            var created = await api.CreateTask(UserId, dto);
+
+            tasks.Prepend(created);
+
+            var q = search?.Trim()?.ToLowerInvariant() ?? "";
+            if (q.Length == 0 || created.Title.ToLowerInvariant().Contains(q))
+                visible.Prepend(created);
+
+            form = new { Title = "", Desc = "", Urgent = false };
+            showForm = false;
+        }
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "CreateTask failed");
+    }
+    finally
+    {
+        isSaving = false;
+    }
+}
+
+// --- Toggle Done state with optimistic UI ---
+async void ToggleDone(item)
+{
+    suppress(onCancel=discard, onError=commit)
+    {
+        var idx  = tasks.FindIndex(t => t.Id == item.Id);
+        var vIdx = visible.FindIndex(t => t.Id == item.Id);
+
+        if (idx >= 0)
+        {
+            var changed = new { item.Id, item.Title, item.Desc, item.Urgent, Done = !item.Done };
+            tasks.ReplaceAt(idx, changed);
+            if (vIdx >= 0) visible.ReplaceAt(vIdx, changed);
+        }
+
+        await api.UpdateDone(item.Id, !item.Done);
+    }
+}
+
+void OpenForm()
+{
+    form = new { Title = "", Desc = "", Urgent = false };
+    showForm = true;
+}
+
+<Stack class="page" Gap="16">
+
+  <Row Align="center" Gap="12">
+    <Text class="h1">User dashboard</Text>
+    <Spacer/>
+    <TextBox class="search" placeholder="Search tasks..." bind:Text={search}/>
+  </Row>
+
+  <Await When={user != null} ReserveHeight={160}
+         Fallback={
+           <Grid Columns="96, *" class="card">
+             <Skeleton width={96} height={96} radius={48}/>
+             <Stack Gap="8">
+               <Skeleton width={220} height={18}/>
+               <Skeleton width={280} height={14}/>
+               <Skeleton width={160} height={14}/>
+             </Stack>
+           </Grid>
+         }>
+
+    <Grid Columns="96, *" class="card">
+      <Avatar size="96" Src={user.AvatarUrl}/>
+      <Stack Gap="10">
+        <Text class="title">{user.Name}</Text>
+        <Text class="muted">{user.Email}</Text>
+        <Row Gap="8">
+          <Badge>Open: {stats.Open}</Badge>
+          <Badge>Done: {stats.Done}</Badge>
+        </Row>
+      </Stack>
+    </Grid>
+  </Await>
+
+  <Row Align="center">
+    <Text class="section">Tasks</Text>
+    <Spacer/>
+    <Button class="primary" Click={() => OpenForm()}>New task</Button>
+  </Row>
+
+  <For react={visible} key={t => t.Id}>
+    <Grid Columns="24, *, auto, auto" class="row">
+      <CheckBox bind:Checked={ from => it.Done, change v => ToggleDone(it) }/>
+      <Stack>
+        <Text class="task">{it.Title}</Text>
+        <Text class="muted">#{it.Id}</Text>
+      </Stack>
+      <Badge class={it.Urgent ? "warn" : "ok"}>{it.Urgent ? "urgent" : "normal"}</Badge>
+      <Button class="ghost" Click={() => {/* edit modal */}}>Edit</Button>
+    </Grid>
+  </For>
+
+  <Await When={visible.Count > 0}
+         Fallback={<EmptyState Icon="inbox" Title="No tasks" Subtitle="Try creating one"/>}>
+    <Box/>
+  </Await>
+
+  <Await When={showForm} KeepAlive={true} Fallback={<Box/>}>
+    <Modal Title="New task" OnClose={() => showForm = false}>
+      <Stack Gap="12">
+        <TextBox Label="Title" bind:Text={form.Title}/>
+        <TextArea Label="Description" bind:Text={form.Desc}/>
+        <Row Gap="8">
+          <CheckBox bind:Checked={form.Urgent}/>
+          <Text>Urgent</Text>
+        </Row>
+
+        <Await When={isValid}
+               Fallback={<Text class="error">Title is required</Text>}>
+          <Text class="ok">Looks good</Text>
+        </Await>
+
+        <Row Gap="8">
+          <Button class="primary" Enabled={isValid && !isSaving} Click={() => SaveNew()}>
+            {isSaving ? "Saving..." : "Create"}
+          </Button>
+          <Button class="ghost" Click={() => showForm = false}>Cancel</Button>
+        </Row>
+      </Stack>
+    </Modal>
+  </Await>
+
+</Stack>

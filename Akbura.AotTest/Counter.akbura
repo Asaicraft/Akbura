@@ -1,0 +1,5 @@
+state count = 0;
+
+<Button Click={count++}>
+	{count}
+</Button>

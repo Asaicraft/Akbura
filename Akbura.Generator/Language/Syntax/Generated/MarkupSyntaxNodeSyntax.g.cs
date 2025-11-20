@@ -1,0 +1,40 @@
+﻿#nullable enable
+
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+
+namespace Akbura.Language.Syntax.Green
+{
+    internal abstract partial class GreenMarkupSyntaxNodeSyntax
+        : global::Akbura.Language.Syntax.Green.GreenNode
+    {
+        protected GreenMarkupSyntaxNodeSyntax(
+            ushort kind,
+            ImmutableArray<AkburaDiagnostic>? diagnostics,
+            ImmutableArray<AkburaSyntaxAnnotation>? annotations)
+            : base(kind, diagnostics, annotations)
+        {
+        }
+    }
+}
+
+namespace Akbura.Language.Syntax
+{
+    internal abstract partial class MarkupSyntaxNodeSyntax
+        : global::Akbura.Language.Syntax.AkburaSyntax
+    {
+        protected MarkupSyntaxNodeSyntax(
+            global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax green,
+            AkburaSyntax? parent,
+            int position)
+            : base(green, parent, position)
+        {
+        }
+
+        internal new global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax Green
+            => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax>(base.Green);
+    }
+}
+
+#nullable restore

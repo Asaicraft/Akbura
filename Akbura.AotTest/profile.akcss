@@ -1,0 +1,49 @@
+.page  { Padding : 16; }
+.h1    { FontSize : 22; FontWeight : 800; }
+.title { FontSize : 18; FontWeight : 700; }
+.section { FontSize : 16; FontWeight : 600; }
+.muted { Opacity : 0.7; }
+
+.card {
+  Background   : rgba(255,255,255,0.04);
+  Padding      : 16;
+  BorderRadius : 12;
+  AlignItems   : center;
+  Gap          : 16;
+}
+
+.row {
+  Background   : rgba(255,255,255,0.03);
+  Padding      : 12 14;
+  BorderRadius : 10;
+  AlignItems   : center;
+  Gap          : 12;
+  MarginBottom : 8;
+}
+
+.task { FontSize : 16; }
+
+.primary {
+  Background : #3B82F6;
+  Color      : #FFFFFF;
+  BorderRadius : 10;
+  Padding : 10 14;
+}
+.ghost {
+  Background : transparent;
+  Border : 1px solid rgba(255,255,255,0.12);
+  Color : #E8EAF0;
+  BorderRadius : 10;
+  Padding : 8 12;
+}
+
+.ok   { Background : rgba(16,185,129,0.15); Color : #10B981; Padding : 2 8; BorderRadius : 8; }
+.warn { Background : rgba(234,179,8,0.18);  Color : #EAB308; Padding : 2 8; BorderRadius : 8; }
+.error{ Color : #F87171; }
+
+.search {
+  Width : 320;
+  Background : rgba(255,255,255,0.06);
+  BorderRadius : 8;
+  Padding : 6 10;
+}

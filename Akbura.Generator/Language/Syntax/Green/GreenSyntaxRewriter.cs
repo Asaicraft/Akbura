@@ -2,13 +2,20 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace Akbura.Language.Syntax.Green;
-internal partial class GreenSyntaxRewriter: GreenSyntaxVisitor<GreenNode>
+internal partial class GreenSyntaxRewriter : GreenSyntaxVisitor<GreenNode>
 {
-    public override GreenNode VisitToken(GreenSyntaxToken token)
+    [return: NotNullIfNotNull(nameof(token))]
+    public override GreenNode? VisitToken(GreenSyntaxToken? token)
     {
+        if (token == null)
+        {
+            return null;
+        }
+
         var leading = this.VisitList(token.LeadingTrivia);
         var trailing = this.VisitList(token.TrailingTrivia);
 
@@ -51,6 +58,21 @@ internal partial class GreenSyntaxRewriter: GreenSyntaxVisitor<GreenNode>
         if (alternate != null)
         {
             return alternate.ToList();
+        }
+
+        return list;
+    }
+
+    public SeparatedGreenSyntaxList<TNode> VisitList<TNode>(SeparatedGreenSyntaxList<TNode> list) where TNode : GreenNode
+    {
+        // A separated list is filled with C# nodes and C# tokens.  Both of which
+        // derive from InternalSyntax.CSharpSyntaxNode.  So this cast is appropriately
+        // typesafe.
+        var withSeps = list.GetWithSeparators();
+        var result = this.VisitList(withSeps);
+        if (result != withSeps)
+        {
+            return result.AsSeparatedList<TNode>();
         }
 
         return list;

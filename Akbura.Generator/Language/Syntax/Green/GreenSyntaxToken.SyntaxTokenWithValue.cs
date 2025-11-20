@@ -43,7 +43,7 @@ partial class GreenSyntaxToken
         public override string? ValueText => Convert.ToString(ValueField, CultureInfo.InvariantCulture);
 
         /// <summary>Creates a new token with leading trivia.</summary>
-        public override GreenSyntaxToken TokenWithLeadingTrivia(GreenNode trivia)
+        public override GreenSyntaxToken TokenWithLeadingTrivia(GreenNode? trivia)
         {
             return new SyntaxTokenWithValueAndTrivia<T>(
                 Kind,
@@ -56,7 +56,7 @@ partial class GreenSyntaxToken
         }
 
         /// <summary>Creates a new token with trailing trivia.</summary>
-        public override GreenSyntaxToken TokenWithTrailingTrivia(GreenNode trivia)
+        public override GreenSyntaxToken TokenWithTrailingTrivia(GreenNode? trivia)
         {
             return new SyntaxTokenWithValueAndTrivia<T>(
                 Kind,

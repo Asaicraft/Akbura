@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace Akbura.Language.Syntax;
-internal static class SyntaxFactory
+internal static partial class SyntaxFactory
 {
     /// <summary>
     /// A trivia with kind EndOfLineTrivia containing both the carriage return and line feed characters.
@@ -210,15 +210,13 @@ internal static class SyntaxFactory
     /// Creates a list of trivia.
     /// </summary>
     /// <param name="trivias">An array of trivia.</param>
-    public static SyntaxTriviaList TriviaList(params SyntaxTrivia[] trivias)
-        => new SyntaxTriviaList(trivias);
+    public static SyntaxTriviaList TriviaList(params SyntaxTrivia[] trivias) => new(trivias);
 
     /// <summary>
     /// Creates a list of trivia.
     /// </summary>
     /// <param name="trivias">A sequence of trivia.</param>
-    public static SyntaxTriviaList TriviaList(IEnumerable<SyntaxTrivia> trivias)
-        => new SyntaxTriviaList(trivias);
+    public static SyntaxTriviaList TriviaList(IEnumerable<SyntaxTrivia> trivias) => new(trivias);
 
     /// <summary>
     /// Creates an empty separated list.
@@ -301,11 +299,11 @@ internal static class SyntaxFactory
 
         if (nodes != null)
         {
-            IEnumerator<TNode> enumerator = nodes.GetEnumerator();
-            SeparatedSyntaxListBuilder<TNode> builder = SeparatedSyntaxListBuilder<TNode>.Create();
+            var enumerator = nodes.GetEnumerator();
+            var builder = SeparatedSyntaxListBuilder<TNode>.Create();
             if (separators != null)
             {
-                foreach (SyntaxToken token in separators)
+                foreach (var token in separators)
                 {
                     if (!enumerator.MoveNext())
                     {
@@ -401,7 +399,7 @@ internal static class SyntaxFactory
     /// </summary>
     public static SyntaxNodeOrTokenList NodeOrTokenList()
     {
-        return default(SyntaxNodeOrTokenList);
+        return default;
     }
 
     /// <summary>
@@ -465,7 +463,7 @@ internal static class SyntaxFactory
     /// <param name="text">The raw text of the identifier name, including any escapes or leading '@' character.</param>        
     public static SyntaxToken Identifier(string text)
     {
-        return new SyntaxToken(Syntax.InternalSyntax.SyntaxFactory.Identifier(ElasticMarker.UnderlyingNode, text, ElasticMarker.UnderlyingNode));
+        return new SyntaxToken(GreenSyntaxFactory.Identifier(ElasticMarker.UnderlyingNode, text, ElasticMarker.UnderlyingNode));
     }
 }
 

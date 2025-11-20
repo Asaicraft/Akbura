@@ -183,21 +183,6 @@ namespace Akbura.Language.Syntax.Green
                 closeToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.SlashGreaterToken ||
                 false);
 
-            var kind = global::Akbura.Language.Syntax.SyntaxKind.MarkupStartTagSyntax;
-            int hash;
-            var cache = Unsafe.As<GreenMarkupStartTagSyntax?>(
-                GreenNodeCache.TryGetNode(
-                    (ushort)kind,
-                    lessToken,
-                    name,
-                    attributes.Node,
-                    closeToken,
-                    out hash));
-
-            if (cache != null)
-            {
-                return cache;
-            }
 
             var result = new GreenMarkupStartTagSyntax(
                 lessToken,
@@ -206,11 +191,6 @@ namespace Akbura.Language.Syntax.Green
                 closeToken,
                 diagnostics: null,
                 annotations: null);
-
-            if (hash > 0)
-            {
-                GreenNodeCache.AddNode(result, hash);
-            }
 
             return result;
         }

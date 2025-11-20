@@ -1,3 +1,5 @@
+#nullable enable
+
 namespace Akbura.Language.Syntax
 {
     internal static partial class SyntaxFacts
@@ -133,3 +135,4 @@ namespace Akbura.Language.Syntax
         }
     }
 }
+#nullable restore

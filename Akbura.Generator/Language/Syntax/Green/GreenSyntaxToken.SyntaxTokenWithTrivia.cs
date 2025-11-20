@@ -76,7 +76,7 @@ partial class GreenSyntaxToken
         }
 
         /// <summary>Creates a new token with updated trailing trivia.</summary>
-        public override GreenSyntaxToken TokenWithTrailingTrivia(GreenNode trivia)
+        public override GreenSyntaxToken TokenWithTrailingTrivia(GreenNode? trivia)
         {
             return new SyntaxTokenWithTrivia(
                 Kind,

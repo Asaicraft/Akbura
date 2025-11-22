@@ -13,6 +13,7 @@ token CancelKeyword      = "cancel";
 token FinallyKeyword     = "finally";
 token AsyncKeyword       = "async";
 token VoidKeyword        = "void";
+token CommandKeyword     = "command"; 
 
 token NewKeyword         = "new";
 token ReactListKeyword   = "ReactList";
@@ -148,7 +149,7 @@ node AkburaDocumentSyntax {
 }
 
 // ─────────────────────────────────────────────────────────────
-// INJECT / PARAM / STATE DECLARATIONS
+// INJECT / PARAM / STATE / COMMAND DECLARATIONS 
 // ─────────────────────────────────────────────────────────────
 
 /// <summary>inject ILogger&lt;ProfileWithTasks&gt; log;</summary>
@@ -221,6 +222,29 @@ node EffectCancelBlockSyntax {
 node EffectFinallyBlockSyntax {
     FinallyKeyword : FinallyKeyword;
     Body           : CSharpBlockSyntax;
+}
+
+/// <summary>
+/// Component-level command contract:
+///   command int CustomClick(int a);
+///
+/// Semantics:
+///   • No body in syntax – this is a contract, not an implementation.
+///   • Exposed as a “command slot” that can be wired from markup:
+///       <CustomButton Click={...} />
+///   • Inside the component the symbol provides:
+///       CustomClick.IsExecuting
+///       await CustomClick.Invoke(arg)
+///     (both are interpreted at semantic/codegen layer, not by grammar).
+/// </summary>
+node CommandDeclarationSyntax : AkTopLevelMember {
+    CommandKeyword : CommandKeyword;           // "command"
+    ReturnType     : CSharpTypeSyntax;         // int / void / etc.
+    Name           : SimpleName;               // CustomClick
+    OpenParen      : OpenParenToken;           // '('
+    Parameters     : syntaxlist<ParameterSyntax, CommaToken>;
+    CloseParen     : CloseParenToken;          // ')'
+    Semicolon      : SemicolonToken;           // ';'
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -348,7 +372,7 @@ node MarkupPlainAttributeSyntax : MarkupAttributeSyntax {
 /// (e.g. bind:Text=..., react={...}, OnClose={...}).
 /// </summary>
 node MarkupPrefixedAttributeSyntax : MarkupAttributeSyntax {
-    Prefix      : IdentifierToken;
+    Prefix      : BindToken | OutToken;
     Colon       : ColonToken;
     Name        : IdentifierToken;
     EqualsToken : EqualsToken;

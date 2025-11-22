@@ -10,6 +10,7 @@ namespace Akbura.Language.Syntax
         // Trivia kinds (predefined)
         EndOfLineTrivia = 1000,
         WhitespaceTrivia = 1001,
+        CommentTrivia = 1002,
 
         // Tokens with well-known text (contiguous range)
         FirstTokenWithWellKnownText = 100,

@@ -13,6 +13,7 @@ namespace Akbura.Language.Syntax.Green
     internal sealed partial class GreenParamDeclarationSyntax : global::Akbura.Language.Syntax.Green.GreenAkTopLevelMemberSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken ParamKeyword;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken BindingKeyword;
         public readonly global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? Type;
         public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? EqualsToken;
@@ -21,9 +22,10 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenParamDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken paramKeyword,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken bindingKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equals,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equalsToken,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax? defaultValue,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
@@ -31,23 +33,37 @@ namespace Akbura.Language.Syntax.Green
             : base((ushort)global::Akbura.Language.Syntax.SyntaxKind.ParamDeclarationSyntax, diagnostics, annotations)
         {
             this.ParamKeyword = paramKeyword;
+            this.BindingKeyword = bindingKeyword;
             this.Type = type;
             this.Name = name;
-            this.EqualsToken = equals;
+            this.EqualsToken = equalsToken;
             this.DefaultValue = defaultValue;
             this.Semicolon = semicolon;
 
             AkburaDebug.Assert(this.ParamKeyword != null);
+            AkburaDebug.Assert(this.BindingKeyword != null);
             AkburaDebug.Assert(this.Name != null);
             AkburaDebug.Assert(this.Semicolon != null);
 
-            AkburaDebug.Assert(this.ParamKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.ParamKeyword);
-            AkburaDebug.Assert(this.Semicolon.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken);
+            AkburaDebug.Assert(
+                this.ParamKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.ParamKeyword);
+            AkburaDebug.Assert(
+                this.BindingKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.OutToken ||
+                this.BindingKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.BindToken);
+            AkburaDebug.Assert(
+                this.Semicolon.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken);
+
+            if (this.EqualsToken is not null)
+            {
+                AkburaDebug.Assert(
+                    this.EqualsToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken);
+            }
 
             var flags = Flags;
             var fullWidth = FullWidth;
 
             AdjustWidthAndFlags(ParamKeyword, ref fullWidth, ref flags);
+            AdjustWidthAndFlags(BindingKeyword, ref fullWidth, ref flags);
 
             if (Type != null)
             {
@@ -68,30 +84,39 @@ namespace Akbura.Language.Syntax.Green
 
             AdjustWidthAndFlags(Semicolon, ref fullWidth, ref flags);
 
-            SlotCount = 6;
+            SlotCount = 7;
             FullWidth = fullWidth;
             Flags = flags;
         }
 
         public GreenParamDeclarationSyntax UpdateParamDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken paramKeyword,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken bindingKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equals,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equalsToken,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax? defaultValue,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
             if (this.ParamKeyword == paramKeyword &&
+                this.BindingKeyword == bindingKeyword &&
                 this.Type == type &&
                 this.Name == name &&
-                this.EqualsToken == equals &&
+                this.EqualsToken == equalsToken &&
                 this.DefaultValue == defaultValue &&
                 this.Semicolon == semicolon)
             {
                 return this;
             }
 
-            var newNode = GreenSyntaxFactory.ParamDeclarationSyntax(paramKeyword, type, name, equals, defaultValue, semicolon);
+            var newNode = GreenSyntaxFactory.ParamDeclarationSyntax(
+                paramKeyword,
+                bindingKeyword,
+                type,
+                name,
+                equalsToken,
+                defaultValue,
+                semicolon);
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -110,32 +135,37 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenParamDeclarationSyntax WithParamKeyword(global::Akbura.Language.Syntax.Green.GreenSyntaxToken paramKeyword)
         {
-            return UpdateParamDeclarationSyntax(paramKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(paramKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+        }
+
+        public GreenParamDeclarationSyntax WithBindingKeyword(global::Akbura.Language.Syntax.Green.GreenSyntaxToken bindingKeyword)
+        {
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, bindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
         }
 
         public GreenParamDeclarationSyntax WithType(global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
         }
 
         public GreenParamDeclarationSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, name, this.EqualsToken, this.DefaultValue, this.Semicolon);
         }
 
-        public GreenParamDeclarationSyntax WithEquals(global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equals)
+        public GreenParamDeclarationSyntax WithEqualsToken(global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equalsToken)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, equals, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, equalsToken, this.DefaultValue, this.Semicolon);
         }
 
         public GreenParamDeclarationSyntax WithDefaultValue(global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax? defaultValue)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, this.EqualsToken, defaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, defaultValue, this.Semicolon);
         }
 
         public GreenParamDeclarationSyntax WithSemicolon(global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, semicolon);
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
@@ -143,11 +173,12 @@ namespace Akbura.Language.Syntax.Green
             return index switch
             {
                 0 => ParamKeyword,
-                1 => Type,
-                2 => Name,
-                3 => EqualsToken,
-                4 => DefaultValue,
-                5 => Semicolon,
+                1 => BindingKeyword,
+                2 => Type,
+                3 => Name,
+                4 => EqualsToken,
+                5 => DefaultValue,
+                6 => Semicolon,
                 _ => null,
             };
         }
@@ -159,12 +190,12 @@ namespace Akbura.Language.Syntax.Green
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
         {
-            return new GreenParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon, diagnostics, GetAnnotations());
+            return new GreenParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon, diagnostics, GetAnnotations());
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
         {
-            return new GreenParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon, GetDiagnostics(), annotations);
+            return new GreenParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon, GetDiagnostics(), annotations);
         }
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
@@ -187,24 +218,43 @@ namespace Akbura.Language.Syntax.Green
     {
         public static GreenParamDeclarationSyntax ParamDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken paramKeyword,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken bindingKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equals,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equalsToken,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax? defaultValue,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
             AkburaDebug.Assert(paramKeyword != null);
+            AkburaDebug.Assert(bindingKeyword != null);
             AkburaDebug.Assert(name != null);
             AkburaDebug.Assert(semicolon != null);
 
             AkburaDebug.Assert(
-                paramKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.ParamKeyword ||
-                false);
+                paramKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.ParamKeyword);
             AkburaDebug.Assert(
-                semicolon!.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken ||
-                false);
+                bindingKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OutToken ||
+                bindingKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.BindToken);
+            AkburaDebug.Assert(
+                semicolon!.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken);
 
-            var result = new GreenParamDeclarationSyntax(paramKeyword, type, name, equals, defaultValue, semicolon, diagnostics: null, annotations: null);
+            if (equalsToken is not null)
+            {
+                AkburaDebug.Assert(
+                    equalsToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken);
+            }
+
+            // SlotCount = 7 (>3), so do not use GreenNodeCache.
+            var result = new GreenParamDeclarationSyntax(
+                paramKeyword,
+                bindingKeyword,
+                type,
+                name,
+                equalsToken,
+                defaultValue,
+                semicolon,
+                diagnostics: null,
+                annotations: null);
 
             return result;
         }
@@ -240,6 +290,7 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateParamDeclarationSyntax(
                 (GreenSyntaxToken)VisitToken(node.ParamKeyword),
+                (GreenSyntaxToken)VisitToken(node.BindingKeyword),
                 (GreenCSharpTypeSyntax?)Visit(node.Type),
                 (GreenSimpleNameSyntax)Visit(node.Name)!,
                 (GreenSyntaxToken?)VisitToken(node.EqualsToken),
@@ -271,40 +322,52 @@ namespace Akbura.Language.Syntax
         public SyntaxToken ParamKeyword
             => new(this, this.Green.ParamKeyword, GetChildPosition(0), GetChildIndex(0));
 
+        public SyntaxToken BindingKeyword
+            => new(this, this.Green.BindingKeyword, GetChildPosition(1), GetChildIndex(1));
+
         public CSharpTypeSyntax? Type
-            => (CSharpTypeSyntax?)GetRed(ref _type, 1);
+            => (CSharpTypeSyntax?)GetRed(ref _type, 2);
 
         public SimpleNameSyntax Name
-            => (SimpleNameSyntax)GetRed(ref _name, 2)!;
+            => (SimpleNameSyntax)GetRed(ref _name, 3)!;
 
         public SyntaxToken EqualsToken
-            => new(this, this.Green.EqualsToken!, GetChildPosition(3), GetChildIndex(3));
+            => new(this, this.Green.EqualsToken!, GetChildPosition(4), GetChildIndex(4));
 
         public CSharpExpressionSyntax? DefaultValue
-            => (CSharpExpressionSyntax?)GetRed(ref _defaultValue, 4);
+            => (CSharpExpressionSyntax?)GetRed(ref _defaultValue, 5);
 
         public SyntaxToken Semicolon
-            => new(this, this.Green.Semicolon, GetChildPositionFromEnd(5), GetChildIndex(5));
+            => new(this, this.Green.Semicolon, GetChildPosition(6), GetChildIndex(6));
 
         public ParamDeclarationSyntax UpdateParamDeclarationSyntax(
             SyntaxToken paramKeyword,
+            SyntaxToken bindingKeyword,
             CSharpTypeSyntax? type,
             SimpleNameSyntax name,
-            SyntaxToken equals,
+            SyntaxToken equalsToken,
             CSharpExpressionSyntax? defaultValue,
             SyntaxToken semicolon)
         {
             if (this.ParamKeyword == paramKeyword &&
+                this.BindingKeyword == bindingKeyword &&
                 this.Type == type &&
                 this.Name == name &&
-                this.EqualsToken == equals &&
+                this.EqualsToken == equalsToken &&
                 this.DefaultValue == defaultValue &&
                 this.Semicolon == semicolon)
             {
                 return this;
             }
 
-            var newNode = SyntaxFactory.ParamDeclarationSyntax(paramKeyword, type, name, equals, defaultValue, semicolon);
+            var newNode = SyntaxFactory.ParamDeclarationSyntax(
+                paramKeyword,
+                bindingKeyword,
+                type,
+                name,
+                equalsToken,
+                defaultValue,
+                semicolon);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -323,41 +386,46 @@ namespace Akbura.Language.Syntax
 
         public ParamDeclarationSyntax WithParamKeyword(SyntaxToken paramKeyword)
         {
-            return UpdateParamDeclarationSyntax(paramKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(paramKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+        }
+
+        public ParamDeclarationSyntax WithBindingKeyword(SyntaxToken bindingKeyword)
+        {
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, bindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
         }
 
         public ParamDeclarationSyntax WithType(CSharpTypeSyntax? type)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, type, this.Name, this.EqualsToken, this.DefaultValue, this.Semicolon);
         }
 
         public ParamDeclarationSyntax WithName(SimpleNameSyntax name)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, name, this.EqualsToken, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, name, this.EqualsToken, this.DefaultValue, this.Semicolon);
         }
 
-        public ParamDeclarationSyntax WithEquals(SyntaxToken equals)
+        public ParamDeclarationSyntax WithEqualsToken(SyntaxToken equalsToken)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, equals, this.DefaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, equalsToken, this.DefaultValue, this.Semicolon);
         }
 
         public ParamDeclarationSyntax WithDefaultValue(CSharpExpressionSyntax? defaultValue)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, this.EqualsToken, defaultValue, this.Semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, defaultValue, this.Semicolon);
         }
 
         public ParamDeclarationSyntax WithSemicolon(SyntaxToken semicolon)
         {
-            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, semicolon);
+            return UpdateParamDeclarationSyntax(this.ParamKeyword, this.BindingKeyword, this.Type, this.Name, this.EqualsToken, this.DefaultValue, semicolon);
         }
 
         public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
         {
             return index switch
             {
-                1 => GetRed(ref _type, 1),
-                2 => GetRed(ref _name, 2),
-                4 => GetRed(ref _defaultValue, 4),
+                2 => GetRed(ref _type, 2),
+                3 => GetRed(ref _name, 3),
+                5 => GetRed(ref _defaultValue, 5),
                 _ => null,
             };
         }
@@ -366,9 +434,9 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
-                1 => _type,
-                2 => _name,
-                4 => _defaultValue,
+                2 => _type,
+                3 => _name,
+                5 => _defaultValue,
                 _ => null,
             };
         }
@@ -393,15 +461,26 @@ namespace Akbura.Language.Syntax
     {
         internal static ParamDeclarationSyntax ParamDeclarationSyntax(
             SyntaxToken paramKeyword,
+            SyntaxToken bindingKeyword,
             CSharpTypeSyntax? type,
             SimpleNameSyntax name,
-            SyntaxToken equals,
+            SyntaxToken equalsToken,
             CSharpExpressionSyntax? defaultValue,
             SyntaxToken semicolon)
         {
             if (paramKeyword.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(paramKeyword), message: $"paramKeyword must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
+            }
+
+            if (bindingKeyword.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
+            {
+                ThrowHelper.ThrowArgumentException(nameof(bindingKeyword), message: $"bindingKeyword must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
+            }
+
+            if (equalsToken.Node is not null && equalsToken.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
+            {
+                ThrowHelper.ThrowArgumentException(nameof(equalsToken), message: $"equalsToken must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
             }
 
             if (semicolon.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
@@ -414,6 +493,18 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentException(nameof(paramKeyword), message: $"paramKeyword must be SyntaxKind.ParamKeyword");
             }
 
+            if (bindingKeyword.RawKind != (ushort)SyntaxKind.OutToken &&
+                bindingKeyword.RawKind != (ushort)SyntaxKind.BindToken)
+            {
+                ThrowHelper.ThrowArgumentException(nameof(bindingKeyword), message: $"bindingKeyword must be SyntaxKind.OutToken or SyntaxKind.BindToken");
+            }
+
+            if (equalsToken.RawKind != 0 &&
+                equalsToken.RawKind != (ushort)SyntaxKind.EqualsToken)
+            {
+                ThrowHelper.ThrowArgumentException(nameof(equalsToken), message: $"equalsToken must be SyntaxKind.EqualsToken when present");
+            }
+
             if (semicolon.RawKind != (ushort)SyntaxKind.SemicolonToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(semicolon), message: $"semicolon must be SyntaxKind.SemicolonToken");
@@ -424,15 +515,12 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentNullException(nameof(name));
             }
 
-            var greenEquals = equals.Node is null
-                ? null
-                : Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken?>(equals.Node);
-
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.ParamDeclarationSyntax(
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(paramKeyword.Node!),
+                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(bindingKeyword.Node!),
                 type?.Green,
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax>(name.Green),
-                greenEquals,
+                name.Green,
+                equalsToken.Node is null ? null : Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(equalsToken.Node!),
                 defaultValue?.Green,
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(semicolon.Node!));
 
@@ -470,6 +558,7 @@ namespace Akbura.Language.Syntax
         {
             return node.UpdateParamDeclarationSyntax(
                 VisitToken(node.ParamKeyword),
+                VisitToken(node.BindingKeyword),
                 (CSharpTypeSyntax?)Visit(node.Type),
                 (SimpleNameSyntax)Visit(node.Name)!,
                 VisitToken(node.EqualsToken),

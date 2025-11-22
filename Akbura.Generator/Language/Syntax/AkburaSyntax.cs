@@ -155,7 +155,7 @@ internal abstract partial class AkburaSyntax
         return result;
     }
 
-    protected T? GetRed<T>(ref T field, int slot)
+    protected T? GetRed<T>(ref T? field, int slot)
         where T : AkburaSyntax
     {
         var result = field;

@@ -16,7 +16,7 @@ namespace Akbura.Language.Syntax.Green
         public readonly global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? Type;
         public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken EqualsToken;
-        public readonly global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax Initializer;
+        public readonly global::Akbura.Language.Syntax.Green.GreenStateInitializerSyntax Initializer;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken Semicolon;
 
         public GreenStateDeclarationSyntax(
@@ -24,7 +24,7 @@ namespace Akbura.Language.Syntax.Green
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
-            global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax initializer,
+            global::Akbura.Language.Syntax.Green.GreenStateInitializerSyntax initializer,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
@@ -43,9 +43,15 @@ namespace Akbura.Language.Syntax.Green
             AkburaDebug.Assert(this.Initializer != null);
             AkburaDebug.Assert(this.Semicolon != null);
 
-            AkburaDebug.Assert(this.StateKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.StateKeyword);
-            AkburaDebug.Assert(this.EqualsToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken);
-            AkburaDebug.Assert(this.Semicolon.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken);
+            AkburaDebug.Assert(
+                this.StateKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.StateKeyword ||
+                false);
+            AkburaDebug.Assert(
+                this.EqualsToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken ||
+                false);
+            AkburaDebug.Assert(
+                this.Semicolon.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken ||
+                false);
 
             var flags = Flags;
             var fullWidth = FullWidth;
@@ -72,7 +78,7 @@ namespace Akbura.Language.Syntax.Green
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
-            global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax initializer,
+            global::Akbura.Language.Syntax.Green.GreenStateInitializerSyntax initializer,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
             if (this.StateKeyword == stateKeyword &&
@@ -85,7 +91,13 @@ namespace Akbura.Language.Syntax.Green
                 return this;
             }
 
-            var newNode = GreenSyntaxFactory.StateDeclarationSyntax(stateKeyword, type, name, equalsToken, initializer, semicolon);
+            var newNode = GreenSyntaxFactory.StateDeclarationSyntax(
+                stateKeyword,
+                type,
+                name,
+                equalsToken,
+                initializer,
+                semicolon);
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -117,12 +129,12 @@ namespace Akbura.Language.Syntax.Green
             return UpdateStateDeclarationSyntax(this.StateKeyword, this.Type, name, this.EqualsToken, this.Initializer, this.Semicolon);
         }
 
-        public GreenStateDeclarationSyntax WithEquals(global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken)
+        public GreenStateDeclarationSyntax WithEqualsToken(global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken)
         {
             return UpdateStateDeclarationSyntax(this.StateKeyword, this.Type, this.Name, equalsToken, this.Initializer, this.Semicolon);
         }
 
-        public GreenStateDeclarationSyntax WithInitializer(global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax initializer)
+        public GreenStateDeclarationSyntax WithInitializer(global::Akbura.Language.Syntax.Green.GreenStateInitializerSyntax initializer)
         {
             return UpdateStateDeclarationSyntax(this.StateKeyword, this.Type, this.Name, this.EqualsToken, initializer, this.Semicolon);
         }
@@ -184,7 +196,7 @@ namespace Akbura.Language.Syntax.Green
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
-            global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax initializer,
+            global::Akbura.Language.Syntax.Green.GreenStateInitializerSyntax initializer,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
             AkburaDebug.Assert(stateKeyword != null);
@@ -203,8 +215,17 @@ namespace Akbura.Language.Syntax.Green
                 semicolon!.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken ||
                 false);
 
-            // 6 slots -> no GreenNodeCache usage per rules
-            var result = new GreenStateDeclarationSyntax(stateKeyword, type, name, equalsToken, initializer, semicolon, diagnostics: null, annotations: null);
+            // SlotCount = 6 (>3), so do not use GreenNodeCache.
+            var result = new GreenStateDeclarationSyntax(
+                stateKeyword,
+                type,
+                name,
+                equalsToken,
+                initializer,
+                semicolon,
+                diagnostics: null,
+                annotations: null);
+
             return result;
         }
     }
@@ -239,10 +260,10 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateStateDeclarationSyntax(
                 (GreenSyntaxToken)VisitToken(node.StateKeyword),
-                (GreenCSharpTypeSyntax?)Visit(node.Type!),
+                (GreenCSharpTypeSyntax?)Visit(node.Type),
                 (GreenSimpleNameSyntax)Visit(node.Name)!,
                 (GreenSyntaxToken)VisitToken(node.EqualsToken),
-                (GreenCSharpExpressionSyntax)Visit(node.Initializer)!,
+                (GreenStateInitializerSyntax)Visit(node.Initializer)!,
                 (GreenSyntaxToken)VisitToken(node.Semicolon));
         }
     }
@@ -279,18 +300,18 @@ namespace Akbura.Language.Syntax
         public SyntaxToken EqualsToken
             => new(this, this.Green.EqualsToken, GetChildPosition(3), GetChildIndex(3));
 
-        public CSharpExpressionSyntax Initializer
-            => (CSharpExpressionSyntax)GetRed(ref _initializer, 4)!;
+        public StateInitializerSyntax Initializer
+            => (StateInitializerSyntax)GetRed(ref _initializer, 4)!;
 
         public SyntaxToken Semicolon
-            => new(this, this.Green.Semicolon, GetChildPositionFromEnd(1), GetChildIndex(5));
+            => new(this, this.Green.Semicolon, GetChildPosition(5), GetChildIndex(5));
 
         public StateDeclarationSyntax UpdateStateDeclarationSyntax(
             SyntaxToken stateKeyword,
             CSharpTypeSyntax? type,
             SimpleNameSyntax name,
             SyntaxToken equalsToken,
-            CSharpExpressionSyntax initializer,
+            StateInitializerSyntax initializer,
             SyntaxToken semicolon)
         {
             if (this.StateKeyword == stateKeyword &&
@@ -303,7 +324,13 @@ namespace Akbura.Language.Syntax
                 return this;
             }
 
-            var newNode = SyntaxFactory.StateDeclarationSyntax(stateKeyword, type, name, equalsToken, initializer, semicolon);
+            var newNode = SyntaxFactory.StateDeclarationSyntax(
+                stateKeyword,
+                type,
+                name,
+                equalsToken,
+                initializer,
+                semicolon);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -335,12 +362,12 @@ namespace Akbura.Language.Syntax
             return UpdateStateDeclarationSyntax(this.StateKeyword, this.Type, name, this.EqualsToken, this.Initializer, this.Semicolon);
         }
 
-        public StateDeclarationSyntax WithEquals(SyntaxToken equalsToken)
+        public StateDeclarationSyntax WithEqualsToken(SyntaxToken equalsToken)
         {
             return UpdateStateDeclarationSyntax(this.StateKeyword, this.Type, this.Name, equalsToken, this.Initializer, this.Semicolon);
         }
 
-        public StateDeclarationSyntax WithInitializer(CSharpExpressionSyntax initializer)
+        public StateDeclarationSyntax WithInitializer(StateInitializerSyntax initializer)
         {
             return UpdateStateDeclarationSyntax(this.StateKeyword, this.Type, this.Name, this.EqualsToken, initializer, this.Semicolon);
         }
@@ -395,7 +422,7 @@ namespace Akbura.Language.Syntax
             CSharpTypeSyntax? type,
             SimpleNameSyntax name,
             SyntaxToken equalsToken,
-            CSharpExpressionSyntax initializer,
+            StateInitializerSyntax initializer,
             SyntaxToken semicolon)
         {
             if (stateKeyword.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
@@ -441,9 +468,9 @@ namespace Akbura.Language.Syntax
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.StateDeclarationSyntax(
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(stateKeyword.Node!),
                 type?.Green,
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax>(name.Green),
+                name.Green,
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(equalsToken.Node!),
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax>(initializer.Green),
+                initializer.Green,
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(semicolon.Node!));
 
             return Unsafe.As<StateDeclarationSyntax>(green.CreateRed(null, 0));
@@ -480,10 +507,10 @@ namespace Akbura.Language.Syntax
         {
             return node.UpdateStateDeclarationSyntax(
                 VisitToken(node.StateKeyword),
-                (CSharpTypeSyntax?)Visit(node.Type!),
+                (CSharpTypeSyntax?)Visit(node.Type),
                 (SimpleNameSyntax)Visit(node.Name)!,
                 VisitToken(node.EqualsToken),
-                (CSharpExpressionSyntax)Visit(node.Initializer)!,
+                (StateInitializerSyntax)Visit(node.Initializer)!,
                 VisitToken(node.Semicolon));
         }
     }

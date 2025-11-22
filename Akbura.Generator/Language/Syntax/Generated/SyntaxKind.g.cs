@@ -1,22 +1,15 @@
-﻿namespace Akbura.Language.Syntax
+using Akbura.Language.Syntax.Green;
+
+namespace Akbura.Language.Syntax
 {
     public enum SyntaxKind : ushort
     {
         None = 0,
-        List = Green.GreenNode.ListKind, // list pseudo-kind
+        List = GreenNode.ListKind, // list pseudo-kind
 
-        // Trivia
+        // Trivia kinds (predefined)
         EndOfLineTrivia = 1000,
         WhitespaceTrivia = 1001,
-
-        // Literal tokens
-        StringLiteralToken = 2000,
-        CharLiteralToken = 2001,
-        NumericLiteralToken = 2002,
-
-        // Identifier and bad token
-        IdentifierToken = 3000,
-        BadToken = 3001,
 
         // Tokens with well-known text (contiguous range)
         FirstTokenWithWellKnownText = 100,
@@ -82,11 +75,23 @@
         DoubleQuoteToken = 151,
 
         AtToken = 152,
+        BindToken = 153,
+        InToken = 154,
+        OutToken = 155,
 
-        LastTokenWithWellKnownText = 152,
+        LastTokenWithWellKnownText = 155,
+
+        // Literal tokens (predefined)
+        StringLiteralToken = 2000,
+        CharLiteralToken = 2001,
+        NumericLiteralToken = 2002,
+
+        // Identifier token (predefined)
+        IdentifierToken = 3000,
+        BadToken = 3001,
 
         // Literals
-        AkTextLiteral = 4000,
+        AkTextLiteral = 201,
 
         // Nodes (starting from 500)
         AkTopLevelMember = 500,
@@ -102,36 +107,73 @@
         ParamDeclarationSyntax = 507,
         StateDeclarationSyntax = 508,
 
-        UseEffectDeclarationSyntax = 509,
-        EffectCancelBlockSyntax = 510,
-        EffectFinallyBlockSyntax = 511,
+        StateInitializer = 509,
+        SimpleStateInitializer = 510,
+        BindableStateInitializer = 511,
 
-        FunctionDeclarationSyntax = 512,
-        ParameterSyntax = 513,
+        UseEffectDeclarationSyntax = 512,
+        EffectCancelBlockSyntax = 513,
+        EffectFinallyBlockSyntax = 514,
 
-        MarkupSyntaxNode = 514,
-        MarkupRootSyntax = 515,
-        MarkupNodeSyntax = 516,
-        MarkupElementSyntax = 517,
-        MarkupStartTagSyntax = 518,
-        MarkupEndTagSyntax = 519,
+        FunctionDeclarationSyntax = 515,
+        ParameterSyntax = 516,
 
-        MarkupContentSyntax = 520,
-        MarkupTextLiteralSyntax = 521,
-        MarkupElementContentSyntax = 522,
-        MarkupInlineExpressionSyntax = 523,
+        MarkupSyntaxNode = 517,
+        MarkupRootSyntax = 518,
+        MarkupNodeSyntax = 519,
+        MarkupElementSyntax = 520,
+        MarkupStartTagSyntax = 521,
+        MarkupEndTagSyntax = 522,
 
-        MarkupAttributeSyntax = 524,
-        MarkupPlainAttributeSyntax = 525,
-        MarkupPrefixedAttributeSyntax = 526,
+        MarkupContentSyntax = 523,
+        MarkupTextLiteralSyntax = 524,
+        MarkupElementContentSyntax = 525,
+        MarkupInlineExpressionSyntax = 526,
 
-        MarkupAttributeValueSyntax = 527,
-        MarkupLiteralAttributeValueSyntax = 528,
-        MarkupDynamicAttributeValueSyntax = 529,
+        MarkupAttributeSyntax = 527,
+        MarkupPlainAttributeSyntax = 528,
+        MarkupPrefixedAttributeSyntax = 529,
 
-        Type = 600,
-        Name = 601,
-        SimpleName = 602,
-        IdentifierName = 603,
+        MarkupAttributeValueSyntax = 530,
+        MarkupLiteralAttributeValueSyntax = 531,
+        MarkupDynamicAttributeValueSyntax = 532,
+
+        TailwindAttributeSyntax = 533,
+
+        TailwindSegmentSyntax = 534,
+        TailwindIdentifierSegmentSyntax = 535,
+        TailwindNumericSegmentSyntax = 536,
+        TailwindExpressionSegmentSyntax = 537,
+
+        TailwindFlagAttributeSyntax = 538,
+
+        TailwindPrefixSegmentSyntax = 539,
+        SimpleConditionalPrefixSyntax = 540,
+        ExpressionConditionalPrefixSyntax = 541,
+
+        TailwindFullAttributeSyntax = 542,
+
+        AkcssDocumentSyntax = 543,
+        AkcssTopLevelMember = 544,
+
+        AkcssBodyMemberSyntax = 545,
+        AkcssAssignmentSyntax = 546,
+        AkcssIfDirectiveSyntax = 547,
+        AkcssAdditionalPseudoStateSyntax = 548,
+        AkcssPseudoSelectorSyntax = 549,
+        AkcssPseudoBlockSyntax = 550,
+
+        AkcssStyleRuleSyntax = 551,
+        AkcssStyleSelectorSyntax = 552,
+
+        AkcssUtilitiesSectionSyntax = 553,
+        AkcssUtilityParameterSyntax = 554,
+        AkcssUtilitySelectorSyntax = 555,
+        AkcssUtilityDeclarationSyntax = 556,
+
+        Type = 700,
+        Name = 701,
+        SimpleName = 702,
+        IdentifierName = 703,
     }
 }

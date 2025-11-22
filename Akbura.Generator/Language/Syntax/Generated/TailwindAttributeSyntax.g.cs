@@ -9,9 +9,9 @@ using System.Collections.Immutable;
 
 namespace Akbura.Language.Syntax.Green
 {
-    internal abstract partial class GreenMarkupNodeSyntax : global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax
+    internal abstract partial class GreenTailwindAttributeSyntax : global::Akbura.Language.Syntax.Green.GreenMarkupAttributeSyntax
     {
-        protected GreenMarkupNodeSyntax(
+        protected GreenTailwindAttributeSyntax(
             ushort kind,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
@@ -23,18 +23,18 @@ namespace Akbura.Language.Syntax.Green
 
 namespace Akbura.Language.Syntax
 {
-    internal abstract partial class MarkupNodeSyntax : global::Akbura.Language.Syntax.MarkupSyntaxNodeSyntax
+    internal abstract partial class TailwindAttributeSyntax : global::Akbura.Language.Syntax.MarkupAttributeSyntax
     {
-        protected MarkupNodeSyntax(
-            global::Akbura.Language.Syntax.Green.GreenMarkupNodeSyntax green,
+        protected TailwindAttributeSyntax(
+            global::Akbura.Language.Syntax.Green.GreenTailwindAttributeSyntax green,
             global::Akbura.Language.Syntax.AkburaSyntax? parent,
             int position)
             : base(green, parent, position)
         {
         }
 
-        internal new global::Akbura.Language.Syntax.Green.GreenMarkupNodeSyntax Green
-            => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenMarkupNodeSyntax>(base.Green);
+        internal new global::Akbura.Language.Syntax.Green.GreenTailwindAttributeSyntax Green
+            => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenTailwindAttributeSyntax>(base.Green);
     }
 }
 

@@ -561,8 +561,10 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
 
     // for debugging
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0305:Simplify collection initialization", Justification = "<Pending>")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "<Pending>")]
     private TNode[] Nodes => this.ToArray();
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "<Pending>")]
     private SyntaxNodeOrToken[] NodesWithSeparators => [.. _list];
 
     public Enumerator GetEnumerator()

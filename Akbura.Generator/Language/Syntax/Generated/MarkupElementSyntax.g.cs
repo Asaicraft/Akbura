@@ -164,7 +164,12 @@ namespace Akbura.Language.Syntax.Green
                 return cache;
             }
 
-            var result = new GreenMarkupElementSyntax(startTag, body.Node, endTag, diagnostics: null, annotations: null);
+            var result = new GreenMarkupElementSyntax(
+                startTag,
+                body.Node,
+                endTag,
+                diagnostics: null,
+                annotations: null);
 
             if (hash > 0)
             {
@@ -237,7 +242,7 @@ namespace Akbura.Language.Syntax
         {
             get
             {
-                var red = GetRed(ref this._body, 1);
+                var red = GetRed(ref _body, 1);
                 return new SyntaxList<MarkupContentSyntax>(red);
             }
         }
@@ -257,9 +262,9 @@ namespace Akbura.Language.Syntax
                 return this;
             }
 
-            if (body != default && body.Node?.Green is not GreenNode)
+            if (body != default && body.Node?.Green is not global::Akbura.Language.Syntax.Green.GreenNode)
             {
-                ThrowHelper.ThrowArgumentException(nameof(body), message: $"body must be backed by a GreenSyntaxList.");
+                ThrowHelper.ThrowArgumentException(nameof(body), message: "body must be backed by a GreenSyntaxList.");
             }
 
             var newNode = SyntaxFactory.MarkupElementSyntax(
@@ -342,14 +347,14 @@ namespace Akbura.Language.Syntax
             SyntaxList<MarkupContentSyntax> body,
             MarkupEndTagSyntax? endTag)
         {
-            if (body != default && body.Node?.Green is not GreenNode)
+            if (body != default && body.Node?.Green is not global::Akbura.Language.Syntax.Green.GreenNode)
             {
-                ThrowHelper.ThrowArgumentException(nameof(body), message: $"body must be backed by a GreenSyntaxList.");
+                ThrowHelper.ThrowArgumentException(nameof(body), message: "body must be backed by a GreenSyntaxList.");
             }
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.MarkupElementSyntax(
                 startTag?.Green,
-                body.ToGreenList<GreenMarkupContentSyntax, MarkupContentSyntax>(),
+                body.ToGreenList<global::Akbura.Language.Syntax.Green.GreenMarkupContentSyntax, MarkupContentSyntax>(),
                 endTag?.Green);
 
             return Unsafe.As<MarkupElementSyntax>(green.CreateRed(null, 0));

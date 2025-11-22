@@ -6,7 +6,6 @@ using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
-using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
@@ -124,7 +123,10 @@ namespace Akbura.Language.Syntax.Green
                 return cache;
             }
 
-            var result = new GreenMarkupRootSyntax(element, diagnostics: null, annotations: null);
+            var result = new GreenMarkupRootSyntax(
+                element,
+                diagnostics: null,
+                annotations: null);
 
             if (hash > 0)
             {
@@ -195,6 +197,11 @@ namespace Akbura.Language.Syntax
             if (this.Element == element)
             {
                 return this;
+            }
+
+            if (element is null)
+            {
+                ThrowHelper.ThrowArgumentNullException(nameof(element));
             }
 
             var newNode = SyntaxFactory.MarkupRootSyntax(element);

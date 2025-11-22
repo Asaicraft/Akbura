@@ -46,6 +46,7 @@ namespace Akbura.Language.Syntax
             {
                 case SyntaxKind.EndOfLineTrivia:
                 case SyntaxKind.WhitespaceTrivia:
+                case SyntaxKind.AkTextLiteral:
                     return true;
                 default:
                     return false;
@@ -66,15 +67,19 @@ namespace Akbura.Language.Syntax
                 SyntaxKind.AsyncKeyword => "async",
                 SyntaxKind.VoidKeyword => "void",
                 SyntaxKind.CommandKeyword => "command",
+
                 SyntaxKind.NewKeyword => "new",
                 SyntaxKind.ReactListKeyword => "ReactList",
+
                 SyntaxKind.IfKeyword => "if",
                 SyntaxKind.ElseKeyword => "else",
                 SyntaxKind.ReturnKeyword => "return",
                 SyntaxKind.ForKeyword => "for",
+
                 SyntaxKind.TrueKeyword => "true",
                 SyntaxKind.FalseKeyword => "false",
                 SyntaxKind.NullKeyword => "null",
+
                 SyntaxKind.PlusToken => "+",
                 SyntaxKind.MinusToken => "-",
                 SyntaxKind.AsteriskToken => "*",
@@ -99,20 +104,27 @@ namespace Akbura.Language.Syntax
                 SyntaxKind.LessEqualsToken => "<=",
                 SyntaxKind.ArrowToken => "=>",
                 SyntaxKind.HashToken => "#",
+
                 SyntaxKind.OpenBraceToken => "{",
                 SyntaxKind.CloseBraceToken => "}",
                 SyntaxKind.OpenBracketToken => "[",
                 SyntaxKind.CloseBracketToken => "]",
                 SyntaxKind.OpenParenToken => "(",
                 SyntaxKind.CloseParenToken => ")",
+
                 SyntaxKind.LessSlashToken => "</",
                 SyntaxKind.SlashGreaterToken => "/>",
+
                 SyntaxKind.SingleQuoteToken => "'",
                 SyntaxKind.DoubleQuoteToken => "\"",
+
                 SyntaxKind.AtToken => "@",
                 SyntaxKind.BindToken => "bind",
                 SyntaxKind.InToken => "in",
                 SyntaxKind.OutToken => "out",
+
+                SyntaxKind.UtilitiesKeyword => "utilities",
+
                 _ => ThrowHelper.ThrowArgumentException<string>($"Unexpected syntax kind: {kind}"),
             };
         }
@@ -129,4 +141,5 @@ namespace Akbura.Language.Syntax
         }
     }
 }
+
 #nullable restore

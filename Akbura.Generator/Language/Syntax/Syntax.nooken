@@ -72,6 +72,8 @@ token BindToken          = "bind";
 token InToken            = "in";
 token OutToken           = "out";
 
+token UtilitiesKeyword    = "utilities";
+
 [id 200]
 /*
     Built-in literal tokens (StringLiteralToken / NumericLiteralToken / etc.)
@@ -671,11 +673,11 @@ node AkcssStyleSelectorSyntax {
 /// Identifier "utilities" is validated at the semantic layer.
 /// </summary>
 node AkcssUtilitiesSectionSyntax : AkcssTopLevelMember {
-    AtToken    : AtToken;         // '@'
-    Name       : SimpleName;      // utilities
-    OpenBrace  : OpenBraceToken;  // '{'
-    Utilities  : syntaxlist<AkcssUtilityDeclarationSyntax>;
-    CloseBrace : CloseBraceToken; // '}'
+    AtToken        : AtToken;          // '@'
+    UtilitiesToken : UtilitiesKeyword; // utilities
+    OpenBrace      : OpenBraceToken;   // '{'
+    Utilities      : syntaxlist<AkcssUtilityDeclarationSyntax>;
+    CloseBrace     : CloseBraceToken;  // '}'
 }
 
 /// <summary>

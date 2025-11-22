@@ -10,7 +10,6 @@ namespace Akbura.Language.Syntax
         // Trivia kinds (predefined)
         EndOfLineTrivia = 1000,
         WhitespaceTrivia = 1001,
-        CommentTrivia = 1002,
 
         // Tokens with well-known text (contiguous range)
         FirstTokenWithWellKnownText = 100,
@@ -81,7 +80,9 @@ namespace Akbura.Language.Syntax
         InToken = 155,
         OutToken = 156,
 
-        LastTokenWithWellKnownText = 156,
+        UtilitiesKeyword = 157,
+
+        LastTokenWithWellKnownText = 157,
 
         // Literal tokens (predefined)
         StringLiteralToken = 2000,
@@ -93,7 +94,7 @@ namespace Akbura.Language.Syntax
         BadToken = 3001,
 
         // Literals
-        AkTextLiteral = 201,
+        AkTextLiteral = 200, // assigned within trivia range for raw text literal (commented as no explicit id given)
 
         // Nodes (starting from 500)
         AkTopLevelMember = 500,
@@ -143,10 +144,12 @@ namespace Akbura.Language.Syntax
         MarkupDynamicAttributeValueSyntax = 533,
 
         TailwindAttributeSyntax = 534,
+
         TailwindSegmentSyntax = 535,
         TailwindIdentifierSegmentSyntax = 536,
         TailwindNumericSegmentSyntax = 537,
         TailwindExpressionSegmentSyntax = 538,
+
         TailwindFlagAttributeSyntax = 539,
 
         TailwindPrefixSegmentSyntax = 540,

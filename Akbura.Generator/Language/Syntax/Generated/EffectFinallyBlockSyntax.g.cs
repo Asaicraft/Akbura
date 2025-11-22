@@ -6,7 +6,6 @@ using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
-using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
@@ -51,7 +50,9 @@ namespace Akbura.Language.Syntax.Green
                 return this;
             }
 
-            var newNode = GreenSyntaxFactory.EffectFinallyBlockSyntax(finallyKeyword, body);
+            var newNode = GreenSyntaxFactory.EffectFinallyBlockSyntax(
+                finallyKeyword,
+                body);
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -128,9 +129,7 @@ namespace Akbura.Language.Syntax.Green
             AkburaDebug.Assert(finallyKeyword != null);
             AkburaDebug.Assert(body != null);
 
-            AkburaDebug.Assert(
-                finallyKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.FinallyKeyword ||
-                false);
+            AkburaDebug.Assert(finallyKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.FinallyKeyword);
 
             var kind = global::Akbura.Language.Syntax.SyntaxKind.EffectFinallyBlockSyntax;
             int hash;
@@ -146,7 +145,11 @@ namespace Akbura.Language.Syntax.Green
                 return cache;
             }
 
-            var result = new GreenEffectFinallyBlockSyntax(finallyKeyword, body, diagnostics: null, annotations: null);
+            var result = new GreenEffectFinallyBlockSyntax(
+                finallyKeyword,
+                body,
+                diagnostics: null,
+                annotations: null);
 
             if (hash > 0)
             {
@@ -225,7 +228,9 @@ namespace Akbura.Language.Syntax
                 return this;
             }
 
-            var newNode = SyntaxFactory.EffectFinallyBlockSyntax(finallyKeyword, body);
+            var newNode = SyntaxFactory.EffectFinallyBlockSyntax(
+                finallyKeyword,
+                body);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)

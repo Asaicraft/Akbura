@@ -168,8 +168,7 @@ internal partial class GreenSyntaxToken : GreenNode
     /// <summary>Creates a new token with leading trivia.</summary>
     public sealed override GreenNode WithLeadingTrivia(GreenNode? trivia)
     {
-        if (trivia is not GreenNode green) return this;
-        return TokenWithLeadingTrivia(green);
+        return trivia is not GreenNode green ? this : (GreenNode)TokenWithLeadingTrivia(green);
     }
 
     /// <summary>Creates a new token with leading trivia.</summary>
@@ -181,8 +180,7 @@ internal partial class GreenSyntaxToken : GreenNode
     /// <summary>Creates a new token with trailing trivia.</summary>
     public sealed override GreenNode WithTrailingTrivia(GreenNode? trivia)
     {
-        if (trivia is not GreenNode green) return this;
-        return TokenWithTrailingTrivia(green);
+        return trivia is not GreenNode green ? this : (GreenNode)TokenWithTrailingTrivia(green);
     }
 
     /// <summary>Creates a new token with trailing trivia.</summary>
@@ -221,15 +219,24 @@ internal partial class GreenSyntaxToken : GreenNode
     {
         foreach (var element in s_tokensWithNoTrivia)
         {
-            if (element.Value != null) yield return element.Value;
+            if (element.Value != null)
+            {
+                yield return element.Value;
+            }
         }
         foreach (var element in s_tokensWithSingleTrailingSpace)
         {
-            if (element.Value != null) yield return element.Value;
+            if (element.Value != null)
+            {
+                yield return element.Value;
+            }
         }
         foreach (var element in s_tokensWithSingleTrailingCRLF)
         {
-            if (element.Value != null) yield return element.Value;
+            if (element.Value != null)
+            {
+                yield return element.Value;
+            }
         }
     }
 

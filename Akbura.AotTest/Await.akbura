@@ -4,8 +4,8 @@ param bool When = false;
 param bool KeepAlive = false;
 param double? ReserveHeight = null;
 
-slot Fallback;
-slot Child; // default slot
+param component Fallback;
+param component Child; // default slot
 
 state active = When ? 1 : 0;
 

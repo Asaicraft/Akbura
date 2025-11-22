@@ -67,6 +67,9 @@ token SingleQuoteToken   = "'";
 token DoubleQuoteToken   = "\"";
 
 token AtToken            = "@";
+token BindToken          = "bind";
+token InToken            = "in";
+token OutToken           = "out";
 
 [id 200]
 /*
@@ -156,14 +159,15 @@ node InjectDeclarationSyntax : AkTopLevelMember {
     Semicolon     : SemicolonToken;
 }
 
-/// <summary>param int UserId = 1;</summary>
+/// <summary>param int UserId = 1; or param out Hello = 10;</summary>
 node ParamDeclarationSyntax : AkTopLevelMember {
-    ParamKeyword  : ParamKeyword;
-    Type?         : CSharpTypeSyntax;
-    Name          : SimpleName;
-    Equals?       : EqualsToken;
-    DefaultValue? : CSharpExpressionSyntax;
-    Semicolon     : SemicolonToken;
+    ParamKeyword   : ParamKeyword;
+    BindingKeyword : OutToken | BindToken;
+    Type?          : CSharpTypeSyntax;
+    Name           : SimpleName;
+    Equals?        : EqualsToken;
+    DefaultValue?  : CSharpExpressionSyntax;
+    Semicolon      : SemicolonToken;
 }
 
 /// <summary>state count = 0; / state ReactList tasks = [];</summary>
@@ -172,8 +176,21 @@ node StateDeclarationSyntax : AkTopLevelMember {
     Type?        : CSharpTypeSyntax;
     Name         : SimpleName;
     Equals       : EqualsToken;
-    Initializer  : CSharpExpressionSyntax;
+    Initializer  : StateInitializer;
     Semicolon    : SemicolonToken;
+}
+
+abstract node StateInitializer
+{
+    Expression : CSharpExpressionSyntax;
+}
+
+node SimpleStateInitializer: StateInitializer;
+
+node BindableStateInitializer: StateInitializer
+{
+    BindingKeyword : InToken | OutToken | BindToken;
+    Expression     : CSharpExpressionSyntax;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -360,10 +377,350 @@ node MarkupDynamicAttributeValueSyntax : MarkupAttributeValueSyntax {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Tailwind attributes
+// ─────────────────────────────────────────────────────────────
+
+abstract node TailwindAttributeSyntax : MarkupAttributeSyntax;
+
+/// <summary>
+/// Base type for a single segment in a composite utility name:
+///   border-l-2
+///       └─ "l" and "2"
+///   p-{a}
+///       └─ "{a}"
+/// </summary>
+abstract node TailwindSegmentSyntax;
+
+node TailwindIdentifierSegmentSyntax : TailwindSegmentSyntax {
+    Name : SimpleName;
+}
+
+node TailwindNumericSegmentSyntax : TailwindSegmentSyntax {
+    Number : NumericLiteralToken;
+}
+
+/// <summary>
+/// Expression segment: `{a}`, `{width}`, `{vm.Prop}` inside the utility name.
+/// Used for patterns like `p-{a}` or `gap-{state * 2}`.
+/// </summary>
+node TailwindExpressionSegmentSyntax : TailwindSegmentSyntax {
+    Expression : InlineExpressionSyntax; // { expr }
+}
+
+/// <summary>
+/// Simple flag-style utility without a value:
+///   flex
+///   grid
+///   items-center
+/// </summary>
+node TailwindFlagAttributeSyntax : TailwindAttributeSyntax {
+    Name : SimpleName;
+}
+
+
+/// <summary>
+/// Base type for a single prefix in:
+///   md:w-40
+///   in:aw-{width}
+///   {state &lt; 10}:h-15
+/// </summary>
+abstract node TailwindPrefixSegmentSyntax
+{
+    Colon : ColonToken;
+}
+
+/// <summary>
+/// Simple conditional prefix:
+///   sm:w-40
+///   md:h-20
+///   lg:flex
+/// </summary>
+node SimpleConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
+    Name  : SimpleName;   // sm / md / lg / xl / 2xl / etc.
+    Colon : ColonToken;   // :
+}
+
+/// <summary>
+/// Expression-based conditional prefix:
+///   {state &lt; 10}:h-15
+///   {isMobile}:w-40
+/// </summary>
+node ExpressionConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
+    Expression : InlineExpressionSyntax; // { expr }
+    Colon      : ColonToken;             // :
+}
+
+
+node TailwindFullAttributeSyntax : TailwindAttributeSyntax {
+    Prefix?   : TailwindPrefixSegmentSyntax;
+    Name      : SimpleName;                                    // aw / w / h / p / etc.
+    Minus?    : MinusToken;                                    // null if no segments
+    Segments  : syntaxlist<TailwindSegmentSyntax, MinusToken>; // may contain binding segments, e.g. {width}
+}
+
+// ─────────────────────────────────────────────────────────────
+// AKCSS ROOT
+// ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Root node for a .akcss file.
+/// Supports:
+///   • class-based style rules: .myclass { ... }, Button.myclass { ... }
+///   • @utilities { ... } with parameterized utilities.
+/// </summary>
+node AkcssDocumentSyntax {
+    Members   : syntaxlist<AkcssTopLevelMember>;
+    EndOfFile : Token;
+}
+
+/// <summary>
+/// Any top-level member inside an .akcss file:
+///   • style rule: .myclass { ... }
+///   • utilities section: @utilities { ... }
+/// </summary>
+abstract node AkcssTopLevelMember;
+
+
+// ============================================================================
+// SHARED BODY MEMBERS (used by styles and utilities)
+// ============================================================================
+
+/// <summary>
+/// Base type for any statement inside a style or utility body:
+///   • simple assignment: Property : expr;
+///   • @if(condition) { ... }
+///   • pseudo-state block: @hover { ... }, @hover@checked { ... }
+/// Utilities may use the same constructs; invalid combinations
+/// are rejected at the semantic layer.
+/// </summary>
+abstract node AkcssBodyMemberSyntax;
+
+/// <summary>
+/// Single property assignment:
+///   Background : "Red";
+///   Opacity    : 0.5;
+///   Width      : width * Spacing;
+///
+/// Semicolon is optional to allow slightly looser formatting.
+/// </summary>
+node AkcssAssignmentSyntax : AkcssBodyMemberSyntax {
+    PropertyName : SimpleName;            // Background / Opacity / Width / ...
+    Colon        : ColonToken;           // ':'
+    Expression   : CSharpExpressionSyntax;
+    Semicolon?   : SemicolonToken;       // optional ';'
+}
+
+/// <summary>
+/// Conditional block:
+///
+///   @if(Property == value) {
+///       Background : "Red";
+///   }
+///
+/// Used both in style rules and in utilities. The semantic layer
+/// decides how to track the referenced properties / parameters.
+/// </summary>
+node AkcssIfDirectiveSyntax : AkcssBodyMemberSyntax {
+    AtToken    : AtToken;                 // '@'
+    IfKeyword  : IfKeyword;               // 'if'
+    OpenParen  : OpenParenToken;          // '('
+    Condition  : CSharpExpressionSyntax;  // Property == value
+    CloseParen : CloseParenToken;         // ')'
+    OpenBrace  : OpenBraceToken;          // '{'
+    Members    : syntaxlist<AkcssBodyMemberSyntax>;
+    CloseBrace : CloseBraceToken;         // '}'
+}
+
+/// <summary>
+/// Additional pseudo-state segment after the first one:
+///   @hover@checked
+///        └────── this part
+/// </summary>
+node AkcssAdditionalPseudoStateSyntax {
+    AtToken : AtToken;        // '@'
+    State   : SimpleName;     // checked / active / focused / ...
+}
+
+/// <summary>
+/// Pseudo-state selector:
+///   @hover
+///   @hover@checked
+///
+/// Parsed as:
+///   AtToken       : '@'
+///   FirstState    : SimpleName;  // hover
+///   Additional    : syntaxlist<AkcssAdditionalPseudoStateSyntax>;
+/// </summary>
+node AkcssPseudoSelectorSyntax {
+    AtToken    : AtToken;                                // '@'
+    FirstState : SimpleName;                             // hover
+    Additional : syntaxlist<AkcssAdditionalPseudoStateSyntax>;
+}
+
+/// <summary>
+/// Pseudo-state block:
+///
+///   @hover {
+///       Background : "LightBlue";
+///   }
+///
+///   @hover@checked {
+///       BorderBrush : "Green";
+///   }
+///
+/// Inside are regular AkcssBodyMemberSyntax items (assignments, nested @if, ...).
+/// It is mainly meaningful inside style rules; usage inside utilities
+/// can be restricted by the semantic layer.
+/// </summary>
+node AkcssPseudoBlockSyntax : AkcssBodyMemberSyntax {
+    Selector  : AkcssPseudoSelectorSyntax;
+    OpenBrace : OpenBraceToken;
+    Members   : syntaxlist<AkcssBodyMemberSyntax>;
+    CloseBrace: CloseBraceToken;
+}
+
+
+// ============================================================================
+// AKCSS STYLE RULES (CLASS-BASED STYLES)
+// ============================================================================
+
+/// <summary>
+/// Style rule:
+///   .myclass { ... }
+///   Button.myclass { ... }
+///
+/// Type prefix is optional. When omitted, the rule is treated as global
+/// or bound to a default base type (e.g., Control) by the semantic layer.
+/// </summary>
+node AkcssStyleRuleSyntax : AkcssTopLevelMember {
+    Selector  : AkcssStyleSelectorSyntax;
+    OpenBrace : OpenBraceToken;
+    Members   : syntaxlist<AkcssBodyMemberSyntax>;
+    CloseBrace: CloseBraceToken;
+}
+
+/// <summary>
+/// Selector for style rules:
+///
+///   .myclass
+///   Button.myclass
+///
+/// Parsed as:
+///   TargetType? : Button / Grid / Control / ...
+///   DotToken    : '.'
+///   Name        : 'myclass'
+/// </summary>
+node AkcssStyleSelectorSyntax {
+    TargetType? : SimpleName;  // optional type prefix: Button / Control / ...
+    DotToken    : DotToken;    // '.'
+    Name        : SimpleName;  // class name: myclass
+}
+
+
+// ============================================================================
+// AKCSS UTILITIES
+// ============================================================================
+
+/// <summary>
+/// @utilities {
+///     .w-(double width) {
+///         Width : width * Akbura.Styles.Utilities.Spacing;
+///     }
+///
+///     .someutil-(double a)-(MySuperPuperEnum enam) {
+///         @if(enam == MySuperPuperEnum.CoolRadius) {
+///             BorderRadius : 1234;
+///         }
+///     }
+///
+///     .flag {
+///         Opacity : 0.5;
+///     }
+///
+///     Button.btn-(Variant variant) {
+///         @if(variant == Variant.Primary) {
+///             // ...
+///         }
+///     }
+/// }
+///
+/// Identifier "utilities" is validated at the semantic layer.
+/// </summary>
+node AkcssUtilitiesSectionSyntax : AkcssTopLevelMember {
+    AtToken    : AtToken;         // '@'
+    Name       : SimpleName;      // utilities
+    OpenBrace  : OpenBraceToken;  // '{'
+    Utilities  : syntaxlist<AkcssUtilityDeclarationSyntax>;
+    CloseBrace : CloseBraceToken; // '}'
+}
+
+/// <summary>
+/// Single utility parameter fragment in the selector:
+///   .w-(double width)
+///   .someutil-(double a)-(MySuperPuperEnum enam)
+///
+/// Each parameter is prefixed with its own '-' and wrapped in parentheses:
+///   - (Type name)
+/// </summary>
+node AkcssUtilityParameterSyntax {
+    Minus     : MinusToken;       // '-'
+    OpenParen : OpenParenToken;   // '('
+    Type      : CSharpTypeSyntax; // double / Variant / MySuperPuperEnum / ...
+    ParamName : SimpleName;       // width / a / variant / enam / ...
+    CloseParen: CloseParenToken;  // ')'
+}
+
+/// <summary>
+/// Unified selector for utilities:
+///
+///   .flag
+///   .w-(double width)
+///   .someutil-(double a)-(MySuperPuperEnum enam)
+///   Button.btn-(Variant variant)
+///
+/// Parsed as:
+///   TargetType? : Button / Grid / Control / ...
+///   DotToken    : '.'
+///   Name        : 'flag' / 'w' / 'someutil' / 'btn'
+///   Parameters  : [ AkcssUtilityParameterSyntax, ... ]  // may be empty
+///
+/// When TargetType is omitted (".btn-..."), the semantic layer may treat
+/// the utility as applicable to the default base type (e.g., Control).
+/// </summary>
+node AkcssUtilitySelectorSyntax {
+    TargetType? : SimpleName;                        // optional: Button / Control / ...
+    DotToken    : DotToken;                          // '.'
+    Name        : SimpleName;                        // utility name: w / flag / someutil / btn
+    Parameters  : syntaxlist<AkcssUtilityParameterSyntax>;
+}
+
+/// <summary>
+/// Utility declaration with a selector and a body:
+///
+///   .w-(double width) {
+///       Width : width * Akbura.Styles.Utilities.Spacing;
+///   }
+///
+///   .flag {
+///       Opacity : 0.5;
+///   }
+///
+/// Body consists of AkcssBodyMemberSyntax items: assignments, @if, etc.
+/// </summary>
+node AkcssUtilityDeclarationSyntax {
+    Selector  : AkcssUtilitySelectorSyntax;
+    OpenBrace : OpenBraceToken;
+    Members   : syntaxlist<AkcssBodyMemberSyntax>;
+    CloseBrace: CloseBraceToken;
+}
+
+
+
+// ─────────────────────────────────────────────────────────────
 // IDENTIFIERS AND TYPES
 // ─────────────────────────────────────────────────────────────
 
-[id 600]
+[id 700]
 abstract node Type;
 
 abstract node Name: Type;

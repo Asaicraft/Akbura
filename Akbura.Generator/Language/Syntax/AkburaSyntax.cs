@@ -304,7 +304,7 @@ internal abstract partial class AkburaSyntax
             var greenChild = green.GetSlot(index);
             if (greenChild != null)
             {
-                offset += greenChild.Width;
+                offset += greenChild.FullWidth;
             }
         }
 

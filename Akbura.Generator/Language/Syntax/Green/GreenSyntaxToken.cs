@@ -1,25 +1,20 @@
 ﻿using Akbura.Collections;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
 using System.Diagnostics;
 using System.Collections.Immutable;
+using CsharpRawNode = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode;
 
 namespace Akbura.Language.Syntax.Green;
 internal partial class GreenSyntaxToken : GreenNode
 {
     public GreenSyntaxToken(SyntaxKind kind, ImmutableArray<AkburaDiagnostic>? diagnostics, ImmutableArray<AkburaSyntaxAnnotation>? annotations) : base((ushort)kind, diagnostics, annotations)
     {
-        FullWidth = Text.Length;
+        FullWidth = Text?.Length ?? 0;
         IsMissing = false;
     }
 
     public GreenSyntaxToken(SyntaxKind kind): this(kind, null, null)
     {
-        FullWidth = Text.Length;
+        FullWidth = Text?.Length ?? 0;
         IsMissing = false;
     }
 
@@ -270,6 +265,16 @@ internal partial class GreenSyntaxToken : GreenNode
         return new SyntaxIdentifierWithTrivia(contextualKind, text, valueText, leading, trailing);
     }
 
+    public static CSharpRawToken CreateCSharpRawToken(string rawText)
+    {
+        return new CSharpRawToken(rawText, null, null);
+    }
+
+    public static CSharpRawToken CreateCSharpRawToken(CsharpRawNode rawNode)
+    {
+        return new CSharpRawToken(rawNode, null, null);
+    }
+
     public override string ToString()
     {
         return Text;
@@ -289,5 +294,69 @@ internal partial class GreenSyntaxToken : GreenNode
     {
         var trailing = GetTrailingTrivia();
         return trailing != null ? trailing.FullWidth : 0;
+    }
+
+    public override bool IsEquivalentTo(GreenNode? other)
+    {
+        if (!base.IsEquivalentTo(other))
+        {
+            return false;
+        }
+
+        var otherToken = (GreenSyntaxToken)other;
+
+        if (this.Text != otherToken.Text)
+        {
+            return false;
+        }
+
+        var thisLeading = this.GetLeadingTrivia();
+        var otherLeading = otherToken.GetLeadingTrivia();
+        if (thisLeading != otherLeading)
+        {
+            if (thisLeading == null || otherLeading == null)
+            {
+                return false;
+            }
+
+            if (!thisLeading.IsEquivalentTo(otherLeading))
+            {
+                return false;
+            }
+        }
+
+        var thisTrailing = this.GetTrailingTrivia();
+        var otherTrailing = otherToken.GetTrailingTrivia();
+        if (thisTrailing != otherTrailing)
+        {
+            if (thisTrailing == null || otherTrailing == null)
+            {
+                return false;
+            }
+
+            if (!thisTrailing.IsEquivalentTo(otherTrailing))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected override void WriteTokenTo(TextWriter writer, bool leading, bool trailing)
+    {
+        if (leading)
+        {
+            var trivia = GetLeadingTrivia();
+            trivia?.WriteTo(writer, true, true);
+        }
+
+        writer.Write(Text);
+
+        if (trailing)
+        {
+            var trivia = GetTrailingTrivia();
+            trivia?.WriteTo(writer, true, true);
+        }
     }
 }

@@ -306,6 +306,8 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentException(nameof(members), message: $"members must be backed by a GreenSyntaxList.");
             }
 
+
+
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.AkburaDocumentSyntax(
                 members.ToGreenList<GreenAkTopLevelMemberSyntax, AkTopLevelMemberSyntax>(),
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(endOfFile.Node!));

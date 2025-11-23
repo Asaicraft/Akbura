@@ -11,12 +11,12 @@ namespace Akbura.Language.Syntax.Green
 {
     internal sealed partial class GreenMarkupPlainAttributeSyntax : global::Akbura.Language.Syntax.Green.GreenMarkupAttributeSyntax
     {
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken Name;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken EqualsToken;
         public readonly global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? Value;
 
         public GreenMarkupPlainAttributeSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken name,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
             global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? value,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
@@ -30,7 +30,6 @@ namespace Akbura.Language.Syntax.Green
             AkburaDebug.Assert(this.Name != null);
             AkburaDebug.Assert(this.EqualsToken != null);
 
-            AkburaDebug.Assert(this.Name.Kind == global::Akbura.Language.Syntax.SyntaxKind.IdentifierToken);
             AkburaDebug.Assert(this.EqualsToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken);
 
             var flags = Flags;
@@ -50,7 +49,7 @@ namespace Akbura.Language.Syntax.Green
         }
 
         public GreenMarkupPlainAttributeSyntax UpdateMarkupPlainAttributeSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken name,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
             global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? value)
         {
@@ -81,7 +80,7 @@ namespace Akbura.Language.Syntax.Green
             return newNode;
         }
 
-        public GreenMarkupPlainAttributeSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSyntaxToken name)
+        public GreenMarkupPlainAttributeSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
         {
             return UpdateMarkupPlainAttributeSyntax(name, this.EqualsToken, this.Value);
         }
@@ -141,7 +140,7 @@ namespace Akbura.Language.Syntax.Green
     internal static partial class GreenSyntaxFactory
     {
         public static GreenMarkupPlainAttributeSyntax MarkupPlainAttributeSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken name,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
             global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? value)
         {
@@ -149,11 +148,7 @@ namespace Akbura.Language.Syntax.Green
             AkburaDebug.Assert(equalsToken != null);
 
             AkburaDebug.Assert(
-                name!.Kind == global::Akbura.Language.Syntax.SyntaxKind.IdentifierToken ||
-                false);
-            AkburaDebug.Assert(
-                equalsToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken ||
-                false);
+                equalsToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken);
 
             var kind = global::Akbura.Language.Syntax.SyntaxKind.MarkupPlainAttributeSyntax;
             int hash;
@@ -215,7 +210,7 @@ namespace Akbura.Language.Syntax.Green
         public override GreenNode? VisitMarkupPlainAttributeSyntax(GreenMarkupPlainAttributeSyntax node)
         {
             return node.UpdateMarkupPlainAttributeSyntax(
-                (GreenSyntaxToken)VisitToken(node.Name),
+                (GreenSimpleNameSyntax)Visit(node.Name)!,
                 (GreenSyntaxToken)VisitToken(node.EqualsToken),
                 (GreenMarkupAttributeValueSyntax?)Visit(node.Value));
         }
@@ -226,6 +221,7 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class MarkupPlainAttributeSyntax : global::Akbura.Language.Syntax.MarkupAttributeSyntax
     {
+        private AkburaSyntax? _name;
         private AkburaSyntax? _value;
 
         public MarkupPlainAttributeSyntax(
@@ -239,8 +235,8 @@ namespace Akbura.Language.Syntax
         internal new global::Akbura.Language.Syntax.Green.GreenMarkupPlainAttributeSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenMarkupPlainAttributeSyntax>(base.Green);
 
-        public SyntaxToken Name
-            => new(this, this.Green.Name, GetChildPosition(0), GetChildIndex(0));
+        public SimpleNameSyntax Name
+            => (SimpleNameSyntax)GetRed(ref _name, 0)!;
 
         public SyntaxToken EqualsToken
             => new(this, this.Green.EqualsToken, GetChildPosition(1), GetChildIndex(1));
@@ -249,7 +245,7 @@ namespace Akbura.Language.Syntax
             => (MarkupAttributeValueSyntax?)GetRed(ref _value, 2);
 
         public MarkupPlainAttributeSyntax UpdateMarkupPlainAttributeSyntax(
-            SyntaxToken name,
+            SimpleNameSyntax name,
             SyntaxToken equalsToken,
             MarkupAttributeValueSyntax? value)
         {
@@ -280,7 +276,7 @@ namespace Akbura.Language.Syntax
             return newNode;
         }
 
-        public MarkupPlainAttributeSyntax WithName(SyntaxToken name)
+        public MarkupPlainAttributeSyntax WithName(SimpleNameSyntax name)
         {
             return UpdateMarkupPlainAttributeSyntax(name, this.EqualsToken, this.Value);
         }
@@ -299,6 +295,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                0 => GetRed(ref _name, 0),
                 2 => GetRed(ref _value, 2),
                 _ => null,
             };
@@ -308,6 +305,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                0 => _name,
                 2 => _value,
                 _ => null,
             };
@@ -332,23 +330,18 @@ namespace Akbura.Language.Syntax
     internal static partial class SyntaxFactory
     {
         internal static MarkupPlainAttributeSyntax MarkupPlainAttributeSyntax(
-            SyntaxToken name,
+            SimpleNameSyntax name,
             SyntaxToken equalsToken,
             MarkupAttributeValueSyntax? value)
         {
-            if (name.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
+            if (name is null)
             {
-                ThrowHelper.ThrowArgumentException(nameof(name), message: $"name must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
+                ThrowHelper.ThrowArgumentNullException(nameof(name));
             }
 
             if (equalsToken.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(equalsToken), message: $"equalsToken must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
-            }
-
-            if (name.RawKind != (ushort)SyntaxKind.IdentifierToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(name), message: $"name must be SyntaxKind.IdentifierToken");
             }
 
             if (equalsToken.RawKind != (ushort)SyntaxKind.EqualsToken)
@@ -357,7 +350,7 @@ namespace Akbura.Language.Syntax
             }
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.MarkupPlainAttributeSyntax(
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(name.Node!),
+                name.Green,
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(equalsToken.Node!),
                 value?.Green);
 
@@ -394,7 +387,7 @@ namespace Akbura.Language.Syntax
         public override AkburaSyntax? VisitMarkupPlainAttributeSyntax(MarkupPlainAttributeSyntax node)
         {
             return node.UpdateMarkupPlainAttributeSyntax(
-                VisitToken(node.Name),
+                (SimpleNameSyntax)Visit(node.Name)!,
                 VisitToken(node.EqualsToken),
                 (MarkupAttributeValueSyntax?)Visit(node.Value));
         }

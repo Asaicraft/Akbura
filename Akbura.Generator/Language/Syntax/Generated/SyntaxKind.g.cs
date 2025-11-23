@@ -92,9 +92,13 @@ namespace Akbura.Language.Syntax
         // Identifier token (predefined)
         IdentifierToken = 3000,
         BadToken = 3001,
+        EndOfFileToken = 3002,
 
         // Literals
         AkTextLiteral = 200, // assigned within trivia range for raw text literal (commented as no explicit id given)
+
+        // C# Raw tokens
+        CSharpRawToken = 201,
 
         // Nodes (starting from 500)
         AkTopLevelMember = 500,

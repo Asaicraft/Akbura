@@ -6,6 +6,7 @@ using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
+using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {

@@ -234,6 +234,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitIdentifierName(this, argument);
         }
+
+        public new IdentifierNameSyntax WithLeadingTrivia(SyntaxTriviaList trivias)
+        {
+            return (IdentifierNameSyntax)base.WithLeadingTrivia(trivias);
+        }
+
+        public new IdentifierNameSyntax WithTrailingTrivia(SyntaxTriviaList trivias)
+        {
+            return (IdentifierNameSyntax)base.WithTrailingTrivia(trivias);
+        }
     }
 
     internal static partial class SyntaxFactory

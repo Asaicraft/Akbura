@@ -174,7 +174,7 @@ namespace Akbura.Language.Syntax
             get
             {
                 var tokens = this.Green.GetSlot(0);
-                return new SyntaxTokenList(Parent, tokens, GetChildPosition(0), GetChildIndex(0));
+                return new SyntaxTokenList(this, tokens, GetChildPosition(0), GetChildIndex(0));
             }
         }
 
@@ -243,7 +243,7 @@ namespace Akbura.Language.Syntax
     {
         internal static CSharpExpressionSyntax CSharpExpressionSyntax(SyntaxTokenList tokens)
         {
-            if (tokens != default && tokens.Node != null)
+            if (tokens != default && tokens.Node == null)
             {
                 ThrowHelper.ThrowArgumentException(nameof(tokens), message: $"tokens must be backed by a GreenSyntaxList.");
             }

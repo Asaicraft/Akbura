@@ -13,14 +13,14 @@ namespace Akbura.Language.Syntax.Green
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken Prefix;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken Colon;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken Name;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken EqualsToken;
         public readonly global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? Value;
 
         public GreenMarkupPrefixedAttributeSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken prefix,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken colon,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken name,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
             global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? value,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
@@ -43,7 +43,6 @@ namespace Akbura.Language.Syntax.Green
                 this.Prefix.Kind == global::Akbura.Language.Syntax.SyntaxKind.OutToken);
 
             AkburaDebug.Assert(this.Colon.Kind == global::Akbura.Language.Syntax.SyntaxKind.ColonToken);
-            AkburaDebug.Assert(this.Name.Kind == global::Akbura.Language.Syntax.SyntaxKind.IdentifierToken);
             AkburaDebug.Assert(this.EqualsToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken);
 
             var flags = Flags;
@@ -67,7 +66,7 @@ namespace Akbura.Language.Syntax.Green
         public GreenMarkupPrefixedAttributeSyntax UpdateMarkupPrefixedAttributeSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken prefix,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken colon,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken name,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
             global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? value)
         {
@@ -112,7 +111,7 @@ namespace Akbura.Language.Syntax.Green
             return UpdateMarkupPrefixedAttributeSyntax(this.Prefix, colon, this.Name, this.EqualsToken, this.Value);
         }
 
-        public GreenMarkupPrefixedAttributeSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSyntaxToken name)
+        public GreenMarkupPrefixedAttributeSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
         {
             return UpdateMarkupPrefixedAttributeSyntax(this.Prefix, this.Colon, name, this.EqualsToken, this.Value);
         }
@@ -176,7 +175,7 @@ namespace Akbura.Language.Syntax.Green
         public static GreenMarkupPrefixedAttributeSyntax MarkupPrefixedAttributeSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken prefix,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken colon,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken name,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken equalsToken,
             global::Akbura.Language.Syntax.Green.GreenMarkupAttributeValueSyntax? value)
         {
@@ -190,7 +189,6 @@ namespace Akbura.Language.Syntax.Green
                 prefix!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OutToken);
 
             AkburaDebug.Assert(colon!.Kind == global::Akbura.Language.Syntax.SyntaxKind.ColonToken);
-            AkburaDebug.Assert(name!.Kind == global::Akbura.Language.Syntax.SyntaxKind.IdentifierToken);
             AkburaDebug.Assert(equalsToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.EqualsToken);
 
             var result = new GreenMarkupPrefixedAttributeSyntax(
@@ -237,7 +235,7 @@ namespace Akbura.Language.Syntax.Green
             return node.UpdateMarkupPrefixedAttributeSyntax(
                 (GreenSyntaxToken)VisitToken(node.Prefix),
                 (GreenSyntaxToken)VisitToken(node.Colon),
-                (GreenSyntaxToken)VisitToken(node.Name),
+                (GreenSimpleNameSyntax)Visit(node.Name)!,
                 (GreenSyntaxToken)VisitToken(node.EqualsToken),
                 (GreenMarkupAttributeValueSyntax?)Visit(node.Value));
         }
@@ -248,6 +246,7 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class MarkupPrefixedAttributeSyntax : global::Akbura.Language.Syntax.MarkupAttributeSyntax
     {
+        private SimpleNameSyntax? _name;
         private AkburaSyntax? _value;
 
         public MarkupPrefixedAttributeSyntax(
@@ -267,8 +266,8 @@ namespace Akbura.Language.Syntax
         public SyntaxToken Colon
             => new(this, this.Green.Colon, GetChildPosition(1), GetChildIndex(1));
 
-        public SyntaxToken Name
-            => new(this, this.Green.Name, GetChildPosition(2), GetChildIndex(2));
+        public SimpleNameSyntax Name
+            => (SimpleNameSyntax)GetRed(ref _name, 2)!;
 
         public SyntaxToken EqualsToken
             => new(this, this.Green.EqualsToken, GetChildPosition(3), GetChildIndex(3));
@@ -279,7 +278,7 @@ namespace Akbura.Language.Syntax
         public MarkupPrefixedAttributeSyntax UpdateMarkupPrefixedAttributeSyntax(
             SyntaxToken prefix,
             SyntaxToken colon,
-            SyntaxToken name,
+            SimpleNameSyntax name,
             SyntaxToken equalsToken,
             MarkupAttributeValueSyntax? value)
         {
@@ -324,7 +323,7 @@ namespace Akbura.Language.Syntax
             return UpdateMarkupPrefixedAttributeSyntax(this.Prefix, colon, this.Name, this.EqualsToken, this.Value);
         }
 
-        public MarkupPrefixedAttributeSyntax WithName(SyntaxToken name)
+        public MarkupPrefixedAttributeSyntax WithName(SimpleNameSyntax name)
         {
             return UpdateMarkupPrefixedAttributeSyntax(this.Prefix, this.Colon, name, this.EqualsToken, this.Value);
         }
@@ -343,6 +342,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                2 => GetRed(ref _name, 2),
                 4 => GetRed(ref _value, 4),
                 _ => null,
             };
@@ -352,6 +352,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                2 => _name,
                 4 => _value,
                 _ => null,
             };
@@ -378,7 +379,7 @@ namespace Akbura.Language.Syntax
         internal static MarkupPrefixedAttributeSyntax MarkupPrefixedAttributeSyntax(
             SyntaxToken prefix,
             SyntaxToken colon,
-            SyntaxToken name,
+            SimpleNameSyntax name,
             SyntaxToken equalsToken,
             MarkupAttributeValueSyntax? value)
         {
@@ -390,11 +391,6 @@ namespace Akbura.Language.Syntax
             if (colon.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(colon), message: $"colon must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
-            }
-
-            if (name.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(name), message: $"name must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
             }
 
             if (equalsToken.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
@@ -413,20 +409,20 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentException(nameof(colon), message: $"colon must be SyntaxKind.ColonToken");
             }
 
-            if (name.RawKind != (ushort)SyntaxKind.IdentifierToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(name), message: $"name must be SyntaxKind.IdentifierToken");
-            }
-
             if (equalsToken.RawKind != (ushort)SyntaxKind.EqualsToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(equalsToken), message: $"equalsToken must be SyntaxKind.EqualsToken");
             }
 
+            if (name is null)
+            {
+                ThrowHelper.ThrowArgumentNullException(nameof(name));
+            }
+
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.MarkupPrefixedAttributeSyntax(
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(prefix.Node!),
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(colon.Node!),
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(name.Node!),
+                name.Green,
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(equalsToken.Node!),
                 value?.Green);
 
@@ -465,7 +461,7 @@ namespace Akbura.Language.Syntax
             return node.UpdateMarkupPrefixedAttributeSyntax(
                 VisitToken(node.Prefix),
                 VisitToken(node.Colon),
-                VisitToken(node.Name),
+                (SimpleNameSyntax)Visit(node.Name)!,
                 VisitToken(node.EqualsToken),
                 (MarkupAttributeValueSyntax?)Visit(node.Value));
         }

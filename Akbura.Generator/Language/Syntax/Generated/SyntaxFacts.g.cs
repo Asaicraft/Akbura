@@ -28,6 +28,8 @@ namespace Akbura.Language.Syntax
 
             switch (kind)
             {
+                case SyntaxKind.CSharpRawToken:
+                case SyntaxKind.EndOfFileToken:
                 case SyntaxKind.IdentifierToken:
                 case SyntaxKind.StringLiteralToken:
                 case SyntaxKind.CharLiteralToken:
@@ -125,7 +127,7 @@ namespace Akbura.Language.Syntax
 
                 SyntaxKind.UtilitiesKeyword => "utilities",
 
-                _ => ThrowHelper.ThrowArgumentException<string>($"Unexpected syntax kind: {kind}"),
+                _ => string.Empty,
             };
         }
 

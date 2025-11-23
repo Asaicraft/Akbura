@@ -304,7 +304,7 @@ namespace Akbura.Language.Syntax
             => (StateInitializerSyntax)GetRed(ref _initializer, 4)!;
 
         public SyntaxToken Semicolon
-            => new(this, this.Green.Semicolon, GetChildPosition(5), GetChildIndex(5));
+            => new(this, this.Green.Semicolon, GetChildPositionFromEnd(5), GetChildIndex(5));
 
         public StateDeclarationSyntax UpdateStateDeclarationSyntax(
             SyntaxToken stateKeyword,
@@ -412,6 +412,16 @@ namespace Akbura.Language.Syntax
         public override TResult? Accept<TParameter, TResult>(SyntaxVisitor<TParameter, TResult> visitor, TParameter argument) where TResult : default
         {
             return visitor.VisitStateDeclarationSyntax(this, argument);
+        }
+
+        public new StateDeclarationSyntax WithLeadingTrivia(SyntaxTriviaList trivias)
+        {
+            return (StateDeclarationSyntax)base.WithLeadingTrivia(trivias);
+        }
+
+        public new StateDeclarationSyntax WithTrailingTrivia(SyntaxTriviaList trivias)
+        {
+            return (StateDeclarationSyntax)base.WithTrailingTrivia(trivias);
         }
     }
 

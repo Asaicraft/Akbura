@@ -172,10 +172,10 @@ internal abstract partial class GreenNode
     public virtual int Width => _fullWidth - GetLeadingTriviaWidth() - GetTrailingTriviaWidth();
 
     public virtual int GetLeadingTriviaWidth()
-        => FullWidth != 0 ? GetFirstTerminal()!.GetLeadingTriviaWidth() : 0;
+        => FullWidth != 0 ? GetFirstTerminal()?.GetLeadingTriviaWidth() ?? 0 : 0;
 
     public virtual int GetTrailingTriviaWidth()
-        => FullWidth != 0 ? GetLastTerminal()!.GetTrailingTriviaWidth() : 0;
+        => FullWidth != 0 ? GetLastTerminal()?.GetTrailingTriviaWidth() ?? 0 : 0;
 
     public bool HasLeadingTrivia => GetLeadingTriviaWidth() != 0;
 
@@ -205,7 +205,11 @@ internal abstract partial class GreenNode
     protected ushort Flags
     {
         get => (ushort)(_nodeFlagsAndSlotCount & 0b_1111_1111_1111_0000);
-        init => _nodeFlagsAndSlotCount = (ushort)(value & 0b_1111_1111_1111_0000);
+        init
+        {
+            var existingSlots = (ushort)(_nodeFlagsAndSlotCount & SlotCountMask);
+            _nodeFlagsAndSlotCount = (ushort)((value & 0b_1111_1111_1111_0000) | existingSlots);
+        }
     }
 
     internal protected ushort InheritMask => (ushort)(_nodeFlagsAndSlotCount & (ushort)GreenNodeFlags.InheritMask);

@@ -57,7 +57,7 @@ internal abstract partial class AkburaSyntax
         get;
     }
 
-    public int EndPosition => Position + Width;
+    public int EndPosition => Position + Green.FullWidth;
 
     public int FullWidth => Green.FullWidth;
 
@@ -67,7 +67,7 @@ internal abstract partial class AkburaSyntax
 
     public ushort RawKind => Green.RawKind;
 
-    public int SpanStart => Span.Start;
+    public int SpanStart => Position + Green.GetLeadingTriviaWidth();
 
     /// <summary>
     /// The absolute span of this node in characters, not including its leading and trailing trivia.

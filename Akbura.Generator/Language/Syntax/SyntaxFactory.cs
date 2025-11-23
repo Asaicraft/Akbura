@@ -1,8 +1,5 @@
 ﻿using Akbura.Language.Syntax.Green;
-using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using CsharpRawNode = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode;
 
 namespace Akbura.Language.Syntax;
 internal static partial class SyntaxFactory
@@ -116,11 +113,16 @@ internal static partial class SyntaxFactory
     /// <param name="trailing">A list of trivia following the token.</param>
     public static SyntaxToken Token(SyntaxTriviaList leading, SyntaxKind kind, SyntaxTriviaList trailing)
     {
-        if (kind == SyntaxKind.IdentifierToken || kind == SyntaxKind.CharLiteralToken || kind == SyntaxKind.NumericLiteralToken || SyntaxFacts.IsAnyToken(kind))
+        if (kind == SyntaxKind.IdentifierToken || kind == SyntaxKind.CharLiteralToken || kind == SyntaxKind.NumericLiteralToken || !SyntaxFacts.IsAnyToken(kind))
         {
             ThrowHelper.ThrowArgumentException("kind", "Invalid token kind. Tokens must be lexemes, not literals.");
         }
         return new SyntaxToken(GreenSyntaxFactory.Token(leading.Node, kind, trailing.Node));
+    }
+
+    public static SyntaxToken TokenWithTrailingSpace(SyntaxKind kind)
+    {
+        return Token(default, kind, new(Space));
     }
 
     /// <summary>
@@ -464,6 +466,31 @@ internal static partial class SyntaxFactory
     public static SyntaxToken Identifier(string text)
     {
         return new SyntaxToken(GreenSyntaxFactory.Identifier(ElasticMarker.UnderlyingNode, text, ElasticMarker.UnderlyingNode));
+    }
+
+    public static SyntaxToken IdentifierWithTrailingSpace(string text)
+    {
+        return Identifier(default, text, new(Space));
+    }
+
+    public static SyntaxToken NumericLiteralToken(string text, int value)
+    {
+        return new SyntaxToken(GreenSyntaxFactory.Literal(null, text, value, null));
+    }
+
+    public static SyntaxToken CSharpRawToken(string text)
+    {
+        return new SyntaxToken(GreenSyntaxFactory.CSharpRawToken(text));
+    }
+
+    public static SyntaxToken CSharpRawToken(CsharpRawNode csharpRawNode)
+    {
+        return new SyntaxToken(GreenSyntaxFactory.CSharpRawToken(csharpRawNode));
+    }
+
+    public static SyntaxToken EndOfFileToken()
+    {
+        return new SyntaxToken(GreenSyntaxFactory.EndOfFile);
     }
 }
 

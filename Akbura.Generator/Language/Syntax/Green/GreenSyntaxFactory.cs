@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using CsharpRawNode = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode;
 
 namespace Akbura.Language.Syntax.Green;
 
@@ -23,6 +24,8 @@ internal static partial class GreenSyntaxFactory
     public static readonly GreenSyntaxTrivia ElasticTab = Whitespace("\t", elastic: true);
 
     public static readonly GreenSyntaxTrivia ElasticZeroSpace = Whitespace(string.Empty, elastic: true);
+
+    public static readonly GreenSyntaxToken EndOfFile = Token(null, SyntaxKind.EndOfFileToken, null);
 
     public static GreenSyntaxTrivia EndOfLine(string text, bool elastic = false)
     {
@@ -86,7 +89,7 @@ internal static partial class GreenSyntaxFactory
 
     public static GreenSyntaxToken Token(GreenNode? leading, SyntaxKind kind, GreenNode? trailing)
     {
-        Debug.Assert(!SyntaxFacts.IsAnyToken(kind));
+        Debug.Assert(SyntaxFacts.IsAnyToken(kind));
         Debug.Assert(kind != SyntaxKind.IdentifierToken);
         Debug.Assert(kind != SyntaxKind.CharLiteralToken);
         Debug.Assert(kind != SyntaxKind.NumericLiteralToken);
@@ -147,7 +150,7 @@ internal static partial class GreenSyntaxFactory
         return GreenSyntaxToken.Identifier(contextualKind, leading, text, valueText, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, int value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, int value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
@@ -298,5 +301,15 @@ internal static partial class GreenSyntaxFactory
     public static IEnumerable<GreenSyntaxToken> GetWellKnownTokens()
     {
         return GreenSyntaxToken.GetWellKnownTokens();
+    }
+
+    public static GreenSyntaxToken CSharpRawToken(string text)
+    {
+        return GreenSyntaxToken.CreateCSharpRawToken(text);
+    }
+
+    public static GreenSyntaxToken CSharpRawToken(CsharpRawNode csharpRawNode)
+    {
+        return GreenSyntaxToken.CreateCSharpRawToken(csharpRawNode);
     }
 }

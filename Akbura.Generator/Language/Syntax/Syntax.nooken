@@ -84,6 +84,7 @@ token UtilitiesKeyword    = "utilities";
 // Raw text used as markup content between tags.
 literal AkTextLiteral : string;
 
+token CSharpRawToken;
 
 
 [id 500]
@@ -364,7 +365,7 @@ abstract node MarkupAttributeSyntax : MarkupSyntaxNode;
 /// Plain attribute: Name="Value".
 /// </summary>
 node MarkupPlainAttributeSyntax : MarkupAttributeSyntax {
-    Name        : IdentifierToken;
+    Name        : SimpleName;
     EqualsToken : EqualsToken;
     Value?      : MarkupAttributeValueSyntax;
 }
@@ -376,7 +377,7 @@ node MarkupPlainAttributeSyntax : MarkupAttributeSyntax {
 node MarkupPrefixedAttributeSyntax : MarkupAttributeSyntax {
     Prefix      : BindToken | OutToken;
     Colon       : ColonToken;
-    Name        : IdentifierToken;
+    Name        : SimpleName;
     EqualsToken : EqualsToken;
     Value?      : MarkupAttributeValueSyntax;
 }

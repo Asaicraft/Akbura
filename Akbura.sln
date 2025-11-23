@@ -14,6 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Akbura.UnitTests", "Akbura.UnitTests\Akbura.UnitTests.csproj", "{C32463C8-47CF-4A0C-BD5D-0EED4AF84E5B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +34,10 @@ Global
 		{AC0BD606-932E-40BE-8E6A-D20174A9A13C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AC0BD606-932E-40BE-8E6A-D20174A9A13C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AC0BD606-932E-40BE-8E6A-D20174A9A13C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C32463C8-47CF-4A0C-BD5D-0EED4AF84E5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C32463C8-47CF-4A0C-BD5D-0EED4AF84E5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C32463C8-47CF-4A0C-BD5D-0EED4AF84E5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C32463C8-47CF-4A0C-BD5D-0EED4AF84E5B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

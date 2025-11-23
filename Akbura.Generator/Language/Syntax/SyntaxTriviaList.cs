@@ -565,4 +565,6 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     {
         return new SyntaxTriviaList(trivia);
     }
+
+    
 }

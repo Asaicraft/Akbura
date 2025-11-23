@@ -449,6 +449,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitUseEffectDeclarationSyntax(this, argument);
         }
+
+        public new UseEffectDeclarationSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (UseEffectDeclarationSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new UseEffectDeclarationSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (UseEffectDeclarationSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

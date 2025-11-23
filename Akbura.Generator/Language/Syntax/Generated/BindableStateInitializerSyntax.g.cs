@@ -304,6 +304,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitBindableStateInitializerSyntax(this, argument);
         }
+
+        public new BindableStateInitializerSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (BindableStateInitializerSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new BindableStateInitializerSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (BindableStateInitializerSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

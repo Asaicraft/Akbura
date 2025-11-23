@@ -295,6 +295,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitMarkupDynamicAttributeValueSyntax(this, argument);
         }
+
+        public new MarkupDynamicAttributeValueSyntax WithLeadingTrivia(SyntaxTriviaList trivias)
+        {
+            return (MarkupDynamicAttributeValueSyntax)base.WithLeadingTrivia(trivias);
+        }
+
+        public new MarkupDynamicAttributeValueSyntax WithTrailingTrivia(SyntaxTriviaList trivias)
+        {
+            return (MarkupDynamicAttributeValueSyntax)base.WithTrailingTrivia(trivias);
+        }
     }
 
     internal static partial class SyntaxFactory

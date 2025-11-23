@@ -251,6 +251,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitTailwindNumericSegmentSyntax(this, argument);
         }
+
+        public new TailwindNumericSegmentSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TailwindNumericSegmentSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new TailwindNumericSegmentSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TailwindNumericSegmentSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

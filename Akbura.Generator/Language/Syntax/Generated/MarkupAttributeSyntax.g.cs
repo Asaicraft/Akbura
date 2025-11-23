@@ -32,6 +32,16 @@ namespace Akbura.Language.Syntax
 
         internal new global::Akbura.Language.Syntax.Green.GreenMarkupAttributeSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenMarkupAttributeSyntax>(base.Green);
+
+        public new MarkupAttributeSyntax WithLeadingTrivia(SyntaxTriviaList trivias)
+        {
+            return (MarkupAttributeSyntax)base.WithLeadingTrivia(trivias);
+        }
+
+        public new MarkupAttributeSyntax WithTrailingTrivia(SyntaxTriviaList trivias)
+        {
+            return (MarkupAttributeSyntax)base.WithTrailingTrivia(trivias);
+        }
     }
 }
 

@@ -21,6 +21,16 @@ namespace Akbura.Language.Syntax
         }
 
         internal new global::Akbura.Language.Syntax.Green.GreenTypeSyntax Green => System.Runtime.CompilerServices.Unsafe.As<global::Akbura.Language.Syntax.Green.GreenTypeSyntax>(base.Green);
+
+        public new TypeSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TypeSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new TypeSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TypeSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
 }

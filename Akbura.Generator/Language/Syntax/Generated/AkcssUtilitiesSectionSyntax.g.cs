@@ -375,6 +375,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitAkcssUtilitiesSectionSyntax(this, argument);
         }
+
+        public new AkcssUtilitiesSectionSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssUtilitiesSectionSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new AkcssUtilitiesSectionSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssUtilitiesSectionSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

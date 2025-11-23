@@ -277,6 +277,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitParameterSyntax(this, argument);
         }
+
+        public new ParameterSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (ParameterSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new ParameterSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (ParameterSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

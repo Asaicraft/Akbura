@@ -311,6 +311,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitCSharpBlockSyntax(this, argument);
         }
+
+        public new CSharpBlockSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (CSharpBlockSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new CSharpBlockSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (CSharpBlockSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

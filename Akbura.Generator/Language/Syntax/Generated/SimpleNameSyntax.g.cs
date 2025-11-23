@@ -47,6 +47,17 @@ namespace Akbura.Language.Syntax
         }
 
         public abstract SimpleNameSyntax UpdateSimpleName(global::Akbura.Language.Syntax.SyntaxToken Identifier);
+
+        public new SimpleNameSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (SimpleNameSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new SimpleNameSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (SimpleNameSyntax)base.WithTrailingTrivia(trivia);
+        }
+
     }
 
 }

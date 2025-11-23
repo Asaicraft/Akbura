@@ -363,6 +363,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitMarkupStartTagSyntax(this, argument);
         }
+
+        public new MarkupStartTagSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (MarkupStartTagSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new MarkupStartTagSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (MarkupStartTagSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

@@ -30,6 +30,16 @@ namespace Akbura.Language.Syntax
 
         internal new global::Akbura.Language.Syntax.Green.GreenAkTopLevelMemberSyntax Green
             => System.Runtime.CompilerServices.Unsafe.As<global::Akbura.Language.Syntax.Green.GreenAkTopLevelMemberSyntax>(base.Green);
+
+        public new AkTopLevelMemberSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkTopLevelMemberSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new AkTopLevelMemberSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkTopLevelMemberSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 }
 #nullable restore

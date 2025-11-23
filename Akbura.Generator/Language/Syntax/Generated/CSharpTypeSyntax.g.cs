@@ -237,6 +237,17 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitCSharpTypeSyntax(this, argument);
         }
+
+        public new CSharpTypeSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (CSharpTypeSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new CSharpTypeSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (CSharpTypeSyntax)base.WithTrailingTrivia(trivia);
+        }
+
     }
 
     internal static partial class SyntaxFactory

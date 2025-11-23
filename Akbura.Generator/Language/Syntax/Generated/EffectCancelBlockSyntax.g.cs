@@ -284,6 +284,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitEffectCancelBlockSyntax(this, argument);
         }
+
+        public new EffectCancelBlockSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (EffectCancelBlockSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new EffectCancelBlockSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (EffectCancelBlockSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

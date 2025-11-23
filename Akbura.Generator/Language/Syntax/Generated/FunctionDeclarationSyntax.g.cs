@@ -459,6 +459,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitFunctionDeclarationSyntax(this, argument);
         }
+
+        public new FunctionDeclarationSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (FunctionDeclarationSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new FunctionDeclarationSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (FunctionDeclarationSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

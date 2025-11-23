@@ -69,6 +69,16 @@ namespace Akbura.Language.Syntax
 
         public abstract TailwindPrefixSegmentSyntax UpdateTailwindPrefixSegmentSyntax(
             SyntaxToken colon);
+
+        public new TailwindPrefixSegmentSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TailwindPrefixSegmentSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new TailwindPrefixSegmentSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TailwindPrefixSegmentSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 }
 

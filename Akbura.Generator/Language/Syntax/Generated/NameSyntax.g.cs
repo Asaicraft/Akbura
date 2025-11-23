@@ -22,6 +22,16 @@ namespace Akbura.Language.Syntax
         }
 
         internal new global::Akbura.Language.Syntax.Green.GreenNameSyntax Green => System.Runtime.CompilerServices.Unsafe.As<global::Akbura.Language.Syntax.Green.GreenNameSyntax>(base.Green);
+
+        public new NameSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (NameSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new NameSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (NameSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
 }

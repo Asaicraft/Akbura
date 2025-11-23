@@ -469,6 +469,17 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitAkcssIfDirectiveSyntax(this, argument);
         }
+
+        public new AkcssIfDirectiveSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssIfDirectiveSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new AkcssIfDirectiveSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssIfDirectiveSyntax)base.WithTrailingTrivia(trivia);
+        }
+
     }
 
     internal static partial class SyntaxFactory

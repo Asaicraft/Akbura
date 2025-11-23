@@ -40,6 +40,16 @@ namespace Akbura.Language.Syntax
 
         internal new global::Akbura.Language.Syntax.Green.GreenAkcssTopLevelMemberSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenAkcssTopLevelMemberSyntax>(base.Green);
+
+        public new AkcssTopLevelMemberSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssTopLevelMemberSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new AkcssTopLevelMemberSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssTopLevelMemberSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 }
 

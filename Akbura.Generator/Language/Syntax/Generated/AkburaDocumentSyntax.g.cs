@@ -288,6 +288,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitAkburaDocumentSyntax(this, argument);
         }
+
+        public new AkburaDocumentSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkburaDocumentSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new AkburaDocumentSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkburaDocumentSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

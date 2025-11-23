@@ -35,6 +35,16 @@ namespace Akbura.Language.Syntax
 
         internal new global::Akbura.Language.Syntax.Green.GreenTailwindAttributeSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenTailwindAttributeSyntax>(base.Green);
+
+        public new TailwindAttributeSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TailwindAttributeSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new TailwindAttributeSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (TailwindAttributeSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 }
 

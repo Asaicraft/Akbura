@@ -372,6 +372,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitMarkupPrefixedAttributeSyntax(this, argument);
         }
+
+        public new MarkupPrefixedAttributeSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (MarkupPrefixedAttributeSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new MarkupPrefixedAttributeSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (MarkupPrefixedAttributeSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

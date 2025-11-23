@@ -317,6 +317,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitSimpleConditionalPrefixSyntax(this, argument);
         }
+
+        public new SimpleConditionalPrefixSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (SimpleConditionalPrefixSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new SimpleConditionalPrefixSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (SimpleConditionalPrefixSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory

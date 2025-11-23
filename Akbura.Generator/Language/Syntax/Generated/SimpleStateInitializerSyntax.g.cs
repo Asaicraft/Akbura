@@ -268,6 +268,17 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitSimpleStateInitializerSyntax(this, argument);
         }
+
+        public new SimpleStateInitializerSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (SimpleStateInitializerSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new SimpleStateInitializerSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (SimpleStateInitializerSyntax)base.WithTrailingTrivia(trivia);
+        }
+
     }
 
     internal static partial class SyntaxFactory

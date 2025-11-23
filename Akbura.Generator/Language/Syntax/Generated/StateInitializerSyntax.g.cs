@@ -91,6 +91,16 @@ namespace Akbura.Language.Syntax
         {
             return null;
         }
+
+        public new StateInitializerSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (StateInitializerSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new StateInitializerSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (StateInitializerSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 }
 

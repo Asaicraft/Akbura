@@ -147,8 +147,6 @@ public class AkburaSyntaxFactoryTests
             )
         );
 
-        var text = stateWithBlankLine.ToFullString();
-
         // Markup root with the Button element
         var markupRoot = SyntaxFactory.MarkupRootSyntax(
             element: buttonElement

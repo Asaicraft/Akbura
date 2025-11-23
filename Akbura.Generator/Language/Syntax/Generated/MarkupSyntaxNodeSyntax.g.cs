@@ -36,6 +36,16 @@ namespace Akbura.Language.Syntax
 
         internal new global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax>(base.Green);
+
+        public new MarkupSyntaxNodeSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (MarkupSyntaxNodeSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new MarkupSyntaxNodeSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (MarkupSyntaxNodeSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 }
 

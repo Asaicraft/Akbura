@@ -174,7 +174,7 @@ void OpenForm()
 
   <For react={visible} key={t => t.Id}>
     <Grid Columns="24, *, auto, auto" class="row">
-      <CheckBox bind:Checked={ from => it.Done, change v => ToggleDone(it) }/>
+      <CheckBox Checked={bind(@in: () => it.Done, @out: (v) => ToggleDone(it))}/>
       <Stack>
         <Text class="task">{it.Title}</Text>
         <Text class="muted">#{it.Id}</Text>

@@ -82,7 +82,7 @@ async void SaveNew()
 
     try
     {
-        suppress(onCancel=discard, onError=discard)
+        suppress(onCancel=discard, onError=discard, () =>
         {
             var dto = new { Title = form.Title, Desc = form.Desc, Urgent = form.Urgent, Done = false };
 
@@ -96,7 +96,7 @@ async void SaveNew()
 
             form = new { Title = "", Desc = "", Urgent = false };
             showForm = false;
-        }
+        });
     }
     catch (Exception ex)
     {
@@ -111,7 +111,7 @@ async void SaveNew()
 // --- Toggle Done state with optimistic UI ---
 async void ToggleDone(item)
 {
-    suppress(onCancel=discard, onError=commit)
+    suppress(onCancel=discard, onError=commit, () =>
     {
         var idx  = tasks.FindIndex(t => t.Id == item.Id);
         var vIdx = visible.FindIndex(t => t.Id == item.Id);
@@ -124,7 +124,7 @@ async void ToggleDone(item)
         }
 
         await api.UpdateDone(item.Id, !item.Done);
-    }
+    });
 }
 
 void OpenForm()

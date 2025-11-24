@@ -11,18 +11,17 @@ namespace Akbura.Language.Syntax
         EndOfLineTrivia = 1000,
         WhitespaceTrivia = 1001,
 
-        // Literals
+        // Built-in literal tokens
         StringLiteralToken = 2000,
         CharLiteralToken = 2001,
         NumericLiteralToken = 2002,
 
-        // Identifiers and special tokens
         IdentifierToken = 3000,
         BadToken = 3001,
         EndOfFileToken = 3002,
 
         // ─────────────────────────────────────────────
-        // TOKENS WITH WELL-KNOWN TEXT (contiguous block)
+        // TOKENS WITH WELL-KNOWN TEXT (contiguous)
         // ─────────────────────────────────────────────
         FirstTokenWithWellKnownText = 100,
 
@@ -96,11 +95,10 @@ namespace Akbura.Language.Syntax
 
         LastTokenWithWellKnownText = 157,
 
-        // ─────────────────────────────────────────────
-        // DSL-specific literals and tokens
-        // ─────────────────────────────────────────────
-        AkTextLiteral = 200,
-        CSharpRawToken = 201,
+        // DSL-specific literal
+        AkTextLiteral = 201,
+
+        CSharpRawToken = 202,
 
         // ─────────────────────────────────────────────
         // SYNTAX NODES
@@ -137,61 +135,64 @@ namespace Akbura.Language.Syntax
         FunctionDeclarationSyntax = 517,
         ParameterSyntax = 518,
 
+        // User hooks
+        UserHook = 519,
+
         // Markup tree
-        MarkupSyntaxNode = 519,
-        MarkupRootSyntax = 520,
-        MarkupNodeSyntax = 521,
-        MarkupElementSyntax = 522,
-        MarkupStartTagSyntax = 523,
-        MarkupEndTagSyntax = 524,
+        MarkupSyntaxNode = 520,
+        MarkupRootSyntax = 521,
+        MarkupNodeSyntax = 522,
+        MarkupElementSyntax = 523,
+        MarkupStartTagSyntax = 524,
+        MarkupEndTagSyntax = 525,
 
         // Markup content nodes
-        MarkupContentSyntax = 525,
-        MarkupTextLiteralSyntax = 526,
-        MarkupElementContentSyntax = 527,
-        MarkupInlineExpressionSyntax = 528,
+        MarkupContentSyntax = 526,
+        MarkupTextLiteralSyntax = 527,
+        MarkupElementContentSyntax = 528,
+        MarkupInlineExpressionSyntax = 529,
 
         // Markup attributes
-        MarkupAttributeSyntax = 529,
-        MarkupPlainAttributeSyntax = 530,
-        MarkupPrefixedAttributeSyntax = 531,
-        MarkupAttributeValueSyntax = 532,
-        MarkupLiteralAttributeValueSyntax = 533,
-        MarkupDynamicAttributeValueSyntax = 534,
+        MarkupAttributeSyntax = 530,
+        MarkupPlainAttributeSyntax = 531,
+        MarkupPrefixedAttributeSyntax = 532,
+        MarkupAttributeValueSyntax = 533,
+        MarkupLiteralAttributeValueSyntax = 534,
+        MarkupDynamicAttributeValueSyntax = 535,
 
         // Tailwind attributes
-        TailwindAttributeSyntax = 535,
-        TailwindSegmentSyntax = 536,
-        TailwindIdentifierSegmentSyntax = 537,
-        TailwindNumericSegmentSyntax = 538,
-        TailwindExpressionSegmentSyntax = 539,
-        TailwindFlagAttributeSyntax = 540,
-        TailwindPrefixSegmentSyntax = 541,
-        SimpleConditionalPrefixSyntax = 542,
-        ExpressionConditionalPrefixSyntax = 543,
-        TailwindFullAttributeSyntax = 544,
+        TailwindAttributeSyntax = 536,
+        TailwindSegmentSyntax = 537,
+        TailwindIdentifierSegmentSyntax = 538,
+        TailwindNumericSegmentSyntax = 539,
+        TailwindExpressionSegmentSyntax = 540,
+        TailwindFlagAttributeSyntax = 541,
+        TailwindPrefixSegmentSyntax = 542,
+        SimpleConditionalPrefixSyntax = 543,
+        ExpressionConditionalPrefixSyntax = 544,
+        TailwindFullAttributeSyntax = 545,
 
         // AKCSS root
-        AkcssDocumentSyntax = 545,
-        AkcssTopLevelMember = 546,
+        AkcssDocumentSyntax = 546,
+        AkcssTopLevelMember = 547,
 
         // Shared body members
-        AkcssBodyMemberSyntax = 547,
-        AkcssAssignmentSyntax = 548,
-        AkcssIfDirectiveSyntax = 549,
-        AkcssAdditionalPseudoStateSyntax = 550,
-        AkcssPseudoSelectorSyntax = 551,
-        AkcssPseudoBlockSyntax = 552,
+        AkcssBodyMemberSyntax = 548,
+        AkcssAssignmentSyntax = 549,
+        AkcssIfDirectiveSyntax = 550,
+        AkcssAdditionalPseudoStateSyntax = 551,
+        AkcssPseudoSelectorSyntax = 552,
+        AkcssPseudoBlockSyntax = 553,
 
         // AKCSS style rules
-        AkcssStyleRuleSyntax = 553,
-        AkcssStyleSelectorSyntax = 554,
+        AkcssStyleRuleSyntax = 554,
+        AkcssStyleSelectorSyntax = 555,
 
         // AKCSS utilities
-        AkcssUtilitiesSectionSyntax = 555,
-        AkcssUtilityParameterSyntax = 556,
-        AkcssUtilitySelectorSyntax = 557,
-        AkcssUtilityDeclarationSyntax = 558,
+        AkcssUtilitiesSectionSyntax = 556,
+        AkcssUtilityParameterSyntax = 557,
+        AkcssUtilitySelectorSyntax = 558,
+        AkcssUtilityDeclarationSyntax = 559,
 
         // Identifiers and types
         Type = 700,

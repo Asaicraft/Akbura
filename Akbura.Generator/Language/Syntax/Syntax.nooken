@@ -275,6 +275,19 @@ node ParameterSyntax {
 }
 
 // ─────────────────────────────────────────────────────────────
+// User hooks
+// ─────────────────────────────────────────────────────────────
+
+node UserHook : AkTopLevelMember
+{
+    Name       : SimpleName;
+    OpenParen  : OpenParenToken;
+    Parameters : syntaxlist<CSharpExpressionSyntax, CommaToken>;
+    CloseParen : CloseParenToken;
+    Body       : CSharpBlockSyntax;
+}
+
+// ─────────────────────────────────────────────────────────────
 // MARKUP TREE (Razor-style component markup)
 // ─────────────────────────────────────────────────────────────
 

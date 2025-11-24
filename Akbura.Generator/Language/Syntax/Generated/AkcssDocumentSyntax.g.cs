@@ -293,6 +293,16 @@ namespace Akbura.Language.Syntax
         {
             return visitor.VisitAkcssDocumentSyntax(this, argument);
         }
+
+        public new AkcssDocumentSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssDocumentSyntax)base.WithLeadingTrivia(trivia);
+        }
+
+        public new AkcssDocumentSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
+        {
+            return (AkcssDocumentSyntax)base.WithTrailingTrivia(trivia);
+        }
     }
 
     internal static partial class SyntaxFactory
@@ -317,17 +327,6 @@ namespace Akbura.Language.Syntax
 
             return Unsafe.As<AkcssDocumentSyntax>(green.CreateRed(null, 0));
         }
-
-        public new AkcssDocumentSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
-        {
-            return (AkcssDocumentSyntax)base.WithLeadingTrivia(trivia);
-        }
-
-        public new AkcssDocumentSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
-        {
-            return (AkcssDocumentSyntax)base.WithTrailingTrivia(trivia);
-        }
-
     }
 
     internal partial class SyntaxVisitor

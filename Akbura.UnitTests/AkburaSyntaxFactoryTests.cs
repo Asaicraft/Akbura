@@ -8,6 +8,13 @@ public class AkburaSyntaxFactoryTests
     [Fact]
     public void Build_Syntax_For_ButtonClick()
     {
+        // state count = 0;
+        //
+        // <Button Click={count++}>
+        //     {count}
+        // </Button>
+
+
         //
         // state count = 0;
         //

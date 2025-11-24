@@ -127,6 +127,10 @@ node CSharpBlockSyntax {
     CloseBrace : CloseBraceToken;
 }
 
+node CSharpStatementSyntax {
+    Tokens : TokenList;
+}
+
 /// <summary>
 /// Inline expression used in markup: { expr }.
 /// </summary>

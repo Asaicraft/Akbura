@@ -127,7 +127,7 @@ node CSharpBlockSyntax {
     CloseBrace : CloseBraceToken;
 }
 
-node CSharpStatementSyntax {
+node CSharpStatementSyntax: AkTopLevelMember {
     Tokens : TokenList;
 }
 

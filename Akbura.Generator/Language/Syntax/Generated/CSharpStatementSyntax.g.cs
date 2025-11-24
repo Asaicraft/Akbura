@@ -10,7 +10,7 @@ using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
-    internal sealed partial class GreenCSharpStatementSyntax : global::Akbura.Language.Syntax.Green.GreenNode
+    internal sealed partial class GreenCSharpStatementSyntax : global::Akbura.Language.Syntax.Green.GreenAkTopLevelMemberSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenNode? _tokens;
 
@@ -173,7 +173,7 @@ namespace Akbura.Language.Syntax.Green
 
 namespace Akbura.Language.Syntax
 {
-    internal sealed partial class CSharpStatementSyntax : global::Akbura.Language.Syntax.AkburaSyntax
+    internal sealed partial class CSharpStatementSyntax : global::Akbura.Language.Syntax.AkTopLevelMemberSyntax
     {
         public CSharpStatementSyntax(
             global::Akbura.Language.Syntax.Green.GreenCSharpStatementSyntax greenNode,

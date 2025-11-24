@@ -12,7 +12,7 @@ internal partial class GreenSyntaxToken : GreenNode
         IsMissing = false;
     }
 
-    public GreenSyntaxToken(SyntaxKind kind): this(kind, null, null)
+    public GreenSyntaxToken(SyntaxKind kind) : this(kind, null, null)
     {
         FullWidth = Text?.Length ?? 0;
         IsMissing = false;
@@ -107,6 +107,21 @@ internal partial class GreenSyntaxToken : GreenNode
         }
 
         return new SyntaxTokenWithTrivia(kind, leading, trailing);
+    }
+
+    public static GreenSyntaxToken CreateTokenWithTrailingSpace(SyntaxKind kind)
+    {
+        if (kind > LastTokenWithWellKnownText)
+        {
+            if (!SyntaxFacts.IsAnyToken(kind))
+            {
+                ThrowHelper.ThisMethodCanOnlyBeUsedToCreateTokens(kind, nameof(kind));
+            }
+
+            return CreateMissing(kind, null, GreenSyntaxFactory.Space);
+        }
+
+        return s_tokensWithSingleTrailingSpace[(ushort)kind];
     }
 
     /// <summary>Creates a missing token.</summary>
@@ -267,12 +282,22 @@ internal partial class GreenSyntaxToken : GreenNode
 
     public static CSharpRawToken CreateCSharpRawToken(string rawText)
     {
-        return new CSharpRawToken(rawText, null, null);
+        return new CSharpRawToken(rawText, null, null, null, null);
     }
 
     public static CSharpRawToken CreateCSharpRawToken(CsharpRawNode rawNode)
     {
-        return new CSharpRawToken(rawNode, null, null);
+        return new CSharpRawToken(rawNode, null, null, null, null);
+    }
+
+    public static GreenSyntaxToken AkTextLiteral(string rawText)
+    {
+        return new SyntaxTokenWithValue<string>(SyntaxKind.AkTextLiteral, rawText, rawText);
+    }
+
+    internal static GreenNode? AkTextLiteralToken(string rawText, string value)
+    {
+        return new SyntaxTokenWithValue<string>(SyntaxKind.AkTextLiteral, rawText, value);
     }
 
     public override string ToString()

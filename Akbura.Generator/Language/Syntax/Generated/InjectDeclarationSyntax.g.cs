@@ -237,7 +237,7 @@ namespace Akbura.Language.Syntax
             => (SimpleNameSyntax)GetRed(ref _name, 2)!;
 
         public SyntaxToken Semicolon
-            => new(this, this.Green.Semicolon, GetChildPositionFromEnd(1), GetChildIndex(3));
+            => new(this, this.Green.Semicolon, GetChildPositionFromEnd(3), GetChildIndex(3));
 
         public InjectDeclarationSyntax UpdateInjectDeclarationSyntax(
             SyntaxToken injectKeyword,

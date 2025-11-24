@@ -588,4 +588,597 @@ public class AkburaSyntaxFactoryTests
 
         Assert.Equal(expected, text);
     }
+
+    [Fact]
+    public void Build_Syntax_For_Full_Akbura_Document()
+    {
+        var nl = new SyntaxTriviaList(LineFeed);
+        var doubleNl = new SyntaxTriviaList(LineFeed, LineFeed);
+        var space = new SyntaxTriviaList(Space);                              // single " "
+        var indent4 = new SyntaxTriviaList(Whitespace("    "));               // 4 spaces
+        var indent8 = new SyntaxTriviaList(Whitespace("        "));           // 8 spaces
+        var nlIndent6 = new SyntaxTriviaList(LineFeed, Whitespace("      ")); // 6 spaces and newline
+
+        //
+        // inject ILogger<ProfileWithTasks> log;
+        //
+        var injectLog = InjectDeclarationSyntax(
+            injectKeyword: TokenWithTrailingSpace(SyntaxKind.InjectKeyword),
+            type: CSharpTypeSyntax(
+                TokenList(
+                    CSharpRawToken("ILogger<ProfileWithTasks>").WithTrailingTrivia(space)
+                )
+            ),
+            name: IdentifierName("log"),
+            semicolon: Token(SyntaxKind.SemicolonToken)
+        ).WithTrailingTrivia(nl);
+
+        //
+        // inject IViewModel viewModel;
+        //
+        var iViewModelToken = Identifier("IViewModel").WithTrailingTrivia(space);
+
+        var injectViewModel = InjectDeclarationSyntax(
+            injectKeyword: Token(SyntaxKind.InjectKeyword)
+                .WithTrailingTrivia(space),
+            type: CSharpTypeSyntax(
+                TokenList(iViewModelToken)
+            ),
+            name: IdentifierName("viewModel"),
+            semicolon: Token(SyntaxKind.SemicolonToken)
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // param bind int UserId = 1;
+        //
+        var intToken = Identifier("int").WithTrailingTrivia(space);
+
+        var paramBindUserId = ParamDeclarationSyntax(
+            paramKeyword: Token(SyntaxKind.ParamKeyword)
+                .WithTrailingTrivia(space),
+            bindingKeyword: Token(SyntaxKind.BindToken)
+                .WithTrailingTrivia(space),
+            type: CSharpTypeSyntax(
+                TokenList(intToken)
+            ),
+            name: IdentifierName("UserId").WithTrailingTrivia(space),
+            equalsToken: Token(SyntaxKind.EqualsToken)
+                .WithTrailingTrivia(space),
+            defaultValue: CSharpExpressionSyntax(
+                TokenList(
+                    NumericLiteralToken("1", 1)
+                )
+            ),
+            semicolon: Token(SyntaxKind.SemicolonToken)
+        ).WithTrailingTrivia(nl);
+
+        //
+        // param out Result = "hello";
+        //
+        var paramOutResult = ParamDeclarationSyntax(
+            paramKeyword: Token(SyntaxKind.ParamKeyword)
+                .WithTrailingTrivia(space),
+            bindingKeyword: Token(SyntaxKind.OutToken)
+                .WithTrailingTrivia(space),
+            type: null,
+            name: IdentifierName("Result").WithTrailingTrivia(space),
+            equalsToken: TokenWithTrailingSpace(SyntaxKind.EqualsToken),
+            defaultValue: CSharpExpressionSyntax(
+                 [CSharpRawToken("\"hello\"")]    
+            ),
+            semicolon: Token(SyntaxKind.SemicolonToken)
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // state count = 0;
+        //
+        var stateCount = StateDeclarationSyntax(
+            stateKeyword: Token(SyntaxKind.StateKeyword)
+                .WithTrailingTrivia(space),
+            type: null,
+            name: IdentifierName("count")
+                .WithTrailingTrivia(space),
+            equalsToken: Token(SyntaxKind.EqualsToken)
+                .WithTrailingTrivia(space),
+            initializer: SimpleStateInitializerSyntax(
+                CSharpExpressionSyntax(
+                    TokenList(
+                        NumericLiteralToken("0", 0)
+                    )
+                )
+            ),
+            semicolon: Token(SyntaxKind.SemicolonToken)
+        ).WithTrailingTrivia(nl);
+
+        //
+        // state ReactList tasks = bind viewModel.Tasks;
+        //
+        var reactListToken = Identifier("ReactList").WithTrailingTrivia(space);
+
+        var stateTasks = StateDeclarationSyntax(
+            stateKeyword: Token(SyntaxKind.StateKeyword)
+                .WithTrailingTrivia(space),
+            type: CSharpTypeSyntax(
+                TokenList(reactListToken)
+            ),
+            name: IdentifierName("tasks")
+                .WithTrailingTrivia(space),
+            equalsToken: Token(SyntaxKind.EqualsToken)
+                .WithTrailingTrivia(space),
+            initializer: BindableStateInitializerSyntax(
+                bindingKeyword: Token(SyntaxKind.BindToken)
+                    .WithTrailingTrivia(space),
+                expression: CSharpExpressionSyntax(
+                    TokenList(
+                        CSharpRawToken("viewModel.Tasks")
+                    )
+                )
+            ),
+            semicolon: Token(SyntaxKind.SemicolonToken)
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // useEffect(UserId, tasks) { }
+        // cancel { }
+        // finally { }
+        //
+        var useEffectBody = CSharpBlockSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken)
+                .WithTrailingTrivia(nl),
+            tokens: List<AkTopLevelMemberSyntax>(),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+                .WithTrailingTrivia(nl)
+        );
+
+        var cancelBody = CSharpBlockSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken)
+                .WithTrailingTrivia(nl),
+            tokens: List<AkTopLevelMemberSyntax>(),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+                .WithTrailingTrivia(nl)
+        );
+
+        var finallyBody = CSharpBlockSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken)
+                .WithTrailingTrivia(nl),
+            tokens: List<AkTopLevelMemberSyntax>(),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+                .WithTrailingTrivia(nl)
+        );
+
+        var useEffect = UseEffectDeclarationSyntax(
+            useEffectKeyword: Token(SyntaxKind.UseEffectKeyword),
+            openParen: Token(SyntaxKind.OpenParenToken),
+            parameters: SeparatedList<SimpleNameSyntax>(
+                [
+                    IdentifierName("UserId"),
+                    IdentifierName("tasks")
+                ]
+            ),
+            closeParen: TokenWithTrailingSpace(SyntaxKind.CloseParenToken),
+            body: useEffectBody,
+            cancelBlock: EffectCancelBlockSyntax(
+                cancelKeyword: Token(SyntaxKind.CancelKeyword),
+                body: cancelBody
+            ),
+            finallyBlock: EffectFinallyBlockSyntax(
+                finallyKeyword: Token(SyntaxKind.FinallyKeyword),
+                body: finallyBody
+            )
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // command int CustomClick(int a);
+        //
+        var commandParam = ParameterSyntax(
+            type: CSharpTypeSyntax(
+                TokenList(
+                    intToken
+                )
+            ),
+            identifier: IdentifierName("a")
+        );
+
+        var command = CommandDeclarationSyntax(
+            commandKeyword: Token(SyntaxKind.CommandKeyword)
+                .WithTrailingTrivia(space),
+            returnType: CSharpTypeSyntax(
+                TokenList(
+                    intToken
+                )
+            ),
+            name: IdentifierName("CustomClick"),
+            openParen: Token(SyntaxKind.OpenParenToken),
+            parameters: SingletonSeparatedList<ParameterSyntax>(
+                commandParam
+            ),
+            closeParen: Token(SyntaxKind.CloseParenToken),
+            semicolon: Token(SyntaxKind.SemicolonToken)
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // async void SaveNew(int id) { }
+        //
+        var saveNewBody = CSharpBlockSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken)
+                .WithTrailingTrivia(nl),
+            tokens: List<AkTopLevelMemberSyntax>(),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+                .WithTrailingTrivia(nl)
+        );
+
+        var saveNewParam = ParameterSyntax(
+            type: CSharpTypeSyntax(
+                TokenList(
+                    intToken
+                )
+            ),
+            identifier: IdentifierName("id")
+        );
+
+        var saveNewFunc = FunctionDeclarationSyntax(
+            asyncKeyword: Token(SyntaxKind.AsyncKeyword)
+                .WithTrailingTrivia(space),
+            returnType: CSharpTypeSyntax(
+                TokenList(
+                    CSharpRawToken("void ")
+                )
+            ),
+            name: IdentifierName("SaveNew"),
+            openParen: Token(SyntaxKind.OpenParenToken),
+            parameters: SingletonSeparatedList<ParameterSyntax>(
+                saveNewParam
+            ),
+            closeParen: Token(SyntaxKind.CloseParenToken),
+            body: saveNewBody
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // onMounted(UserId, tasks) { }
+        //
+        var hookBody = CSharpBlockSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken)
+                .WithTrailingTrivia(nl),
+            tokens: List<AkTopLevelMemberSyntax>(),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+                .WithTrailingTrivia(nl)
+        );
+
+        var hook = UserHook(
+            name: IdentifierName("onMounted"),
+            openParen: Token(SyntaxKind.OpenParenToken),
+            parameters: SeparatedList(
+                [
+                    CSharpExpressionSyntax(
+                        TokenList(
+                            Identifier("UserId")
+                        )
+                    ),
+                    CSharpExpressionSyntax(
+                        TokenList(
+                            Identifier("tasks")
+                        )
+                    )
+                ]
+            ),
+            closeParen: Token(SyntaxKind.CloseParenToken),
+            body: hookBody
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // Embedded C# statement as AkTopLevelMember:
+        // Console.WriteLine("Hello from Akbura");
+        //
+        var csharpStatement = CSharpStatementSyntax(
+            tokens: TokenList(
+                CSharpRawToken("Console.WriteLine(\"Hello from Akbura\");")
+            ),
+            body: null
+        ).WithTrailingTrivia(doubleNl);
+
+        //
+        // MARKUP:
+        //
+        // <Grid Title="Dashboard"
+        //       bind:Search={search}
+        //       flex
+        //       md:w-40
+        //       {isMobile}:h-15>
+        //     <Button Click={count++} out:Result={CustomClick}>
+        //         {count}
+        //     </Button>
+        // </Grid>
+        //
+
+        var less = Token(SyntaxKind.LessThanToken);
+        var greater = Token(SyntaxKind.GreaterThanToken);
+        var lessSlash = Token(SyntaxKind.LessSlashToken);
+
+        var gridName = IdentifierName("Grid");
+        var buttonName = IdentifierName("Button");
+
+        // Title="Dashboard"
+        var titleLiteral = AkTextLiteral("\"Dashboard\"", "Dashboard");
+        var titleText = MarkupTextLiteralSyntax(
+            textTokens: TokenList(titleLiteral)
+        );
+        var titleValue = MarkupLiteralAttributeValueSyntax(
+            prefix: null,
+            value: titleText
+        );
+        var titleAttribute = MarkupPlainAttributeSyntax(
+            name: IdentifierName("Title"),
+            equalsToken: Token(SyntaxKind.EqualsToken),
+            value: titleValue
+        );
+
+        // bind:Search={search}
+        var searchExpression = InlineExpressionSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken),
+            expression: CSharpExpressionSyntax(
+                TokenList(
+                    Identifier("search")
+                )
+            ),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+        );
+
+        var bindSearchAttribute = MarkupPrefixedAttributeSyntax(
+            prefix: Token(SyntaxKind.BindToken),
+            colon: Token(SyntaxKind.ColonToken),
+            name: IdentifierName("Search"),
+            equalsToken: Token(SyntaxKind.EqualsToken),
+            value: MarkupDynamicAttributeValueSyntax(
+                prefix: null,
+                expression: searchExpression
+            )
+        );
+
+        // flex (TailwindFlagAttributeSyntax)
+        var flexAttribute = TailwindFlagAttributeSyntax(
+            name: IdentifierName("flex")
+        );
+
+        // md:w-40 (TailwindFullAttributeSyntax with simple conditional prefix)
+        var mdPrefix = SimpleConditionalPrefixSyntax(
+            name: IdentifierName("md"),
+            colon: Token(SyntaxKind.ColonToken)
+        );
+
+        var mdWidthSegment = TailwindNumericSegmentSyntax(
+            number: NumericLiteralToken("40", 40)
+        );
+
+        var mdWidthAttribute = TailwindFullAttributeSyntax(
+            prefix: mdPrefix,
+            name: IdentifierName("w"),
+            minus: Token(SyntaxKind.MinusToken),
+            segments: SingletonSeparatedList<TailwindSegmentSyntax>(
+                mdWidthSegment
+            )
+        );
+
+        // {isMobile}:h-15 (TailwindFullAttributeSyntax with expression-based prefix)
+        var isMobileInline = InlineExpressionSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken),
+            expression: CSharpExpressionSyntax(
+                TokenList(
+                    Identifier("isMobile")
+                )
+            ),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+        );
+
+        var mobilePrefix = ExpressionConditionalPrefixSyntax(
+            expression: isMobileInline,
+            colon: Token(SyntaxKind.ColonToken)
+        );
+
+        var mobileHeightSegment = TailwindNumericSegmentSyntax(
+            number: NumericLiteralToken("15", 15)
+        );
+
+        var mobileHeightAttr = TailwindFullAttributeSyntax(
+            prefix: mobilePrefix,
+            name: IdentifierName("h"),
+            minus: Token(SyntaxKind.MinusToken),
+            segments: SingletonSeparatedList<TailwindSegmentSyntax>(
+                mobileHeightSegment
+            )
+        );
+
+        // <Grid ...>
+        var gridStartTag = MarkupStartTagSyntax(
+            lessToken: less,
+            name: gridName.WithTrailingTrivia(space),
+            attributes: List<MarkupAttributeSyntax>(
+                [
+                    titleAttribute.WithTrailingTrivia(nlIndent6),
+                    bindSearchAttribute.WithTrailingTrivia(nlIndent6),
+                    flexAttribute.WithTrailingTrivia(nlIndent6),
+                    mdWidthAttribute.WithTrailingTrivia(nlIndent6),
+                    mobileHeightAttr
+                ]
+            ),
+            closeToken: greater.WithTrailingTrivia(nl)
+        );
+
+        var gridEndTag = MarkupEndTagSyntax(
+            lessSlashToken: lessSlash,
+            name: gridName,
+            greaterToken: greater
+        );
+
+        //
+        // <Button Click={count++} out:Result={Console.WriteLine(@value)}>
+        //     {count}
+        // </Button>
+        //
+
+        // Click={count++}
+        var countPlusTokens = TokenList(
+            CSharpRawToken("count++")
+        );
+
+        var clickInline = InlineExpressionSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken),
+            expression: CSharpExpressionSyntax(countPlusTokens),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+        );
+
+        var clickAttribute = MarkupPlainAttributeSyntax(
+            name: IdentifierName("Click"),
+            equalsToken: Token(SyntaxKind.EqualsToken),
+            value: MarkupDynamicAttributeValueSyntax(
+                prefix: null,
+                expression: clickInline
+            )
+        );
+
+        // out:Result={Console.WriteLine(@value)}
+        var customClickInline = InlineExpressionSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken),
+            expression: CSharpExpressionSyntax(
+                TokenList(
+                    Identifier("Console.WriteLine(@value)")
+                )
+            ),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+        );
+
+        var outResultAttribute = MarkupPrefixedAttributeSyntax(
+            prefix: Token(SyntaxKind.OutToken),
+            colon: Token(SyntaxKind.ColonToken),
+            name: IdentifierName("Result"),
+            equalsToken: Token(SyntaxKind.EqualsToken),
+            value: MarkupDynamicAttributeValueSyntax(
+                prefix: null,
+                expression: customClickInline
+            )
+        );
+
+        var buttonStartTag = MarkupStartTagSyntax(
+            lessToken: less,
+            name: buttonName.WithTrailingTrivia(space),
+            attributes: List<MarkupAttributeSyntax>(
+                [
+                    clickAttribute.WithTrailingTrivia(space),
+                    outResultAttribute
+                ]
+            ),
+            closeToken: greater.WithTrailingTrivia(nl)
+        ).WithLeadingTrivia(indent4);
+
+        var buttonEndTag = MarkupEndTagSyntax(
+            lessSlashToken: lessSlash,
+            name: buttonName,
+            greaterToken: greater
+        ).WithLeadingTrivia(indent4)
+         .WithTrailingTrivia(nl);
+
+        // {count}
+        var countInline = InlineExpressionSyntax(
+            openBrace: Token(SyntaxKind.OpenBraceToken),
+            expression: CSharpExpressionSyntax(
+                TokenList(
+                    Identifier("count")
+                )
+            ),
+            closeBrace: Token(SyntaxKind.CloseBraceToken)
+        );
+
+        var buttonBody = MarkupInlineExpressionSyntax(
+            expression: countInline
+        ).WithLeadingTrivia(indent8)
+         .WithTrailingTrivia(nl);
+
+        var buttonElement = MarkupElementSyntax(
+            startTag: buttonStartTag,
+            body: SingletonList<MarkupContentSyntax>(
+                buttonBody
+            ),
+            endTag: buttonEndTag
+        );
+
+        var gridBodyContent = MarkupElementContentSyntax(
+            element: buttonElement
+        );
+
+        var gridElement = MarkupElementSyntax(
+            startTag: gridStartTag,
+            body: SingletonList<MarkupContentSyntax>(
+                gridBodyContent
+            ),
+            endTag: gridEndTag
+        );
+
+        var markupRoot = MarkupRootSyntax(
+            element: gridElement
+        );
+
+        //
+        // Final AkburaDocumentSyntax
+        //
+        var document = AkburaDocumentSyntax(
+            members: List<AkTopLevelMemberSyntax>(
+                [
+                    injectLog,
+                    injectViewModel,
+                    paramBindUserId,
+                    paramOutResult,
+                    stateCount,
+                    stateTasks,
+                    useEffect,
+                    command,
+                    saveNewFunc,
+                    hook,
+                    csharpStatement,
+                    markupRoot
+                ]
+            ),
+            endOfFile: EndOfFileToken()
+        );
+
+        var actual = document.ToFullString();
+
+        const string expected = """
+        inject ILogger<ProfileWithTasks> log;
+        inject IViewModel viewModel;
+
+        param bind int UserId = 1;
+        param out Result = "hello";
+
+        state count = 0;
+        state ReactList tasks = bind viewModel.Tasks;
+
+        useEffect(UserId, tasks) {
+        }
+        cancel{
+        }
+        finally{
+        }
+
+        command int CustomClick(int a);
+
+        async void SaveNew(int id){
+        }
+
+        onMounted(UserId, tasks){
+        }
+
+        Console.WriteLine("Hello from Akbura");
+
+        <Grid Title="Dashboard"
+              bind:Search={search}
+              flex
+              md:w-40
+              {isMobile}:h-15>
+            <Button Click={count++} out:Result={Console.WriteLine(@value)}>
+                {count}
+            </Button>
+        </Grid>
+        """;
+
+        Assert.Equal(expected.ReplaceLineEndings("\n"), actual);
+    }
 }

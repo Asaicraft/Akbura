@@ -122,7 +122,7 @@ internal static partial class SyntaxFactory
 
     public static SyntaxToken TokenWithTrailingSpace(SyntaxKind kind)
     {
-        return Token(default, kind, new(Space));
+        return new(GreenSyntaxFactory.TokenWithTrailingSpace(kind));
     }
 
     /// <summary>
@@ -275,11 +275,11 @@ internal static partial class SyntaxFactory
 
         builder.Add(firstNode);
 
-        var commaToken = Token(SyntaxKind.CommaToken);
+        var separator = firstNode.Green.CreateSeparator(firstNode);
 
         do
         {
-            builder.AddSeparator(commaToken);
+            builder.AddSeparator(separator);
             builder.Add(enumerator.Current);
         }
         while (enumerator.MoveNext());
@@ -486,6 +486,16 @@ internal static partial class SyntaxFactory
     public static SyntaxToken CSharpRawToken(CsharpRawNode csharpRawNode)
     {
         return new SyntaxToken(GreenSyntaxFactory.CSharpRawToken(csharpRawNode));
+    }
+
+    public static SyntaxToken AkTextLiteral(string text)
+    {
+        return new SyntaxToken(GreenSyntaxFactory.AkTextLiteral(text));
+    }
+
+    public static SyntaxToken AkTextLiteral(string text, string value)
+    {
+        return new SyntaxToken(GreenSyntaxFactory.AkTextLiteralToken(text, value));
     }
 
     public static SyntaxToken EndOfFileToken()

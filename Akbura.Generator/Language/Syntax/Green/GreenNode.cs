@@ -582,7 +582,7 @@ internal abstract partial class GreenNode
 
     public virtual SyntaxToken CreateSeparator(AkburaSyntax element)
     {
-        return SyntaxFactory.Token(SyntaxKind.CommaToken);
+        return SyntaxFactory.TokenWithTrailingSpace(SyntaxKind.CommaToken);
     }
 
     public virtual bool IsTriviaWithEndOfLine()

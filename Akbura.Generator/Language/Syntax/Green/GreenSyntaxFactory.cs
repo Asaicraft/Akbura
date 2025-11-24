@@ -79,12 +79,22 @@ internal static partial class GreenSyntaxFactory
 
     public static GreenSyntaxToken Token(SyntaxKind kind)
     {
-        Debug.Assert(!SyntaxFacts.IsAnyToken(kind));
+        Debug.Assert(SyntaxFacts.IsAnyToken(kind));
         Debug.Assert(kind != SyntaxKind.IdentifierToken);
         Debug.Assert(kind != SyntaxKind.CharLiteralToken);
         Debug.Assert(kind != SyntaxKind.NumericLiteralToken);
 
         return GreenSyntaxToken.Create(kind);
+    }
+
+    public static GreenSyntaxToken TokenWithTrailingSpace(SyntaxKind kind)
+    {
+        Debug.Assert(SyntaxFacts.IsAnyToken(kind));
+        Debug.Assert(kind != SyntaxKind.IdentifierToken);
+        Debug.Assert(kind != SyntaxKind.CharLiteralToken);
+        Debug.Assert(kind != SyntaxKind.NumericLiteralToken);
+
+        return GreenSyntaxToken.CreateTokenWithTrailingSpace(kind);
     }
 
     public static GreenSyntaxToken Token(GreenNode? leading, SyntaxKind kind, GreenNode? trailing)
@@ -105,7 +115,7 @@ internal static partial class GreenSyntaxFactory
 
     public static GreenSyntaxToken Token(GreenNode leading, SyntaxKind kind, string text, string valueText, GreenNode trailing)
     {
-        Debug.Assert(!SyntaxFacts.IsAnyToken(kind));
+        Debug.Assert(SyntaxFacts.IsAnyToken(kind));
         Debug.Assert(kind != SyntaxKind.IdentifierToken);
         Debug.Assert(kind != SyntaxKind.CharLiteralToken);
         Debug.Assert(kind != SyntaxKind.NumericLiteralToken);
@@ -311,5 +321,15 @@ internal static partial class GreenSyntaxFactory
     public static GreenSyntaxToken CSharpRawToken(CsharpRawNode csharpRawNode)
     {
         return GreenSyntaxToken.CreateCSharpRawToken(csharpRawNode);
+    }
+
+    public static GreenNode? AkTextLiteral(string text)
+    {
+        return GreenSyntaxToken.AkTextLiteral(text);
+    }
+
+    public static GreenNode? AkTextLiteralToken(string text, string value)
+    {
+        return GreenSyntaxToken.AkTextLiteralToken(text, value);
     }
 }

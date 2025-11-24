@@ -128,7 +128,7 @@ internal abstract partial class GreenNode
 
 
     internal virtual bool IsToken => false;
-    internal virtual bool IsList => false;
+    internal bool IsList => _rawKind == ListKind;
     internal virtual bool IsTrivia => false;
 
     public int FullWidth

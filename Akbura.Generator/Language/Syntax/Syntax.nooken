@@ -123,12 +123,13 @@ node CSharpExpressionSyntax {
 /// </summary>
 node CSharpBlockSyntax {
     OpenBrace  : OpenBraceToken;
-    Tokens     : TokenList;      // contents without the outer braces
+    Tokens     : syntaxlist<AkTopLevelMember>;
     CloseBrace : CloseBraceToken;
 }
 
 node CSharpStatementSyntax: AkTopLevelMember {
     Tokens : TokenList;
+    Body?  : CSharpBlockSyntax;
 }
 
 /// <summary>

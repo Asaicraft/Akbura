@@ -30,6 +30,7 @@ namespace Akbura.Language.Syntax.Green
 
             AkburaDebug.Assert(this.OpenBrace != null);
             AkburaDebug.Assert(this.CloseBrace != null);
+
             AkburaDebug.Assert(this.OpenBrace.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenBraceToken);
             AkburaDebug.Assert(this.CloseBrace.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseBraceToken);
 
@@ -50,21 +51,23 @@ namespace Akbura.Language.Syntax.Green
             Flags = flags;
         }
 
-        public GreenSyntaxList<GreenSyntaxToken> Tokens => new(_tokens);
+        public GreenSyntaxList<GreenAkTopLevelMemberSyntax> Tokens => new(_tokens);
 
         public GreenCSharpBlockSyntax UpdateCSharpBlockSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken openBrace,
             global::Akbura.Language.Syntax.Green.GreenNode? tokens,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
         {
-            if (this.OpenBrace == openBrace && this._tokens == tokens && this.CloseBrace == closeBrace)
+            if (this.OpenBrace == openBrace &&
+                this._tokens == tokens &&
+                this.CloseBrace == closeBrace)
             {
                 return this;
             }
 
             var newNode = GreenSyntaxFactory.CSharpBlockSyntax(
                 openBrace,
-                tokens.ToGreenList<GreenSyntaxToken>(),
+                tokens.ToGreenList<GreenAkTopLevelMemberSyntax>(),
                 closeBrace);
 
             var diagnostics = GetDiagnostics();
@@ -84,17 +87,17 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenCSharpBlockSyntax WithOpenBrace(global::Akbura.Language.Syntax.Green.GreenSyntaxToken openBrace)
         {
-            return UpdateCSharpBlockSyntax(openBrace, _tokens, CloseBrace);
+            return UpdateCSharpBlockSyntax(openBrace, this._tokens, this.CloseBrace);
         }
 
-        public GreenCSharpBlockSyntax WithTokens(global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenSyntaxToken> tokens)
+        public GreenCSharpBlockSyntax WithTokens(global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenAkTopLevelMemberSyntax> tokens)
         {
-            return UpdateCSharpBlockSyntax(OpenBrace, tokens.Node, CloseBrace);
+            return UpdateCSharpBlockSyntax(this.OpenBrace, tokens.Node, this.CloseBrace);
         }
 
         public GreenCSharpBlockSyntax WithCloseBrace(global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
         {
-            return UpdateCSharpBlockSyntax(OpenBrace, _tokens, closeBrace);
+            return UpdateCSharpBlockSyntax(this.OpenBrace, this._tokens, closeBrace);
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
@@ -143,33 +146,36 @@ namespace Akbura.Language.Syntax.Green
     {
         public static GreenCSharpBlockSyntax CSharpBlockSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken openBrace,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenSyntaxToken> tokens,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenAkTopLevelMemberSyntax> tokens,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
         {
-            Debug.Assert(openBrace != null);
-            Debug.Assert(closeBrace != null);
-            Debug.Assert(
-                openBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenBraceToken ||
-                false);
-            Debug.Assert(
-                closeBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseBraceToken ||
-                false);
+            AkburaDebug.Assert(openBrace != null);
+            AkburaDebug.Assert(closeBrace != null);
+
+            AkburaDebug.Assert(openBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenBraceToken);
+            AkburaDebug.Assert(closeBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseBraceToken);
 
             var kind = global::Akbura.Language.Syntax.SyntaxKind.CSharpBlockSyntax;
             int hash;
-            var cache = Unsafe.As<GreenCSharpBlockSyntax?>(GreenNodeCache.TryGetNode(
-                (ushort)kind,
-                openBrace,
-                tokens.Node,
-                closeBrace,
-                out hash));
+            var cache = Unsafe.As<GreenCSharpBlockSyntax?>(
+                GreenNodeCache.TryGetNode(
+                    (ushort)kind,
+                    openBrace,
+                    tokens.Node,
+                    closeBrace,
+                    out hash));
 
             if (cache != null)
             {
                 return cache;
             }
 
-            var result = new GreenCSharpBlockSyntax(openBrace, tokens.Node, closeBrace, diagnostics: null, annotations: null);
+            var result = new GreenCSharpBlockSyntax(
+                openBrace,
+                tokens.Node,
+                closeBrace,
+                diagnostics: null,
+                annotations: null);
 
             if (hash > 0)
             {
@@ -208,8 +214,11 @@ namespace Akbura.Language.Syntax.Green
     {
         public override GreenNode? VisitCSharpBlockSyntax(GreenCSharpBlockSyntax node)
         {
-            return node.UpdateCSharpBlockSyntax((GreenSyntaxToken)VisitToken(node.OpenBrace), VisitList(node.Tokens).Node, (GreenSyntaxToken)VisitToken(node.CloseBrace))
-;        }
+            return node.UpdateCSharpBlockSyntax(
+                (GreenSyntaxToken)VisitToken(node.OpenBrace),
+                VisitList(node.Tokens).Node,
+                (GreenSyntaxToken)VisitToken(node.CloseBrace));
+        }
     }
 }
 
@@ -217,8 +226,13 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class CSharpBlockSyntax : global::Akbura.Language.Syntax.AkburaSyntax
     {
-        public CSharpBlockSyntax(global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax greenNode, global::Akbura.Language.Syntax.AkburaSyntax? parent, int position)
-            : base(greenNode, parent, position)
+        private AkburaSyntax? _tokens;
+
+        public CSharpBlockSyntax(
+            global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax green,
+            global::Akbura.Language.Syntax.AkburaSyntax? parent,
+            int position)
+            : base(green, parent, position)
         {
         }
 
@@ -228,28 +242,33 @@ namespace Akbura.Language.Syntax
         public SyntaxToken OpenBrace
             => new(this, this.Green.OpenBrace, GetChildPosition(0), GetChildIndex(0));
 
-        public SyntaxTokenList Tokens
+        public SyntaxList<AkTopLevelMemberSyntax> Tokens
         {
             get
             {
-                var tokens = this.Green.GetSlot(1);
-                return new SyntaxTokenList(this, tokens, GetChildPosition(1), GetChildIndex(1));
+                return new SyntaxList<AkTopLevelMemberSyntax>(GetRed(ref this._tokens, 1));
             }
         }
 
-        public SyntaxToken CloseBrace => new(this, this.Green.CloseBrace, GetChildPositionFromEnd(2), GetChildIndex(2));
+        public SyntaxToken CloseBrace
+            => new(this, this.Green.CloseBrace, GetChildPositionFromEnd(1), GetChildIndex(2));
 
         public CSharpBlockSyntax UpdateCSharpBlockSyntax(
             SyntaxToken openBrace,
-            SyntaxTokenList tokens,
+            SyntaxList<AkTopLevelMemberSyntax> tokens,
             SyntaxToken closeBrace)
         {
-            if (this.OpenBrace == openBrace && this.Tokens == tokens && this.CloseBrace == closeBrace)
+            if (this.OpenBrace == openBrace &&
+                this.Tokens == tokens &&
+                this.CloseBrace == closeBrace)
             {
                 return this;
             }
 
-            var newNode = SyntaxFactory.CSharpBlockSyntax(openBrace, tokens, closeBrace);
+            var newNode = SyntaxFactory.CSharpBlockSyntax(
+                openBrace,
+                tokens,
+                closeBrace);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -271,7 +290,7 @@ namespace Akbura.Language.Syntax
             return UpdateCSharpBlockSyntax(openBrace, this.Tokens, this.CloseBrace);
         }
 
-        public CSharpBlockSyntax WithTokens(SyntaxTokenList tokens)
+        public CSharpBlockSyntax WithTokens(SyntaxList<AkTopLevelMemberSyntax> tokens)
         {
             return UpdateCSharpBlockSyntax(this.OpenBrace, tokens, this.CloseBrace);
         }
@@ -285,6 +304,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                1 => GetRed(ref _tokens, 1),
                 _ => null,
             };
         }
@@ -293,6 +313,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                1 => _tokens,
                 _ => null,
             };
         }
@@ -327,7 +348,7 @@ namespace Akbura.Language.Syntax
     {
         internal static CSharpBlockSyntax CSharpBlockSyntax(
             SyntaxToken openBrace,
-            SyntaxTokenList tokens,
+            SyntaxList<AkTopLevelMemberSyntax> tokens,
             SyntaxToken closeBrace)
         {
             if (openBrace.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
@@ -350,17 +371,17 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentException(nameof(closeBrace), message: $"closeBrace must be SyntaxKind.CloseBraceToken");
             }
 
-            if (tokens != default && tokens.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxList)
+            if (tokens != default && tokens.Node?.Green is not global::Akbura.Language.Syntax.Green.GreenNode)
             {
                 ThrowHelper.ThrowArgumentException(nameof(tokens), message: $"tokens must be backed by a GreenSyntaxList.");
             }
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.CSharpBlockSyntax(
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(openBrace.Node!),
-                tokens.Node.ToGreenList<GreenSyntaxToken>(),
+                tokens.ToGreenList<GreenAkTopLevelMemberSyntax, AkTopLevelMemberSyntax>(),
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(closeBrace.Node!));
 
-            return Unsafe.As<CSharpBlockSyntax>(green.CreateRed());
+            return Unsafe.As<CSharpBlockSyntax>(green.CreateRed(null, 0));
         }
     }
 
@@ -392,8 +413,12 @@ namespace Akbura.Language.Syntax
     {
         public override AkburaSyntax? VisitCSharpBlockSyntax(CSharpBlockSyntax node)
         {
-            return node.UpdateCSharpBlockSyntax(VisitToken(node.OpenBrace), VisitList(node.Tokens), VisitToken(node.CloseBrace));
+            return node.UpdateCSharpBlockSyntax(
+                VisitToken(node.OpenBrace),
+                VisitList(node.Tokens),
+                VisitToken(node.CloseBrace));
         }
     }
 }
+
 #nullable restore

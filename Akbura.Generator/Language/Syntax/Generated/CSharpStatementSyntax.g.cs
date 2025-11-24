@@ -13,14 +13,17 @@ namespace Akbura.Language.Syntax.Green
     internal sealed partial class GreenCSharpStatementSyntax : global::Akbura.Language.Syntax.Green.GreenAkTopLevelMemberSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenNode? _tokens;
+        public readonly global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax? Body;
 
         public GreenCSharpStatementSyntax(
             global::Akbura.Language.Syntax.Green.GreenNode? tokens,
+            global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax? body,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
             : base((ushort)global::Akbura.Language.Syntax.SyntaxKind.CSharpStatementSyntax, diagnostics, annotations)
         {
             this._tokens = tokens;
+            this.Body = body;
 
             var flags = Flags;
             var fullWidth = FullWidth;
@@ -30,21 +33,31 @@ namespace Akbura.Language.Syntax.Green
                 AdjustWidthAndFlags(_tokens, ref fullWidth, ref flags);
             }
 
-            SlotCount = 1;
+            if (Body != null)
+            {
+                AdjustWidthAndFlags(Body, ref fullWidth, ref flags);
+            }
+
+            SlotCount = 2;
             FullWidth = fullWidth;
             Flags = flags;
         }
 
         public GreenSyntaxList<GreenSyntaxToken> Tokens => new(_tokens);
 
-        public GreenCSharpStatementSyntax UpdateCSharpStatementSyntax(global::Akbura.Language.Syntax.Green.GreenNode? tokens)
+        public GreenCSharpStatementSyntax UpdateCSharpStatementSyntax(
+            global::Akbura.Language.Syntax.Green.GreenNode? tokens,
+            global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax? body)
         {
-            if (this._tokens == tokens)
+            if (this._tokens == tokens &&
+                this.Body == body)
             {
                 return this;
             }
 
-            var newNode = GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToGreenList<GreenSyntaxToken>());
+            var newNode = GreenSyntaxFactory.CSharpStatementSyntax(
+                tokens.ToGreenList<GreenSyntaxToken>(),
+                body);
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -63,7 +76,12 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenCSharpStatementSyntax WithTokens(global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenSyntaxToken> tokens)
         {
-            return UpdateCSharpStatementSyntax(tokens.Node);
+            return UpdateCSharpStatementSyntax(tokens.Node, this.Body);
+        }
+
+        public GreenCSharpStatementSyntax WithBody(global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax? body)
+        {
+            return UpdateCSharpStatementSyntax(this._tokens, body);
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
@@ -71,6 +89,7 @@ namespace Akbura.Language.Syntax.Green
             return index switch
             {
                 0 => _tokens,
+                1 => Body,
                 _ => null,
             };
         }
@@ -82,12 +101,12 @@ namespace Akbura.Language.Syntax.Green
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
         {
-            return new GreenCSharpStatementSyntax(this._tokens, diagnostics, GetAnnotations());
+            return new GreenCSharpStatementSyntax(this._tokens, this.Body, diagnostics, GetAnnotations());
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
         {
-            return new GreenCSharpStatementSyntax(this._tokens, GetDiagnostics(), annotations);
+            return new GreenCSharpStatementSyntax(this._tokens, this.Body, GetDiagnostics(), annotations);
         }
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
@@ -108,7 +127,9 @@ namespace Akbura.Language.Syntax.Green
 
     internal static partial class GreenSyntaxFactory
     {
-        public static GreenCSharpStatementSyntax CSharpStatementSyntax(global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenSyntaxToken> tokens)
+        public static GreenCSharpStatementSyntax CSharpStatementSyntax(
+            global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenSyntaxToken> tokens,
+            global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax? body)
         {
             var kind = global::Akbura.Language.Syntax.SyntaxKind.CSharpStatementSyntax;
             int hash;
@@ -116,6 +137,7 @@ namespace Akbura.Language.Syntax.Green
                 GreenNodeCache.TryGetNode(
                     (ushort)kind,
                     tokens.Node,
+                    body,
                     out hash));
 
             if (cache != null)
@@ -125,6 +147,7 @@ namespace Akbura.Language.Syntax.Green
 
             var result = new GreenCSharpStatementSyntax(
                 tokens.Node,
+                body,
                 diagnostics: null,
                 annotations: null);
 
@@ -166,7 +189,8 @@ namespace Akbura.Language.Syntax.Green
         public override GreenNode? VisitCSharpStatementSyntax(GreenCSharpStatementSyntax node)
         {
             return node.UpdateCSharpStatementSyntax(
-                VisitList(node.Tokens).Node);
+                VisitList(node.Tokens).Node,
+                (GreenCSharpBlockSyntax?)Visit(node.Body));
         }
     }
 }
@@ -175,6 +199,8 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class CSharpStatementSyntax : global::Akbura.Language.Syntax.AkTopLevelMemberSyntax
     {
+        private AkburaSyntax? _body;
+
         public CSharpStatementSyntax(
             global::Akbura.Language.Syntax.Green.GreenCSharpStatementSyntax greenNode,
             global::Akbura.Language.Syntax.AkburaSyntax? parent,
@@ -195,14 +221,20 @@ namespace Akbura.Language.Syntax
             }
         }
 
-        public CSharpStatementSyntax UpdateCSharpStatementSyntax(SyntaxTokenList tokens)
+        public CSharpBlockSyntax? Body
+            => (CSharpBlockSyntax?)GetRed(ref _body, 1);
+
+        public CSharpStatementSyntax UpdateCSharpStatementSyntax(
+            SyntaxTokenList tokens,
+            CSharpBlockSyntax? body)
         {
-            if (this.Tokens == tokens)
+            if (this.Tokens == tokens &&
+                this.Body == body)
             {
                 return this;
             }
 
-            var newNode = SyntaxFactory.CSharpStatementSyntax(tokens);
+            var newNode = SyntaxFactory.CSharpStatementSyntax(tokens, body);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -221,13 +253,19 @@ namespace Akbura.Language.Syntax
 
         public CSharpStatementSyntax WithTokens(SyntaxTokenList tokens)
         {
-            return UpdateCSharpStatementSyntax(tokens);
+            return UpdateCSharpStatementSyntax(tokens, this.Body);
+        }
+
+        public CSharpStatementSyntax WithBody(CSharpBlockSyntax? body)
+        {
+            return UpdateCSharpStatementSyntax(this.Tokens, body);
         }
 
         public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
         {
             return index switch
             {
+                1 => GetRed(ref _body, 1),
                 _ => null,
             };
         }
@@ -236,6 +274,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                1 => _body,
                 _ => null,
             };
         }
@@ -268,15 +307,18 @@ namespace Akbura.Language.Syntax
 
     internal static partial class SyntaxFactory
     {
-        internal static CSharpStatementSyntax CSharpStatementSyntax(SyntaxTokenList tokens)
+        internal static CSharpStatementSyntax CSharpStatementSyntax(
+            SyntaxTokenList tokens,
+            CSharpBlockSyntax? body)
         {
-            if (tokens != default && tokens.Node != null && tokens.Node is not global::Akbura.Language.Syntax.Green.GreenNode)
+            if (tokens != default && tokens.Node is not global::Akbura.Language.Syntax.Green.GreenNode)
             {
                 ThrowHelper.ThrowArgumentException(nameof(tokens), message: "tokens must be backed by a GreenSyntaxList.");
             }
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.CSharpStatementSyntax(
-                tokens.Node.ToGreenList<GreenSyntaxToken>());
+                tokens.Node.ToGreenList<GreenSyntaxToken>(),
+                body?.Green);
 
             return Unsafe.As<CSharpStatementSyntax>(green.CreateRed(null, 0));
         }
@@ -311,7 +353,8 @@ namespace Akbura.Language.Syntax
         public override AkburaSyntax? VisitCSharpStatementSyntax(CSharpStatementSyntax node)
         {
             return node.UpdateCSharpStatementSyntax(
-                VisitList(node.Tokens));
+                VisitList(node.Tokens),
+                (CSharpBlockSyntax?)Visit(node.Body));
         }
     }
 }

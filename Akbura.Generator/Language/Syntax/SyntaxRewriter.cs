@@ -111,7 +111,7 @@ internal abstract partial class SyntaxRewriter : SyntaxVisitor<AkburaSyntax?>
 
     public virtual SyntaxTrivia VisitTrivia(SyntaxTrivia trivia)
     {
-        // NOTE: Structured trivia removed — your syntax does not support it.
+        // NOTE: Structured trivia removed
         return trivia;
     }
 

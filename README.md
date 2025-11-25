@@ -1,4 +1,4 @@
-﻿[![Discord](https://img.shields.io/discord/1442893504085757984?)](https://discord.gg/zMj4MmJ9U5)
+﻿[![Discord](https://img.shields.io/discord/1442893504085757984?color=8a2be2&label=discord)](https://discord.gg/zMj4MmJ9U5)
 [![Telegram](https://raw.githubusercontent.com/Patrolavia/telegram-badge/master/chat.svg)](https://t.me/akburaui)
 
 # Akbura

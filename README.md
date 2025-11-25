@@ -34,8 +34,8 @@ Create a file named `Counter.akbura`:
 state int count = 0;
 
 <Stack w-full h-full items-center>
-    <Text FontSize="24">Count: {count}</Text>
-    <Button Click={count++}>Increment</Button>
+	<Text FontSize="24">Count: {count}</Text>
+	<Button Click={count++}>Increment</Button>
 </Stack>
 ```
 
@@ -86,8 +86,8 @@ Create a file named `Counter.akbura`:
 state int count = 0;
 
 <Stack w-full h-full items-center>
-    <Text FontSize="24">Count: {count}</Text>
-    <Button Click={count++}>Increment</Button>
+	<Text FontSize="24">Count: {count}</Text>
+	<Button Click={count++}>Increment</Button>
 </Stack>
 ```
 
@@ -99,15 +99,15 @@ In your Avalonia XAML file:
 
 ```xaml
 <Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:akbura="clr-namespace:Akbura.Avalonia;assembly=Akbura.Avalonia"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-        x:Class="AvaloniaApplication.MainWindow"
-        Title="AvaloniaApplication">
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:akbura="clr-namespace:Akbura.Avalonia;assembly=Akbura.Avalonia"
+		mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+		x:Class="AvaloniaApplication.MainWindow"
+		Title="AvaloniaApplication">
 
-    <akbura:AkburaAvaloniaHost Component="{x:Type Counter}" />
+	<akbura:AkburaAvaloniaHost Component="{x:Type Counter}" />
 </Window>
 ```
 
@@ -335,13 +335,6 @@ out:Data={value => {
 }}/>
 ```
 
-### Notes
-
-* `@in` behaves like a getter.
-* `@out` behaves like a setter.
-* When a parameter is declared as `out`, the parent **must** use `out:`.
-
----
 
 This fully reflects the correct behavior of parameter binding in Akbura.
 
@@ -367,34 +360,27 @@ state int count = 0;
 state string message = "Hello";
 
 useEffect() {
-    Console.WriteLine("Component did mount");
+	Console.WriteLine("Component did mount");
 }
 
 // Reacts only to changes of `count`
 useEffect(count) {
-    Console.WriteLine($"Count changed to: {count}");
-    Console.WriteLine($"Old value is: {@old(count)}");
+	Console.WriteLine($"Count changed to: {count}");
+	Console.WriteLine($"Old value is: {@old(count)}");
 }
 
 // Reacts only to `message` changes
 useEffect(message) {
-    Console.WriteLine($"Message changed to: {message}");
-    Console.WriteLine($"Old value is: {@old(message)}");
+	Console.WriteLine($"Message changed to: {message}");
+	Console.WriteLine($"Old value is: {@old(message)}");
 }
 
 <Stack>
-    <Input bind:Value={count}/>
-    <Input bind:Value={message}/>
+	<Input bind:Value={count}/>
+	<Input bind:Value={message}/>
 </Stack>
 ```
 
-### Notes
-
-* `useEffect()` with *no dependencies* runs **once on mount**.
-* `useEffect(dep1, dep2, ...)` runs **whenever a listed state changes**.
-* `@old(expr)` gives you the previous value of that expression.
-
----
 
 ## Async useEffect
 
@@ -404,29 +390,22 @@ Effects can be asynchronous. Akbura automatically provides cancellation tokens a
 state int? data = null;
 
 useEffect() {
-    await Task.Delay(2000); // async work
-    data = 42;
+	await Task.Delay(2000); // async work
+	data = 42;
 }
 cancel {
-    Console.WriteLine("Effect was cancelled");
+	Console.WriteLine("Effect was cancelled");
 }
 finally {
-    Console.WriteLine("Effect has completed");
+	Console.WriteLine("Effect has completed");
 }
 
 if(data == null) {
-    <Text>Data is loading...</Text>
+	<Text>Data is loading...</Text>
 }
 
 <Text>Data is fetched! Data is {data}</Text>
 ```
-
-### Notes
-
-* `cancel { ... }` runs when the effect is interrupted (new run triggered).
-* `finally { ... }` always runs at the end (success or cancellation).
-
----
 
 ## Cancellation Token Example
 
@@ -438,27 +417,27 @@ state bool canceled = false;
 state string? query = 0;
 
 useEffect(query, @cancel) {
-    await Task.Delay(2000, @cancel);
+	await Task.Delay(2000, @cancel);
 
-    if(@cancel.IsCancellationRequested) {
-        canceled = true;
-        return;
-    }
+	if(@cancel.IsCancellationRequested) {
+		canceled = true;
+		return;
+	}
 
-    data = 42;
+	data = 42;
 }
 cancel {
-    canceled = true;
-    Console.WriteLine("Effect was cancelled");
+	canceled = true;
+	Console.WriteLine("Effect was cancelled");
 }
 finally {
-    Console.WriteLine("Effect has completed");
+	Console.WriteLine("Effect has completed");
 }
 
 <Stack>
-    <Input bind:Value={query} Placeholder="Enter query"/>
-    <Text {!canceled}:hidden>Previous operation was canceled.</Text>
-    <Text {data == null}:hidden>Fetched data is {data}</Text>
+	<Input bind:Value={query} Placeholder="Enter query"/>
+	<Text {!canceled}:hidden>Previous operation was canceled.</Text>
+	<Text {data == null}:hidden>Fetched data is {data}</Text>
 </Stack>
 ```
 
@@ -472,8 +451,8 @@ Akbura supports dependency injection (DI) to provide services and shared resourc
 
 ```csharp
 AkburaRoot.Builder()
-    .UseServiceProvider(yourServiceProvider)
-    .Run<MyRoot>();
+	.UseServiceProvider(yourServiceProvider)
+	.Run<MyRoot>();
 ```
 
 This configures the DI provider for all Akbura components in the application.
@@ -482,13 +461,13 @@ This configures the DI provider for all Akbura components in the application.
 
 ```xaml
 <akbura:AkburaAvaloniaHost
-    Component="{x:Type MyRoot}"
-    ServiceProvider="{... your service provider ...}" />
+	Component="{x:Type MyRoot}"
+	ServiceProvider="{... your service provider ...}" />
 ```
 
 Here DI is bound per-host, allowing Akbura to interoperate with Avalonia and external DI systems.
 
-## Injecting Dependencies into Components
+### Injecting Dependencies into Components
 
 To consume a service inside an Akbura component, use the `inject` keyword:
 
@@ -496,11 +475,208 @@ To consume a service inside an Akbura component, use the `inject` keyword:
 inject ILogger<MyComponent> logger;
 
 useEffect() {
-    logger.LogInformation("MyComponent mounted");
+	logger.LogInformation("MyComponent mounted");
 }
 
 <Text>
-    Hello world!
-    ILogger hashcode: {logger.GetHashCode()}
+	Hello world!
+	ILogger hashcode: {logger.GetHashCode()}
 </Text>
 ```
+
+## Commands
+
+Commands in Akbura behave similarly to UI events, but with additional capabilities:
+
+* **CanExecute semantics**
+* **IsExecuting state tracking**
+* **Async method support**
+* **Typed arguments and return values**
+* **Direct binding to C# commands**
+
+They allow components to expose rich interaction points that integrate with both state and asynchronous workflows.
+
+
+### Declaring a Command
+
+Inside a component:
+
+```akbura
+// CustomButton.akbura
+
+command int CustomClick(int a);
+
+state int clicked = 0;
+
+useEffect(CustomClick.IsExecuting) {
+	Console.WriteLine("Command is executing");
+}
+
+<Block p-4 {CustomClick.IsExecuting}:disabled>
+	<Button Click={() => {
+		var result = await CustomClick.Invoke(clicked++);
+		Console.WriteLine($"Result is {result}");
+	}}/>
+</Block>
+```
+
+### Generated Behavior
+
+Every command automatically provides:
+
+* **`.Invoke(args)`** — executes sync or async code
+* **`.IsExecuting`** — a reactive boolean state
+* 
+
+### Using Commands from Another Component
+
+```akbura
+// Root.akbura
+
+inject RootVm Vm;
+
+<Stack>
+	<CustomButton Click={() => Console.WriteLine("Hello world")} />
+	<!-- No argument → argument ignored, default return value, no async -->
+
+	<CustomButton Click={x => Console.WriteLine($"Hello world with {x}")} />
+	<!-- Receives argument, no return value, sync execution -->
+
+	<CustomButton Click={x => x * 2} />
+	<!-- Returns explicit value, still sync -->
+
+	<CustomButton Click={x => await Vm.Fetch(x)} />
+	<!-- Async execution, awaited result passed to command -->
+
+	<CustomButton Click={Vm.MyCommand} />
+	<!-- Direct reference to a C# ICommand-like method or handler -->
+</Stack>
+```
+
+## AKCSS
+
+AKCSS is a CSS-inspired styling language designed for Akbura components.
+It provides a familiar declarative syntax while integrating tightly with component state, pseudo-classes, and the Akbura rendering model.
+
+AKCSS files allow you to define reusable style rules that are compiled into strongly typed C# classes.
+
+---
+
+## Basic Example
+
+```akcss
+.myclass {
+	Background: "Red";
+
+	@if(IsHovered) {
+		Background: "Blue";
+	}
+
+	@if(this == Button) {
+		Padding: 10;
+	}
+
+	@if(this is Button) {
+		Padding: 5;
+	}
+}
+```
+
+Applied to a component:
+
+```akbura
+<Button class="myclass" />
+```
+
+---
+
+## Generated C# Code
+
+When compiled, Akcss generates an internal class representing the style logic:
+
+```csharp
+[AkcssClass("myclass", Source="...")]
+[Observes("IsHovered")]
+class __myclass_Akcss_ : AkcssStyleClass
+{
+	public override void ApplyOrUpdateStyle(AkburaControl control)
+	{
+		control.Background = "Red";
+
+		if (control.IsHovered)
+		{
+			control.Background = "Blue";
+		}
+
+		if (control.UnderlyingControl.GetType() == typeof(Button))
+		{
+			control.Padding = 10;
+		}
+
+		if (control.UnderlyingControl is Button)
+		{
+			control.Padding = 5;
+		}
+	}
+}
+```
+
+## Akcss Utilities
+
+Akcss supports a utility system inspired by Tailwind, where concise class-like patterns expand into full property assignments. Utilities are defined inside an `@utilities` block.
+
+```akcss
+@utilities {
+    .rounded {
+        CornerRadius: 4;
+    }
+
+    .w-(double width) {
+        Width: width * MyNamespace.MyStaticClass.Spacing;
+    }
+
+    .space-(int x)-(int y) {
+        MarginLeft: x * MyNamespace.MyStaticClass.Spacing;
+        MarginTop:  y * MyNamespace.MyStaticClass.Spacing;
+
+        @if(x > y) {
+            BorderThickness: x - y;
+        }
+    }
+}
+```
+
+Using the utilities:
+
+```akbura
+<Block w-30 space-2-4 rounded />
+```
+
+## Akcss Utilities — Condition Prefix
+
+Akcss utilities support **conditional prefixes**, allowing styles to be applied only when a specific condition or pseudo‑state is true.
+
+This enables dynamic utility behavior without writing full AKCSS blocks.
+
+```akcss
+state bool isMobile = false;
+
+<Box w-30 {isMobile}:w-20>
+```
+
+Here:
+
+* `w-30` applies normally.
+* `{isMobile}:w-20` applies *only when `isMobile` is true*.
+
+Conditional prefixes may also use:
+
+* component boolean states
+* hover, checked and other pseudo-classes
+* parameter values
+
+Akcss resolves utilities in the following order:
+
+* If multiple utilities share the same base name, **only the last matching one is applied**.
+* Utilities have **higher priority** than regular AKCSS class styles.
+* Conditional utilities override unconditional ones if their condition evaluates to true.

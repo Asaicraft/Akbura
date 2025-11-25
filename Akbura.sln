@@ -12,6 +12,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{18952FBD-A851-420F-AC99-BD254B05FA6A}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Akbura.UnitTests", "Akbura.UnitTests\Akbura.UnitTests.csproj", "{C32463C8-47CF-4A0C-BD5D-0EED4AF84E5B}"

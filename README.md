@@ -1,4 +1,7 @@
-﻿# Akbura
+﻿[![Discord](https://img.shields.io/discord/1442893504085757984?)](https://discord.gg/zMj4MmJ9U5)
+[![Telegram](https://raw.githubusercontent.com/Patrolavia/telegram-badge/master/chat.svg)](https://t.me/akburaui)
+
+# Akbura
 
 Akbura is a UI framework for building applications using a declarative, component-based language.
 

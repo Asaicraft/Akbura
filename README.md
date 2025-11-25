@@ -8,6 +8,51 @@ If you want to follow progress or contribute ideas, you are welcome to join the 
 
 Akbura is an active exploration of what a modern reactive UI language for .NET could look like — and your feedback is invaluable.
 
+# Table of Contents
+
+* [Akbura](#akbura)
+
+  * [Getting Started](#getting-started)
+
+    * [1. Install the Package](#1-install-the-package)
+    * [2. Create Your First Component](#2-create-your-first-component)
+    * [3. Run the App](#3-run-the-app)
+  * [Getting Started with Avalonia](#getting-started-with-avalonia)
+
+    * [1. Install the Package](#1-install-the-package-1)
+    * [2. Create Your First Component](#2-create-your-first-component-1)
+    * [3. Use AkburaAvaloniaHost in your Avalonia App](#3-use-akburaavaloniahost-in-your-avalonia-app)
+* [States](#states)
+
+  * [Binding to viewmodel](#binding-to-viewmodel)
+* [Parameters](#parameters)
+
+  * [Parameters Binding](#parameters-binding)
+  * [Modify Bindings](#modify-bindings)
+* [useEffect Declaration](#useeffect-declaration)
+
+  * [Basic useEffect](#basic-useeffect)
+  * [Async useEffect](#async-useeffect)
+  * [Cancellation Token Example](#cancellation-token-example)
+* [Dependency Injection](#dependency-injection)
+
+  * [Registering an IServiceProvider](#registering-an-iserviceprovider)
+
+    * [Using AkburaRoot](#using-akburaroot)
+    * [Using Avalonia Host](#using-avalonia-host)
+  * [Injecting Dependencies into Components](#injecting-dependencies-into-components)
+* [Commands](#commands)
+
+  * [Declaring a Command](#declaring-a-command)
+  * [Using Commands from Another Component](#using-commands-from-another-component)
+* [AKCSS](#akcss)
+
+  * [Basic Example](#basic-example)
+  * [Generated C# Code](#generated-c-code)
+* [Akcss Utilities](#akcss-utilities)
+* [Akcss Utilities - Condition Prefix](#akcss-utilities---condition-prefix)
+
+
 ## Getting Started
 
 Akbura is currently in active development. When the framework becomes production‑ready, creating a new Akbura application will be simple and familiar for any .NET developer.
@@ -652,7 +697,7 @@ Using the utilities:
 <Block w-30 space-2-4 rounded />
 ```
 
-## Akcss Utilities — Condition Prefix
+## Akcss Utilities - Condition Prefix
 
 Akcss utilities support **conditional prefixes**, allowing styles to be applied only when a specific condition or pseudo‑state is true.
 

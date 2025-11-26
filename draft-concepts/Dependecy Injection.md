@@ -1,8 +1,8 @@
-# Dependency Injection — Advanced Concepts
+# Dependency Injection â€” Advanced Concepts
 
 > **Note:** This section comes from `draft-concepts` and may not be implemented. These are exploratory ideas for extending Akbura's DI system.
 
-Akbura’s standard DI integrates with any `IServiceProvider`. For more advanced behaviors—such as component-scoped services, hierarchical resolution, custom lifetimes, and DI chaining—the framework conceptually supports an extended provider interface.
+Akburaâ€™s standard DI integrates with any `IServiceProvider`. For more advanced behaviorsâ€”such as component-scoped services, hierarchical resolution, custom lifetimes, and DI chainingâ€”the framework conceptually supports an extended provider interface.
 
 ---
 
@@ -71,7 +71,7 @@ public class ScopedProvider : IAkburaServiceProvider
 }
 ```
 
-This allows a service to depend on the **location of the component** inside the tree—useful for things like:
+This allows a service to depend on the **location of the component** inside the treeâ€”useful for things like:
 
 * navigation scopes,
 * per-module services,
@@ -91,7 +91,7 @@ AkburaRoot.Builder()
         var services = ServiceCollection.BuildServiceProvider();
         var scopedProvider = new ScopedProvider();
 
-        return new IAkburaServiceProvider[]
+        return new IServiceProvider[]
         {
             scopedProvider,
             services

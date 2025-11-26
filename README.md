@@ -5,7 +5,9 @@
 
 Akbura is a UI framework for building applications using a declarative, component-based language.
 
-The project is currently in **early experimental development**, and many parts of the system exist only as concepts. Expect frequent breaking changes during the initial stages as the language, code generation model, and runtime evolve.
+Note: Akbura is still in an early experimental stage.
+The first usable preview version is expected around January 26, 2026
+Until then, the API, syntax, and compiler behavior may change frequently as the project evolves.
 
 If you want to follow progress or contribute ideas, you are welcome to join the community on **Discord** or **Telegram**. All drafts, specifications, and current design notes can be found in the `drafts-concepts` folder.
 

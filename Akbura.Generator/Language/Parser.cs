@@ -3,6 +3,6 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace Akbura.Language;
-internal class Parser
+internal sealed class Parser
 {
 }

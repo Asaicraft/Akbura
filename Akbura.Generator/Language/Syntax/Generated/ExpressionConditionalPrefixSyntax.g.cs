@@ -279,7 +279,7 @@ namespace Akbura.Language.Syntax
             return UpdateExpressionConditionalPrefixSyntax(expression, this.Colon);
         }
 
-        public ExpressionConditionalPrefixSyntax WithColon(SyntaxToken colon)
+        public new ExpressionConditionalPrefixSyntax WithColon(SyntaxToken colon)
         {
             return UpdateExpressionConditionalPrefixSyntax(this.Expression, colon);
         }

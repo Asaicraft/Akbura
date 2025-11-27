@@ -183,8 +183,6 @@ namespace Akbura.Language.Syntax.Green
             AkburaDebug.Assert(openParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenParenToken);
             AkburaDebug.Assert(closeParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseParenToken);
 
-            var kind = global::Akbura.Language.Syntax.SyntaxKind.AkcssUtilityParameterSyntax;
-
             // SlotCount = 5 (>3), so do not use GreenNodeCache.
             var result = new GreenAkcssUtilityParameterSyntax(
                 minus,

@@ -154,7 +154,7 @@ internal readonly partial struct GreenSyntaxList<TNode> : IEquatable<GreenSyntax
         return new SeparatedGreenSyntaxList<TOther>(this);
     }
 
-    public static implicit operator GreenSyntaxList<TNode>(TNode node)
+    public static implicit operator GreenSyntaxList<TNode>(TNode? node)
     {
         return new GreenSyntaxList<TNode>(node);
     }

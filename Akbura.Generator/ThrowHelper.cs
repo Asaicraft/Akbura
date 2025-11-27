@@ -347,6 +347,12 @@ internal static class ThrowHelper
     }
 
     [DoesNotReturn]
+    public static void ThrowArgumentOutOfRangeException(string? message, string? paramName)
+    {
+        throw new ArgumentOutOfRangeException(paramName, message);
+    }
+
+    [DoesNotReturn]
     public static void ThrowArgumentOutOfRangeException(string paramName)
     {
         throw new ArgumentOutOfRangeException(paramName);
@@ -362,5 +368,37 @@ internal static class ThrowHelper
     public static void ThrowArgumentNullException(string paramName)
     {
         throw new ArgumentNullException(paramName);
+    }
+
+    public static void ThrowIfNull([NotNull] object? value, [CallerArgumentExpression(nameof(value))] string? paramName = null!)
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(paramName, nameof(value));
+        }
+    }
+
+    public static void ThrowIfNegative(int value, [CallerArgumentExpression(nameof(value))] string? paramName = null!)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, "Value must not be negative.");
+        }
+    }
+
+    public static void ThrowIfGreaterThanOrEqual(uint value, uint max, [CallerArgumentExpression(nameof(value))] string? paramName = null!)
+    {
+        if (value >= max)
+        {
+            throw new ArgumentOutOfRangeException(paramName, $"Value must be less than {max}.");
+        }
+    }
+
+    public static void ThrowIfLessThan(int value, int size, [CallerArgumentExpression(nameof(value))] string? paramName = null!)
+    {
+        if (value < size)
+        {
+            throw new ArgumentOutOfRangeException(paramName, $"Value must be greater than or equal to {size}.");
+        }
     }
 }

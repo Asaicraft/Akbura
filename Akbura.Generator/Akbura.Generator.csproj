@@ -12,6 +12,7 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageType>Analyzer</PackageType>
     <RootNamespace>Akbura</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

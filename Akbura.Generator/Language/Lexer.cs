@@ -19,11 +19,19 @@ internal sealed class Lexer
         TextWindow = new SlidingTextWindow(sourceText);
     }
 
+
+
     internal enum LexerMode
     {
         Default,
         InString,
         InCsharpExpression,
+        InCsharpBlock,
+        InStartTag,
+        InContent,
+        InEndTag,
+        InAkcss,
+        InUtilities,
     }
 
     internal struct TokenInfo

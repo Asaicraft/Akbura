@@ -24,7 +24,7 @@ internal static class AkburaRuntimeHelpers
     {
 #if NET5_0_OR_GREATER
         return RuntimeHelpers.IsReferenceOrContainsReferences<T>();
-#endif
+#else
         var type = typeof(T);
         var hashCode = type.GetHashCode();
 
@@ -37,6 +37,7 @@ internal static class AkburaRuntimeHelpers
         }
 
         return GetInformationSlow(type, index);
+#endif
     }
 
     private static bool GetInformationSlow(Type type, int index)

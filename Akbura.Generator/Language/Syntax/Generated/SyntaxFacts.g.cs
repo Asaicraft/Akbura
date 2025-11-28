@@ -131,6 +131,49 @@ namespace Akbura.Language.Syntax
             };
         }
 
+        public static partial SyntaxKind GetKeywordKind(string text)
+        {
+            switch (text)
+            {
+                case "inject": return SyntaxKind.InjectKeyword;
+                case "param": return SyntaxKind.ParamKeyword;
+                case "state": return SyntaxKind.StateKeyword;
+                case "useEffect": return SyntaxKind.UseEffectKeyword;
+                case "suppress": return SyntaxKind.SuppressKeyword;
+                case "cancel": return SyntaxKind.CancelKeyword;
+                case "finally": return SyntaxKind.FinallyKeyword;
+                case "async": return SyntaxKind.AsyncKeyword;
+                case "void": return SyntaxKind.VoidKeyword;
+                case "command": return SyntaxKind.CommandKeyword;
+
+                case "new": return SyntaxKind.NewKeyword;
+                case "ReactList": return SyntaxKind.ReactListKeyword;
+
+                case "if": return SyntaxKind.IfKeyword;
+                case "else": return SyntaxKind.ElseKeyword;
+                case "return": return SyntaxKind.ReturnKeyword;
+                case "for": return SyntaxKind.ForKeyword;
+
+                case "true": return SyntaxKind.TrueKeyword;
+                case "false": return SyntaxKind.FalseKeyword;
+                case "null": return SyntaxKind.NullKeyword;
+
+                case "bind": return SyntaxKind.BindToken;
+                case "in": return SyntaxKind.InToken;
+                case "out": return SyntaxKind.OutToken;
+
+                case "utilities": return SyntaxKind.UtilitiesKeyword;
+
+                default:
+                    return SyntaxKind.None;
+            }
+        }
+
+        public static partial SyntaxKind GetContextualKeywordKind(string text)
+        {
+            return SyntaxKind.None;
+        }
+
         public static partial object? GetValue(SyntaxKind kind, string text)
         {
             return kind switch

@@ -1,10 +1,8 @@
 ﻿using Akbura.Language.Syntax;
-using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
-using System;
-using System.Collections.Generic;
-using System.Text;
+
+using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language;
 internal sealed class Lexer
@@ -13,13 +11,6 @@ internal sealed class Lexer
     /// Not readonly. This is a mutable struct that will be modified as we lex tokens.
     /// </summary>
     internal SlidingTextWindow TextWindow;
-
-    public Lexer(SourceText sourceText)
-    {
-        TextWindow = new SlidingTextWindow(sourceText);
-    }
-
-
 
     internal enum LexerMode
     {
@@ -54,6 +45,13 @@ internal sealed class Lexer
         internal double DoubleValue;
         internal decimal DecimalValue;
         internal bool IsVerbatim;
+
+        internal CSharpSyntaxKind CSharpSyntaxKind;
+    }
+
+    public Lexer(SourceText sourceText)
+    {
+        TextWindow = new SlidingTextWindow(sourceText);
     }
 
 

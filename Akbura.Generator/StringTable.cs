@@ -25,6 +25,9 @@ internal sealed class StringTable
         public string Text;
     }
 
+    // TODO: Adjust cache sizing once we have enough real-world usage data.
+    //       Current values are initial estimates based on Roslyn behavior.
+
     // Size of local cache.
     private const int LocalSizeBits = 11;
     private const int LocalSize = (1 << LocalSizeBits);

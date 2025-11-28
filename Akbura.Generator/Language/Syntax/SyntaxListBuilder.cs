@@ -12,6 +12,8 @@ internal sealed class SyntaxListBuilder
     private ArrayElement<GreenNode?>[] _nodes;
     public int Count { get; private set; }
 
+    public int Capacity => _nodes.Length;
+
     public SyntaxListBuilder(int size)
     {
         _nodes = new ArrayElement<GreenNode?>[size];

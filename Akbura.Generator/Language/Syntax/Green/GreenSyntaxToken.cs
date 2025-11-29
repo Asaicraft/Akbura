@@ -1,7 +1,7 @@
 ﻿using Akbura.Collections;
 using System.Diagnostics;
 using System.Collections.Immutable;
-using CsharpRawNode = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode;
+using CsharpRawNode = Microsoft.CodeAnalysis.SyntaxNode;
 
 namespace Akbura.Language.Syntax.Green;
 internal partial class GreenSyntaxToken : GreenNode

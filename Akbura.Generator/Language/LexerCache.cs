@@ -12,7 +12,7 @@ internal sealed class LexerCache
 
     private static readonly ObjectPool<CachingIdentityFactory<string, SyntaxKind>> s_keywordKindPool =
         CachingIdentityFactory<string, SyntaxKind>.CreatePool(
-                        512,
+                        128,
                         (key) =>
                         {
                             var kind = SyntaxFacts.GetKeywordKind(key);
@@ -102,7 +102,7 @@ internal sealed class LexerCache
         s_lexerCachePool.Free(this);
     }
 
-    internal char[] IdentBuffer => _identBuffer;
+    internal char[] IdentifierBuffer => _identBuffer;
 
     private TextKeyedCache<GreenSyntaxTrivia> TriviaMap
     {

@@ -1,5 +1,8 @@
-﻿using System;
+﻿// This file is ported and adopted from KirillOsenkov/XmlParser
+
+using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -8,7 +11,7 @@ namespace Akbura.Language.Syntax;
 /// <summary>
 /// Describes how severe a diagnostic is.
 /// </summary>
-public enum DiagnosticSeverity
+public enum AkburaDiagnosticSeverity
 {
     /// <summary>
     /// Something that is an issue, as determined by some authority,
@@ -41,23 +44,31 @@ public sealed class AkburaDiagnostic
     }
 
     [SetsRequiredMembers]
-    public AkburaDiagnostic(string message, string code, DiagnosticSeverity severity)
+    public AkburaDiagnostic(ImmutableArray<object> parameters, string code, AkburaDiagnosticSeverity severity)
     {
-        Message = message;
+        Parameters = parameters;
         Code = code;
         Severity = severity;
     }
 
-    [SetsRequiredMembers]
-    public AkburaDiagnostic(string message, string code)
-        : this(message, code, DiagnosticSeverity.Error)
-    {
-
-    }
-
-    public required string Message
+    public required ImmutableArray<object> Parameters
     {
         get; init;
+    }
+
+    public string Message
+    {
+        get
+        {
+            var message = AkburaResources.ResourceManager.GetString(Code);
+
+            if(string.IsNullOrWhiteSpace(message))
+            {
+                return Code;
+            }
+
+            return string.Format(message, Parameters.ToArrayUnsafe());
+        }
     }
 
     public required string Code
@@ -65,7 +76,7 @@ public sealed class AkburaDiagnostic
         get; init;
     }
 
-    public required DiagnosticSeverity Severity
+    public required AkburaDiagnosticSeverity Severity
     {
         get; init;
     }

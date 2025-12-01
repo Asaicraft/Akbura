@@ -11,6 +11,7 @@ using SpecialType = Microsoft.CodeAnalysis.SpecialType;
 using System.Diagnostics;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace Akbura.Language;
 
@@ -116,20 +117,39 @@ internal sealed partial class Lexer : IDisposable
 #endif
         _mode = mode;
 
-        var tokenInfo = mode switch
+        if(mode != LexerMode.TopLevel)
         {
-            LexerMode.InInlineExpression => ParseInlineExpression(),
-            LexerMode.InExpressionUntilSemicolon => ParseExpressionUntilSemicolon(),
-            LexerMode.InExpressionUntilComma => ParseExpressionUntilComma(),
-            _ => ParseNextToken()
-        };
+            var tokenInfo = mode switch
+            {
+                LexerMode.InInlineExpression => ParseInlineExpression(),
+                LexerMode.InExpressionUntilSemicolon => ParseExpressionUntilSemicolon(),
+                LexerMode.InExpressionUntilComma => ParseExpressionUntilComma(),
+                _ => default
+            };
 
-        return CreateToken(in tokenInfo);
+            // In expression modes, we do not care about trivia or errors.
+            return CreateToken(in tokenInfo, null, null, null);
+        }
+
+        return ParseNextToken();
     }
 
-    private TokenInfo ParseNextToken()
+    private GreenSyntaxToken ParseNextToken()
     {
-        return default;
+        _leadingTriviaCache.Clear();
+        LexSyntaxTrivia(isTrailing: false, triviaList: ref _leadingTriviaCache);
+        var leading = _leadingTriviaCache;
+
+        TokenInfo tokenInfo = default;
+
+        Start();
+        var errors = GetErrors();
+
+        _trailingTriviaCache.Clear();
+        LexSyntaxTrivia(isTrailing: true, triviaList: ref _trailingTriviaCache);
+        var trailing = _trailingTriviaCache;
+
+        return CreateToken(in tokenInfo, leading, trailing, errors);
     }
 
     private void Start()
@@ -1135,12 +1155,19 @@ internal sealed partial class Lexer : IDisposable
 
     #endregion
 
-    private static GreenSyntaxToken CreateToken(in TokenInfo tokenInfo)
+    private static GreenSyntaxToken CreateToken(in TokenInfo tokenInfo, GreenSyntaxListBuilder? leading, GreenSyntaxListBuilder? trailing, ImmutableArray<AkburaDiagnostic>? diagnostics)
     {
+        var leadingNode = leading?.ToListNode();
+        var trailingNode = trailing?.ToListNode();
+
+        GreenSyntaxToken? token = null;
+
         if (tokenInfo.Kind == SyntaxKind.CSharpRawToken)
         {
             AkburaDebug.AssertNotNull(tokenInfo.CSharpNode);
 
+            // no leading, trailing trivia
+            // also no diagnostics/annotations for now
             return GreenSyntaxToken.CreateCSharpRawToken(tokenInfo.CSharpNode);
         }
 
@@ -1148,10 +1175,17 @@ internal sealed partial class Lexer : IDisposable
         {
             AkburaDebug.AssertNotNull(tokenInfo.Text);
 
-            return GreenSyntaxToken.Identifier(tokenInfo.Text);
+            token = GreenSyntaxToken.Identifier(leadingNode, tokenInfo.Text, trailingNode);
         }
 
-        throw new NotImplementedException();
+        AkburaDebug.AssertNotNull(token);
+
+        if (diagnostics?.IsDefaultOrEmpty == false)
+        {
+            token = Unsafe.As<GreenSyntaxToken>(token.WithDiagnostics(diagnostics));
+        }
+
+        return token;
     }
 }
 #pragma warning restore RSEXPERIMENTAL003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.

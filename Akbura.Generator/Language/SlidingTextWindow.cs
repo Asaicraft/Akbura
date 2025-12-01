@@ -49,7 +49,7 @@ internal struct SlidingTextWindow
     /// as more profiling data becomes available and we gain a better understanding of 
     /// how Akbura codebases behave in practice.
     /// </summary>
-    public const int DefaultWindowLength = 4096;
+    public const int DefaultWindowLength = 1024;
 
     private static readonly ObjectPool<char[]> s_windowPool = new(() => new char[DefaultWindowLength]);
 

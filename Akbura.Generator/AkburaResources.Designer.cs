@@ -68,5 +68,14 @@ namespace Akbura {
                 return ResourceManager.GetString("ERR_IllegalEscape", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unterminated multi-line comment..
+        /// </summary>
+        internal static string ERR_OpenEndedComment {
+            get {
+                return ResourceManager.GetString("ERR_OpenEndedComment", resourceCulture);
+            }
+        }
     }
 }

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
-using CsharpRawNode = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode;
+using CsharpRawNode = Microsoft.CodeAnalysis.SyntaxNode;
 
 namespace Akbura.Language.Syntax.Green;
 partial class GreenSyntaxToken

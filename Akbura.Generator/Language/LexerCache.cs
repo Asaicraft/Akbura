@@ -31,8 +31,8 @@ internal sealed class LexerCache
 
     private PooledStringBuilder? _stringBuilder;
     private readonly char[] _identBuffer;
-    private SyntaxListBuilder? _leadingTriviaCache;
-    private SyntaxListBuilder? _trailingTriviaCache;
+    private GreenSyntaxListBuilder? _leadingTriviaCache;
+    private GreenSyntaxListBuilder? _trailingTriviaCache;
 
     private const int LeadingTriviaCacheInitialCapacity = 128;
     private const int TrailingTriviaCacheInitialCapacity = 16;
@@ -144,21 +144,21 @@ internal sealed class LexerCache
         }
     }
 
-    internal SyntaxListBuilder LeadingTriviaCache
+    internal GreenSyntaxListBuilder LeadingTriviaCache
     {
         get
         {
-            _leadingTriviaCache ??= new SyntaxListBuilder(LeadingTriviaCacheInitialCapacity);
+            _leadingTriviaCache ??= new GreenSyntaxListBuilder(LeadingTriviaCacheInitialCapacity);
 
             return _leadingTriviaCache;
         }
     }
 
-    internal SyntaxListBuilder TrailingTriviaCache
+    internal GreenSyntaxListBuilder TrailingTriviaCache
     {
         get
         {
-            _trailingTriviaCache ??= new SyntaxListBuilder(TrailingTriviaCacheInitialCapacity);
+            _trailingTriviaCache ??= new GreenSyntaxListBuilder(TrailingTriviaCacheInitialCapacity);
 
             return _trailingTriviaCache;
         }
@@ -176,7 +176,7 @@ internal sealed class LexerCache
         return kind != SyntaxKind.None;
     }
 
-    internal SyntaxTrivia LookupWhitespaceTrivia(
+    internal GreenSyntaxTrivia LookupWhitespaceTrivia(
         in SlidingTextWindow textWindow,
         int lexemeStartPosition,
         int hashCode)
@@ -197,7 +197,7 @@ internal sealed class LexerCache
         }
 
         // Otherwise, if it's outside of the window, just grab from the underlying text.
-        return SyntaxFactory.Whitespace(textWindow.GetText(lexemeStartPosition, intern: true));
+        return GreenSyntaxFactory.Whitespace(textWindow.GetText(lexemeStartPosition, intern: true));
     }
 
     // TODO: remove this when done tweaking this cache.

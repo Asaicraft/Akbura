@@ -775,3 +775,12 @@ abstract node SimpleName: Name {
 }
 
 node IdentifierName: SimpleName;
+
+
+[id 800]
+// ─────────────────────────────────────────────────────────────
+// TRIVIA
+// ─────────────────────────────────────────────────────────────
+
+trivia SingleLineCommentTrivia;
+trivia MultiLineCommentTrivia;

@@ -332,4 +332,14 @@ internal static partial class GreenSyntaxFactory
     {
         return GreenSyntaxToken.AkTextLiteralToken(text, value);
     }
+
+    public static GreenNode Comment(string text)
+    {
+        return GreenSyntaxTrivia.Create(SyntaxKind.SingleLineCommentTrivia, text);
+    }
+
+    public static GreenNode MultiLineComment(string text)
+    {
+        return GreenSyntaxTrivia.Create(SyntaxKind.MultiLineCommentTrivia, text);
+    }
 }

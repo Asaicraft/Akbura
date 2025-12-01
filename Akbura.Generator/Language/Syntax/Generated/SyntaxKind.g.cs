@@ -199,5 +199,9 @@ namespace Akbura.Language.Syntax
         Name = 701,
         SimpleName = 702,
         IdentifierName = 703,
+
+        // Trivia
+        SingleLineCommentTrivia = 800,
+        MultiLineCommentTrivia = 801,
     }
 }

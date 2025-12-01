@@ -120,4 +120,7 @@
   <data name="ERR_IllegalEscape" xml:space="preserve">
     <value>Illegal escape sequence at position {0} (length {1}).</value>
   </data>
+  <data name="ERR_OpenEndedComment" xml:space="preserve">
+    <value>Unterminated multi-line comment.</value>
+  </data>
 </root>

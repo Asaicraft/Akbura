@@ -1,19 +1,31 @@
-﻿using Akbura.Language.Syntax;
+﻿// THis file is ported and adopted from roslyn
+
+using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
 using System.Text;
 using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CodeAnalysisSyntaxNode = Microsoft.CodeAnalysis.SyntaxNode;
-using Microsoft.CodeAnalysis;
+using SpecialType = Microsoft.CodeAnalysis.SpecialType;
 using System.Diagnostics;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Akbura.Language;
 
 #pragma warning disable RSEXPERIMENTAL003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 internal sealed partial class Lexer : IDisposable
 {
+    // Akbura currently lacks real-world profiling data for token sizes,
+    // so we adopt Roslyn’s empirical limit: tokens over ~40 chars are rare.
+    // 42 serves as a practical upper bound for our cache.
+    // https://github.com/dotnet/roslyn/blob/c14edd18895fe53efd010d4517da332f30784df6/src/Compilers/CSharp/Portable/Parser/QuickScanner.cs#L17
+    internal const int MaxCachedTokenSize = 42;
+
+
+    private const int TriviaListInitialCapacity = 8;
+
     /// <summary>
     /// Not readonly. This is a mutable struct that will be modified as we lex tokens.
     /// </summary>
@@ -61,8 +73,8 @@ internal sealed partial class Lexer : IDisposable
     private readonly LexerCache _cache;
     private int _badTokenCount; // cumulative count of bad tokens produced
 
-    private SyntaxListBuilder _leadingTriviaCache;
-    private SyntaxListBuilder _trailingTriviaCache;
+    private GreenSyntaxListBuilder _leadingTriviaCache;
+    private GreenSyntaxListBuilder _trailingTriviaCache;
 
     private List<AkburaDiagnostic>? _errors;
 
@@ -91,6 +103,12 @@ internal sealed partial class Lexer : IDisposable
     internal static int TokensLexed;
 #endif
 
+    public void Dispose()
+    {
+        _cache.Free();
+        this.TextWindow.Free();
+    }
+
     public GreenSyntaxToken Lex(LexerMode mode)
     {
 #if DEBUG
@@ -114,11 +132,6 @@ internal sealed partial class Lexer : IDisposable
         return default;
     }
 
-    public void Dispose()
-    {
-        this.TextWindow.Free();
-    }
-
     private void Start()
     {
         LexemeStartPosition = this.TextWindow.Position;
@@ -131,6 +144,277 @@ internal sealed partial class Lexer : IDisposable
 
     internal string GetInternedLexemeText()
             => TextWindow.GetText(LexemeStartPosition, intern: true);
+
+    internal string GetNonInternedLexemeText()
+            => TextWindow.GetText(LexemeStartPosition, intern: false);
+
+    #region Trivia
+
+    internal SyntaxTriviaList LexSyntaxLeadingTrivia()
+    {
+        _leadingTriviaCache.Clear();
+        LexSyntaxTrivia(isTrailing: false, triviaList: ref _leadingTriviaCache);
+        return new SyntaxTriviaList(
+            token: default,
+            node: _leadingTriviaCache.ToListNode(),
+            position: 0,
+            index: 0
+        );
+    }
+
+    internal SyntaxTriviaList LexSyntaxTrailingTrivia()
+    {
+        _trailingTriviaCache.Clear();
+        LexSyntaxTrivia(isTrailing: true, triviaList: ref _trailingTriviaCache);
+        return new SyntaxTriviaList(
+            token: default,
+            node: _trailingTriviaCache.ToListNode(),
+            position: 0,
+            index: 0
+        );
+    }
+
+    /// <summary>
+    /// Lexes trivia: whitespace, newline, // comments, /* comments */.
+    /// No structural trivia: no XML doc, no directives.
+    /// </summary>
+    private void LexSyntaxTrivia(bool isTrailing, ref GreenSyntaxListBuilder triviaList)
+    {
+        while (true)
+        {
+            Start();
+
+            var character = TextWindow.PeekChar();
+            if (character == SlidingTextWindow.InvalidCharacter)
+            {
+                return;
+            }
+
+            // Normalize unicode whitespace
+            if (character > 127)
+            {
+                if (SyntaxFacts.IsWhitespace(character))
+                {
+                    character = ' ';
+                }
+                else if (SyntaxFacts.IsNewLine(character))
+                {
+                    character = '\n';
+                }
+            }
+
+            switch (character)
+            {
+                case ' ':
+                case '\t':
+                case '\v':
+                case '\f':
+                case '\u001A':
+                    AddTrivia(ScanWhitespace(), ref triviaList);
+                    break;
+
+                case '\r':
+                case '\n':
+                    var eol = ScanEndOfLine();
+                    AddTrivia(eol, ref triviaList);
+
+                    // Trailing trivia stops on newline
+                    if (isTrailing)
+                    {
+                        return;
+                    }
+
+                    break;
+
+                case '/':
+                {
+                    var next = TextWindow.PeekChar(1);
+
+                    // Single line comment //
+                    if (next == '/')
+                    {
+                        LexSingleLineComment(ref triviaList);
+                        break;
+                    }
+
+                    // Multi-line comment /* ... */
+                    if (next == '*')
+                    {
+                        LexMultiLineComment(ref triviaList);
+                        break;
+                    }
+
+                    // Not a trivia
+                    return;
+                }
+
+                default:
+                    // Stop lexing trivia
+                    return;
+            }
+        }
+
+        void LexSingleLineComment(ref GreenSyntaxListBuilder list)
+        {
+            // Consume "//"
+            TextWindow.AdvanceChar(2);
+
+            // Read until newline
+            while (true)
+            {
+                var character = TextWindow.PeekChar();
+                if (character == '\r' || character == '\n' || character == SlidingTextWindow.InvalidCharacter)
+                {
+                    break;
+                }
+
+                TextWindow.AdvanceChar();
+            }
+
+            var text = GetNonInternedLexemeText();
+            AddTrivia(GreenSyntaxFactory.Comment(text), ref list);
+        }
+
+        void LexMultiLineComment(ref GreenSyntaxListBuilder list)
+        {
+            // Consume "/*"
+            TextWindow.AdvanceChar(2);
+            var terminated = false;
+
+            while (true)
+            {
+                var character = TextWindow.PeekChar();
+                if (character == SlidingTextWindow.InvalidCharacter)
+                {
+                    break;
+                }
+
+                if (character == '*' && TextWindow.PeekChar(1) == '/')
+                {
+                    TextWindow.AdvanceChar(2);
+                    terminated = true;
+                    break;
+                }
+
+                TextWindow.AdvanceChar();
+            }
+
+            if (!terminated)
+            {
+                AddError(ErrorCodes.ERR_OpenEndedComment);
+            }
+
+            var text = GetNonInternedLexemeText();
+            AddTrivia(GreenSyntaxFactory.MultiLineComment(text), ref list);
+        }
+    }
+
+    private void AddTrivia(GreenNode? trivia, [NotNull] ref GreenSyntaxListBuilder? list)
+    {
+        if (this.HasErrors)
+        {
+            trivia = trivia?.WithDiagnostics(this.GetErrors());
+        }
+
+        list ??= new GreenSyntaxListBuilder(TriviaListInitialCapacity);
+
+        list.Add(trivia);
+    }
+
+    /// <summary>
+    /// Scans all of the whitespace (not new-lines) into a trivia node until it runs out.
+    /// </summary>
+    /// <returns>A trivia node with the whitespace text</returns>
+    private GreenSyntaxTrivia ScanWhitespace()
+    {
+        Debug.Assert(SyntaxFacts.IsWhitespace(TextWindow.PeekChar()));
+
+        var hashCode = HashCode.FnvOffsetBias;  // FNV base
+        var onlySpaces = true;
+
+    top:
+        var ch = TextWindow.PeekChar();
+
+        switch (ch)
+        {
+            case '\t':       // Horizontal tab
+            case '\v':       // Vertical Tab
+            case '\f':       // Form-feed
+            case '\u001A':
+                onlySpaces = false;
+                goto case ' ';
+
+            case ' ':
+                TextWindow.AdvanceChar();
+                hashCode = HashCode.CombineFNVHash(hashCode, ch);
+                goto top;
+
+            case '\r':      // Carriage Return
+            case '\n':      // Line-feed
+                break;
+
+            default:
+                if (ch > 127 && SyntaxFacts.IsWhitespace(ch))
+                {
+                    goto case '\t';
+                }
+
+                break;
+        }
+
+        Debug.Assert(this.CurrentLexemeWidth > 0);
+
+        if (this.CurrentLexemeWidth == 1 && onlySpaces)
+        {
+            return GreenSyntaxFactory.Space;
+        }
+        else
+        {
+            var width = this.CurrentLexemeWidth;
+
+            if (width < MaxCachedTokenSize)
+            {
+                return _cache.LookupWhitespaceTrivia(
+                    TextWindow,
+                    this.LexemeStartPosition,
+                    hashCode);
+            }
+            else
+            {
+                return GreenSyntaxFactory.Whitespace(this.GetInternedLexemeText());
+            }
+        }
+    }
+
+    /// <summary>
+    /// Scans a new-line sequence (either a single new-line character or a CR-LF combo).
+    /// </summary>
+    /// <returns>A trivia node with the new-line text</returns>
+    private GreenNode? ScanEndOfLine()
+    {
+        char character;
+        switch (character = TextWindow.PeekChar())
+        {
+            case '\r':
+                TextWindow.AdvanceChar();
+                return TextWindow.TryAdvance('\n') ? GreenSyntaxFactory.CarriageReturnLineFeed : GreenSyntaxFactory.CarriageReturn;
+            case '\n':
+                TextWindow.AdvanceChar();
+                return GreenSyntaxFactory.LineFeed;
+            default:
+                if (SyntaxFacts.IsNewLine(character))
+                {
+                    TextWindow.AdvanceChar();
+                    return GreenSyntaxFactory.EndOfLine(character.ToString());
+                }
+
+                return null;
+        }
+    }
+
+    #endregion
+
+    #region CSharp Expression
 
     private TokenInfo ParseInlineExpression()
     {
@@ -288,6 +572,10 @@ internal sealed partial class Lexer : IDisposable
         return tokenInfo;
     }
 
+    #endregion
+
+    #region Identifier
+
     private bool TryParseIdentifier(ref TokenInfo token)
     {
         if (TryParseIdentifier_Fast(ref token))
@@ -443,7 +731,7 @@ internal sealed partial class Lexer : IDisposable
     private bool TryParseIdentifier_Slow(ref TokenInfo info)
     {
         var start = TextWindow.Position;
-        ResetIdentBuffer();
+        ResetIdentifierBuffer();
 
         var hasEscape = false;
 
@@ -584,7 +872,7 @@ internal sealed partial class Lexer : IDisposable
         return false;
     }
 
-    private void ResetIdentBuffer()
+    private void ResetIdentifierBuffer()
     {
         _identifierLength = 0;
     }
@@ -593,18 +881,22 @@ internal sealed partial class Lexer : IDisposable
     {
         if (_identifierLength >= _identifierBuffer.Length)
         {
-            GrowIdentBuffer();
+            GrowIdentifierBuffer();
         }
 
         _identifierBuffer[_identifierLength++] = ch;
     }
 
-    private void GrowIdentBuffer()
+    private void GrowIdentifierBuffer()
     {
         var tmp = new char[_identifierBuffer.Length * 2];
         Array.Copy(_identifierBuffer, tmp, _identifierBuffer.Length);
         _identifierBuffer = tmp;
     }
+
+    #endregion
+
+    #region Unicode
 
     private bool IsUnicodeEscape()
     {
@@ -765,6 +1057,27 @@ internal sealed partial class Lexer : IDisposable
         return character;
     }
 
+    private static char GetCharsFromUtf32(uint codepoint, out char lowSurrogate)
+    {
+        if (codepoint < (uint)0x00010000)
+        {
+            lowSurrogate = SlidingTextWindow.InvalidCharacter;
+            return (char)codepoint;
+        }
+        else
+        {
+            Debug.Assert(codepoint > 0x0000FFFF && codepoint <= 0x0010FFFF);
+            lowSurrogate = (char)((codepoint - 0x00010000) % 0x0400 + 0xDC00);
+            return (char)((codepoint - 0x00010000) / 0x0400 + 0xD800);
+        }
+    }
+
+    #endregion
+
+    #region Errors
+
+    internal bool HasErrors => _errors != null;
+
     private void AddError(AkburaDiagnostic? error)
     {
         if (error != null)
@@ -772,6 +1085,31 @@ internal sealed partial class Lexer : IDisposable
             _errors ??= new List<AkburaDiagnostic>(8);
             _errors.Add(error);
         }
+    }
+
+    private void AddError(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        var diagnostic = new AkburaDiagnostic(
+            parameters: [],
+            code: code!,
+            severity: AkburaDiagnosticSeverity.Error
+        );
+
+        AddError(diagnostic);
+    }
+
+    private ImmutableArray<AkburaDiagnostic> GetErrors()
+    {
+        if (_errors == null || _errors.Count == 0)
+        {
+            return [];
+        }
+        return ImmutableArray.CreateRange(_errors);
     }
 
     /// <summary>
@@ -795,6 +1133,8 @@ internal sealed partial class Lexer : IDisposable
         );
     }
 
+    #endregion
+
     private static GreenSyntaxToken CreateToken(in TokenInfo tokenInfo)
     {
         if (tokenInfo.Kind == SyntaxKind.CSharpRawToken)
@@ -812,21 +1152,6 @@ internal sealed partial class Lexer : IDisposable
         }
 
         throw new NotImplementedException();
-    }
-
-    private static char GetCharsFromUtf32(uint codepoint, out char lowSurrogate)
-    {
-        if (codepoint < (uint)0x00010000)
-        {
-            lowSurrogate = SlidingTextWindow.InvalidCharacter;
-            return (char)codepoint;
-        }
-        else
-        {
-            Debug.Assert(codepoint > 0x0000FFFF && codepoint <= 0x0010FFFF);
-            lowSurrogate = (char)((codepoint - 0x00010000) % 0x0400 + 0xDC00);
-            return (char)((codepoint - 0x00010000) / 0x0400 + 0xD800);
-        }
     }
 }
 #pragma warning restore RSEXPERIMENTAL003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.

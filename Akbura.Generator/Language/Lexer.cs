@@ -143,6 +143,7 @@ internal sealed partial class Lexer : IDisposable
         TokenInfo tokenInfo = default;
 
         Start();
+        ParseSyntaxToken(ref tokenInfo);
         var errors = GetErrors();
 
         _trailingTriviaCache.Clear();
@@ -150,6 +151,389 @@ internal sealed partial class Lexer : IDisposable
         var trailing = _trailingTriviaCache;
 
         return CreateToken(in tokenInfo, leading, trailing, errors);
+    }
+
+    private void ParseSyntaxToken(ref TokenInfo info)
+    {
+        // Reset token info for a new scan.
+        info.Kind = SyntaxKind.None;
+        info.ContextualKind = SyntaxKind.None;
+        info.Text = null;
+        info.StringValue = null;
+        info.ValueKind = SpecialType.None;
+        info.IsVerbatim = false;
+        info.HasIdentifierEscapeSequence = false;
+
+        var isEscaped = false;
+        var startingPosition = TextWindow.Position;
+
+        var character = TextWindow.PeekChar();
+
+        // End-of-file handling
+        if (character == SlidingTextWindow.InvalidCharacter)
+        {
+            if (!TextWindow.IsReallyAtEnd())
+            {
+                ConsumeUnexpected(ref info, startingPosition, isEscaped);
+                return;
+            }
+
+            info.Kind = SyntaxKind.EndOfFileToken;
+            return;
+        }
+
+        switch (character)
+        {
+            // Quote tokens for markup / AKCSS
+            case '\'':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.SingleQuoteToken;
+                return;
+
+            case '"':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.DoubleQuoteToken;
+                return;
+
+            // Slash: "/", "/>"
+            case '/':
+            {
+                TextWindow.AdvanceChar();
+
+                if (TextWindow.TryAdvance('>'))
+                {
+                    info.Kind = SyntaxKind.SlashGreaterToken; // "/>"
+                    return;
+                }
+
+                info.Kind = SyntaxKind.SlashToken; // "/"
+                return;
+            }
+
+            // Dot / DoubleDot: "." / ".."
+            case '.':
+            {
+                if (TextWindow.PeekChar(1) == '.')
+                {
+                    TextWindow.AdvanceChar(2);
+                    info.Kind = SyntaxKind.DoubleDotToken; // ".."
+                    return;
+                }
+
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.DotToken; // "."
+                return;
+            }
+
+            // Punctuation: comma / colon / semicolon / question
+            case ',':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.CommaToken;
+                return;
+
+            case ':':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.ColonToken;
+                return;
+
+            case ';':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.SemicolonToken;
+                return;
+
+            case '?':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.QuestionToken;
+                return;
+
+            // Arithmetic / bitwise operators
+            case '+':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.PlusToken;
+                return;
+
+            case '-':
+            {
+                TextWindow.AdvanceChar();
+
+                info.Kind = SyntaxKind.MinusToken;
+                return;
+            }
+
+            case '*':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.AsteriskToken;
+                return;
+
+            case '%':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.PercentToken;
+                return;
+
+            case '^':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.CaretToken;
+                return;
+
+            case '&':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.AmpersandToken;
+                return;
+
+            case '|':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.BarToken;
+                return;
+
+            // Equals / "==" / "=>"
+            case '=':
+            {
+                TextWindow.AdvanceChar();
+
+                if (TextWindow.TryAdvance('>'))
+                {
+                    info.Kind = SyntaxKind.ArrowToken; // "=>"
+                    return;
+                }
+
+                if (TextWindow.TryAdvance('='))
+                {
+                    info.Kind = SyntaxKind.EqualsEqualsToken; // "=="
+                    return;
+                }
+
+                info.Kind = SyntaxKind.EqualsToken; // "="
+                return;
+            }
+
+            // Bang / "!="
+            case '!':
+            {
+                TextWindow.AdvanceChar();
+
+                if (TextWindow.TryAdvance('='))
+                {
+                    info.Kind = SyntaxKind.BangEqualsToken; // "!="
+                    return;
+                }
+
+                info.Kind = SyntaxKind.BangToken; // "!"
+                return;
+            }
+
+            // Comparison / markup open: "<", "<=", "</"
+            case '<':
+            {
+                TextWindow.AdvanceChar();
+
+                if (TextWindow.TryAdvance('/'))
+                {
+                    info.Kind = SyntaxKind.LessSlashToken; // "</"
+                    return;
+                }
+
+                if (TextWindow.TryAdvance('='))
+                {
+                    info.Kind = SyntaxKind.LessEqualsToken; // "<="
+                    return;
+                }
+
+                info.Kind = SyntaxKind.LessThanToken; // "<"
+                return;
+            }
+
+            case '>':
+            {
+                TextWindow.AdvanceChar();
+
+                if (TextWindow.TryAdvance('='))
+                {
+                    info.Kind = SyntaxKind.GreaterEqualsToken; // ">="
+                    return;
+                }
+
+                info.Kind = SyntaxKind.GreaterThanToken; // ">"
+                return;
+            }
+
+            // Braces / brackets / parens
+            case '{':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.OpenBraceToken;
+                return;
+
+            case '}':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.CloseBraceToken;
+                return;
+
+            case '[':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.OpenBracketToken;
+                return;
+
+            case ']':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.CloseBracketToken;
+                return;
+
+            case '(':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.OpenParenToken;
+                return;
+
+            case ')':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.CloseParenToken;
+                return;
+
+            // Akcss / utilities 
+            case '@':
+                TextWindow.AdvanceChar();
+                info.Kind = SyntaxKind.AtToken;
+                return;
+
+
+            // Numeric literal: used in Tailwind segments (w-10)
+            // and potentially in DSL contexts.
+            case >= '0' and <= '9':
+                throw new NotImplementedException();
+                return;
+
+            // Identifier / keyword (ASCII fast path)
+            case '_':
+            case >= 'a' and <= 'z':
+            case >= 'A' and <= 'Z':
+                ScanIdentifierOrKeyword(ref info);
+                return;
+
+            // '\' — possible start of a unicode-escaped identifier
+            case '\\':
+            {
+                isEscaped = true;
+
+                var peeked = PeekCharOrUnicodeEscape(out _);
+                if (SyntaxFacts.IsIdentifierStartCharacter(peeked))
+                {
+                    if (ScanIdentifierOrKeyword(ref info))
+                    {
+                        return;
+                    }
+                }
+
+                goto default;
+            }
+
+
+            default:
+                // Non-ASCII identifier start
+                if (SyntaxFacts.IsIdentifierStartCharacter(character))
+                {
+                    goto case '_';
+                }
+
+                // Unknown / invalid character => error + recovery
+                ConsumeUnexpected(ref info, startingPosition, isEscaped);
+                return;
+        }
+    }
+
+
+    private bool ScanIdentifierOrKeyword(ref TokenInfo info)
+    {
+        // Reset contextual kind for each identifier
+        info.ContextualKind = SyntaxKind.None;
+
+        if (!TryParseIdentifier(ref info))
+        {
+            info.Kind = SyntaxKind.None;
+            return false;
+        }
+
+        // At this point TryParseIdentifier has filled info.Text / StringValue etc.
+        AkburaDebug.Assert(info.Text is not null);
+
+        // If the identifier is escaped or verbatim, it can never be a keyword.
+        if (info.IsVerbatim || info.HasIdentifierEscapeSequence)
+        {
+            info.Kind = SyntaxKind.IdentifierToken;
+            info.ContextualKind = SyntaxKind.None;
+            return true;
+        }
+
+        // Akbura does not have directive mode. We always use the regular keyword table.
+        if (_cache.TryGetKeywordKind(info.Text, out var keywordKind))
+        {
+            if (SyntaxFacts.IsContextualKeyword(keywordKind))
+            {
+                // Let the parser decide based on context:
+                // lexically this is still an identifier, but we carry the contextual kind.
+                info.Kind = SyntaxKind.IdentifierToken;
+                info.ContextualKind = keywordKind;
+            }
+            else
+            {
+                // Hard keyword at the token level.
+                info.Kind = keywordKind;
+                info.ContextualKind = keywordKind;
+            }
+        }
+        else
+        {
+            info.Kind = SyntaxKind.IdentifierToken;
+            info.ContextualKind = SyntaxKind.None;
+        }
+
+        if (info.Kind == SyntaxKind.None)
+        {
+            info.Kind = SyntaxKind.IdentifierToken;
+        }
+
+        return true;
+    }
+
+    private void ConsumeUnexpected(ref TokenInfo info, int startingPosition, bool isEscaped)
+    {
+        var ch = TextWindow.PeekChar();
+
+        if (ch != SlidingTextWindow.InvalidCharacter)
+        {
+            TextWindow.AdvanceChar();
+
+            // If we hit the start of a surrogate pair, consume both chars
+            if (char.IsHighSurrogate(ch) && char.IsLowSurrogate(TextWindow.PeekChar()))
+            {
+                TextWindow.AdvanceChar();
+            }
+        }
+
+        if (_badTokenCount++ <= 200)
+        {
+            info.Text = GetInternedLexemeText();
+        }
+        else
+        {
+            var end = TextWindow.Text.Length;
+            info.Text = TextWindow.Text.ToString(TextSpan.FromBounds(startingPosition, end));
+            TextWindow.Reset(end);
+        }
+
+        // For now we classify it as an identifier-like bad token so that CreateToken can handle it.
+        info.Kind = SyntaxKind.IdentifierToken;
+
+        // If the original text wasn't already escaped, then escape non-printable chars in the message.
+        var messageText = info.Text;
+        if (!isEscaped && messageText is not null)
+        {
+            messageText = ObjectDisplay.FormatLiteral(
+                messageText,
+                ObjectDisplayOptions.EscapeNonPrintableCharacters
+            );
+        }
+
+        // For now we ignore messageText in the diagnostic payload.
+        // It can be wired as a diagnostic parameter later if needed.
+        AddError(ErrorCodes.ERR_UnexpectedCharacter, [messageText]);
     }
 
     private void Start()
@@ -1116,6 +1500,22 @@ internal sealed partial class Lexer : IDisposable
 
         var diagnostic = new AkburaDiagnostic(
             parameters: [],
+            code: code!,
+            severity: AkburaDiagnosticSeverity.Error
+        );
+
+        AddError(diagnostic);
+    }
+
+    private void AddError(string? code, ImmutableArray<object?> parameters)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        var diagnostic = new AkburaDiagnostic(
+            parameters: parameters,
             code: code!,
             severity: AkburaDiagnosticSeverity.Error
         );

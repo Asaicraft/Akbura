@@ -174,6 +174,11 @@ namespace Akbura.Language.Syntax
             return SyntaxKind.None;
         }
 
+        public static partial bool IsContextualKeyword(SyntaxKind kind)
+        {
+            return false;
+        }
+
         public static partial object? GetValue(SyntaxKind kind, string text)
         {
             return kind switch

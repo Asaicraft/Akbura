@@ -44,14 +44,14 @@ public sealed class AkburaDiagnostic
     }
 
     [SetsRequiredMembers]
-    public AkburaDiagnostic(ImmutableArray<object> parameters, string code, AkburaDiagnosticSeverity severity)
+    public AkburaDiagnostic(ImmutableArray<object?> parameters, string code, AkburaDiagnosticSeverity severity)
     {
         Parameters = parameters;
         Code = code;
         Severity = severity;
     }
 
-    public required ImmutableArray<object> Parameters
+    public required ImmutableArray<object?> Parameters
     {
         get; init;
     }

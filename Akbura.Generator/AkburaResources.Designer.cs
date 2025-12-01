@@ -77,5 +77,14 @@ namespace Akbura {
                 return ResourceManager.GetString("ERR_OpenEndedComment", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unexpected character: {0}.
+        /// </summary>
+        internal static string ERR_UnexpectedCharacter {
+            get {
+                return ResourceManager.GetString("ERR_UnexpectedCharacter", resourceCulture);
+            }
+        }
     }
 }

@@ -23,6 +23,8 @@ public static partial class SyntaxFacts
     public static partial SyntaxKind GetKeywordKind(string text);
     public static partial SyntaxKind GetContextualKeywordKind(string text);
 
+    public static partial bool IsContextualKeyword(SyntaxKind kind);
+
     public static bool IsHexDigit(char c)
     {
         return (c >= '0' && c <= '9') ||

@@ -123,4 +123,7 @@
   <data name="ERR_OpenEndedComment" xml:space="preserve">
     <value>Unterminated multi-line comment.</value>
   </data>
+  <data name="ERR_UnexpectedCharacter" xml:space="preserve">
+    <value>Unexpected character: {0}</value>
+  </data>
 </root>

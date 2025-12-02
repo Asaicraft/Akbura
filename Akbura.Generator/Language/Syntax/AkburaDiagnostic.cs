@@ -36,7 +36,7 @@ public enum AkburaDiagnosticSeverity
     Error = 3,
 }
 
-public sealed class AkburaDiagnostic
+public class AkburaDiagnostic
 {
     public AkburaDiagnostic()
     {

@@ -117,8 +117,23 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="ERR_FloatOverflow" xml:space="preserve">
+    <value>Floating-point constant is too large for '{0}'.</value>
+  </data>
   <data name="ERR_IllegalEscape" xml:space="preserve">
     <value>Illegal escape sequence at position {0} (length {1}).</value>
+  </data>
+  <data name="ERR_IntOverflow" xml:space="preserve">
+    <value>Integer literal is too large.</value>
+  </data>
+  <data name="ERR_InvalidNumber" xml:space="preserve">
+    <value>Invalid number literal at position {0} (length {1}).</value>
+  </data>
+  <data name="ERR_InvalidNumber_WithoutPosition" xml:space="preserve">
+    <value>Invalid number literal.</value>
+  </data>
+  <data name="ERR_InvalidReal" xml:space="preserve">
+    <value>Invalid real literal.</value>
   </data>
   <data name="ERR_OpenEndedComment" xml:space="preserve">
     <value>Unterminated multi-line comment.</value>

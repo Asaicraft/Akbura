@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Globalization;
 
 namespace Akbura.Language;
 
@@ -397,7 +398,7 @@ internal sealed partial class Lexer : IDisposable
             // Numeric literal: used in Tailwind segments (w-10)
             // and potentially in DSL contexts.
             case >= '0' and <= '9':
-                throw new NotImplementedException();
+                ScanNumericLiteral(ref info);
                 return;
 
             // Identifier / keyword (ASCII fast path)
@@ -551,6 +552,443 @@ internal sealed partial class Lexer : IDisposable
 
     internal string GetNonInternedLexemeText()
             => TextWindow.GetText(LexemeStartPosition, intern: false);
+
+    #region Numeric
+
+    private bool ScanNumericLiteral(ref TokenInfo info)
+    {
+        var start = TextWindow.Position;
+        char character;
+        var isHex = false;
+        var isBinary = false;
+        var hasDecimal = false;
+        var hasExponent = false;
+        info.Text = null;
+        info.ValueKind = SpecialType.None;
+        _builder.Clear();
+        var hasUSuffix = false;
+        var hasLSuffix = false;
+        var underscoreInWrongPlace = false;
+        var usedUnderscore = false;
+        var firstCharWasUnderscore = false;
+
+        character = TextWindow.PeekChar();
+        if (character == '0')
+        {
+            character = TextWindow.PeekChar(1);
+            if (character == 'x' || character == 'X')
+            {
+                TextWindow.AdvanceChar(2);
+                isHex = true;
+            }
+            else if (character == 'b' || character == 'B')
+            {
+                TextWindow.AdvanceChar(2);
+                isBinary = true;
+            }
+        }
+
+        if (isHex || isBinary)
+        {
+            // It's OK if it has no digits after the '0x' -- we'll catch it in ScanNumericLiteral
+            // and give a proper error then.
+            ScanNumericLiteralSingleInteger(ref underscoreInWrongPlace, ref usedUnderscore, ref firstCharWasUnderscore, isHex, isBinary);
+
+            if (TextWindow.PeekChar() is 'L' or 'l')
+            {
+                TextWindow.AdvanceChar();
+                hasLSuffix = true;
+                if (TextWindow.PeekChar() is 'u' or 'U')
+                {
+                    TextWindow.AdvanceChar();
+                    hasUSuffix = true;
+                }
+            }
+            else if (TextWindow.PeekChar() is 'u' or 'U')
+            {
+                TextWindow.AdvanceChar();
+                hasUSuffix = true;
+                if (TextWindow.PeekChar() is 'L' or 'l')
+                {
+                    TextWindow.AdvanceChar();
+                    hasLSuffix = true;
+                }
+            }
+        }
+        else
+        {
+            ScanNumericLiteralSingleInteger(ref underscoreInWrongPlace, ref usedUnderscore, ref firstCharWasUnderscore, isHex: false, isBinary: false);
+
+            if ((character = TextWindow.PeekChar()) == '.')
+            {
+                var ch2 = TextWindow.PeekChar(1);
+                if (ch2 >= '0' && ch2 <= '9')
+                {
+                    hasDecimal = true;
+                    _builder.Append(character);
+                    TextWindow.AdvanceChar();
+
+                    ScanNumericLiteralSingleInteger(ref underscoreInWrongPlace, ref usedUnderscore, ref firstCharWasUnderscore, isHex: false, isBinary: false);
+                }
+                else if (_builder.Length == 0)
+                {
+                    // we only have the dot so far.. (no preceding number or following number)
+                    TextWindow.Reset(start);
+                    return false;
+                }
+            }
+
+            if ((character = TextWindow.PeekChar()) is 'E' or 'e')
+            {
+                _builder.Append(character);
+                TextWindow.AdvanceChar();
+                hasExponent = true;
+                if ((character = TextWindow.PeekChar()) is '-' or '+')
+                {
+                    _builder.Append(character);
+                    TextWindow.AdvanceChar();
+                }
+
+                if (!(((character = TextWindow.PeekChar()) >= '0' && character <= '9') || character == '_'))
+                {
+                    // use this for now (CS0595), cant use CS0594 as we dont know 'type'
+                    this.AddError(ErrorCodes.ERR_InvalidReal);
+                    // add dummy exponent, so parser does not blow up
+                    _builder.Append('0');
+                }
+                else
+                {
+                    ScanNumericLiteralSingleInteger(ref underscoreInWrongPlace, ref usedUnderscore, ref firstCharWasUnderscore, isHex: false, isBinary: false);
+                }
+            }
+
+            character = TextWindow.PeekChar();
+            if (hasExponent || hasDecimal)
+            {
+                if (character is 'f' or 'F')
+                {
+                    TextWindow.AdvanceChar();
+                    info.ValueKind = SpecialType.System_Single;
+                }
+                else if (character is 'D' or 'd')
+                {
+                    TextWindow.AdvanceChar();
+                    info.ValueKind = SpecialType.System_Double;
+                }
+                else if (character is 'm' or 'M')
+                {
+                    TextWindow.AdvanceChar();
+                    info.ValueKind = SpecialType.System_Decimal;
+                }
+                else
+                {
+                    info.ValueKind = SpecialType.System_Double;
+                }
+            }
+            else if (character is 'f' or 'F')
+            {
+                TextWindow.AdvanceChar();
+                info.ValueKind = SpecialType.System_Single;
+            }
+            else if (character is 'D' or 'd')
+            {
+                TextWindow.AdvanceChar();
+                info.ValueKind = SpecialType.System_Double;
+            }
+            else if (character is 'm' or 'M')
+            {
+                TextWindow.AdvanceChar();
+                info.ValueKind = SpecialType.System_Decimal;
+            }
+            else if (character is 'L' or 'l')
+            {
+                TextWindow.AdvanceChar();
+                hasLSuffix = true;
+                if (TextWindow.PeekChar() is 'u' or 'U')
+                {
+                    TextWindow.AdvanceChar();
+                    hasUSuffix = true;
+                }
+            }
+            else if (character == 'u' || character == 'U')
+            {
+                hasUSuffix = true;
+                TextWindow.AdvanceChar();
+                if (TextWindow.PeekChar() is 'L' or 'l')
+                {
+                    TextWindow.AdvanceChar();
+                    hasLSuffix = true;
+                }
+            }
+        }
+
+        if (underscoreInWrongPlace)
+        {
+            this.AddError(ErrorCodes.ERR_InvalidNumber, [start, TextWindow.Position - start]);
+        }
+
+        info.Kind = SyntaxKind.NumericLiteralToken;
+        info.Text = this.GetInternedLexemeText();
+        Debug.Assert(info.Text != null);
+        var valueText = TextWindow.Intern(_builder);
+        ulong val;
+        switch (info.ValueKind)
+        {
+            case SpecialType.System_Single:
+                info.FloatValue = this.GetValueSingle(valueText);
+                break;
+            case SpecialType.System_Double:
+                info.DoubleValue = this.GetValueDouble(valueText);
+                break;
+            case SpecialType.System_Decimal:
+                info.DecimalValue = this.GetValueDecimal(valueText, start, TextWindow.Position);
+                break;
+            default:
+                if (string.IsNullOrEmpty(valueText))
+                {
+                    if (!underscoreInWrongPlace)
+                    {
+                        this.AddError(ErrorCodes.ERR_InvalidNumber_WithoutPosition);
+                    }
+                    val = 0; //safe default
+                }
+                else
+                {
+                    val = this.GetValueUInt64(valueText, isHex, isBinary);
+                }
+
+                // 2.4.4.2 Integer literals
+                // ...
+                // The type of an integer literal is determined as follows:
+
+                // * If the literal has no suffix, it has the first of these types in which its value can be represented: int, uint, long, ulong.
+                if (!hasUSuffix && !hasLSuffix)
+                {
+                    if (val <= Int32.MaxValue)
+                    {
+                        info.ValueKind = SpecialType.System_Int32;
+                        info.IntValue = (int)val;
+                    }
+                    else if (val <= UInt32.MaxValue)
+                    {
+                        info.ValueKind = SpecialType.System_UInt32;
+                        info.UintValue = (uint)val;
+
+                        // TODO: See below, it may be desirable to mark this token
+                        // as special for folding if its value is 2147483648.
+                    }
+                    else if (val <= Int64.MaxValue)
+                    {
+                        info.ValueKind = SpecialType.System_Int64;
+                        info.LongValue = (long)val;
+                    }
+                    else
+                    {
+                        info.ValueKind = SpecialType.System_UInt64;
+                        info.UlongValue = val;
+
+                        // TODO: See below, it may be desirable to mark this token
+                        // as special for folding if its value is 9223372036854775808
+                    }
+                }
+                else if (hasUSuffix && !hasLSuffix)
+                {
+                    // * If the literal is suffixed by U or u, it has the first of these types in which its value can be represented: uint, ulong.
+                    if (val <= UInt32.MaxValue)
+                    {
+                        info.ValueKind = SpecialType.System_UInt32;
+                        info.UintValue = (uint)val;
+                    }
+                    else
+                    {
+                        info.ValueKind = SpecialType.System_UInt64;
+                        info.UlongValue = val;
+                    }
+                }
+
+                // * If the literal is suffixed by L or l, it has the first of these types in which its value can be represented: long, ulong.
+                else if (!hasUSuffix & hasLSuffix)
+                {
+                    if (val <= Int64.MaxValue)
+                    {
+                        info.ValueKind = SpecialType.System_Int64;
+                        info.LongValue = (long)val;
+                    }
+                    else
+                    {
+                        info.ValueKind = SpecialType.System_UInt64;
+                        info.UlongValue = val;
+
+                        // TODO: See below, it may be desirable to mark this token
+                        // as special for folding if its value is 9223372036854775808
+                    }
+                }
+
+                // * If the literal is suffixed by UL, Ul, uL, ul, LU, Lu, lU, or lu, it is of type ulong.
+                else
+                {
+                    Debug.Assert(hasUSuffix && hasLSuffix);
+                    info.ValueKind = SpecialType.System_UInt64;
+                    info.UlongValue = val;
+                }
+
+                break;
+
+                // Note, the following portion of the spec is not implemented here. It is implemented
+                // in the unary minus analysis.
+
+                // * When a decimal-integer-literal with the value 2147483648 (231) and no integer-type-suffix appears
+                //   as the token immediately following a unary minus operator token (§7.7.2), the result is a constant
+                //   of type int with the value −2147483648 (−231). In all other situations, such a decimal-integer-
+                //   literal is of type uint.
+                // * When a decimal-integer-literal with the value 9223372036854775808 (263) and no integer-type-suffix
+                //   or the integer-type-suffix L or l appears as the token immediately following a unary minus operator
+                //   token (§7.7.2), the result is a constant of type long with the value −9223372036854775808 (−263).
+                //   In all other situations, such a decimal-integer-literal is of type ulong.
+        }
+
+        return true;
+    }
+
+    // Allows underscores in integers, except at beginning for decimal and end
+    private void ScanNumericLiteralSingleInteger(ref bool underscoreInWrongPlace, ref bool usedUnderscore, ref bool firstCharWasUnderscore, bool isHex, bool isBinary)
+    {
+        if (TextWindow.PeekChar() == '_')
+        {
+            if (isHex || isBinary)
+            {
+                firstCharWasUnderscore = true;
+            }
+            else
+            {
+                underscoreInWrongPlace = true;
+            }
+        }
+
+        var lastCharWasUnderscore = false;
+        while (true)
+        {
+            var character = TextWindow.PeekChar();
+            if (character == '_')
+            {
+                usedUnderscore = true;
+                lastCharWasUnderscore = true;
+            }
+            else if (!(isHex ? SyntaxFacts.IsHexDigit(character) :
+                       isBinary ? SyntaxFacts.IsBinaryDigit(character) :
+                       SyntaxFacts.IsDecDigit(character)))
+            {
+                break;
+            }
+            else
+            {
+                _builder.Append(character);
+                lastCharWasUnderscore = false;
+            }
+            TextWindow.AdvanceChar();
+        }
+
+        if (lastCharWasUnderscore)
+        {
+            underscoreInWrongPlace = true;
+        }
+    }
+
+    private float GetValueSingle(string text)
+    {
+        if (!RealParser.TryParseFloat(text, out var result))
+        {
+            //we've already lexed the literal, so the error must be from overflow
+            this.AddError(ErrorCodes.ERR_FloatOverflow, ["float"]);
+        }
+
+        return result;
+    }
+
+    private double GetValueDouble(string text)
+    {
+        if (!RealParser.TryParseDouble(text, out var result))
+        {
+            //we've already lexed the literal, so the error must be from overflow
+            this.AddError(ErrorCodes.ERR_FloatOverflow, ["double"]);
+        }
+
+        return result;
+    }
+
+    private ulong GetValueUInt64(string text, bool isHex, bool isBinary)
+    {
+        ulong result;
+        if (isBinary)
+        {
+            if (!TryParseBinaryUInt64(text, out result))
+            {
+                this.AddError(ErrorCodes.ERR_IntOverflow);
+            }
+        }
+        else if (!UInt64.TryParse(text, isHex ? NumberStyles.AllowHexSpecifier : NumberStyles.None, CultureInfo.InvariantCulture, out result))
+        {
+            //we've already lexed the literal, so the error must be from overflow
+            this.AddError(ErrorCodes.ERR_IntOverflow);
+        }
+
+        return result;
+    }
+
+    private decimal GetValueDecimal(string text, int start, int end)
+    {
+        // Use decimal.TryParse to parse value. Note: the behavior of
+        // decimal.TryParse differs from Dev11 in several cases:
+        //
+        // 1. [-]0eNm where N > 0
+        //     The native compiler ignores sign and scale and treats such cases
+        //     as 0e0m. decimal.TryParse fails so these cases are compile errors.
+        //     [Bug #568475]
+        // 2. 1e-Nm where N >= 1000
+        //     The native compiler reports CS0594 "Floating-point constant is
+        //     outside the range of type 'decimal'". decimal.TryParse allows
+        //     N >> 1000 but treats decimals with very small exponents as 0.
+        //     [No bug.]
+        // 3. Decimals with significant digits below 1e-49
+        //     The native compiler considers digits below 1e-49 when rounding.
+        //     decimal.TryParse ignores digits below 1e-49 when rounding. This
+        //     last difference is perhaps the most significant since existing code
+        //     will continue to compile but constant values may be rounded differently.
+        //     (Note that the native compiler does not round in all cases either since
+        //     the native compiler chops the string at 50 significant digits. For example
+        //     ".100000000000000000000000000050000000000000000000001m" is not
+        //     rounded up to 0.1000000000000000000000000001.)
+        //     [Bug #568494]
+
+        if (!decimal.TryParse(text, NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent, CultureInfo.InvariantCulture, out var result))
+        {
+            //we've already lexed the literal, so the error must be from overflow
+            this.AddError(start, end - start, ErrorCodes.ERR_FloatOverflow, ["decimal"]);
+        }
+
+        return result;
+    }
+
+    // TODO: Change to Int64.TryParse when it supports NumberStyles.AllowBinarySpecifier (inline this method into GetValueUInt32/64)
+    private static bool TryParseBinaryUInt64(string text, out ulong value)
+    {
+        value = 0;
+        foreach (var character in text)
+        {
+            // if uppermost bit is set, then the next bitshift will overflow
+            if ((value & 0x8000000000000000) != 0)
+            {
+                return false;
+            }
+            // We shouldn't ever get a string that's nonbinary (see ScanNumericLiteral),
+            // so don't explicitly check for it (there's a debug assert in SyntaxFacts)
+            var bit = (ulong)SyntaxFacts.BinaryValue(character);
+            value = (value << 1) | bit;
+        }
+        return true;
+    }
+
+    #endregion
 
     #region Trivia
 
@@ -1515,6 +1953,24 @@ internal sealed partial class Lexer : IDisposable
         }
 
         var diagnostic = new AkburaDiagnostic(
+            parameters: parameters,
+            code: code!,
+            severity: AkburaDiagnosticSeverity.Error
+        );
+
+        AddError(diagnostic);
+    }
+
+    private void AddError(int position, int width, string? code, ImmutableArray<object?> parameters)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        var diagnostic = new SyntaxDiagnosticInfo(
+            position,
+            width,
             parameters: parameters,
             code: code!,
             severity: AkburaDiagnosticSeverity.Error

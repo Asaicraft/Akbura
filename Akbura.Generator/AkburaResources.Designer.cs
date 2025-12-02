@@ -61,11 +61,56 @@ namespace Akbura {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Floating-point constant is too large for &apos;{0}&apos;..
+        /// </summary>
+        internal static string ERR_FloatOverflow {
+            get {
+                return ResourceManager.GetString("ERR_FloatOverflow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Illegal escape sequence at position {0} (length {1})..
         /// </summary>
         internal static string ERR_IllegalEscape {
             get {
                 return ResourceManager.GetString("ERR_IllegalEscape", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Integer literal is too large..
+        /// </summary>
+        internal static string ERR_IntOverflow {
+            get {
+                return ResourceManager.GetString("ERR_IntOverflow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid number literal at position {0} (length {1})..
+        /// </summary>
+        internal static string ERR_InvalidNumber {
+            get {
+                return ResourceManager.GetString("ERR_InvalidNumber", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid number literal..
+        /// </summary>
+        internal static string ERR_InvalidNumber_WithoutPosition {
+            get {
+                return ResourceManager.GetString("ERR_InvalidNumber_WithoutPosition", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid real literal..
+        /// </summary>
+        internal static string ERR_InvalidReal {
+            get {
+                return ResourceManager.GetString("ERR_InvalidReal", resourceCulture);
             }
         }
         

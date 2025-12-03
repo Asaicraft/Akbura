@@ -1,8 +1,12 @@
 ﻿using Akbura.Collections;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using CSharpTrivia = Microsoft.CodeAnalysis.SyntaxTrivia;
+using CSharpFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Akbura.Pools;
 
 namespace Akbura.Language.Syntax.Green;
 internal sealed class GreenSyntaxListBuilder
@@ -195,5 +199,31 @@ internal sealed class GreenSyntaxListBuilder
     public GreenSyntaxList<TNode> ToList<TNode>() where TNode : GreenNode
     {
         return new GreenSyntaxList<TNode>(ToListNode());
+    }
+
+    public string ToFullString()
+    {
+        var stringBuilder = PooledStringBuilder.GetInstance();
+        var writer = new StringWriter(stringBuilder.Builder);
+
+        for (var i = 0; i < Count; i++)
+        {
+            var triviaNode = _nodes[i].Value!;
+
+            AkburaDebug.AssertNotNull(triviaNode);
+
+            triviaNode.WriteTo(writer);
+        }
+
+        return stringBuilder.ToStringAndFree();
+    }
+
+    public Microsoft.CodeAnalysis.SyntaxTriviaList ToCSharpSyntaxTriviaArray(bool leading)
+    {
+        var fullString = ToFullString();
+
+        return leading 
+            ? CSharpFactory.ParseLeadingTrivia(fullString)
+            : CSharpFactory.ParseTrailingTrivia(fullString);
     }
 }

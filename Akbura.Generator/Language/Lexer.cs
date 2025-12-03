@@ -13,6 +13,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Globalization;
+using CodeAnalysis = Microsoft.CodeAnalysis;
 
 namespace Akbura.Language;
 
@@ -40,6 +41,8 @@ internal sealed partial class Lexer : IDisposable
         InInlineExpression = 1 << 0,
         InExpressionUntilSemicolon = 1 << 1,
         InExpressionUntilComma = 1 << 2,
+        InArgumentExpression = 1 << 3,
+        InMarkup = 1 << 4,
     }
 
     internal struct TokenInfo
@@ -118,13 +121,14 @@ internal sealed partial class Lexer : IDisposable
 #endif
         _mode = mode;
 
-        if(mode != LexerMode.TopLevel)
+        if (mode != LexerMode.TopLevel)
         {
             var tokenInfo = mode switch
             {
                 LexerMode.InInlineExpression => ParseInlineExpression(),
                 LexerMode.InExpressionUntilSemicolon => ParseExpressionUntilSemicolon(),
                 LexerMode.InExpressionUntilComma => ParseExpressionUntilComma(),
+                LexerMode.InArgumentExpression => ParseArgumentExpression(),
                 _ => default
             };
 
@@ -137,21 +141,28 @@ internal sealed partial class Lexer : IDisposable
 
     private GreenSyntaxToken ParseNextToken()
     {
+        var tokenInfo = ParseNextTokenInfo(out var leading, out var trailing, out var errors);
+
+        return CreateToken(in tokenInfo, leading, trailing, errors);
+    }
+
+    private TokenInfo ParseNextTokenInfo(out GreenSyntaxListBuilder leading, out GreenSyntaxListBuilder trailing, out ImmutableArray<AkburaDiagnostic> errors)
+    {
         _leadingTriviaCache.Clear();
         LexSyntaxTrivia(isTrailing: false, triviaList: ref _leadingTriviaCache);
-        var leading = _leadingTriviaCache;
+        leading = _leadingTriviaCache;
 
         TokenInfo tokenInfo = default;
 
         Start();
         ParseSyntaxToken(ref tokenInfo);
-        var errors = GetErrors();
+        errors = GetErrors();
 
         _trailingTriviaCache.Clear();
         LexSyntaxTrivia(isTrailing: true, triviaList: ref _trailingTriviaCache);
-        var trailing = _trailingTriviaCache;
+        trailing = _trailingTriviaCache;
 
-        return CreateToken(in tokenInfo, leading, trailing, errors);
+        return tokenInfo;
     }
 
     private void ParseSyntaxToken(ref TokenInfo info)
@@ -439,7 +450,6 @@ internal sealed partial class Lexer : IDisposable
         }
     }
 
-
     private bool ScanIdentifierOrKeyword(ref TokenInfo info)
     {
         // Reset contextual kind for each identifier
@@ -543,6 +553,8 @@ internal sealed partial class Lexer : IDisposable
         _errors = null;
     }
 
+    #region Lexeme Utilities
+
     internal int LexemeStartPosition;
 
     internal int CurrentLexemeWidth => this.TextWindow.Position - LexemeStartPosition;
@@ -552,6 +564,8 @@ internal sealed partial class Lexer : IDisposable
 
     internal string GetNonInternedLexemeText()
             => TextWindow.GetText(LexemeStartPosition, intern: false);
+
+    #endregion
 
     #region Numeric
 
@@ -1260,7 +1274,7 @@ internal sealed partial class Lexer : IDisposable
 
     private TokenInfo ParseInlineExpression()
     {
-        return ParseExpressionUntil(')');
+        return ParseExpressionUntil('}');
     }
 
     private TokenInfo ParseExpressionUntilSemicolon()
@@ -1271,6 +1285,11 @@ internal sealed partial class Lexer : IDisposable
     private TokenInfo ParseExpressionUntilComma()
     {
         return ParseExpressionUntil(',');
+    }
+
+    private TokenInfo ParseArgumentExpression()
+    {
+        return ParseExpressionUntil(',', ')');
     }
 
     private TokenInfo ParseExpressionUntil(char terminator)
@@ -1413,6 +1432,138 @@ internal sealed partial class Lexer : IDisposable
 
         return tokenInfo;
     }
+
+    private TokenInfo ParseExpressionUntil(char firstTerminator, char secondTerminator)
+    {
+        static void IncreaseDepth(ref int depth, char character, StringBuilder stringBuilder, in SlidingTextWindow TextWindow)
+        {
+            depth++;
+            stringBuilder.Append(character);
+            TextWindow.NextChar();
+        }
+
+        static bool DecreaseDepth(ref int depth, char character, StringBuilder stringBuilder, in SlidingTextWindow TextWindow)
+        {
+            depth--;
+            stringBuilder.Append(character);
+            TextWindow.NextChar();
+
+            if (depth < 0)
+            {
+                depth = 0;
+                return true;
+            }
+
+            return false;
+        }
+
+        var tokenInfo = new TokenInfo
+        {
+            Kind = SyntaxKind.CSharpRawToken,
+            ContextualKind = SyntaxKind.CSharpRawToken
+        };
+
+        var expressionOffset = TextWindow.Position;
+        _builder.Clear();
+
+        var paren = 0;
+        var brace = 0;
+        var bracket = 0;
+
+        while (true)
+        {
+            var character = TextWindow.PeekChar();
+
+            if (character == SlidingTextWindow.InvalidCharacter)
+                break;
+
+            // handle strings/chars
+            if (ScanCSharpStringOrChar())
+            {
+                var token = ParseCSharpStringOrChar();
+
+                if (token.RawKind != 0)
+                {
+                    _builder.Append(token.Text);
+                    continue;
+                }
+
+                break;
+            }
+
+            // structure: (
+            if (character == '(')
+            {
+                IncreaseDepth(ref paren, character, _builder, in TextWindow);
+                continue;
+            }
+
+            if (character == ')')
+            {
+                if (DecreaseDepth(ref paren, character, _builder, in TextWindow))
+                    break;
+                continue;
+            }
+
+            // structure: {
+            if (character == '{')
+            {
+                IncreaseDepth(ref brace, character, _builder, in TextWindow);
+                continue;
+            }
+
+            if (character == '}')
+            {
+                if (DecreaseDepth(ref brace, character, _builder, in TextWindow))
+                    break;
+                continue;
+            }
+
+            // structure: [
+            if (character == '[')
+            {
+                IncreaseDepth(ref bracket, character, _builder, in TextWindow);
+                continue;
+            }
+
+            if (character == ']')
+            {
+                if (DecreaseDepth(ref bracket, character, _builder, in TextWindow))
+                    break;
+                continue;
+            }
+
+            // NEW: stop if we hit ANY terminator and nesting == 0
+            if ((character == firstTerminator || character == secondTerminator) &&
+                paren == 0 && brace == 0 && bracket == 0)
+            {
+                break;
+            }
+
+            _builder.Append(character);
+            TextWindow.NextChar();
+        }
+
+        var expressionText = _builder.ToString();
+        tokenInfo.Text = expressionText;
+
+        var parsed = CSharpSyntaxFactory.ParseExpression(
+            expressionText,
+            expressionOffset,
+            options: null,
+            consumeFullText: true);
+
+        tokenInfo.CSharpNode = parsed;
+        tokenInfo.CSharpSyntaxKind = parsed.Kind();
+
+        return tokenInfo;
+    }
+
+    #endregion
+
+    #region CSharp Statements
+
+    private void ParseCSharp
 
     #endregion
 

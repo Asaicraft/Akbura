@@ -61,11 +61,38 @@ namespace Akbura {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to &apos;)&apos; expected..
+        /// </summary>
+        internal static string ERR_CloseParenExpected {
+            get {
+                return ResourceManager.GetString("ERR_CloseParenExpected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Floating-point constant is too large for &apos;{0}&apos;..
         /// </summary>
         internal static string ERR_FloatOverflow {
             get {
                 return ResourceManager.GetString("ERR_FloatOverflow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Identifier expected..
+        /// </summary>
+        internal static string ERR_IdentifierExpected {
+            get {
+                return ResourceManager.GetString("ERR_IdentifierExpected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Identifier expected; &apos;{0}&apos; is a keyword..
+        /// </summary>
+        internal static string ERR_IdentifierExpectedKW {
+            get {
+                return ResourceManager.GetString("ERR_IdentifierExpectedKW", resourceCulture);
             }
         }
         
@@ -115,11 +142,47 @@ namespace Akbura {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to &apos;{&apos; expected..
+        /// </summary>
+        internal static string ERR_LbraceExpected {
+            get {
+                return ResourceManager.GetString("ERR_LbraceExpected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Unterminated multi-line comment..
         /// </summary>
         internal static string ERR_OpenEndedComment {
             get {
                 return ResourceManager.GetString("ERR_OpenEndedComment", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;}&apos; expected..
+        /// </summary>
+        internal static string ERR_RbraceExpected {
+            get {
+                return ResourceManager.GetString("ERR_RbraceExpected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;;&apos; expected..
+        /// </summary>
+        internal static string ERR_SemicolonExpected {
+            get {
+                return ResourceManager.GetString("ERR_SemicolonExpected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Syntax error; &apos;{0}&apos; expected..
+        /// </summary>
+        internal static string ERR_SyntaxError {
+            get {
+                return ResourceManager.GetString("ERR_SyntaxError", resourceCulture);
             }
         }
         

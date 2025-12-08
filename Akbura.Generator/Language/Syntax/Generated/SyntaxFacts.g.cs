@@ -189,6 +189,42 @@ namespace Akbura.Language.Syntax
                 _ => text,
             };
         }
+
+        public static partial bool IsReservedKeyword(SyntaxKind kind)
+        {
+            switch (kind)
+            {
+                case SyntaxKind.InjectKeyword:
+                case SyntaxKind.ParamKeyword:
+                case SyntaxKind.StateKeyword:
+                case SyntaxKind.UseEffectKeyword:
+                case SyntaxKind.SuppressKeyword:
+                case SyntaxKind.CancelKeyword:
+                case SyntaxKind.FinallyKeyword:
+                case SyntaxKind.AsyncKeyword:
+                case SyntaxKind.VoidKeyword:
+                case SyntaxKind.CommandKeyword:
+
+                case SyntaxKind.NewKeyword:
+
+                case SyntaxKind.IfKeyword:
+                case SyntaxKind.ElseKeyword:
+                case SyntaxKind.ReturnKeyword:
+                case SyntaxKind.ForKeyword:
+
+                case SyntaxKind.TrueKeyword:
+                case SyntaxKind.FalseKeyword:
+                case SyntaxKind.NullKeyword:
+
+                case SyntaxKind.BindToken:
+                case SyntaxKind.InToken:
+                case SyntaxKind.OutToken:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
     }
 }
 

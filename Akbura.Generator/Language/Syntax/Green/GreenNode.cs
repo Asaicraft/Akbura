@@ -590,6 +590,18 @@ internal abstract partial class GreenNode
         return Kind == SyntaxKind.EndOfLineTrivia;
     }
 
+    public GreenChildSyntaxList ChildNodesAndTokens()
+    {
+        return new GreenChildSyntaxList(this);
+    }
+
+    /// <summary>
+    /// Enumerates all green nodes of the tree rooted by this node (including this node).  This includes normal
+    /// nodes, list nodes, and tokens.  The nodes will be returned in depth-first order.  This will not descend 
+    /// into trivia or structured trivia.
+    /// </summary>
+    public NodeEnumerable EnumerateNodes() => new(this);
+
     /// <summary>
     /// Find the slot that contains the given offset.
     /// </summary>

@@ -117,8 +117,17 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="ERR_CloseParenExpected" xml:space="preserve">
+    <value>')' expected.</value>
+  </data>
   <data name="ERR_FloatOverflow" xml:space="preserve">
     <value>Floating-point constant is too large for '{0}'.</value>
+  </data>
+  <data name="ERR_IdentifierExpected" xml:space="preserve">
+    <value>Identifier expected.</value>
+  </data>
+  <data name="ERR_IdentifierExpectedKW" xml:space="preserve">
+    <value>Identifier expected; '{0}' is a keyword.</value>
   </data>
   <data name="ERR_IllegalEscape" xml:space="preserve">
     <value>Illegal escape sequence at position {0} (length {1}).</value>
@@ -135,8 +144,20 @@
   <data name="ERR_InvalidReal" xml:space="preserve">
     <value>Invalid real literal.</value>
   </data>
+  <data name="ERR_LbraceExpected" xml:space="preserve">
+    <value>'{' expected.</value>
+  </data>
   <data name="ERR_OpenEndedComment" xml:space="preserve">
     <value>Unterminated multi-line comment.</value>
+  </data>
+  <data name="ERR_RbraceExpected" xml:space="preserve">
+    <value>'}' expected.</value>
+  </data>
+  <data name="ERR_SemicolonExpected" xml:space="preserve">
+    <value>';' expected.</value>
+  </data>
+  <data name="ERR_SyntaxError" xml:space="preserve">
+    <value>Syntax error; '{0}' expected.</value>
   </data>
   <data name="ERR_UnexpectedCharacter" xml:space="preserve">
     <value>Unexpected character: {0}</value>

@@ -1563,7 +1563,6 @@ internal sealed partial class Lexer : IDisposable
 
     #region CSharp Statements
 
-    private void ParseCSharp
 
     #endregion
 

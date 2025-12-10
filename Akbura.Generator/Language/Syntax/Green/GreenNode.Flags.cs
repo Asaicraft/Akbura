@@ -16,7 +16,8 @@ partial class GreenNode
         IsNotMissing = 1 << 7,
         IsCSharpSyntax = 1 << 8,
         ContainsAkburaSyntaxInCSharpSyntax = 1 << 10,
+        ContainsSkippedText = 1 << 11,
 
-        InheritMask = ContainsDiagnostics | ContainsAnnotations | IsNotMissing,
+        InheritMask = ContainsDiagnostics | ContainsAnnotations | IsNotMissing | ContainsSkippedText,
     }
 }

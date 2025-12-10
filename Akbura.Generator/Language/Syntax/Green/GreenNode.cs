@@ -270,6 +270,14 @@ internal abstract partial class GreenNode
             : (_nodeFlagsAndSlotCount & ~(int)GreenNodeFlags.ContainsAkburaSyntaxInCSharpSyntax));
     }
 
+    public bool ContainsSkippedText
+    {
+        get => (_nodeFlagsAndSlotCount & (int)GreenNodeFlags.ContainsSkippedText) != 0;
+        init => _nodeFlagsAndSlotCount = (ushort)(value
+            ? (_nodeFlagsAndSlotCount | (int)GreenNodeFlags.ContainsSkippedText)
+            : (_nodeFlagsAndSlotCount & ~(int)GreenNodeFlags.ContainsSkippedText));
+    }
+
     public GreenNode GetRequiredSlot(int index)
     {
         var slot = GetSlot(index);

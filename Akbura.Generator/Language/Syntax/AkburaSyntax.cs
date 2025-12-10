@@ -110,11 +110,13 @@ internal abstract partial class AkburaSyntax
     public bool IsCSharpSyntax => Green.IsCSharpSyntax;
     public bool ContainsAkburaIdentifierInCsharpSyntax => Green.ContainsAkburaSyntaxInCSharpSyntax;
 
+    public bool ContainsSkippedText => Green.ContainsSkippedText;
+
     public AkburaSyntax GetRequiredNodeSlot(int index)
     {
         var node = GetNodeSlot(index);
 
-        return node == null ? throw new NullReferenceException() : node;
+        return node ?? throw new NullReferenceException();
     }
 
     public abstract AkburaSyntax? GetNodeSlot(int index);

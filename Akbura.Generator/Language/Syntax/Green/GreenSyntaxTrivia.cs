@@ -76,9 +76,12 @@ internal partial class GreenSyntaxTrivia : GreenNode
 
     public override bool IsEquivalentTo(GreenNode? other)
     {
-        if (!base.IsEquivalentTo(other)) return false;
-        if (Text != ((GreenSyntaxTrivia)other).Text) return false;
-        return true;
+        if (!base.IsEquivalentTo(other))
+        {
+            return false;
+        }
+
+        return Text == ((GreenSyntaxTrivia)other).Text;
     }
 
     public override AkburaSyntax CreateRed(AkburaSyntax? parent, int position)

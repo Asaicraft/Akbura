@@ -10,6 +10,7 @@ namespace Akbura.Language.Syntax
         // Trivia
         EndOfLineTrivia = 1000,
         WhitespaceTrivia = 1001,
+        SkippedTokensTrivia = 1002,
 
         // Built-in literal tokens
         StringLiteralToken = 2000,

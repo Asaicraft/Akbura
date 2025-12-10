@@ -115,6 +115,26 @@ internal readonly struct SyntaxTrivia : IEquatable<SyntaxTrivia>
     /// </summary>
     public bool ContainsAnnotations => UnderlyingNode?.ContainsAnnotations ?? false;
 
+    public bool ContainsSkippedText => UnderlyingNode?.ContainsSkippedText ?? false;
+
+    public SyntaxTokenList SkippedTokens
+    {
+        get
+        {
+            if(UnderlyingNode?.Kind == SyntaxKind.SkippedTokensTrivia)
+            {
+                var skippedTokensTrivia = (GreenSkippedTokensTrivia)UnderlyingNode;
+                var tokensNode = skippedTokensTrivia.Tokens;
+                if(tokensNode != null)
+                {
+                    return new SyntaxTokenList(Token.Parent, tokensNode, Position, Index);
+                }
+            }
+
+            return default;
+        }
+    }
+
     /// <summary>
     /// Determines where this trivia has annotations of the specified annotation kind.
     /// </summary>

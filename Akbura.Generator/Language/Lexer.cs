@@ -2135,7 +2135,7 @@ internal sealed partial class Lexer : IDisposable
         {
             return [];
         }
-        return ImmutableArray.CreateRange(_errors);
+        return [.. _errors];
     }
 
     /// <summary>

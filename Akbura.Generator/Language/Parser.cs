@@ -403,44 +403,123 @@ internal sealed class Parser : IDisposable
     }
 
     /// <summary>
-    /// Computes the diagnostic span for a missing node or token. Since missing nodes
-    /// have no real text, we attach the diagnostic either:
-    ///   1. At the end of the previous line, if the previous token ends with an EOL.
-    ///   2. On the next real token, otherwise.
+    /// Given a "missing" node or token (one where <see cref="GreenNode.IsMissing"/> must be true), determines the
+    /// ideal location to place the diagnostic for it.  The intuition here is that we want to place the diagnostic
+    /// on the token that "follows" this 'missing' entity if they're on the same line.  Or, place it at the end of
+    /// the 'preceding' token if the following token is on the next line.
     /// </summary>
     private (int offset, int width) GetDiagnosticSpanForMissingNodeOrToken(GreenNode missingNodeOrToken)
     {
         Debug.Assert(missingNodeOrToken.IsMissing);
 
-        return getOffsetAndWidthBasedOnPriorAndNextTokens();
+        // Note: missingNodeOrToken.IsMissing means this is either a MissingToken itself, or a node comprised
+        // (transitively) only from MissingTokens.  Missing tokens are guaranteed to have no text.  But they are
+        // allowed to have trivia.  This is a common pattern the parser will follow when it encounters unexpected
+        // tokens.  It will make a missing token of the expected kind for the current location, then attach the
+        // unexpected tokens as missed tokens to it.
+
+        // At this point, we have a node or token without real text in it.  The intuition we have here is that we
+        // want to place the diagnostic on the token that "follows" this 'missing' entity.  There is a subtlety
+        // here.  If the node or token contains skipped tokens, then we consider that skipped token the "following"
+        // token, and we will want to place the diagnostic on it.  Otherwise, we want to place it on the true 'next
+        // token' the parser is currently pointing at.
+
+        if (!missingNodeOrToken.ContainsSkippedText)
+        {
+            // Simple case this node/token does not contain any skipped text.  Place the diagnostic at the start of
+            // the token that follows.
+            return getOffsetAndWidthBasedOnPriorAndNextTokens();
+        }
+        else
+        {
+            // Complex case.  This node or token contains skipped text.  Place the diagnostic on the skipped text.
+            return getOffsetAndWidthOfSkippedToken();
+        }
 
         (int offset, int width) getOffsetAndWidthBasedOnPriorAndNextTokens()
         {
+            // If the previous token has a trailing EndOfLineTrivia, the missing token diagnostic position is moved
+            // to the end of line containing the previous token and its width is set to zero. Otherwise we squiggle
+            // the token following the missing token (the token we're currently pointing at).
             AkburaDebug.AssertNotNull(_prevTokenTrailingTrivia);
-
-            var trailingTrivia = _prevTokenTrailingTrivia;
-            var trailingList = new GreenSyntaxList<GreenNode>(trailingTrivia);
-
-            // Case 1: previous token ended with newline => place diagnostic at end of the line.
-            if (trailingList.Any((int)SyntaxKind.EndOfLineTrivia))
+            var trivia = _prevTokenTrailingTrivia;
+            var triviaList = new GreenSyntaxList<GreenNode>(trivia);
+            if (triviaList.Any((int)SyntaxKind.EndOfLineTrivia))
             {
-                // Shift back by leading trivia of the missing node and full width of the trailing trivia.
-                return (
-                    offset: -missingNodeOrToken.GetLeadingTriviaWidth() - trailingTrivia.FullWidth,
-                    width: 0
-                );
+                // We have:
+                //
+                //   [previous token][previous token trailing trivia...][missing node leading trivia...][missing node or token]
+                //                                                                                      ^
+                //                                                                                      | here
+                //
+                // Update so we report diagnostic here:
+                //
+                //   [previous token][previous token trailing trivia...][missing node leading trivia...][missing node or token]
+                //                   ^
+                //                   | here
+                return (offset: -missingNodeOrToken.GetLeadingTriviaWidth() - trivia.FullWidth, width: 0);
+            }
+            else
+            {
+                // We have:
+                //
+                //   [missing node leading trivia...][missing node or token][missing node or token trailing trivia..][current token leading trivia ...][current token]
+                //                                   ^
+                //                                   | here
+                //
+                // Update so we report diagnostic here:
+                //
+                //   [missing node leading trivia...][missing node or token][missing node or token trailing trivia..][current token leading trivia ...][current token]
+                //                                                                                                                                     ^             ^
+                //                                                                                                                                     | --- here -- |
+                var token = this.CurrentToken;
+                return (missingNodeOrToken.Width + missingNodeOrToken.GetTrailingTriviaWidth() + token.GetLeadingTriviaWidth(), token.Width);
+            }
+        }
+
+        (int offset, int width) getOffsetAndWidthOfSkippedToken()
+        {
+            var offset = 0;
+
+            // Walk all the children of this nodeOrToken (including itself).  Note: this does not walk into trivia.
+            // We are looking for the first token that has skipped text.  When we find that token (which must exist,
+            // based on the check above), we will place the diagnostic on the skipped token within that token.
+            foreach (var child in missingNodeOrToken.EnumerateNodes())
+            {
+                Debug.Assert(child.IsMissing, "All children of a missing node or token should themselves be missing.");
+                if (!child.IsToken)
+                    continue;
+
+                var childToken = (GreenSyntaxToken)child;
+                Debug.Assert(childToken.Text == "", "All missing tokens should have no text");
+                if (!child.ContainsSkippedText)
+                {
+                    offset += child.FullWidth;
+                    continue;
+                }
+
+                // Now, walk the trivia of this token, looking for the skipped tokens trivia.
+                var allTrivia = new GreenSyntaxList<GreenNode>(GreenSyntaxList.Concat(childToken.GetLeadingTrivia(), childToken.GetTrailingTrivia()));
+                Debug.Assert(allTrivia.Count > 0, "How can a token with skipped text not have trivia at all?");
+
+                foreach (var trivia in allTrivia)
+                {
+                    if (!trivia.IsSkippedTokensTrivia)
+                    {
+                        offset += trivia.FullWidth;
+                        continue;
+                    }
+
+                    // Found the skipped tokens trivia.  Place the diagnostic on it.
+                    return (offset, trivia.Width);
+                }
+
+                Debug.Fail("This should not be reachable.  We should have hit a skipped token in the trivia of this token.");
+                return default;
             }
 
-            // Case 2: same line => place diagnostic on next token
-            var next = this.CurrentToken;
-
-            return (
-                offset:
-                    missingNodeOrToken.Width +
-                    missingNodeOrToken.GetTrailingTriviaWidth() +
-                    next.GetLeadingTriviaWidth(),
-                width: next.Width
-            );
+            Debug.Fail("This should not be reachable.  We should have hit a child token with skipped text within this node.");
+            return default;
         }
     }
 

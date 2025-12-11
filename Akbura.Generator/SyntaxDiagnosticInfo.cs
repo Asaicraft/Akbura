@@ -19,6 +19,11 @@ internal sealed class SyntaxDiagnosticInfo : AkburaDiagnostic
     {
         Position = position;
         Width = width;
+
+        if (code == ErrorCodes.WRN_ErrorOverride)
+        {
+            Severity = AkburaDiagnosticSeverity.Warning;
+        }
     }
 
 
@@ -28,6 +33,11 @@ internal sealed class SyntaxDiagnosticInfo : AkburaDiagnostic
     {
         Position = position;
         Width = width;
+
+        if(code == ErrorCodes.WRN_ErrorOverride)
+        {
+            Severity = AkburaDiagnosticSeverity.Warning;
+        }
     }
 
     [SetsRequiredMembers]
@@ -36,6 +46,11 @@ internal sealed class SyntaxDiagnosticInfo : AkburaDiagnostic
     {
         Position = position;
         Width = width;
+
+        if (code == ErrorCodes.WRN_ErrorOverride)
+        {
+            Severity = AkburaDiagnosticSeverity.Warning;
+        }
     }
 
 

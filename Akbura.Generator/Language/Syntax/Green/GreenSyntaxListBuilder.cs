@@ -93,9 +93,10 @@ internal sealed class GreenSyntaxListBuilder
         }
     }
 
-    public void AddRange(GreenSyntaxList<GreenNode> list)
+    public GreenSyntaxListBuilder AddRange(GreenSyntaxList<GreenNode> list)
     {
         AddRange(list, 0, list.Count);
+        return this;
     }
 
     public void AddRange(GreenSyntaxList<GreenNode> list, int offset, int length)

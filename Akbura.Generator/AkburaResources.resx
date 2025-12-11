@@ -162,4 +162,7 @@
   <data name="ERR_UnexpectedCharacter" xml:space="preserve">
     <value>Unexpected character: {0}</value>
   </data>
+  <data name="WRN_ErrorOverride" xml:space="preserve">
+    <value>Error '{0}' was reported as a warning.</value>
+  </data>
 </root>

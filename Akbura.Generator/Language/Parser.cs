@@ -1,4 +1,6 @@
-﻿using Akbura.Collections;
+﻿// this file is ported and adapted from roslyn
+
+using Akbura.Collections;
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
@@ -201,7 +203,7 @@ internal sealed class Parser : IDisposable
     private GreenSyntaxToken CreateMissingToken(SyntaxKind expected, SyntaxKind actual)
     {
         var token = GreenSyntaxFactory.MissingToken(expected);
-        return WithAdditionalDiagnostics(token, this.GetExpectedMissingNodeOrTokenError(token, expected, actual));
+        return WithAdditionalDiagnostics(token, GetExpectedMissingNodeOrTokenError(token, expected, actual));
     }
 
     private GreenSyntaxToken CreateMissingToken(SyntaxKind expected, string errorCode, bool reportError)
@@ -262,7 +264,7 @@ internal sealed class Parser : IDisposable
         if (token.Kind != kind)
         {
             var (offset, width) = getDiagnosticSpan();
-            token = WithAdditionalDiagnostics(token, this.GetExpectedTokenError(kind, token.Kind, offset, width));
+            token = WithAdditionalDiagnostics(token, GetExpectedTokenError(kind, token.Kind, offset, width));
         }
 
         MoveToNextToken();
@@ -335,6 +337,15 @@ internal sealed class Parser : IDisposable
         {
             return new SyntaxDiagnosticInfo(offset, width, code);
         }
+    }
+
+   private SyntaxDiagnosticInfo GetExpectedMissingNodeOrTokenError(
+            GreenNode missingNodeOrToken, SyntaxKind expected, SyntaxKind actual)
+    {
+        Debug.Assert(missingNodeOrToken.IsMissing);
+
+        var (offset, width) = GetDiagnosticSpanForMissingNodeOrToken(missingNodeOrToken);
+        return GetExpectedTokenError(expected, actual, offset, width);
     }
 
     private static string GetExpectedTokenErrorCode(SyntaxKind expected, SyntaxKind actual)
@@ -591,12 +602,205 @@ internal sealed class Parser : IDisposable
         }
     }
 
+    private static SyntaxDiagnosticInfo MakeError(int offset, int length, string errorCode, params ImmutableArray<object?> args)
+    {
+        return new SyntaxDiagnosticInfo(offset, length, errorCode, args);
+    }
+
+    private static SyntaxDiagnosticInfo MakeError(GreenNode node, string errorCode, params ImmutableArray<object?> args)
+    {
+        return new SyntaxDiagnosticInfo(0, node.Width, errorCode, args);
+    }
+
+    private static AkburaDiagnostic MakeError(string errorCode, params ImmutableArray<object?> args)
+    {
+        return new AkburaDiagnostic(args, errorCode, AkburaDiagnosticSeverity.Error);
+    }
+
+    #region Skipped Syntax Handling
+
+    private TNode AddLeadingSkippedSyntax<TNode>(TNode node, GreenNode? skippedSyntax) where TNode : GreenNode
+    {
+        if (skippedSyntax is null)
+        {
+            return node;
+        }
+
+        var oldToken = node as GreenSyntaxToken ?? (GreenSyntaxToken)node.GetFirstTerminal()!;
+        var newToken = AddSkippedSyntax(oldToken, skippedSyntax, trailing: false);
+        return GreenSyntaxFirstTokenReplacer.Replace(node, oldToken, newToken, skippedSyntax.FullWidth);
+    }
+
+    private void AddTrailingSkippedSyntax(GreenSyntaxListBuilder list, GreenNode skippedSyntax)
+    {
+        list[^1] = AddTrailingSkippedSyntax(list[^1]!, skippedSyntax);
+    }
+
+    private void AddTrailingSkippedSyntax<TNode>(GreenSyntaxListBuilder<TNode> list, GreenNode skippedSyntax) where TNode : GreenNode
+    {
+        list[^1] = AddTrailingSkippedSyntax(list[^1], skippedSyntax);
+    }
+
+    private TNode AddTrailingSkippedSyntax<TNode>(TNode node, GreenNode skippedSyntax) where TNode : GreenNode
+    {
+        if (node is GreenSyntaxToken token)
+        {
+            return (TNode)(object)AddSkippedSyntax(token, skippedSyntax, trailing: true);
+        }
+        else
+        {
+            var lastToken = (GreenSyntaxToken)node.GetLastTerminal();
+            var newToken = AddSkippedSyntax(lastToken, skippedSyntax, trailing: true);
+            return GreenSyntaxLastTokenReplacer.Replace(node, newToken);
+        }
+    }
+
+    /// <summary>
+    /// Converts skippedSyntax node into all its constituent tokens (and their constituent trivias) and adds these
+    /// all as trivia on the target token.  For example, given <c>token1-token2</c>, then target will have
+    /// <c>leading_trivia1-token1-trailing_trivia1-leading_trivia2-token2-trailing_trivia2-</c> added to it.
+    /// <para/>
+    /// 
+    /// Also adds the first node-based error, or error on a missing-token, in depth-first preorder, found in the
+    /// skipped syntax tree to the target token.  This ensures that we do not lose token/node errors found in
+    /// skipped syntax.
+    /// 
+    /// Note: This behavior could technically lead to buggy behavior.  Specifically, because we only take the first
+    /// diagnostic we find, we might miss a more relevant diagnostic later in the tree.  For example, we might
+    /// preserve a 'warning' while missing an error.
+    /// 
+    /// We should either:
+    /// 
+    /// 1. ensure that we copy over an error if it exists, overwriting any warnings we found along the way.
+    /// 
+    /// 2. just copy over everything.  This seems saner, as it means not losing anything. But it might be the case
+    /// that when we recover from a big error recovery scan, we might report a ton of errors.
+    ///
+    /// For now, we do neither, and just take the first error/warning we find.  This can/should be revisited later
+    /// if we discover it means we're losing important diagnostics.
+    /// </summary>
+    internal GreenSyntaxToken AddSkippedSyntax(GreenSyntaxToken target, GreenNode skippedSyntax, bool trailing)
+    {
+        var builder = new GreenSyntaxListBuilder(4);
+
+        int currentOffset;
+        if (trailing)
+        {
+            // The normal offset for a node/token is its start (not full start).  So if we're placing the skipped
+            // syntax at the end of the trivia, then the offset relative to the node/token start will be adjusted
+            // forward by the width of the node/token plus the existing trailing trivia.
+            currentOffset = target.Width + target.GetTrailingTriviaWidth();
+            builder.Add(target.GetTrailingTrivia());
+        }
+        else
+        {
+            // The normal offset for a node/token is its start (not full start). So if we're placing the skipped
+            // syntax at the start of the trivia, then the offset relative to the node/token start will be adjusted
+            // backward by the width of the existing leading trivia plus the width of the skipped syntax we're
+            // tacking on at the front.
+            currentOffset = -target.GetLeadingTriviaWidth() - skippedSyntax.FullWidth;
+        }
+
+        // the error in we'll attach to the node
+        SyntaxDiagnosticInfo diagnostic = null!;
+        var finalDiagnosticOffset = 0;
+
+        foreach (var node in skippedSyntax.EnumerateNodes())
+        {
+            if (node is GreenSyntaxToken token)
+            {
+                // Strip the leading trivia of the token, and add it to the target's final trivia list.
+                builder.Add(token.GetLeadingTrivia());
+
+                if (token.Width > 0)
+                {
+                    // Then add the token (stripped of its own trivia) to the target's final trivia list.
+
+                    builder.Add(GreenSyntaxFactory.SkippedTokensTrivia(
+                        token.TokenWithLeadingTrivia(null).TokenWithTrailingTrivia(null)));
+                }
+                else
+                {
+                    // Do not bother adding zero-width tokens to target's final trivia list.  Lots of code (like
+                    // GetStructure) does not like it at all. But do keep around any diagnostics that might have
+                    // been on this zero width token, and move it to the target.
+                    var existing = (SyntaxDiagnosticInfo)token.GetDiagnostics().FirstOrDefault()!;
+                    if (existing != null)
+                    {
+                        diagnostic = existing;
+                        finalDiagnosticOffset = currentOffset + token.GetLeadingTriviaWidth() + existing.Position;
+                    }
+                }
+
+                // Finally strip the trailing trivia of the token, and add it to the target's final list.
+                builder.Add(token.GetTrailingTrivia());
+
+                currentOffset += token.FullWidth;
+            }
+            else if (node.ContainsDiagnostics && diagnostic == null)
+            {
+                // Ensure we don't lose any diagnostics on non-token nodes that we're diving into.
+                // Only propagate the first error to reduce noise:
+                var existing = (SyntaxDiagnosticInfo)node.GetDiagnostics().FirstOrDefault()!;
+                if (existing != null)
+                {
+                    diagnostic = existing;
+                    finalDiagnosticOffset = currentOffset + node.GetLeadingTriviaWidth() + existing.Position;
+                }
+            }
+        }
+
+        // If we found a diagnostic on a node (or empty-width token) in the skipped syntax, ensure it is moved
+        // over to the target.
+        if (diagnostic != null)
+        {
+            target = WithAdditionalDiagnostics(target,
+                new SyntaxDiagnosticInfo(finalDiagnosticOffset, diagnostic.Width, diagnostic.Code, diagnostic.Parameters));
+        }
+
+        // If we were adding the skipped token as trailing trivia, then at this point we're done.  Otherwise, we
+        // were adding it as leading trivia, so we need to tack on the existing leading trivia of the target.
+        return trailing
+            ? target.TokenWithTrailingTrivia(builder.ToListNode())
+            : target.TokenWithLeadingTrivia(builder.AddRange(target.GetLeadingTrivia()).ToListNode());
+    }
+
+    #endregion
+
+    private static GreenSyntaxToken ConvertToKeyword(GreenSyntaxToken token)
+    {
+        if (token.Kind != token.ContextualKind)
+        {
+            var keyword = token.IsMissing
+                    ? GreenSyntaxFactory.MissingToken(token.LeadingTrivia.Node!, token.ContextualKind, token.TrailingTrivia.Node!)
+                    : GreenSyntaxFactory.Token(token.LeadingTrivia.Node, token.ContextualKind, token.TrailingTrivia.Node);
+            var diagnostics = token.GetDiagnostics();
+            if (diagnostics != null && diagnostics.Length > 0)
+            {
+                keyword = (GreenSyntaxToken)keyword.WithDiagnostics(diagnostics);
+            }
+
+            return keyword;
+        }
+
+        return token;
+    }
+
+    private static GreenSyntaxToken ConvertToIdentifier(GreenSyntaxToken token)
+    {
+        Debug.Assert(!token.IsMissing);
+
+        var identifier = GreenSyntaxToken.Identifier(token.Kind, token.LeadingTrivia.Node, token.Text, token.ValueText!, token.TrailingTrivia.Node);
+        if (token.ContainsDiagnostics)
+        {
+            identifier = (GreenSyntaxToken)identifier.WithDiagnostics(token.GetDiagnostics());
+        }
+
+        return identifier;
+    }
 
     public void Dispose()
     {
         ReturnLexedTokensToPool(_lexedTokens);
     }
-
-
-
 }

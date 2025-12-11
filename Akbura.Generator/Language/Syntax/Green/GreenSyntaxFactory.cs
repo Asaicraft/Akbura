@@ -342,4 +342,9 @@ internal static partial class GreenSyntaxFactory
     {
         return GreenSyntaxTrivia.Create(SyntaxKind.MultiLineCommentTrivia, text);
     }
+
+    public static GreenNode SkippedTokensTrivia(GreenNode tokens)
+    {
+        return GreenSkippedTokensTrivia.Create(tokens);
+    }
 }

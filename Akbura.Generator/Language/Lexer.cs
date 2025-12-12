@@ -129,6 +129,7 @@ internal sealed partial class Lexer : IDisposable
                 LexerMode.InExpressionUntilSemicolon => ParseExpressionUntilSemicolon(),
                 LexerMode.InExpressionUntilComma => ParseExpressionUntilComma(),
                 LexerMode.InArgumentExpression => ParseArgumentExpression(),
+                LexerMode.InTypeName => ParseTypeName(),
                 _ => default
             };
 

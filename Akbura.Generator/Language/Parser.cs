@@ -14,7 +14,7 @@ using System.Xml.Linq;
 using CSharpFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Language;
-internal sealed class Parser : IDisposable
+internal sealed partial class Parser : IDisposable
 {
     // Array size held in token pool. This should be large enough to prevent most allocations, but
     //  not so large as to be wasteful when not in use.

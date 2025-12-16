@@ -80,21 +80,22 @@ namespace Akbura.Language.Syntax
         CloseBracketToken = 146,
         OpenParenToken = 147,
         CloseParenToken = 148,
+        DoubleColonToken = 149,
 
-        LessSlashToken = 149,
-        SlashGreaterToken = 150,
+        LessSlashToken = 150,
+        SlashGreaterToken = 151,
 
-        SingleQuoteToken = 151,
-        DoubleQuoteToken = 152,
+        SingleQuoteToken = 152,
+        DoubleQuoteToken = 153,
 
-        AtToken = 153,
-        BindToken = 154,
-        InToken = 155,
-        OutToken = 156,
+        AtToken = 154,
+        BindToken = 155,
+        InToken = 156,
+        OutToken = 157,
 
-        UtilitiesKeyword = 157,
+        UtilitiesKeyword = 158,
 
-        LastTokenWithWellKnownText = 157,
+        LastTokenWithWellKnownText = UtilitiesKeyword,
 
         // DSL-specific literal
         AkTextLiteral = 201,
@@ -200,6 +201,13 @@ namespace Akbura.Language.Syntax
         Name = 701,
         SimpleName = 702,
         IdentifierName = 703,
+
+        MarkupSimpleComponentNameSyntax = 754,
+        MarkupQualifiedNameSyntax = 755,
+        MarkupAliasQualifierSyntax = 756,
+        MarkupGenericArgumentListSyntax = 757,
+        MarkupQualifiedComponentNameSyntax = 758,
+
 
         // Trivia
         SingleLineCommentTrivia = 800,

@@ -113,6 +113,7 @@ namespace Akbura.Language.Syntax
                 SyntaxKind.CloseBracketToken => "]",
                 SyntaxKind.OpenParenToken => "(",
                 SyntaxKind.CloseParenToken => ")",
+                SyntaxKind.DoubleColonToken => "::",
 
                 SyntaxKind.LessSlashToken => "</",
                 SyntaxKind.SlashGreaterToken => "/>",

@@ -59,6 +59,7 @@ token OpenBracketToken   = "[";
 token CloseBracketToken  = "]";
 token OpenParenToken     = "(";
 token CloseParenToken    = ")";
+token DoubleColonToken   = "::";
 
 // markup tokens
 token LessSlashToken     = "</";
@@ -775,6 +776,45 @@ abstract node SimpleName: Name {
 }
 
 node IdentifierName: SimpleName;
+
+[id 750]
+
+/// <summary>
+/// Base type for component names used in markup.
+/// </summary>
+abstract node MarkupComponentNameSyntax;
+
+/// <summary>
+/// Simple component name: <Button />
+/// </summary>
+node MarkupSimpleComponentNameSyntax : MarkupComponentNameSyntax {
+    Name : SimpleName;
+}
+
+node MarkupAliasQualifierSyntax {
+    Alias      : SimpleName;       // alias
+    DoubleColon: DoubleColonToken; // ::
+}
+
+node MarkupQualifiedNameSyntax {
+    Parts : syntaxlist<SimpleName, DotToken>; // Namespace.Class
+}
+
+node MarkupGenericArgumentListSyntax {
+    OpenBrace  : OpenBraceToken; // {
+    Arguments  : syntaxlist<CSharpTypeSyntax, CommaToken>;
+    CloseBrace : CloseBraceToken; // }
+}
+
+/// <summary>
+/// Fully qualified component name:
+///   alias::Namespace.Class{T1, T2}
+/// </summary>
+node MarkupQualifiedComponentNameSyntax : MarkupComponentNameSyntax {
+    AliasQualifier? : MarkupAliasQualifierSyntax;
+    Name            : MarkupQualifiedNameSyntax;
+    GenericArgs?    : MarkupGenericArgumentListSyntax;
+}
 
 
 [id 800]

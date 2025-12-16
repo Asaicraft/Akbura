@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
 using Akbura.Language.Syntax.Green;
+using CSharp = Microsoft.CodeAnalysis.CSharp;
 
 namespace Akbura.Language.Syntax.Green
 {
@@ -248,6 +249,34 @@ namespace Akbura.Language.Syntax
             return (CSharpTypeSyntax)base.WithTrailingTrivia(trivia);
         }
 
+        public CSharp.Syntax.TypeSyntax ToCSharp()
+        {
+            if(Tokens.Count == 0)
+            {
+                throw new InvalidOperationException("Cannot convert to CSharp syntax when there are no tokens.");
+            }
+
+            if(Tokens.Count == 1)
+            {
+                var token = Tokens[0].Node;
+
+                if(token.Kind == SyntaxKind.CSharpRawToken)
+                {
+                    var rawToken = (Syntax.Green.GreenSyntaxToken.CSharpRawToken)token;
+
+                    if(rawToken.RawNode is CSharp.Syntax.TypeSyntax typeSyntax)
+                    {
+                        return typeSyntax;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("The raw token does not contain a valid CSharp TypeSyntax node.");
+                    }
+                }
+            }
+
+            return CSharp.SyntaxFactory.ParseTypeName(this.ToString());
+        }
     }
 
     internal static partial class SyntaxFactory

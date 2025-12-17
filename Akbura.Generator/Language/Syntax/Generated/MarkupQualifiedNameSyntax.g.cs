@@ -12,22 +12,22 @@ namespace Akbura.Language.Syntax.Green
 {
     internal sealed partial class GreenMarkupQualifiedNameSyntax : global::Akbura.Language.Syntax.Green.GreenNode
     {
-        public readonly global::Akbura.Language.Syntax.Green.GreenNode? _parts;
+        public readonly global::Akbura.Language.Syntax.Green.GreenNode? _segments;
 
         public GreenMarkupQualifiedNameSyntax(
-            global::Akbura.Language.Syntax.Green.GreenNode? parts,
+            global::Akbura.Language.Syntax.Green.GreenNode? segments,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
             : base((ushort)global::Akbura.Language.Syntax.SyntaxKind.MarkupQualifiedNameSyntax, diagnostics, annotations)
         {
-            this._parts = parts;
+            this._segments = segments;
 
             var flags = Flags;
             var fullWidth = FullWidth;
 
-            if (_parts != null)
+            if (_segments != null)
             {
-                AdjustWidthAndFlags(_parts, ref fullWidth, ref flags);
+                AdjustWidthAndFlags(_segments, ref fullWidth, ref flags);
             }
 
             SlotCount = 1;
@@ -35,18 +35,18 @@ namespace Akbura.Language.Syntax.Green
             Flags = flags;
         }
 
-        public GreenSyntaxList<GreenSimpleNameSyntax> Parts => new(_parts);
+        public GreenSyntaxList<GreenMarkupNameSegmentSyntax> Segments => new(_segments);
 
         public GreenMarkupQualifiedNameSyntax UpdateMarkupQualifiedNameSyntax(
-            global::Akbura.Language.Syntax.Green.GreenNode? parts)
+            global::Akbura.Language.Syntax.Green.GreenNode? segments)
         {
-            if (this._parts == parts)
+            if (this._segments == segments)
             {
                 return this;
             }
 
             var newNode = GreenSyntaxFactory.MarkupQualifiedNameSyntax(
-                parts.ToGreenSeparatedList<GreenSimpleNameSyntax>());
+                segments.ToGreenSeparatedList<GreenMarkupNameSegmentSyntax>());
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -63,16 +63,16 @@ namespace Akbura.Language.Syntax.Green
             return newNode;
         }
 
-        public GreenMarkupQualifiedNameSyntax WithParts(global::Akbura.Language.Syntax.Green.SeparatedGreenSyntaxList<GreenSimpleNameSyntax> parts)
+        public GreenMarkupQualifiedNameSyntax WithSegments(global::Akbura.Language.Syntax.Green.SeparatedGreenSyntaxList<GreenMarkupNameSegmentSyntax> segments)
         {
-            return UpdateMarkupQualifiedNameSyntax(parts.Node);
+            return UpdateMarkupQualifiedNameSyntax(segments.Node);
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
         {
             return index switch
             {
-                0 => _parts,
+                0 => _segments,
                 _ => null,
             };
         }
@@ -84,12 +84,12 @@ namespace Akbura.Language.Syntax.Green
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
         {
-            return new GreenMarkupQualifiedNameSyntax(this._parts, diagnostics, GetAnnotations());
+            return new GreenMarkupQualifiedNameSyntax(this._segments, diagnostics, GetAnnotations());
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
         {
-            return new GreenMarkupQualifiedNameSyntax(this._parts, GetDiagnostics(), annotations);
+            return new GreenMarkupQualifiedNameSyntax(this._segments, GetDiagnostics(), annotations);
         }
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
@@ -111,14 +111,16 @@ namespace Akbura.Language.Syntax.Green
     internal static partial class GreenSyntaxFactory
     {
         public static GreenMarkupQualifiedNameSyntax MarkupQualifiedNameSyntax(
-            global::Akbura.Language.Syntax.Green.SeparatedGreenSyntaxList<GreenSimpleNameSyntax> parts)
+            global::Akbura.Language.Syntax.Green.SeparatedGreenSyntaxList<GreenMarkupNameSegmentSyntax> segments)
         {
             var kind = global::Akbura.Language.Syntax.SyntaxKind.MarkupQualifiedNameSyntax;
+
+            // SlotCount = 1 (<=3), so we can use GreenNodeCache.
             int hash;
             var cache = Unsafe.As<GreenMarkupQualifiedNameSyntax?>(
                 GreenNodeCache.TryGetNode(
                     (ushort)kind,
-                    parts.Node,
+                    segments.Node,
                     out hash));
 
             if (cache != null)
@@ -127,7 +129,7 @@ namespace Akbura.Language.Syntax.Green
             }
 
             var result = new GreenMarkupQualifiedNameSyntax(
-                parts.Node,
+                segments.Node,
                 diagnostics: null,
                 annotations: null);
 
@@ -169,7 +171,7 @@ namespace Akbura.Language.Syntax.Green
         public override GreenNode? VisitMarkupQualifiedNameSyntax(GreenMarkupQualifiedNameSyntax node)
         {
             return node.UpdateMarkupQualifiedNameSyntax(
-                VisitList(node.Parts).Node);
+                VisitList(node.Segments).Node);
         }
     }
 }
@@ -178,7 +180,7 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class MarkupQualifiedNameSyntax : global::Akbura.Language.Syntax.AkburaSyntax
     {
-        private AkburaSyntax? _parts;
+        private AkburaSyntax? _segments;
 
         public MarkupQualifiedNameSyntax(
             global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax greenNode,
@@ -191,24 +193,24 @@ namespace Akbura.Language.Syntax
         internal new global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax>(base.Green);
 
-        public SeparatedSyntaxList<SimpleNameSyntax> Parts
+        public SeparatedSyntaxList<MarkupNameSegmentSyntax> Segments
         {
             get
             {
-                var red = GetRed(ref this._parts, 0);
-                return new SeparatedSyntaxList<SimpleNameSyntax>(red!, GetChildIndex(0));
+                var red = GetRed(ref this._segments, 0);
+                return new SeparatedSyntaxList<MarkupNameSegmentSyntax>(red!, GetChildIndex(0));
             }
         }
 
         public MarkupQualifiedNameSyntax UpdateMarkupQualifiedNameSyntax(
-            SeparatedSyntaxList<SimpleNameSyntax> parts)
+            SeparatedSyntaxList<MarkupNameSegmentSyntax> segments)
         {
-            if (this.Parts == parts)
+            if (this.Segments == segments)
             {
                 return this;
             }
 
-            var newNode = SyntaxFactory.MarkupQualifiedNameSyntax(parts);
+            var newNode = SyntaxFactory.MarkupQualifiedNameSyntax(segments);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -225,16 +227,16 @@ namespace Akbura.Language.Syntax
             return newNode;
         }
 
-        public MarkupQualifiedNameSyntax WithParts(SeparatedSyntaxList<SimpleNameSyntax> parts)
+        public MarkupQualifiedNameSyntax WithSegments(SeparatedSyntaxList<MarkupNameSegmentSyntax> segments)
         {
-            return UpdateMarkupQualifiedNameSyntax(parts);
+            return UpdateMarkupQualifiedNameSyntax(segments);
         }
 
         public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
         {
             return index switch
             {
-                0 => GetRed(ref _parts, 0),
+                0 => GetRed(ref _segments, 0),
                 _ => null,
             };
         }
@@ -243,7 +245,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
-                0 => _parts,
+                0 => _segments,
                 _ => null,
             };
         }
@@ -277,15 +279,15 @@ namespace Akbura.Language.Syntax
     internal static partial class SyntaxFactory
     {
         internal static MarkupQualifiedNameSyntax MarkupQualifiedNameSyntax(
-            SeparatedSyntaxList<SimpleNameSyntax> parts)
+            SeparatedSyntaxList<MarkupNameSegmentSyntax> segments)
         {
-            if (parts != default && parts.Node?.Green is not global::Akbura.Language.Syntax.Green.GreenNode)
+            if (segments != default && segments.Node?.Green is not global::Akbura.Language.Syntax.Green.GreenNode)
             {
-                ThrowHelper.ThrowArgumentException(nameof(parts), message: $"parts must be backed by a GreenSyntaxList or SeparatedGreenSyntaxList.");
+                ThrowHelper.ThrowArgumentException(nameof(segments), message: $"segments must be backed by a GreenSyntaxList or SeparatedGreenSyntaxList.");
             }
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.MarkupQualifiedNameSyntax(
-                parts.ToGreenSeparatedList<global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax, SimpleNameSyntax>());
+                segments.ToGreenSeparatedList<global::Akbura.Language.Syntax.Green.GreenMarkupNameSegmentSyntax, MarkupNameSegmentSyntax>());
 
             return Unsafe.As<MarkupQualifiedNameSyntax>(green.CreateRed(null, 0));
         }
@@ -320,7 +322,7 @@ namespace Akbura.Language.Syntax
         public override AkburaSyntax? VisitMarkupQualifiedNameSyntax(MarkupQualifiedNameSyntax node)
         {
             return node.UpdateMarkupQualifiedNameSyntax(
-                VisitList(node.Parts));
+                VisitList(node.Segments));
         }
     }
 }

@@ -781,25 +781,36 @@ node IdentifierName: SimpleName;
 
 /// <summary>
 /// Base type for component names used in markup.
+/// Examples:
+///   <Button />
+///   <Namespace.Component />
+///   <Namespace.Sub{T1, T2}.Component{U} />
+///   <ak::Namespace.Sub.Component />
 /// </summary>
 abstract node MarkupComponentNameSyntax;
 
 /// <summary>
-/// Simple component name: <Button />
+/// Simple component name without qualification:
+///   <Button />
 /// </summary>
 node MarkupSimpleComponentNameSyntax : MarkupComponentNameSyntax {
     Name : SimpleName;
 }
 
+/// <summary>
+/// Alias qualifier:
+///   ak::
+/// </summary>
 node MarkupAliasQualifierSyntax {
-    Alias      : SimpleName;       // alias
-    DoubleColon: DoubleColonToken; // ::
+    Alias       : SimpleName;
+    DoubleColon : DoubleColonToken; // ::
 }
 
-node MarkupQualifiedNameSyntax {
-    Parts : syntaxlist<SimpleName, DotToken>; // Namespace.Class
-}
-
+/// <summary>
+/// Generic argument list used in markup:
+///   {T}
+///   {T1, T2}
+/// </summary>
 node MarkupGenericArgumentListSyntax {
     OpenBrace  : OpenBraceToken; // {
     Arguments  : syntaxlist<CSharpTypeSyntax, CommaToken>;
@@ -807,13 +818,53 @@ node MarkupGenericArgumentListSyntax {
 }
 
 /// <summary>
+/// Base type for a single segment of a qualified component name.
+/// </summary>
+abstract node MarkupNameSegmentSyntax;
+
+
+/// <summary>
+/// Identifier segment without generics:
+///   Namespace
+///   Component
+/// </summary>
+node MarkupIdentifierNameSegmentSyntax : MarkupNameSegmentSyntax {
+    Name : SimpleName;
+}
+
+/// <summary>
+/// Identifier segment with generic arguments:
+///   Sub{T}
+///   Component{T1, T2}
+/// </summary>
+node MarkupGenericNameSegmentSyntax : MarkupNameSegmentSyntax {
+    Name        : SimpleName;
+    GenericArgs : MarkupGenericArgumentListSyntax;
+}
+
+/// <summary>
+/// Qualified component name:
+///   Namespace.Component
+///   Namespace.Sub.Component
+///   Namespace.Sub{T}.Component{U}
+/// </summary>
+node MarkupQualifiedNameSyntax {
+    Segments : syntaxlist<MarkupNameSegmentSyntax, DotToken>;
+}
+
+/// <summary>
 /// Fully qualified component name:
-///   alias::Namespace.Class{T1, T2}
+///
+///   alias::Namespace.Sub.Component
+///   alias::Namespace.Sub{T1}.Component{T2}
+///   Namespace.Component{T}
+///
+/// Alias is optional.
+/// Generics may appear on any segment.
 /// </summary>
 node MarkupQualifiedComponentNameSyntax : MarkupComponentNameSyntax {
     AliasQualifier? : MarkupAliasQualifierSyntax;
     Name            : MarkupQualifiedNameSyntax;
-    GenericArgs?    : MarkupGenericArgumentListSyntax;
 }
 
 

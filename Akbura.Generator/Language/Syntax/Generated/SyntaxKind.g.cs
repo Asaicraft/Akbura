@@ -207,6 +207,8 @@ namespace Akbura.Language.Syntax
         MarkupAliasQualifierSyntax = 756,
         MarkupGenericArgumentListSyntax = 757,
         MarkupQualifiedComponentNameSyntax = 758,
+        MarkupIdentifierNameSegmentSyntax = 759,
+        MarkupGenericNameSegmentSyntax = 760,
 
 
         // Trivia

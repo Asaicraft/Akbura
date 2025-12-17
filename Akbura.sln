@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.12.35707.178
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11304.174 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Akbura", "Akbura\Akbura.csproj", "{D7EA4966-8FC8-469E-9107-BA8A5BE0C26E}"
 EndProject
@@ -16,6 +16,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Akbura.UnitTests", "Akbura.UnitTests\Akbura.UnitTests.csproj", "{C32463C8-47CF-4A0C-BD5D-0EED4AF84E5B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "draft-concepts", "draft-concepts", "{BC591B12-D8DF-4CFC-B44A-BEE6B8ACF2F2}"
+	ProjectSection(SolutionItems) = preProject
+		draft-concepts\Dependecy Injection.md = draft-concepts\Dependecy Injection.md
+		draft-concepts\User defined hook.md = draft-concepts\User defined hook.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -42,5 +48,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FB3F233C-FAAE-4CAE-8C72-203799D1D967}
 	EndGlobalSection
 EndGlobal

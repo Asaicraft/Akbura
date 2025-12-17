@@ -9,23 +9,20 @@ using System.Collections.Immutable;
 
 namespace Akbura.Language.Syntax.Green
 {
-    internal sealed partial class GreenMarkupQualifiedComponentNameSyntax : GreenMarkupComponentNameSyntax
+    internal sealed partial class GreenMarkupQualifiedComponentNameSyntax : global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax
     {
-        public readonly GreenMarkupAliasQualifierSyntax? AliasQualifier;
-        public readonly GreenMarkupQualifiedNameSyntax Name;
-        public readonly GreenMarkupGenericArgumentListSyntax? GenericArgs;
+        public readonly global::Akbura.Language.Syntax.Green.GreenMarkupAliasQualifierSyntax? AliasQualifier;
+        public readonly global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax Name;
 
         public GreenMarkupQualifiedComponentNameSyntax(
-            GreenMarkupAliasQualifierSyntax? aliasQualifier,
-            GreenMarkupQualifiedNameSyntax name,
-            GreenMarkupGenericArgumentListSyntax? genericArgs,
+            global::Akbura.Language.Syntax.Green.GreenMarkupAliasQualifierSyntax? aliasQualifier,
+            global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax name,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
             : base((ushort)global::Akbura.Language.Syntax.SyntaxKind.MarkupQualifiedComponentNameSyntax, diagnostics, annotations)
         {
             this.AliasQualifier = aliasQualifier;
             this.Name = name;
-            this.GenericArgs = genericArgs;
 
             AkburaDebug.Assert(this.Name != null);
 
@@ -39,32 +36,24 @@ namespace Akbura.Language.Syntax.Green
 
             AdjustWidthAndFlags(Name, ref fullWidth, ref flags);
 
-            if (GenericArgs != null)
-            {
-                AdjustWidthAndFlags(GenericArgs, ref fullWidth, ref flags);
-            }
-
-            SlotCount = 3;
+            SlotCount = 2;
             FullWidth = fullWidth;
             Flags = flags;
         }
 
         public GreenMarkupQualifiedComponentNameSyntax UpdateMarkupQualifiedComponentNameSyntax(
-            GreenMarkupAliasQualifierSyntax? aliasQualifier,
-            GreenMarkupQualifiedNameSyntax name,
-            GreenMarkupGenericArgumentListSyntax? genericArgs)
+            global::Akbura.Language.Syntax.Green.GreenMarkupAliasQualifierSyntax? aliasQualifier,
+            global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax name)
         {
             if (this.AliasQualifier == aliasQualifier &&
-                this.Name == name &&
-                this.GenericArgs == genericArgs)
+                this.Name == name)
             {
                 return this;
             }
 
             var newNode = GreenSyntaxFactory.MarkupQualifiedComponentNameSyntax(
                 aliasQualifier,
-                name,
-                genericArgs);
+                name);
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -81,28 +70,22 @@ namespace Akbura.Language.Syntax.Green
             return newNode;
         }
 
-        public GreenMarkupQualifiedComponentNameSyntax WithAliasQualifier(GreenMarkupAliasQualifierSyntax? aliasQualifier)
+        public GreenMarkupQualifiedComponentNameSyntax WithAliasQualifier(global::Akbura.Language.Syntax.Green.GreenMarkupAliasQualifierSyntax? aliasQualifier)
         {
-            return UpdateMarkupQualifiedComponentNameSyntax(aliasQualifier, this.Name, this.GenericArgs);
+            return UpdateMarkupQualifiedComponentNameSyntax(aliasQualifier, this.Name);
         }
 
-        public GreenMarkupQualifiedComponentNameSyntax WithName(GreenMarkupQualifiedNameSyntax name)
+        public GreenMarkupQualifiedComponentNameSyntax WithName(global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax name)
         {
-            return UpdateMarkupQualifiedComponentNameSyntax(this.AliasQualifier, name, this.GenericArgs);
+            return UpdateMarkupQualifiedComponentNameSyntax(this.AliasQualifier, name);
         }
 
-        public GreenMarkupQualifiedComponentNameSyntax WithGenericArgs(GreenMarkupGenericArgumentListSyntax? genericArgs)
-        {
-            return UpdateMarkupQualifiedComponentNameSyntax(this.AliasQualifier, this.Name, genericArgs);
-        }
-
-        public override GreenNode? GetSlot(int index)
+        public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
         {
             return index switch
             {
                 0 => AliasQualifier,
                 1 => Name,
-                2 => GenericArgs,
                 _ => null,
             };
         }
@@ -112,14 +95,14 @@ namespace Akbura.Language.Syntax.Green
             return new global::Akbura.Language.Syntax.MarkupQualifiedComponentNameSyntax(this, parent, position);
         }
 
-        public override GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
+        public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
         {
-            return new GreenMarkupQualifiedComponentNameSyntax(this.AliasQualifier, this.Name, this.GenericArgs, diagnostics, GetAnnotations());
+            return new GreenMarkupQualifiedComponentNameSyntax(this.AliasQualifier, this.Name, diagnostics, GetAnnotations());
         }
 
-        public override GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
+        public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
         {
-            return new GreenMarkupQualifiedComponentNameSyntax(this.AliasQualifier, this.Name, this.GenericArgs, GetDiagnostics(), annotations);
+            return new GreenMarkupQualifiedComponentNameSyntax(this.AliasQualifier, this.Name, GetDiagnostics(), annotations);
         }
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
@@ -141,9 +124,8 @@ namespace Akbura.Language.Syntax.Green
     internal static partial class GreenSyntaxFactory
     {
         public static GreenMarkupQualifiedComponentNameSyntax MarkupQualifiedComponentNameSyntax(
-            GreenMarkupAliasQualifierSyntax? aliasQualifier,
-            GreenMarkupQualifiedNameSyntax name,
-            GreenMarkupGenericArgumentListSyntax? genericArgs)
+            global::Akbura.Language.Syntax.Green.GreenMarkupAliasQualifierSyntax? aliasQualifier,
+            global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedNameSyntax name)
         {
             AkburaDebug.Assert(name != null);
 
@@ -154,7 +136,6 @@ namespace Akbura.Language.Syntax.Green
                     (ushort)kind,
                     aliasQualifier,
                     name,
-                    genericArgs,
                     out hash));
 
             if (cache != null)
@@ -165,7 +146,6 @@ namespace Akbura.Language.Syntax.Green
             var result = new GreenMarkupQualifiedComponentNameSyntax(
                 aliasQualifier,
                 name,
-                genericArgs,
                 diagnostics: null,
                 annotations: null);
 
@@ -208,23 +188,21 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateMarkupQualifiedComponentNameSyntax(
                 (GreenMarkupAliasQualifierSyntax?)Visit(node.AliasQualifier),
-                (GreenMarkupQualifiedNameSyntax)Visit(node.Name)!,
-                (GreenMarkupGenericArgumentListSyntax?)Visit(node.GenericArgs));
+                (GreenMarkupQualifiedNameSyntax)Visit(node.Name)!);
         }
     }
 }
 
 namespace Akbura.Language.Syntax
 {
-    internal sealed partial class MarkupQualifiedComponentNameSyntax : MarkupComponentNameSyntax
+    internal sealed partial class MarkupQualifiedComponentNameSyntax : global::Akbura.Language.Syntax.MarkupComponentNameSyntax
     {
         private AkburaSyntax? _aliasQualifier;
         private AkburaSyntax? _name;
-        private AkburaSyntax? _genericArgs;
 
         public MarkupQualifiedComponentNameSyntax(
             global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedComponentNameSyntax greenNode,
-            AkburaSyntax? parent,
+            global::Akbura.Language.Syntax.AkburaSyntax? parent,
             int position)
             : base(greenNode, parent, position)
         {
@@ -239,17 +217,12 @@ namespace Akbura.Language.Syntax
         public MarkupQualifiedNameSyntax Name
             => (MarkupQualifiedNameSyntax)GetRed(ref _name, 1)!;
 
-        public MarkupGenericArgumentListSyntax? GenericArgs
-            => (MarkupGenericArgumentListSyntax?)GetRed(ref _genericArgs, 2);
-
         public MarkupQualifiedComponentNameSyntax UpdateMarkupQualifiedComponentNameSyntax(
             MarkupAliasQualifierSyntax? aliasQualifier,
-            MarkupQualifiedNameSyntax name,
-            MarkupGenericArgumentListSyntax? genericArgs)
+            MarkupQualifiedNameSyntax name)
         {
             if (this.AliasQualifier == aliasQualifier &&
-                this.Name == name &&
-                this.GenericArgs == genericArgs)
+                this.Name == name)
             {
                 return this;
             }
@@ -261,8 +234,7 @@ namespace Akbura.Language.Syntax
 
             var newNode = SyntaxFactory.MarkupQualifiedComponentNameSyntax(
                 aliasQualifier,
-                name,
-                genericArgs);
+                name);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -281,37 +253,30 @@ namespace Akbura.Language.Syntax
 
         public MarkupQualifiedComponentNameSyntax WithAliasQualifier(MarkupAliasQualifierSyntax? aliasQualifier)
         {
-            return UpdateMarkupQualifiedComponentNameSyntax(aliasQualifier, this.Name, this.GenericArgs);
+            return UpdateMarkupQualifiedComponentNameSyntax(aliasQualifier, this.Name);
         }
 
         public MarkupQualifiedComponentNameSyntax WithName(MarkupQualifiedNameSyntax name)
         {
-            return UpdateMarkupQualifiedComponentNameSyntax(this.AliasQualifier, name, this.GenericArgs);
+            return UpdateMarkupQualifiedComponentNameSyntax(this.AliasQualifier, name);
         }
 
-        public MarkupQualifiedComponentNameSyntax WithGenericArgs(MarkupGenericArgumentListSyntax? genericArgs)
-        {
-            return UpdateMarkupQualifiedComponentNameSyntax(this.AliasQualifier, this.Name, genericArgs);
-        }
-
-        public override AkburaSyntax? GetNodeSlot(int index)
+        public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
         {
             return index switch
             {
                 0 => GetRed(ref _aliasQualifier, 0),
                 1 => GetRed(ref _name, 1),
-                2 => GetRed(ref _genericArgs, 2),
                 _ => null,
             };
         }
 
-        public override AkburaSyntax? GetCachedSlot(int index)
+        public override global::Akbura.Language.Syntax.AkburaSyntax? GetCachedSlot(int index)
         {
             return index switch
             {
                 0 => _aliasQualifier,
                 1 => _name,
-                2 => _genericArgs,
                 _ => null,
             };
         }
@@ -346,8 +311,7 @@ namespace Akbura.Language.Syntax
     {
         internal static MarkupQualifiedComponentNameSyntax MarkupQualifiedComponentNameSyntax(
             MarkupAliasQualifierSyntax? aliasQualifier,
-            MarkupQualifiedNameSyntax name,
-            MarkupGenericArgumentListSyntax? genericArgs)
+            MarkupQualifiedNameSyntax name)
         {
             if (name is null)
             {
@@ -356,8 +320,7 @@ namespace Akbura.Language.Syntax
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.MarkupQualifiedComponentNameSyntax(
                 aliasQualifier?.Green,
-                name.Green,
-                genericArgs?.Green);
+                name.Green);
 
             return Unsafe.As<MarkupQualifiedComponentNameSyntax>(green.CreateRed(null, 0));
         }
@@ -393,8 +356,7 @@ namespace Akbura.Language.Syntax
         {
             return node.UpdateMarkupQualifiedComponentNameSyntax(
                 (MarkupAliasQualifierSyntax?)Visit(node.AliasQualifier),
-                (MarkupQualifiedNameSyntax)Visit(node.Name)!,
-                (MarkupGenericArgumentListSyntax?)Visit(node.GenericArgs));
+                (MarkupQualifiedNameSyntax)Visit(node.Name)!);
         }
     }
 }

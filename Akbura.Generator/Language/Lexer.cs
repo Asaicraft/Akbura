@@ -4,6 +4,7 @@ using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
 using System.Text;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CodeAnalysisSyntaxNode = Microsoft.CodeAnalysis.SyntaxNode;
@@ -43,6 +44,7 @@ internal sealed partial class Lexer : IDisposable
         InExpressionUntilComma = 1 << 2,
         InArgumentExpression = 1 << 3,
         InMarkup = 1 << 4,
+        InTypeName = 1 << 5,
     }
 
     internal struct TokenInfo
@@ -1564,6 +1566,41 @@ internal sealed partial class Lexer : IDisposable
 
     #region CSharp Statements
 
+
+    #endregion
+
+    #region CSharp TypeSyntax
+
+    private TokenInfo ParseTypeName()
+    {
+        var parsed = ParseSlow();
+
+        return new()
+        {
+            Kind = SyntaxKind.CSharpRawToken,
+            CSharpNode = parsed,
+            CSharpSyntaxKind = parsed.Kind()
+        };
+    }
+
+    private CSharp.TypeSyntax ParseSlow()
+    {
+        const int OptimisticTypeSyntaxLength = 128;
+
+        var start = TextWindow.Position;
+
+        var optimisticString = TextWindow.GetText(start, OptimisticTypeSyntaxLength, intern: false);
+
+        var parsed = CSharpSyntaxFactory.ParseTypeName(
+            optimisticString,
+            start,
+            options: null,
+            consumeFullText: false);
+
+        TextWindow.Reset(start + parsed.FullSpan.Length);
+
+        return parsed;
+    }
 
     #endregion
 

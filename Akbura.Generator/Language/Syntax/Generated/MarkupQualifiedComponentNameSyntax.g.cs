@@ -197,8 +197,8 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class MarkupQualifiedComponentNameSyntax : global::Akbura.Language.Syntax.MarkupComponentNameSyntax
     {
-        private AkburaSyntax? _aliasQualifier;
-        private AkburaSyntax? _name;
+        private MarkupAliasQualifierSyntax? _aliasQualifier;
+        private MarkupQualifiedNameSyntax? _name;
 
         public MarkupQualifiedComponentNameSyntax(
             global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedComponentNameSyntax greenNode,
@@ -212,10 +212,10 @@ namespace Akbura.Language.Syntax
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenMarkupQualifiedComponentNameSyntax>(base.Green);
 
         public MarkupAliasQualifierSyntax? AliasQualifier
-            => (MarkupAliasQualifierSyntax?)GetRed(ref _aliasQualifier, 0);
+            => GetRed(ref _aliasQualifier, 0);
 
         public MarkupQualifiedNameSyntax Name
-            => (MarkupQualifiedNameSyntax)GetRed(ref _name, 1)!;
+            => GetRed(ref _name, 1)!;
 
         public MarkupQualifiedComponentNameSyntax UpdateMarkupQualifiedComponentNameSyntax(
             MarkupAliasQualifierSyntax? aliasQualifier,

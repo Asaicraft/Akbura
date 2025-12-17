@@ -2,10 +2,11 @@
 
 #nullable enable
 
+using Akbura.Pools;
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Collections.Immutable;
 using CSharp = Microsoft.CodeAnalysis.CSharp;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -65,104 +66,105 @@ namespace Akbura.Language.Syntax
 
         public CSharp.Syntax.TypeSyntax ToCSharp()
         {
-            if(Kind == SyntaxKind.MarkupSimpleComponentNameSyntax)
+            if (Kind == SyntaxKind.MarkupSimpleComponentNameSyntax)
             {
-                var simpleName = (SimpleNameSyntax)GetRequiredNodeSlot(0);
+                var simpleComponentName = (MarkupSimpleComponentNameSyntax)this;
 
                 return CSharpSyntaxFactory.IdentifierName(
-                    CSharpSyntaxFactory.Identifier(simpleName.Identifier.ToString())
+                    CSharpSyntaxFactory.Identifier(simpleComponentName.Name.Identifier.ToString())
                 );
             }
 
-            if(Kind == SyntaxKind.MarkupQualifiedComponentNameSyntax)
+            if (Kind == SyntaxKind.MarkupQualifiedComponentNameSyntax)
             {
-                var qualified = (MarkupQualifiedComponentNameSyntax)this;
+                var qualifiedComponentName = (MarkupQualifiedComponentNameSyntax)this;
 
-                // 1. Build base name: Namespace.Type or Namespace.Sub.Type
-                CSharp.Syntax.NameSyntax nameSyntax = BuildQualifiedName(qualified.Name);
-
-                // 2. Apply generics if present
-                if (qualified.GenericArgs is not null)
-                {
-                    nameSyntax = ApplyGenericArguments(nameSyntax, qualified.GenericArgs);
-                }
-
-                // 3. Apply alias if present: alias::Name
-                if (qualified.AliasQualifier is not null)
-                {
-                    nameSyntax = CSharpSyntaxFactory.AliasQualifiedName(
-                        CSharpSyntaxFactory.IdentifierName(
-                            qualified.AliasQualifier.Alias.Identifier.ToString()
-                        ),
-                        (CSharp.Syntax.SimpleNameSyntax)nameSyntax
-                    );
-                }
-
-                return nameSyntax;
+                return BuildQualifiedNameFromSegments(
+                    qualifiedComponentName.Name.Segments,
+                    qualifiedComponentName.AliasQualifier
+                );
             }
 
             throw new NotSupportedException($"Cannot convert {Kind} to CSharp TypeSyntax.");
         }
 
-        private static CSharp.Syntax.NameSyntax BuildQualifiedName(MarkupQualifiedNameSyntax name)
+        private static CSharp.Syntax.NameSyntax BuildQualifiedNameFromSegments(
+            SeparatedSyntaxList<MarkupNameSegmentSyntax> segments,
+            MarkupAliasQualifierSyntax? aliasQualifier)
         {
-            Debug.Assert(name.Parts.Count > 0);
-
-            CSharp.Syntax.NameSyntax current =
-                CSharpSyntaxFactory.IdentifierName(
-                    name.Parts[0].Identifier.ToString()
-                );
-
-            for (var i = 1; i < name.Parts.Count; i++)
+            if (segments.Count == 0)
             {
-                current = CSharpSyntaxFactory.QualifiedName(
-                    current,
+                throw new InvalidOperationException("Qualified component name must have at least one segment.");
+            }
+
+            // First segment must be SimpleNameSyntax for AliasQualifiedName.
+            var firstSegmentName = BuildSimpleNameFromSegment(segments[0]);
+
+            CSharp.Syntax.NameSyntax currentName;
+
+            if (aliasQualifier is not null)
+            {
+                currentName = CSharpSyntaxFactory.AliasQualifiedName(
                     CSharpSyntaxFactory.IdentifierName(
-                        name.Parts[i].Identifier.ToString()
-                    )
+                        aliasQualifier.Alias.Identifier.ToString()
+                    ),
+                    firstSegmentName
+                );
+            }
+            else
+            {
+                currentName = firstSegmentName;
+            }
+
+            // Remaining segments: always QualifiedName(left, rightSimple)
+            for (var index = 1; index < segments.Count; index++)
+            {
+                var rightSegmentName = BuildSimpleNameFromSegment(segments[index]);
+
+                currentName = CSharpSyntaxFactory.QualifiedName(
+                    currentName,
+                    rightSegmentName
                 );
             }
 
-            return current;
+            return currentName;
         }
 
-        private static CSharp.Syntax.NameSyntax ApplyGenericArguments(
-            CSharp.Syntax.NameSyntax name,
-            MarkupGenericArgumentListSyntax genericArgs)
+        private static CSharp.Syntax.SimpleNameSyntax BuildSimpleNameFromSegment(MarkupNameSegmentSyntax segment)
         {
-            var arguments = ImmutableArray.CreateBuilder<CSharp.Syntax.TypeSyntax>();
-
-            foreach (var arg in genericArgs.Arguments)
+            if (segment.Kind == SyntaxKind.MarkupIdentifierNameSegmentSyntax)
             {
-                arguments.Add(arg.ToCSharp());
-            }
+                var identifierSegment = (MarkupIdentifierNameSegmentSyntax)segment;
 
-            var typeArgumentList = CSharpSyntaxFactory.TypeArgumentList(
-                CSharpSyntaxFactory.SeparatedList(arguments)
-            );
-
-            // If name is already qualified: Namespace.Type
-            if (name is CSharp.Syntax.QualifiedNameSyntax qualified)
-            {
-                return CSharpSyntaxFactory.QualifiedName(
-                    qualified.Left,
-                    CSharpSyntaxFactory.GenericName(
-                        qualified.Right.Identifier,
-                        typeArgumentList
-                    )
+                return CSharpSyntaxFactory.IdentifierName(
+                    CSharpSyntaxFactory.Identifier(identifierSegment.Name.Identifier.ToString())
                 );
             }
 
-            // Simple generic name: Type<T>
-            if (name is CSharp.Syntax.IdentifierNameSyntax identifier)
+            if (segment.Kind == SyntaxKind.MarkupGenericNameSegmentSyntax)
             {
+                var genericSegment = (MarkupGenericNameSegmentSyntax)segment;
+
+                using var typeArgumentsBuilder = ImmutableArrayBuilder<CSharp.Syntax.TypeSyntax>.Rent();
+
+                foreach (var typeArgument in genericSegment.GenericArgs.Arguments)
+                {
+                    typeArgumentsBuilder.Add(typeArgument.ToCSharp());
+                }
+
+                var typeArguments = typeArgumentsBuilder.ToImmutable();
+
+                var typeArgumentList = CSharpSyntaxFactory.TypeArgumentList(
+                    CSharpSyntaxFactory.SeparatedList(typeArguments)
+                );
+
                 return CSharpSyntaxFactory.GenericName(
-                    identifier.Identifier,
+                    CSharpSyntaxFactory.Identifier(genericSegment.Name.Identifier.ToString()),
                     typeArgumentList
                 );
             }
 
-            throw new NotSupportedException("Unsupported name kind for generic application.");
+            throw new NotSupportedException($"Unsupported markup name segment kind: {segment.Kind}");
         }
     }
 }

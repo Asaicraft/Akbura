@@ -43,13 +43,23 @@ partial class Parser
     {
         var stateKeyword = EatToken(SyntaxKind.StateKeyword);
 
+        var typeSyntax = EatOrNullCSharpTypeSyntax();
 
-    }
+        GreenCSharpTypeSyntax? type = null;
 
-    private GreenSyntaxToken.CSharpRawToken ParseTypeName()
-    {
-        var builder = PooledStringBuilder.GetInstance();
+        if (typeSyntax != null)
+        {
+            type = GreenSyntaxFactory.CSharpTypeSyntax(typeSyntax);
+        }
 
+        var name = EatToken(SyntaxKind.IdentifierToken);
 
+        var equalsToken = EatToken(SyntaxKind.EqualsToken);
+
+        var initializer = ParseStateInitializer();
+
+        var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
+
+        return GreenSyntaxFactory.StateDeclarationSyntax(stateKeyword, type, name, equalsToken, initializer, semicolonToken);
     }
 }

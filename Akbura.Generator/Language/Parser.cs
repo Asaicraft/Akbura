@@ -127,6 +127,15 @@ internal sealed partial class Parser : IDisposable
         return _lexedTokens[_tokenOffset + n];
     }
 
+    private GreenSyntaxToken FastPeekToken()
+    {
+        var token = _lexer.Lex(_mode);
+
+        _lexer.TextWindow.Reset(_lexer.TextWindow.Position - token.FullWidth);
+
+        return token;
+    }
+
     //this method is called very frequently
     //we should keep it simple so that it can be inlined.
     private GreenSyntaxToken EatToken()
@@ -649,7 +658,7 @@ internal sealed partial class Parser : IDisposable
         }
         else
         {
-            var lastToken = (GreenSyntaxToken)node.GetLastTerminal();
+            var lastToken = (GreenSyntaxToken)node.GetLastTerminal()!;
             var newToken = AddSkippedSyntax(lastToken, skippedSyntax, trailing: true);
             return GreenSyntaxLastTokenReplacer.Replace(node, newToken);
         }

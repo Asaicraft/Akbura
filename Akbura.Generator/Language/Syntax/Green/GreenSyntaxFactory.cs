@@ -108,12 +108,12 @@ internal static partial class GreenSyntaxFactory
     }
 
     /// <summary>Creates a token whose Text and ValueText are the same.</summary>
-    public static GreenSyntaxToken Token(GreenNode leading, SyntaxKind kind, string text, GreenNode trailing)
+    public static GreenSyntaxToken Token(GreenNode? leading, SyntaxKind kind, string text, GreenNode trailing)
     {
         return Token(leading, kind, text, text, trailing);
     }
 
-    public static GreenSyntaxToken Token(GreenNode leading, SyntaxKind kind, string text, string valueText, GreenNode trailing)
+    public static GreenSyntaxToken Token(GreenNode? leading, SyntaxKind kind, string text, string valueText, GreenNode trailing)
     {
         Debug.Assert(SyntaxFacts.IsAnyToken(kind));
         Debug.Assert(kind != SyntaxKind.IdentifierToken);
@@ -135,7 +135,7 @@ internal static partial class GreenSyntaxFactory
         return GreenSyntaxToken.CreateMissing(kind);
     }
 
-    public static GreenSyntaxToken MissingToken(GreenNode leading, SyntaxKind kind, GreenNode trailing)
+    public static GreenSyntaxToken MissingToken(GreenNode? leading, SyntaxKind kind, GreenNode trailing)
     {
         return GreenSyntaxToken.CreateMissing(kind, leading, trailing);
     }
@@ -165,52 +165,52 @@ internal static partial class GreenSyntaxFactory
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, uint value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, uint value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, long value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, long value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, ulong value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, ulong value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, float value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, float value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, double value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, double value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, decimal value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, decimal value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.NumericLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, string value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, string value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.StringLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, SyntaxKind kind, string value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, SyntaxKind kind, string value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(kind, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken Literal(GreenNode leading, string text, char value, GreenNode trailing)
+    public static GreenSyntaxToken Literal(GreenNode? leading, string text, char value, GreenNode? trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.CharLiteralToken, leading, text, value, trailing);
     }
 
-    public static GreenSyntaxToken BadToken(GreenNode leading, string text, GreenNode trailing)
+    public static GreenSyntaxToken BadToken(GreenNode? leading, string text, GreenNode trailing)
     {
         return GreenSyntaxToken.WithValue(SyntaxKind.BadToken, leading, text, text, trailing);
     }
@@ -313,12 +313,12 @@ internal static partial class GreenSyntaxFactory
         return GreenSyntaxToken.GetWellKnownTokens();
     }
 
-    public static GreenSyntaxToken CSharpRawToken(string text)
+    public static GreenSyntaxToken.CSharpRawToken CSharpRawToken(string text)
     {
         return GreenSyntaxToken.CreateCSharpRawToken(text);
     }
 
-    public static GreenSyntaxToken CSharpRawToken(CsharpRawNode csharpRawNode)
+    public static GreenSyntaxToken.CSharpRawToken CSharpRawToken(CsharpRawNode csharpRawNode)
     {
         return GreenSyntaxToken.CreateCSharpRawToken(csharpRawNode);
     }

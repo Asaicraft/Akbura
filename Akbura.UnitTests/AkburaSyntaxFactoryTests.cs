@@ -222,7 +222,7 @@ public class AkburaSyntaxFactoryTests
             expression: redExpression,
             semicolon: Token(SyntaxKind.SemicolonToken)
         )
-        .WithLeadingTrivia(new(indent4))   // "    Background..."
+        .WithLeadingTrivia([.. indent4])   // "    Background..."
         .WithTrailingTrivia(nl);      // end of line
 
         // @hover { Background: "Blue"; }

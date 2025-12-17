@@ -1426,7 +1426,7 @@ internal sealed partial class Lexer : IDisposable
 
         var parsed = CSharpSyntaxFactory.ParseExpression(
             expressionText,
-            expressionOffset,
+            0,
             options: null,
             consumeFullText: true);
 
@@ -1573,7 +1573,7 @@ internal sealed partial class Lexer : IDisposable
 
     private TokenInfo ParseTypeName()
     {
-        var parsed = ParseSlow();
+        var parsed = ParseCSharpTypeSlow();
 
         return new()
         {
@@ -1583,7 +1583,7 @@ internal sealed partial class Lexer : IDisposable
         };
     }
 
-    private CSharp.TypeSyntax ParseSlow()
+    private CSharp.TypeSyntax ParseCSharpTypeSlow()
     {
         const int OptimisticTypeSyntaxLength = 128;
 
@@ -1593,7 +1593,7 @@ internal sealed partial class Lexer : IDisposable
 
         var parsed = CSharpSyntaxFactory.ParseTypeName(
             optimisticString,
-            start,
+            0,
             options: null,
             consumeFullText: false);
 
@@ -2220,6 +2220,41 @@ internal sealed partial class Lexer : IDisposable
             AkburaDebug.AssertNotNull(tokenInfo.Text);
 
             token = GreenSyntaxToken.Identifier(leadingNode, tokenInfo.Text, trailingNode);
+        }
+        else if (tokenInfo.Kind == SyntaxKind.NumericLiteralToken)
+        {
+            AkburaDebug.AssertNotNull(tokenInfo.Text);
+            switch (tokenInfo.ValueKind)
+            {
+                case SpecialType.System_Int32:
+                    token = GreenSyntaxFactory.Literal(leadingNode, tokenInfo.Text, tokenInfo.IntValue, trailingNode);
+                    break;
+                case SpecialType.System_UInt32:
+                    token = GreenSyntaxFactory.Literal(leadingNode, tokenInfo.Text, tokenInfo.UintValue, trailingNode);
+                    break;
+                case SpecialType.System_Int64:
+                    token = GreenSyntaxFactory.Literal(leadingNode, tokenInfo.Text, tokenInfo.LongValue, trailingNode);
+                    break;
+                case SpecialType.System_UInt64:
+                    token = GreenSyntaxFactory.Literal(leadingNode, tokenInfo.Text, tokenInfo.UlongValue, trailingNode);
+                    break;
+                case SpecialType.System_Single:
+                    token = GreenSyntaxFactory.Literal(leadingNode, tokenInfo.Text, tokenInfo.FloatValue, trailingNode);
+                    break;
+                case SpecialType.System_Double:
+                    token = GreenSyntaxFactory.Literal(leadingNode, tokenInfo.Text, tokenInfo.DoubleValue, trailingNode);
+                    break;
+                case SpecialType.System_Decimal:
+                    token = GreenSyntaxFactory.Literal(leadingNode, tokenInfo.Text, tokenInfo.DecimalValue, trailingNode);
+                    break;
+                default:
+                    ThrowHelper.UnexpectedValue(tokenInfo.ValueKind);
+                    break;
+            }
+        }
+        else
+        {
+            token = GreenSyntaxFactory.Token(leadingNode, tokenInfo.Kind, trailingNode);
         }
 
         AkburaDebug.AssertNotNull(token);

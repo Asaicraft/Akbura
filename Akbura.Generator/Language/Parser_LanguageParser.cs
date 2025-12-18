@@ -63,10 +63,9 @@ partial class Parser
         var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
 
         return GreenSyntaxFactory.StateDeclarationSyntax(stateKeyword, type, name, equalsToken, initializer, semicolonToken);
-        
+
         GreenSyntaxToken.CSharpRawToken? EatOrNullCSharpTypeSyntax()
         {
-            // Called right after consuming 'state'.
             // Fast path: "state <name> = ..." (no explicit type).
             if (PeekToken(0).Kind == SyntaxKind.IdentifierToken &&
                 PeekToken(1).Kind == SyntaxKind.EqualsToken)
@@ -74,19 +73,16 @@ partial class Parser
                 return null;
             }
 
-            // Find the first occurrence of: "<identifier> ="
-            // That identifier is considered the state variable name.
             const int MaxLookahead = 128;
             var nameIndex = -1;
 
+            // Find "<identifier> =" => that's the variable name token.
             for (var i = 1; i < MaxLookahead; i++)
             {
                 var t = PeekToken(i);
 
                 if (t.Kind == SyntaxKind.EndOfFileToken || t.Kind == SyntaxKind.SemicolonToken)
-                {
                     break;
-                }
 
                 if (t.Kind == SyntaxKind.IdentifierToken && PeekToken(i + 1).Kind == SyntaxKind.EqualsToken)
                 {
@@ -95,58 +91,66 @@ partial class Parser
                 }
             }
 
-            // If we didn't find "<identifier> =", we can't reliably detect a type.
-            // If nameIndex == 0 => it would mean empty type (not allowed), so treat as no-type as well.
             if (nameIndex <= 0)
-            {
                 return null;
-            }
 
-            // Build C# type text from tokens [0..nameIndex-1].
+            var firstTypeToken = PeekToken(0);
+            var lastTypeToken = PeekToken(nameIndex - 1);
+
+            // Preserve trivia that would otherwise be lost after collapsing tokens into a single CSharpRawToken.
+            var leadingTrivia = firstTypeToken.GetLeadingTrivia();
+            var trailingTrivia = lastTypeToken.GetTrailingTrivia(); // <-- includes the space between type and name
+
+            // Build the type text from tokens [0..nameIndex-1],
+            // but DO NOT include trailing trivia of the last type token (it must remain between type and name).
             var sb = PooledStringBuilder.GetInstance();
+
             for (var i = 0; i < nameIndex; i++)
             {
                 var token = PeekToken(i);
-                sb.Builder.Append(GetTokenTextForCSharp(token));
+
+                sb.Builder.Append(GetTokenCoreText(token));
+
+                if (i != nameIndex - 1)
+                {
+                    // Keep internal spacing/comments between type tokens.
+                    sb.Builder.Append(token.GetTrailingTrivia()?.ToFullString() ?? null);
+                }
             }
 
             var typeText = sb.ToStringAndFree();
             if (typeText.Length == 0)
-            {
                 return null;
-            }
 
-            // Parse the type using Roslyn.
-            // consumeFullText: true => we require the whole string to be a type.
-            CSharp.TypeSyntax typeSyntax;
+            Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax parsedType;
             try
             {
-                typeSyntax = CSharpFactory.ParseTypeName(typeText, offset: 0, options: null, consumeFullText: true);
+                parsedType = CSharpFactory.ParseTypeName(typeText, offset: 0, options: null, consumeFullText: true);
             }
             catch
             {
                 return null;
             }
 
-            // Consume the type tokens so the caller can read the variable name next.
+            // Consume the original type tokens.
             for (var i = 0; i < nameIndex; i++)
             {
                 EatToken();
             }
 
-            return GreenSyntaxFactory.CSharpRawToken(typeSyntax);
+            // Create raw token and re-attach trivia from the original boundary tokens.
+            var raw = GreenSyntaxFactory.CSharpRawToken(parsedType);
 
-            static string GetTokenTextForCSharp(GreenSyntaxToken token)
-            {
-                // Identifiers/keywords/literals usually carry Text.
-                if (!string.IsNullOrEmpty(token.Text))
-                {
-                    return token.Text;
-                }
+            raw = (GreenSyntaxToken.CSharpRawToken)raw
+                .TokenWithLeadingTrivia(leadingTrivia)
+                .TokenWithTrailingTrivia(trailingTrivia);
 
-                // Punctuation usually doesn't carry Text, so take canonical spelling from SyntaxFacts.
-                return SyntaxFacts.GetText(token.Kind) ?? string.Empty;
-            }
+            return raw;
+
+            static string GetTokenCoreText(GreenSyntaxToken token)
+                => !string.IsNullOrEmpty(token.Text)
+                    ? token.Text
+                    : (SyntaxFacts.GetText(token.Kind) ?? string.Empty);
         }
     }
 

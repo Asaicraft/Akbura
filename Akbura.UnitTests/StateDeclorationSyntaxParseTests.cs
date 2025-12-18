@@ -28,5 +28,56 @@ public class StateDeclorationSyntaxParseTests
         var syntax = parser.ParseStateDeclaration();
 
         Assert.NotNull(syntax);
+
+        Assert.Equal("state", syntax.StateKeyword.ToString());
+        Assert.Equal("int", syntax.Type?.ToString());
+        Assert.Equal("a", syntax.Name.ToString());
+        Assert.Equal("=", syntax.EqualsToken.ToString());
+        Assert.Equal("11", syntax.Initializer.ToString());
+        Assert.Equal(";", syntax.Semicolon.ToString());
+
+        Assert.Equal(code, syntax.ToFullString());
     }
+
+    [Fact]
+    public void ImplicitTypeStateDeclaration_ParseSuccessfully()
+    {
+        const string code = "state b = 100;";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseStateDeclaration();
+
+        Assert.NotNull(syntax);
+
+        Assert.Equal("state", syntax.StateKeyword.ToString());
+        Assert.Null(syntax.Type);
+        Assert.Equal("b", syntax.Name.ToString());
+        Assert.Equal("=", syntax.EqualsToken.ToString());
+        Assert.Equal("100", syntax.Initializer.ToString());
+        Assert.Equal(";", syntax.Semicolon.ToString());
+
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void GenericTypeStateDeclaration_ParseSuccessfully()
+    {
+        const string code = "state List<int> items = new();";
+
+        var parser = MakeParser(code);
+        var syntax = parser.ParseStateDeclaration();
+
+        Assert.NotNull(syntax);
+
+        Assert.Equal("state", syntax.StateKeyword.ToString());
+        Assert.Equal("List<int>", syntax.Type?.ToString());
+        Assert.Equal("items", syntax.Name.ToString());
+        Assert.Equal("=", syntax.EqualsToken.ToString());
+        Assert.Equal("new()", syntax.Initializer.ToString());
+        Assert.Equal(";", syntax.Semicolon.ToString());
+
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
 }

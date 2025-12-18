@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/draft-concepts/">
+    <File Path="draft-concepts/Dependecy Injection.md" />
+    <File Path="draft-concepts/User defined hook.md" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="Akbura.AotTest/Akbura.AotTest.csproj" />
+  <Project Path="Akbura.Generator/Akbura.Generator.csproj" />
+  <Project Path="Akbura.UnitTests/Akbura.UnitTests.csproj" />
+  <Project Path="Akbura/Akbura.csproj" />
+</Solution>

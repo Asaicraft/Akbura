@@ -1297,14 +1297,14 @@ internal sealed partial class Lexer : IDisposable
 
     private TokenInfo ParseExpressionUntil(char terminator)
     {
-        static void IncreaseDepth(ref int depth, char character, StringBuilder stringBuilder, in SlidingTextWindow TextWindow)
+        static void IncreaseDepth(ref int depth, char character, StringBuilder stringBuilder, ref SlidingTextWindow TextWindow)
         {
             depth++;
             stringBuilder.Append(character);
             TextWindow.NextChar();
         }
 
-        static bool DecreaseDepth(ref int depth, char character, StringBuilder stringBuilder, in SlidingTextWindow TextWindow)
+        static bool DecreaseDepth(ref int depth, char character, StringBuilder stringBuilder, ref SlidingTextWindow TextWindow)
         {
             depth--;
             stringBuilder.Append(character);
@@ -1362,13 +1362,13 @@ internal sealed partial class Lexer : IDisposable
             // structure tracking
             if (character == '(')
             {
-                IncreaseDepth(ref paren, character, _builder, in TextWindow);
+                IncreaseDepth(ref paren, character, _builder, ref TextWindow);
                 continue;
             }
 
             if (character == ')')
             {
-                if (DecreaseDepth(ref paren, character, _builder, in TextWindow))
+                if (DecreaseDepth(ref paren, character, _builder, ref TextWindow))
                 {
                     // Unmatched ')', just break to avoid infinite loop
                     break;
@@ -1379,14 +1379,14 @@ internal sealed partial class Lexer : IDisposable
 
             if (character == '{')
             {
-                IncreaseDepth(ref brace, character, _builder, in TextWindow);
+                IncreaseDepth(ref brace, character, _builder, ref TextWindow);
                 continue;
             }
 
 
             if (character == '}')
             {
-                if (DecreaseDepth(ref brace, character, _builder, in TextWindow))
+                if (DecreaseDepth(ref brace, character, _builder, ref TextWindow))
                 {
                     // Unmatched '}', just break to avoid infinite loop
                     break;
@@ -1396,13 +1396,13 @@ internal sealed partial class Lexer : IDisposable
 
             if (character == '[')
             {
-                IncreaseDepth(ref bracket, character, _builder, in TextWindow);
+                IncreaseDepth(ref bracket, character, _builder, ref TextWindow);
                 continue;
             }
 
             if (character == ']')
             {
-                if (DecreaseDepth(ref bracket, character, _builder, in TextWindow))
+                if (DecreaseDepth(ref bracket, character, _builder, ref TextWindow))
                 {
                     // Unmatched ']', just break to avoid infinite loop
                     break;

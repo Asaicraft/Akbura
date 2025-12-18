@@ -45,6 +45,7 @@ internal sealed partial class Lexer : IDisposable
         InArgumentExpression = 1 << 3,
         InMarkup = 1 << 4,
         InTypeName = 1 << 5,
+        InAkcss = 1 << 6,
     }
 
     internal struct TokenInfo
@@ -404,6 +405,15 @@ internal sealed partial class Lexer : IDisposable
 
             // Akcss / utilities 
             case '@':
+
+                if ((_mode & LexerMode.InAkcss) == 0)
+                {
+                    if (!this.ScanIdentifierOrKeyword(ref info))
+                    {
+                        return;
+                    }
+                }
+
                 TextWindow.AdvanceChar();
                 info.Kind = SyntaxKind.AtToken;
                 return;
@@ -1762,6 +1772,14 @@ internal sealed partial class Lexer : IDisposable
     {
         var start = TextWindow.Position;
         ResetIdentifierBuffer();
+
+        while (TextWindow.PeekChar() == '@')
+        {
+            TextWindow.AdvanceChar();
+        }
+
+        var atCount = TextWindow.Position - start;
+        info.IsVerbatim = atCount > 0;
 
         var hasEscape = false;
 

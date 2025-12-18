@@ -461,7 +461,6 @@ internal sealed partial class Parser : IDisposable
             // If the previous token has a trailing EndOfLineTrivia, the missing token diagnostic position is moved
             // to the end of line containing the previous token and its width is set to zero. Otherwise we squiggle
             // the token following the missing token (the token we're currently pointing at).
-            AkburaDebug.AssertNotNull(_prevTokenTrailingTrivia);
             var trivia = _prevTokenTrailingTrivia;
             var triviaList = new GreenSyntaxList<GreenNode>(trivia);
             if (triviaList.Any((int)SyntaxKind.EndOfLineTrivia))

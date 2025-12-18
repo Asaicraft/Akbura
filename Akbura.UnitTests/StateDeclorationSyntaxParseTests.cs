@@ -250,4 +250,25 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.Equal(code, syntax.ToFullString());
     }
+
+    [Fact]
+    public void MissingSemicolon_StillBuildsNode_WithMissingToken()
+    {
+        // If your parser follows Roslyn-style recovery, this should still produce a node
+        // and the semicolon token should be missing.
+        const string code = "state int a = 11";
+
+        var parser = MakeParser(code);
+        var syntax = parser.ParseStateDeclaration();
+
+        Assert.NotNull(syntax);
+
+        Assert.Equal("int", syntax.Type?.ToString());
+        Assert.Equal("a", syntax.Name.ToString());
+        Assert.Equal("11", syntax.Initializer.ToString());
+
+        // This assumes your MissingToken prints empty string or something stable.
+        // If your missing token ToString() differs, adjust this assertion accordingly.
+        Assert.True(syntax.Semicolon.IsMissing);
+    }
 }

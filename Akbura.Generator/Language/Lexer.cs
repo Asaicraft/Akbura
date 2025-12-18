@@ -408,7 +408,7 @@ internal sealed partial class Lexer : IDisposable
 
                 if ((_mode & LexerMode.InAkcss) == 0)
                 {
-                    if (!this.ScanIdentifierOrKeyword(ref info))
+                    if (this.ScanIdentifierOrKeyword(ref info))
                     {
                         return;
                     }
@@ -1908,7 +1908,6 @@ internal sealed partial class Lexer : IDisposable
                 info.StringValue = TextWindow.Intern(_identifierBuffer, 0, _identifierLength);
             }
 
-            info.IsVerbatim = false;
             info.HasIdentifierEscapeSequence = hasEscape;
 
             return true;

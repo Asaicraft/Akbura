@@ -92,7 +92,9 @@ partial class Parser
             }
 
             if (nameIndex <= 0)
+            {
                 return null;
+            }
 
             var firstTypeToken = PeekToken(0);
             var lastTypeToken = PeekToken(nameIndex - 1);

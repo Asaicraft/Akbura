@@ -32,6 +32,7 @@ namespace Akbura.Language.Syntax.Green
             SlotCount = 1;
             FullWidth = fullWidth;
             Flags = flags;
+            IsCSharpSyntax = true;
         }
 
         public GreenStateInitializerSyntax WithExpression(global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression)

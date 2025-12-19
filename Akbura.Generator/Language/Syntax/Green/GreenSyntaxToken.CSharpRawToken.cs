@@ -29,6 +29,8 @@ partial class GreenSyntaxToken
         {
             _rawNode = rawText;
             _rawText = _rawNode.ToFullString();
+            FullWidth = _rawText.Length;
+            IsMissing = _rawNode.IsMissing;
 
             _leading = leading;
             _trailing = trailing;
@@ -77,5 +79,31 @@ partial class GreenSyntaxToken
 
             return new CSharpRawToken(_rawText, _leading, trivia, GetDiagnostics(), GetAnnotations());
         }
+
+        //protected override void WriteTokenTo(TextWriter writer, bool leading, bool trailing)
+        //{
+        //    if(leading)
+        //    {
+        //        _leading?.WriteTo(writer);
+        //        if(_rawNode != null)
+        //        {
+        //            var leadingCs = _rawNode.GetLeadingTrivia();
+        //            writer.Write(leadingCs.ToFullString());
+        //        }
+        //    }
+
+        //    var text = _rawText ?? _rawNode?.ToString() ?? string.Empty;
+        //    writer.Write(text);
+
+        //    if (trailing)
+        //    {
+        //        _trailing?.WriteTo(writer);
+        //        if (_rawNode != null)
+        //        {
+        //            var trailingCs = _rawNode.GetTrailingTrivia();
+        //            writer.Write(trailingCs.ToFullString());
+        //        }
+        //    }
+        //}
     }
 }

@@ -32,6 +32,7 @@ namespace Akbura.Language.Syntax.Green
 
             SlotCount = 1;
             FullWidth = fullWidth;
+            IsMissing = _tokens?.IsMissing ?? false;
             Flags = flags;
         }
 

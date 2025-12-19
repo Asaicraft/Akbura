@@ -1595,15 +1595,21 @@ internal sealed partial class Lexer : IDisposable
 
     private CSharp.TypeSyntax ParseCSharpTypeSlow()
     {
-        const int OptimisticTypeSyntaxLength = 128;
+        const int SmallStringLength = 512;
 
         var start = TextWindow.Position;
+        var end = TextWindow.Text.Length;
+        var length = end - start;
 
-        var optimisticString = TextWindow.GetText(start, OptimisticTypeSyntaxLength, intern: false);
+        var startParse = end < SmallStringLength ? start : 0;
+
+        var sourceText = end < SmallStringLength 
+            ? TextWindow.Text.ToString()
+            : TextWindow.GetText(start, length, intern: false);
 
         var parsed = CSharpSyntaxFactory.ParseTypeName(
-            optimisticString,
-            0,
+            sourceText,
+            startParse,
             options: null,
             consumeFullText: false);
 

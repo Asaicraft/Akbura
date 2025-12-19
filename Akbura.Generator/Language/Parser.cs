@@ -50,6 +50,7 @@ internal sealed partial class Parser : IDisposable
 
     }
 
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)] // watch only _currentToken to avoid fetching tokens in debugger
     private GreenSyntaxToken CurrentToken
     {
         get => _currentToken ??= FetchCurrentToken();
@@ -136,6 +137,48 @@ internal sealed partial class Parser : IDisposable
         return token;
     }
 
+    /// <summary>
+    /// Rolls back the parser by one token (undoes a single EatToken / MoveToNextToken).
+    /// The token must already exist in the lexed token buffer.
+    /// </summary>
+    private void ReturnToken()
+    {
+        // Nothing to rewind.
+        if (_tokenOffset == 0)
+        {
+            return;
+        }
+
+        var lastToken = _lexedTokens[_tokenCount - 1];
+        _lexedTokens[_tokenCount - 1] = default;
+
+        // Undo MoveToNextToken increment.
+        _tokenOffset--;
+        _tokenCount--;
+
+        // Clear cached current token so CurrentToken will be fetched from the buffer.
+        _currentToken = null;
+
+        // Restore trailing trivia of the token *before* the new current token.
+        // This keeps GetDiagnosticSpanForMissingNodeOrToken behavior stable.
+        if (_tokenOffset > 0)
+        {
+            var prev = _lexedTokens[_tokenOffset - 1].Value;
+            _prevTokenTrailingTrivia = prev?.GetTrailingTrivia();
+        }
+        else
+        {
+            _prevTokenTrailingTrivia = null;
+        }
+
+        if (lastToken.Value == null)
+        {
+            return;
+        }
+        var currentPosition = _lexer.TextWindow.Position;
+        _lexer.TextWindow.Reset(currentPosition - lastToken.Value.FullWidth);
+    }
+
     //this method is called very frequently
     //we should keep it simple so that it can be inlined.
     private GreenSyntaxToken EatToken()
@@ -179,6 +222,26 @@ internal sealed partial class Parser : IDisposable
 
         //slow part of EatToken(SyntaxKind kind)
         return CreateMissingToken(kind, this.CurrentToken.Kind);
+    }
+
+    private GreenSyntaxToken EatOrReturn(SyntaxKind kind)
+    {
+        Debug.Assert(SyntaxFacts.IsAnyToken(kind));
+
+        var currentToken = CurrentToken;
+        if (currentToken.Kind == kind)
+        {
+            MoveToNextToken();
+            return currentToken;
+        }
+
+        //slow part of EatToken(SyntaxKind kind)
+        var returToken = CreateMissingToken(kind, currentToken.Kind);
+        ReturnToken();
+
+        _tokenOffset++;
+
+        return returToken;
     }
 
     // Consume a token if it is the right kind. Otherwise skip a token and replace it with one of the correct kind.

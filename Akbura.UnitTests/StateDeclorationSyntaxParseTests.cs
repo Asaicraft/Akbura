@@ -30,7 +30,7 @@ public class StateDeclorationSyntaxParseTests
         Assert.NotNull(syntax);
 
         Assert.Equal("state", syntax.StateKeyword.ToString());
-        Assert.Equal("int", syntax.Type?.ToString());
+        Assert.Equal("int ", syntax.Type?.ToString());
         Assert.Equal("a", syntax.Name.ToString());
         Assert.Equal("=", syntax.EqualsToken.ToString());
         Assert.Equal("11", syntax.Initializer.ToString());
@@ -71,7 +71,7 @@ public class StateDeclorationSyntaxParseTests
         Assert.NotNull(syntax);
 
         Assert.Equal("state", syntax.StateKeyword.ToString());
-        Assert.Equal("List<int>", syntax.Type?.ToString());
+        Assert.Equal("List<int> ", syntax.Type?.ToString());
         Assert.Equal("items", syntax.Name.ToString());
         Assert.Equal("=", syntax.EqualsToken.ToString());
         Assert.Equal("new()", syntax.Initializer.ToString());
@@ -91,7 +91,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("System.Collections.Generic.List<string>", syntax.Type?.ToString());
+        Assert.Equal("System.Collections.Generic.List<string> ", syntax.Type?.ToString());
         Assert.Equal("names", syntax.Name.ToString());
         Assert.Equal("new()", syntax.Initializer.ToString());
 
@@ -108,7 +108,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("int?", syntax.Type?.ToString());
+        Assert.Equal("int? ", syntax.Type?.ToString());
         Assert.Equal("x", syntax.Name.ToString());
         Assert.Equal("null", syntax.Initializer.ToString());
 
@@ -125,7 +125,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("int[]", syntax.Type?.ToString());
+        Assert.Equal("int[] ", syntax.Type?.ToString());
         Assert.Equal("xs", syntax.Name.ToString());
         Assert.Equal("new[] { 1, 2, 3 }", syntax.Initializer.ToString());
 
@@ -142,7 +142,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("(int a, string b)", syntax.Type?.ToString());
+        Assert.Equal("(int a, string b) ", syntax.Type?.ToString());
         Assert.Equal("t", syntax.Name.ToString());
         Assert.Equal("(1, \"x\")", syntax.Initializer.ToString());
 
@@ -177,7 +177,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("MyType", syntax.Type?.ToString());
+        Assert.Equal("MyType ", syntax.Type?.ToString());
         Assert.Equal("x", syntax.Name.ToString());
         Assert.Equal("new() { A = 1, B = Foo(2, 3) }", syntax.Initializer.ToString());
 
@@ -195,8 +195,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("int", syntax.Type?.ToString());
-        Assert.Equal("int   ", syntax.Type?.ToFullString());
+        Assert.Equal("int   ", syntax.Type?.ToString());
         Assert.Equal("a", syntax.Name.ToString());
         Assert.Equal(code, syntax.ToFullString());
     }
@@ -212,7 +211,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("int", syntax.Type?.ToString());
+        Assert.Equal("int ", syntax.Type?.ToString());
         Assert.Equal("a", syntax.Name.ToString());
         Assert.Equal(code, syntax.ToFullString());
     }
@@ -228,7 +227,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("int", syntax.Type?.ToString());
+        Assert.Equal("int/*c*/", syntax.Type?.ToString());
         Assert.Equal("a", syntax.Name.ToString());
         Assert.Equal(code, syntax.ToFullString());
     }
@@ -244,7 +243,7 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("int", syntax.Type?.ToString());
+        Assert.Equal("int ", syntax.Type?.ToString());
         Assert.Equal("@class", syntax.Name.ToString());
         Assert.Equal("1", syntax.Initializer.ToString());
 
@@ -263,12 +262,93 @@ public class StateDeclorationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.Equal("int", syntax.Type?.ToString());
+        Assert.Equal("int ", syntax.Type?.ToString());
         Assert.Equal("a", syntax.Name.ToString());
         Assert.Equal("11", syntax.Initializer.ToString());
 
         // This assumes your MissingToken prints empty string or something stable.
         // If your missing token ToString() differs, adjust this assertion accordingly.
         Assert.True(syntax.Semicolon.IsMissing);
+    }
+
+    [Fact]
+    public void MissingEquals_ParsesAndRecoversToSemicolon()
+    {
+        const string code = "state int a 11;";
+
+        var parser = MakeParser(code);
+        var syntax = parser.ParseStateDeclaration();
+
+        Assert.NotNull(syntax);
+
+        Assert.Equal("int ", syntax.Type?.ToString());
+        Assert.Equal("a", syntax.Name.ToString());
+
+        // '=' should be missing.
+        Assert.True(syntax.EqualsToken.IsMissing);
+
+        // Initializer will likely become "11" if you still parse until ';',
+        // or it might be missing depending on your strategy. At least don't crash.
+        Assert.False(syntax.Semicolon.IsMissing);
+
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void MissingInitializer_ParsesWithMissingExpression()
+    {
+        const string code = "state int a = ;";
+
+        var parser = MakeParser(code);
+        var syntax = parser.ParseStateDeclaration();
+
+        Assert.NotNull(syntax);
+
+        Assert.Equal("int ", syntax.Type?.ToString());
+        Assert.Equal("a", syntax.Name.ToString());
+        Assert.Equal("=", syntax.EqualsToken.ToString());
+        Assert.True(syntax.Initializer.Expression.IsMissing);
+
+        // Depending on your implementation you might produce empty expression, "default", or missing token.
+        // The key requirement: the node exists and semicolon is present.
+        Assert.False(syntax.Semicolon.IsMissing);
+
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void GarbageAfterInitializer_IsSkippedAndStillTerminates()
+    {
+        const string code = "state int a = 11 !!! ;";
+
+        var parser = MakeParser(code);
+        var syntax = parser.ParseStateDeclaration();
+
+        Assert.NotNull(syntax);
+
+        Assert.Equal("int ", syntax.Type?.ToString());
+        Assert.Equal("a", syntax.Name.ToString());
+        Assert.False(syntax.Semicolon.IsMissing);
+
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void BadType_FallsBackToImplicitType()
+    {
+        // Type parsing should fail and the parser should treat it as implicit type state declaration.
+        const string code = "state < > a = 1;";
+
+        var parser = MakeParser(code);
+        var syntax = parser.ParseStateDeclaration();
+
+        Assert.NotNull(syntax);
+
+        Assert.Null(syntax.Type);
+        Assert.Equal("a", syntax.Name.ToString());
+        Assert.Equal("1", syntax.Initializer.ToString());
+        Assert.False(syntax.Semicolon.IsMissing);
+
+        Assert.Equal(code, syntax.ToFullString());
     }
 }

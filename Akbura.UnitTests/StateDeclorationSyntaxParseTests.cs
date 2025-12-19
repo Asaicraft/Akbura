@@ -5,18 +5,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static Akbura.UnitTests.ParserHelper;
 
 namespace Akbura.UnitTests;
 
 public class StateDeclorationSyntaxParseTests
 {
-    private static Parser MakeParser(string code)
-    {
-        var sourceText = SourceText.From(code);
-        var lexer = new Lexer(sourceText);
-
-        return new Parser(lexer, default);
-    }
 
     [Fact]
     public void SimpleStateDeclaration_ParseSuccessfully()

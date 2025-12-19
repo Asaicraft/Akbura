@@ -130,6 +130,10 @@ partial class Parser
         var name = GreenSyntaxFactory.IdentifierName(EatToken(SyntaxKind.IdentifierToken));
 
         var equalsToken = EatOrReturn(SyntaxKind.EqualsToken);
+        if(equalsToken.IsMissing)
+        {
+            equalsToken = null;
+        }
 
         GreenCSharpExpressionSyntax? defaultValue = null;
         if (equalsToken != null)

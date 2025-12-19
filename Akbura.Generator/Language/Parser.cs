@@ -292,6 +292,51 @@ internal sealed partial class Parser : IDisposable
         return null;
     }
 
+    private CSharpRawToken? EatCSharpTypeSyntax()
+    {
+        var mode = _mode;
+        _mode = Lexer.LexerMode.InTypeName;
+
+        var token = EatToken();
+
+        _mode = mode;
+
+        AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+        AkburaDebug.Assert(((CSharpRawToken)token).RawNode is CSharp.TypeSyntax, "Exprected TypeSyntax");
+
+        var typeOrIdentifier = (CSharp.TypeSyntax)((CSharpRawToken)token).RawNode!;
+
+        // if it's not an identifier name, it's definitely a type
+        if (typeOrIdentifier.Kind() != CSharpSyntaxKind.IdentifierName)
+        {
+            return (CSharpRawToken)token;
+        }
+
+        // check for well-known types (int, string, etc.)
+        if (SyntaxFacts.IsWellKnownType(typeOrIdentifier))
+        {
+            return (CSharpRawToken)token;
+        }
+
+        var fastToken = FastPeekToken();
+
+        if (fastToken.Kind == SyntaxKind.EqualsToken)
+        {
+            // if the next token is '=', then it's a identifier used as a name, not a type
+            ReturnToken();
+            return (CSharpRawToken)EatToken(SyntaxKind.CSharpRawToken);
+        }
+
+        if (fastToken.Kind == SyntaxKind.IdentifierToken)
+        {
+            // if the next token is an identifier, then it's definitely a type
+            return (CSharpRawToken)token;
+        }
+
+        ReturnToken();
+        return (CSharpRawToken)EatToken(SyntaxKind.CSharpRawToken);
+    }
+
     // Consume a token if it is the right kind. Otherwise skip a token and replace it with one of the correct kind.
     private GreenSyntaxToken EatTokenAsKind(SyntaxKind expected)
     {

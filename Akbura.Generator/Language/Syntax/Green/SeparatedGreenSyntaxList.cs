@@ -55,6 +55,16 @@ internal readonly struct SeparatedGreenSyntaxList<TNode> : IEquatable<SeparatedG
         return _list;
     }
 
+    public override string ToString()
+    {
+        return _list.ToString();
+    }
+
+    public string ToFullString()
+    {
+        return _list.ToFullString();
+    }
+
     public static bool operator ==(in SeparatedGreenSyntaxList<TNode> left, in SeparatedGreenSyntaxList<TNode> right)
     {
         return left.Equals(right);

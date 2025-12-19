@@ -41,6 +41,7 @@ partial class Parser
             SyntaxKind.StateKeyword => ParseStateDeclaration(),
             SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
             SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
+            SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
             _ => default!
         };
     }
@@ -175,6 +176,36 @@ partial class Parser
 
     #endregion
 
+    #region CommandDeclarationSyntax
+
+    internal GreenCommandDeclarationSyntax ParseCommandDeclarationSyntax()
+    {
+        var commandKeyword = EatToken(SyntaxKind.CommandKeyword);
+
+        var returnTypeSyntax = ParseCShaprType();
+
+        var name = ParseIdentifierName();
+
+        var openParen = EatToken(SyntaxKind.OpenParenToken);
+
+        var parameters = ParseParameterList();
+
+        var closeParen = EatToken(SyntaxKind.CloseParenToken);
+
+        var semicolon = EatToken(SyntaxKind.SemicolonToken);
+
+        return GreenSyntaxFactory.CommandDeclarationSyntax(
+            commandKeyword,
+            returnTypeSyntax,
+            name,
+            openParen,
+            parameters,
+            closeParen,
+            semicolon);
+    }
+
+    #endregion
+
     #region IdentifierNameSyntax
 
     private GreenIdentifierNameSyntax ParseIdentifierName()
@@ -200,6 +231,47 @@ partial class Parser
 
     #endregion
 
+    #region ParameterSyntax
+
+    private SeparatedGreenSyntaxList<GreenParameterSyntax> ParseParameterList()
+    {
+        var parameters = _pool.Allocate<GreenNode>();
+        try
+        {
+            while (CurrentToken.Kind != SyntaxKind.CloseParenToken && CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+            {
+                ReturnToken();
+                _tokenOffset++;
+                var parameter = ParseParameter();
+                parameters.Add(parameter);
+                if (CurrentToken.Kind == SyntaxKind.CommaToken)
+                {
+                    var comma = EatToken(SyntaxKind.CommaToken);
+                    parameters.Add(comma);
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return new SeparatedGreenSyntaxList<GreenParameterSyntax>(parameters.ToList());
+        }
+        finally
+        {
+            _pool.Free(parameters);
+        }
+    }
+
+    private GreenParameterSyntax ParseParameter()
+    {
+        var type = ParseCShaprType();
+        var name = ParseIdentifierName();
+
+        return GreenSyntaxFactory.ParameterSyntax(type, name);
+    }
+
+    #endregion
+
     #region CSharpExpressionSyntax
 
     private GreenCSharpExpressionSyntax ParseCShaprExpressionUntilSemicolon()
@@ -216,6 +288,29 @@ partial class Parser
         _mode = mode;
 
         return GreenSyntaxFactory.CSharpExpressionSyntax(token);
+    }
+
+    #endregion
+
+    #region CSharpTypeSyntax
+
+    private GreenCSharpTypeSyntax ParseCShaprType()
+    {
+        var token = EatCSharpTypeSyntax();
+
+        return GreenSyntaxFactory.CSharpTypeSyntax(token);
+    }
+
+    private GreenCSharpTypeSyntax? ParseCSharpTypeOrNull()
+    {
+        var token = EatOrNullCSharpTypeSyntax();
+
+        if (token == null)
+        {
+            return null;
+        }
+
+        return GreenSyntaxFactory.CSharpTypeSyntax(token);
     }
 
     #endregion

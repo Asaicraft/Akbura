@@ -124,6 +124,16 @@ internal readonly partial struct GreenSyntaxList<TNode> : IEquatable<GreenSyntax
         }
     }
 
+    public override string ToString()
+    {
+        return _node?.ToString() ?? string.Empty;
+    }
+
+    public string ToFullString()
+    {
+        return _node?.ToFullString() ?? string.Empty;
+    }
+
     public static bool operator ==(GreenSyntaxList<TNode> left, GreenSyntaxList<TNode> right)
     {
         return left._node == right._node;

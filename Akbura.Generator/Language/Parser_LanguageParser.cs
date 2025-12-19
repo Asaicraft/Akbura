@@ -60,7 +60,7 @@ partial class Parser
             type = GreenSyntaxFactory.CSharpTypeSyntax(typeSyntax);
         }
 
-        var name = GreenSyntaxFactory.IdentifierName(EatToken(SyntaxKind.IdentifierToken));
+        var name = ParseIdentifierName();
 
         var equalsToken = EatOrReturn(SyntaxKind.EqualsToken);
 
@@ -128,7 +128,7 @@ partial class Parser
             type = GreenSyntaxFactory.CSharpTypeSyntax(typeSyntax);
         }
 
-        var name = GreenSyntaxFactory.IdentifierName(EatToken(SyntaxKind.IdentifierToken));
+        var name = ParseIdentifierName();
 
         var equalsToken = EatOrReturn(SyntaxKind.EqualsToken);
         if(equalsToken.IsMissing)
@@ -166,11 +166,36 @@ partial class Parser
             type = GreenSyntaxFactory.CSharpTypeSyntax(EatToken(SyntaxKind.CSharpRawToken));
         }
 
-        var name = GreenSyntaxFactory.IdentifierName(EatToken(SyntaxKind.IdentifierToken));
+        var name = ParseIdentifierName();
         
         var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
         
         return GreenSyntaxFactory.InjectDeclarationSyntax(token, type, name, semicolonToken);
+    }
+
+    #endregion
+
+    #region IdentifierNameSyntax
+
+    private GreenIdentifierNameSyntax ParseIdentifierName()
+    {
+        if(CurrentToken.Kind == SyntaxKind.IdentifierToken)
+        {
+            var identifierToken = EatToken(SyntaxKind.IdentifierToken);
+            return GreenSyntaxFactory.IdentifierName(identifierToken);
+        }
+
+        return GreenSyntaxFactory.IdentifierName(ParseIdentifierToken());
+    }
+
+    private GreenSyntaxToken ParseIdentifierToken()
+    {
+        return AddError(CreateMissingIdentifierToken(), ErrorCodes.ERR_IdentifierExpected);
+    }
+
+    private static GreenSyntaxToken CreateMissingIdentifierToken()
+    {
+        return GreenSyntaxFactory.MissingToken(SyntaxKind.IdentifierToken);
     }
 
     #endregion

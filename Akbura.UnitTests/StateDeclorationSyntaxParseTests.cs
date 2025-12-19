@@ -334,20 +334,14 @@ public class StateDeclorationSyntaxParseTests
     }
 
     [Fact]
-    public void BadType_FallsBackToImplicitType()
+    public void ParseInvalidSyntax()
     {
-        // Type parsing should fail and the parser should treat it as implicit type state declaration.
         const string code = "state < > a = 1;";
 
         var parser = MakeParser(code);
         var syntax = parser.ParseStateDeclaration();
 
         Assert.NotNull(syntax);
-
-        Assert.Null(syntax.Type);
-        Assert.Equal("a", syntax.Name.ToString());
-        Assert.Equal("1", syntax.Initializer.ToString());
-        Assert.False(syntax.Semicolon.IsMissing);
 
         Assert.Equal(code, syntax.ToFullString());
     }

@@ -171,13 +171,13 @@ node InjectDeclarationSyntax : AkTopLevelMember {
 
 /// <summary>param int UserId = 1; or param out Hello = 10;</summary>
 node ParamDeclarationSyntax : AkTopLevelMember {
-    ParamKeyword   : ParamKeyword;
-    BindingKeyword : OutToken | BindToken;
-    Type?          : CSharpTypeSyntax;
-    Name           : SimpleName;
-    Equals?        : EqualsToken;
-    DefaultValue?  : CSharpExpressionSyntax;
-    Semicolon      : SemicolonToken;
+    ParamKeyword    : ParamKeyword;
+    BindingKeyword? : OutToken | BindToken;
+    Type?           : CSharpTypeSyntax;
+    Name            : SimpleName;
+    Equals?         : EqualsToken;
+    DefaultValue?   : CSharpExpressionSyntax;
+    Semicolon       : SemicolonToken;
 }
 
 /// <summary>state count = 0; / state ReactList tasks = [];</summary>

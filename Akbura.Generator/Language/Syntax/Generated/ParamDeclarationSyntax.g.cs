@@ -13,7 +13,7 @@ namespace Akbura.Language.Syntax.Green
     internal sealed partial class GreenParamDeclarationSyntax : global::Akbura.Language.Syntax.Green.GreenAkTopLevelMemberSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken ParamKeyword;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken BindingKeyword;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? BindingKeyword;
         public readonly global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? Type;
         public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? EqualsToken;
@@ -22,7 +22,7 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenParamDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken paramKeyword,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken bindingKeyword,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? bindingKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equalsToken,
@@ -41,13 +41,13 @@ namespace Akbura.Language.Syntax.Green
             this.Semicolon = semicolon;
 
             AkburaDebug.Assert(this.ParamKeyword != null);
-            AkburaDebug.Assert(this.BindingKeyword != null);
             AkburaDebug.Assert(this.Name != null);
             AkburaDebug.Assert(this.Semicolon != null);
 
             AkburaDebug.Assert(
                 this.ParamKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.ParamKeyword);
             AkburaDebug.Assert(
+                this.BindingKeyword == null ||
                 this.BindingKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.OutToken ||
                 this.BindingKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.BindToken);
             AkburaDebug.Assert(
@@ -63,7 +63,12 @@ namespace Akbura.Language.Syntax.Green
             var fullWidth = FullWidth;
 
             AdjustWidthAndFlags(ParamKeyword, ref fullWidth, ref flags);
-            AdjustWidthAndFlags(BindingKeyword, ref fullWidth, ref flags);
+            
+            if(BindingKeyword != null)
+            {
+                AdjustWidthAndFlags(BindingKeyword, ref fullWidth, ref flags);
+            }
+            
 
             if (Type != null)
             {
@@ -91,7 +96,7 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenParamDeclarationSyntax UpdateParamDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken paramKeyword,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken bindingKeyword,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? bindingKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equalsToken,
@@ -218,7 +223,7 @@ namespace Akbura.Language.Syntax.Green
     {
         public static GreenParamDeclarationSyntax ParamDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken paramKeyword,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken bindingKeyword,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? bindingKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? type,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken? equalsToken,
@@ -226,13 +231,13 @@ namespace Akbura.Language.Syntax.Green
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
             AkburaDebug.Assert(paramKeyword != null);
-            AkburaDebug.Assert(bindingKeyword != null);
             AkburaDebug.Assert(name != null);
             AkburaDebug.Assert(semicolon != null);
 
             AkburaDebug.Assert(
                 paramKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.ParamKeyword);
             AkburaDebug.Assert(
+                bindingKeyword == null ||
                 bindingKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OutToken ||
                 bindingKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.BindToken);
             AkburaDebug.Assert(
@@ -290,7 +295,7 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateParamDeclarationSyntax(
                 (GreenSyntaxToken)VisitToken(node.ParamKeyword),
-                (GreenSyntaxToken)VisitToken(node.BindingKeyword),
+                (GreenSyntaxToken?)VisitToken(node.BindingKeyword),
                 (GreenCSharpTypeSyntax?)Visit(node.Type),
                 (GreenSimpleNameSyntax)Visit(node.Name)!,
                 (GreenSyntaxToken?)VisitToken(node.EqualsToken),

@@ -39,9 +39,12 @@ partial class Parser
         return CurrentToken.Kind switch
         {
             SyntaxKind.StateKeyword => ParseStateDeclaration(),
+            SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
             _ => default!
         };
     }
+
+    #region StateDeclarationSyntax
 
     internal GreenStateDeclarationSyntax ParseStateDeclaration()
     {
@@ -65,45 +68,6 @@ partial class Parser
         var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
 
         return GreenSyntaxFactory.StateDeclarationSyntax(stateKeyword, type, name, equalsToken, initializer, semicolonToken);
-
-        CSharpRawToken? EatOrNullCSharpTypeSyntax()
-        {
-            var mode = _mode;
-            _mode = Lexer.LexerMode.InTypeName;
-
-            var token = EatToken();
-
-            _mode = mode;
-
-            AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
-            AkburaDebug.Assert(((CSharpRawToken)token).RawNode is CSharp.TypeSyntax, "Exprected TypeSyntax");
-
-            var typeOrIdentifier = (CSharp.TypeSyntax)((CSharpRawToken)token).RawNode!;
-
-            // if it's not an identifier name, it's definitely a type
-            if (typeOrIdentifier.Kind() != CSharpSyntaxKind.IdentifierName)
-            {
-                return (CSharpRawToken)token;
-            }
-
-            var fastToken = FastPeekToken();
-
-            if(fastToken.Kind == SyntaxKind.EqualsToken)
-            {
-                // if the next token is '=', then it's a identifier used as a name, not a type
-                ReturnToken();
-                return null;
-            }
-
-            if(fastToken.Kind == SyntaxKind.IdentifierToken)
-            {
-                // if the next token is an identifier, then it's definitely a type
-                return (CSharpRawToken)token;
-            }
-
-            ReturnToken();
-            return null;
-        }
     }
 
     private GreenStateInitializerSyntax ParseStateInitializer()
@@ -133,6 +97,52 @@ partial class Parser
 
         return GreenSyntaxFactory.BindableStateInitializerSyntax(bindToken, sourceExpression);
     }
+
+    #endregion
+
+    #region ParamDeclarationSyntax
+
+    internal GreenParamDeclarationSyntax ParseParamDeclarationSyntax()
+    {
+        var token = EatToken(SyntaxKind.ParamKeyword);
+
+        var bindingToken = FastPeekToken();
+
+        if(bindingToken.Kind != SyntaxKind.BindToken && bindingToken.Kind != SyntaxKind.OutToken)
+        {
+            bindingToken = null;
+        }
+
+        GreenSyntaxToken? bindingKeyword = null;
+        if (bindingToken != null)
+        {
+            bindingKeyword = EatToken();
+        }
+
+        var typeSyntax = EatOrNullCSharpTypeSyntax();
+
+        GreenCSharpTypeSyntax? type = null;
+        if (typeSyntax != null)
+        {
+            type = GreenSyntaxFactory.CSharpTypeSyntax(typeSyntax);
+        }
+
+        var name = GreenSyntaxFactory.IdentifierName(EatToken(SyntaxKind.IdentifierToken));
+
+        var equalsToken = EatOrReturn(SyntaxKind.EqualsToken);
+
+        GreenCSharpExpressionSyntax? defaultValue = null;
+        if (equalsToken != null)
+        {
+            defaultValue = ParseCShaprExpressionUntilSemicolon();
+        }
+
+        var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
+
+        return GreenSyntaxFactory.ParamDeclarationSyntax(token, bindingKeyword, type, name, equalsToken, defaultValue, semicolonToken);
+    }
+
+    #endregion
 
     #region CSharpExpressionSyntax
 

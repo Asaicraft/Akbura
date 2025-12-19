@@ -40,6 +40,7 @@ partial class Parser
         {
             SyntaxKind.StateKeyword => ParseStateDeclaration(),
             SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
+            SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
             _ => default!
         };
     }
@@ -144,6 +145,32 @@ partial class Parser
         var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
 
         return GreenSyntaxFactory.ParamDeclarationSyntax(token, bindingKeyword, type, name, equalsToken, defaultValue, semicolonToken);
+    }
+
+    #endregion
+
+    #region InjectDeclarationSyntax
+
+    internal GreenInjectDeclarationSyntax ParseInjectDeclarationSyntax()
+    {
+        var token = EatToken(SyntaxKind.InjectKeyword);
+        var typeSyntax = EatOrNullCSharpTypeSyntax();
+        GreenCSharpTypeSyntax? type = null;
+
+        if (typeSyntax != null)
+        {
+            type = GreenSyntaxFactory.CSharpTypeSyntax(typeSyntax);
+        }
+        else
+        {
+            type = GreenSyntaxFactory.CSharpTypeSyntax(EatToken(SyntaxKind.CSharpRawToken));
+        }
+
+        var name = GreenSyntaxFactory.IdentifierName(EatToken(SyntaxKind.IdentifierToken));
+        
+        var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
+        
+        return GreenSyntaxFactory.InjectDeclarationSyntax(token, type, name, semicolonToken);
     }
 
     #endregion

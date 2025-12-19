@@ -267,6 +267,12 @@ internal sealed partial class Parser : IDisposable
             return (CSharpRawToken)token;
         }
 
+        // check for well-known types (int, string, etc.)
+        if (SyntaxFacts.IsWellKnownType(typeOrIdentifier))
+        {
+            return (CSharpRawToken)token;
+        }
+
         var fastToken = FastPeekToken();
 
         if (fastToken.Kind == SyntaxKind.EqualsToken)

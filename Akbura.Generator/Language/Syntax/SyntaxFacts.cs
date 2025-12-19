@@ -1,8 +1,10 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis.CSharp;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language.Syntax;
 /// <summary>Provides helper methods for working with syntax kinds.</summary>
@@ -127,6 +129,11 @@ public static partial class SyntaxFacts
             '“' or '”' => true,
             _ => false,
         };
+    }
+
+    public static bool IsWellKnownType(CSharp.TypeSyntax typeSyntax)
+    {
+        return typeSyntax.Kind() == Microsoft.CodeAnalysis.CSharp.SyntaxKind.PredefinedType;
     }
 
     public static partial object? GetValue(SyntaxKind kind, string text);

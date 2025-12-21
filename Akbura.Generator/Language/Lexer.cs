@@ -46,6 +46,7 @@ internal sealed partial class Lexer : IDisposable
         InMarkup = 1 << 4,
         InTypeName = 1 << 5,
         InAkcss = 1 << 6,
+        InCSharpParameterList = 1 << 7,
     }
 
     internal struct TokenInfo
@@ -133,6 +134,7 @@ internal sealed partial class Lexer : IDisposable
                 LexerMode.InExpressionUntilComma => ParseExpressionUntilComma(),
                 LexerMode.InArgumentExpression => ParseArgumentExpression(),
                 LexerMode.InTypeName => ParseTypeName(),
+                LexerMode.InCSharpParameterList => ParseCSharpParameterList(),
                 _ => default
             };
 
@@ -1608,6 +1610,47 @@ internal sealed partial class Lexer : IDisposable
             : TextWindow.GetText(start, length, intern: false);
 
         var parsed = CSharpSyntaxFactory.ParseTypeName(
+            sourceText,
+            startParse,
+            options: null,
+            consumeFullText: false);
+
+        TextWindow.Reset(start + parsed.FullSpan.Length);
+
+        return parsed;
+    }
+
+    #endregion
+
+    #region CSharpParameterList
+
+    private TokenInfo ParseCSharpParameterList()
+    {
+        var parsed = ParseCSharpParameterListSlow();
+
+        return new()
+        {
+            Kind = SyntaxKind.CSharpRawToken,
+            CSharpNode = parsed,
+            CSharpSyntaxKind = parsed.Kind()
+        };
+    }
+
+    private CSharp.ParameterListSyntax ParseCSharpParameterListSlow()
+    {
+        const int SmallStringLength = 512;
+
+        var start = TextWindow.Position;
+        var end = TextWindow.Text.Length;
+        var length = end - start;
+
+        var startParse = end < SmallStringLength ? start : 0;
+
+        var sourceText = end < SmallStringLength
+            ? TextWindow.Text.ToString()
+            : TextWindow.GetText(start, length, intern: false);
+
+        var parsed = CSharpSyntaxFactory.ParseParameterList(
             sourceText,
             startParse,
             options: null,

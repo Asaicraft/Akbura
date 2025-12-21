@@ -770,14 +770,6 @@ public class AkburaSyntaxFactoryTests
         //
         // command int CustomClick(int a);
         //
-        var commandParam = ParameterSyntax(
-            type: CSharpTypeSyntax(
-                TokenList(
-                    intToken
-                )
-            ),
-            identifier: IdentifierName("a")
-        );
 
         var command = CommandDeclarationSyntax(
             commandKeyword: Token(SyntaxKind.CommandKeyword)
@@ -788,49 +780,8 @@ public class AkburaSyntaxFactoryTests
                 )
             ),
             name: IdentifierName("CustomClick"),
-            openParen: Token(SyntaxKind.OpenParenToken),
-            parameters: SingletonSeparatedList<ParameterSyntax>(
-                commandParam
-            ),
-            closeParen: Token(SyntaxKind.CloseParenToken),
+            parameters: SyntaxFactory.CSharpParameterListSyntax("(int a)"),
             semicolon: Token(SyntaxKind.SemicolonToken)
-        ).WithTrailingTrivia(doubleNl);
-
-        //
-        // async void SaveNew(int id) { }
-        //
-        var saveNewBody = CSharpBlockSyntax(
-            openBrace: Token(SyntaxKind.OpenBraceToken)
-                .WithTrailingTrivia(nl),
-            tokens: List<AkTopLevelMemberSyntax>(),
-            closeBrace: Token(SyntaxKind.CloseBraceToken)
-                .WithTrailingTrivia(nl)
-        );
-
-        var saveNewParam = ParameterSyntax(
-            type: CSharpTypeSyntax(
-                TokenList(
-                    intToken
-                )
-            ),
-            identifier: IdentifierName("id")
-        );
-
-        var saveNewFunc = FunctionDeclarationSyntax(
-            asyncKeyword: Token(SyntaxKind.AsyncKeyword)
-                .WithTrailingTrivia(space),
-            returnType: CSharpTypeSyntax(
-                TokenList(
-                    CSharpRawToken("void ")
-                )
-            ),
-            name: IdentifierName("SaveNew"),
-            openParen: Token(SyntaxKind.OpenParenToken),
-            parameters: SingletonSeparatedList<ParameterSyntax>(
-                saveNewParam
-            ),
-            closeParen: Token(SyntaxKind.CloseParenToken),
-            body: saveNewBody
         ).WithTrailingTrivia(doubleNl);
 
         //
@@ -1130,7 +1081,6 @@ public class AkburaSyntaxFactoryTests
                     stateTasks,
                     useEffect,
                     command,
-                    saveNewFunc,
                     hook,
                     csharpStatement,
                     markupRoot
@@ -1159,9 +1109,6 @@ public class AkburaSyntaxFactoryTests
         }
 
         command int CustomClick(int a);
-
-        async void SaveNew(int id){
-        }
 
         onMounted(UserId, tasks){
         }

@@ -1,5 +1,7 @@
 ﻿using Akbura.Language.Syntax.Green;
 using CsharpRawNode = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language.Syntax;
 internal static partial class SyntaxFactory
@@ -501,6 +503,21 @@ internal static partial class SyntaxFactory
     public static SyntaxToken EndOfFileToken()
     {
         return new SyntaxToken(GreenSyntaxFactory.EndOfFile);
+    }
+
+    public static CSharpParameterListSyntax CSharpParameterListSyntax(string parameters)
+    {
+        var parametersSyntax = CSharpSyntaxFactory.ParseParameterList(parameters);
+
+        return CSharpParameterListSyntax(parametersSyntax);
+    }
+
+    public static CSharpParameterListSyntax CSharpParameterListSyntax(CSharp.ParameterListSyntax parameterListSyntax)
+    {
+        var token = GreenSyntaxFactory.CSharpRawToken(parameterListSyntax);
+        var greenNode = GreenSyntaxFactory.CSharpParameterListSyntax(token);
+
+        return (CSharpParameterListSyntax)greenNode.CreateRed();
     }
 }
 

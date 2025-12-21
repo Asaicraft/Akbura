@@ -134,7 +134,8 @@ namespace Akbura.Language.Syntax
         CommandDeclarationSyntax = 516,
 
         // Function Declarations
-        FunctionDeclarationSyntax = 517,
+        //FunctionDeclarationSyntax = 517,
+        CSharpParameterListSyntax = 517,
         ParameterSyntax = 518,
 
         // User hooks

@@ -6,7 +6,6 @@ using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
-using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
@@ -15,18 +14,14 @@ namespace Akbura.Language.Syntax.Green
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken CommandKeyword;
         public readonly global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax ReturnType;
         public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken OpenParen;
-        public readonly global::Akbura.Language.Syntax.Green.GreenNode? _parameters;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken CloseParen;
+        public readonly global::Akbura.Language.Syntax.Green.GreenCSharpParameterListSyntax Parameters;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken Semicolon;
 
         public GreenCommandDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken commandKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax returnType,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen,
-            global::Akbura.Language.Syntax.Green.GreenNode? parameters,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpParameterListSyntax parameters,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
@@ -35,21 +30,16 @@ namespace Akbura.Language.Syntax.Green
             this.CommandKeyword = commandKeyword;
             this.ReturnType = returnType;
             this.Name = name;
-            this.OpenParen = openParen;
-            this._parameters = parameters;
-            this.CloseParen = closeParen;
+            this.Parameters = parameters;
             this.Semicolon = semicolon;
 
             AkburaDebug.Assert(this.CommandKeyword != null);
             AkburaDebug.Assert(this.ReturnType != null);
             AkburaDebug.Assert(this.Name != null);
-            AkburaDebug.Assert(this.OpenParen != null);
-            AkburaDebug.Assert(this.CloseParen != null);
+            AkburaDebug.Assert(this.Parameters != null);
             AkburaDebug.Assert(this.Semicolon != null);
 
             AkburaDebug.Assert(this.CommandKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.CommandKeyword);
-            AkburaDebug.Assert(this.OpenParen.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenParenToken);
-            AkburaDebug.Assert(this.CloseParen.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseParenToken);
             AkburaDebug.Assert(this.Semicolon.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken);
 
             var flags = Flags;
@@ -58,38 +48,25 @@ namespace Akbura.Language.Syntax.Green
             AdjustWidthAndFlags(CommandKeyword, ref fullWidth, ref flags);
             AdjustWidthAndFlags(ReturnType, ref fullWidth, ref flags);
             AdjustWidthAndFlags(Name, ref fullWidth, ref flags);
-            AdjustWidthAndFlags(OpenParen, ref fullWidth, ref flags);
-
-            if (_parameters != null)
-            {
-                AdjustWidthAndFlags(_parameters, ref fullWidth, ref flags);
-            }
-
-            AdjustWidthAndFlags(CloseParen, ref fullWidth, ref flags);
+            AdjustWidthAndFlags(Parameters, ref fullWidth, ref flags);
             AdjustWidthAndFlags(Semicolon, ref fullWidth, ref flags);
 
-            SlotCount = 7;
+            SlotCount = 5;
             FullWidth = fullWidth;
             Flags = flags;
         }
-
-        public SeparatedGreenSyntaxList<GreenParameterSyntax> Parameters => _parameters.ToGreenSeparatedList<GreenParameterSyntax>();
 
         public GreenCommandDeclarationSyntax UpdateCommandDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken commandKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax returnType,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen,
-            global::Akbura.Language.Syntax.Green.GreenNode? parameters,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpParameterListSyntax parameters,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
             if (this.CommandKeyword == commandKeyword &&
                 this.ReturnType == returnType &&
                 this.Name == name &&
-                this.OpenParen == openParen &&
-                this._parameters == parameters &&
-                this.CloseParen == closeParen &&
+                this.Parameters == parameters &&
                 this.Semicolon == semicolon)
             {
                 return this;
@@ -99,9 +76,7 @@ namespace Akbura.Language.Syntax.Green
                 commandKeyword,
                 returnType,
                 name,
-                openParen,
-                parameters.ToGreenSeparatedList<GreenParameterSyntax>(),
-                closeParen,
+                parameters,
                 semicolon);
 
             var diagnostics = GetDiagnostics();
@@ -121,37 +96,27 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenCommandDeclarationSyntax WithCommandKeyword(global::Akbura.Language.Syntax.Green.GreenSyntaxToken commandKeyword)
         {
-            return UpdateCommandDeclarationSyntax(commandKeyword, this.ReturnType, this.Name, this.OpenParen, this._parameters, this.CloseParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(commandKeyword, this.ReturnType, this.Name, this.Parameters, this.Semicolon);
         }
 
         public GreenCommandDeclarationSyntax WithReturnType(global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax returnType)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, returnType, this.Name, this.OpenParen, this._parameters, this.CloseParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, returnType, this.Name, this.Parameters, this.Semicolon);
         }
 
         public GreenCommandDeclarationSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, name, this.OpenParen, this._parameters, this.CloseParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, name, this.Parameters, this.Semicolon);
         }
 
-        public GreenCommandDeclarationSyntax WithOpenParen(global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen)
+        public GreenCommandDeclarationSyntax WithParameters(global::Akbura.Language.Syntax.Green.GreenCSharpParameterListSyntax parameters)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, openParen, this._parameters, this.CloseParen, this.Semicolon);
-        }
-
-        public GreenCommandDeclarationSyntax WithParameters(global::Akbura.Language.Syntax.Green.SeparatedGreenSyntaxList<GreenParameterSyntax> parameters)
-        {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, parameters.Node, this.CloseParen, this.Semicolon);
-        }
-
-        public GreenCommandDeclarationSyntax WithCloseParen(global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen)
-        {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, this._parameters, closeParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, parameters, this.Semicolon);
         }
 
         public GreenCommandDeclarationSyntax WithSemicolon(global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, this._parameters, this.CloseParen, semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.Parameters, semicolon);
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
@@ -161,10 +126,8 @@ namespace Akbura.Language.Syntax.Green
                 0 => CommandKeyword,
                 1 => ReturnType,
                 2 => Name,
-                3 => OpenParen,
-                4 => _parameters,
-                5 => CloseParen,
-                6 => Semicolon,
+                3 => Parameters,
+                4 => Semicolon,
                 _ => null,
             };
         }
@@ -176,12 +139,12 @@ namespace Akbura.Language.Syntax.Green
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
         {
-            return new GreenCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, this._parameters, this.CloseParen, this.Semicolon, diagnostics, GetAnnotations());
+            return new GreenCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.Parameters, this.Semicolon, diagnostics, GetAnnotations());
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
         {
-            return new GreenCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, this._parameters, this.CloseParen, this.Semicolon, GetDiagnostics(), annotations);
+            return new GreenCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.Parameters, this.Semicolon, GetDiagnostics(), annotations);
         }
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
@@ -206,31 +169,23 @@ namespace Akbura.Language.Syntax.Green
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken commandKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax returnType,
             global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen,
-            global::Akbura.Language.Syntax.Green.SeparatedGreenSyntaxList<GreenParameterSyntax> parameters,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpParameterListSyntax parameters,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken semicolon)
         {
             AkburaDebug.Assert(commandKeyword != null);
             AkburaDebug.Assert(returnType != null);
             AkburaDebug.Assert(name != null);
-            AkburaDebug.Assert(openParen != null);
-            AkburaDebug.Assert(closeParen != null);
+            AkburaDebug.Assert(parameters != null);
             AkburaDebug.Assert(semicolon != null);
 
             AkburaDebug.Assert(commandKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CommandKeyword);
-            AkburaDebug.Assert(openParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenParenToken);
-            AkburaDebug.Assert(closeParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseParenToken);
             AkburaDebug.Assert(semicolon!.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken);
 
-            // SlotCount = 7 (>3), so do not use GreenNodeCache.
             var result = new GreenCommandDeclarationSyntax(
                 commandKeyword,
                 returnType,
                 name,
-                openParen,
-                parameters.Node,
-                closeParen,
+                parameters,
                 semicolon,
                 diagnostics: null,
                 annotations: null);
@@ -271,9 +226,7 @@ namespace Akbura.Language.Syntax.Green
                 (GreenSyntaxToken)VisitToken(node.CommandKeyword),
                 (GreenCSharpTypeSyntax)Visit(node.ReturnType)!,
                 (GreenSimpleNameSyntax)Visit(node.Name)!,
-                (GreenSyntaxToken)VisitToken(node.OpenParen),
-                VisitList(node.Parameters).Node,
-                (GreenSyntaxToken)VisitToken(node.CloseParen),
+                (GreenCSharpParameterListSyntax)Visit(node.Parameters)!,
                 (GreenSyntaxToken)VisitToken(node.Semicolon));
         }
     }
@@ -307,39 +260,23 @@ namespace Akbura.Language.Syntax
         public SimpleNameSyntax Name
             => (SimpleNameSyntax)GetRed(ref _name, 2)!;
 
-        public SyntaxToken OpenParen
-            => new(this, this.Green.OpenParen, GetChildPosition(3), GetChildIndex(3));
-
-        public SeparatedSyntaxList<ParameterSyntax> Parameters
-        {
-            get
-            {
-                var red = GetRed(ref this._parameters, 4);
-                return new SeparatedSyntaxList<ParameterSyntax>(red!, GetChildIndex(4));
-            }
-        }
-
-        public SyntaxToken CloseParen
-            => new(this, this.Green.CloseParen, GetChildPositionFromEnd(5), GetChildIndex(5));
+        public CSharpParameterListSyntax Parameters
+            => (CSharpParameterListSyntax)GetRed(ref _parameters, 3)!;
 
         public SyntaxToken Semicolon
-            => new(this, this.Green.Semicolon, GetChildPositionFromEnd(6), GetChildIndex(6));
+            => new(this, this.Green.Semicolon, GetChildPositionFromEnd(4), GetChildIndex(4));
 
         public CommandDeclarationSyntax UpdateCommandDeclarationSyntax(
             SyntaxToken commandKeyword,
             CSharpTypeSyntax returnType,
             SimpleNameSyntax name,
-            SyntaxToken openParen,
-            SeparatedSyntaxList<ParameterSyntax> parameters,
-            SyntaxToken closeParen,
+            CSharpParameterListSyntax parameters,
             SyntaxToken semicolon)
         {
             if (this.CommandKeyword == commandKeyword &&
                 this.ReturnType == returnType &&
                 this.Name == name &&
-                this.OpenParen == openParen &&
                 this.Parameters == parameters &&
-                this.CloseParen == closeParen &&
                 this.Semicolon == semicolon)
             {
                 return this;
@@ -349,9 +286,7 @@ namespace Akbura.Language.Syntax
                 commandKeyword,
                 returnType,
                 name,
-                openParen,
                 parameters,
-                closeParen,
                 semicolon);
 
             var annotations = this.GetAnnotations();
@@ -371,37 +306,27 @@ namespace Akbura.Language.Syntax
 
         public CommandDeclarationSyntax WithCommandKeyword(SyntaxToken commandKeyword)
         {
-            return UpdateCommandDeclarationSyntax(commandKeyword, this.ReturnType, this.Name, this.OpenParen, this.Parameters, this.CloseParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(commandKeyword, this.ReturnType, this.Name, this.Parameters, this.Semicolon);
         }
 
         public CommandDeclarationSyntax WithReturnType(CSharpTypeSyntax returnType)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, returnType, this.Name, this.OpenParen, this.Parameters, this.CloseParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, returnType, this.Name, this.Parameters, this.Semicolon);
         }
 
         public CommandDeclarationSyntax WithName(SimpleNameSyntax name)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, name, this.OpenParen, this.Parameters, this.CloseParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, name, this.Parameters, this.Semicolon);
         }
 
-        public CommandDeclarationSyntax WithOpenParen(SyntaxToken openParen)
+        public CommandDeclarationSyntax WithParameters(CSharpParameterListSyntax parameters)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, openParen, this.Parameters, this.CloseParen, this.Semicolon);
-        }
-
-        public CommandDeclarationSyntax WithParameters(SeparatedSyntaxList<ParameterSyntax> parameters)
-        {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, parameters, this.CloseParen, this.Semicolon);
-        }
-
-        public CommandDeclarationSyntax WithCloseParen(SyntaxToken closeParen)
-        {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, this.Parameters, closeParen, this.Semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, parameters, this.Semicolon);
         }
 
         public CommandDeclarationSyntax WithSemicolon(SyntaxToken semicolon)
         {
-            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.OpenParen, this.Parameters, this.CloseParen, semicolon);
+            return UpdateCommandDeclarationSyntax(this.CommandKeyword, this.ReturnType, this.Name, this.Parameters, semicolon);
         }
 
         public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
@@ -410,7 +335,7 @@ namespace Akbura.Language.Syntax
             {
                 1 => GetRed(ref _returnType, 1),
                 2 => GetRed(ref _name, 2),
-                4 => GetRed(ref _parameters, 4),
+                3 => GetRed(ref _parameters, 3),
                 _ => null,
             };
         }
@@ -421,7 +346,7 @@ namespace Akbura.Language.Syntax
             {
                 1 => _returnType,
                 2 => _name,
-                4 => _parameters,
+                3 => _parameters,
                 _ => null,
             };
         }
@@ -458,24 +383,12 @@ namespace Akbura.Language.Syntax
             SyntaxToken commandKeyword,
             CSharpTypeSyntax returnType,
             SimpleNameSyntax name,
-            SyntaxToken openParen,
-            SeparatedSyntaxList<ParameterSyntax> parameters,
-            SyntaxToken closeParen,
+            CSharpParameterListSyntax parameters,
             SyntaxToken semicolon)
         {
             if (commandKeyword.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(commandKeyword), message: $"commandKeyword must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
-            }
-
-            if (openParen.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(openParen), message: $"openParen must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
-            }
-
-            if (closeParen.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(closeParen), message: $"closeParen must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
             }
 
             if (semicolon.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
@@ -486,16 +399,6 @@ namespace Akbura.Language.Syntax
             if (commandKeyword.RawKind != (ushort)SyntaxKind.CommandKeyword)
             {
                 ThrowHelper.ThrowArgumentException(nameof(commandKeyword), message: $"commandKeyword must be SyntaxKind.CommandKeyword");
-            }
-
-            if (openParen.RawKind != (ushort)SyntaxKind.OpenParenToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(openParen), message: $"openParen must be SyntaxKind.OpenParenToken");
-            }
-
-            if (closeParen.RawKind != (ushort)SyntaxKind.CloseParenToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(closeParen), message: $"closeParen must be SyntaxKind.CloseParenToken");
             }
 
             if (semicolon.RawKind != (ushort)SyntaxKind.SemicolonToken)
@@ -513,18 +416,16 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentNullException(nameof(name));
             }
 
-            if (parameters != default && parameters.Node?.Green is not global::Akbura.Language.Syntax.Green.GreenNode)
+            if (parameters is null)
             {
-                ThrowHelper.ThrowArgumentException(nameof(parameters), message: $"parameters must be backed by a GreenSyntaxList or SeparatedGreenSyntaxList.");
+                ThrowHelper.ThrowArgumentNullException(nameof(parameters));
             }
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.CommandDeclarationSyntax(
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(commandKeyword.Node!),
                 returnType.Green,
                 name.Green,
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(openParen.Node!),
-                parameters.ToGreenSeparatedList<global::Akbura.Language.Syntax.Green.GreenParameterSyntax, ParameterSyntax>(),
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(closeParen.Node!),
+                parameters.Green,
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(semicolon.Node!));
 
             return Unsafe.As<CommandDeclarationSyntax>(green.CreateRed(null, 0));
@@ -563,9 +464,7 @@ namespace Akbura.Language.Syntax
                 VisitToken(node.CommandKeyword),
                 (CSharpTypeSyntax)Visit(node.ReturnType)!,
                 (SimpleNameSyntax)Visit(node.Name)!,
-                VisitToken(node.OpenParen),
-                VisitList(node.Parameters),
-                VisitToken(node.CloseParen),
+                (CSharpParameterListSyntax)Visit(node.Parameters)!,
                 VisitToken(node.Semicolon));
         }
     }

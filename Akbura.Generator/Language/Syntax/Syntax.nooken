@@ -250,30 +250,20 @@ node CommandDeclarationSyntax : AkTopLevelMember {
     CommandKeyword : CommandKeyword;           // "command"
     ReturnType     : CSharpTypeSyntax;         // int / void / etc.
     Name           : SimpleName;               // CustomClick
-    OpenParen      : OpenParenToken;           // '('
-    Parameters     : syntaxlist<ParameterSyntax, CommaToken>;
-    CloseParen     : CloseParenToken;          // ')'
+    Parameters     : CSharpParameterListSyntax;
     Semicolon      : SemicolonToken;           // ';'
 }
 
-// ─────────────────────────────────────────────────────────────
-// FUNCTION DECLARATIONS (async void SaveNew(...){})
-// ─────────────────────────────────────────────────────────────
-
-node FunctionDeclarationSyntax : AkTopLevelMember {
-    AsyncKeyword? : AsyncKeyword;          // "async" if present
-    ReturnType    : CSharpTypeSyntax;      // e.g. "void", "Task", "Task<Result>"
-    Name          : SimpleName;
-    OpenParen     : OpenParenToken;
-    Parameters    : syntaxlist<ParameterSyntax, CommaToken>;
-    CloseParen    : CloseParenToken;
-    Body          : CSharpBlockSyntax;
+node CSharpParameterListSyntax {
+    Parameters : CSharpRawToken;
 }
 
 node ParameterSyntax {
     Type       : CSharpTypeSyntax;
     Identifier : SimpleName;
 }
+
+
 
 // ─────────────────────────────────────────────────────────────
 // User hooks

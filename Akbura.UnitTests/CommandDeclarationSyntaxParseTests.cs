@@ -23,8 +23,7 @@ public class CommandDeclarationSyntaxParseTests
         Assert.Equal("command", syntax.CommandKeyword.ToString());
         Assert.Equal("int ", syntax.ReturnType.ToString());
         Assert.Equal("Add", syntax.Name.ToString());
-        Assert.Equal("(", syntax.OpenParen.ToString());
-        Assert.Equal(")", syntax.CloseParen.ToString());
+        Assert.Equal("(int a)", syntax.Parameters.ToString());
         Assert.Equal(";", syntax.Semicolon.ToString());
 
         Assert.Equal(code, syntax.ToFullString());
@@ -42,9 +41,7 @@ public class CommandDeclarationSyntaxParseTests
 
         Assert.Equal("void ", syntax.ReturnType.ToString());
         Assert.Equal("Log", syntax.Name.ToString());
-        Assert.Equal("(", syntax.OpenParen.ToString());
-        Assert.Equal(default, syntax.Parameters);
-        Assert.Equal(")", syntax.CloseParen.ToString());
+        Assert.Equal("()", syntax.Parameters.ToString());
         Assert.Equal(";", syntax.Semicolon.ToString());
 
         Assert.Equal(code, syntax.ToFullString());
@@ -127,7 +124,7 @@ public class CommandDeclarationSyntaxParseTests
         Assert.Equal("Sum", syntax.Name.ToString());
         Assert.Equal("int ", syntax.ReturnType.ToString());
 
-        Assert.Equal("int a, int b, int c", syntax.Parameters.ToString());
+        Assert.Equal("(int a, int b, int c)", syntax.Parameters.ToString());
 
         Assert.Equal(code, syntax.ToFullString());
     }
@@ -169,6 +166,6 @@ public class CommandDeclarationSyntaxParseTests
 
         Assert.NotNull(syntax);
 
-        Assert.True(syntax.CloseParen.IsMissing || !syntax.Semicolon.IsMissing);
+        Assert.Equal(code, syntax.ToString());
     }
 }

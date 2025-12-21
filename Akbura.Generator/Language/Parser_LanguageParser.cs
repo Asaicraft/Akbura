@@ -186,11 +186,7 @@ partial class Parser
 
         var name = ParseIdentifierName();
 
-        var openParen = EatToken(SyntaxKind.OpenParenToken);
-
-        var parameters = ParseParameterList();
-
-        var closeParen = EatToken(SyntaxKind.CloseParenToken);
+        var parameters = ParseCSharpParameterList();
 
         var semicolon = EatToken(SyntaxKind.SemicolonToken);
 
@@ -198,9 +194,7 @@ partial class Parser
             commandKeyword,
             returnTypeSyntax,
             name,
-            openParen,
             parameters,
-            closeParen,
             semicolon);
     }
 
@@ -233,33 +227,25 @@ partial class Parser
 
     #region ParameterSyntax
 
-    private SeparatedGreenSyntaxList<GreenParameterSyntax> ParseParameterList()
+    private GreenCSharpParameterListSyntax ParseCSharpParameterList()
     {
-        var parameters = _pool.Allocate<GreenNode>();
-        try
+        if(_currentToken != null)
         {
-            while (CurrentToken.Kind != SyntaxKind.CloseParenToken && CurrentToken.Kind != SyntaxKind.EndOfFileToken)
-            {
-                ReturnToken();
-                _tokenOffset++;
-                var parameter = ParseParameter();
-                parameters.Add(parameter);
-                if (CurrentToken.Kind == SyntaxKind.CommaToken)
-                {
-                    var comma = EatToken(SyntaxKind.CommaToken);
-                    parameters.Add(comma);
-                }
-                else
-                {
-                    break;
-                }
-            }
-            return new SeparatedGreenSyntaxList<GreenParameterSyntax>(parameters.ToList());
+            ReturnToken();
         }
-        finally
-        {
-            _pool.Free(parameters);
-        }
+
+        var mode = _mode;
+
+        _mode = Lexer.LexerMode.InCSharpParameterList;
+
+        var parameters = EatToken();
+
+        _mode = mode;
+
+        AkburaDebug.Assert(parameters.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+        AkburaDebug.Assert(((GreenSyntaxToken.CSharpRawToken)parameters).RawNode is CSharp.ParameterListSyntax, "Expected ParameterListSyntax");
+
+        return GreenSyntaxFactory.CSharpParameterListSyntax(parameters);
     }
 
     private GreenParameterSyntax ParseParameter()

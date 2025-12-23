@@ -519,5 +519,42 @@ internal static partial class SyntaxFactory
 
         return (CSharpParameterListSyntax)greenNode.CreateRed();
     }
+
+    public static CSharpArgumentListSyntax CSharpArgumentListSyntax(string arguments)
+    {
+        var argumentsSyntax = CSharpSyntaxFactory.ParseArgumentList(arguments);
+        return CSharpArgumentListSyntax(argumentsSyntax);
+    }
+
+    public static CSharpArgumentListSyntax CSharpArgumentListSyntax(CSharp.ArgumentListSyntax argumentListSyntax)
+    {
+        var token = GreenSyntaxFactory.CSharpRawToken(argumentListSyntax);
+        var greenNode = GreenSyntaxFactory.CSharpArgumentListSyntax(token);
+        return (CSharpArgumentListSyntax)greenNode.CreateRed();
+    }
+
+    public static UseEffectDeclarationSyntax UseEffectDeclarationSyntax(SyntaxToken useEffectKeyword, string arguments, CSharpBlockSyntax body, UseEffectTailBlockSyntax? tail1 = null, UseEffectTailBlockSyntax? tail2 = null)
+    {
+        var argumentsSyntax = CSharpArgumentListSyntax(arguments);
+
+        var tails = new SyntaxListBuilder<UseEffectTailBlockSyntax>();
+
+        if (tail1 != null)
+        {
+            tails.Add(tail1);
+        }
+
+        if (tail2 != null)
+        {
+            tails.Add(tail2);
+        }
+
+        return SyntaxFactory.UseEffectDeclarationSyntax(
+            useEffectKeyword,
+            argumentsSyntax,
+            body,
+            tails.ToList()
+        );
+    }
 }
 

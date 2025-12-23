@@ -200,7 +200,7 @@ namespace Akbura.Language.Syntax.Green
 
 namespace Akbura.Language.Syntax
 {
-    internal sealed partial class EffectFinallyBlockSyntax : global::Akbura.Language.Syntax.AkburaSyntax
+    internal sealed partial class EffectFinallyBlockSyntax : global::Akbura.Language.Syntax.UseEffectTailBlockSyntax
     {
         private AkburaSyntax? _body;
 
@@ -218,8 +218,13 @@ namespace Akbura.Language.Syntax
         public SyntaxToken FinallyKeyword
             => new(this, this.Green.FinallyKeyword, GetChildPosition(0), GetChildIndex(0));
 
-        public CSharpBlockSyntax Body
+        public override CSharpBlockSyntax Body
             => (CSharpBlockSyntax)GetRed(ref _body, 1)!;
+
+        public override UseEffectTailBlockSyntax UpdateUseEffectTailBlockSyntax(CSharpBlockSyntax body)
+        {
+            return UpdateEffectFinallyBlockSyntax(this.FinallyKeyword, body);
+        }
 
         public EffectFinallyBlockSyntax UpdateEffectFinallyBlockSyntax(
             SyntaxToken finallyKeyword,

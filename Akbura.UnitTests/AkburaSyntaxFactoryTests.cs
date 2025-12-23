@@ -748,20 +748,13 @@ public class AkburaSyntaxFactoryTests
 
         var useEffect = UseEffectDeclarationSyntax(
             useEffectKeyword: Token(SyntaxKind.UseEffectKeyword),
-            openParen: Token(SyntaxKind.OpenParenToken),
-            parameters: SeparatedList<SimpleNameSyntax>(
-                [
-                    IdentifierName("UserId"),
-                    IdentifierName("tasks")
-                ]
-            ),
-            closeParen: TokenWithTrailingSpace(SyntaxKind.CloseParenToken),
+            arguments: "(UserId, tasks)",
             body: useEffectBody,
-            cancelBlock: EffectCancelBlockSyntax(
+            EffectCancelBlockSyntax(
                 cancelKeyword: Token(SyntaxKind.CancelKeyword),
                 body: cancelBody
             ),
-            finallyBlock: EffectFinallyBlockSyntax(
+            EffectFinallyBlockSyntax(
                 finallyKeyword: Token(SyntaxKind.FinallyKeyword),
                 body: finallyBody
             )

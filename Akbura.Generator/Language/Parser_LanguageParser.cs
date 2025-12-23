@@ -366,7 +366,7 @@ partial class Parser
 
         try
         {
-            while (CurrentToken.Kind is SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken)
+            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
             {
                 var member = ParseTopLevelMember();
                 members.Add(member);

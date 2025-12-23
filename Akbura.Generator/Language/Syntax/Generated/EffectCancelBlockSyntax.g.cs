@@ -197,7 +197,7 @@ namespace Akbura.Language.Syntax.Green
 
 namespace Akbura.Language.Syntax
 {
-    internal sealed partial class EffectCancelBlockSyntax : global::Akbura.Language.Syntax.AkburaSyntax
+    internal sealed partial class EffectCancelBlockSyntax : global::Akbura.Language.Syntax.UseEffectTailBlockSyntax
     {
         private AkburaSyntax? _body;
 
@@ -215,8 +215,13 @@ namespace Akbura.Language.Syntax
         public SyntaxToken CancelKeyword
             => new(this, this.Green.CancelKeyword, GetChildPosition(0), GetChildIndex(0));
 
-        public CSharpBlockSyntax Body
+        public override CSharpBlockSyntax Body
             => (CSharpBlockSyntax)GetRed(ref _body, 1)!;
+
+        public override UseEffectTailBlockSyntax UpdateUseEffectTailBlockSyntax(CSharpBlockSyntax body)
+        {
+            return UpdateEffectCancelBlockSyntax(this.CancelKeyword, body);
+        }
 
         public EffectCancelBlockSyntax UpdateEffectCancelBlockSyntax(
             SyntaxToken cancelKeyword,

@@ -136,6 +136,7 @@ internal sealed partial class Lexer : IDisposable
                 LexerMode.InArgumentExpression => ParseArgumentExpression(),
                 LexerMode.InTypeName => ParseTypeName(),
                 LexerMode.InCSharpParameterList => ParseCSharpParameterList(),
+                LexerMode.InCSharpArgumentList => ParseCSharpArgumentList(),
                 _ => default
             };
 

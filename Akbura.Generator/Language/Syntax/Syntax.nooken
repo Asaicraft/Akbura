@@ -215,21 +215,22 @@ node BindableStateInitializer: StateInitializer
 /// </summary>
 node UseEffectDeclarationSyntax : AkTopLevelMember {
     UseEffectKeyword : UseEffectKeyword;
-    OpenParen        : OpenParenToken;
     // Dependency list: e.g., $cancel, UserId, tasks
-    Parameters       : syntaxlist<SimpleName, CommaToken>;
-    CloseParen       : CloseParenToken;
+    Arguments        : CSharpArgumentListSyntax;
     Body             : CSharpBlockSyntax;
-    CancelBlock?     : EffectCancelBlockSyntax;
-    FinallyBlock?    : EffectFinallyBlockSyntax;
+    Tails            : syntaxlist<UseEffectTailBlockSyntax>; // only 2 variants
 }
 
-node EffectCancelBlockSyntax {
+abstract node UseEffectTailBlockSyntax {
+    Body : CSharpBlockSyntax;
+}
+
+node EffectCancelBlockSyntax : UseEffectTailBlockSyntax {
     CancelKeyword : CancelKeyword;
     Body          : CSharpBlockSyntax;
 }
 
-node EffectFinallyBlockSyntax {
+node EffectFinallyBlockSyntax : UseEffectTailBlockSyntax {
     FinallyKeyword : FinallyKeyword;
     Body           : CSharpBlockSyntax;
 }

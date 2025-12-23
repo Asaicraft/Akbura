@@ -10,20 +10,18 @@ using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
-    internal sealed partial class GreenEffectCancelBlockSyntax : global::Akbura.Language.Syntax.Green.GreenNode
+    internal sealed partial class GreenEffectCancelBlockSyntax : global::Akbura.Language.Syntax.Green.GreenUseEffectTailBlockSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken CancelKeyword;
-        public readonly global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax Body;
 
         public GreenEffectCancelBlockSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken cancelKeyword,
             global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
-            : base((ushort)global::Akbura.Language.Syntax.SyntaxKind.EffectCancelBlockSyntax, diagnostics, annotations)
+            : base(body, (ushort)global::Akbura.Language.Syntax.SyntaxKind.EffectCancelBlockSyntax, diagnostics, annotations)
         {
             this.CancelKeyword = cancelKeyword;
-            this.Body = body;
 
             AkburaDebug.Assert(this.CancelKeyword != null);
             AkburaDebug.Assert(this.Body != null);
@@ -39,6 +37,11 @@ namespace Akbura.Language.Syntax.Green
             SlotCount = 2;
             FullWidth = fullWidth;
             Flags = flags;
+        }
+
+        public override GreenUseEffectTailBlockSyntax UpdateUseEffectTailBlockSyntax(GreenCSharpBlockSyntax body)
+        {
+            return UpdateEffectCancelBlockSyntax(this.CancelKeyword, body);
         }
 
         public GreenEffectCancelBlockSyntax UpdateEffectCancelBlockSyntax(

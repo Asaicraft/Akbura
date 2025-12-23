@@ -6,108 +6,74 @@ using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
-using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
     internal sealed partial class GreenUseEffectDeclarationSyntax : global::Akbura.Language.Syntax.Green.GreenAkTopLevelMemberSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken UseEffectKeyword;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken OpenParen;
-        public readonly global::Akbura.Language.Syntax.Green.GreenNode? _parameters;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken CloseParen;
+        public readonly global::Akbura.Language.Syntax.Green.GreenCSharpArgumentListSyntax Arguments;
         public readonly global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax Body;
-        public readonly global::Akbura.Language.Syntax.Green.GreenEffectCancelBlockSyntax? CancelBlock;
-        public readonly global::Akbura.Language.Syntax.Green.GreenEffectFinallyBlockSyntax? FinallyBlock;
+        public readonly global::Akbura.Language.Syntax.Green.GreenNode? _tails;
 
         public GreenUseEffectDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken useEffectKeyword,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen,
-            global::Akbura.Language.Syntax.Green.GreenNode? parameters,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpArgumentListSyntax arguments,
             global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body,
-            global::Akbura.Language.Syntax.Green.GreenEffectCancelBlockSyntax? cancelBlock,
-            global::Akbura.Language.Syntax.Green.GreenEffectFinallyBlockSyntax? finallyBlock,
+            global::Akbura.Language.Syntax.Green.GreenNode? tails,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
             : base((ushort)global::Akbura.Language.Syntax.SyntaxKind.UseEffectDeclarationSyntax, diagnostics, annotations)
         {
             this.UseEffectKeyword = useEffectKeyword;
-            this.OpenParen = openParen;
-            this._parameters = parameters;
-            this.CloseParen = closeParen;
+            this.Arguments = arguments;
             this.Body = body;
-            this.CancelBlock = cancelBlock;
-            this.FinallyBlock = finallyBlock;
+            this._tails = tails;
 
             AkburaDebug.Assert(this.UseEffectKeyword != null);
-            AkburaDebug.Assert(this.OpenParen != null);
-            AkburaDebug.Assert(this.CloseParen != null);
+            AkburaDebug.Assert(this.Arguments != null);
             AkburaDebug.Assert(this.Body != null);
 
             AkburaDebug.Assert(this.UseEffectKeyword.Kind == global::Akbura.Language.Syntax.SyntaxKind.UseEffectKeyword);
-            AkburaDebug.Assert(this.OpenParen.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenParenToken);
-            AkburaDebug.Assert(this.CloseParen.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseParenToken);
 
             var flags = Flags;
             var fullWidth = FullWidth;
 
             AdjustWidthAndFlags(UseEffectKeyword, ref fullWidth, ref flags);
-            AdjustWidthAndFlags(OpenParen, ref fullWidth, ref flags);
-
-            if (_parameters != null)
-            {
-                AdjustWidthAndFlags(_parameters, ref fullWidth, ref flags);
-            }
-
-            AdjustWidthAndFlags(CloseParen, ref fullWidth, ref flags);
+            AdjustWidthAndFlags(Arguments, ref fullWidth, ref flags);
             AdjustWidthAndFlags(Body, ref fullWidth, ref flags);
 
-            if (CancelBlock != null)
+            if (_tails != null)
             {
-                AdjustWidthAndFlags(CancelBlock, ref fullWidth, ref flags);
+                AdjustWidthAndFlags(_tails, ref fullWidth, ref flags);
             }
 
-            if (FinallyBlock != null)
-            {
-                AdjustWidthAndFlags(FinallyBlock, ref fullWidth, ref flags);
-            }
-
-            SlotCount = 7;
+            SlotCount = 4;
             FullWidth = fullWidth;
             Flags = flags;
         }
 
-        public GreenSyntaxList<GreenSimpleNameSyntax> Parameters => new(_parameters);
+        public GreenSyntaxList<GreenUseEffectTailBlockSyntax> Tails => new(_tails);
 
         public GreenUseEffectDeclarationSyntax UpdateUseEffectDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken useEffectKeyword,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen,
-            global::Akbura.Language.Syntax.Green.GreenNode? parameters,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpArgumentListSyntax arguments,
             global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body,
-            global::Akbura.Language.Syntax.Green.GreenEffectCancelBlockSyntax? cancelBlock,
-            global::Akbura.Language.Syntax.Green.GreenEffectFinallyBlockSyntax? finallyBlock)
+            global::Akbura.Language.Syntax.Green.GreenNode? tails)
         {
             if (this.UseEffectKeyword == useEffectKeyword &&
-                this.OpenParen == openParen &&
-                this._parameters == parameters &&
-                this.CloseParen == closeParen &&
+                this.Arguments == arguments &&
                 this.Body == body &&
-                this.CancelBlock == cancelBlock &&
-                this.FinallyBlock == finallyBlock)
+                this._tails == tails)
             {
                 return this;
             }
 
             var newNode = GreenSyntaxFactory.UseEffectDeclarationSyntax(
                 useEffectKeyword,
-                openParen,
-                parameters.ToGreenSeparatedList<GreenSimpleNameSyntax>(),
-                closeParen,
+                arguments,
                 body,
-                cancelBlock,
-                finallyBlock);
+                tails.ToGreenList<GreenUseEffectTailBlockSyntax>());
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -126,37 +92,22 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenUseEffectDeclarationSyntax WithUseEffectKeyword(global::Akbura.Language.Syntax.Green.GreenSyntaxToken useEffectKeyword)
         {
-            return UpdateUseEffectDeclarationSyntax(useEffectKeyword, this.OpenParen, this._parameters, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock);
+            return UpdateUseEffectDeclarationSyntax(useEffectKeyword, this.Arguments, this.Body, this._tails);
         }
 
-        public GreenUseEffectDeclarationSyntax WithOpenParen(global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen)
+        public GreenUseEffectDeclarationSyntax WithArguments(global::Akbura.Language.Syntax.Green.GreenCSharpArgumentListSyntax arguments)
         {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, openParen, this._parameters, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock);
-        }
-
-        public GreenUseEffectDeclarationSyntax WithParameters(global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenSimpleNameSyntax> parameters)
-        {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, parameters.Node, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock);
-        }
-
-        public GreenUseEffectDeclarationSyntax WithCloseParen(global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen)
-        {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this._parameters, closeParen, this.Body, this.CancelBlock, this.FinallyBlock);
+            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, arguments, this.Body, this._tails);
         }
 
         public GreenUseEffectDeclarationSyntax WithBody(global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body)
         {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this._parameters, this.CloseParen, body, this.CancelBlock, this.FinallyBlock);
+            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.Arguments, body, this._tails);
         }
 
-        public GreenUseEffectDeclarationSyntax WithCancelBlock(global::Akbura.Language.Syntax.Green.GreenEffectCancelBlockSyntax? cancelBlock)
+        public GreenUseEffectDeclarationSyntax WithTails(global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenUseEffectTailBlockSyntax> tails)
         {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this._parameters, this.CloseParen, this.Body, cancelBlock, this.FinallyBlock);
-        }
-
-        public GreenUseEffectDeclarationSyntax WithFinallyBlock(global::Akbura.Language.Syntax.Green.GreenEffectFinallyBlockSyntax? finallyBlock)
-        {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this._parameters, this.CloseParen, this.Body, this.CancelBlock, finallyBlock);
+            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.Arguments, this.Body, tails.Node);
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
@@ -164,12 +115,9 @@ namespace Akbura.Language.Syntax.Green
             return index switch
             {
                 0 => UseEffectKeyword,
-                1 => OpenParen,
-                2 => _parameters,
-                3 => CloseParen,
-                4 => Body,
-                5 => CancelBlock,
-                6 => FinallyBlock,
+                1 => Arguments,
+                2 => Body,
+                3 => _tails,
                 _ => null,
             };
         }
@@ -181,12 +129,12 @@ namespace Akbura.Language.Syntax.Green
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
         {
-            return new GreenUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this._parameters, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock, diagnostics, GetAnnotations());
+            return new GreenUseEffectDeclarationSyntax(this.UseEffectKeyword, this.Arguments, this.Body, this._tails, diagnostics, GetAnnotations());
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
         {
-            return new GreenUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this._parameters, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock, GetDiagnostics(), annotations);
+            return new GreenUseEffectDeclarationSyntax(this.UseEffectKeyword, this.Arguments, this.Body, this._tails, GetDiagnostics(), annotations);
         }
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
@@ -209,37 +157,21 @@ namespace Akbura.Language.Syntax.Green
     {
         public static GreenUseEffectDeclarationSyntax UseEffectDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken useEffectKeyword,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken openParen,
-            global::Akbura.Language.Syntax.Green.SeparatedGreenSyntaxList<GreenSimpleNameSyntax> parameters,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpArgumentListSyntax arguments,
             global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body,
-            global::Akbura.Language.Syntax.Green.GreenEffectCancelBlockSyntax? cancelBlock,
-            global::Akbura.Language.Syntax.Green.GreenEffectFinallyBlockSyntax? finallyBlock)
+            global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenUseEffectTailBlockSyntax> tails)
         {
             AkburaDebug.Assert(useEffectKeyword != null);
-            AkburaDebug.Assert(openParen != null);
-            AkburaDebug.Assert(closeParen != null);
+            AkburaDebug.Assert(arguments != null);
             AkburaDebug.Assert(body != null);
 
-            AkburaDebug.Assert(
-                useEffectKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.UseEffectKeyword ||
-                false);
-            AkburaDebug.Assert(
-                openParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenParenToken ||
-                false);
-            AkburaDebug.Assert(
-                closeParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseParenToken ||
-                false);
+            AkburaDebug.Assert(useEffectKeyword!.Kind == global::Akbura.Language.Syntax.SyntaxKind.UseEffectKeyword);
 
-            // SlotCount = 7 (>3), so do not use GreenNodeCache.
             var result = new GreenUseEffectDeclarationSyntax(
                 useEffectKeyword,
-                openParen,
-                parameters.Node,
-                closeParen,
+                arguments,
                 body,
-                cancelBlock,
-                finallyBlock,
+                tails.Node,
                 diagnostics: null,
                 annotations: null);
 
@@ -277,12 +209,9 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateUseEffectDeclarationSyntax(
                 (GreenSyntaxToken)VisitToken(node.UseEffectKeyword),
-                (GreenSyntaxToken)VisitToken(node.OpenParen),
-                VisitList(node.Parameters).Node,
-                (GreenSyntaxToken)VisitToken(node.CloseParen),
+                (GreenCSharpArgumentListSyntax)Visit(node.Arguments)!,
                 (GreenCSharpBlockSyntax)Visit(node.Body)!,
-                (GreenEffectCancelBlockSyntax?)Visit(node.CancelBlock),
-                (GreenEffectFinallyBlockSyntax?)Visit(node.FinallyBlock));
+                VisitList(node.Tails).Node);
         }
     }
 }
@@ -291,10 +220,9 @@ namespace Akbura.Language.Syntax
 {
     internal sealed partial class UseEffectDeclarationSyntax : global::Akbura.Language.Syntax.AkTopLevelMemberSyntax
     {
-        private AkburaSyntax? _parameters;
+        private AkburaSyntax? _arguments;
         private AkburaSyntax? _body;
-        private AkburaSyntax? _cancelBlock;
-        private AkburaSyntax? _finallyBlock;
+        private AkburaSyntax? _tails;
 
         public UseEffectDeclarationSyntax(
             global::Akbura.Language.Syntax.Green.GreenUseEffectDeclarationSyntax greenNode,
@@ -310,58 +238,40 @@ namespace Akbura.Language.Syntax
         public SyntaxToken UseEffectKeyword
             => new(this, this.Green.UseEffectKeyword, GetChildPosition(0), GetChildIndex(0));
 
-        public SyntaxToken OpenParen
-            => new(this, this.Green.OpenParen, GetChildPosition(1), GetChildIndex(1));
+        public CSharpArgumentListSyntax Arguments
+            => (CSharpArgumentListSyntax)GetRed(ref _arguments, 1)!;
 
-        public SeparatedSyntaxList<SimpleNameSyntax> Parameters
+        public CSharpBlockSyntax Body
+            => (CSharpBlockSyntax)GetRed(ref _body, 2)!;
+
+        public SyntaxList<UseEffectTailBlockSyntax> Tails
         {
             get
             {
-                var red = GetRed(ref this._parameters, 2);
-                return new SeparatedSyntaxList<SimpleNameSyntax>(red!, GetChildIndex(2));
+                var red = GetRed(ref this._tails, 3);
+                return new SyntaxList<UseEffectTailBlockSyntax>(red);
             }
         }
 
-        public SyntaxToken CloseParen
-            => new(this, this.Green.CloseParen, GetChildPosition(3), GetChildIndex(3));
-
-        public CSharpBlockSyntax Body
-            => (CSharpBlockSyntax)GetRed(ref _body, 4)!;
-
-        public EffectCancelBlockSyntax? CancelBlock
-            => (EffectCancelBlockSyntax?)GetRed(ref _cancelBlock, 5);
-
-        public EffectFinallyBlockSyntax? FinallyBlock
-            => (EffectFinallyBlockSyntax?)GetRed(ref _finallyBlock, 6);
-
         public UseEffectDeclarationSyntax UpdateUseEffectDeclarationSyntax(
             SyntaxToken useEffectKeyword,
-            SyntaxToken openParen,
-            SeparatedSyntaxList<SimpleNameSyntax> parameters,
-            SyntaxToken closeParen,
+            CSharpArgumentListSyntax arguments,
             CSharpBlockSyntax body,
-            EffectCancelBlockSyntax? cancelBlock,
-            EffectFinallyBlockSyntax? finallyBlock)
+            SyntaxList<UseEffectTailBlockSyntax> tails)
         {
             if (this.UseEffectKeyword == useEffectKeyword &&
-                this.OpenParen == openParen &&
-                this.Parameters == parameters &&
-                this.CloseParen == closeParen &&
+                this.Arguments == arguments &&
                 this.Body == body &&
-                this.CancelBlock == cancelBlock &&
-                this.FinallyBlock == finallyBlock)
+                this.Tails == tails)
             {
                 return this;
             }
 
             var newNode = SyntaxFactory.UseEffectDeclarationSyntax(
                 useEffectKeyword,
-                openParen,
-                parameters,
-                closeParen,
+                arguments,
                 body,
-                cancelBlock,
-                finallyBlock);
+                tails);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -380,46 +290,31 @@ namespace Akbura.Language.Syntax
 
         public UseEffectDeclarationSyntax WithUseEffectKeyword(SyntaxToken useEffectKeyword)
         {
-            return UpdateUseEffectDeclarationSyntax(useEffectKeyword, this.OpenParen, this.Parameters, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock);
+            return UpdateUseEffectDeclarationSyntax(useEffectKeyword, this.Arguments, this.Body, this.Tails);
         }
 
-        public UseEffectDeclarationSyntax WithOpenParen(SyntaxToken openParen)
+        public UseEffectDeclarationSyntax WithArguments(CSharpArgumentListSyntax arguments)
         {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, openParen, this.Parameters, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock);
-        }
-
-        public UseEffectDeclarationSyntax WithParameters(SeparatedSyntaxList<SimpleNameSyntax> parameters)
-        {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, parameters, this.CloseParen, this.Body, this.CancelBlock, this.FinallyBlock);
-        }
-
-        public UseEffectDeclarationSyntax WithCloseParen(SyntaxToken closeParen)
-        {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this.Parameters, closeParen, this.Body, this.CancelBlock, this.FinallyBlock);
+            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, arguments, this.Body, this.Tails);
         }
 
         public UseEffectDeclarationSyntax WithBody(CSharpBlockSyntax body)
         {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this.Parameters, this.CloseParen, body, this.CancelBlock, this.FinallyBlock);
+            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.Arguments, body, this.Tails);
         }
 
-        public UseEffectDeclarationSyntax WithCancelBlock(EffectCancelBlockSyntax? cancelBlock)
+        public UseEffectDeclarationSyntax WithTails(SyntaxList<UseEffectTailBlockSyntax> tails)
         {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this.Parameters, this.CloseParen, this.Body, cancelBlock, this.FinallyBlock);
-        }
-
-        public UseEffectDeclarationSyntax WithFinallyBlock(EffectFinallyBlockSyntax? finallyBlock)
-        {
-            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.OpenParen, this.Parameters, this.CloseParen, this.Body, this.CancelBlock, finallyBlock);
+            return UpdateUseEffectDeclarationSyntax(this.UseEffectKeyword, this.Arguments, this.Body, tails);
         }
 
         public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
         {
             return index switch
             {
-                4 => GetRed(ref _body, 4),
-                5 => GetRed(ref _cancelBlock, 5),
-                6 => GetRed(ref _finallyBlock, 6),
+                1 => GetRed(ref _arguments, 1),
+                2 => GetRed(ref _body, 2),
+                3 => GetRed(ref _tails, 3),
                 _ => null,
             };
         }
@@ -428,9 +323,9 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
-                4 => _body,
-                5 => _cancelBlock,
-                6 => _finallyBlock,
+                1 => _arguments,
+                2 => _body,
+                3 => _tails,
                 _ => null,
             };
         }
@@ -465,26 +360,13 @@ namespace Akbura.Language.Syntax
     {
         internal static UseEffectDeclarationSyntax UseEffectDeclarationSyntax(
             SyntaxToken useEffectKeyword,
-            SyntaxToken openParen,
-            SeparatedSyntaxList<SimpleNameSyntax> parameters,
-            SyntaxToken closeParen,
+            CSharpArgumentListSyntax arguments,
             CSharpBlockSyntax body,
-            EffectCancelBlockSyntax? cancelBlock,
-            EffectFinallyBlockSyntax? finallyBlock)
+            SyntaxList<UseEffectTailBlockSyntax> tails)
         {
             if (useEffectKeyword.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(useEffectKeyword), message: $"useEffectKeyword must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
-            }
-
-            if (openParen.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(openParen), message: $"openParen must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
-            }
-
-            if (closeParen.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(closeParen), message: $"closeParen must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
             }
 
             if (useEffectKeyword.RawKind != (ushort)SyntaxKind.UseEffectKeyword)
@@ -492,14 +374,9 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentException(nameof(useEffectKeyword), message: $"useEffectKeyword must be SyntaxKind.UseEffectKeyword");
             }
 
-            if (openParen.RawKind != (ushort)SyntaxKind.OpenParenToken)
+            if (arguments is null)
             {
-                ThrowHelper.ThrowArgumentException(nameof(openParen), message: $"openParen must be SyntaxKind.OpenParenToken");
-            }
-
-            if (closeParen.RawKind != (ushort)SyntaxKind.CloseParenToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(closeParen), message: $"closeParen must be SyntaxKind.CloseParenToken");
+                ThrowHelper.ThrowArgumentNullException(nameof(arguments));
             }
 
             if (body is null)
@@ -507,19 +384,16 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentNullException(nameof(body));
             }
 
-            if (parameters != default && parameters.Node?.Green is not GreenNode)
+            if (tails != default && tails.Node?.Green is not global::Akbura.Language.Syntax.Green.GreenNode)
             {
-                ThrowHelper.ThrowArgumentException(nameof(parameters), message: $"parameters must be backed by a GreenSyntaxList or SeparatedGreenSyntaxList.");
+                ThrowHelper.ThrowArgumentException(nameof(tails), message: $"tails must be backed by a GreenSyntaxList.");
             }
 
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.UseEffectDeclarationSyntax(
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(useEffectKeyword.Node!),
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(openParen.Node!),
-                parameters.ToGreenSeparatedList<GreenSimpleNameSyntax, SimpleNameSyntax>(),
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(closeParen.Node!),
+                arguments.Green,
                 body.Green,
-                cancelBlock?.Green,
-                finallyBlock?.Green);
+                tails.ToGreenList<global::Akbura.Language.Syntax.Green.GreenUseEffectTailBlockSyntax, UseEffectTailBlockSyntax>());
 
             return Unsafe.As<UseEffectDeclarationSyntax>(green.CreateRed(null, 0));
         }
@@ -555,12 +429,9 @@ namespace Akbura.Language.Syntax
         {
             return node.UpdateUseEffectDeclarationSyntax(
                 VisitToken(node.UseEffectKeyword),
-                VisitToken(node.OpenParen),
-                VisitList(node.Parameters),
-                VisitToken(node.CloseParen),
+                (CSharpArgumentListSyntax)Visit(node.Arguments)!,
                 (CSharpBlockSyntax)Visit(node.Body)!,
-                (EffectCancelBlockSyntax?)Visit(node.CancelBlock),
-                (EffectFinallyBlockSyntax?)Visit(node.FinallyBlock));
+                VisitList(node.Tails));
         }
     }
 }

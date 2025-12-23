@@ -3,6 +3,7 @@ using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using static Akbura.Language.Syntax.Green.GreenSyntaxToken;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -211,15 +212,57 @@ partial class Parser
 
         var block = ParseCSharpBlock();
 
-        if(CurrentToken.Kind == SyntaxKind.CancelKeyword)
+        var tails = _pool.Allocate<GreenUseEffectTailBlockSyntax>();
+        try
         {
+            // first tail
+            if (CurrentToken.Kind is SyntaxKind.CancelKeyword or SyntaxKind.FinallyKeyword)
+            {
+                var tail = ParseUseEffectTailBlockSyntax();
+                tails.Add(tail);
+            }
 
+            // second tail
+            if (CurrentToken.Kind is SyntaxKind.CancelKeyword or SyntaxKind.FinallyKeyword)
+            {
+                var tail = ParseUseEffectTailBlockSyntax();
+                tails.Add(tail);
+            }
+
+            return GreenSyntaxFactory.UseEffectDeclarationSyntax(
+                useEffectKeyword,
+                arguments,
+                block,
+                tails.ToList());
+        }
+        finally
+        {
+            _pool.Free(tails);
         }
     }
 
-    private GreenEffectCancelBlockSyntax? ParseEffectCancelBlockSyntax()
+    private GreenUseEffectTailBlockSyntax ParseUseEffectTailBlockSyntax()
     {
+        return CurrentToken.Kind switch
+        {
+            SyntaxKind.CancelKeyword => ParseEffectCancelBlockSyntax(),
+            SyntaxKind.FinallyKeyword => ParseEffectFinallyBlockSyntax(),
+            _ => throw new UnreachableException("Unexpected token kind in use effect tail block."),
+        };
+    }
 
+    private GreenEffectCancelBlockSyntax ParseEffectCancelBlockSyntax()
+    {
+        var cancelKeyword = EatToken(SyntaxKind.CancelKeyword);
+        var body = ParseCSharpBlock();
+        return GreenSyntaxFactory.EffectCancelBlockSyntax(cancelKeyword, body);
+    }
+
+    private GreenEffectFinallyBlockSyntax ParseEffectFinallyBlockSyntax()
+    {
+        var finallyKeyword = EatToken(SyntaxKind.FinallyKeyword);
+        var body = ParseCSharpBlock();
+        return GreenSyntaxFactory.EffectFinallyBlockSyntax(finallyKeyword, body);
     }
 
     #endregion

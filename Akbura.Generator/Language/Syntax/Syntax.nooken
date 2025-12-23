@@ -33,6 +33,7 @@ token MinusToken         = "-";
 token AsteriskToken      = "*";
 token SlashToken         = "/";
 token PercentToken       = "%";
+token PercentToken       = "%";
 token CaretToken         = "^";
 token BarToken           = "|";
 token AmpersandToken     = "&";
@@ -258,9 +259,8 @@ node CSharpParameterListSyntax {
     Parameters : CSharpRawToken;
 }
 
-node ParameterSyntax {
-    Type       : CSharpTypeSyntax;
-    Identifier : SimpleName;
+node CSharpArgumentListSyntax {
+    Parameters : CSharpRawToken;
 }
 
 

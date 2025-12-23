@@ -42,6 +42,7 @@ partial class Parser
             SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
             SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
             SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
+            SyntaxKind.UseEffectKeyword => ParseUseEffectDeclarationSyntax(),
             _ => default!
         };
     }
@@ -77,7 +78,7 @@ partial class Parser
         var token = FastPeekToken();
 
         // in out bind tokens
-        if((int)token.Kind >= (int)SyntaxKind.BindToken && (int)token.Kind <= (int)SyntaxKind.OutToken)
+        if ((int)token.Kind >= (int)SyntaxKind.BindToken && (int)token.Kind <= (int)SyntaxKind.OutToken)
         {
             return ParseBindingStateInitializer();
         }
@@ -110,7 +111,7 @@ partial class Parser
 
         var bindingToken = FastPeekToken();
 
-        if(bindingToken.Kind != SyntaxKind.BindToken && bindingToken.Kind != SyntaxKind.OutToken)
+        if (bindingToken.Kind != SyntaxKind.BindToken && bindingToken.Kind != SyntaxKind.OutToken)
         {
             bindingToken = null;
         }
@@ -132,7 +133,7 @@ partial class Parser
         var name = ParseIdentifierName();
 
         var equalsToken = EatOrReturn(SyntaxKind.EqualsToken);
-        if(equalsToken.IsMissing)
+        if (equalsToken.IsMissing)
         {
             equalsToken = null;
         }
@@ -168,9 +169,9 @@ partial class Parser
         }
 
         var name = ParseIdentifierName();
-        
+
         var semicolonToken = EatToken(SyntaxKind.SemicolonToken);
-        
+
         return GreenSyntaxFactory.InjectDeclarationSyntax(token, type, name, semicolonToken);
     }
 
@@ -200,11 +201,34 @@ partial class Parser
 
     #endregion
 
+    #region UseEffectDeclarationSyntax
+
+    internal GreenUseEffectDeclarationSyntax ParseUseEffectDeclarationSyntax()
+    {
+        var useEffectKeyword = EatToken(SyntaxKind.UseEffectKeyword);
+
+        var arguments = ParseCSharpArgumentList();
+
+        var block = ParseCSharpBlock();
+
+        if(CurrentToken.Kind == SyntaxKind.CancelKeyword)
+        {
+
+        }
+    }
+
+    private GreenEffectCancelBlockSyntax? ParseEffectCancelBlockSyntax()
+    {
+
+    }
+
+    #endregion
+
     #region IdentifierNameSyntax
 
     private GreenIdentifierNameSyntax ParseIdentifierName()
     {
-        if(CurrentToken.Kind == SyntaxKind.IdentifierToken)
+        if (CurrentToken.Kind == SyntaxKind.IdentifierToken)
         {
             var identifierToken = EatToken(SyntaxKind.IdentifierToken);
             return GreenSyntaxFactory.IdentifierName(identifierToken);
@@ -229,7 +253,7 @@ partial class Parser
 
     private GreenCSharpParameterListSyntax ParseCSharpParameterList()
     {
-        if(_currentToken != null)
+        if (_currentToken != null)
         {
             ReturnToken();
         }
@@ -248,12 +272,23 @@ partial class Parser
         return GreenSyntaxFactory.CSharpParameterListSyntax(parameters);
     }
 
-    private GreenParameterSyntax ParseParameter()
-    {
-        var type = ParseCShaprType();
-        var name = ParseIdentifierName();
+    #endregion
 
-        return GreenSyntaxFactory.ParameterSyntax(type, name);
+    #region CSharpArgumentListSyntax
+
+    private GreenCSharpArgumentListSyntax ParseCSharpArgumentList()
+    {
+        if (_currentToken != null)
+        {
+            ReturnToken();
+        }
+        var mode = _mode;
+        _mode = Lexer.LexerMode.InCSharpArgumentList;
+        var arguments = EatToken();
+        _mode = mode;
+        AkburaDebug.Assert(arguments.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+        AkburaDebug.Assert(((GreenSyntaxToken.CSharpRawToken)arguments).RawNode is CSharp.ArgumentListSyntax, "Expected ArgumentListSyntax");
+        return GreenSyntaxFactory.CSharpArgumentListSyntax(arguments);
     }
 
     #endregion
@@ -274,6 +309,33 @@ partial class Parser
         _mode = mode;
 
         return GreenSyntaxFactory.CSharpExpressionSyntax(token);
+    }
+
+    #endregion
+
+    #region CSharpBlock
+
+    private GreenCSharpBlockSyntax ParseCSharpBlock()
+    {
+        var openBraceToken = EatToken(SyntaxKind.OpenBraceToken);
+
+        var members = _pool.Allocate<GreenAkTopLevelMemberSyntax>();
+
+        try
+        {
+            while (CurrentToken.Kind is SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken)
+            {
+                var member = ParseTopLevelMember();
+                members.Add(member);
+            }
+
+            var closeBraceToken = EatToken(SyntaxKind.CloseBraceToken);
+            return GreenSyntaxFactory.CSharpBlockSyntax(openBraceToken, members.ToList(), closeBraceToken);
+        }
+        finally
+        {
+            _pool.Free(members);
+        }
     }
 
     #endregion

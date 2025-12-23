@@ -47,6 +47,7 @@ internal sealed partial class Lexer : IDisposable
         InTypeName = 1 << 5,
         InAkcss = 1 << 6,
         InCSharpParameterList = 1 << 7,
+        InCSharpArgumentList = 1 << 8,
     }
 
     internal struct TokenInfo
@@ -1651,6 +1652,47 @@ internal sealed partial class Lexer : IDisposable
             : TextWindow.GetText(start, length, intern: false);
 
         var parsed = CSharpSyntaxFactory.ParseParameterList(
+            sourceText,
+            startParse,
+            options: null,
+            consumeFullText: false);
+
+        TextWindow.Reset(start + parsed.FullSpan.Length);
+
+        return parsed;
+    }
+
+    #endregion
+
+    #region CSharpArgumentList
+
+    private TokenInfo ParseCSharpArgumentList()
+    {
+        var parsed = ParseCSharpArgumentListSlow();
+
+        return new()
+        {
+            Kind = SyntaxKind.CSharpRawToken,
+            CSharpNode = parsed,
+            CSharpSyntaxKind = parsed.Kind()
+        };
+    }
+
+    private CSharp.ArgumentListSyntax ParseCSharpArgumentListSlow()
+    {
+        const int SmallStringLength = 512;
+
+        var start = TextWindow.Position;
+        var end = TextWindow.Text.Length;
+        var length = end - start;
+
+        var startParse = end < SmallStringLength ? start : 0;
+
+        var sourceText = end < SmallStringLength
+            ? TextWindow.Text.ToString()
+            : TextWindow.GetText(start, length, intern: false);
+
+        var parsed = CSharpSyntaxFactory.ParseArgumentList(
             sourceText,
             startParse,
             options: null,

@@ -522,7 +522,7 @@ public class AkburaSyntaxFactoryTests
                 .WithLeadingTrivia(indent4)
                 .WithTrailingTrivia(nl)
         )
-        .WithLeadingTrivia(new(indent4));
+        .WithLeadingTrivia([.. indent4]);
 
         //
         // @utilities { ... }

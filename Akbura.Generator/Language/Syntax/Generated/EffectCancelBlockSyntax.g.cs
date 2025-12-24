@@ -76,7 +76,7 @@ namespace Akbura.Language.Syntax.Green
             return UpdateEffectCancelBlockSyntax(cancelKeyword, this.Body);
         }
 
-        public GreenEffectCancelBlockSyntax WithBody(global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body)
+        public new GreenEffectCancelBlockSyntax WithBody(global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body)
         {
             return UpdateEffectCancelBlockSyntax(this.CancelKeyword, body);
         }
@@ -255,7 +255,7 @@ namespace Akbura.Language.Syntax
             return UpdateEffectCancelBlockSyntax(cancelKeyword, this.Body);
         }
 
-        public EffectCancelBlockSyntax WithBody(CSharpBlockSyntax body)
+        public new EffectCancelBlockSyntax WithBody(CSharpBlockSyntax body)
         {
             return UpdateEffectCancelBlockSyntax(this.CancelKeyword, body);
         }

@@ -13,13 +13,13 @@ namespace Akbura.Language.Syntax.Green
     internal sealed partial class GreenMarkupStartTagSyntax : global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken LessToken;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
+        public readonly global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax Name;
         public readonly global::Akbura.Language.Syntax.Green.GreenNode? _attributes;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken CloseToken;
 
         public GreenMarkupStartTagSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken lessToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
+            global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenNode? attributes,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeToken,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
@@ -66,7 +66,7 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenMarkupStartTagSyntax UpdateMarkupStartTagSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken lessToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
+            global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenNode? attributes,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeToken)
         {
@@ -104,7 +104,7 @@ namespace Akbura.Language.Syntax.Green
             return UpdateMarkupStartTagSyntax(lessToken, this.Name, this._attributes, this.CloseToken);
         }
 
-        public GreenMarkupStartTagSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
+        public GreenMarkupStartTagSyntax WithName(global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name)
         {
             return UpdateMarkupStartTagSyntax(this.LessToken, name, this._attributes, this.CloseToken);
         }
@@ -166,7 +166,7 @@ namespace Akbura.Language.Syntax.Green
     {
         public static GreenMarkupStartTagSyntax MarkupStartTagSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken lessToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
+            global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxList<GreenMarkupAttributeSyntax> attributes,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeToken)
         {
@@ -226,7 +226,7 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateMarkupStartTagSyntax(
                 (GreenSyntaxToken)VisitToken(node.LessToken),
-                (GreenSimpleNameSyntax)Visit(node.Name)!,
+                (GreenMarkupComponentNameSyntax)Visit(node.Name)!,
                 VisitList(node.Attributes).Node,
                 (GreenSyntaxToken)VisitToken(node.CloseToken));
         }
@@ -254,8 +254,8 @@ namespace Akbura.Language.Syntax
         public SyntaxToken LessToken
             => new(this, this.Green.LessToken, GetChildPosition(0), GetChildIndex(0));
 
-        public SimpleNameSyntax Name
-            => (SimpleNameSyntax)GetRed(ref _name, 1)!;
+        public MarkupComponentNameSyntax Name
+            => (MarkupComponentNameSyntax)GetRed(ref _name, 1)!;
 
         public SyntaxList<MarkupAttributeSyntax> Attributes
         {
@@ -271,7 +271,7 @@ namespace Akbura.Language.Syntax
 
         public MarkupStartTagSyntax UpdateMarkupStartTagSyntax(
             SyntaxToken lessToken,
-            SimpleNameSyntax name,
+            MarkupComponentNameSyntax name,
             SyntaxList<MarkupAttributeSyntax> attributes,
             SyntaxToken closeToken)
         {
@@ -309,7 +309,7 @@ namespace Akbura.Language.Syntax
             return UpdateMarkupStartTagSyntax(lessToken, this.Name, this.Attributes, this.CloseToken);
         }
 
-        public MarkupStartTagSyntax WithName(SimpleNameSyntax name)
+        public MarkupStartTagSyntax WithName(MarkupComponentNameSyntax name)
         {
             if (name is null)
             {
@@ -379,7 +379,7 @@ namespace Akbura.Language.Syntax
     {
         internal static MarkupStartTagSyntax MarkupStartTagSyntax(
             SyntaxToken lessToken,
-            SimpleNameSyntax name,
+            MarkupComponentNameSyntax name,
             SyntaxList<MarkupAttributeSyntax> attributes,
             SyntaxToken closeToken)
         {
@@ -454,7 +454,7 @@ namespace Akbura.Language.Syntax
         {
             return node.UpdateMarkupStartTagSyntax(
                 VisitToken(node.LessToken),
-                (SimpleNameSyntax)Visit(node.Name)!,
+                (MarkupComponentNameSyntax)Visit(node.Name)!,
                 VisitList(node.Attributes),
                 VisitToken(node.CloseToken));
         }

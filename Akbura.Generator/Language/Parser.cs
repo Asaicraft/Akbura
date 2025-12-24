@@ -442,7 +442,7 @@ internal sealed partial class Parser : IDisposable
             // the end of the previous token and make it zero width, indicating the expected token was missed at
             // that location (even though we're still unilaterally consuming this token).
 
-            var trivia = _prevTokenTrailingTrivia;
+            var trivia = _prevTokenTrailingTrivia!;
             var triviaList = new GreenSyntaxList<GreenNode>(trivia);
             return triviaList.Any((int)SyntaxKind.EndOfLineTrivia)
                 ? (offset: -(trivia.FullWidth + token.GetLeadingTriviaWidth()), width: 0)
@@ -617,7 +617,7 @@ internal sealed partial class Parser : IDisposable
             // If the previous token has a trailing EndOfLineTrivia, the missing token diagnostic position is moved
             // to the end of line containing the previous token and its width is set to zero. Otherwise we squiggle
             // the token following the missing token (the token we're currently pointing at).
-            var trivia = _prevTokenTrailingTrivia;
+            var trivia = _prevTokenTrailingTrivia!;
             var triviaList = new GreenSyntaxList<GreenNode>(trivia);
             if (triviaList.Any((int)SyntaxKind.EndOfLineTrivia))
             {
@@ -663,7 +663,9 @@ internal sealed partial class Parser : IDisposable
             {
                 Debug.Assert(child.IsMissing, "All children of a missing node or token should themselves be missing.");
                 if (!child.IsToken)
+                {
                     continue;
+                }
 
                 var childToken = (GreenSyntaxToken)child;
                 Debug.Assert(childToken.Text == "", "All missing tokens should have no text");
@@ -727,7 +729,7 @@ internal sealed partial class Parser : IDisposable
     /// <summary>
     /// Adds an error diagnostic with arguments to the first token of the node.
     /// </summary>
-    private TNode AddErrorToFirstToken<TNode>(TNode node, string errorCode, params ImmutableArray<object> args)
+    private TNode AddErrorToFirstToken<TNode>(TNode node, string errorCode, params ImmutableArray<object?> args)
         where TNode : GreenNode
     {
         var firstToken = (GreenSyntaxToken?)node.GetFirstTerminal();

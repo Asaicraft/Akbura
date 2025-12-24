@@ -44,6 +44,7 @@ partial class Parser
             SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
             SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
             SyntaxKind.UseEffectKeyword => ParseUseEffectDeclarationSyntax(),
+            SyntaxKind.LessThanToken => ParseMarkupRootSyntax(),
             _ => default!
         };
     }
@@ -263,6 +264,15 @@ partial class Parser
         var finallyKeyword = EatToken(SyntaxKind.FinallyKeyword);
         var body = ParseCSharpBlock();
         return GreenSyntaxFactory.EffectFinallyBlockSyntax(finallyKeyword, body);
+    }
+
+    #endregion
+
+    #region MarkupRootSyntax
+
+    private GreenMarkupRootSyntax ParseMarkupRootSyntax()
+    {
+        throw new NotImplementedException();
     }
 
     #endregion

@@ -13,12 +13,12 @@ namespace Akbura.Language.Syntax.Green
     internal sealed partial class GreenMarkupEndTagSyntax : global::Akbura.Language.Syntax.Green.GreenMarkupSyntaxNodeSyntax
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken LessSlashToken;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
+        public readonly global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax Name;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken GreaterToken;
 
         public GreenMarkupEndTagSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken lessSlashToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
+            global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken greaterToken,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
@@ -49,7 +49,7 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenMarkupEndTagSyntax UpdateMarkupEndTagSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken lessSlashToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
+            global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken greaterToken)
         {
             if (this.LessSlashToken == lessSlashToken &&
@@ -84,7 +84,7 @@ namespace Akbura.Language.Syntax.Green
             return UpdateMarkupEndTagSyntax(lessSlashToken, this.Name, this.GreaterToken);
         }
 
-        public GreenMarkupEndTagSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
+        public GreenMarkupEndTagSyntax WithName(global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name)
         {
             return UpdateMarkupEndTagSyntax(this.LessSlashToken, name, this.GreaterToken);
         }
@@ -140,7 +140,7 @@ namespace Akbura.Language.Syntax.Green
     {
         public static GreenMarkupEndTagSyntax MarkupEndTagSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken lessSlashToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
+            global::Akbura.Language.Syntax.Green.GreenMarkupComponentNameSyntax name,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken greaterToken)
         {
             AkburaDebug.Assert(lessSlashToken != null);
@@ -215,7 +215,7 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateMarkupEndTagSyntax(
                 (GreenSyntaxToken)VisitToken(node.LessSlashToken),
-                (GreenSimpleNameSyntax)Visit(node.Name)!,
+                (GreenMarkupComponentNameSyntax)Visit(node.Name)!,
                 (GreenSyntaxToken)VisitToken(node.GreaterToken));
         }
     }
@@ -241,15 +241,15 @@ namespace Akbura.Language.Syntax
         public SyntaxToken LessSlashToken
             => new(this, this.Green.LessSlashToken, GetChildPosition(0), GetChildIndex(0));
 
-        public SimpleNameSyntax Name
-            => (SimpleNameSyntax)GetRed(ref _name, 1)!;
+        public MarkupComponentNameSyntax Name
+            => (MarkupComponentNameSyntax)GetRed(ref _name, 1)!;
 
         public SyntaxToken GreaterToken
             => new(this, this.Green.GreaterToken, GetChildPosition(2), GetChildIndex(2));
 
         public MarkupEndTagSyntax UpdateMarkupEndTagSyntax(
             SyntaxToken lessSlashToken,
-            SimpleNameSyntax name,
+            MarkupComponentNameSyntax name,
             SyntaxToken greaterToken)
         {
             if (this.LessSlashToken == lessSlashToken &&
@@ -284,7 +284,7 @@ namespace Akbura.Language.Syntax
             return UpdateMarkupEndTagSyntax(lessSlashToken, this.Name, this.GreaterToken);
         }
 
-        public MarkupEndTagSyntax WithName(SimpleNameSyntax name)
+        public MarkupEndTagSyntax WithName(MarkupComponentNameSyntax name)
         {
             return UpdateMarkupEndTagSyntax(this.LessSlashToken, name, this.GreaterToken);
         }
@@ -342,7 +342,7 @@ namespace Akbura.Language.Syntax
     {
         internal static MarkupEndTagSyntax MarkupEndTagSyntax(
             SyntaxToken lessSlashToken,
-            SimpleNameSyntax name,
+            MarkupComponentNameSyntax name,
             SyntaxToken greaterToken)
         {
             if (lessSlashToken.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
@@ -409,7 +409,7 @@ namespace Akbura.Language.Syntax
         {
             return node.UpdateMarkupEndTagSyntax(
                 VisitToken(node.LessSlashToken),
-                (SimpleNameSyntax)Visit(node.Name)!,
+                (MarkupComponentNameSyntax)Visit(node.Name)!,
                 VisitToken(node.GreaterToken));
         }
     }

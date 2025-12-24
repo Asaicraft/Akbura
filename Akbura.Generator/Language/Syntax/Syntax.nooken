@@ -315,7 +315,7 @@ node MarkupElementSyntax : MarkupNodeSyntax {
 /// </summary>
 node MarkupStartTagSyntax : MarkupSyntaxNode {
     LessToken  : LessThanToken;          // "<"
-    Name       : SimpleName;        // element name (Stack, Row, Button, ...)
+    Name       : MarkupComponentNameSyntax;        // element name (Stack, Row, Button, ...)
     Attributes : syntaxlist<MarkupAttributeSyntax>;
     // Either ">" or "/>".
     CloseToken : GreaterThanToken | SlashGreaterToken;
@@ -326,7 +326,7 @@ node MarkupStartTagSyntax : MarkupSyntaxNode {
 /// </summary>
 node MarkupEndTagSyntax : MarkupSyntaxNode {
     LessSlashToken : LessSlashToken;     // "</"
-    Name           : SimpleName;
+    Name           : MarkupComponentNameSyntax;
     GreaterToken   : GreaterThanToken;  // ">"
 }
 

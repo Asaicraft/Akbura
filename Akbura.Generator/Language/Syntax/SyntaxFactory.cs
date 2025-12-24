@@ -556,5 +556,27 @@ internal static partial class SyntaxFactory
             tails.ToList()
         );
     }
+
+    public static MarkupStartTagSyntax MarkupStartTagSyntax(SyntaxToken lessToken, IdentifierNameSyntax name, SyntaxList<MarkupAttributeSyntax> attributes, SyntaxToken closeToken)
+    {
+        var markupComponentNameSyntax = MarkupSimpleComponentNameSyntax(name);
+
+        return MarkupStartTagSyntax(
+            lessToken,
+            markupComponentNameSyntax,
+            attributes,
+            closeToken
+        );
+    }
+
+    public static MarkupEndTagSyntax MarkupEndTagSyntax(SyntaxToken lessSlashToken, IdentifierNameSyntax name, SyntaxToken greaterToken)
+    {
+        var markupComponentNameSyntax = MarkupSimpleComponentNameSyntax(name);
+        return MarkupEndTagSyntax(
+            lessSlashToken,
+            markupComponentNameSyntax,
+            greaterToken
+        );
+    }
 }
 

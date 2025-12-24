@@ -77,7 +77,7 @@ namespace Akbura.Language.Syntax.Green
             return UpdateEffectFinallyBlockSyntax(finallyKeyword, this.Body);
         }
 
-        public GreenEffectFinallyBlockSyntax WithBody(global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body)
+        public new GreenEffectFinallyBlockSyntax WithBody(global::Akbura.Language.Syntax.Green.GreenCSharpBlockSyntax body)
         {
             return UpdateEffectFinallyBlockSyntax(this.FinallyKeyword, body);
         }
@@ -260,7 +260,7 @@ namespace Akbura.Language.Syntax
             return UpdateEffectFinallyBlockSyntax(finallyKeyword, this.Body);
         }
 
-        public EffectFinallyBlockSyntax WithBody(CSharpBlockSyntax body)
+        public new EffectFinallyBlockSyntax WithBody(CSharpBlockSyntax body)
         {
             return UpdateEffectFinallyBlockSyntax(this.FinallyKeyword, body);
         }

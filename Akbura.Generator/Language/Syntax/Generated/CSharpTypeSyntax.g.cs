@@ -258,7 +258,7 @@ namespace Akbura.Language.Syntax
 
             if(Tokens.Count == 1)
             {
-                var token = Tokens[0].Node;
+                var token = Tokens[0].Node!;
 
                 if(token.Kind == SyntaxKind.CSharpRawToken)
                 {

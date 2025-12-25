@@ -589,6 +589,7 @@ internal abstract partial class GreenNode
 
     #endregion
 
+    // TODO devirtualize this method, and use Kind 
     public virtual SyntaxToken CreateSeparator(AkburaSyntax element)
     {
         return SyntaxFactory.TokenWithTrailingSpace(SyntaxKind.CommaToken);

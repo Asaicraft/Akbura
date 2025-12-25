@@ -297,6 +297,12 @@ internal sealed partial class Parser : IDisposable
         var mode = _mode;
         _mode = Lexer.LexerMode.InTypeName;
 
+        if(_currentToken != null)
+        {
+            ReturnToken();
+            _tokenOffset++;
+        }
+
         var token = EatToken();
 
         _mode = mode;

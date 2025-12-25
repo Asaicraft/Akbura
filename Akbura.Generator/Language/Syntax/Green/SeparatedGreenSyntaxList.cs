@@ -82,7 +82,7 @@ internal readonly struct SeparatedGreenSyntaxList<TNode> : IEquatable<SeparatedG
 
     public override bool Equals(object? obj)
     {
-        return (obj is SeparatedGreenSyntaxList<TNode>) && Equals((SeparatedGreenSyntaxList<TNode>)obj);
+        return (obj is SeparatedGreenSyntaxList<TNode> list) && Equals(list);
     }
 
     public override int GetHashCode()

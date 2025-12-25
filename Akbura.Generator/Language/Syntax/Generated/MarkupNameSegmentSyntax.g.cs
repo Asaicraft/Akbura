@@ -23,6 +23,11 @@ namespace Akbura.Language.Syntax.Green
         {
             return null;
         }
+
+        public sealed override SyntaxToken CreateSeparator(AkburaSyntax element)
+        {
+            return SyntaxFactory.Token(SyntaxKind.DotToken);
+        }
     }
 }
 

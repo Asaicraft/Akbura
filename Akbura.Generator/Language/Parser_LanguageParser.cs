@@ -277,6 +277,120 @@ partial class Parser
 
     #endregion
 
+    #region MarkupComponentNameSyntax
+
+    internal GreenMarkupComponentNameSyntax ParseMarkupComponentNameSyntax()
+    {
+        // alias:: ... ?
+        GreenMarkupAliasQualifierSyntax? aliasQualifier = null;
+
+        if (CurrentToken.Kind == SyntaxKind.IdentifierToken &&
+            PeekToken(1).Kind == SyntaxKind.DoubleColonToken)
+        {
+            var alias = ParseIdentifierName();
+            var doubleColon = EatToken(SyntaxKind.DoubleColonToken);
+            aliasQualifier = GreenSyntaxFactory.MarkupAliasQualifierSyntax(alias, doubleColon);
+        }
+
+        var firstName = ParseIdentifierName();
+        GreenMarkupGenericArgumentListSyntax? firstGenericArgs = null;
+
+        if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
+        {
+            firstGenericArgs = ParseMarkupGenericArgumentListSyntax();
+        }
+
+        // If no alias, no dots, no generics => Simple name <Button />
+        if (aliasQualifier is null &&
+            firstGenericArgs is null &&
+            CurrentToken.Kind != SyntaxKind.DotToken)
+        {
+            return GreenSyntaxFactory.MarkupSimpleComponentNameSyntax(firstName);
+        }
+
+        // Otherwise => Qualified component name (may still have single segment if it has generics)
+        var segments = _pool.AllocateSeparated<GreenMarkupNameSegmentSyntax>();
+
+        try
+        {
+            segments.Add(
+                firstGenericArgs is null
+                    ? GreenSyntaxFactory.MarkupIdentifierNameSegmentSyntax(firstName)
+                    : GreenSyntaxFactory.MarkupGenericNameSegmentSyntax(firstName, firstGenericArgs)
+            );
+
+            while (CurrentToken.Kind == SyntaxKind.DotToken)
+            {
+                var dot = EatToken(SyntaxKind.DotToken);
+                segments.AddSeparator(dot);
+
+                var segName = ParseIdentifierName();
+                GreenMarkupGenericArgumentListSyntax? segGenerics = null;
+
+                if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
+                {
+                    segGenerics = ParseMarkupGenericArgumentListSyntax();
+                }
+
+                segments.Add(
+                    segGenerics is null
+                        ? GreenSyntaxFactory.MarkupIdentifierNameSegmentSyntax(segName)
+                        : GreenSyntaxFactory.MarkupGenericNameSegmentSyntax(segName, segGenerics)
+                );
+            }
+
+            var qualifiedName = GreenSyntaxFactory.MarkupQualifiedNameSyntax(segments.ToList());
+
+            return GreenSyntaxFactory.MarkupQualifiedComponentNameSyntax(
+                aliasQualifier,
+                qualifiedName
+            );
+        }
+        finally
+        {
+            _pool.Free(segments);
+        }
+    }
+
+    private GreenMarkupGenericArgumentListSyntax ParseMarkupGenericArgumentListSyntax()
+    {
+        var open = EatToken(SyntaxKind.OpenBraceToken);
+
+        var list = _pool.AllocateSeparated<GreenCSharpTypeSyntax>();
+        try
+        {
+            if (CurrentToken.Kind != SyntaxKind.CloseBraceToken &&
+                CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+            {
+                list.Add(ParseCShaprType());
+
+                while (CurrentToken.Kind == SyntaxKind.CommaToken)
+                {
+                    list.AddSeparator(EatToken(SyntaxKind.CommaToken));
+
+                    // recovery: allow trailing comma before }
+                    if (CurrentToken.Kind == SyntaxKind.CloseBraceToken ||
+                        CurrentToken.Kind == SyntaxKind.EndOfFileToken)
+                    {
+                        break;
+                    }
+
+                    list.Add(ParseCShaprType());
+                }
+            }
+
+            var close = EatToken(SyntaxKind.CloseBraceToken);
+
+            return GreenSyntaxFactory.MarkupGenericArgumentListSyntax(open, list.ToList(), close);
+        }
+        finally
+        {
+            _pool.Free(list);
+        }
+    }
+
+    #endregion
+
     #region IdentifierNameSyntax
 
     private GreenIdentifierNameSyntax ParseIdentifierName()

@@ -537,7 +537,7 @@ internal static partial class SyntaxFactory
     {
         var argumentsSyntax = CSharpArgumentListSyntax(arguments);
 
-        var tails = new SyntaxListBuilder<UseEffectTailBlockSyntax>();
+        var tails = new SyntaxListBuilder<UseEffectTailBlockSyntax>(2);
 
         if (tail1 != null)
         {

@@ -724,6 +724,7 @@ public class AkburaSyntaxFactoryTests
         //
         var useEffectBody = CSharpBlockSyntax(
             openBrace: Token(SyntaxKind.OpenBraceToken)
+                .WithLeadingTrivia(space)
                 .WithTrailingTrivia(nl),
             tokens: List<AkTopLevelMemberSyntax>(),
             closeBrace: Token(SyntaxKind.CloseBraceToken)

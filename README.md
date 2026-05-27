@@ -19,14 +19,14 @@ Akbura is an active exploration of what a modern reactive UI language for .NET c
 
   * [Getting Started](#getting-started)
 
-    * [1. Install the Package](#1-install-the-package)
-    * [2. Create Your First Component](#2-create-your-first-component)
-    * [3. Run the App](#3-run-the-app)
+	* [1. Install the Package](#1-install-the-package)
+	* [2. Create Your First Component](#2-create-your-first-component)
+	* [3. Run the App](#3-run-the-app)
   * [Getting Started with Avalonia](#getting-started-with-avalonia)
 
-    * [1. Install the Package](#1-install-the-package-1)
-    * [2. Create Your First Component](#2-create-your-first-component-1)
-    * [3. Use AkburaAvaloniaHost in your Avalonia App](#3-use-akburaavaloniahost-in-your-avalonia-app)
+	* [1. Install the Package](#1-install-the-package-1)
+	* [2. Create Your First Component](#2-create-your-first-component-1)
+	* [3. Use AkburaAvaloniaHost in your Avalonia App](#3-use-akburaavaloniahost-in-your-avalonia-app)
 * [States](#states)
 
   * [Binding to viewmodel](#binding-to-viewmodel)
@@ -43,8 +43,8 @@ Akbura is an active exploration of what a modern reactive UI language for .NET c
 
   * [Registering an IServiceProvider](#registering-an-iserviceprovider)
 
-    * [Using AkburaRoot](#using-akburaroot)
-    * [Using Avalonia Host](#using-avalonia-host)
+	* [Using AkburaRoot](#using-akburaroot)
+	* [Using Avalonia Host](#using-avalonia-host)
   * [Injecting Dependencies into Components](#injecting-dependencies-into-components)
 * [Commands](#commands)
 
@@ -606,7 +606,7 @@ inject RootVm Vm;
 ## AKCSS
 
 AKCSS is a CSS-inspired styling language designed for Akbura components.
-It provides a familiar declarative syntax while integrating tightly with component state, pseudo-classes, and the Akbura rendering model.
+It provides a familiar declarative syntax while integrating tightly with component state, control state expressions, and the Akbura rendering model.
 
 AKCSS files allow you to define reusable style rules that are compiled into strongly typed C# classes.
 
@@ -677,22 +677,22 @@ Akcss supports a utility system inspired by Tailwind, where concise class-like p
 
 ```akcss
 @utilities {
-    .rounded {
-        CornerRadius: 4;
-    }
+	.rounded {
+		CornerRadius: 4;
+	}
 
-    .w-(double width) {
-        Width: width * MyNamespace.MyStaticClass.Spacing;
-    }
+	.w-(double width) {
+		Width: width * MyNamespace.MyStaticClass.Spacing;
+	}
 
-    .space-(int x)-(int y) {
-        MarginLeft: x * MyNamespace.MyStaticClass.Spacing;
-        MarginTop:  y * MyNamespace.MyStaticClass.Spacing;
+	.space-(int x)-(int y) {
+		MarginLeft: x * MyNamespace.MyStaticClass.Spacing;
+		MarginTop:  y * MyNamespace.MyStaticClass.Spacing;
 
-        @if(x > y) {
-            BorderThickness: x - y;
-        }
-    }
+		@if(x > y) {
+			BorderThickness: x - y;
+		}
+	}
 }
 ```
 
@@ -704,7 +704,7 @@ Using the utilities:
 
 ## Akcss Utilities - Condition Prefix
 
-Akcss utilities support **conditional prefixes**, allowing styles to be applied only when a specific condition or pseudo‑state is true.
+Akcss utilities support **conditional prefixes**, allowing styles to be applied only when a specific condition expression is true.
 
 This enables dynamic utility behavior without writing full AKCSS blocks.
 
@@ -722,7 +722,7 @@ Here:
 Conditional prefixes may also use:
 
 * component boolean states
-* hover, checked and other pseudo-classes
+* control state values such as `IsHovered` or `IsChecked`
 * parameter values
 
 Akcss resolves utilities in the following order:

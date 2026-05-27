@@ -196,7 +196,7 @@ public class AkburaSyntaxFactoryTests
         //
         // .myclass {
         //     Background: "Red";
-        //     @hover {
+        //     @if(IsHovered) {
         //         Background: "Blue";
         //     }
         // }
@@ -225,7 +225,7 @@ public class AkburaSyntaxFactoryTests
         .WithLeadingTrivia([.. indent4])   // "    Background..."
         .WithTrailingTrivia(nl);      // end of line
 
-        // @hover { Background: "Blue"; }
+        // @if(IsHovered) { Background: "Blue"; }
 
         var blueExpression = CSharpExpressionSyntax(
             TokenList(
@@ -242,17 +242,21 @@ public class AkburaSyntaxFactoryTests
         .WithLeadingTrivia(indent8)   // "        Background..."
         .WithTrailingTrivia(nl);      // end of line
 
-        var hoverSelector = AkcssPseudoSelectorSyntax(
-            atToken: Token(SyntaxKind.AtToken),
-            firstState: IdentifierName("hover"),
-            additional: List<AkcssAdditionalPseudoStateSyntax>()
+        var isHoveredExpr = CSharpExpressionSyntax(
+            TokenList(
+                CSharpRawToken("IsHovered")
+            )
         );
 
-        // "@hover {" line + its body
-        var hoverBlock = AkcssPseudoBlockSyntax(
-            selector: hoverSelector,
+        // "@if(IsHovered) {" line + its body
+        var hoveredIfBlock = AkcssIfDirectiveSyntax(
+            atToken: Token(SyntaxKind.AtToken)
+                .WithLeadingTrivia(indent4),
+            ifKeyword: Token(SyntaxKind.IfKeyword),
+            openParen: Token(SyntaxKind.OpenParenToken),
+            condition: isHoveredExpr,
+            closeParen: TokenWithTrailingSpace(SyntaxKind.CloseParenToken),
             openBrace: Token(SyntaxKind.OpenBraceToken)
-                .WithLeadingTrivia(space)      // "@hover {"
                 .WithTrailingTrivia(nl),       // newline after "{"
             members: List<AkcssBodyMemberSyntax>(
                 [
@@ -261,8 +265,7 @@ public class AkburaSyntaxFactoryTests
             closeBrace: Token(SyntaxKind.CloseBraceToken)
                 .WithLeadingTrivia(indent4)    // "    }"
                 .WithTrailingTrivia(nl)        // newline after inner '}'
-        )
-        .WithLeadingTrivia(indent4);           // "    @hover..."
+        );
 
         // Whole .myclass rule
         var myClassRule = AkcssStyleRuleSyntax(
@@ -273,7 +276,7 @@ public class AkburaSyntaxFactoryTests
             members: List<AkcssBodyMemberSyntax>(
                 [
                     backgroundRedAssignment,
-                    hoverBlock
+                    hoveredIfBlock
                 ]),
             closeBrace: Token(SyntaxKind.CloseBraceToken)
                 .WithTrailingTrivia(doubleNl)    // "}\n\n" (blank line after rule)
@@ -562,7 +565,7 @@ public class AkburaSyntaxFactoryTests
         const string expected =
             ".myclass {\n" +
             "    Background: \"Red\";\n" +
-            "    @hover {\n" +
+            "    @if(IsHovered) {\n" +
             "        Background: \"Blue\";\n" +
             "    }\n" +
             "}\n" +

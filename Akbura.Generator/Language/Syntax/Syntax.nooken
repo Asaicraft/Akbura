@@ -78,9 +78,9 @@ token UtilitiesKeyword    = "utilities";
 
 [id 200]
 /*
-    Built-in literal tokens (StringLiteralToken / NumericLiteralToken / etc.)
-    already exist at the token layer. Here we only declare DSL-specific
-    literals when we want distinct AST-level categories.
+	Built-in literal tokens (StringLiteralToken / NumericLiteralToken / etc.)
+	already exist at the token layer. Here we only declare DSL-specific
+	literals when we want distinct AST-level categories.
 */
 
 // Raw text used as markup content between tags.
@@ -110,37 +110,37 @@ abstract node AkTopLevelMember;
 /// Represented as a flat TokenList, left to a C# sub-parser.
 /// </summary>
 node CSharpTypeSyntax {
-    Tokens : TokenList;
+	Tokens : TokenList;
 }
 
 /// <summary>
 /// C# expression fragment.
 /// </summary>
 node CSharpExpressionSyntax {
-    Tokens : TokenList;
+	Tokens : TokenList;
 }
 
 /// <summary>
 /// C# block enclosed in braces: { ... }.
 /// </summary>
 node CSharpBlockSyntax {
-    OpenBrace  : OpenBraceToken;
-    Tokens     : syntaxlist<AkTopLevelMember>;
-    CloseBrace : CloseBraceToken;
+	OpenBrace  : OpenBraceToken;
+	Tokens     : syntaxlist<AkTopLevelMember>;
+	CloseBrace : CloseBraceToken;
 }
 
 node CSharpStatementSyntax: AkTopLevelMember {
-    Tokens : TokenList;
-    Body?  : CSharpBlockSyntax;
+	Tokens : TokenList;
+	Body?  : CSharpBlockSyntax;
 }
 
 /// <summary>
 /// Inline expression used in markup: { expr }.
 /// </summary>
 node InlineExpressionSyntax {
-    OpenBrace  : OpenBraceToken;
-    Expression : CSharpExpressionSyntax;
-    CloseBrace : CloseBraceToken;
+	OpenBrace  : OpenBraceToken;
+	Expression : CSharpExpressionSyntax;
+	CloseBrace : CloseBraceToken;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -151,11 +151,11 @@ node InlineExpressionSyntax {
 /// Entire .akbura compilation unit.
 /// </summary>
 node AkburaDocumentSyntax {
-    Members   : syntaxlist<AkTopLevelMember>;
-    /// <summary> 
-    /// End-of-file token provided by the host; we reference it as a generic Token.
-    /// </summary>
-    EndOfFile : Token;
+	Members   : syntaxlist<AkTopLevelMember>;
+	/// <summary> 
+	/// End-of-file token provided by the host; we reference it as a generic Token.
+	/// </summary>
+	EndOfFile : Token;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -164,44 +164,44 @@ node AkburaDocumentSyntax {
 
 /// <summary>inject ILogger&lt;ProfileWithTasks&gt; log;</summary>
 node InjectDeclarationSyntax : AkTopLevelMember {
-    InjectKeyword : InjectKeyword;
-    Type          : CSharpTypeSyntax;
-    Name          : SimpleName;
-    Semicolon     : SemicolonToken;
+	InjectKeyword : InjectKeyword;
+	Type          : CSharpTypeSyntax;
+	Name          : SimpleName;
+	Semicolon     : SemicolonToken;
 }
 
 /// <summary>param int UserId = 1; or param out Hello = 10;</summary>
 node ParamDeclarationSyntax : AkTopLevelMember {
-    ParamKeyword    : ParamKeyword;
-    BindingKeyword? : OutToken | BindToken;
-    Type?           : CSharpTypeSyntax;
-    Name            : SimpleName;
-    Equals?         : EqualsToken;
-    DefaultValue?   : CSharpExpressionSyntax;
-    Semicolon       : SemicolonToken;
+	ParamKeyword    : ParamKeyword;
+	BindingKeyword? : OutToken | BindToken;
+	Type?           : CSharpTypeSyntax;
+	Name            : SimpleName;
+	Equals?         : EqualsToken;
+	DefaultValue?   : CSharpExpressionSyntax;
+	Semicolon       : SemicolonToken;
 }
 
 /// <summary>state count = 0; / state ReactList tasks = [];</summary>
 node StateDeclarationSyntax : AkTopLevelMember {
-    StateKeyword : StateKeyword;
-    Type?        : CSharpTypeSyntax;
-    Name         : SimpleName;
-    Equals       : EqualsToken;
-    Initializer  : StateInitializer;
-    Semicolon    : SemicolonToken;
+	StateKeyword : StateKeyword;
+	Type?        : CSharpTypeSyntax;
+	Name         : SimpleName;
+	Equals       : EqualsToken;
+	Initializer  : StateInitializer;
+	Semicolon    : SemicolonToken;
 }
 
 abstract node StateInitializer
 {
-    Expression : CSharpExpressionSyntax;
+	Expression : CSharpExpressionSyntax;
 }
 
 node SimpleStateInitializer: StateInitializer;
 
 node BindableStateInitializer: StateInitializer
 {
-    BindingKeyword : InToken | OutToken | BindToken;
-    Expression     : CSharpExpressionSyntax;
+	BindingKeyword : InToken | OutToken | BindToken;
+	Expression     : CSharpExpressionSyntax;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -214,25 +214,25 @@ node BindableStateInitializer: StateInitializer
 /// finally { ... }
 /// </summary>
 node UseEffectDeclarationSyntax : AkTopLevelMember {
-    UseEffectKeyword : UseEffectKeyword;
-    // Dependency list: e.g., $cancel, UserId, tasks
-    Arguments        : CSharpArgumentListSyntax;
-    Body             : CSharpBlockSyntax;
-    Tails            : syntaxlist<UseEffectTailBlockSyntax>; // only 2 variants
+	UseEffectKeyword : UseEffectKeyword;
+	// Dependency list: e.g., $cancel, UserId, tasks
+	Arguments        : CSharpArgumentListSyntax;
+	Body             : CSharpBlockSyntax;
+	Tails            : syntaxlist<UseEffectTailBlockSyntax>; // only 2 variants
 }
 
 abstract node UseEffectTailBlockSyntax {
-    Body : CSharpBlockSyntax;
+	Body : CSharpBlockSyntax;
 }
 
 node EffectCancelBlockSyntax : UseEffectTailBlockSyntax {
-    CancelKeyword : CancelKeyword;
-    Body          : CSharpBlockSyntax;
+	CancelKeyword : CancelKeyword;
+	Body          : CSharpBlockSyntax;
 }
 
 node EffectFinallyBlockSyntax : UseEffectTailBlockSyntax {
-    FinallyKeyword : FinallyKeyword;
-    Body           : CSharpBlockSyntax;
+	FinallyKeyword : FinallyKeyword;
+	Body           : CSharpBlockSyntax;
 }
 
 /// <summary>
@@ -249,19 +249,19 @@ node EffectFinallyBlockSyntax : UseEffectTailBlockSyntax {
 ///     (both are interpreted at semantic/codegen layer, not by grammar).
 /// </summary>
 node CommandDeclarationSyntax : AkTopLevelMember {
-    CommandKeyword : CommandKeyword;           // "command"
-    ReturnType     : CSharpTypeSyntax;         // int / void / etc.
-    Name           : SimpleName;               // CustomClick
-    Parameters     : CSharpParameterListSyntax;
-    Semicolon      : SemicolonToken;           // ';'
+	CommandKeyword : CommandKeyword;           // "command"
+	ReturnType     : CSharpTypeSyntax;         // int / void / etc.
+	Name           : SimpleName;               // CustomClick
+	Parameters     : CSharpParameterListSyntax;
+	Semicolon      : SemicolonToken;           // ';'
 }
 
 node CSharpParameterListSyntax {
-    Parameters : CSharpRawToken;
+	Parameters : CSharpRawToken;
 }
 
 node CSharpArgumentListSyntax {
-    Parameters : CSharpRawToken;
+	Parameters : CSharpRawToken;
 }
 
 
@@ -272,11 +272,11 @@ node CSharpArgumentListSyntax {
 
 node UserHook : AkTopLevelMember
 {
-    Name       : SimpleName;
-    OpenParen  : OpenParenToken;
-    Parameters : syntaxlist<CSharpExpressionSyntax, CommaToken>;
-    CloseParen : CloseParenToken;
-    Body       : CSharpBlockSyntax;
+	Name       : SimpleName;
+	OpenParen  : OpenParenToken;
+	Parameters : syntaxlist<CSharpExpressionSyntax, CommaToken>;
+	CloseParen : CloseParenToken;
+	Body       : CSharpBlockSyntax;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -292,7 +292,7 @@ abstract node MarkupSyntaxNode;
 /// Top-level markup root: a single element at the end of the file.
 /// </summary>
 node MarkupRootSyntax : AkTopLevelMember {
-    Element : MarkupElementSyntax;
+	Element : MarkupElementSyntax;
 }
 
 /// <summary>
@@ -305,29 +305,29 @@ abstract node MarkupNodeSyntax : MarkupSyntaxNode;
 /// Allows optional StartTag/EndTag to support fragments and self-closing tags.
 /// </summary>
 node MarkupElementSyntax : MarkupNodeSyntax {
-    StartTag? : MarkupStartTagSyntax;
-    Body      : syntaxlist<MarkupContentSyntax>;
-    EndTag?   : MarkupEndTagSyntax;
+	StartTag? : MarkupStartTagSyntax;
+	Body      : syntaxlist<MarkupContentSyntax>;
+	EndTag?   : MarkupEndTagSyntax;
 }
 
 /// <summary>
 /// Opening tag.
 /// </summary>
 node MarkupStartTagSyntax : MarkupSyntaxNode {
-    LessToken  : LessThanToken;          // "<"
-    Name       : MarkupComponentNameSyntax;        // element name (Stack, Row, Button, ...)
-    Attributes : syntaxlist<MarkupAttributeSyntax>;
-    // Either ">" or "/>".
-    CloseToken : GreaterThanToken | SlashGreaterToken;
+	LessToken  : LessThanToken;          // "<"
+	Name       : MarkupComponentNameSyntax;        // element name (Stack, Row, Button, ...)
+	Attributes : syntaxlist<MarkupAttributeSyntax>;
+	// Either ">" or "/>".
+	CloseToken : GreaterThanToken | SlashGreaterToken;
 }
 
 /// <summary>
 /// Closing tag.
 /// </summary>
 node MarkupEndTagSyntax : MarkupSyntaxNode {
-    LessSlashToken : LessSlashToken;     // "</"
-    Name           : MarkupComponentNameSyntax;
-    GreaterToken   : GreaterThanToken;  // ">"
+	LessSlashToken : LessSlashToken;     // "</"
+	Name           : MarkupComponentNameSyntax;
+	GreaterToken   : GreaterThanToken;  // ">"
 }
 
 
@@ -344,21 +344,21 @@ abstract node MarkupContentSyntax : MarkupNodeSyntax;
 /// Raw text between tags.
 /// </summary>
 node MarkupTextLiteralSyntax : MarkupContentSyntax {
-    TextTokens : syntaxlist<AkTextLiteral>;
+	TextTokens : syntaxlist<AkTextLiteral>;
 }
 
 /// <summary>
 /// Nested element content.
 /// </summary>
 node MarkupElementContentSyntax : MarkupContentSyntax {
-    Element : MarkupElementSyntax;
+	Element : MarkupElementSyntax;
 }
 
 /// <summary>
 /// Inline expression content: { expr }.
 /// </summary>
 node MarkupInlineExpressionSyntax : MarkupContentSyntax {
-    Expression : InlineExpressionSyntax;
+	Expression : InlineExpressionSyntax;
 }
 
 
@@ -375,9 +375,9 @@ abstract node MarkupAttributeSyntax : MarkupSyntaxNode;
 /// Plain attribute: Name="Value".
 /// </summary>
 node MarkupPlainAttributeSyntax : MarkupAttributeSyntax {
-    Name        : SimpleName;
-    EqualsToken : EqualsToken;
-    Value?      : MarkupAttributeValueSyntax;
+	Name        : SimpleName;
+	EqualsToken : EqualsToken;
+	Value?      : MarkupAttributeValueSyntax;
 }
 
 /// <summary>
@@ -385,11 +385,11 @@ node MarkupPlainAttributeSyntax : MarkupAttributeSyntax {
 /// (e.g. bind:Text=..., react={...}, OnClose={...}).
 /// </summary>
 node MarkupPrefixedAttributeSyntax : MarkupAttributeSyntax {
-    Prefix      : BindToken | OutToken;
-    Colon       : ColonToken;
-    Name        : SimpleName;
-    EqualsToken : EqualsToken;
-    Value?      : MarkupAttributeValueSyntax;
+	Prefix      : BindToken | OutToken;
+	Colon       : ColonToken;
+	Name        : SimpleName;
+	EqualsToken : EqualsToken;
+	Value?      : MarkupAttributeValueSyntax;
 }
 
 /// <summary>
@@ -401,16 +401,16 @@ abstract node MarkupAttributeValueSyntax : MarkupSyntaxNode;
 /// Literal attribute value, e.g. "User dashboard".
 /// </summary>
 node MarkupLiteralAttributeValueSyntax : MarkupAttributeValueSyntax {
-    Prefix? : MarkupTextLiteralSyntax;
-    Value?  : MarkupTextLiteralSyntax;
+	Prefix? : MarkupTextLiteralSyntax;
+	Value?  : MarkupTextLiteralSyntax;
 }
 
 /// <summary>
 /// Dynamic attribute value, e.g. { search } or { () => SaveNew() }.
 /// </summary>
 node MarkupDynamicAttributeValueSyntax : MarkupAttributeValueSyntax {
-    Prefix?    : MarkupTextLiteralSyntax;
-    Expression : InlineExpressionSyntax;
+	Prefix?    : MarkupTextLiteralSyntax;
+	Expression : InlineExpressionSyntax;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -429,11 +429,11 @@ abstract node TailwindAttributeSyntax : MarkupAttributeSyntax;
 abstract node TailwindSegmentSyntax;
 
 node TailwindIdentifierSegmentSyntax : TailwindSegmentSyntax {
-    Name : SimpleName;
+	Name : SimpleName;
 }
 
 node TailwindNumericSegmentSyntax : TailwindSegmentSyntax {
-    Number : NumericLiteralToken;
+	Number : NumericLiteralToken;
 }
 
 /// <summary>
@@ -441,7 +441,7 @@ node TailwindNumericSegmentSyntax : TailwindSegmentSyntax {
 /// Used for patterns like `p-{a}` or `gap-{state * 2}`.
 /// </summary>
 node TailwindExpressionSegmentSyntax : TailwindSegmentSyntax {
-    Expression : InlineExpressionSyntax; // { expr }
+	Expression : InlineExpressionSyntax; // { expr }
 }
 
 /// <summary>
@@ -451,7 +451,7 @@ node TailwindExpressionSegmentSyntax : TailwindSegmentSyntax {
 ///   items-center
 /// </summary>
 node TailwindFlagAttributeSyntax : TailwindAttributeSyntax {
-    Name : SimpleName;
+	Name : SimpleName;
 }
 
 
@@ -463,7 +463,7 @@ node TailwindFlagAttributeSyntax : TailwindAttributeSyntax {
 /// </summary>
 abstract node TailwindPrefixSegmentSyntax
 {
-    Colon : ColonToken;
+	Colon : ColonToken;
 }
 
 /// <summary>
@@ -473,8 +473,8 @@ abstract node TailwindPrefixSegmentSyntax
 ///   lg:flex
 /// </summary>
 node SimpleConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
-    Name  : SimpleName;   // sm / md / lg / xl / 2xl / etc.
-    Colon : ColonToken;   // :
+	Name  : SimpleName;   // sm / md / lg / xl / 2xl / etc.
+	Colon : ColonToken;   // :
 }
 
 /// <summary>
@@ -483,16 +483,16 @@ node SimpleConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
 ///   {isMobile}:w-40
 /// </summary>
 node ExpressionConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
-    Expression : InlineExpressionSyntax; // { expr }
-    Colon      : ColonToken;             // :
+	Expression : InlineExpressionSyntax; // { expr }
+	Colon      : ColonToken;             // :
 }
 
 
 node TailwindFullAttributeSyntax : TailwindAttributeSyntax {
-    Prefix?   : TailwindPrefixSegmentSyntax;
-    Name      : SimpleName;                                    // aw / w / h / p / etc.
-    Minus?    : MinusToken;                                    // null if no segments
-    Segments  : syntaxlist<TailwindSegmentSyntax, MinusToken>; // may contain binding segments, e.g. {width}
+	Prefix?   : TailwindPrefixSegmentSyntax;
+	Name      : SimpleName;                                    // aw / w / h / p / etc.
+	Minus?    : MinusToken;                                    // null if no segments
+	Segments  : syntaxlist<TailwindSegmentSyntax, MinusToken>; // may contain binding segments, e.g. {width}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -506,8 +506,8 @@ node TailwindFullAttributeSyntax : TailwindAttributeSyntax {
 ///   • @utilities { ... } with parameterized utilities.
 /// </summary>
 node AkcssDocumentSyntax {
-    Members   : syntaxlist<AkcssTopLevelMember>;
-    EndOfFile : Token;
+	Members   : syntaxlist<AkcssTopLevelMember>;
+	EndOfFile : Token;
 }
 
 /// <summary>
@@ -526,7 +526,7 @@ abstract node AkcssTopLevelMember;
 /// Base type for any statement inside a style or utility body:
 ///   • simple assignment: Property : expr;
 ///   • @if(condition) { ... }
-///   • pseudo-state block: @hover { ... }, @hover@checked { ... }
+///   • named at-selector block kept as syntax/extension surface.
 /// Utilities may use the same constructs; invalid combinations
 /// are rejected at the semantic layer.
 /// </summary>
@@ -541,10 +541,10 @@ abstract node AkcssBodyMemberSyntax;
 /// Semicolon is optional to allow slightly looser formatting.
 /// </summary>
 node AkcssAssignmentSyntax : AkcssBodyMemberSyntax {
-    PropertyName : SimpleName;            // Background / Opacity / Width / ...
-    Colon        : ColonToken;           // ':'
-    Expression   : CSharpExpressionSyntax;
-    Semicolon?   : SemicolonToken;       // optional ';'
+	PropertyName : SimpleName;            // Background / Opacity / Width / ...
+	Colon        : ColonToken;           // ':'
+	Expression   : CSharpExpressionSyntax;
+	Semicolon?   : SemicolonToken;       // optional ';'
 }
 
 /// <summary>
@@ -558,62 +558,76 @@ node AkcssAssignmentSyntax : AkcssBodyMemberSyntax {
 /// decides how to track the referenced properties / parameters.
 /// </summary>
 node AkcssIfDirectiveSyntax : AkcssBodyMemberSyntax {
-    AtToken    : AtToken;                 // '@'
-    IfKeyword  : IfKeyword;               // 'if'
-    OpenParen  : OpenParenToken;          // '('
-    Condition  : CSharpExpressionSyntax;  // Property == value
-    CloseParen : CloseParenToken;         // ')'
-    OpenBrace  : OpenBraceToken;          // '{'
-    Members    : syntaxlist<AkcssBodyMemberSyntax>;
-    CloseBrace : CloseBraceToken;         // '}'
+	AtToken    : AtToken;                 // '@'
+	IfKeyword  : IfKeyword;               // 'if'
+	OpenParen  : OpenParenToken;          // '('
+	Condition  : CSharpExpressionSyntax;  // Property == value
+	CloseParen : CloseParenToken;         // ')'
+	OpenBrace  : OpenBraceToken;          // '{'
+	Members    : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace : CloseBraceToken;         // '}'
 }
 
 /// <summary>
-/// Additional pseudo-state segment after the first one:
-///   @hover@checked
+/// Additional named selector segment after the first one:
+///   @name@modifier
 ///        └────── this part
+///
+/// State-dependent styles such as hover/checked are expressed with @if(...)
+/// conditions instead of dedicated state-name blocks.
 /// </summary>
 node AkcssAdditionalPseudoStateSyntax {
-    AtToken : AtToken;        // '@'
-    State   : SimpleName;     // checked / active / focused / ...
+	AtToken : AtToken;        // '@'
+	State   : SimpleName;     // modifier / variant / extension name / ...
 }
 
 /// <summary>
-/// Pseudo-state selector:
-///   @hover
-///   @hover@checked
+/// Named at-selector parsed as a pseudo selector:
+///   @name
+///   @name@modifier
 ///
-/// Parsed as:
-///   AtToken       : '@'
-///   FirstState    : SimpleName;  // hover
-///   Additional    : syntaxlist<AkcssAdditionalPseudoStateSyntax>;
-/// </summary>
-node AkcssPseudoSelectorSyntax {
-    AtToken    : AtToken;                                // '@'
-    FirstState : SimpleName;                             // hover
-    Additional : syntaxlist<AkcssAdditionalPseudoStateSyntax>;
-}
-
-/// <summary>
-/// Pseudo-state block:
+/// This node preserves the syntax shape for extension or compatibility
+/// scenarios. It is not the current way to model control states.
+/// State-dependent Akcss should use @if(...) with a normal C# expression:
 ///
-///   @hover {
+///   @if(IsHovered) {
 ///       Background : "LightBlue";
 ///   }
 ///
-///   @hover@checked {
-///       BorderBrush : "Green";
+/// Parsed as:
+///   AtToken       : '@'
+///   FirstState    : SimpleName;  // name
+///   Additional    : syntaxlist<AkcssAdditionalPseudoStateSyntax>;
+/// </summary>
+node AkcssPseudoSelectorSyntax {
+	AtToken    : AtToken;                                // '@'
+	FirstState : SimpleName;                             // name
+	Additional : syntaxlist<AkcssAdditionalPseudoStateSyntax>;
+}
+
+/// <summary>
+/// Named at-selector block:
+///
+///   @name {
+///       Property : value;
 ///   }
 ///
 /// Inside are regular AkcssBodyMemberSyntax items (assignments, nested @if, ...).
-/// It is mainly meaningful inside style rules; usage inside utilities
-/// can be restricted by the semantic layer.
+/// This node is retained as a syntax/extension surface; ordinary
+/// state-based styling should be written as conditional Akcss:
+///
+///   @if(IsHovered) {
+///       Background : "LightBlue";
+///   }
+///
+/// The semantic layer may reject, reinterpret, or reserve named at-selector
+/// blocks depending on the active feature set.
 /// </summary>
 node AkcssPseudoBlockSyntax : AkcssBodyMemberSyntax {
-    Selector  : AkcssPseudoSelectorSyntax;
-    OpenBrace : OpenBraceToken;
-    Members   : syntaxlist<AkcssBodyMemberSyntax>;
-    CloseBrace: CloseBraceToken;
+	Selector  : AkcssPseudoSelectorSyntax;
+	OpenBrace : OpenBraceToken;
+	Members   : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace: CloseBraceToken;
 }
 
 
@@ -630,10 +644,10 @@ node AkcssPseudoBlockSyntax : AkcssBodyMemberSyntax {
 /// or bound to a default base type (e.g., Control) by the semantic layer.
 /// </summary>
 node AkcssStyleRuleSyntax : AkcssTopLevelMember {
-    Selector  : AkcssStyleSelectorSyntax;
-    OpenBrace : OpenBraceToken;
-    Members   : syntaxlist<AkcssBodyMemberSyntax>;
-    CloseBrace: CloseBraceToken;
+	Selector  : AkcssStyleSelectorSyntax;
+	OpenBrace : OpenBraceToken;
+	Members   : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace: CloseBraceToken;
 }
 
 /// <summary>
@@ -648,9 +662,9 @@ node AkcssStyleRuleSyntax : AkcssTopLevelMember {
 ///   Name        : 'myclass'
 /// </summary>
 node AkcssStyleSelectorSyntax {
-    TargetType? : SimpleName;  // optional type prefix: Button / Control / ...
-    DotToken    : DotToken;    // '.'
-    Name        : SimpleName;  // class name: myclass
+	TargetType? : SimpleName;  // optional type prefix: Button / Control / ...
+	DotToken    : DotToken;    // '.'
+	Name        : SimpleName;  // class name: myclass
 }
 
 
@@ -684,11 +698,11 @@ node AkcssStyleSelectorSyntax {
 /// Identifier "utilities" is validated at the semantic layer.
 /// </summary>
 node AkcssUtilitiesSectionSyntax : AkcssTopLevelMember {
-    AtToken        : AtToken;          // '@'
-    UtilitiesToken : UtilitiesKeyword; // utilities
-    OpenBrace      : OpenBraceToken;   // '{'
-    Utilities      : syntaxlist<AkcssUtilityDeclarationSyntax>;
-    CloseBrace     : CloseBraceToken;  // '}'
+	AtToken        : AtToken;          // '@'
+	UtilitiesToken : UtilitiesKeyword; // utilities
+	OpenBrace      : OpenBraceToken;   // '{'
+	Utilities      : syntaxlist<AkcssUtilityDeclarationSyntax>;
+	CloseBrace     : CloseBraceToken;  // '}'
 }
 
 /// <summary>
@@ -700,11 +714,11 @@ node AkcssUtilitiesSectionSyntax : AkcssTopLevelMember {
 ///   - (Type name)
 /// </summary>
 node AkcssUtilityParameterSyntax {
-    Minus     : MinusToken;       // '-'
-    OpenParen : OpenParenToken;   // '('
-    Type      : CSharpTypeSyntax; // double / Variant / MySuperPuperEnum / ...
-    ParamName : SimpleName;       // width / a / variant / enam / ...
-    CloseParen: CloseParenToken;  // ')'
+	Minus     : MinusToken;       // '-'
+	OpenParen : OpenParenToken;   // '('
+	Type      : CSharpTypeSyntax; // double / Variant / MySuperPuperEnum / ...
+	ParamName : SimpleName;       // width / a / variant / enam / ...
+	CloseParen: CloseParenToken;  // ')'
 }
 
 /// <summary>
@@ -725,10 +739,10 @@ node AkcssUtilityParameterSyntax {
 /// the utility as applicable to the default base type (e.g., Control).
 /// </summary>
 node AkcssUtilitySelectorSyntax {
-    TargetType? : SimpleName;                        // optional: Button / Control / ...
-    DotToken    : DotToken;                          // '.'
-    Name        : SimpleName;                        // utility name: w / flag / someutil / btn
-    Parameters  : syntaxlist<AkcssUtilityParameterSyntax>;
+	TargetType? : SimpleName;                        // optional: Button / Control / ...
+	DotToken    : DotToken;                          // '.'
+	Name        : SimpleName;                        // utility name: w / flag / someutil / btn
+	Parameters  : syntaxlist<AkcssUtilityParameterSyntax>;
 }
 
 /// <summary>
@@ -745,10 +759,10 @@ node AkcssUtilitySelectorSyntax {
 /// Body consists of AkcssBodyMemberSyntax items: assignments, @if, etc.
 /// </summary>
 node AkcssUtilityDeclarationSyntax {
-    Selector  : AkcssUtilitySelectorSyntax;
-    OpenBrace : OpenBraceToken;
-    Members   : syntaxlist<AkcssBodyMemberSyntax>;
-    CloseBrace: CloseBraceToken;
+	Selector  : AkcssUtilitySelectorSyntax;
+	OpenBrace : OpenBraceToken;
+	Members   : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace: CloseBraceToken;
 }
 
 
@@ -785,7 +799,7 @@ abstract node MarkupComponentNameSyntax;
 ///   <Button />
 /// </summary>
 node MarkupSimpleComponentNameSyntax : MarkupComponentNameSyntax {
-    Name : SimpleName;
+	Name : SimpleName;
 }
 
 /// <summary>
@@ -793,8 +807,8 @@ node MarkupSimpleComponentNameSyntax : MarkupComponentNameSyntax {
 ///   ak::
 /// </summary>
 node MarkupAliasQualifierSyntax {
-    Alias       : SimpleName;
-    DoubleColon : DoubleColonToken; // ::
+	Alias       : SimpleName;
+	DoubleColon : DoubleColonToken; // ::
 }
 
 /// <summary>
@@ -803,9 +817,9 @@ node MarkupAliasQualifierSyntax {
 ///   {T1, T2}
 /// </summary>
 node MarkupGenericArgumentListSyntax {
-    OpenBrace  : OpenBraceToken; // {
-    Arguments  : syntaxlist<CSharpTypeSyntax, CommaToken>;
-    CloseBrace : CloseBraceToken; // }
+	OpenBrace  : OpenBraceToken; // {
+	Arguments  : syntaxlist<CSharpTypeSyntax, CommaToken>;
+	CloseBrace : CloseBraceToken; // }
 }
 
 /// <summary>
@@ -820,7 +834,7 @@ abstract node MarkupNameSegmentSyntax;
 ///   Component
 /// </summary>
 node MarkupIdentifierNameSegmentSyntax : MarkupNameSegmentSyntax {
-    Name : SimpleName;
+	Name : SimpleName;
 }
 
 /// <summary>
@@ -829,8 +843,8 @@ node MarkupIdentifierNameSegmentSyntax : MarkupNameSegmentSyntax {
 ///   Component{T1, T2}
 /// </summary>
 node MarkupGenericNameSegmentSyntax : MarkupNameSegmentSyntax {
-    Name        : SimpleName;
-    GenericArgs : MarkupGenericArgumentListSyntax;
+	Name        : SimpleName;
+	GenericArgs : MarkupGenericArgumentListSyntax;
 }
 
 /// <summary>
@@ -840,7 +854,7 @@ node MarkupGenericNameSegmentSyntax : MarkupNameSegmentSyntax {
 ///   Namespace.Sub{T}.Component{U}
 /// </summary>
 node MarkupQualifiedNameSyntax {
-    Segments : syntaxlist<MarkupNameSegmentSyntax, DotToken>;
+	Segments : syntaxlist<MarkupNameSegmentSyntax, DotToken>;
 }
 
 /// <summary>
@@ -854,8 +868,8 @@ node MarkupQualifiedNameSyntax {
 /// Generics may appear on any segment.
 /// </summary>
 node MarkupQualifiedComponentNameSyntax : MarkupComponentNameSyntax {
-    AliasQualifier? : MarkupAliasQualifierSyntax;
-    Name            : MarkupQualifiedNameSyntax;
+	AliasQualifier? : MarkupAliasQualifierSyntax;
+	Name            : MarkupQualifiedNameSyntax;
 }
 
 

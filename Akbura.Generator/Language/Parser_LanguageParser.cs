@@ -277,6 +277,207 @@ partial class Parser
 
     #endregion
 
+    #region MarkupAttributeSyntax
+
+    internal GreenMarkupAttributeSyntax ParseMarkupAttributeSyntax()
+    {
+        if (IsMarkupPrefixedAttributeStart())
+        {
+            return ParseMarkupPrefixedAttributeSyntax();
+        }
+
+        if (IsPlainMarkupAttributeStart())
+        {
+            return ParseMarkupPlainAttributeSyntax();
+        }
+
+        return ParseTailwindAttributeSyntax();
+    }
+
+    private bool IsMarkupPrefixedAttributeStart()
+    {
+        return CurrentToken.Kind is SyntaxKind.BindToken or SyntaxKind.OutToken &&
+            PeekToken(1).Kind == SyntaxKind.ColonToken;
+    }
+
+    private bool IsPlainMarkupAttributeStart()
+    {
+        return IsMarkupNameToken(CurrentToken) &&
+            PeekToken(1).Kind == SyntaxKind.EqualsToken;
+    }
+
+    private GreenMarkupPlainAttributeSyntax ParseMarkupPlainAttributeSyntax()
+    {
+        var name = ParseMarkupSimpleName();
+        var equals = EatToken(SyntaxKind.EqualsToken);
+        var value = ParseMarkupAttributeValueSyntax();
+
+        return GreenSyntaxFactory.MarkupPlainAttributeSyntax(name, equals, value);
+    }
+
+    private GreenMarkupPrefixedAttributeSyntax ParseMarkupPrefixedAttributeSyntax()
+    {
+        var prefix = EatToken();
+        AkburaDebug.Assert(prefix.Kind is SyntaxKind.BindToken or SyntaxKind.OutToken, "Expected bind or out prefix.");
+
+        var colon = EatToken(SyntaxKind.ColonToken);
+        var name = ParseMarkupSimpleName();
+        var equals = EatToken(SyntaxKind.EqualsToken);
+        var value = ParseMarkupAttributeValueSyntax();
+
+        return GreenSyntaxFactory.MarkupPrefixedAttributeSyntax(prefix, colon, name, equals, value);
+    }
+
+    private GreenMarkupAttributeValueSyntax? ParseMarkupAttributeValueSyntax()
+    {
+        return CurrentToken.Kind switch
+        {
+            SyntaxKind.OpenBraceToken => GreenSyntaxFactory.MarkupDynamicAttributeValueSyntax(
+                prefix: null,
+                expression: ParseInlineExpressionSyntax()),
+            SyntaxKind.DoubleQuoteToken or SyntaxKind.SingleQuoteToken => GreenSyntaxFactory.MarkupLiteralAttributeValueSyntax(
+                prefix: null,
+                value: ParseQuotedMarkupTextLiteralSyntax()),
+            _ => null,
+        };
+    }
+
+    private GreenMarkupTextLiteralSyntax ParseQuotedMarkupTextLiteralSyntax()
+    {
+        var quoteKind = CurrentToken.Kind;
+        AkburaDebug.Assert(quoteKind is SyntaxKind.DoubleQuoteToken or SyntaxKind.SingleQuoteToken, "Expected quote token.");
+
+        var rawText = new StringBuilder();
+        var valueText = new StringBuilder();
+
+        var openQuote = EatToken();
+        rawText.Append(openQuote.ToFullString());
+
+        while (CurrentToken.Kind != quoteKind &&
+               CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+        {
+            var token = EatToken();
+            var tokenText = token.ToFullString();
+            rawText.Append(tokenText);
+            valueText.Append(tokenText);
+        }
+
+        var closeQuote = EatToken(quoteKind);
+        rawText.Append(closeQuote.ToFullString());
+
+        var textToken = (GreenSyntaxToken)GreenSyntaxFactory.AkTextLiteralToken(
+            rawText.ToString(),
+            valueText.ToString())!;
+
+        var tokens = _pool.Allocate<GreenSyntaxToken>();
+        try
+        {
+            tokens.Add(textToken);
+            return GreenSyntaxFactory.MarkupTextLiteralSyntax(tokens.ToList());
+        }
+        finally
+        {
+            _pool.Free(tokens);
+        }
+    }
+
+    #endregion
+
+    #region TailwindAttributeSyntax
+
+    internal GreenTailwindAttributeSyntax ParseTailwindAttributeSyntax()
+    {
+        var prefix = TryParseTailwindPrefixSegmentSyntax();
+        var name = ParseTailwindSimpleName();
+
+        if (CurrentToken.Kind != SyntaxKind.MinusToken)
+        {
+            if (prefix is null)
+            {
+                return GreenSyntaxFactory.TailwindFlagAttributeSyntax(name);
+            }
+
+            return GreenSyntaxFactory.TailwindFullAttributeSyntax(
+                prefix,
+                name,
+                minus: null,
+                segments: default);
+        }
+
+        var minus = EatToken(SyntaxKind.MinusToken);
+        var segments = _pool.AllocateSeparated<GreenTailwindSegmentSyntax>();
+
+        try
+        {
+            segments.Add(ParseTailwindSegmentSyntax());
+
+            while (CurrentToken.Kind == SyntaxKind.MinusToken)
+            {
+                segments.AddSeparator(EatToken(SyntaxKind.MinusToken));
+                segments.Add(ParseTailwindSegmentSyntax());
+            }
+
+            return GreenSyntaxFactory.TailwindFullAttributeSyntax(
+                prefix,
+                name,
+                minus,
+                segments.ToList());
+        }
+        finally
+        {
+            _pool.Free(segments);
+        }
+    }
+
+    private GreenTailwindPrefixSegmentSyntax? TryParseTailwindPrefixSegmentSyntax()
+    {
+        if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
+        {
+            var expression = ParseInlineExpressionSyntax();
+            var colon = EatToken(SyntaxKind.ColonToken);
+            return GreenSyntaxFactory.ExpressionConditionalPrefixSyntax(expression, colon);
+        }
+
+        if (IsTailwindNameToken(CurrentToken) &&
+            PeekToken(1).Kind == SyntaxKind.ColonToken &&
+            !IsMarkupPrefixedAttributeStart())
+        {
+            var name = ParseTailwindSimpleName();
+            var colon = EatToken(SyntaxKind.ColonToken);
+            return GreenSyntaxFactory.SimpleConditionalPrefixSyntax(name, colon);
+        }
+
+        return null;
+    }
+
+    private GreenTailwindSegmentSyntax ParseTailwindSegmentSyntax()
+    {
+        return CurrentToken.Kind switch
+        {
+            SyntaxKind.NumericLiteralToken => GreenSyntaxFactory.TailwindNumericSegmentSyntax(
+                EatToken(SyntaxKind.NumericLiteralToken)),
+            SyntaxKind.OpenBraceToken => GreenSyntaxFactory.TailwindExpressionSegmentSyntax(
+                ParseInlineExpressionSyntax()),
+            _ => GreenSyntaxFactory.TailwindIdentifierSegmentSyntax(
+                ParseTailwindSimpleName()),
+        };
+    }
+
+    #endregion
+
+    #region InlineExpressionSyntax
+
+    internal GreenInlineExpressionSyntax ParseInlineExpressionSyntax()
+    {
+        var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+        var expression = ParseCSharpExpressionInMode(Lexer.LexerMode.InInlineExpression);
+        var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+        return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, expression, closeBrace);
+    }
+
+    #endregion
+
     #region MarkupComponentNameSyntax
 
     internal GreenMarkupComponentNameSyntax ParseMarkupComponentNameSyntax()
@@ -393,6 +594,46 @@ partial class Parser
 
     #region IdentifierNameSyntax
 
+    private GreenIdentifierNameSyntax ParseMarkupSimpleName()
+    {
+        if (IsMarkupNameToken(CurrentToken))
+        {
+            return GreenSyntaxFactory.IdentifierName(EatMarkupNameTokenAsIdentifier());
+        }
+
+        return GreenSyntaxFactory.IdentifierName(ParseIdentifierToken());
+    }
+
+    private GreenIdentifierNameSyntax ParseTailwindSimpleName()
+    {
+        if (IsTailwindNameToken(CurrentToken))
+        {
+            return GreenSyntaxFactory.IdentifierName(EatMarkupNameTokenAsIdentifier());
+        }
+
+        return GreenSyntaxFactory.IdentifierName(ParseIdentifierToken());
+    }
+
+    private GreenSyntaxToken EatMarkupNameTokenAsIdentifier()
+    {
+        var token = EatToken();
+
+        return token.Kind == SyntaxKind.IdentifierToken
+            ? token
+            : ConvertToIdentifier(token);
+    }
+
+    private static bool IsMarkupNameToken(GreenSyntaxToken token)
+    {
+        return token.Kind == SyntaxKind.IdentifierToken;
+    }
+
+    private static bool IsTailwindNameToken(GreenSyntaxToken token)
+    {
+        return token.Kind == SyntaxKind.IdentifierToken ||
+            (SyntaxFacts.IsReservedKeyword(token.Kind) && token.ValueText is not null);
+    }
+
     private GreenIdentifierNameSyntax ParseIdentifierName()
     {
         if (CurrentToken.Kind == SyntaxKind.IdentifierToken)
@@ -464,9 +705,14 @@ partial class Parser
 
     private GreenCSharpExpressionSyntax ParseCShaprExpressionUntilSemicolon()
     {
+        return ParseCSharpExpressionInMode(Lexer.LexerMode.InExpressionUntilSemicolon);
+    }
+
+    private GreenCSharpExpressionSyntax ParseCSharpExpressionInMode(Lexer.LexerMode expressionMode)
+    {
         var mode = _mode;
 
-        _mode = Lexer.LexerMode.InExpressionUntilSemicolon;
+        _mode = expressionMode;
 
         var token = EatToken();
 

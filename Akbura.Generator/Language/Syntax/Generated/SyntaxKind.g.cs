@@ -92,8 +92,13 @@ namespace Akbura.Language.Syntax
         BindToken = 155,
         InToken = 156,
         OutToken = 157,
+        UsingKeyword = 158,
+        NamespaceKeyword = 159,
+        GlobalKeyword = 160,
+        StaticKeyword = 161,
+        UnsafeKeyword = 162,
 
-        UtilitiesKeyword = 158,
+        UtilitiesKeyword = 163,
 
         LastTokenWithWellKnownText = UtilitiesKeyword,
 
@@ -140,6 +145,11 @@ namespace Akbura.Language.Syntax
 
         // User hooks
         UserHook = 519,
+
+        // Using and namespace directives
+        UsingAliasSyntax = 761,
+        UsingDirectiveSyntax = 762,
+        NamespaceDeclarationSyntax = 763,
 
         // Markup tree
         MarkupSyntaxNode = 520,

@@ -22,7 +22,7 @@ partial class Parser
 		{
 			while (CurrentToken.Kind != SyntaxKind.EndOfFileToken)
 			{
-				var member = ParseTopLevelMember();
+				var member = ParseCompilationUnitMember();
 				members.Add(member);
 			}
 
@@ -33,6 +33,17 @@ partial class Parser
 		{
 			_pool.Free(members);
 		}
+	}
+
+	internal GreenAkTopLevelMemberSyntax ParseCompilationUnitMember()
+	{
+		return CurrentToken.Kind switch
+		{
+			SyntaxKind.UsingKeyword => ParseUsingDirectiveSyntax(),
+			SyntaxKind.GlobalKeyword when PeekToken(1).Kind == SyntaxKind.UsingKeyword => ParseUsingDirectiveSyntax(),
+			SyntaxKind.NamespaceKeyword => ParseNamespaceDeclarationSyntax(),
+			_ => ParseTopLevelMember()
+		};
 	}
 
 	internal GreenAkTopLevelMemberSyntax ParseTopLevelMember()
@@ -48,6 +59,72 @@ partial class Parser
 			_ => default!
 		};
 	}
+
+	#region UsingAndNamespaceSyntax
+
+	internal GreenUsingDirectiveSyntax ParseUsingDirectiveSyntax()
+	{
+		GreenSyntaxToken? globalKeyword = null;
+		if (CurrentToken.Kind == SyntaxKind.GlobalKeyword &&
+			PeekToken(1).Kind == SyntaxKind.UsingKeyword)
+		{
+			globalKeyword = EatToken(SyntaxKind.GlobalKeyword);
+		}
+
+		var usingKeyword = EatToken(SyntaxKind.UsingKeyword);
+		var staticKeyword = TryEatToken(SyntaxKind.StaticKeyword);
+		var unsafeKeyword = TryEatToken(SyntaxKind.UnsafeKeyword);
+		var alias = TryParseUsingAliasSyntax();
+		var name = ParseRequiredCSharpTypeSyntax();
+		var semicolon = EatToken(SyntaxKind.SemicolonToken);
+
+		return GreenSyntaxFactory.UsingDirectiveSyntax(
+			globalKeyword,
+			usingKeyword,
+			staticKeyword,
+			unsafeKeyword,
+			alias,
+			name,
+			semicolon);
+	}
+
+	private GreenUsingAliasSyntax? TryParseUsingAliasSyntax()
+	{
+		if (CurrentToken.Kind != SyntaxKind.IdentifierToken ||
+			PeekToken(1).Kind != SyntaxKind.EqualsToken)
+		{
+			return null;
+		}
+
+		var name = ParseIdentifierName();
+		var equals = EatToken(SyntaxKind.EqualsToken);
+
+		return GreenSyntaxFactory.UsingAliasSyntax(name, equals);
+	}
+
+	internal GreenNamespaceDeclarationSyntax ParseNamespaceDeclarationSyntax()
+	{
+		var namespaceKeyword = EatToken(SyntaxKind.NamespaceKeyword);
+		var name = ParseRequiredCSharpTypeSyntax();
+		var semicolon = EatToken(SyntaxKind.SemicolonToken);
+
+		return GreenSyntaxFactory.NamespaceDeclarationSyntax(namespaceKeyword, name, semicolon);
+	}
+
+	private GreenCSharpTypeSyntax ParseRequiredCSharpTypeSyntax()
+	{
+		var rawText = new StringBuilder();
+
+		while (CurrentToken.Kind is not (SyntaxKind.SemicolonToken or SyntaxKind.EndOfFileToken))
+		{
+			rawText.Append(EatToken().ToFullString());
+		}
+
+		return GreenSyntaxFactory.CSharpTypeSyntax(
+			GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText.ToString())));
+	}
+
+	#endregion
 
 	#region StateDeclarationSyntax
 

@@ -125,6 +125,11 @@ namespace Akbura.Language.Syntax
                 SyntaxKind.BindToken => "bind",
                 SyntaxKind.InToken => "in",
                 SyntaxKind.OutToken => "out",
+                SyntaxKind.UsingKeyword => "using",
+                SyntaxKind.NamespaceKeyword => "namespace",
+                SyntaxKind.GlobalKeyword => "global",
+                SyntaxKind.StaticKeyword => "static",
+                SyntaxKind.UnsafeKeyword => "unsafe",
 
                 SyntaxKind.UtilitiesKeyword => "utilities",
 
@@ -162,6 +167,11 @@ namespace Akbura.Language.Syntax
                 case "bind": return SyntaxKind.BindToken;
                 case "in": return SyntaxKind.InToken;
                 case "out": return SyntaxKind.OutToken;
+                case "using": return SyntaxKind.UsingKeyword;
+                case "namespace": return SyntaxKind.NamespaceKeyword;
+                case "global": return SyntaxKind.GlobalKeyword;
+                case "static": return SyntaxKind.StaticKeyword;
+                case "unsafe": return SyntaxKind.UnsafeKeyword;
 
                 case "utilities": return SyntaxKind.UtilitiesKeyword;
 
@@ -220,6 +230,11 @@ namespace Akbura.Language.Syntax
                 case SyntaxKind.BindToken:
                 case SyntaxKind.InToken:
                 case SyntaxKind.OutToken:
+                case SyntaxKind.UsingKeyword:
+                case SyntaxKind.NamespaceKeyword:
+                case SyntaxKind.GlobalKeyword:
+                case SyntaxKind.StaticKeyword:
+                case SyntaxKind.UnsafeKeyword:
                     return true;
 
                 default:

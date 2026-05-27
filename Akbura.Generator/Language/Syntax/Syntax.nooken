@@ -73,6 +73,11 @@ token AtToken            = "@";
 token BindToken          = "bind";
 token InToken            = "in";
 token OutToken           = "out";
+token UsingKeyword       = "using";
+token NamespaceKeyword   = "namespace";
+token GlobalKeyword      = "global";
+token StaticKeyword      = "static";
+token UnsafeKeyword      = "unsafe";
 
 token UtilitiesKeyword    = "utilities";
 
@@ -161,6 +166,55 @@ node AkburaDocumentSyntax {
 // ─────────────────────────────────────────────────────────────
 // INJECT / PARAM / STATE / COMMAND DECLARATIONS 
 // ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Alias prefix in a C# using directive:
+///   using Alias = My.Namespace.Type;
+///   global using unsafe Alias = int*;
+/// </summary>
+node UsingAliasSyntax {
+	Name        : SimpleName;
+	EqualsToken : EqualsToken;
+}
+
+/// <summary>
+/// File-level C# using directive. Supports the C# directive forms Akbura
+/// forwards to generated C#:
+///   using System;
+///   using static System.Math;
+///   using Alias = My.Namespace.Type;
+///   using unsafe Alias = int*;
+///   global using System;
+///   global using static System.Math;
+///   global using Alias = My.Namespace.Type;
+///   global using unsafe Alias = int*;
+///
+/// This is a top-level directive only; it is not valid inside component
+/// bodies or namespace/member lists.
+/// </summary>
+node UsingDirectiveSyntax : AkTopLevelMember {
+	GlobalKeyword? : GlobalKeyword;
+	UsingKeyword   : UsingKeyword;
+	StaticKeyword? : StaticKeyword;
+	UnsafeKeyword? : UnsafeKeyword;
+	Alias?         : UsingAliasSyntax;
+	Name           : CSharpTypeSyntax;
+	Semicolon      : SemicolonToken;
+}
+
+/// <summary>
+/// File-scoped namespace directive:
+///   namespace My.App;
+///
+/// The directive is flat in Akbura syntax: following top-level members remain
+/// siblings in AkburaDocumentSyntax.Members. Block-scoped namespace syntax is
+/// intentionally not represented here.
+/// </summary>
+node NamespaceDeclarationSyntax : AkTopLevelMember {
+	NamespaceKeyword : NamespaceKeyword;
+	Name             : CSharpTypeSyntax;
+	Semicolon        : SemicolonToken;
+}
 
 /// <summary>inject ILogger&lt;ProfileWithTasks&gt; log;</summary>
 node InjectDeclarationSyntax : AkTopLevelMember {

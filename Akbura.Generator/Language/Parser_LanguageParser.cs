@@ -39,6 +39,7 @@ partial class Parser
 	{
 		return CurrentToken.Kind switch
 		{
+			SyntaxKind.AtToken when PeekToken(1).Kind == SyntaxKind.AkcssKeyword => ParseInlineAkcssBlockSyntax(),
 			SyntaxKind.UsingKeyword => ParseUsingDirectiveSyntax(),
 			SyntaxKind.GlobalKeyword when PeekToken(1).Kind == SyntaxKind.UsingKeyword => ParseUsingDirectiveSyntax(),
 			SyntaxKind.NamespaceKeyword => ParseNamespaceDeclarationSyntax(),
@@ -59,6 +60,432 @@ partial class Parser
 			_ => ParseCSharpStatementSyntax()
 		};
 	}
+
+	#region InlineAkcssBlockSyntax
+
+	internal GreenInlineAkcssBlockSyntax ParseInlineAkcssBlockSyntax()
+	{
+		var mode = _mode;
+		_mode = Lexer.LexerMode.InAkcss;
+
+		try
+		{
+			var atToken = EatToken(SyntaxKind.AtToken);
+			var akcssKeyword = EatToken(SyntaxKind.AkcssKeyword);
+			var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+			var members = ParseAkcssTopLevelMemberList();
+			var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+			return GreenSyntaxFactory.InlineAkcssBlockSyntax(
+				atToken,
+				akcssKeyword,
+				openBrace,
+				members,
+				closeBrace);
+		}
+		finally
+		{
+			_mode = mode;
+		}
+	}
+
+	#endregion
+
+	#region AkcssSyntax
+
+	internal GreenAkcssDocumentSyntax ParseAkcssDocumentSyntax()
+	{
+		var mode = _mode;
+		_mode = Lexer.LexerMode.InAkcss;
+
+		try
+		{
+			var members = ParseAkcssTopLevelMemberList(stopAtCloseBrace: false);
+			var eof = EatToken(SyntaxKind.EndOfFileToken);
+
+			return GreenSyntaxFactory.AkcssDocumentSyntax(members, eof);
+		}
+		finally
+		{
+			_mode = mode;
+		}
+	}
+
+	internal GreenAkcssTopLevelMemberSyntax ParseAkcssTopLevelMemberSyntax()
+	{
+		var mode = _mode;
+		_mode = Lexer.LexerMode.InAkcss;
+
+		try
+		{
+			return ParseAkcssTopLevelMemberSyntaxCore();
+		}
+		finally
+		{
+			_mode = mode;
+		}
+	}
+
+	private GreenAkcssTopLevelMemberSyntax ParseAkcssTopLevelMemberSyntaxCore()
+	{
+		return CurrentToken.Kind == SyntaxKind.AtToken &&
+			PeekToken(1).Kind == SyntaxKind.UtilitiesKeyword
+				? ParseAkcssUtilitiesSectionSyntaxCore()
+				: ParseAkcssStyleRuleSyntaxCore();
+	}
+
+	private GreenSyntaxList<GreenAkcssTopLevelMemberSyntax> ParseAkcssTopLevelMemberList(bool stopAtCloseBrace = true)
+	{
+		var members = _pool.Allocate<GreenAkcssTopLevelMemberSyntax>();
+
+		try
+		{
+			while (CurrentToken.Kind != SyntaxKind.EndOfFileToken &&
+				   (!stopAtCloseBrace || CurrentToken.Kind != SyntaxKind.CloseBraceToken))
+			{
+				members.Add(ParseAkcssTopLevelMemberSyntaxCore());
+			}
+
+			return members.ToList();
+		}
+		finally
+		{
+			_pool.Free(members);
+		}
+	}
+
+	internal GreenAkcssStyleRuleSyntax ParseAkcssStyleRuleSyntax()
+	{
+		var mode = _mode;
+		_mode = Lexer.LexerMode.InAkcss;
+
+		try
+		{
+			return ParseAkcssStyleRuleSyntaxCore();
+		}
+		finally
+		{
+			_mode = mode;
+		}
+	}
+
+	private GreenAkcssStyleRuleSyntax ParseAkcssStyleRuleSyntaxCore()
+	{
+		var selector = ParseAkcssStyleSelectorSyntax();
+		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+		var members = ParseAkcssBodyMemberList();
+		var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+		return GreenSyntaxFactory.AkcssStyleRuleSyntax(selector, openBrace, members, closeBrace);
+	}
+
+	private GreenAkcssStyleSelectorSyntax ParseAkcssStyleSelectorSyntax()
+	{
+		var (targetType, dotToken, name) = ParseAkcssDottedSelectorParts();
+		return GreenSyntaxFactory.AkcssStyleSelectorSyntax(targetType, dotToken, name);
+	}
+
+	internal GreenAkcssUtilitiesSectionSyntax ParseAkcssUtilitiesSectionSyntax()
+	{
+		var mode = _mode;
+		_mode = Lexer.LexerMode.InAkcss;
+
+		try
+		{
+			return ParseAkcssUtilitiesSectionSyntaxCore();
+		}
+		finally
+		{
+			_mode = mode;
+		}
+	}
+
+	private GreenAkcssUtilitiesSectionSyntax ParseAkcssUtilitiesSectionSyntaxCore()
+	{
+		var atToken = EatToken(SyntaxKind.AtToken);
+		var utilitiesToken = EatToken(SyntaxKind.UtilitiesKeyword);
+		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+		var utilities = _pool.Allocate<GreenAkcssUtilityDeclarationSyntax>();
+
+		try
+		{
+			while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+			{
+				utilities.Add(ParseAkcssUtilityDeclarationSyntax());
+			}
+
+			var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+			return GreenSyntaxFactory.AkcssUtilitiesSectionSyntax(
+				atToken,
+				utilitiesToken,
+				openBrace,
+				utilities.ToList(),
+				closeBrace);
+		}
+		finally
+		{
+			_pool.Free(utilities);
+		}
+	}
+
+	private GreenAkcssUtilityDeclarationSyntax ParseAkcssUtilityDeclarationSyntax()
+	{
+		var selector = ParseAkcssUtilitySelectorSyntax();
+		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+		var members = ParseAkcssBodyMemberList();
+		var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+		return GreenSyntaxFactory.AkcssUtilityDeclarationSyntax(selector, openBrace, members, closeBrace);
+	}
+
+	private GreenAkcssUtilitySelectorSyntax ParseAkcssUtilitySelectorSyntax()
+	{
+		var (targetType, dotToken, name) = ParseAkcssDottedSelectorParts();
+		var parameters = _pool.Allocate<GreenAkcssUtilityParameterSyntax>();
+
+		try
+		{
+			while (CurrentToken.Kind == SyntaxKind.MinusToken &&
+				   PeekToken(1).Kind == SyntaxKind.OpenParenToken)
+			{
+				parameters.Add(ParseAkcssUtilityParameterSyntax());
+			}
+
+			return GreenSyntaxFactory.AkcssUtilitySelectorSyntax(
+				targetType,
+				dotToken,
+				name,
+				parameters.ToList());
+		}
+		finally
+		{
+			_pool.Free(parameters);
+		}
+	}
+
+	private GreenAkcssUtilityParameterSyntax ParseAkcssUtilityParameterSyntax()
+	{
+		var minus = EatToken(SyntaxKind.MinusToken);
+		var openParen = EatToken(SyntaxKind.OpenParenToken);
+		var type = ParseCShaprType();
+		var paramName = ParseAkcssSimpleName();
+		var closeParen = EatToken(SyntaxKind.CloseParenToken);
+
+		return GreenSyntaxFactory.AkcssUtilityParameterSyntax(
+			minus,
+			openParen,
+			type,
+			paramName,
+			closeParen);
+	}
+
+	private GreenSyntaxList<GreenAkcssBodyMemberSyntax> ParseAkcssBodyMemberList()
+	{
+		var members = _pool.Allocate<GreenAkcssBodyMemberSyntax>();
+
+		try
+		{
+			while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+			{
+				members.Add(ParseAkcssBodyMemberSyntax());
+			}
+
+			return members.ToList();
+		}
+		finally
+		{
+			_pool.Free(members);
+		}
+	}
+
+	private GreenAkcssBodyMemberSyntax ParseAkcssBodyMemberSyntax()
+	{
+		if (CurrentToken.Kind == SyntaxKind.AtToken &&
+			PeekToken(1).Kind == SyntaxKind.IfKeyword)
+		{
+			return ParseAkcssIfDirectiveSyntax();
+		}
+
+		if (CurrentToken.Kind == SyntaxKind.AtToken)
+		{
+			return ParseAkcssPseudoBlockSyntax();
+		}
+
+		return ParseAkcssAssignmentSyntax();
+	}
+
+	private GreenAkcssAssignmentSyntax ParseAkcssAssignmentSyntax()
+	{
+		var propertyName = ParseAkcssSimpleName();
+		var colon = EatToken(SyntaxKind.ColonToken);
+		var expression = ParseAkcssExpressionUntilSemicolonOrCloseBrace();
+		var semicolon = TryEatToken(SyntaxKind.SemicolonToken);
+
+		return GreenSyntaxFactory.AkcssAssignmentSyntax(propertyName, colon, expression, semicolon);
+	}
+
+	private GreenAkcssIfDirectiveSyntax ParseAkcssIfDirectiveSyntax()
+	{
+		var atToken = EatToken(SyntaxKind.AtToken);
+		var ifKeyword = EatToken(SyntaxKind.IfKeyword);
+		var openParen = EatToken(SyntaxKind.OpenParenToken);
+		var condition = ParseAkcssExpressionUntil(SyntaxKind.CloseParenToken);
+		var closeParen = EatToken(SyntaxKind.CloseParenToken);
+		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+		var members = ParseAkcssBodyMemberList();
+		var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+		return GreenSyntaxFactory.AkcssIfDirectiveSyntax(
+			atToken,
+			ifKeyword,
+			openParen,
+			condition,
+			closeParen,
+			openBrace,
+			members,
+			closeBrace);
+	}
+
+	private GreenAkcssPseudoBlockSyntax ParseAkcssPseudoBlockSyntax()
+	{
+		var selector = ParseAkcssPseudoSelectorSyntax();
+		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+		var members = ParseAkcssBodyMemberList();
+		var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+		return GreenSyntaxFactory.AkcssPseudoBlockSyntax(selector, openBrace, members, closeBrace);
+	}
+
+	private GreenAkcssPseudoSelectorSyntax ParseAkcssPseudoSelectorSyntax()
+	{
+		var atToken = EatToken(SyntaxKind.AtToken);
+		var firstState = ParseAkcssSimpleName();
+		var additional = _pool.Allocate<GreenAkcssAdditionalPseudoStateSyntax>();
+
+		try
+		{
+			while (CurrentToken.Kind == SyntaxKind.AtToken &&
+				   IsAkcssNameToken(PeekToken(1)))
+			{
+				additional.Add(ParseAkcssAdditionalPseudoStateSyntax());
+			}
+
+			return GreenSyntaxFactory.AkcssPseudoSelectorSyntax(
+				atToken,
+				firstState,
+				additional.ToList());
+		}
+		finally
+		{
+			_pool.Free(additional);
+		}
+	}
+
+	private GreenAkcssAdditionalPseudoStateSyntax ParseAkcssAdditionalPseudoStateSyntax()
+	{
+		var atToken = EatToken(SyntaxKind.AtToken);
+		var state = ParseAkcssSimpleName();
+
+		return GreenSyntaxFactory.AkcssAdditionalPseudoStateSyntax(atToken, state);
+	}
+
+	private (GreenSimpleNameSyntax? TargetType, GreenSyntaxToken DotToken, GreenSimpleNameSyntax Name) ParseAkcssDottedSelectorParts()
+	{
+		GreenSimpleNameSyntax? targetType = null;
+
+		if (IsAkcssNameToken(CurrentToken) &&
+			PeekToken(1).Kind == SyntaxKind.DotToken)
+		{
+			targetType = ParseAkcssSimpleName();
+		}
+
+		var dotToken = EatToken(SyntaxKind.DotToken);
+		var name = ParseAkcssSimpleName();
+
+		return (targetType, dotToken, name);
+	}
+
+	private GreenIdentifierNameSyntax ParseAkcssSimpleName()
+	{
+		if (IsAkcssNameToken(CurrentToken))
+		{
+			return GreenSyntaxFactory.IdentifierName(EatMarkupNameTokenAsIdentifier());
+		}
+
+		return GreenSyntaxFactory.IdentifierName(ParseIdentifierToken());
+	}
+
+	private static bool IsAkcssNameToken(GreenSyntaxToken token)
+	{
+		return token.Kind == SyntaxKind.IdentifierToken ||
+			token.Kind == SyntaxKind.UtilitiesKeyword ||
+			token.Kind == SyntaxKind.AkcssKeyword ||
+			(SyntaxFacts.IsReservedKeyword(token.Kind) && token.ValueText is not null);
+	}
+
+	private GreenCSharpExpressionSyntax ParseAkcssExpressionUntilSemicolonOrCloseBrace()
+		=> ParseAkcssExpressionUntil(SyntaxKind.SemicolonToken, SyntaxKind.CloseBraceToken);
+
+	private GreenCSharpExpressionSyntax ParseAkcssExpressionUntil(
+		SyntaxKind firstTerminator,
+		SyntaxKind? secondTerminator = null)
+	{
+		var rawText = new StringBuilder();
+		var parenDepth = 0;
+		var bracketDepth = 0;
+		var braceDepth = 0;
+
+		while (CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+		{
+			var kind = CurrentToken.Kind;
+
+			if (parenDepth == 0 &&
+				bracketDepth == 0 &&
+				braceDepth == 0 &&
+				(kind == firstTerminator ||
+				 (secondTerminator.HasValue && kind == secondTerminator.Value)))
+			{
+				break;
+			}
+
+			var token = EatToken();
+			rawText.Append(token.ToFullString());
+
+			switch (kind)
+			{
+				case SyntaxKind.OpenParenToken:
+					parenDepth++;
+					break;
+				case SyntaxKind.CloseParenToken when parenDepth > 0:
+					parenDepth--;
+					break;
+				case SyntaxKind.OpenBracketToken:
+					bracketDepth++;
+					break;
+				case SyntaxKind.CloseBracketToken when bracketDepth > 0:
+					bracketDepth--;
+					break;
+				case SyntaxKind.OpenBraceToken:
+					braceDepth++;
+					break;
+				case SyntaxKind.CloseBraceToken when braceDepth > 0:
+					braceDepth--;
+					break;
+			}
+		}
+
+		var expression = CSharpFactory.ParseExpression(
+			rawText.ToString(),
+			offset: 0,
+			options: null,
+			consumeFullText: true);
+
+		return GreenSyntaxFactory.CSharpExpressionSyntax(
+			GreenSyntaxFactory.CSharpRawToken(expression));
+	}
+
+	#endregion
 
 	#region UsingAndNamespaceSyntax
 

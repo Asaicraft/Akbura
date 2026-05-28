@@ -80,6 +80,7 @@ token StaticKeyword      = "static";
 token UnsafeKeyword      = "unsafe";
 
 token UtilitiesKeyword    = "utilities";
+token AkcssKeyword        = "akcss";
 
 [id 200]
 /*
@@ -101,7 +102,7 @@ token CSharpRawToken;
 // ─────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Any construct allowed at file top-level (inject/param/state/useEffect/func/markup).
+/// Any construct allowed at file top-level (using/namespace/inject/param/state/useEffect/func/markup/@akcss).
 /// Base type AkburaSyntaxNode is implicit.
 /// </summary>
 abstract node AkTopLevelMember;
@@ -161,6 +162,26 @@ node AkburaDocumentSyntax {
 	/// End-of-file token provided by the host; we reference it as a generic Token.
 	/// </summary>
 	EndOfFile : Token;
+}
+
+/// <summary>
+/// Inline Akcss section embedded in an .akbura file:
+///
+///   @akcss {
+///       .btn { Background : "Red"; }
+///       @utilities { ... }
+///   }
+///
+/// The block contains the same top-level members as a standalone .akcss file.
+/// It is parsed as a flat AkTopLevelMember; style/codegen merging is handled
+/// outside this syntax node.
+/// </summary>
+node InlineAkcssBlockSyntax : AkTopLevelMember {
+	AtToken      : AtToken;
+	AkcssKeyword : AkcssKeyword;
+	OpenBrace    : OpenBraceToken;
+	Members      : syntaxlist<AkcssTopLevelMember>;
+	CloseBrace   : CloseBraceToken;
 }
 
 // ─────────────────────────────────────────────────────────────

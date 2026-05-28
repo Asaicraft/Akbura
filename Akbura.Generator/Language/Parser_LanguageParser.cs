@@ -56,7 +56,7 @@ partial class Parser
 			SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
 			SyntaxKind.UseEffectKeyword => ParseUseEffectDeclarationSyntax(),
 			SyntaxKind.LessThanToken => ParseMarkupRootSyntax(),
-			_ => default!
+			_ => ParseCSharpStatementSyntax()
 		};
 	}
 
@@ -122,6 +122,98 @@ partial class Parser
 
 		return GreenSyntaxFactory.CSharpTypeSyntax(
 			GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText.ToString())));
+	}
+
+	#endregion
+
+	#region CSharpStatementSyntax
+
+	internal GreenCSharpStatementSyntax ParseCSharpStatementSyntax()
+	{
+		var tokens = _pool.Allocate<GreenSyntaxToken>();
+		var canHaveBlockBody = IsCSharpBlockStatementStarter(CurrentToken);
+		var parenDepth = 0;
+		var bracketDepth = 0;
+		var braceDepth = 0;
+
+		try
+		{
+			while (CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+			{
+				var kind = CurrentToken.Kind;
+
+				if (kind == SyntaxKind.CloseBraceToken && braceDepth == 0)
+				{
+					break;
+				}
+
+				if (kind == SyntaxKind.OpenBraceToken &&
+					parenDepth == 0 &&
+					bracketDepth == 0 &&
+					braceDepth == 0 &&
+					canHaveBlockBody)
+				{
+					var body = ParseCSharpBlock();
+					return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body);
+				}
+
+				var token = EatToken();
+				tokens.Add(token);
+
+				switch (kind)
+				{
+					case SyntaxKind.OpenParenToken:
+						parenDepth++;
+						break;
+					case SyntaxKind.CloseParenToken when parenDepth > 0:
+						parenDepth--;
+						break;
+					case SyntaxKind.OpenBracketToken:
+						bracketDepth++;
+						break;
+					case SyntaxKind.CloseBracketToken when bracketDepth > 0:
+						bracketDepth--;
+						break;
+					case SyntaxKind.OpenBraceToken:
+						braceDepth++;
+						break;
+					case SyntaxKind.CloseBraceToken when braceDepth > 0:
+						braceDepth--;
+						break;
+					case SyntaxKind.SemicolonToken when parenDepth == 0 && bracketDepth == 0 && braceDepth == 0:
+						return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body: null);
+				}
+			}
+
+			return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body: null);
+		}
+		finally
+		{
+			_pool.Free(tokens);
+		}
+	}
+
+	private static bool IsCSharpBlockStatementStarter(GreenSyntaxToken token)
+	{
+		return token.Kind is SyntaxKind.IfKeyword or
+			SyntaxKind.ForKeyword or
+			SyntaxKind.ElseKeyword or
+			SyntaxKind.UsingKeyword or
+			SyntaxKind.UnsafeKeyword or
+			SyntaxKind.FinallyKeyword ||
+			token.ValueText is "while" or
+				"foreach" or
+				"switch" or
+				"lock" or
+				"try" or
+				"catch" or
+				"finally" or
+				"using" or
+				"fixed" or
+				"checked" or
+				"unchecked" or
+				"unsafe" or
+				"do";
 	}
 
 	#endregion

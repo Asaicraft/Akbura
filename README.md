@@ -30,6 +30,7 @@ Akbura is an active exploration of what a modern reactive UI language for .NET c
 * [States](#states)
 
   * [Binding to viewmodel](#binding-to-viewmodel)
+* [Conditional Rendering](#conditional-rendering)
 * [Parameters](#parameters)
 
   * [Parameters Binding](#parameters-binding)
@@ -277,6 +278,52 @@ state string surname = in vm.Surname; // one-way binding to vm.Surname property
 	<Input Value="Full Name: {fullName}"/>
 </Stack>
 ```
+
+## Conditional Rendering
+
+Akbura supports top-level C# control-flow blocks in component files. This means a component can contain a normal `if` statement, and the body may contain regular C# statements and markup as siblings.
+
+```akbura
+state isOpen = false;
+
+if(isOpen)
+{
+	Console.WriteLine("Panel is open");
+
+	<TextBlock Text="Opened!"/>
+}
+
+<Button OnClick={isOpen = true}>Open</Button>
+```
+
+This syntax is intentionally top-level only. Akbura does not currently support Razor-style control flow inside markup content:
+
+```akbura
+<Button>
+	@if(isOpen)
+	{
+		<FirstControl/>
+	}
+	@else
+	{
+		<SecondControl/>
+	}
+</Button>
+```
+
+For now, the recommended production-style approach is still the classic visibility pattern: always declare the component in markup, then control whether it is visible.
+
+```akbura
+state isBox1Visible = true;
+state isBox2Visible = false;
+
+<StackPanel>
+	<Border class="box" IsVisible={isBox1Visible}/>
+	<Border class="box" {!isBox2Visible}:hidden/>
+</StackPanel>
+```
+
+The top-level `if` form is useful for parser and future rendering work, but full conditional branch generation is still evolving. Prefer `IsVisible={...}` or conditional Tailwind utilities such as `{condition}:hidden` when you need predictable behavior today.
 
 ## Parameters
 

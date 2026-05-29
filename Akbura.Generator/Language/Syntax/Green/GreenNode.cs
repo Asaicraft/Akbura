@@ -162,7 +162,9 @@ internal abstract partial class GreenNode
 
         internal init
         {
-            var slotCount = (ushort)(value & 0b_0000_0000_0000_1111);
+            var slotCount = value > 14
+                ? (ushort)15
+                : (ushort)(value & 0b_0000_0000_0000_1111);
 
             _nodeFlagsAndSlotCount |= slotCount;
         }

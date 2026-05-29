@@ -957,12 +957,14 @@ partial class Parser
 	private GreenMarkupTextLiteralSyntax ParseMarkupTextLiteralSyntax()
 	{
 		var rawText = new StringBuilder();
+		var hasUnsupportedControlFlowDirective = false;
 
 		while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or
 			   SyntaxKind.LessThanToken or
 			   SyntaxKind.LessSlashToken or
 			   SyntaxKind.OpenBraceToken))
 		{
+			hasUnsupportedControlFlowDirective |= IsUnsupportedMarkupControlFlowDirectiveStart();
 			rawText.Append(EatToken().ToFullString());
 		}
 
@@ -979,12 +981,47 @@ partial class Parser
 		try
 		{
 			tokens.Add(textToken);
-			return GreenSyntaxFactory.MarkupTextLiteralSyntax(tokens.ToList());
+			var text = GreenSyntaxFactory.MarkupTextLiteralSyntax(tokens.ToList());
+
+			if (hasUnsupportedControlFlowDirective)
+			{
+				text = AddErrorToFirstToken(text, ErrorCodes.ERR_SyntaxError);
+			}
+
+			return text;
 		}
 		finally
 		{
 			_pool.Free(tokens);
 		}
+	}
+
+	private bool IsUnsupportedMarkupControlFlowDirectiveStart()
+	{
+		if (CurrentToken.Kind == SyntaxKind.IdentifierToken &&
+			CurrentToken.Text.Length > 1 &&
+			CurrentToken.Text[0] == '@')
+		{
+			var name = CurrentToken.Text.TrimStart('@');
+
+			return name is "if" or
+				"else" or
+				"for" or
+				"foreach" or
+				"while";
+		}
+
+		if (CurrentToken.Kind != SyntaxKind.AtToken)
+		{
+			return false;
+		}
+
+		var keyword = PeekToken(1);
+
+		return keyword.Kind is SyntaxKind.IfKeyword or
+			SyntaxKind.ElseKeyword or
+			SyntaxKind.ForKeyword ||
+			keyword.ValueText is "foreach" or "while";
 	}
 
 	#endregion

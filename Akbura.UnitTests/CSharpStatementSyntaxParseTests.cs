@@ -78,6 +78,38 @@ public class CSharpStatementSyntaxParseTests
 	}
 
 	[Fact]
+	public void CompilationUnit_TopLevelIfWithCSharpAndMarkupBody_ParseSuccessfully()
+	{
+		const string code =
+			"state isOpen = false;\n" +
+			"\n" +
+			"if(isOpen)\n" +
+			"{\n" +
+			"     Console.WriteLine(\"Hello world!\");\n" +
+			"\n" +
+			"     <TextBlock Text=\"Not Openned!\"/>\n" +
+			"}\n" +
+			"\n" +
+			"<Button OnClick={isOpen = true}>Hello world!</Button>";
+
+		var parser = MakeParser(code);
+
+		var syntax = parser.ParseCompilationUnit();
+
+		Assert.Equal(3, syntax.Members.Count);
+		Assert.IsType<GreenStateDeclarationSyntax>(syntax.Members[0]);
+
+		var statement = Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[1]);
+		Assert.NotNull(statement.Body);
+		Assert.Equal(2, statement.Body!.Tokens.Count);
+		Assert.IsType<GreenCSharpStatementSyntax>(statement.Body.Tokens[0]);
+		Assert.IsType<GreenMarkupRootSyntax>(statement.Body.Tokens[1]);
+
+		Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[2]);
+		Assert.Equal(code, syntax.ToFullString());
+	}
+
+	[Fact]
 	public void CompilationUnit_CounterComponent_ParseSuccessfully()
 	{
 		const string code =

@@ -163,6 +163,66 @@ public class MarkupNodeSyntaxParseTests
     }
 
     [Fact]
+    public void InlineTernaryExpressionContent_ParseSuccessfully()
+    {
+        const string code = "<Text>{isOpen ? \"Hi\": \"Arnold\"}</Text>";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+
+        Assert.False(syntax.ContainsDiagnostics);
+        Assert.IsType<GreenMarkupInlineExpressionSyntax>(syntax.Element.Body[0]);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void MarkupBodyControlFlowDirective_ProducesDiagnosticAndRoundTrips()
+    {
+        const string code =
+            "<Button OnClick={isOpen = true}>\n" +
+            "    @if(isOpen)\n" +
+            "    {\n" +
+            "          <FirstControl/> \n" +
+            "    }\n" +
+            "    @else\n" +
+            "    {\n" +
+            "          <SecondControl/> \n" +
+            "    }\n" +
+            "</Button>";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+
+        AssertMarkupTextDiagnostic(syntax);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Theory]
+    [InlineData("<Button>@if(isOpen){<FirstControl/>}</Button>")]
+    [InlineData("<Button>@else{<SecondControl/>}</Button>")]
+    [InlineData("<Button>@for(var i = 0; i != 10; i++){<Item/>}</Button>")]
+    [InlineData("<Button>@foreach(var item in items){<Item/>}</Button>")]
+    public void MarkupBodyControlFlowDirectiveVariants_ProduceDiagnostic(string code)
+    {
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+
+        AssertMarkupTextDiagnostic(syntax);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    private static void AssertMarkupTextDiagnostic(GreenMarkupRootSyntax syntax)
+    {
+        var text = Assert.IsType<GreenMarkupTextLiteralSyntax>(syntax.Element.Body[0]);
+
+        Assert.True(text.ContainsDiagnosticsDirectly);
+        Assert.NotEmpty(text.GetDiagnostics());
+    }
+
+    [Fact]
     public void CompilationUnit_WithMarkupRoot_ParseSuccessfully()
     {
         const string code = "<HelloWorld></HelloWorld>";

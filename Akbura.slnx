@@ -3,6 +3,7 @@
     <BuildType Name="Debug" />
     <BuildType Name="DebugStats" />
     <BuildType Name="Release" />
+    <BuildType Name="ReleaseStats" />
   </Configurations>
   <Folder Name="/draft-concepts/">
     <File Path="draft-concepts/Dependecy Injection.md" />

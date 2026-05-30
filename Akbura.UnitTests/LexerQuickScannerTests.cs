@@ -188,6 +188,31 @@ public class LexerQuickScannerTests
 		Assert.True(quick.Fallbacks > 0);
 	}
 
+	[Theory]
+	[InlineData("@class")]
+	[InlineData("@if(isOpen)")]
+	[InlineData("@akcss = 1;")]
+	[InlineData("state @name = 0;")]
+	[InlineData("    @if(isOpen)")]
+	public void TopLevelVerbatimAtIdentifiers_FallBackAndMatchRegularLexer(string code)
+	{
+		var quick = AssertQuickMatchesRegular(code, Lexer.LexerMode.TopLevel);
+
+		Assert.True(quick.Fallbacks > 0);
+	}
+
+	[Fact]
+	public void InAkcssAtDirectives_QuickScanAndMatchRegularLexer()
+	{
+		const string code =
+			"@utilities { .w-(double width) { Width: width * Spacing; } }\n" +
+			".btn { @if(IsHovered) { Background: \"Blue\"; } }";
+
+		var quick = AssertQuickMatchesRegular(code, Lexer.LexerMode.InAkcss);
+
+		Assert.True(quick.Hits > 0);
+	}
+
 	private static (string Text, SyntaxKind[] Kinds, int Hits, int Fallbacks) AssertQuickMatchesRegular(
 		string code,
 		Lexer.LexerMode mode)

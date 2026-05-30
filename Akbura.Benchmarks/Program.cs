@@ -27,7 +27,7 @@ public class LexerQuickScannerBenchmarks
 {
     private SourceText _source = null!;
 
-    [Params(80)]
+    [Params(80, 800, 8_000)]
     public int Repetitions { get; set; }
 
     [GlobalSetup]
@@ -96,7 +96,7 @@ public sealed class QuickScanBenchmarkConfig : ManualConfig
     public QuickScanBenchmarkConfig()
     {
         AddJob(
-            Job.Default
+            Job.LongRun
                 .WithMsBuildArguments(
                     "/p:EnableQuickScanBenchmark=true",
                     "/p:EnableAkburaStats=true",

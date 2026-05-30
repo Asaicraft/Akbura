@@ -1,54 +1,129 @@
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Akbura.Language;
 
 internal sealed partial class Lexer
 {
 	/// <summary>
-	/// Small deterministic scanner states used by the quick path.
+	/// Compact ASCII classification for the quick path.
 	///
 	/// The regular lexer below is still the source of truth. This scanner is only
 	/// allowed to accept short, ordinary DSL tokens that are obviously complete in
 	/// the current <see cref="SlidingTextWindow"/> chunk. Anything that might need
 	/// Roslyn's C# parser, unicode identifier rules, comments, diagnostics, numeric
-	/// suffixes, escape handling, or cross-window reads returns <see cref="Bad"/>
-	/// and lets the existing lexer do the real work.
+	/// suffixes, escape handling, or cross-window reads falls back to the regular
+	/// lexer.
 	/// </summary>
-	private enum QuickScanState : byte
+	[Flags]
+	private enum QuickCharKind : byte
 	{
-		Initial,
-		Whitespace,
-		NewLine,
-		Identifier,
-		Number,
-		Punctuation,
-		Done,
-		Bad
+		Complex = 0,
+		White = 1 << 0,
+		NewLine = 1 << 1,
+		IdentifierStart = 1 << 2,
+		IdentifierPart = 1 << 3,
+		Digit = 1 << 4,
+		Punctuation = 1 << 5,
+		Slash = 1 << 6
 	}
 
-	private readonly struct QuickTokenData
+	private static readonly byte[] s_quickCharKinds = CreateQuickCharKinds();
+
+	private static readonly ushort[] s_singleCharTokenKinds = CreateSingleCharTokenKinds();
+
+	private static byte[] CreateQuickCharKinds()
 	{
-		public QuickTokenData(
-			SyntaxKind kind,
-			GreenNode? leading,
-			GreenNode? trailing,
-			string? text,
-			int intValue)
+		var kinds = new byte[128];
+
+		SetQuickCharKind(kinds, '\0', QuickCharKind.Punctuation);
+
+		SetQuickCharKind(kinds, ' ', QuickCharKind.White);
+		SetQuickCharKind(kinds, '\t', QuickCharKind.White);
+		SetQuickCharKind(kinds, '\v', QuickCharKind.White);
+		SetQuickCharKind(kinds, '\f', QuickCharKind.White);
+		SetQuickCharKind(kinds, '\u001A', QuickCharKind.White);
+		SetQuickCharKind(kinds, '\r', QuickCharKind.NewLine);
+		SetQuickCharKind(kinds, '\n', QuickCharKind.NewLine);
+
+		for (var ch = 'a'; ch <= 'z'; ch++)
 		{
-			Kind = kind;
-			Leading = leading;
-			Trailing = trailing;
-			Text = text;
-			IntValue = intValue;
+			SetQuickCharKind(kinds, ch, QuickCharKind.IdentifierStart | QuickCharKind.IdentifierPart);
 		}
 
-		public readonly SyntaxKind Kind;
-		public readonly GreenNode? Leading;
-		public readonly GreenNode? Trailing;
-		public readonly string? Text;
-		public readonly int IntValue;
+		for (var ch = 'A'; ch <= 'Z'; ch++)
+		{
+			SetQuickCharKind(kinds, ch, QuickCharKind.IdentifierStart | QuickCharKind.IdentifierPart);
+		}
+
+		SetQuickCharKind(kinds, '_', QuickCharKind.IdentifierStart | QuickCharKind.IdentifierPart);
+
+		for (var ch = '0'; ch <= '9'; ch++)
+		{
+			SetQuickCharKind(kinds, ch, QuickCharKind.Digit | QuickCharKind.IdentifierPart);
+		}
+
+		foreach (var ch in "'\"+-*%^|&?:;,.=!<>{}[]()@~")
+		{
+			SetQuickCharKind(kinds, ch, QuickCharKind.Punctuation);
+		}
+
+		SetQuickCharKind(kinds, '/', QuickCharKind.Slash | QuickCharKind.Punctuation);
+
+		return kinds;
+	}
+
+	private static ushort[] CreateSingleCharTokenKinds()
+	{
+		var kinds = new ushort[128];
+
+		SetSingleCharTokenKind(kinds, '\'', SyntaxKind.SingleQuoteToken);
+		SetSingleCharTokenKind(kinds, '"', SyntaxKind.DoubleQuoteToken);
+		SetSingleCharTokenKind(kinds, '/', SyntaxKind.SlashToken);
+		SetSingleCharTokenKind(kinds, '.', SyntaxKind.DotToken);
+		SetSingleCharTokenKind(kinds, ':', SyntaxKind.ColonToken);
+		SetSingleCharTokenKind(kinds, '=', SyntaxKind.EqualsToken);
+		SetSingleCharTokenKind(kinds, '!', SyntaxKind.BangToken);
+		SetSingleCharTokenKind(kinds, '<', SyntaxKind.LessThanToken);
+		SetSingleCharTokenKind(kinds, '>', SyntaxKind.GreaterThanToken);
+		SetSingleCharTokenKind(kinds, '+', SyntaxKind.PlusToken);
+		SetSingleCharTokenKind(kinds, '-', SyntaxKind.MinusToken);
+		SetSingleCharTokenKind(kinds, '*', SyntaxKind.AsteriskToken);
+		SetSingleCharTokenKind(kinds, '%', SyntaxKind.PercentToken);
+		SetSingleCharTokenKind(kinds, '^', SyntaxKind.CaretToken);
+		SetSingleCharTokenKind(kinds, '|', SyntaxKind.BarToken);
+		SetSingleCharTokenKind(kinds, '&', SyntaxKind.AmpersandToken);
+		SetSingleCharTokenKind(kinds, '?', SyntaxKind.QuestionToken);
+		SetSingleCharTokenKind(kinds, ';', SyntaxKind.SemicolonToken);
+		SetSingleCharTokenKind(kinds, ',', SyntaxKind.CommaToken);
+		SetSingleCharTokenKind(kinds, '{', SyntaxKind.OpenBraceToken);
+		SetSingleCharTokenKind(kinds, '}', SyntaxKind.CloseBraceToken);
+		SetSingleCharTokenKind(kinds, '[', SyntaxKind.OpenBracketToken);
+		SetSingleCharTokenKind(kinds, ']', SyntaxKind.CloseBracketToken);
+		SetSingleCharTokenKind(kinds, '(', SyntaxKind.OpenParenToken);
+		SetSingleCharTokenKind(kinds, ')', SyntaxKind.CloseParenToken);
+
+		return kinds;
+	}
+
+	private static void SetQuickCharKind(byte[] kinds, char ch, QuickCharKind kind)
+	{
+		kinds[ch] = (byte)kind;
+	}
+
+	private static void SetSingleCharTokenKind(ushort[] kinds, char ch, SyntaxKind kind)
+	{
+		kinds[ch] = (ushort)kind;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static QuickCharKind GetQuickCharKind(char ch)
+	{
+		return ch < s_quickCharKinds.Length
+			? (QuickCharKind)s_quickCharKinds[ch]
+			: QuickCharKind.Complex;
 	}
 
 	private bool TryQuickScanToken(LexerMode mode, out GreenSyntaxToken token)
@@ -81,36 +156,21 @@ internal sealed partial class Lexer
 			return false;
 		}
 
-		var leadingEnd = 0;
-		if (!TryQuickScanTrivia(span, ref leadingEnd, isTrailing: false, _leadingTriviaCache, out var leading))
+		// The quick path deliberately scans only width + hash. Real token,
+		// trivia, interned text, values, and diagnostics are created by the
+		// regular lexer only on a cache miss.
+		Start();
+
+		var scanSpan = span.Length > MaxCachedTokenSize
+			? span[..MaxCachedTokenSize]
+			: span;
+
+		var hashCode = HashCode.FnvOffsetBias;
+		if (!TryQuickScanTokenWidthOnly(mode, scanSpan, ref hashCode, out var fullWidth))
 		{
 			return false;
 		}
 
-		if (leadingEnd >= span.Length)
-		{
-			return false;
-		}
-
-		if (!TryQuickScanSyntaxToken(
-			mode,
-			span,
-			leadingEnd,
-			out var kind,
-			out var tokenWidth,
-			out var tokenText,
-			out var intValue))
-		{
-			return false;
-		}
-
-		var trailingEnd = leadingEnd + tokenWidth;
-		if (!TryQuickScanTrivia(span, ref trailingEnd, isTrailing: true, _trailingTriviaCache, out var trailing))
-		{
-			return false;
-		}
-
-		var fullWidth = trailingEnd;
 		if (fullWidth <= 0 || fullWidth > MaxCachedTokenSize)
 		{
 			return false;
@@ -119,212 +179,187 @@ internal sealed partial class Lexer
 		// If we consumed exactly to the end of the current window, but not to EOF,
 		// the next chunk could still contain token/trivia continuation. Falling
 		// back keeps the quick path from guessing across the sliding-window seam.
-		if (fullWidth == span.Length &&
+		if (fullWidth == scanSpan.Length &&
 			TextWindow.Position + fullWidth < TextWindow.Text.Length)
 		{
 			return false;
 		}
 
 		var fullTokenSpan = span[..fullWidth];
-		var hashCode = HashCode.GetFNVHashCode(fullTokenSpan);
-		var data = new QuickTokenData(kind, leading, trailing, tokenText, intValue);
+		TextWindow.AdvanceChar(fullWidth);
 
 		token = _cache.LookupToken(
 			fullTokenSpan,
 			hashCode,
-			static data => CreateQuickToken(data),
-			data);
+			static lexer => CreateQuickTokenFromRegularLexer(lexer),
+			this);
 
-		TextWindow.AdvanceChar(fullWidth);
 		return true;
 	}
 
-	private bool TryQuickScanTrivia(
+	private static bool TryQuickScanTokenWidthOnly(
+		LexerMode mode,
+		ReadOnlySpan<char> span,
+		ref int hashCode,
+		out int fullWidth)
+	{
+		fullWidth = 0;
+
+		var index = 0;
+		if (!TryQuickScanTriviaWidthOnly(span, ref index, isTrailing: false, ref hashCode))
+		{
+			return false;
+		}
+
+		if (index >= span.Length)
+		{
+			return false;
+		}
+
+		if (!TryQuickScanSyntaxTokenWidthOnly(mode, span, index, ref hashCode, out var tokenWidth))
+		{
+			return false;
+		}
+
+		index += tokenWidth;
+		if (!TryQuickScanTriviaWidthOnly(span, ref index, isTrailing: true, ref hashCode))
+		{
+			return false;
+		}
+
+		fullWidth = index;
+		return true;
+	}
+
+	private static bool TryQuickScanTriviaWidthOnly(
 		ReadOnlySpan<char> span,
 		ref int index,
 		bool isTrailing,
-		GreenSyntaxListBuilder builder,
-		out GreenNode? trivia)
+		ref int hashCode)
 	{
-		builder.Clear();
-		trivia = null;
-
-		var state = QuickScanState.Initial;
-
 		while (index < span.Length)
 		{
 			var ch = span[index];
-
-			state = ch switch
+			if (ch >= s_quickCharKinds.Length)
 			{
-				' ' or '\t' or '\v' or '\f' or '\u001A' => QuickScanState.Whitespace,
-				'\r' or '\n' => QuickScanState.NewLine,
-				'/' => QuickScanState.Bad,
-				> (char)127 => QuickScanState.Bad,
-				_ => QuickScanState.Done
-			};
-
-			switch (state)
-			{
-				case QuickScanState.Whitespace:
-					builder.Add(QuickScanWhitespaceTrivia(span, ref index));
-					continue;
-
-				case QuickScanState.NewLine:
-					builder.Add(QuickScanNewLineTrivia(span, ref index));
-
-					// This mirrors LexSyntaxTrivia: trailing trivia is allowed to
-					// consume the newline that ends the token, then must stop so
-					// the next token starts on the following line.
-					if (isTrailing)
-					{
-						trivia = builder.ToListNode();
-						return true;
-					}
-
-					continue;
-
-				case QuickScanState.Bad:
-					// A slash may be the beginning of // or /* trivia. Comments
-					// can contain arbitrary text and diagnostics, so the regular
-					// lexer owns that path. A non-ASCII whitespace/newline also
-					// belongs to the regular lexer because it normalizes via
-					// SyntaxFacts.
-					if (ch == '/' &&
-						index + 1 < span.Length &&
-						span[index + 1] is not ('/' or '*'))
-					{
-						trivia = builder.ToListNode();
-						return true;
-					}
-
-					return false;
-
-				case QuickScanState.Done:
-					trivia = builder.ToListNode();
-					return true;
+				return false;
 			}
+
+			var charKind = GetQuickCharKind(ch);
+			if ((charKind & QuickCharKind.White) != 0)
+			{
+				QuickScanWhitespaceTriviaWidthOnly(span, ref index, ref hashCode);
+				continue;
+			}
+
+			if ((charKind & QuickCharKind.NewLine) != 0)
+			{
+				QuickScanNewLineTriviaWidthOnly(span, ref index, ref hashCode);
+
+				// This mirrors LexSyntaxTrivia: trailing trivia is allowed to
+				// consume the newline that ends the token, then must stop so
+				// the next token starts on the following line.
+				if (isTrailing)
+				{
+					return true;
+				}
+
+				continue;
+			}
+
+			// A slash may be the beginning of // or /* trivia. Comments can contain
+			// arbitrary text and diagnostics, so the regular lexer owns that path.
+			if ((charKind & QuickCharKind.Slash) != 0 &&
+				index + 1 < span.Length &&
+				span[index + 1] is '/' or '*')
+			{
+				return false;
+			}
+
+			return true;
 		}
 
-		trivia = builder.ToListNode();
 		return true;
 	}
 
-	private GreenSyntaxTrivia QuickScanWhitespaceTrivia(ReadOnlySpan<char> span, ref int index)
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static void QuickScanWhitespaceTriviaWidthOnly(ReadOnlySpan<char> span, ref int index, ref int hashCode)
 	{
-		var start = index;
-		var state = QuickScanState.Whitespace;
-
-		while (state == QuickScanState.Whitespace && index < span.Length)
+		while (index < span.Length &&
+			(GetQuickCharKind(span[index]) & QuickCharKind.White) != 0)
 		{
-			switch (span[index])
-			{
-				case ' ':
-				case '\t':
-				case '\v':
-				case '\f':
-				case '\u001A':
-					index++;
-					break;
-
-				default:
-					state = QuickScanState.Done;
-					break;
-			}
+			hashCode = HashCode.CombineFNVHash(hashCode, span[index]);
+			index++;
 		}
-
-		var text = span.Slice(start, index - start);
-		if (text.Length == 1)
-		{
-			return text[0] switch
-			{
-				' ' => GreenSyntaxFactory.Space,
-				'\t' => GreenSyntaxFactory.Tab,
-				_ => GreenSyntaxFactory.Whitespace(TextWindow.Intern(text))
-			};
-		}
-
-		return GreenSyntaxFactory.Whitespace(TextWindow.Intern(text));
 	}
 
-	private static GreenSyntaxTrivia QuickScanNewLineTrivia(ReadOnlySpan<char> span, ref int index)
+	private static void QuickScanNewLineTriviaWidthOnly(ReadOnlySpan<char> span, ref int index, ref int hashCode)
 	{
 		if (span[index] == '\r')
 		{
+			hashCode = HashCode.CombineFNVHash(hashCode, span[index]);
+
 			if (index + 1 < span.Length && span[index + 1] == '\n')
 			{
+				hashCode = HashCode.CombineFNVHash(hashCode, span[index + 1]);
 				index += 2;
-				return GreenSyntaxFactory.CarriageReturnLineFeed;
+				return;
 			}
 
 			index++;
-			return GreenSyntaxFactory.CarriageReturn;
+			return;
 		}
 
 		Debug.Assert(span[index] == '\n');
+		hashCode = HashCode.CombineFNVHash(hashCode, span[index]);
 		index++;
-		return GreenSyntaxFactory.LineFeed;
 	}
 
-	private bool TryQuickScanSyntaxToken(
+	private static bool TryQuickScanSyntaxTokenWidthOnly(
 		LexerMode mode,
 		ReadOnlySpan<char> span,
 		int index,
-		out SyntaxKind kind,
-		out int width,
-		out string? text,
-		out int intValue)
+		ref int hashCode,
+		out int width)
 	{
-		kind = SyntaxKind.None;
 		width = 0;
-		text = null;
-		intValue = 0;
 
-		var ch = span[index];
-		var state = QuickScanState.Initial;
-
-		state = ch switch
+		var charKind = GetQuickCharKind(span[index]);
+		if ((charKind & QuickCharKind.IdentifierStart) != 0)
 		{
-			'_' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') => QuickScanState.Identifier,
-			>= '0' and <= '9' => QuickScanState.Number,
-			'\'' or '"' or '+' or '-' or '*' or '%' or '^' or '|' or '&' or '?' or ':' or ';' or ',' or '.' or '=' or '!' or '<' or '>' or '{' or '}' or '[' or ']' or '(' or ')' or '/' => QuickScanState.Punctuation,
-			'@' when mode == LexerMode.InAkcss => QuickScanState.Punctuation,
-			_ => QuickScanState.Bad
-		};
+			return TryQuickScanIdentifierWidthOnly(span, index, ref hashCode, out width);
+		}
 
-		return state switch
+		if ((charKind & QuickCharKind.Digit) != 0)
 		{
-			QuickScanState.Identifier => TryQuickScanIdentifier(span, index, out kind, out width, out text),
-			QuickScanState.Number => TryQuickScanDecimalInt32(span, index, out kind, out width, out text, out intValue),
-			QuickScanState.Punctuation => TryQuickScanPunctuation(mode, span, index, out kind, out width),
-			_ => false
-		};
+			return TryQuickScanDecimalInt32WidthOnly(span, index, ref hashCode, out width);
+		}
+
+		if ((charKind & QuickCharKind.Punctuation) != 0)
+		{
+			return TryQuickScanPunctuationWidthOnly(mode, span, index, ref hashCode, out width);
+		}
+
+		return false;
 	}
 
-	private bool TryQuickScanIdentifier(
+	private static bool TryQuickScanIdentifierWidthOnly(
 		ReadOnlySpan<char> span,
 		int index,
-		out SyntaxKind kind,
-		out int width,
-		out string text)
+		ref int hashCode,
+		out int width)
 	{
-		kind = SyntaxKind.IdentifierToken;
 		width = 0;
-		text = string.Empty;
 
 		var current = index;
 		while (current < span.Length)
 		{
 			var ch = span[current];
-			var isPart =
-				ch == '_' ||
-				(ch >= 'a' && ch <= 'z') ||
-				(ch >= 'A' && ch <= 'Z') ||
-				(ch >= '0' && ch <= '9');
+			var charKind = GetQuickCharKind(ch);
 
-			if (!isPart)
+			if ((charKind & QuickCharKind.IdentifierPart) == 0)
 			{
-				if (IsQuickIdentifierTerminator(ch))
+				if (IsQuickIdentifierTerminator(ch, charKind))
 				{
 					break;
 				}
@@ -332,6 +367,7 @@ internal sealed partial class Lexer
 				return false;
 			}
 
+			hashCode = HashCode.CombineFNVHash(hashCode, ch);
 			current++;
 		}
 
@@ -341,41 +377,23 @@ internal sealed partial class Lexer
 			return false;
 		}
 
-		text = TextWindow.Intern(span.Slice(index, width));
-
-		if (_cache.TryGetKeywordKind(text, out var keywordKind))
-		{
-			kind = keywordKind;
-		}
-
 		return true;
 	}
 
-	private static bool IsQuickIdentifierTerminator(char ch)
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static bool IsQuickIdentifierTerminator(char ch, QuickCharKind charKind)
 	{
-		return ch switch
-		{
-			'\0' or
-			' ' or '\r' or '\n' or '\t' or '\v' or '\f' or
-			'!' or '%' or '(' or ')' or '*' or '+' or ',' or '-' or '.' or '/' or
-			':' or ';' or '<' or '=' or '>' or '?' or '[' or ']' or '^' or '{' or
-			'|' or '}' or '~' or '"' or '\'' or '&' or '@' => true,
-			_ => false
-		};
+		return ch < s_quickCharKinds.Length &&
+			(charKind & (QuickCharKind.White | QuickCharKind.NewLine | QuickCharKind.Punctuation | QuickCharKind.Slash)) != 0;
 	}
 
-	private bool TryQuickScanDecimalInt32(
+	private static bool TryQuickScanDecimalInt32WidthOnly(
 		ReadOnlySpan<char> span,
 		int index,
-		out SyntaxKind kind,
-		out int width,
-		out string text,
-		out int intValue)
+		ref int hashCode,
+		out int width)
 	{
-		kind = SyntaxKind.NumericLiteralToken;
 		width = 0;
-		text = string.Empty;
-		intValue = 0;
 
 		if (span[index] == '0' &&
 			index + 1 < span.Length &&
@@ -389,7 +407,7 @@ internal sealed partial class Lexer
 		while (current < span.Length)
 		{
 			var ch = span[current];
-			if (ch < '0' || ch > '9')
+			if ((GetQuickCharKind(ch) & QuickCharKind.Digit) == 0)
 			{
 				break;
 			}
@@ -401,16 +419,16 @@ internal sealed partial class Lexer
 			}
 
 			value = (value * 10) + digit;
+			hashCode = HashCode.CombineFNVHash(hashCode, ch);
 			current++;
 		}
 
 		if (current < span.Length)
 		{
 			var next = span[current];
-			if (next == '_' ||
-				next == '.' ||
-				(next >= 'a' && next <= 'z') ||
-				(next >= 'A' && next <= 'Z'))
+			var nextKind = GetQuickCharKind(next);
+			if (next == '.' ||
+				(nextKind & QuickCharKind.IdentifierPart) != 0)
 			{
 				return false;
 			}
@@ -422,19 +440,16 @@ internal sealed partial class Lexer
 			return false;
 		}
 
-		text = TextWindow.Intern(span.Slice(index, width));
-		intValue = value;
 		return true;
 	}
 
-	private static bool TryQuickScanPunctuation(
+	private static bool TryQuickScanPunctuationWidthOnly(
 		LexerMode mode,
 		ReadOnlySpan<char> span,
 		int index,
-		out SyntaxKind kind,
+		ref int hashCode,
 		out int width)
 	{
-		kind = SyntaxKind.None;
 		width = 0;
 
 		var ch = span[index];
@@ -442,22 +457,10 @@ internal sealed partial class Lexer
 
 		switch (ch)
 		{
-			case '\'':
-				kind = SyntaxKind.SingleQuoteToken;
-				width = 1;
-				return true;
-
-			case '"':
-				kind = SyntaxKind.DoubleQuoteToken;
-				width = 1;
-				return true;
-
 			case '/':
 				if (next == '>')
 				{
-					kind = SyntaxKind.SlashGreaterToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
 				if (next is '/' or '*')
@@ -465,16 +468,12 @@ internal sealed partial class Lexer
 					return false;
 				}
 
-				kind = SyntaxKind.SlashToken;
-				width = 1;
-				return true;
+				break;
 
 			case '.':
 				if (next == '.')
 				{
-					kind = SyntaxKind.DoubleDotToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
 				if (next is >= '0' and <= '9')
@@ -482,182 +481,111 @@ internal sealed partial class Lexer
 					return false;
 				}
 
-				kind = SyntaxKind.DotToken;
-				width = 1;
-				return true;
+				break;
 
 			case ':':
 				if (next == ':')
 				{
-					kind = SyntaxKind.DoubleColonToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
-				kind = SyntaxKind.ColonToken;
-				width = 1;
-				return true;
+				break;
 
 			case '=':
 				if (next == '>')
 				{
-					kind = SyntaxKind.ArrowToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
 				if (next == '=')
 				{
-					kind = SyntaxKind.EqualsEqualsToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
-				kind = SyntaxKind.EqualsToken;
-				width = 1;
-				return true;
+				break;
 
 			case '!':
 				if (next == '=')
 				{
-					kind = SyntaxKind.BangEqualsToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
-				kind = SyntaxKind.BangToken;
-				width = 1;
-				return true;
+				break;
 
 			case '<':
 				if (next == '/')
 				{
-					kind = SyntaxKind.LessSlashToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
 				if (next == '=')
 				{
-					kind = SyntaxKind.LessEqualsToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
-				kind = SyntaxKind.LessThanToken;
-				width = 1;
-				return true;
+				break;
 
 			case '>':
 				if (next == '=')
 				{
-					kind = SyntaxKind.GreaterEqualsToken;
-					width = 2;
-					return true;
+					return AcceptQuickPunctuationWidthOnly(span, index, 2, ref hashCode, out width);
 				}
 
-				kind = SyntaxKind.GreaterThanToken;
-				width = 1;
-				return true;
-
-			case '+':
-				kind = SyntaxKind.PlusToken;
-				width = 1;
-				return true;
-
-			case '-':
-				kind = SyntaxKind.MinusToken;
-				width = 1;
-				return true;
-
-			case '*':
-				kind = SyntaxKind.AsteriskToken;
-				width = 1;
-				return true;
-
-			case '%':
-				kind = SyntaxKind.PercentToken;
-				width = 1;
-				return true;
-
-			case '^':
-				kind = SyntaxKind.CaretToken;
-				width = 1;
-				return true;
-
-			case '|':
-				kind = SyntaxKind.BarToken;
-				width = 1;
-				return true;
-
-			case '&':
-				kind = SyntaxKind.AmpersandToken;
-				width = 1;
-				return true;
-
-			case '?':
-				kind = SyntaxKind.QuestionToken;
-				width = 1;
-				return true;
-
-			case ';':
-				kind = SyntaxKind.SemicolonToken;
-				width = 1;
-				return true;
-
-			case ',':
-				kind = SyntaxKind.CommaToken;
-				width = 1;
-				return true;
-
-			case '{':
-				kind = SyntaxKind.OpenBraceToken;
-				width = 1;
-				return true;
-
-			case '}':
-				kind = SyntaxKind.CloseBraceToken;
-				width = 1;
-				return true;
-
-			case '[':
-				kind = SyntaxKind.OpenBracketToken;
-				width = 1;
-				return true;
-
-			case ']':
-				kind = SyntaxKind.CloseBracketToken;
-				width = 1;
-				return true;
-
-			case '(':
-				kind = SyntaxKind.OpenParenToken;
-				width = 1;
-				return true;
-
-			case ')':
-				kind = SyntaxKind.CloseParenToken;
-				width = 1;
-				return true;
+				break;
 
 			case '@' when mode == LexerMode.InAkcss:
-				kind = SyntaxKind.AtToken;
-				width = 1;
-				return true;
+				return AcceptQuickPunctuationWidthOnly(span, index, 1, ref hashCode, out width);
 
-			default:
+			case '@':
 				return false;
 		}
+
+		if (ch >= s_singleCharTokenKinds.Length)
+		{
+			return false;
+		}
+
+		var tokenKind = (SyntaxKind)s_singleCharTokenKinds[ch];
+		if (tokenKind == SyntaxKind.None)
+		{
+			return false;
+		}
+
+		return AcceptQuickPunctuationWidthOnly(span, index, 1, ref hashCode, out width);
 	}
 
-	private static GreenSyntaxToken CreateQuickToken(QuickTokenData data)
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static bool AcceptQuickPunctuationWidthOnly(
+		ReadOnlySpan<char> span,
+		int index,
+		int acceptedWidth,
+		ref int hashCode,
+		out int width)
 	{
-		return data.Kind switch
+		for (var i = 0; i < acceptedWidth; i++)
 		{
-			SyntaxKind.IdentifierToken => GreenSyntaxFactory.Identifier(data.Leading, data.Text!, data.Trailing),
-			SyntaxKind.NumericLiteralToken => GreenSyntaxFactory.Literal(data.Leading, data.Text!, data.IntValue, data.Trailing),
-			_ => GreenSyntaxFactory.Token(data.Leading, data.Kind, data.Trailing)
-		};
+			hashCode = HashCode.CombineFNVHash(hashCode, span[index + i]);
+		}
+
+		width = acceptedWidth;
+		return true;
+	}
+
+	private static GreenSyntaxToken CreateQuickTokenFromRegularLexer(Lexer lexer)
+	{
+#if DEBUG
+		var expectedFullWidth = lexer.CurrentLexemeWidth;
+#endif
+		var fullTokenStart = lexer.LexemeStartPosition;
+
+		lexer.TextWindow.Reset(fullTokenStart);
+		var token = lexer.ParseNextToken();
+
+#if DEBUG
+		Debug.Assert(token.FullWidth == expectedFullWidth);
+		Debug.Assert(lexer.TextWindow.Position - fullTokenStart == expectedFullWidth);
+#endif
+		return token;
 	}
 
 #if STATS

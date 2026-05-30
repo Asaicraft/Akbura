@@ -125,6 +125,83 @@ public class LexerQuickScannerTests
 		Assert.True(quick.Fallbacks > 0);
 	}
 
+	[Theory]
+	[InlineData("alpha _beta beta123")]
+	[InlineData("state count = 123;")]
+	[InlineData("using namespace global static unsafe")]
+	public void TableCoveredIdentifiersAndKeywords_MatchRegularLexer(string code)
+	{
+		var quick = AssertQuickMatchesRegular(code, Lexer.LexerMode.TopLevel);
+
+		Assert.True(quick.Hits > 0);
+	}
+
+	[Theory]
+	[InlineData("0 1 42 2147483647")]
+	[InlineData("Width: 12; Height: 30;")]
+	public void TableCoveredNumericLiterals_MatchRegularLexer(string code)
+	{
+		var quick = AssertQuickMatchesRegular(code, Lexer.LexerMode.TopLevel);
+
+		Assert.True(quick.Hits > 0);
+	}
+
+	[Theory]
+	[InlineData("1.5")]
+	[InlineData("0x10")]
+	[InlineData("1_000")]
+	[InlineData("10u")]
+	public void ComplexNumericLiterals_FallBackAndMatchRegularLexer(string code)
+	{
+		var quick = AssertQuickMatchesRegular(code, Lexer.LexerMode.TopLevel);
+
+		Assert.True(quick.Fallbacks > 0);
+	}
+
+	[Theory]
+	[InlineData(". .. : :: = == => < </ />")]
+	[InlineData("+ - * % ^ | & ? ; , { } [ ] ( )")]
+	public void TableCoveredPunctuationAndCompounds_MatchRegularLexer(string code)
+	{
+		var quick = AssertQuickMatchesRegular(code, Lexer.LexerMode.TopLevel);
+
+		Assert.True(quick.Hits > 0);
+	}
+
+	[Theory]
+	[InlineData("state")]
+	[InlineData("   state")]
+	[InlineData("state\ncount")]
+	[InlineData("state\r\ncount")]
+	public void TableCoveredTrivia_MatchRegularLexer(string code)
+	{
+		var quick = AssertQuickMatchesRegular(code, Lexer.LexerMode.TopLevel);
+
+		Assert.True(quick.Hits > 0);
+	}
+
+	[Fact]
+	public void CommentTrivia_FallsBackAndMatchesRegularLexer()
+	{
+		var quick = AssertQuickMatchesRegular("// comment\nstate", Lexer.LexerMode.TopLevel);
+
+		Assert.True(quick.Fallbacks > 0);
+	}
+
+	private static (string Text, SyntaxKind[] Kinds, int Hits, int Fallbacks) AssertQuickMatchesRegular(
+		string code,
+		Lexer.LexerMode mode)
+	{
+		var regular = LexAll(code, mode, enableQuickScanner: false);
+		var quick = LexAll(code, mode, enableQuickScanner: true);
+
+		Assert.Equal(regular.Kinds, quick.Kinds);
+		Assert.Equal(regular.Text, quick.Text);
+		Assert.Equal(code, quick.Text);
+
+		return quick;
+	}
+
 	private static (string Text, SyntaxKind[] Kinds, int Hits, int Fallbacks) LexAll(
 		string code,
 		Lexer.LexerMode mode,

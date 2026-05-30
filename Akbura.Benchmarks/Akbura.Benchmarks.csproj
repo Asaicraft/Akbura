@@ -1,25 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <EnableQuickScanBenchmark Condition="'$(EnableQuickScanBenchmark)' == ''">true</EnableQuickScanBenchmark>
-    <Configurations>Debug;Release;DebugStats</Configurations>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<EnableQuickScanBenchmark Condition="'$(EnableQuickScanBenchmark)' == ''">true</EnableQuickScanBenchmark>
+		<Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(EnableQuickScanBenchmark)' == 'true'">
-    <DefineConstants>$(DefineConstants);STATS;ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(EnableQuickScanBenchmark)' == 'true'">
+		<DefineConstants>$(DefineConstants);STATS;ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+	<ItemGroup>
+		<PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
 
-  </ItemGroup>
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" AdditionalProperties="EnableAkburaStats=true;EnableQuickScanBenchmark=true" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" AdditionalProperties="EnableAkburaStats=true;EnableQuickScanBenchmark=true" />
+	</ItemGroup>
 
 </Project>

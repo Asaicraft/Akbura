@@ -64,4 +64,19 @@ public class MarkupComponentNameSyntaxParseTests
         Assert.IsType<GreenMarkupQualifiedComponentNameSyntax>(syntax);
         Assert.Equal(code, syntax.ToFullString());
     }
+
+    [Fact]
+    public void AliasQualifiedName_ParseSuccessfully()
+    {
+        const string code = "ui::Button";
+
+        var parser = MakeParser(code);
+        var syntax = parser.ParseMarkupComponentNameSyntax();
+
+        Assert.NotNull(syntax);
+
+        var qualified = Assert.IsType<GreenMarkupQualifiedComponentNameSyntax>(syntax);
+        Assert.NotNull(qualified.AliasQualifier);
+        Assert.Equal(code, syntax.ToFullString());
+    }
 }

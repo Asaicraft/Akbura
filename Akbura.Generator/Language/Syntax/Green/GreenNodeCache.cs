@@ -40,7 +40,7 @@ namespace Akbura.Language.Syntax.Green;
 ///     and are not likely to be repetitive.
 ///     
 /// </summary>
-public class GreenStats
+internal class GreenStats
 {
     // TODO: remove when done tweaking this cache.
 #if STATS
@@ -78,13 +78,13 @@ public class GreenStats
 
         ~GreenStats()
         {
-            Console.WriteLine("Green: " + greenNodes);
-            Console.WriteLine("GreenTk: " + greenTokens);
-            Console.WriteLine("Nonterminals added: " + nontermsAdded);
-            Console.WriteLine("Nonterminals cacheable: " + cacheableNodes);
-            Console.WriteLine("CacheHits: " + cacheHits);
-            Console.WriteLine("RateOfAll: " + (cacheHits * 100 / (cacheHits + greenNodes - greenTokens)) + "%");
-            Console.WriteLine("RateOfCacheable: " + (cacheHits * 100 / (cacheableNodes)) + "%");
+            Debug.WriteLine("Green: " + greenNodes);
+            Debug.WriteLine("GreenTk: " + greenTokens);
+            Debug.WriteLine("Nonterminals added: " + nontermsAdded);
+            Debug.WriteLine("Nonterminals cacheable: " + cacheableNodes);
+            Debug.WriteLine("CacheHits: " + cacheHits);
+            Debug.WriteLine("RateOfAll: " + (cacheHits * 100 / (cacheHits + greenNodes - greenTokens)) + "%");
+            Debug.WriteLine("RateOfCacheable: " + (cacheHits * 100 / (cacheableNodes)) + "%");
         }
 #else
     internal static void NoteGreen(GreenNode _)

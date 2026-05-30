@@ -83,6 +83,14 @@ internal sealed partial class Lexer : IDisposable
 	private readonly LexerCache _cache;
 	private int _badTokenCount; // cumulative count of bad tokens produced
 
+#if ENABLE_QUICK_SCAN_BENCHMARK
+	private readonly bool _enableQuickScanner;
+#endif
+
+#if STATS
+	private readonly bool _collectQuickScannerStats;
+#endif
+
 	private GreenSyntaxListBuilder _leadingTriviaCache;
 	private GreenSyntaxListBuilder _trailingTriviaCache;
 
@@ -90,17 +98,39 @@ internal sealed partial class Lexer : IDisposable
 
 	private readonly Microsoft.CodeAnalysis.CSharp.SyntaxTokenParser _tokenParser;
 
-	public Lexer(SourceText sourceText)
+	public Lexer(
+		SourceText sourceText
+#if ENABLE_QUICK_SCAN_BENCHMARK
+		, bool enableQuickScanner = true
+#endif
+#if STATS
+		, bool collectQuickScannerStats = false
+#endif
+		)
 	{
 		TextWindow = new SlidingTextWindow(sourceText);
 
 		_cache = LexerCache.GetInstance();
+
+#if ENABLE_QUICK_SCAN_BENCHMARK
+		_enableQuickScanner = enableQuickScanner;
+#endif
+
+#if STATS
+		_collectQuickScannerStats = collectQuickScannerStats;
+#endif
 		_builder = _cache.StringBuilder;
 		_identifierBuffer = _cache.IdentifierBuffer;
 		_leadingTriviaCache = _cache.LeadingTriviaCache;
 		_trailingTriviaCache = _cache.TrailingTriviaCache;
 		_tokenParser = CSharpSyntaxFactory.CreateTokenParser(sourceText);
 	}
+
+#if STATS
+	internal int QuickScannerHitCount { get; private set; }
+
+	internal int QuickScannerFallbackCount { get; private set; }
+#endif
 
 	public GreenSyntaxToken Lex(ref LexerMode mode)
 	{
@@ -143,6 +173,18 @@ internal sealed partial class Lexer : IDisposable
 			// In expression modes, we do not care about trivia or errors.
 			return CreateToken(in tokenInfo, null, null, null);
 		}
+
+#if ENABLE_QUICK_SCAN_BENCHMARK
+		if (_enableQuickScanner && TryQuickScanToken(mode, out var quickToken))
+		{
+			return quickToken;
+		}
+#else
+		if (TryQuickScanToken(mode, out var quickToken))
+		{
+			return quickToken;
+		}
+#endif
 
 		return ParseNextToken();
 	}
@@ -253,6 +295,13 @@ internal sealed partial class Lexer : IDisposable
 
 			case ':':
 				TextWindow.AdvanceChar();
+
+				if (TextWindow.TryAdvance(':'))
+				{
+					info.Kind = SyntaxKind.DoubleColonToken;
+					return;
+				}
+
 				info.Kind = SyntaxKind.ColonToken;
 				return;
 

@@ -1,45 +1,58 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-    <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
-    <IsRoslynComponent>true</IsRoslynComponent>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <PackageType>Analyzer</PackageType>
-    <RootNamespace>Akbura</RootNamespace>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
+		<IsRoslynComponent>true</IsRoslynComponent>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<PackageType>Analyzer</PackageType>
+		<RootNamespace>Akbura</RootNamespace>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="PolySharp" Version="1.15.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'DebugStats' Or '$(Configuration)' == 'ReleaseStats'">
+		<DefineConstants>$(DefineConstants);STATS;ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <Compile Update="AkburaResources.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>AkburaResources.resx</DependentUpon>
-    </Compile>
-  </ItemGroup>
+	<PropertyGroup Condition="'$(EnableAkburaStats)' == 'true'">
+		<DefineConstants>$(DefineConstants);STATS</DefineConstants>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Update="AkburaResources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>AkburaResources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
+	<PropertyGroup Condition="'$(EnableQuickScanBenchmark)' == 'true'">
+		<DefineConstants>$(DefineConstants);ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="PolySharp" Version="1.15.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="AkburaResources.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>AkburaResources.resx</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Update="AkburaResources.resx">
+			<Generator>ResXFileCodeGenerator</Generator>
+			<LastGenOutput>AkburaResources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+	</ItemGroup>
 
 </Project>

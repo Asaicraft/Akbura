@@ -18,8 +18,12 @@ internal sealed partial class Lexer
         Number,
         Punctuation,
         Dot,
-        CompoundPunctStart,
         Slash,
+        Bang,
+        Colon,
+        Less,
+        Equals,
+        Greater,
         DoneAfterNext,
         // Bad must immediately follow Done so a single "state >= Done" check exits.
         Done,
@@ -35,165 +39,50 @@ internal sealed partial class Lexer
         Digit,
         Punct,
         Dot,
-        CompoundPunctStart,
         Slash,
+        Asterisk,
+        Bang,
+        Colon,
+        Less,
+        Equals,
+        Greater,
         Complex,
         EndOfFile
     }
 
-    // PERF: use byte instead of QuickScanState so the runtime can initialize the
-    // multidimensional array directly, same shape as Roslyn's quick scanner.
-    private static readonly byte[,] s_stateTransitions = new byte[,]
+    private const int CharFlagsCount = (int)CharFlags.EndOfFile + 1;
+    private const int CharFlagsShift = 4;
+
+    private static ReadOnlySpan<byte> StateTransitions => new byte[]
     {
         // Initial
-        {
-            (byte)QuickScanState.Initial,             // White
-            (byte)QuickScanState.Initial,             // CR
-            (byte)QuickScanState.Initial,             // LF
-            (byte)QuickScanState.Ident,               // Letter
-            (byte)QuickScanState.Number,              // Digit
-            (byte)QuickScanState.Punctuation,         // Punct
-            (byte)QuickScanState.Dot,                 // Dot
-            (byte)QuickScanState.CompoundPunctStart,  // CompoundPunctStart
-            (byte)QuickScanState.Slash,               // Slash
-            (byte)QuickScanState.Bad,                 // Complex
-            (byte)QuickScanState.Bad,                 // EndOfFile
-        },
-
+        (byte)QuickScanState.Initial, (byte)QuickScanState.Initial, (byte)QuickScanState.Initial, (byte)QuickScanState.Ident, (byte)QuickScanState.Number, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Dot, (byte)QuickScanState.Slash, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Bang, (byte)QuickScanState.Colon, (byte)QuickScanState.Less, (byte)QuickScanState.Equals, (byte)QuickScanState.Greater, (byte)QuickScanState.Bad, (byte)QuickScanState.Bad,
         // FollowingWhite
-        {
-            (byte)QuickScanState.FollowingWhite,      // White
-            (byte)QuickScanState.FollowingCR,         // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Done,                // Letter
-            (byte)QuickScanState.Done,                // Digit
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Done,                // Dot
-            (byte)QuickScanState.Done,                // CompoundPunctStart
-            (byte)QuickScanState.Bad,                 // Slash could start trailing comment
-            (byte)QuickScanState.Bad,                 // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
         // FollowingCR
-        {
-            (byte)QuickScanState.Done,                // White
-            (byte)QuickScanState.Done,                // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Done,                // Letter
-            (byte)QuickScanState.Done,                // Digit
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Done,                // Dot
-            (byte)QuickScanState.Done,                // CompoundPunctStart
-            (byte)QuickScanState.Done,                // Slash
-            (byte)QuickScanState.Done,                // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
-        // Identifier
-        {
-            (byte)QuickScanState.FollowingWhite,      // White
-            (byte)QuickScanState.FollowingCR,         // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Ident,               // Letter
-            (byte)QuickScanState.Ident,               // Digit
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Done,                // Dot
-            (byte)QuickScanState.Done,                // CompoundPunctStart
-            (byte)QuickScanState.Bad,                 // Slash could start trailing comment
-            (byte)QuickScanState.Bad,                 // Complex could be identifier continuation
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
+        (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done,
+        // Ident
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Ident, (byte)QuickScanState.Ident, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
         // Number
-        {
-            (byte)QuickScanState.FollowingWhite,      // White
-            (byte)QuickScanState.FollowingCR,         // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Bad,                 // Letter: suffix/base marker/etc.
-            (byte)QuickScanState.Number,              // Digit
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Bad,                 // Dot: decimal/range ambiguity
-            (byte)QuickScanState.Done,                // CompoundPunctStart
-            (byte)QuickScanState.Bad,                 // Slash could start trailing comment
-            (byte)QuickScanState.Bad,                 // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Bad, (byte)QuickScanState.Number, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
         // Punctuation
-        {
-            (byte)QuickScanState.FollowingWhite,      // White
-            (byte)QuickScanState.FollowingCR,         // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Done,                // Letter
-            (byte)QuickScanState.Done,                // Digit
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Done,                // Dot
-            (byte)QuickScanState.Done,                // CompoundPunctStart
-            (byte)QuickScanState.Bad,                 // Slash could start trailing comment
-            (byte)QuickScanState.Bad,                 // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
         // Dot
-        {
-            (byte)QuickScanState.FollowingWhite,      // White
-            (byte)QuickScanState.FollowingCR,         // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Done,                // Letter
-            (byte)QuickScanState.Bad,                 // .0 ambiguity
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Bad,                 // DotDot is handled by the DSL patch below
-            (byte)QuickScanState.Done,                // CompoundPunctStart
-            (byte)QuickScanState.Bad,                 // Slash could start trailing comment
-            (byte)QuickScanState.Bad,                 // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
-        // CompoundPunctStart
-        {
-            (byte)QuickScanState.FollowingWhite,      // White
-            (byte)QuickScanState.FollowingCR,         // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Done,                // Letter
-            (byte)QuickScanState.Done,                // Digit
-            (byte)QuickScanState.Bad,                 // Punct
-            (byte)QuickScanState.Done,                // Dot
-            (byte)QuickScanState.Bad,                 // CompoundPunctStart
-            (byte)QuickScanState.Bad,                 // Slash
-            (byte)QuickScanState.Bad,                 // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
         // Slash
-        {
-            (byte)QuickScanState.FollowingWhite,      // White
-            (byte)QuickScanState.FollowingCR,         // CR
-            (byte)QuickScanState.DoneAfterNext,       // LF
-            (byte)QuickScanState.Done,                // Letter
-            (byte)QuickScanState.Done,                // Digit
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Done,                // Dot
-            (byte)QuickScanState.Done,                // CompoundPunctStart, except /* below
-            (byte)QuickScanState.Bad,                 // Slash: // comment
-            (byte)QuickScanState.Bad,                 // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
-
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
+        // Bang
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
+        // Colon
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
+        // Less
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
+        // Equals
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
+        // Greater
+        (byte)QuickScanState.FollowingWhite, (byte)QuickScanState.FollowingCR, (byte)QuickScanState.DoneAfterNext, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Punctuation, (byte)QuickScanState.Done, (byte)QuickScanState.Bad, (byte)QuickScanState.Done,
         // DoneAfterNext
-        {
-            (byte)QuickScanState.Done,                // White
-            (byte)QuickScanState.Done,                // CR
-            (byte)QuickScanState.Done,                // LF
-            (byte)QuickScanState.Done,                // Letter
-            (byte)QuickScanState.Done,                // Digit
-            (byte)QuickScanState.Done,                // Punct
-            (byte)QuickScanState.Done,                // Dot
-            (byte)QuickScanState.Done,                // CompoundPunctStart
-            (byte)QuickScanState.Done,                // Slash
-            (byte)QuickScanState.Done,                // Complex
-            (byte)QuickScanState.Done,                // EndOfFile
-        },
+        (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done, (byte)QuickScanState.Done,
     };
 
     private bool TryQuickScanToken(LexerMode mode, out GreenSyntaxToken token)
@@ -221,101 +110,53 @@ internal sealed partial class Lexer
         token = null!;
         Start();
 
-        var span = TextWindow.CurrentWindowSpan;
-        if (span.IsEmpty)
+        var textWindowCharSpan = TextWindow.CurrentWindowSpan;
+        if (textWindowCharSpan.IsEmpty)
         {
             return false;
         }
 
-        var scanSpan = span[..Math.Min(MaxCachedTokenSize, span.Length)];
+        // Cap how much of the char span we're willing to look at.
+        textWindowCharSpan = textWindowCharSpan[..Math.Min(MaxCachedTokenSize, textWindowCharSpan.Length)];
+
         var charProperties = CharProperties;
         var charPropertiesLength = charProperties.Length;
+        var stateTransitions = StateTransitions;
+
+        Debug.Assert(CharFlagsCount == 1 << CharFlagsShift);
+
         var state = QuickScanState.Initial;
         var hashCode = HashCode.FnvOffsetBias;
-        var previousIncludedChar = '\0';
 
         var currentIndex = 0;
-        for (; currentIndex < scanSpan.Length; currentIndex++)
+        for (; currentIndex < textWindowCharSpan.Length; currentIndex++)
         {
-            var c = scanSpan[currentIndex];
+            var c = textWindowCharSpan[currentIndex];
             var uc = unchecked((int)c);
-            var flags = uc < charPropertiesLength
+            var flags = (uint)uc < (uint)charPropertiesLength
                 ? (CharFlags)charProperties[uc]
                 : CharFlags.Complex;
 
-            // DSL-specific token: Roslyn classifies '@' as Complex. In AkCSS mode
-            // it is a normal one-character token, so keep it on the quick path.
-            if (c == '@' && mode == LexerMode.InAkcss)
-            {
-                flags = CharFlags.Punct;
-            }
+            state = (QuickScanState)stateTransitions[((int)state << CharFlagsShift) + (int)flags];
 
-            var nextState = (QuickScanState)s_stateTransitions[(int)state, (int)flags];
-
-            // DSL-specific two-character punctuators. Everything else follows the
-            // same conservative state table as Roslyn and falls back on ambiguous
-            // punctuation chains.
-            if (state == QuickScanState.Dot && c == '.')
+            // Bad > Done and it is the only state like that.
+            // As a result, we exit the loop on either Bad or Done.
+            if (state >= QuickScanState.Done)
             {
-                nextState = QuickScanState.Punctuation;
-            }
-            else if (state == QuickScanState.Slash)
-            {
-                if (c == '>')
-                {
-                    nextState = QuickScanState.Punctuation;
-                }
-                else if (c == '*')
-                {
-                    nextState = QuickScanState.Bad;
-                }
-            }
-            else if (state == QuickScanState.CompoundPunctStart)
-            {
-                switch (previousIncludedChar)
-                {
-                    case ':' when c == ':':
-                    case '=' when c is '>' or '=':
-                    case '!' when c == '=':
-                    case '<' when c is '/' or '=':
-                    case '>' when c == '=':
-                        nextState = QuickScanState.Punctuation;
-                        break;
-
-                    // In this DSL these compound-start characters are also valid
-                    // one-character tokens. Roslyn falls back on punctuation chains,
-                    // but markup has many safe cases like class="..." where falling
-                    // back on '=' costs hit-rate. Keep '~' conservative because the
-                    // previous quick scanner did not accept it as a token.
-                    default:
-                        if (previousIncludedChar != '~' && nextState == QuickScanState.Bad)
-                        {
-                            nextState = QuickScanState.Done;
-                        }
-
-                        break;
-                }
-            }
-
-            if (nextState >= QuickScanState.Done)
-            {
-                state = nextState;
                 goto exitLoop;
             }
 
-            state = nextState;
             hashCode = HashCode.CombineFNVHash(hashCode, c);
-            previousIncludedChar = c;
         }
 
-        // We reached the end of scanSpan without seeing a terminator. Roslyn normally
-        // observes an EOF sentinel in the window and transitions through the table.
-        // This text window can end exactly at real EOF, so synthesize that transition
-        // without hashing or consuming an EOF character. If this is only a window /
+        // We reached the end of the current span without seeing a terminator.
+        // Roslyn normally observes an EOF sentinel in the window. This text window
+        // can end exactly at real EOF, so synthesize that transition without
+        // hashing or consuming an EOF character. If this is only a window /
         // MaxCachedTokenSize boundary, keep the conservative fallback.
         if (TextWindow.Position + currentIndex >= TextWindow.Text.Length)
         {
-            state = (QuickScanState)s_stateTransitions[(int)state, (int)CharFlags.EndOfFile];
+            state = (QuickScanState)stateTransitions[((int)state << CharFlagsShift) + (int)CharFlags.EndOfFile];
         }
         else
         {
@@ -330,25 +171,16 @@ internal sealed partial class Lexer
             return false;
         }
 
-        var fullWidth = currentIndex;
-        if (fullWidth <= 0 || fullWidth > MaxCachedTokenSize)
+        var tokenLength = currentIndex;
+        if (tokenLength <= 0 || tokenLength > MaxCachedTokenSize)
         {
             return false;
         }
 
-        // If we reached the current window boundary, the next window could still
-        // continue a token or trivia. Fall back instead of guessing across seams.
-        if (fullWidth == scanSpan.Length &&
-            TextWindow.Position + fullWidth < TextWindow.Text.Length)
-        {
-            return false;
-        }
-
-        var fullTokenSpan = span[..fullWidth];
-        TextWindow.AdvanceChar(fullWidth);
+        TextWindow.AdvanceChar(tokenLength);
 
         token = _cache.LookupToken(
-            fullTokenSpan,
+            textWindowCharSpan[..tokenLength],
             hashCode,
             static lexer => CreateQuickTokenFromRegularLexer(lexer),
             this);
@@ -373,166 +205,105 @@ internal sealed partial class Lexer
         return token;
     }
 
-    private static ReadOnlySpan<byte> CharProperties => new[]
-            {
-                // 0 .. 31
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex,
-                (byte)CharFlags.White,   // TAB
-                (byte)CharFlags.LF,      // LF
-                (byte)CharFlags.White,   // VT
-                (byte)CharFlags.White,   // FF
-                (byte)CharFlags.CR,      // CR
-                (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-
-                // 32 .. 63
-                (byte)CharFlags.White,    // SPC
-                (byte)CharFlags.CompoundPunctStart,    // !
-                (byte)CharFlags.Punct,    // "
-                (byte)CharFlags.Complex,  // #
-                (byte)CharFlags.Complex,  // $
-                (byte)CharFlags.CompoundPunctStart, // %
-                (byte)CharFlags.CompoundPunctStart, // &
-                (byte)CharFlags.Punct,    // '
-                (byte)CharFlags.Punct,    // (
-                (byte)CharFlags.Punct,    // )
-                (byte)CharFlags.CompoundPunctStart, // *
-                (byte)CharFlags.CompoundPunctStart, // +
-                (byte)CharFlags.Punct,    // ,
-                (byte)CharFlags.CompoundPunctStart, // -
-                (byte)CharFlags.Dot,      // .
-                (byte)CharFlags.Slash,    // /
-                (byte)CharFlags.Digit,    // 0
-                (byte)CharFlags.Digit,    // 1
-                (byte)CharFlags.Digit,    // 2
-                (byte)CharFlags.Digit,    // 3
-                (byte)CharFlags.Digit,    // 4
-                (byte)CharFlags.Digit,    // 5
-                (byte)CharFlags.Digit,    // 6
-                (byte)CharFlags.Digit,    // 7
-                (byte)CharFlags.Digit,    // 8
-                (byte)CharFlags.Digit,    // 9
-                (byte)CharFlags.CompoundPunctStart,  // :
-                (byte)CharFlags.Punct,    // ;
-                (byte)CharFlags.CompoundPunctStart,  // <
-                (byte)CharFlags.CompoundPunctStart,  // =
-                (byte)CharFlags.CompoundPunctStart,  // >
-                (byte)CharFlags.CompoundPunctStart,  // ?
-
-                // 64 .. 95
-                (byte)CharFlags.Complex,  // @
-                (byte)CharFlags.Letter,   // A
-                (byte)CharFlags.Letter,   // B
-                (byte)CharFlags.Letter,   // C
-                (byte)CharFlags.Letter,   // D
-                (byte)CharFlags.Letter,   // E
-                (byte)CharFlags.Letter,   // F
-                (byte)CharFlags.Letter,   // G
-                (byte)CharFlags.Letter,   // H
-                (byte)CharFlags.Letter,   // I
-                (byte)CharFlags.Letter,   // J
-                (byte)CharFlags.Letter,   // K
-                (byte)CharFlags.Letter,   // L
-                (byte)CharFlags.Letter,   // M
-                (byte)CharFlags.Letter,   // N
-                (byte)CharFlags.Letter,   // O
-                (byte)CharFlags.Letter,   // P
-                (byte)CharFlags.Letter,   // Q
-                (byte)CharFlags.Letter,   // R
-                (byte)CharFlags.Letter,   // S
-                (byte)CharFlags.Letter,   // T
-                (byte)CharFlags.Letter,   // U
-                (byte)CharFlags.Letter,   // V
-                (byte)CharFlags.Letter,   // W
-                (byte)CharFlags.Letter,   // X
-                (byte)CharFlags.Letter,   // Y
-                (byte)CharFlags.Letter,   // Z
-                (byte)CharFlags.Punct,    // [
-                (byte)CharFlags.Complex,  // \
-                (byte)CharFlags.Punct,    // ]
-                (byte)CharFlags.CompoundPunctStart,    // ^
-                (byte)CharFlags.Letter,   // _
-
-                // 96 .. 127
-                (byte)CharFlags.Complex,  // `
-                (byte)CharFlags.Letter,   // a
-                (byte)CharFlags.Letter,   // b
-                (byte)CharFlags.Letter,   // c
-                (byte)CharFlags.Letter,   // d
-                (byte)CharFlags.Letter,   // e
-                (byte)CharFlags.Letter,   // f
-                (byte)CharFlags.Letter,   // g
-                (byte)CharFlags.Letter,   // h
-                (byte)CharFlags.Letter,   // i
-                (byte)CharFlags.Letter,   // j
-                (byte)CharFlags.Letter,   // k
-                (byte)CharFlags.Letter,   // l
-                (byte)CharFlags.Letter,   // m
-                (byte)CharFlags.Letter,   // n
-                (byte)CharFlags.Letter,   // o
-                (byte)CharFlags.Letter,   // p
-                (byte)CharFlags.Letter,   // q
-                (byte)CharFlags.Letter,   // r
-                (byte)CharFlags.Letter,   // s
-                (byte)CharFlags.Letter,   // t
-                (byte)CharFlags.Letter,   // u
-                (byte)CharFlags.Letter,   // v
-                (byte)CharFlags.Letter,   // w
-                (byte)CharFlags.Letter,   // x
-                (byte)CharFlags.Letter,   // y
-                (byte)CharFlags.Letter,   // z
-                (byte)CharFlags.Punct,    // {
-                (byte)CharFlags.CompoundPunctStart,  // |
-                (byte)CharFlags.Punct,    // }
-                (byte)CharFlags.CompoundPunctStart,    // ~
-                (byte)CharFlags.Complex,
-
-                // 128 .. 159
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-
-                // 160 .. 191
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Letter, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Letter, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-                (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Letter, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
-
-                // 192 .. 
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Complex,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Complex,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
-                (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter
-            };
+    private static ReadOnlySpan<byte> CharProperties => new byte[]
+    {
+        // 0 .. 7
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 8 .. 15
+        (byte)CharFlags.Complex, (byte)CharFlags.White, (byte)CharFlags.LF, (byte)CharFlags.White, (byte)CharFlags.White, (byte)CharFlags.CR, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 16 .. 23
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 24 .. 31
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.White, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 32 .. 39
+        (byte)CharFlags.White, (byte)CharFlags.Bang, (byte)CharFlags.Punct, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Punct,
+        // 40 .. 47
+        (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Asterisk, (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Dot, (byte)CharFlags.Slash,
+        // 48 .. 55
+        (byte)CharFlags.Digit, (byte)CharFlags.Digit, (byte)CharFlags.Digit, (byte)CharFlags.Digit, (byte)CharFlags.Digit, (byte)CharFlags.Digit, (byte)CharFlags.Digit, (byte)CharFlags.Digit,
+        // 56 .. 63
+        (byte)CharFlags.Digit, (byte)CharFlags.Digit, (byte)CharFlags.Colon, (byte)CharFlags.Punct, (byte)CharFlags.Less, (byte)CharFlags.Equals, (byte)CharFlags.Greater, (byte)CharFlags.Punct,
+        // 64 .. 71
+        (byte)CharFlags.Punct, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 72 .. 79
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 80 .. 87
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 88 .. 95
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Punct, (byte)CharFlags.Complex, (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Letter,
+        // 96 .. 103
+        (byte)CharFlags.Complex, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 104 .. 111
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 112 .. 119
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 120 .. 127
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Punct, (byte)CharFlags.Complex,
+        // 128 .. 135
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 136 .. 143
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 144 .. 151
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 152 .. 159
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 160 .. 167
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 168 .. 175
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Letter, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 176 .. 183
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Letter, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 184 .. 191
+        (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Letter, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex, (byte)CharFlags.Complex,
+        // 192 .. 199
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 200 .. 207
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 208 .. 215
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Complex,
+        // 216 .. 223
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 224 .. 231
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 232 .. 239
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 240 .. 247
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Complex,
+        // 248 .. 255
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 256 .. 263
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 264 .. 271
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 272 .. 279
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 280 .. 287
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 288 .. 295
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 296 .. 303
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 304 .. 311
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 312 .. 319
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 320 .. 327
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 328 .. 335
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 336 .. 343
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 344 .. 351
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 352 .. 359
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 360 .. 367
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 368 .. 375
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter,
+        // 376 .. 383
+        (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter, (byte)CharFlags.Letter
+    };
 
 #if STATS
     private void RecordQuickScannerHit()

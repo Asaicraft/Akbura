@@ -58,8 +58,8 @@ internal sealed partial class Lexer
     //
     // Columns: White, CR, LF, Letter, Digit, Punct, Dot, Slash,
     //          Asterisk, Bang, Colon, Less, Equals, Greater, Complex, EndOfFile.
-    private static ReadOnlySpan<byte> StateTransitions => new byte[]
-    {
+    private static ReadOnlySpan<byte> StateTransitions =>
+    [
         //  0: Initial - no token yet
         (byte)QuickScanState.Initial,        //  0: White
         (byte)QuickScanState.Initial,        //  1: CR
@@ -311,7 +311,7 @@ internal sealed partial class Lexer
         (byte)QuickScanState.Done,           // 13: Greater
         (byte)QuickScanState.Done,           // 14: Complex
         (byte)QuickScanState.Done,           // 15: EndOfFile
-    };
+    ];
 
     private bool TryQuickScanToken(LexerMode mode, out GreenSyntaxToken token)
     {
@@ -493,8 +493,8 @@ internal sealed partial class Lexer
     // NOTE: TryQuickScanTokenCore currently caps lookup to 128 characters:
     //     var charPropertiesLength = Math.Min(128, charProperties.Length);
     // Entries U+0080..U+017F are documented here, but are not used until that cap is removed.
-    private static ReadOnlySpan<byte> CharProperties => new byte[]
-    {
+    private static ReadOnlySpan<byte> CharProperties =>
+    [
         // U+0000 .. U+001F
         (byte)CharFlags.Complex,  //   0 / U+0000 NUL
         (byte)CharFlags.Complex,  //   1 / U+0001 SOH
@@ -902,7 +902,7 @@ internal sealed partial class Lexer
         (byte)CharFlags.Letter,   // 381 / U+017D
         (byte)CharFlags.Letter,   // 382 / U+017E
         (byte)CharFlags.Letter,   // 383 / U+017F
-    };
+    ];
 
 #if STATS
     private void RecordQuickScannerHit()

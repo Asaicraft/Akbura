@@ -95,6 +95,42 @@ internal sealed partial class Parser
         return true;
     }
 
+    private bool TryParseIncrementalCommandDeclaration(out GreenCommandDeclarationSyntax command)
+    {
+        command = null!;
+
+        if (!CanReadIncrementalNodeOrToken() ||
+            !TryReadIncrementalToken(SyntaxKind.CommandKeyword, out var commandKeyword))
+        {
+            return false;
+        }
+
+        var returnType = ParseIncrementalCSharpType();
+        var name = ParseIncrementalIdentifierName();
+        var parameters = ParseIncrementalCSharpParameterList();
+        var semicolon = ReadRequiredIncrementalToken(SyntaxKind.SemicolonToken);
+
+        command = GreenSyntaxFactory.CommandDeclarationSyntax(
+            commandKeyword,
+            returnType,
+            name,
+            parameters,
+            semicolon);
+        return true;
+    }
+
+    private GreenCSharpTypeSyntax ParseIncrementalCSharpType()
+    {
+        if (TryReadReusableIncrementalNode<GreenCSharpTypeSyntax>(out var type))
+        {
+            return type;
+        }
+
+        var token = EatCSharpTypeSyntax();
+        AkburaDebug.Assert(token != null, "Expected required C# return type.");
+        return ParseIncrementalCSharpType(token!.ToFullString());
+    }
+
     private GreenCSharpTypeSyntax? ParseIncrementalCSharpTypeOrNull()
     {
         if (TryReadReusableIncrementalNode<GreenCSharpTypeSyntax>(out var type))
@@ -106,6 +142,25 @@ internal sealed partial class Parser
         return token == null
             ? null
             : ParseIncrementalCSharpType(token.ToFullString());
+    }
+
+    private GreenCSharpParameterListSyntax ParseIncrementalCSharpParameterList()
+    {
+        if (TryReadReusableIncrementalNode<GreenCSharpParameterListSyntax>(out var parameters))
+        {
+            return parameters;
+        }
+
+        var mode = _mode;
+        _mode = Lexer.LexerMode.InCSharpParameterList;
+
+        var token = EatToken();
+
+        _mode = mode;
+
+        AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+        return GreenSyntaxFactory.CSharpParameterListSyntax(
+            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseParameterList(token.ToFullString())));
     }
 
     private GreenCSharpTypeSyntax ParseIncrementalCSharpType(string text)

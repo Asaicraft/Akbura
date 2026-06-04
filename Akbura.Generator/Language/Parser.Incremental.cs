@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using CSharpFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Language;
 
@@ -50,10 +51,7 @@ internal sealed partial class Parser
     {
         member = null!;
 
-        if (!_isIncremental ||
-            _mode != Lexer.LexerMode.TopLevel ||
-            _currentToken != null ||
-            _tokenOffset < _tokenCount)
+        if (!CanReadIncrementalNodeOrToken())
         {
             return false;
         }
@@ -71,11 +69,210 @@ internal sealed partial class Parser
         return true;
     }
 
+    private bool TryParseIncrementalStateDeclaration(out GreenStateDeclarationSyntax state)
+    {
+        state = null!;
+
+        if (!CanReadIncrementalNodeOrToken() ||
+            !TryReadIncrementalToken(SyntaxKind.StateKeyword, out var stateKeyword))
+        {
+            return false;
+        }
+
+        var type = ParseIncrementalCSharpTypeOrNull();
+        var name = ParseIncrementalIdentifierName();
+        var equals = ReadRequiredIncrementalToken(SyntaxKind.EqualsToken);
+        var initializer = ParseIncrementalStateInitializer();
+        var semicolon = ReadRequiredIncrementalToken(SyntaxKind.SemicolonToken);
+
+        state = GreenSyntaxFactory.StateDeclarationSyntax(
+            stateKeyword,
+            type,
+            name,
+            equals,
+            initializer,
+            semicolon);
+        return true;
+    }
+
+    private GreenCSharpTypeSyntax? ParseIncrementalCSharpTypeOrNull()
+    {
+        if (TryReadReusableIncrementalNode<GreenCSharpTypeSyntax>(out var type))
+        {
+            return type;
+        }
+
+        var token = EatOrNullCSharpTypeSyntax();
+        return token == null
+            ? null
+            : ParseIncrementalCSharpType(token.ToFullString());
+    }
+
+    private GreenCSharpTypeSyntax ParseIncrementalCSharpType(string text)
+    {
+        return GreenSyntaxFactory.CSharpTypeSyntax(
+            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(text)));
+    }
+
+    private GreenIdentifierNameSyntax ParseIncrementalIdentifierName()
+    {
+        return TryReadReusableIncrementalNode<GreenIdentifierNameSyntax>(out var name)
+            ? name
+            : ParseIdentifierName();
+    }
+
+    private GreenStateInitializerSyntax ParseIncrementalStateInitializer()
+    {
+        if (TryReadReusableIncrementalNode<GreenStateInitializerSyntax>(out var initializer))
+        {
+            return initializer;
+        }
+
+        if (TryReadIncrementalToken(IsStateBindingKeyword, out var bindingKeyword))
+        {
+            var expression = ParseIncrementalCSharpExpressionUntilSemicolon();
+            return GreenSyntaxFactory.BindableStateInitializerSyntax(bindingKeyword, expression);
+        }
+
+        return GreenSyntaxFactory.SimpleStateInitializerSyntax(
+            ParseIncrementalCSharpExpressionUntilSemicolon());
+    }
+
+    private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpressionUntilSemicolon()
+    {
+        if (TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(out var expression))
+        {
+            return expression;
+        }
+
+        var mode = _mode;
+        _mode = Lexer.LexerMode.InExpressionUntilSemicolon;
+
+        var token = EatToken();
+
+        _mode = mode;
+
+        AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+        return ParseIncrementalCSharpExpression(token.ToFullString());
+    }
+
+    private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpression(string text)
+    {
+        return GreenSyntaxFactory.CSharpExpressionSyntax(
+            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseExpression(
+                text,
+                offset: 0,
+                options: null,
+                consumeFullText: true)));
+    }
+
+    private bool TryReadReusableIncrementalNode<TNode>(out TNode node)
+        where TNode : GreenNode
+    {
+        node = null!;
+
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return false;
+        }
+
+        var savedPosition = _lexer.TextWindow.Position;
+        var blended = _blender.ReadNode(_mode);
+        if (blended.Node?.Green is not TNode green ||
+            !CanReuseIncrementalNode(green))
+        {
+            _lexer.TextWindow.Reset(savedPosition);
+            return false;
+        }
+
+        _blender = blended.Blender;
+        _prevTokenTrailingTrivia = ((GreenSyntaxToken?)green.GetLastTerminal())?.GetTrailingTrivia();
+        node = green;
+        return true;
+    }
+
+    private bool TryReadIncrementalToken(SyntaxKind kind, out GreenSyntaxToken token)
+    {
+        return TryReadIncrementalToken(current => current == kind, out token);
+    }
+
+    private bool TryReadIncrementalToken(Func<SyntaxKind, bool> predicate, out GreenSyntaxToken token)
+    {
+        token = null!;
+
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return false;
+        }
+
+        var savedPosition = _lexer.TextWindow.Position;
+        var blended = _blender.ReadToken(_mode);
+        var green = (GreenSyntaxToken?)blended.Token.Node;
+
+        if (green == null ||
+            !predicate(green.Kind) ||
+            !CanReuseIncrementalNode(green))
+        {
+            _lexer.TextWindow.Reset(savedPosition);
+            return false;
+        }
+
+        _blender = blended.Blender;
+        _prevTokenTrailingTrivia = green.GetTrailingTrivia();
+        token = green;
+        return true;
+    }
+
+    private GreenSyntaxToken ReadRequiredIncrementalToken(SyntaxKind kind)
+    {
+        if (TryReadIncrementalToken(kind, out var token))
+        {
+            return token;
+        }
+
+        var actual = PeekIncrementalTokenKind();
+        return CreateMissingToken(kind, actual);
+    }
+
+    private SyntaxKind PeekIncrementalTokenKind()
+    {
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return CurrentToken.Kind;
+        }
+
+        var savedPosition = _lexer.TextWindow.Position;
+        var blended = _blender.ReadToken(_mode);
+        var kind = blended.Token.Node?.Kind ?? SyntaxKind.None;
+        _lexer.TextWindow.Reset(savedPosition);
+        return kind;
+    }
+
+    private bool CanReadIncrementalNodeOrToken()
+    {
+        return _isIncremental &&
+               _mode == Lexer.LexerMode.TopLevel &&
+               _currentToken == null &&
+               _tokenOffset >= _tokenCount;
+    }
+
     private static bool CanReuseTopLevelMember(GreenAkTopLevelMemberSyntax member)
     {
         return member.FullWidth > 0 &&
                !member.ContainsDiagnostics &&
                !member.ContainsSkippedText;
+    }
+
+    private static bool CanReuseIncrementalNode(GreenNode node)
+    {
+        return node.FullWidth > 0 &&
+               !node.ContainsDiagnostics &&
+               !node.ContainsSkippedText;
+    }
+
+    private static bool IsStateBindingKeyword(SyntaxKind kind)
+    {
+        return kind is SyntaxKind.InToken or SyntaxKind.OutToken or SyntaxKind.BindToken;
     }
 
     private void RestoreBlenderBeforeReturnedToken(int tokenIndex)

@@ -28,6 +28,12 @@ partial class Parser
 					continue;
 				}
 
+				if (TryParseIncrementalStateDeclaration(out var incrementalState))
+				{
+					members.Add(incrementalState);
+					continue;
+				}
+
 				if (CurrentToken.Kind == SyntaxKind.EndOfFileToken)
 				{
 					break;
@@ -53,6 +59,11 @@ partial class Parser
 			return reusableMember;
 		}
 
+		if (TryParseIncrementalStateDeclaration(out var incrementalState))
+		{
+			return incrementalState;
+		}
+
 		return CurrentToken.Kind switch
 		{
 			SyntaxKind.AtToken when PeekToken(1).Kind == SyntaxKind.AkcssKeyword => ParseInlineAkcssBlockSyntax(),
@@ -65,6 +76,11 @@ partial class Parser
 
 	internal GreenAkTopLevelMemberSyntax ParseTopLevelMember()
 	{
+		if (TryParseIncrementalStateDeclaration(out var incrementalState))
+		{
+			return incrementalState;
+		}
+
 		return CurrentToken.Kind switch
 		{
 			SyntaxKind.StateKeyword => ParseStateDeclaration(),

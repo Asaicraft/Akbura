@@ -119,6 +119,28 @@ internal sealed partial class Parser
         return true;
     }
 
+    private bool TryParseIncrementalInjectDeclaration(out GreenInjectDeclarationSyntax inject)
+    {
+        inject = null!;
+
+        if (!CanReadIncrementalNodeOrToken() ||
+            !TryReadIncrementalToken(SyntaxKind.InjectKeyword, out var injectKeyword))
+        {
+            return false;
+        }
+
+        var type = ParseIncrementalCSharpType();
+        var name = ParseIncrementalIdentifierName();
+        var semicolon = ReadRequiredIncrementalToken(SyntaxKind.SemicolonToken);
+
+        inject = GreenSyntaxFactory.InjectDeclarationSyntax(
+            injectKeyword,
+            type,
+            name,
+            semicolon);
+        return true;
+    }
+
     private GreenCSharpTypeSyntax ParseIncrementalCSharpType()
     {
         if (TryReadReusableIncrementalNode<GreenCSharpTypeSyntax>(out var type))

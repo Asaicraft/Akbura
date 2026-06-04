@@ -287,7 +287,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
-                1 => _expression,
+                1 => GetRed(ref _expression, 1),
                 _ => null,
             };
         }

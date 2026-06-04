@@ -262,6 +262,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                0 => GetRed(ref _members, 0),
                 _ => null,
             };
         }
@@ -270,6 +271,7 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
+                0 => _members,
                 _ => null,
             };
         }

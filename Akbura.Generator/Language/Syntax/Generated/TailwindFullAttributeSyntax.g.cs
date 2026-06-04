@@ -328,6 +328,7 @@ namespace Akbura.Language.Syntax
             return index switch
             {
                 0 => GetRed(ref _prefix, 0),
+                1 => GetRed(ref _name, 1),
                 3 => GetRed(ref _segments, 3),
                 _ => null,
             };
@@ -338,6 +339,7 @@ namespace Akbura.Language.Syntax
             return index switch
             {
                 0 => _prefix,
+                1 => _name,
                 3 => _segments,
                 _ => null,
             };

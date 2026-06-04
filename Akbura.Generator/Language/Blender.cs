@@ -73,6 +73,12 @@ internal readonly partial struct Blender
         return ReadNodeOrToken(mode, asToken: true);
     }
 
+    public BlendedNode ReadFreshToken(Lexer.LexerMode mode)
+    {
+        var reader = new Reader(this);
+        return reader.ReadFreshToken(mode);
+    }
+
     private BlendedNode ReadNodeOrToken(Lexer.LexerMode mode, bool asToken)
     {
         var reader = new Reader(this);
@@ -88,7 +94,7 @@ internal readonly partial struct Blender
             return changeRange;
         }
 
-        const int maxLookahead = 1;
+        const int maxLookahead = 0;
         var start = changeRange.Span.Start;
 
         for (var i = 0; start > 0 && i < maxLookahead; i++)

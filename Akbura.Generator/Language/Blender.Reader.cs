@@ -27,11 +27,31 @@ internal readonly partial struct Blender
         public BlendedNode ReadNodeOrToken(Lexer.LexerMode mode, bool asToken)
         {
             SkipPastChanges();
-            SkipOldTreePastNewPosition();
+            if (!IsWithinCurrentChangeInNewText(_newPosition))
+            {
+                SkipOldTreePastNewPosition();
+            }
 
             if (TryReadOldNodeOrToken(mode, asToken, out var blended))
             {
                 return blended;
+            }
+
+            if (!asToken)
+            {
+                return default;
+            }
+
+            _oldTreeCursor = MoveToFirstToken(_oldTreeCursor);
+            return ReadNewToken(mode);
+        }
+
+        public BlendedNode ReadFreshToken(Lexer.LexerMode mode)
+        {
+            SkipPastChanges();
+            if (!IsWithinCurrentChangeInNewText(_newPosition))
+            {
+                SkipOldTreePastNewPosition();
             }
 
             return ReadNewToken(mode);
@@ -42,9 +62,15 @@ internal readonly partial struct Blender
             bool asToken,
             out BlendedNode blended)
         {
+            if (IsWithinCurrentChangeInNewText(_newPosition))
+            {
+                blended = default;
+                return false;
+            }
+
             var cursor = asToken
                 ? MoveToFirstToken(_oldTreeCursor)
-                : _oldTreeCursor;
+                : MoveToReusableNode(_oldTreeCursor);
 
             if (cursor.IsFinished)
             {
@@ -64,9 +90,10 @@ internal readonly partial struct Blender
                 return false;
             }
 
-            var nextCursor = cursor.MoveToNextSibling();
-            _oldTreeCursor = nextCursor;
             _newPosition += nodeOrToken.FullSpan.Length;
+            _oldTreeCursor = cursor;
+            _oldTreeCursor = MoveOldTreePast(_newPosition);
+            _lexer.TextWindow.Reset(_newPosition);
 
             blended = asToken
                 ? new BlendedNode(null, nodeOrToken.AsToken(), CreateBlender())
@@ -80,7 +107,9 @@ internal readonly partial struct Blender
 
             var position = _lexer.TextWindow.Position;
             var token = _lexer.Lex(mode);
-            var nextCursor = MoveOldTreePast(position + token.FullWidth);
+            var nextCursor = IsWithinCurrentChangeInNewText(position)
+                ? _oldTreeCursor
+                : MoveOldTreePast(position + token.FullWidth);
 
             _oldTreeCursor = nextCursor;
             _newPosition += token.FullWidth;
@@ -90,6 +119,19 @@ internal readonly partial struct Blender
                 new SyntaxToken(parent: null, token: token, position: position, index: 0),
                 CreateBlender());
             return blended;
+        }
+
+        private bool IsWithinCurrentChangeInNewText(int position)
+        {
+            if (_changes.IsEmpty)
+            {
+                return false;
+            }
+
+            var change = _changes.Peek();
+            var newStart = change.Span.Start + _changeDelta;
+            var newEnd = change.Span.Start + _changeDelta + change.NewLength;
+            return position >= newStart && position < newEnd;
         }
 
         private Blender CreateBlender()
@@ -107,8 +149,8 @@ internal readonly partial struct Blender
             while (!_changes.IsEmpty)
             {
                 var change = _changes.Peek();
-                var oldEndInNewText = change.Span.End + _changeDelta;
-                if (_newPosition < oldEndInNewText)
+                var newEnd = change.Span.Start + _changeDelta + change.NewLength;
+                if (_newPosition < newEnd)
                 {
                     break;
                 }
@@ -149,7 +191,8 @@ internal readonly partial struct Blender
                 return false;
             }
 
-            return oldSpan.IntersectsWith(_changes.Peek().Span);
+            var changeSpan = _changes.Peek().Span;
+            return oldSpan.Start < changeSpan.End && changeSpan.Start < oldSpan.End;
         }
 
         private static bool CanReuse(SyntaxNodeOrToken nodeOrToken, bool asToken)
@@ -170,6 +213,35 @@ internal readonly partial struct Blender
             while (!cursor.IsFinished && cursor.Current.IsNode)
             {
                 cursor = cursor.MoveToFirstChild();
+            }
+
+            return cursor;
+        }
+
+        private static Cursor MoveToReusableNode(Cursor cursor)
+        {
+            if (cursor.IsFinished)
+            {
+                return cursor;
+            }
+
+            if (cursor.Current.IsToken)
+            {
+                cursor = cursor.MoveToParent();
+            }
+
+            while (!cursor.IsFinished)
+            {
+                var parent = cursor.MoveToParent();
+                if (parent.IsFinished ||
+                    parent.Position != cursor.Position ||
+                    parent.Current.RequiredUnderlyingNode.IsList ||
+                    parent.Current.Kind == SyntaxKind.AkburaDocumentSyntax)
+                {
+                    break;
+                }
+
+                cursor = parent;
             }
 
             return cursor;

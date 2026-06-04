@@ -23,8 +23,6 @@ namespace Akbura.Language.Syntax.Green
             var flags = Flags;
             var fullWidth = FullWidth;
 
-            AdjustWidthAndFlags(Expression, ref fullWidth, ref flags);
-
             SlotCount = 1;
             FullWidth = fullWidth;
             Flags = flags;

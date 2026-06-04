@@ -84,6 +84,29 @@ public sealed class BlenderCursorTests
     }
 
     [Fact]
+    public void Cursor_MoveToNextSibling_FromMarkupFirstToken_MovesToComponentName()
+    {
+        const string code = "<TextBlock Text=\"Hi\"/>";
+
+        var root = ParseRoot(code);
+        var firstToken = new Blender.Cursor(root).MoveToFirstChild();
+        while (firstToken.Current.IsNode)
+        {
+            firstToken = firstToken.MoveToFirstChild();
+        }
+
+        var secondToken = firstToken.MoveToNextSibling();
+        while (secondToken.Current.IsNode)
+        {
+            secondToken = secondToken.MoveToFirstChild();
+        }
+
+        Assert.Equal(SyntaxKind.LessThanToken, firstToken.Current.Kind);
+        Assert.Equal(SyntaxKind.IdentifierToken, secondToken.Current.Kind);
+        Assert.Equal("TextBlock ", secondToken.Current.ToFullString());
+    }
+
+    [Fact]
     public void Cursor_MoveToParent_ReturnsContainingNode()
     {
         const string code = "state count = 0;";

@@ -20,8 +20,19 @@ partial class Parser
 
 		try
 		{
-			while (CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+			while (true)
 			{
+				if (TryEatReusableTopLevelMember(out var reusableMember))
+				{
+					members.Add(reusableMember);
+					continue;
+				}
+
+				if (CurrentToken.Kind == SyntaxKind.EndOfFileToken)
+				{
+					break;
+				}
+
 				var member = ParseCompilationUnitMember();
 				members.Add(member);
 			}
@@ -37,6 +48,11 @@ partial class Parser
 
 	internal GreenAkTopLevelMemberSyntax ParseCompilationUnitMember()
 	{
+		if (TryEatReusableTopLevelMember(out var reusableMember))
+		{
+			return reusableMember;
+		}
+
 		return CurrentToken.Kind switch
 		{
 			SyntaxKind.AtToken when PeekToken(1).Kind == SyntaxKind.AkcssKeyword => ParseInlineAkcssBlockSyntax(),

@@ -71,6 +71,12 @@ internal sealed partial class Parser : IDisposable
 
     private void AddNewToken()
     {
+        if (_isIncremental)
+        {
+            AddNewBlendedToken();
+            return;
+        }
+
         AddLexedToken(_lexer.Lex(_mode));
     }
 
@@ -106,6 +112,8 @@ internal sealed partial class Parser : IDisposable
                 Array.Copy(_lexedTokens, shiftOffset, _lexedTokens, 0, shiftCount);
             }
 
+            ShiftBlendedTokenSlots(shiftOffset, shiftCount);
+
             _firstToken += shiftOffset;
             _tokenCount -= shiftOffset;
             _tokenOffset -= shiftOffset;
@@ -115,6 +123,7 @@ internal sealed partial class Parser : IDisposable
             var lexedTokens = _lexedTokens;
 
             Array.Resize(ref _lexedTokens, _lexedTokens.Length * 2);
+            ResizeBlendedTokenSlots(_lexedTokens.Length);
 
             ReturnLexedTokensToPool(lexedTokens);
         }
@@ -133,6 +142,11 @@ internal sealed partial class Parser : IDisposable
 
     private GreenSyntaxToken FastPeekToken()
     {
+        if (_isIncremental)
+        {
+            return FastPeekBlendedToken();
+        }
+
         var token = _lexer.Lex(_mode);
 
         _lexer.TextWindow.Reset(_lexer.TextWindow.Position - token.FullWidth);
@@ -154,6 +168,7 @@ internal sealed partial class Parser : IDisposable
 
         var lastToken = _lexedTokens[_tokenCount - 1];
         _lexedTokens[_tokenCount - 1] = default;
+        RestoreBlenderBeforeReturnedToken(_tokenCount - 1);
 
         // Undo MoveToNextToken increment.
         _tokenOffset--;
@@ -174,7 +189,7 @@ internal sealed partial class Parser : IDisposable
             _prevTokenTrailingTrivia = null;
         }
 
-        if (lastToken.Value == null)
+        if (lastToken.Value == null || _isIncremental)
         {
             return;
         }

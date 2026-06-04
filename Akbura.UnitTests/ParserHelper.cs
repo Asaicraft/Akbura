@@ -1,8 +1,7 @@
-﻿using Akbura.Language;
+using Akbura.Language;
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Akbura.UnitTests;
 
@@ -14,5 +13,16 @@ internal class ParserHelper
         var lexer = new Lexer(sourceText);
 
         return new Parser(lexer, default);
+    }
+
+    internal static Parser MakeIncrementalParser(
+        string code,
+        AkburaDocumentSyntax oldTree,
+        IEnumerable<TextChangeRange>? changes)
+    {
+        var sourceText = SourceText.From(code);
+        var lexer = new Lexer(sourceText);
+
+        return new Parser(lexer, default, oldTree, changes);
     }
 }

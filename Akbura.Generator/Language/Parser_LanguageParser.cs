@@ -46,6 +46,12 @@ partial class Parser
 					continue;
 				}
 
+				if (TryParseIncrementalInlineAkcssBlockSyntax(out var incrementalAkcss))
+				{
+					members.Add(incrementalAkcss);
+					continue;
+				}
+
 				if (TryParseIncrementalMarkupRootSyntax(out var incrementalMarkup))
 				{
 					members.Add(incrementalMarkup);
@@ -92,6 +98,11 @@ partial class Parser
 			return incrementalInject;
 		}
 
+		if (TryParseIncrementalInlineAkcssBlockSyntax(out var incrementalAkcss))
+		{
+			return incrementalAkcss;
+		}
+
 		if (TryParseIncrementalMarkupRootSyntax(out var incrementalMarkup))
 		{
 			return incrementalMarkup;
@@ -122,6 +133,11 @@ partial class Parser
 		if (TryParseIncrementalInjectDeclaration(out var incrementalInject))
 		{
 			return incrementalInject;
+		}
+
+		if (TryParseIncrementalInlineAkcssBlockSyntax(out var incrementalAkcss))
+		{
+			return incrementalAkcss;
 		}
 
 		if (TryParseIncrementalMarkupRootSyntax(out var incrementalMarkup))

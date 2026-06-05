@@ -1,5 +1,6 @@
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
@@ -10,6 +11,8 @@ namespace Akbura.Language;
 
 internal sealed partial class Parser
 {
+    private static readonly ObjectPool<Blender[]> s_blendersBeforeTokenPool = new(() => new Blender[CachedTokenArraySize]);
+
     private readonly bool _isIncremental;
     private Blender _blender;
     private Blender[]? _blendersBeforeToken;
@@ -28,7 +31,7 @@ internal sealed partial class Parser
 
         _isIncremental = true;
         _blender = new Blender(lexer, oldTree, changes);
-        _blendersBeforeToken = new Blender[_lexedTokens.Length];
+        _blendersBeforeToken = s_blendersBeforeTokenPool.Allocate();
     }
 
     private void AddNewBlendedToken()
@@ -867,6 +870,172 @@ internal sealed partial class Parser
         return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, csharpExpression, closeBrace);
     }
 
+    private bool TryParseIncrementalCSharpStatementSyntax(
+        bool allowFileScopedDirectives,
+        out GreenCSharpStatementSyntax statement)
+    {
+        statement = null!;
+
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return false;
+        }
+
+        if (TryReadReusableIncrementalNode<GreenCSharpStatementSyntax>(out statement))
+        {
+            return true;
+        }
+
+        if (!IsIncrementalCSharpStatementStart(allowFileScopedDirectives))
+        {
+            return false;
+        }
+
+        statement = ParseIncrementalCSharpStatementSyntaxCore();
+        return true;
+    }
+
+    private GreenCSharpStatementSyntax ParseIncrementalCSharpStatementSyntaxCore()
+    {
+        var tokens = _pool.Allocate<GreenSyntaxToken>();
+        var canHaveBlockBody = IsCSharpBlockStatementStarter(PeekIncrementalToken());
+        var parenDepth = 0;
+        var bracketDepth = 0;
+        var braceDepth = 0;
+
+        try
+        {
+            while (PeekIncrementalTokenKind() != SyntaxKind.EndOfFileToken)
+            {
+                var kind = PeekIncrementalTokenKind();
+
+                if (kind == SyntaxKind.CloseBraceToken && braceDepth == 0)
+                {
+                    break;
+                }
+
+                if (kind == SyntaxKind.OpenBraceToken &&
+                    parenDepth == 0 &&
+                    bracketDepth == 0 &&
+                    braceDepth == 0 &&
+                    canHaveBlockBody)
+                {
+                    var body = ParseIncrementalCSharpBlockSyntaxCore();
+                    return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body);
+                }
+
+                var token = ReadIncrementalToken();
+                tokens.Add(token);
+
+                switch (kind)
+                {
+                    case SyntaxKind.OpenParenToken:
+                        parenDepth++;
+                        break;
+                    case SyntaxKind.CloseParenToken when parenDepth > 0:
+                        parenDepth--;
+                        break;
+                    case SyntaxKind.OpenBracketToken:
+                        bracketDepth++;
+                        break;
+                    case SyntaxKind.CloseBracketToken when bracketDepth > 0:
+                        bracketDepth--;
+                        break;
+                    case SyntaxKind.OpenBraceToken:
+                        braceDepth++;
+                        break;
+                    case SyntaxKind.CloseBraceToken when braceDepth > 0:
+                        braceDepth--;
+                        break;
+                    case SyntaxKind.SemicolonToken when parenDepth == 0 && bracketDepth == 0 && braceDepth == 0:
+                        return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body: null);
+                }
+            }
+
+            return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body: null);
+        }
+        finally
+        {
+            _pool.Free(tokens);
+        }
+    }
+
+    private bool TryParseIncrementalCSharpBlockSyntax(out GreenCSharpBlockSyntax block)
+    {
+        block = null!;
+
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return false;
+        }
+
+        if (TryReadReusableIncrementalNode<GreenCSharpBlockSyntax>(out block))
+        {
+            return true;
+        }
+
+        if (PeekIncrementalTokenKind() != SyntaxKind.OpenBraceToken)
+        {
+            return false;
+        }
+
+        block = ParseIncrementalCSharpBlockSyntaxCore();
+        return true;
+    }
+
+    private GreenCSharpBlockSyntax ParseIncrementalCSharpBlockSyntaxCore()
+    {
+        var openBraceToken = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
+        var members = _pool.Allocate<GreenAkTopLevelMemberSyntax>();
+
+        try
+        {
+            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+            {
+                members.Add(ParseTopLevelMember());
+            }
+
+            var closeBraceToken = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
+            return GreenSyntaxFactory.CSharpBlockSyntax(openBraceToken, members.ToList(), closeBraceToken);
+        }
+        finally
+        {
+            _pool.Free(members);
+        }
+    }
+
+    private bool IsIncrementalCSharpStatementStart(bool allowFileScopedDirectives)
+    {
+        var kind = PeekIncrementalTokenKind();
+
+        if (kind is SyntaxKind.EndOfFileToken or
+            SyntaxKind.CloseBraceToken or
+            SyntaxKind.StateKeyword or
+            SyntaxKind.ParamKeyword or
+            SyntaxKind.InjectKeyword or
+            SyntaxKind.CommandKeyword or
+            SyntaxKind.UseEffectKeyword or
+            SyntaxKind.LessThanToken)
+        {
+            return false;
+        }
+
+        if (kind == SyntaxKind.AtToken &&
+            PeekIncrementalTokenKind(1) == SyntaxKind.AkcssKeyword)
+        {
+            return false;
+        }
+
+        if (!allowFileScopedDirectives &&
+            (kind is SyntaxKind.UsingKeyword or SyntaxKind.NamespaceKeyword ||
+             kind == SyntaxKind.GlobalKeyword && PeekIncrementalTokenKind(1) == SyntaxKind.UsingKeyword))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     private GreenMarkupComponentNameSyntax ParseIncrementalMarkupComponentNameSyntax()
     {
         if (TryReadReusableIncrementalNode<GreenMarkupComponentNameSyntax>(out var name))
@@ -1037,7 +1206,10 @@ internal sealed partial class Parser
 
         var token = EatCSharpTypeSyntax();
         AkburaDebug.Assert(token != null, "Expected required C# return type.");
-        return ParseIncrementalCSharpType(token!.ToFullString());
+        return GreenSyntaxFactory.CSharpTypeSyntax(
+            EnsureCSharpRawToken(
+                token!,
+                text => CSharpFactory.ParseTypeName(text)));
     }
 
     private GreenCSharpTypeSyntax? ParseIncrementalCSharpTypeOrNull()
@@ -1050,7 +1222,10 @@ internal sealed partial class Parser
         var token = EatOrNullCSharpTypeSyntax();
         return token == null
             ? null
-            : ParseIncrementalCSharpType(token.ToFullString());
+            : GreenSyntaxFactory.CSharpTypeSyntax(
+                EnsureCSharpRawToken(
+                    token,
+                    text => CSharpFactory.ParseTypeName(text)));
     }
 
     private GreenCSharpParameterListSyntax ParseIncrementalCSharpParameterList()
@@ -1069,13 +1244,9 @@ internal sealed partial class Parser
 
         AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
         return GreenSyntaxFactory.CSharpParameterListSyntax(
-            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseParameterList(token.ToFullString())));
-    }
-
-    private GreenCSharpTypeSyntax ParseIncrementalCSharpType(string text)
-    {
-        return GreenSyntaxFactory.CSharpTypeSyntax(
-            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(text)));
+            EnsureCSharpRawToken(
+                (GreenSyntaxToken.CSharpRawToken)token,
+                text => CSharpFactory.ParseParameterList(text)));
     }
 
     private GreenIdentifierNameSyntax ParseIncrementalIdentifierName()
@@ -1122,17 +1293,27 @@ internal sealed partial class Parser
         _mode = mode;
 
         AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
-        return ParseIncrementalCSharpExpression(token.ToFullString());
+        return GreenSyntaxFactory.CSharpExpressionSyntax(
+            EnsureCSharpRawToken(
+                (GreenSyntaxToken.CSharpRawToken)token,
+                text => CSharpFactory.ParseExpression(
+                    text,
+                    offset: 0,
+                    options: null,
+                    consumeFullText: true)));
     }
 
-    private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpression(string text)
+    private static GreenSyntaxToken.CSharpRawToken EnsureCSharpRawToken<TNode>(
+        GreenSyntaxToken.CSharpRawToken token,
+        Func<string, TNode> parse)
+        where TNode : Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode
     {
-        return GreenSyntaxFactory.CSharpExpressionSyntax(
-            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseExpression(
-                text,
-                offset: 0,
-                options: null,
-                consumeFullText: true)));
+        if (token.RawNode is TNode)
+        {
+            return token;
+        }
+
+        return GreenSyntaxFactory.CSharpRawToken(parse(token.ToFullString()));
     }
 
     private bool TryReadReusableIncrementalNode<TNode>(out TNode node)
@@ -1236,6 +1417,34 @@ internal sealed partial class Parser
         return PeekIncrementalTokenKind(offset: 0);
     }
 
+    private GreenSyntaxToken PeekIncrementalToken()
+    {
+        return PeekIncrementalToken(offset: 0);
+    }
+
+    private GreenSyntaxToken PeekIncrementalToken(int offset)
+    {
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return PeekToken(offset);
+        }
+
+        var savedPosition = _lexer.TextWindow.Position;
+        var blender = _blender;
+        GreenSyntaxToken? token = null;
+
+        for (var i = 0; i <= offset; i++)
+        {
+            var blended = blender.ReadToken(_mode);
+            token = (GreenSyntaxToken?)blended.Token.Node;
+            blender = blended.Blender;
+        }
+
+        _lexer.TextWindow.Reset(savedPosition);
+        AkburaDebug.Assert(token != null, "Expected a token from the incremental lexer.");
+        return token!;
+    }
+
     private SyntaxKind PeekIncrementalTokenKind(int offset)
     {
         if (!CanReadIncrementalNodeOrToken())
@@ -1256,6 +1465,22 @@ internal sealed partial class Parser
 
         _lexer.TextWindow.Reset(savedPosition);
         return kind;
+    }
+
+    private GreenSyntaxToken ReadIncrementalToken()
+    {
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return EatToken();
+        }
+
+        var blended = _blender.ReadToken(_mode);
+        var token = (GreenSyntaxToken?)blended.Token.Node;
+        AkburaDebug.Assert(token != null, "Expected a token from the incremental lexer.");
+
+        _blender = blended.Blender;
+        _prevTokenTrailingTrivia = token!.GetTrailingTrivia();
+        return token;
     }
 
     private bool IsIncrementalMarkupAttributeStart()
@@ -1432,5 +1657,27 @@ internal sealed partial class Parser
         }
 
         Array.Resize(ref _blendersBeforeToken, length);
+    }
+
+    private void ReturnBlendersBeforeTokenToPool()
+    {
+        var blendersBeforeToken = _blendersBeforeToken;
+        if (blendersBeforeToken == null)
+        {
+            return;
+        }
+
+        _blendersBeforeToken = null;
+
+        var clearCount = Math.Min(_maxWrittenLexedTokenIndex + 1, blendersBeforeToken.Length);
+        if (clearCount > 0)
+        {
+            Array.Clear(blendersBeforeToken, 0, clearCount);
+        }
+
+        if (blendersBeforeToken.Length == CachedTokenArraySize)
+        {
+            s_blendersBeforeTokenPool.Free(blendersBeforeToken);
+        }
     }
 }

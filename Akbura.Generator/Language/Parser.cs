@@ -988,6 +988,7 @@ internal sealed partial class Parser : IDisposable
 
     public void Dispose()
     {
+        ReturnBlendersBeforeTokenToPool();
         ReturnLexedTokensToPool(_lexedTokens);
     }
 }

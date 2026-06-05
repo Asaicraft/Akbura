@@ -28,6 +28,14 @@ partial class Parser
 					continue;
 				}
 
+				if (TryParseIncrementalCSharpStatementSyntax(
+					allowFileScopedDirectives: false,
+					out var incrementalStatement))
+				{
+					members.Add(incrementalStatement);
+					continue;
+				}
+
 				if (TryParseIncrementalStateDeclaration(out var incrementalState))
 				{
 					members.Add(incrementalState);
@@ -83,6 +91,13 @@ partial class Parser
 			return reusableMember;
 		}
 
+		if (TryParseIncrementalCSharpStatementSyntax(
+			allowFileScopedDirectives: false,
+			out var incrementalStatement))
+		{
+			return incrementalStatement;
+		}
+
 		if (TryParseIncrementalStateDeclaration(out var incrementalState))
 		{
 			return incrementalState;
@@ -120,6 +135,18 @@ partial class Parser
 
 	internal GreenAkTopLevelMemberSyntax ParseTopLevelMember()
 	{
+		if (TryEatReusableTopLevelMember(out var reusableMember))
+		{
+			return reusableMember;
+		}
+
+		if (TryParseIncrementalCSharpStatementSyntax(
+			allowFileScopedDirectives: true,
+			out var incrementalStatement))
+		{
+			return incrementalStatement;
+		}
+
 		if (TryParseIncrementalStateDeclaration(out var incrementalState))
 		{
 			return incrementalState;
@@ -1597,6 +1624,11 @@ partial class Parser
 
 	private GreenCSharpBlockSyntax ParseCSharpBlock()
 	{
+		if (TryParseIncrementalCSharpBlockSyntax(out var incrementalBlock))
+		{
+			return incrementalBlock;
+		}
+
 		var openBraceToken = EatToken(SyntaxKind.OpenBraceToken);
 
 		var members = _pool.Allocate<GreenAkTopLevelMemberSyntax>();

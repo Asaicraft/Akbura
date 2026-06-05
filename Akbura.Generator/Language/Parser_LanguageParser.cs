@@ -46,6 +46,12 @@ partial class Parser
 					continue;
 				}
 
+				if (TryParseIncrementalMarkupRootSyntax(out var incrementalMarkup))
+				{
+					members.Add(incrementalMarkup);
+					continue;
+				}
+
 				if (CurrentToken.Kind == SyntaxKind.EndOfFileToken)
 				{
 					break;
@@ -86,6 +92,11 @@ partial class Parser
 			return incrementalInject;
 		}
 
+		if (TryParseIncrementalMarkupRootSyntax(out var incrementalMarkup))
+		{
+			return incrementalMarkup;
+		}
+
 		return CurrentToken.Kind switch
 		{
 			SyntaxKind.AtToken when PeekToken(1).Kind == SyntaxKind.AkcssKeyword => ParseInlineAkcssBlockSyntax(),
@@ -111,6 +122,11 @@ partial class Parser
 		if (TryParseIncrementalInjectDeclaration(out var incrementalInject))
 		{
 			return incrementalInject;
+		}
+
+		if (TryParseIncrementalMarkupRootSyntax(out var incrementalMarkup))
+		{
+			return incrementalMarkup;
 		}
 
 		return CurrentToken.Kind switch

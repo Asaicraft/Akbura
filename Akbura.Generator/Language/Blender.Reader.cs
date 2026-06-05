@@ -197,8 +197,7 @@ internal readonly partial struct Blender
 
         private static bool CanReuse(SyntaxNodeOrToken nodeOrToken, bool asToken)
         {
-            if (nodeOrToken.RequiredUnderlyingNode.ContainsSkippedText ||
-                nodeOrToken.RequiredUnderlyingNode.ContainsDiagnostics)
+            if (ContainsDiagnosticsOrSkippedText(nodeOrToken.RequiredUnderlyingNode))
             {
                 return false;
             }
@@ -206,6 +205,68 @@ internal readonly partial struct Blender
             return asToken
                 ? nodeOrToken.IsToken
                 : nodeOrToken.IsNode;
+        }
+
+        private static bool ContainsDiagnosticsOrSkippedText(GreenNode node)
+        {
+            if (node is GreenInlineExpressionSyntax inlineExpression)
+            {
+                return ContainsInvalidInlineExpression(inlineExpression);
+            }
+
+            if (node.Kind is SyntaxKind.CSharpExpressionSyntax or
+                SyntaxKind.CSharpTypeSyntax or
+                SyntaxKind.CSharpParameterListSyntax or
+                SyntaxKind.CSharpArgumentListSyntax)
+            {
+                return false;
+            }
+
+            if (node.ContainsDiagnosticsDirectly)
+            {
+                return true;
+            }
+
+            if (node.SlotCount == 0)
+            {
+                return node.ContainsSkippedText;
+            }
+
+            for (var i = 0; i < node.SlotCount; i++)
+            {
+                var child = node.GetSlot(i);
+                if (child != null && ContainsDiagnosticsOrSkippedText(child))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsInvalidInlineExpression(GreenInlineExpressionSyntax node)
+        {
+            if (ContainsDiagnosticsOrSkippedText(node.OpenBrace) ||
+                ContainsDiagnosticsOrSkippedText(node.Expression))
+            {
+                return true;
+            }
+
+            if (!node.CloseBrace.ContainsDiagnosticsDirectly &&
+                !node.CloseBrace.ContainsSkippedText)
+            {
+                return false;
+            }
+
+            // The current raw C# inline-expression lexer consumes the closing
+            // '}' into the CSharpRawToken, so the parser creates a zero-width
+            // missing CloseBraceToken. That recovery shape is stable and safe
+            // to reuse outside changed text. A truly unterminated expression
+            // does not have the terminator in the raw expression text and stays
+            // non-reusable.
+            return !node.CloseBrace.IsMissing ||
+                   node.CloseBrace.FullWidth != 0 ||
+                   !node.Expression.ToFullString().EndsWith("}");
         }
 
         private static Cursor MoveToFirstToken(Cursor cursor)
@@ -225,6 +286,13 @@ internal readonly partial struct Blender
                 return cursor;
             }
 
+            while (!cursor.IsFinished &&
+                   cursor.Current.IsNode &&
+                   cursor.Current.RequiredUnderlyingNode.IsList)
+            {
+                cursor = cursor.MoveToFirstChild();
+            }
+
             if (cursor.Current.IsToken)
             {
                 cursor = cursor.MoveToParent();
@@ -234,7 +302,7 @@ internal readonly partial struct Blender
             {
                 var parent = cursor.MoveToParent();
                 if (parent.IsFinished ||
-                    parent.Position != cursor.Position ||
+                    parent.Current.FullSpan.Start != cursor.Current.FullSpan.Start ||
                     parent.Current.RequiredUnderlyingNode.IsList ||
                     parent.Current.Kind == SyntaxKind.AkburaDocumentSyntax)
                 {

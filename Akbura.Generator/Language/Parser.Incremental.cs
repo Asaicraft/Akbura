@@ -996,9 +996,20 @@ internal sealed partial class Parser
 
         try
         {
-            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+            while (true)
             {
-                members.Add(ParseTopLevelMember());
+                if (TryEatReusableTopLevelMember(out var reusableMember))
+                {
+                    members.Add(reusableMember);
+                    continue;
+                }
+
+                if (PeekIncrementalTokenKind() is SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken)
+                {
+                    break;
+                }
+
+                members.Add(ParseTopLevelMemberAfterReusableProbe());
             }
 
             var closeBraceToken = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
@@ -1008,6 +1019,52 @@ internal sealed partial class Parser
         {
             _pool.Free(members);
         }
+    }
+
+    private GreenAkTopLevelMemberSyntax ParseTopLevelMemberAfterReusableProbe()
+    {
+        if (TryParseIncrementalCSharpStatementSyntax(
+            allowFileScopedDirectives: true,
+            out var incrementalStatement))
+        {
+            return incrementalStatement;
+        }
+
+        if (TryParseIncrementalStateDeclaration(out var incrementalState))
+        {
+            return incrementalState;
+        }
+
+        if (TryParseIncrementalCommandDeclaration(out var incrementalCommand))
+        {
+            return incrementalCommand;
+        }
+
+        if (TryParseIncrementalInjectDeclaration(out var incrementalInject))
+        {
+            return incrementalInject;
+        }
+
+        if (TryParseIncrementalInlineAkcssBlockSyntax(out var incrementalAkcss))
+        {
+            return incrementalAkcss;
+        }
+
+        if (TryParseIncrementalMarkupRootSyntax(out var incrementalMarkup))
+        {
+            return incrementalMarkup;
+        }
+
+        return CurrentToken.Kind switch
+        {
+            SyntaxKind.StateKeyword => ParseStateDeclaration(),
+            SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
+            SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
+            SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
+            SyntaxKind.UseEffectKeyword => ParseUseEffectDeclarationSyntax(),
+            SyntaxKind.LessThanToken => ParseMarkupRootSyntax(),
+            _ => ParseCSharpStatementSyntax()
+        };
     }
 
     private bool IsIncrementalCSharpStatementStart(bool allowFileScopedDirectives)

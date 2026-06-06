@@ -1364,7 +1364,11 @@ partial class Parser
 	{
 		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
 		var expression = ParseCSharpExpressionInMode(Lexer.LexerMode.InInlineExpression);
-		var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+		var closeBrace = CurrentToken.Kind == SyntaxKind.CloseBraceToken
+			? EatToken(SyntaxKind.CloseBraceToken)
+			: InlineExpressionRawEndsWithCloseBrace(expression)
+				? GreenSyntaxFactory.MissingToken(SyntaxKind.CloseBraceToken)
+				: EatToken(SyntaxKind.CloseBraceToken);
 
 		return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, expression, closeBrace);
 	}

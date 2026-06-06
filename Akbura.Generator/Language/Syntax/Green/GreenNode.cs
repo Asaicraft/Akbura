@@ -122,8 +122,13 @@ internal abstract partial class GreenNode
     {
         _rawKind = kind;
 
-        ContainsAnnotationsDirectly = SetAnnotations(annotations);
-        ContainsDiagnosticsDirectly = SetDiagnostics(diagnosticInfos);
+        var containsAnnotations = SetAnnotations(annotations);
+        ContainsAnnotationsDirectly = containsAnnotations;
+        ContainsAnnotations = containsAnnotations;
+
+        var containsDiagnostics = SetDiagnostics(diagnosticInfos);
+        ContainsDiagnosticsDirectly = containsDiagnostics;
+        ContainsDiagnostics = containsDiagnostics;
     }
 
 

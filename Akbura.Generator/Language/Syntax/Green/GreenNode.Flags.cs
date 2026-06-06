@@ -9,7 +9,7 @@ partial class GreenNode
     internal enum GreenNodeFlags : ushort
     {
         None = 0,
-        ContainsDiagnostics = 1 << 3,
+        ContainsDiagnostics = 1 << 9,
         ContainsAnnotations = 1 << 4,
         ContainsDiagnosticsDirectly = 1 << 5,
         ContainsAnnotationsDirectly = 1 << 6,

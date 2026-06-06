@@ -4,8 +4,10 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using CSharpFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language;
 
@@ -865,7 +867,11 @@ internal sealed partial class Parser
 
         var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
         var csharpExpression = ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode.InInlineExpression);
-        var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
+        var closeBrace = PeekIncrementalTokenKind() == SyntaxKind.CloseBraceToken
+            ? ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken)
+            : InlineExpressionRawEndsWithCloseBrace(csharpExpression)
+                ? GreenSyntaxFactory.MissingToken(SyntaxKind.CloseBraceToken)
+                : ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
 
         return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, csharpExpression, closeBrace);
     }
@@ -1558,9 +1564,9 @@ internal sealed partial class Parser
 
     private static bool ContainsDiagnosticsOrSkippedText(GreenNode node)
     {
-        if (node is GreenInlineExpressionSyntax inlineExpression)
+        if (node.Kind == SyntaxKind.InlineExpressionSyntax)
         {
-            return ContainsInvalidInlineExpression(inlineExpression);
+            return ContainsInvalidInlineExpression(Unsafe.As<GreenInlineExpressionSyntax>(node));
         }
 
         if (node.Kind is SyntaxKind.CSharpExpressionSyntax or
@@ -1571,14 +1577,38 @@ internal sealed partial class Parser
             return false;
         }
 
-        if (node.ContainsDiagnosticsDirectly)
+        if (node.ContainsSkippedText)
         {
             return true;
         }
 
-        if (node.SlotCount == 0)
+        if (!node.ContainsDiagnostics)
         {
-            return node.ContainsSkippedText;
+            return false;
+        }
+
+        return ContainsDiagnosticsOrSkippedTextSlow(node);
+    }
+
+    private static bool ContainsDiagnosticsOrSkippedTextSlow(GreenNode node)
+    {
+        if (node.Kind == SyntaxKind.InlineExpressionSyntax)
+        {
+            return ContainsInvalidInlineExpression(Unsafe.As<GreenInlineExpressionSyntax>(node));
+        }
+
+        if (node.Kind is SyntaxKind.CSharpExpressionSyntax or
+            SyntaxKind.CSharpTypeSyntax or
+            SyntaxKind.CSharpParameterListSyntax or
+            SyntaxKind.CSharpArgumentListSyntax)
+        {
+            return false;
+        }
+
+        if (node.ContainsDiagnosticsDirectly ||
+            node.ContainsSkippedText)
+        {
+            return true;
         }
 
         for (var i = 0; i < node.SlotCount; i++)
@@ -1615,7 +1645,32 @@ internal sealed partial class Parser
         // non-reusable.
         return !node.CloseBrace.IsMissing ||
                node.CloseBrace.FullWidth != 0 ||
-               !node.Expression.ToFullString().EndsWith("}");
+               !InlineExpressionRawEndsWithCloseBrace(node.Expression);
+    }
+
+    private static bool InlineExpressionRawEndsWithCloseBrace(GreenCSharpExpressionSyntax expression)
+    {
+        var tokens = expression.Tokens;
+        if (tokens.Count == 0)
+        {
+            return false;
+        }
+
+        var token = tokens[0];
+        if (token == null || token.Kind != SyntaxKind.CSharpRawToken)
+        {
+            return false;
+        }
+
+        var rawToken = Unsafe.As<GreenSyntaxToken.CSharpRawToken>(token);
+        var rawNode = rawToken.RawNode;
+        if (rawNode != null)
+        {
+            var lastToken = rawNode.GetLastToken(includeZeroWidth: true, includeSkipped: true);
+            return lastToken.RawKind == (int)CSharpSyntaxKind.CloseBraceToken;
+        }
+
+        return rawToken.Text.EndsWith("}", StringComparison.Ordinal);
     }
 
     private static bool IsStateBindingKeyword(SyntaxKind kind)

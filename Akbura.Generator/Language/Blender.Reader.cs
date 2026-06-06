@@ -2,6 +2,8 @@ using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language;
 
@@ -209,9 +211,9 @@ internal readonly partial struct Blender
 
         private static bool ContainsDiagnosticsOrSkippedText(GreenNode node)
         {
-            if (node is GreenInlineExpressionSyntax inlineExpression)
+            if (node.Kind == SyntaxKind.InlineExpressionSyntax)
             {
-                return ContainsInvalidInlineExpression(inlineExpression);
+                return ContainsInvalidInlineExpression(Unsafe.As<GreenInlineExpressionSyntax>(node));
             }
 
             if (node.Kind is SyntaxKind.CSharpExpressionSyntax or
@@ -222,14 +224,38 @@ internal readonly partial struct Blender
                 return false;
             }
 
-            if (node.ContainsDiagnosticsDirectly)
+            if (node.ContainsSkippedText)
             {
                 return true;
             }
 
-            if (node.SlotCount == 0)
+            if (!node.ContainsDiagnostics)
             {
-                return node.ContainsSkippedText;
+                return false;
+            }
+
+            return ContainsDiagnosticsOrSkippedTextSlow(node);
+        }
+
+        private static bool ContainsDiagnosticsOrSkippedTextSlow(GreenNode node)
+        {
+            if (node.Kind == SyntaxKind.InlineExpressionSyntax)
+            {
+                return ContainsInvalidInlineExpression(Unsafe.As<GreenInlineExpressionSyntax>(node));
+            }
+
+            if (node.Kind is SyntaxKind.CSharpExpressionSyntax or
+                SyntaxKind.CSharpTypeSyntax or
+                SyntaxKind.CSharpParameterListSyntax or
+                SyntaxKind.CSharpArgumentListSyntax)
+            {
+                return false;
+            }
+
+            if (node.ContainsDiagnosticsDirectly ||
+                node.ContainsSkippedText)
+            {
+                return true;
             }
 
             for (var i = 0; i < node.SlotCount; i++)
@@ -266,7 +292,32 @@ internal readonly partial struct Blender
             // non-reusable.
             return !node.CloseBrace.IsMissing ||
                    node.CloseBrace.FullWidth != 0 ||
-                   !node.Expression.ToFullString().EndsWith("}");
+                   !InlineExpressionRawEndsWithCloseBrace(node.Expression);
+        }
+
+        private static bool InlineExpressionRawEndsWithCloseBrace(GreenCSharpExpressionSyntax expression)
+        {
+            var tokens = expression.Tokens;
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            var token = tokens[0];
+            if (token == null || token.Kind != SyntaxKind.CSharpRawToken)
+            {
+                return false;
+            }
+
+            var rawToken = Unsafe.As<GreenSyntaxToken.CSharpRawToken>(token);
+            var rawNode = rawToken.RawNode;
+            if (rawNode != null)
+            {
+                var lastToken = rawNode.GetLastToken(includeZeroWidth: true, includeSkipped: true);
+                return lastToken.RawKind == (int)CSharpSyntaxKind.CloseBraceToken;
+            }
+
+            return rawToken.Text.EndsWith("}", System.StringComparison.Ordinal);
         }
 
         private static Cursor MoveToFirstToken(Cursor cursor)

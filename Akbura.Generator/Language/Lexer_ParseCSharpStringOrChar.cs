@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Akbura.Language;
 
+#pragma warning disable RSEXPERIMENTAL003 // SyntaxTokenParser is used as a targeted C# raw-token helper.
 
 partial class Lexer
 {
@@ -74,10 +75,17 @@ partial class Lexer
     {
         var start = TextWindow.Position;
 
+        if (start < _tokenParserPosition)
+        {
+            _tokenParser = CSharpSyntaxFactory.CreateTokenParser(TextWindow.Text);
+            _tokenParserPosition = 0;
+        }
+
         _tokenParser.SkipForwardTo(start);
 
         var result = _tokenParser.ParseNextToken();
         var token = result.Token;
+        _tokenParserPosition = start + token.FullSpan.Length;
 
         if(IsCSharpStringOrCharKind(token.Kind()))
         {

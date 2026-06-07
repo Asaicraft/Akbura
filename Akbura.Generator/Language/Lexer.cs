@@ -96,7 +96,8 @@ internal sealed partial class Lexer : IDisposable
 
 	private List<AkburaDiagnostic>? _errors;
 
-	private readonly Microsoft.CodeAnalysis.CSharp.SyntaxTokenParser _tokenParser;
+	private Microsoft.CodeAnalysis.CSharp.SyntaxTokenParser _tokenParser;
+	private int _tokenParserPosition;
 
 	public Lexer(
 		SourceText sourceText

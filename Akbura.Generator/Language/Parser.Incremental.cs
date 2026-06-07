@@ -1355,7 +1355,12 @@ internal sealed partial class Parser
 
         _mode = mode;
 
-        AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+        if (token.Kind != SyntaxKind.CSharpRawToken)
+        {
+            return GreenSyntaxFactory.CSharpExpressionSyntax(
+                GreenSyntaxFactory.CSharpRawToken(token.ToFullString()));
+        }
+
         return GreenSyntaxFactory.CSharpExpressionSyntax(
             EnsureCSharpRawToken(
                 (GreenSyntaxToken.CSharpRawToken)token,

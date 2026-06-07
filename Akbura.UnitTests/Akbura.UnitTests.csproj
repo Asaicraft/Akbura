@@ -35,6 +35,7 @@
 
 	<ItemGroup>
 		<Using Include="Xunit" />
+		<Compile Include="..\Akbura.TestUtilities\RealisticIncrementalScenario.cs" Link="RealisticIncrementalScenario.cs" />
 		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" />
 	</ItemGroup>
 

@@ -20,6 +20,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" AdditionalProperties="EnableAkburaStats=true;EnableQuickScanBenchmark=true" />
+		<Compile Include="..\Akbura.TestUtilities\RealisticIncrementalScenario.cs" Link="RealisticIncrementalScenario.cs" />
 	</ItemGroup>
 
 </Project>

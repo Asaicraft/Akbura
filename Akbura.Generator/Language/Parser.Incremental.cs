@@ -48,7 +48,9 @@ internal sealed partial class Parser
 
     private GreenSyntaxToken FastPeekBlendedToken()
     {
+        var savedPosition = _lexer.TextWindow.Position;
         var blended = _blender.ReadFreshToken(_mode);
+        _lexer.TextWindow.Reset(savedPosition);
         return (GreenSyntaxToken)blended.Token.RequiredNode;
     }
 

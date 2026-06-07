@@ -127,6 +127,7 @@ public class FullComponentSyntaxParseTests
 		Assert.IsType<GreenStateDeclarationSyntax>(syntax.Members[1]);
 		Assert.IsType<GreenUseEffectDeclarationSyntax>(syntax.Members[2]);
 		Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[3]);
+		Assert.Equal(code.Length, syntax.FullWidth);
 		Assert.Equal(code, syntax.ToFullString());
 	}
 
@@ -319,6 +320,7 @@ public class FullComponentSyntaxParseTests
 		Assert.Equal("StackPanel", markup.Element.StartTag!.Name.ToFullString().Trim());
 		Assert.Equal(4, markup.Element.StartTag.Attributes.Count);
 		Assert.Equal(6, markup.Element.Body.Count);
+		Assert.Equal(code.Length, syntax.FullWidth);
 		Assert.Equal(code, syntax.ToFullString());
 	}
 
@@ -327,6 +329,7 @@ public class FullComponentSyntaxParseTests
 		var parser = MakeParser(code);
 		var syntax = parser.ParseCompilationUnit();
 
+		Assert.Equal(code.Length, syntax.FullWidth);
 		Assert.Equal(code, syntax.ToFullString());
 
 		return syntax;
@@ -337,6 +340,7 @@ public class FullComponentSyntaxParseTests
 		var parser = MakeParser(code);
 		var syntax = parser.ParseAkcssDocumentSyntax();
 
+		Assert.Equal(code.Length, syntax.FullWidth);
 		Assert.Equal(code, syntax.ToFullString());
 
 		return syntax;

@@ -1,4 +1,5 @@
 ﻿using Akbura.Language.Syntax;
+using System.Text;
 using static Akbura.Language.Syntax.SyntaxFactory;
 
 namespace Akbura.UnitTests;
@@ -47,6 +48,7 @@ public class AkburaSyntaxFactoryTests
         const string expectedStateDeclarationText = "state count = 0;";
 
         Assert.Equal(expectedStateDeclarationText, stateDeclarationText);
+        AssertFullWidthMatchesText(expectedStateDeclarationText, stateDeclaration);
 
         //
         // <Button Click={count++}>
@@ -135,6 +137,7 @@ public class AkburaSyntaxFactoryTests
             "</Button>";
 
         Assert.Equal(expectedButtonText, buttonText);
+        AssertFullWidthMatchesText(expectedButtonText, buttonElement);
 
         //
         // Now we assemble the full document:
@@ -180,6 +183,7 @@ public class AkburaSyntaxFactoryTests
             "</Button>";
 
         Assert.Equal(expectedDocumentText, documentText);
+        AssertFullWidthMatchesText(expectedDocumentText, document);
     }
 
     [Fact]
@@ -590,6 +594,7 @@ public class AkburaSyntaxFactoryTests
             "}\n";
 
         Assert.Equal(expected, text);
+        AssertFullWidthMatchesText(expected, akcssDocument);
     }
 
     [Fact]
@@ -1123,6 +1128,53 @@ public class AkburaSyntaxFactoryTests
         </Grid>
         """;
 
-        Assert.Equal(expected.ReplaceLineEndings("\n"), actual);
+        var expectedText = expected.ReplaceLineEndings("\n");
+
+        Assert.Equal(expectedText, actual);
+        AssertFullWidthMatchesText(expectedText, document);
+    }
+
+    private static void AssertFullWidthMatchesText(string expected, AkburaSyntax syntax)
+    {
+        if (expected.Length != syntax.FullWidth)
+        {
+            var message = new StringBuilder();
+            message.Append("Expected text length ");
+            message.Append(expected.Length);
+            message.Append(" to match ");
+            message.Append(syntax.Kind);
+            message.Append(".FullWidth ");
+            message.Append(syntax.FullWidth);
+            message.AppendLine(".");
+
+            var isSelf = true;
+            foreach (var nodeOrToken in syntax.DescendantNodesAndTokensAndSelf())
+            {
+                if (isSelf)
+                {
+                    isSelf = false;
+                    continue;
+                }
+
+                var textLength = nodeOrToken.ToFullString().Length;
+                if (textLength == nodeOrToken.FullWidth)
+                {
+                    continue;
+                }
+
+                message.Append("First mismatching descendant: ");
+                message.Append(nodeOrToken.Kind);
+                message.Append(", text length ");
+                message.Append(textLength);
+                message.Append(", FullWidth ");
+                message.Append(nodeOrToken.FullWidth);
+                message.AppendLine(".");
+                break;
+            }
+
+            Assert.Fail(message.ToString());
+        }
+
+        Assert.Equal(expected, syntax.ToFullString());
     }
 }

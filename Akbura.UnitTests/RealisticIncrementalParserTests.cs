@@ -109,7 +109,9 @@ public sealed class RealisticIncrementalParserTests
     private static GreenAkburaDocumentSyntax Parse(string code)
     {
         using var parser = ParserHelper.MakeParser(code);
-        return parser.ParseCompilationUnit();
+        var syntax = parser.ParseCompilationUnit();
+        AssertFullWidthMatchesText(code, syntax);
+        return syntax;
     }
 
     private static GreenAkburaDocumentSyntax ParseIncremental(
@@ -119,7 +121,50 @@ public sealed class RealisticIncrementalParserTests
     {
         var oldTree = (AkburaDocumentSyntax)oldSyntax.CreateRed();
         using var parser = ParserHelper.MakeIncrementalParser(code, oldTree, changes);
-        return parser.ParseCompilationUnit();
+        var syntax = parser.ParseCompilationUnit();
+        AssertFullWidthMatchesText(code, syntax);
+        return syntax;
+    }
+
+    private static void AssertFullWidthMatchesText(string code, GreenAkburaDocumentSyntax syntax)
+    {
+        if (code.Length == syntax.FullWidth)
+        {
+            return;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("Root FullWidth mismatch. ");
+        builder.Append("Text length: ");
+        builder.Append(code.Length);
+        builder.Append(", FullWidth: ");
+        builder.Append(syntax.FullWidth);
+        builder.AppendLine(".");
+
+        for (var i = 0; i < syntax.Members.Count; i++)
+        {
+            var member = syntax.Members[i];
+            if (member == null)
+            {
+                continue;
+            }
+
+            var textLength = member.ToFullString().Length;
+            if (textLength != member.FullWidth)
+            {
+                builder.Append("Member ");
+                builder.Append(i);
+                builder.Append(" ");
+                builder.Append(member.Kind);
+                builder.Append(" text length ");
+                builder.Append(textLength);
+                builder.Append(" full width ");
+                builder.Append(member.FullWidth);
+                builder.AppendLine(".");
+            }
+        }
+
+        Assert.Fail(builder.ToString());
     }
 
     private static double GetTopLevelReuseRatio(

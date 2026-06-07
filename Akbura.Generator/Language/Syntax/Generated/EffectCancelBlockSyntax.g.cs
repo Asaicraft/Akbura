@@ -32,7 +32,6 @@ namespace Akbura.Language.Syntax.Green
             var fullWidth = FullWidth;
 
             AdjustWidthAndFlags(CancelKeyword, ref fullWidth, ref flags);
-            AdjustWidthAndFlags(Body, ref fullWidth, ref flags);
 
             SlotCount = 2;
             FullWidth = fullWidth;

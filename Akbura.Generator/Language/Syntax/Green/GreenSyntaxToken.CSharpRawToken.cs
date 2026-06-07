@@ -18,10 +18,24 @@ partial class GreenSyntaxToken
             : base(SyntaxKind.CSharpRawToken, diagnostics, annotations)
         {
             _rawText = rawText;
-            FullWidth = rawText.Length;
-
             _leading = leading;
             _trailing = trailing;
+
+            var fullWidth = rawText.Length;
+            var flags = Flags;
+
+            if (leading != null)
+            {
+                AdjustWidthAndFlags(leading, ref fullWidth, ref flags);
+            }
+
+            if (trailing != null)
+            {
+                AdjustWidthAndFlags(trailing, ref fullWidth, ref flags);
+            }
+
+            FullWidth = fullWidth;
+            Flags = flags;
         }
 
         public CSharpRawToken(CsharpRawNode rawText, GreenNode? leading, GreenNode? trailing, ImmutableArray<AkburaDiagnostic>? diagnostics, ImmutableArray<AkburaSyntaxAnnotation>? annotations)
@@ -29,11 +43,26 @@ partial class GreenSyntaxToken
         {
             _rawNode = rawText;
             _rawText = _rawNode.ToFullString();
-            FullWidth = _rawText.Length;
             IsMissing = _rawNode.IsMissing;
 
             _leading = leading;
             _trailing = trailing;
+
+            var fullWidth = _rawText.Length;
+            var flags = Flags;
+
+            if (leading != null)
+            {
+                AdjustWidthAndFlags(leading, ref fullWidth, ref flags);
+            }
+
+            if (trailing != null)
+            {
+                AdjustWidthAndFlags(trailing, ref fullWidth, ref flags);
+            }
+
+            FullWidth = fullWidth;
+            Flags = flags;
         }
 
         public override string Text => _rawText;

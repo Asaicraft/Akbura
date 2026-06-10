@@ -1,3 +1,4 @@
+using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using static Akbura.UnitTests.ParserHelper;
 
@@ -71,6 +72,28 @@ public class MarkupAttributeSyntaxParseTests
             parser.ParseMarkupAttributeSyntax());
 
         Assert.IsType(expectedValueType, syntax.Value);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void PlainDynamicAttribute_CloseBraceIsSeparateToken()
+    {
+        const string code = "Click={count++}";
+
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+        var value = Assert.IsType<GreenMarkupDynamicAttributeValueSyntax>(syntax.Value);
+        var expression = value.Expression;
+
+        Assert.Equal(1, expression.Expression.Tokens.Count);
+        var rawToken = expression.Expression.Tokens[0]!;
+
+        Assert.Equal(SyntaxKind.CSharpRawToken, rawToken.Kind);
+        Assert.Equal("count++", rawToken.ToFullString());
+        Assert.False(expression.CloseBrace.IsMissing);
+        Assert.Equal("}", expression.CloseBrace.ToFullString());
         Assert.Equal(code, syntax.ToFullString());
     }
 

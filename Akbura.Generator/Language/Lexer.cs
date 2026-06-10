@@ -1457,6 +1457,15 @@ internal sealed partial class Lexer : IDisposable
 				break;
 			}
 
+			// Stop before the terminator when it belongs to the Akbura grammar.
+			// The terminator must stay available as the next token, e.g. the
+			// closing '}' of an inline expression is a CloseBraceToken, not part
+			// of the CSharpRawToken.
+			if (character == terminator && paren == 0 && brace == 0 && bracket == 0)
+			{
+				break;
+			}
+
 			// structure tracking
 			if (character == '(')
 			{
@@ -1506,12 +1515,6 @@ internal sealed partial class Lexer : IDisposable
 					break;
 				}
 				continue;
-			}
-
-			// Stop only when fully unnested ---
-			if (character == terminator && paren == 0 && brace == 0 && bracket == 0)
-			{
-				break;
 			}
 
 			// normal char 
@@ -1592,6 +1595,14 @@ internal sealed partial class Lexer : IDisposable
 				break;
 			}
 
+			// Stop before Akbura-owned separators/closers. They must remain in
+			// the token stream for the outer parser to consume.
+			if ((character == firstTerminator || character == secondTerminator) &&
+				paren == 0 && brace == 0 && bracket == 0)
+			{
+				break;
+			}
+
 			// structure: (
 			if (character == '(')
 			{
@@ -1632,13 +1643,6 @@ internal sealed partial class Lexer : IDisposable
 				if (DecreaseDepth(ref bracket, character, _builder, in TextWindow))
 					break;
 				continue;
-			}
-
-			// NEW: stop if we hit ANY terminator and nesting == 0
-			if ((character == firstTerminator || character == secondTerminator) &&
-				paren == 0 && brace == 0 && bracket == 0)
-			{
-				break;
 			}
 
 			_builder.Append(character);

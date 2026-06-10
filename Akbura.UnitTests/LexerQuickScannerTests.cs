@@ -87,8 +87,14 @@ public class LexerQuickScannerTests
 		var token = lexer.Lex(Lexer.LexerMode.InInlineExpression);
 
 		Assert.Equal(SyntaxKind.CSharpRawToken, token.Kind);
+		Assert.Equal("count++", token.ToFullString());
 		Assert.Equal(0, lexer.QuickScannerHitCount);
 		Assert.Equal(0, lexer.QuickScannerFallbackCount);
+
+		var closeBrace = lexer.Lex(Lexer.LexerMode.TopLevel);
+
+		Assert.Equal(SyntaxKind.CloseBraceToken, closeBrace.Kind);
+		Assert.Equal("}", closeBrace.ToFullString());
 	}
 
 	[Fact]

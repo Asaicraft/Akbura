@@ -8,7 +8,6 @@ using System.Text;
 using static Akbura.Language.Syntax.Green.GreenSyntaxToken;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language;
 
@@ -1087,7 +1086,13 @@ partial class Parser
 			   SyntaxKind.LessSlashToken or
 			   SyntaxKind.OpenBraceToken))
 		{
-			hasUnsupportedControlFlowDirective |= IsUnsupportedMarkupControlFlowDirectiveStart();
+			if (IsUnsupportedMarkupControlFlowDirectiveStart())
+			{
+				hasUnsupportedControlFlowDirective = true;
+				AppendUnsupportedMarkupControlFlowDirectiveText(rawText);
+				continue;
+			}
+
 			rawText.Append(EatToken().ToFullString());
 		}
 
@@ -1116,6 +1121,35 @@ partial class Parser
 		finally
 		{
 			_pool.Free(tokens);
+		}
+	}
+
+	private void AppendUnsupportedMarkupControlFlowDirectiveText(StringBuilder rawText)
+	{
+		var braceDepth = 0;
+		var seenBlock = false;
+
+		while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.LessSlashToken))
+		{
+			var token = EatToken();
+			rawText.Append(token.ToFullString());
+
+			if (token.Kind == SyntaxKind.OpenBraceToken)
+			{
+				braceDepth++;
+				seenBlock = true;
+				continue;
+			}
+
+			if (token.Kind == SyntaxKind.CloseBraceToken && seenBlock)
+			{
+				braceDepth--;
+
+				if (braceDepth <= 0)
+				{
+					break;
+				}
+			}
 		}
 	}
 
@@ -1364,11 +1398,7 @@ partial class Parser
 	{
 		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
 		var expression = ParseCSharpExpressionInMode(Lexer.LexerMode.InInlineExpression);
-		var closeBrace = CurrentToken.Kind == SyntaxKind.CloseBraceToken
-			? EatToken(SyntaxKind.CloseBraceToken)
-			: InlineExpressionRawEndsWithCloseBrace(expression)
-				? GreenSyntaxFactory.MissingToken(SyntaxKind.CloseBraceToken)
-				: EatToken(SyntaxKind.CloseBraceToken);
+		var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
 
 		return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, expression, closeBrace);
 	}

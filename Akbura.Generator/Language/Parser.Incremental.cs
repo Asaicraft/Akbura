@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using CSharpFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language;
 
@@ -869,11 +868,7 @@ internal sealed partial class Parser
 
         var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
         var csharpExpression = ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode.InInlineExpression);
-        var closeBrace = PeekIncrementalTokenKind() == SyntaxKind.CloseBraceToken
-            ? ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken)
-            : InlineExpressionRawEndsWithCloseBrace(csharpExpression)
-                ? GreenSyntaxFactory.MissingToken(SyntaxKind.CloseBraceToken)
-                : ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
+        var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
 
         return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, csharpExpression, closeBrace);
     }
@@ -1628,11 +1623,6 @@ internal sealed partial class Parser
 
     private static bool ContainsDiagnosticsOrSkippedText(GreenNode node)
     {
-        if (node.Kind == SyntaxKind.InlineExpressionSyntax)
-        {
-            return ContainsInvalidInlineExpression(Unsafe.As<GreenInlineExpressionSyntax>(node));
-        }
-
         if (node.Kind is SyntaxKind.CSharpExpressionSyntax or
             SyntaxKind.CSharpTypeSyntax or
             SyntaxKind.CSharpParameterListSyntax or
@@ -1646,9 +1636,9 @@ internal sealed partial class Parser
             return true;
         }
 
-        if (!node.ContainsDiagnostics)
+        if (node.ContainsDiagnostics)
         {
-            return false;
+            return true;
         }
 
         return ContainsDiagnosticsOrSkippedTextSlow(node);
@@ -1656,11 +1646,6 @@ internal sealed partial class Parser
 
     private static bool ContainsDiagnosticsOrSkippedTextSlow(GreenNode node)
     {
-        if (node.Kind == SyntaxKind.InlineExpressionSyntax)
-        {
-            return ContainsInvalidInlineExpression(Unsafe.As<GreenInlineExpressionSyntax>(node));
-        }
-
         if (node.Kind is SyntaxKind.CSharpExpressionSyntax or
             SyntaxKind.CSharpTypeSyntax or
             SyntaxKind.CSharpParameterListSyntax or
@@ -1685,56 +1670,6 @@ internal sealed partial class Parser
         }
 
         return false;
-    }
-
-    private static bool ContainsInvalidInlineExpression(GreenInlineExpressionSyntax node)
-    {
-        if (ContainsDiagnosticsOrSkippedText(node.OpenBrace) ||
-            ContainsDiagnosticsOrSkippedText(node.Expression))
-        {
-            return true;
-        }
-
-        if (!node.CloseBrace.ContainsDiagnosticsDirectly &&
-            !node.CloseBrace.ContainsSkippedText)
-        {
-            return false;
-        }
-
-        // The current raw C# inline-expression lexer consumes the closing
-        // '}' into the CSharpRawToken, so the parser creates a zero-width
-        // missing CloseBraceToken. That recovery shape is stable and safe
-        // to reuse outside changed text. A truly unterminated expression
-        // does not have the terminator in the raw expression text and stays
-        // non-reusable.
-        return !node.CloseBrace.IsMissing ||
-               node.CloseBrace.FullWidth != 0 ||
-               !InlineExpressionRawEndsWithCloseBrace(node.Expression);
-    }
-
-    private static bool InlineExpressionRawEndsWithCloseBrace(GreenCSharpExpressionSyntax expression)
-    {
-        var tokens = expression.Tokens;
-        if (tokens.Count == 0)
-        {
-            return false;
-        }
-
-        var token = tokens[0];
-        if (token == null || token.Kind != SyntaxKind.CSharpRawToken)
-        {
-            return false;
-        }
-
-        var rawToken = Unsafe.As<GreenSyntaxToken.CSharpRawToken>(token);
-        var rawNode = rawToken.RawNode;
-        if (rawNode != null)
-        {
-            var lastToken = rawNode.GetLastToken(includeZeroWidth: true, includeSkipped: true);
-            return lastToken.RawKind == (int)CSharpSyntaxKind.CloseBraceToken;
-        }
-
-        return rawToken.Text.EndsWith("}", StringComparison.Ordinal);
     }
 
     private static bool IsStateBindingKeyword(SyntaxKind kind)
@@ -1775,7 +1710,17 @@ internal sealed partial class Parser
             return;
         }
 
-        Array.Resize(ref _blendersBeforeToken, length);
+        var blendersBeforeToken = _blendersBeforeToken;
+        if (blendersBeforeToken.Length == length)
+        {
+            return;
+        }
+
+        var resized = new Blender[length];
+        Array.Copy(blendersBeforeToken, resized, Math.Min(blendersBeforeToken.Length, resized.Length));
+
+        _blendersBeforeToken = resized;
+        ReturnBlendersBeforeTokenToPool(blendersBeforeToken);
     }
 
     private void ReturnBlendersBeforeTokenToPool()
@@ -1787,7 +1732,11 @@ internal sealed partial class Parser
         }
 
         _blendersBeforeToken = null;
+        ReturnBlendersBeforeTokenToPool(blendersBeforeToken);
+    }
 
+    private void ReturnBlendersBeforeTokenToPool(Blender[] blendersBeforeToken)
+    {
         var clearCount = Math.Min(_maxWrittenLexedTokenIndex + 1, blendersBeforeToken.Length);
         if (clearCount > 0)
         {

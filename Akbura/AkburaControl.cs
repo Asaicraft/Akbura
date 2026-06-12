@@ -1,9 +1,11 @@
 ﻿using Avalonia;
+using Akbura.Akcss;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,6 +19,11 @@ public abstract class AkburaControl : Control
 
     public static readonly StyledProperty<Thickness> PaddingProperty =
             Decorator.PaddingProperty.AddOwner<TemplatedControl>();
+
+    public static readonly AttachedProperty<ImmutableArray<TailwindUtilityActivator>> TailwindUtilitiesProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, ImmutableArray<TailwindUtilityActivator>>(
+            "TailwindUtilities",
+            coerce: CoerceTailwindUtilities);
 
     /// <summary>
     /// Initializes static members of the <see cref="Decorator"/> class.
@@ -39,6 +46,54 @@ public abstract class AkburaControl : Control
     {
         get => GetValue(PaddingProperty);
         set => SetValue(PaddingProperty, value);
+    }
+
+    public static ImmutableArray<TailwindUtilityActivator> GetTailwindUtilities(Control control)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+
+        var utilities = control.GetValue(TailwindUtilitiesProperty);
+        return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
+    }
+
+    public static void SetTailwindUtilities(
+        Control control,
+        ImmutableArray<TailwindUtilityActivator> utilities)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+
+        if (control.IsSet(TailwindUtilitiesProperty))
+        {
+            throw new InvalidOperationException("TailwindUtilities has already been set.");
+        }
+
+        control.SetValue(
+            TailwindUtilitiesProperty,
+            utilities.IsDefault ? [] : utilities);
+    }
+
+    public static void ExecuteTailwindUtilities(Control control)
+    {
+        foreach (var utility in GetTailwindUtilities(control))
+        {
+            if (utility.Condition)
+            {
+                utility.Execute(control);
+            }
+        }
+    }
+
+    private static ImmutableArray<TailwindUtilityActivator> CoerceTailwindUtilities(
+        AvaloniaObject sender,
+        ImmutableArray<TailwindUtilityActivator> utilities)
+    {
+        if (TailwindUtilitiesProperty != null &&
+            sender.IsSet(TailwindUtilitiesProperty))
+        {
+            throw new InvalidOperationException("TailwindUtilities has already been set.");
+        }
+
+        return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
     }
 
 

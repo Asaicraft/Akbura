@@ -1,0 +1,32 @@
+namespace Akbura.Language.Operations;
+
+internal enum OperationKind
+{
+    None = 0,
+    Document,
+    Namespace,
+    Using,
+    Component,
+    MarkupElement,
+    MarkupAttribute,
+    MarkupText,
+    InlineExpression,
+    StateDeclaration,
+    StateInitializer,
+    ParamDeclaration,
+    InjectDeclaration,
+    CommandDeclaration,
+    FunctionDeclaration,
+    UserHook,
+    UseEffect,
+    CSharpStatement,
+    CSharpExpression,
+    CSharpType,
+    AkcssBlock,
+    AkcssStyleRule,
+    AkcssUtilityDeclaration,
+    AkcssAssignment,
+    AkcssIf,
+    TailwindUtility,
+    Error,
+}

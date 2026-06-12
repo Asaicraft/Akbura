@@ -31,6 +31,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj"/>
+		<ProjectReference Include="..\Akbura\Akbura.csproj"/>
 	</ItemGroup>
 
 	<ItemGroup>

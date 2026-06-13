@@ -22,6 +22,7 @@ public class SymbolTests
             csharpDefinition: new CSharpSymbolDefinition(buttonType!));
 
         Assert.Equal(AkburaSymbolKind.MarkupComponent, symbol.Kind);
+        Assert.IsAssignableFrom<IMarkupComponentSymbol>(symbol);
         Assert.Equal(SymbolLanguage.Markup, symbol.Language);
         Assert.Equal("Button", symbol.Name);
         Assert.Equal("Button", symbol.MetadataName);

@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 
 namespace Akbura.Language.Symbols;
 
-internal sealed class MarkupComponentSymbol : Symbol
+internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 {
     public MarkupComponentSymbol(
         string name,

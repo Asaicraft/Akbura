@@ -41,6 +41,7 @@ public class SemanticPipelineTests
         var symbolInfo = semanticModel.GetSymbolInfo(element);
 
         var symbol = Assert.IsType<MarkupComponentSymbol>(symbolInfo.Symbol);
+        Assert.IsAssignableFrom<IMarkupComponentSymbol>(symbol);
         Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
         Assert.True(symbolInfo.CandidateSymbols.IsEmpty);
         Assert.Equal("Button", symbol.Name);

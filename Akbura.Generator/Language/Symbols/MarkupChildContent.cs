@@ -9,7 +9,7 @@ internal readonly struct MarkupChildContent
         MarkupContentSyntax syntax,
         MarkupChildKind kind,
         CSharpSymbolDefinition type,
-        MarkupComponentSymbol? componentSymbol = null,
+        IMarkupComponentSymbol? componentSymbol = null,
         string text = "")
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
@@ -25,7 +25,7 @@ internal readonly struct MarkupChildContent
 
     public CSharpSymbolDefinition Type { get; }
 
-    public MarkupComponentSymbol? ComponentSymbol { get; }
+    public IMarkupComponentSymbol? ComponentSymbol { get; }
 
     public string Text { get; }
 }

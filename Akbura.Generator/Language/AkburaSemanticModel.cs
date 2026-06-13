@@ -236,7 +236,7 @@ internal sealed class AkburaSemanticModel
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         var symbolInfo = GetSymbolInfo(elementContent.Element);
-        var componentSymbol = symbolInfo.Symbol as MarkupComponentSymbol;
+        var componentSymbol = symbolInfo.Symbol as IMarkupComponentSymbol;
         var childType = componentSymbol?.CSharpDefinition ?? default;
 
         childrenBuilder.Add(new MarkupChildContent(

@@ -1104,13 +1104,13 @@ internal sealed partial class Parser
         }
 
         GreenMarkupAliasQualifierSyntax? aliasQualifier = null;
-        if (PeekIncrementalTokenKind() == SyntaxKind.IdentifierToken &&
+        if (IsIncrementalMarkupNameToken(PeekIncrementalTokenKind()) &&
             PeekIncrementalTokenKind(1) == SyntaxKind.DoubleColonToken)
         {
             aliasQualifier = ParseIncrementalMarkupAliasQualifierSyntax();
         }
 
-        var firstName = ParseIncrementalIdentifierName();
+        var firstName = ParseIncrementalMarkupSimpleName();
         GreenMarkupGenericArgumentListSyntax? firstGenericArgs = null;
 
         if (PeekIncrementalTokenKind() == SyntaxKind.OpenBraceToken)
@@ -1159,7 +1159,7 @@ internal sealed partial class Parser
             return aliasQualifier;
         }
 
-        var alias = ParseIncrementalIdentifierName();
+        var alias = ParseIncrementalMarkupSimpleName();
         var doubleColon = ReadRequiredIncrementalToken(SyntaxKind.DoubleColonToken);
 
         return GreenSyntaxFactory.MarkupAliasQualifierSyntax(alias, doubleColon);
@@ -1172,7 +1172,7 @@ internal sealed partial class Parser
             return segment;
         }
 
-        var name = ParseIncrementalIdentifierName();
+        var name = ParseIncrementalMarkupSimpleName();
 
         if (PeekIncrementalTokenKind() != SyntaxKind.OpenBraceToken)
         {

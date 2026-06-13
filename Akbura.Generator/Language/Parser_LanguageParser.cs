@@ -1412,15 +1412,15 @@ partial class Parser
 		// alias:: ... ?
 		GreenMarkupAliasQualifierSyntax? aliasQualifier = null;
 
-		if (CurrentToken.Kind == SyntaxKind.IdentifierToken &&
+		if (IsMarkupNameToken(CurrentToken) &&
 			PeekToken(1).Kind == SyntaxKind.DoubleColonToken)
 		{
-			var alias = ParseIdentifierName();
+			var alias = ParseMarkupSimpleName();
 			var doubleColon = EatToken(SyntaxKind.DoubleColonToken);
 			aliasQualifier = GreenSyntaxFactory.MarkupAliasQualifierSyntax(alias, doubleColon);
 		}
 
-		var firstName = ParseIdentifierName();
+		var firstName = ParseMarkupSimpleName();
 		GreenMarkupGenericArgumentListSyntax? firstGenericArgs = null;
 
 		if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
@@ -1452,7 +1452,7 @@ partial class Parser
 				var dot = EatToken(SyntaxKind.DotToken);
 				segments.AddSeparator(dot);
 
-				var segName = ParseIdentifierName();
+				var segName = ParseMarkupSimpleName();
 				GreenMarkupGenericArgumentListSyntax? segGenerics = null;
 
 				if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)

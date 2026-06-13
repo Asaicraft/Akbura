@@ -105,9 +105,7 @@ namespace Akbura.Language.Syntax
             if (aliasQualifier is not null)
             {
                 currentName = CSharpSyntaxFactory.AliasQualifiedName(
-                    CSharpSyntaxFactory.IdentifierName(
-                        aliasQualifier.Alias.Identifier.ToString()
-                    ),
+                    BuildAliasIdentifierName(aliasQualifier),
                     firstSegmentName
                 );
             }
@@ -128,6 +126,21 @@ namespace Akbura.Language.Syntax
             }
 
             return currentName;
+        }
+
+        private static CSharp.Syntax.IdentifierNameSyntax BuildAliasIdentifierName(MarkupAliasQualifierSyntax aliasQualifier)
+        {
+            var aliasText = aliasQualifier.Alias.Identifier.ValueText;
+            if (aliasText == "global")
+            {
+                return CSharpSyntaxFactory.IdentifierName(
+                    CSharpSyntaxFactory.Token(CSharp.SyntaxKind.GlobalKeyword)
+                );
+            }
+
+            return CSharpSyntaxFactory.IdentifierName(
+                CSharpSyntaxFactory.Identifier(aliasText)
+            );
         }
 
         private static CSharp.Syntax.SimpleNameSyntax BuildSimpleNameFromSegment(MarkupNameSegmentSyntax segment)

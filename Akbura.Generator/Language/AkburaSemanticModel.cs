@@ -2,18 +2,22 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language;
 
 internal sealed class AkburaSemanticModel
 {
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache = new();
-    private ImmutableArray<string> _usingNamespaces;
 
     public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
@@ -74,37 +78,19 @@ internal sealed class AkburaSemanticModel
             return default;
         }
 
-        var typeName = typeSyntax.ToFullString().Trim();
-        if (string.IsNullOrWhiteSpace(typeName))
+        CSharp.TypeSyntax csharpType;
+        try
+        {
+            csharpType = typeSyntax.ToCSharp();
+        }
+        catch (InvalidOperationException)
         {
             return default;
         }
 
-        var typeSymbol = ResolveCSharpType(typeName);
+        var binding = BindCSharpType(csharpType);
+        var typeSymbol = binding.TypeSymbol;
         return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-    }
-
-    private ITypeSymbol? ResolveCSharpType(string typeName)
-    {
-        return typeName switch
-        {
-            "bool" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean),
-            "byte" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Byte),
-            "char" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Char),
-            "decimal" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Decimal),
-            "double" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Double),
-            "float" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Single),
-            "int" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Int32),
-            "long" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Int64),
-            "object" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object),
-            "sbyte" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_SByte),
-            "short" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Int16),
-            "string" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_String),
-            "uint" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_UInt32),
-            "ulong" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_UInt64),
-            "ushort" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_UInt16),
-            _ => Compilation.CSharpCompilation.GetTypeByMetadataName(typeName),
-        };
     }
 
     private AkburaSymbolInfo ResolveMarkupComponent(MarkupElementSyntax markupElement)
@@ -115,96 +101,194 @@ internal sealed class AkburaSemanticModel
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
-        var componentName = startTag.Name.ToFullString().Trim();
-        if (string.IsNullOrWhiteSpace(componentName))
+        var componentName = startTag.Name;
+        var componentNameText = componentName.ToFullString().Trim();
+        if (string.IsNullOrWhiteSpace(componentNameText))
         {
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
-        var candidates = ResolveComponentCandidates(componentName);
-        if (candidates.Length == 0)
+        CSharp.TypeSyntax csharpType;
+        try
         {
-            return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+            csharpType = componentName.ToCSharp();
+        }
+        catch (InvalidOperationException)
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
-        if (candidates.Length > 1)
+        var binding = BindCSharpType(csharpType);
+        if (binding.TypeSymbol is INamedTypeSymbol namedType &&
+            namedType.TypeKind != TypeKind.Error)
         {
-            return AkburaSymbolInfo.Candidates(candidates, AkburaCandidateReason.Ambiguous);
+            return AkburaSymbolInfo.Success(new MarkupComponentSymbol(
+                componentNameText,
+                new CSharpSymbolDefinition(namedType)));
         }
 
-        return AkburaSymbolInfo.Success(candidates[0]);
+        var candidates = CreateMarkupComponentCandidates(componentNameText, binding.CandidateSymbols);
+        if (candidates.Length > 0)
+        {
+            return AkburaSymbolInfo.Candidates(candidates, binding.CandidateReason);
+        }
+
+        return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
     }
 
-    private ImmutableArray<AkburaSymbol> ResolveComponentCandidates(string componentName)
+    private CSharpTypeBinding BindCSharpType(CSharp.TypeSyntax typeSyntax)
     {
-        using var builder = ImmutableArrayBuilder<AkburaSymbol>.Rent();
-        var seenMetadataNames = new HashSet<string>(StringComparer.Ordinal);
+        var field = CSharpSyntaxFactory.FieldDeclaration(
+            CSharpSyntaxFactory.VariableDeclaration(typeSyntax)
+                .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
+                    CSharpSyntaxFactory.VariableDeclarator("__akbura_value"))));
 
-        foreach (var metadataName in GetComponentMetadataNames(componentName))
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(field));
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
+
+        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
+        if (namespaceDeclaration != null)
         {
-            if (!seenMetadataNames.Add(metadataName))
-            {
-                continue;
-            }
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
+                    namespaceDeclaration.WithMembers(
+                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
+        }
+        else
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
+        }
 
-            var symbol = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
-            if (symbol == null)
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeType = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.FieldDeclarationSyntax>()
+            .Single()
+            .Declaration
+            .Type;
+
+        var typeInfo = semanticModel.GetTypeInfo(probeType);
+        var symbolInfo = semanticModel.GetSymbolInfo(probeType);
+        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
+            ? null
+            : typeInfo.Type;
+
+        return new CSharpTypeBinding(
+            typeSymbol,
+            symbolInfo.CandidateSymbols,
+            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
+                ? AkburaCandidateReason.Ambiguous
+                : AkburaCandidateReason.NotFound);
+    }
+
+    private ImmutableArray<CSharp.UsingDirectiveSyntax> GetCSharpUsingDirectives()
+    {
+        using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
+        foreach (var member in SyntaxTree.GetRoot().Members)
+        {
+            if (member is UsingDirectiveSyntax usingDirective)
+            {
+                builder.Add(usingDirective.ToCSharp());
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<CSharp.ExternAliasDirectiveSyntax> GetCSharpExternAliases()
+    {
+        using var builder = ImmutableArrayBuilder<CSharp.ExternAliasDirectiveSyntax>.Rent();
+        var seenAliases = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var reference in Compilation.CSharpCompilation.References)
+        {
+            foreach (var alias in reference.Properties.Aliases)
+            {
+                if (string.IsNullOrWhiteSpace(alias) ||
+                    alias == "global" ||
+                    !seenAliases.Add(alias))
+                {
+                    continue;
+                }
+
+                builder.Add(CSharpSyntaxFactory.ExternAliasDirective(
+                    CSharpSyntaxFactory.Identifier(alias)));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private CSharp.FileScopedNamespaceDeclarationSyntax? GetCSharpNamespaceDeclaration()
+    {
+        foreach (var member in SyntaxTree.GetRoot().Members)
+        {
+            if (member is NamespaceDeclarationSyntax namespaceDeclaration)
+            {
+                return namespaceDeclaration.ToCSharp();
+            }
+        }
+
+        return null;
+    }
+
+    private static ImmutableArray<AkburaSymbol> CreateMarkupComponentCandidates(
+        string componentName,
+        ImmutableArray<RoslynSymbol> csharpCandidates)
+    {
+        if (csharpCandidates.IsDefaultOrEmpty)
+        {
+            return ImmutableArray<AkburaSymbol>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<AkburaSymbol>.Rent();
+        var seenSymbols = new HashSet<RoslynSymbol>(SymbolEqualityComparer.Default);
+        foreach (var candidate in csharpCandidates)
+        {
+            if (candidate is not INamedTypeSymbol namedType ||
+                namedType.TypeKind == TypeKind.Error ||
+                !seenSymbols.Add(namedType))
             {
                 continue;
             }
 
             builder.Add(new MarkupComponentSymbol(
                 componentName,
-                new CSharpSymbolDefinition(symbol)));
+                new CSharpSymbolDefinition(namedType)));
         }
 
         return builder.ToImmutable();
     }
 
-    private IEnumerable<string> GetComponentMetadataNames(string componentName)
+    private readonly struct CSharpTypeBinding
     {
-        if (componentName.Contains("."))
+        public CSharpTypeBinding(
+            ITypeSymbol? typeSymbol,
+            ImmutableArray<RoslynSymbol> candidateSymbols,
+            AkburaCandidateReason candidateReason)
         {
-            yield return componentName;
-            yield break;
+            TypeSymbol = typeSymbol;
+            CandidateSymbols = candidateSymbols.IsDefault
+                ? ImmutableArray<RoslynSymbol>.Empty
+                : candidateSymbols;
+            CandidateReason = candidateReason;
         }
 
-        foreach (var @namespace in GetUsingNamespaces())
-        {
-            yield return @namespace + "." + componentName;
-        }
+        public ITypeSymbol? TypeSymbol { get; }
 
-        yield return componentName;
-    }
+        public ImmutableArray<RoslynSymbol> CandidateSymbols { get; }
 
-    private ImmutableArray<string> GetUsingNamespaces()
-    {
-        if (!_usingNamespaces.IsDefault)
-        {
-            return _usingNamespaces;
-        }
-
-        using var builder = ImmutableArrayBuilder<string>.Rent();
-        foreach (var member in SyntaxTree.GetRoot().Members)
-        {
-            if (member is not UsingDirectiveSyntax usingDirective)
-            {
-                continue;
-            }
-
-            if (usingDirective.StaticKeyword.RawKind != 0 ||
-                usingDirective.Alias != null)
-            {
-                continue;
-            }
-
-            var name = usingDirective.Name.ToFullString().Trim();
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                builder.Add(name);
-            }
-        }
-
-        return _usingNamespaces = builder.ToImmutable();
+        public AkburaCandidateReason CandidateReason { get; }
     }
 }

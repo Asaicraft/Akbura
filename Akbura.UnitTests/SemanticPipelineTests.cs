@@ -4,6 +4,7 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
+using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
 
 namespace Akbura.UnitTests;
 
@@ -48,6 +49,43 @@ public class SemanticPipelineTests
         Assert.True(SymbolEqualityComparer.Default.Equals(avaloniaButton, symbol.CSharpDefinition.Symbol));
 
         var cachedSymbolInfo = semanticModel.GetSymbolInfo(element);
+        Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesStateSymbol()
+    {
+        const string code =
+            "state bool isOpen = false;\n" +
+            "\n" +
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Button />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var state = Assert.IsType<StateDeclarationSyntax>(
+            syntaxTree.GetRoot().Members.Single(member => member is StateDeclarationSyntax));
+
+        var symbolInfo = semanticModel.GetSymbolInfo(state);
+
+        var symbol = Assert.IsAssignableFrom<IStateSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.True(symbolInfo.CandidateSymbols.IsEmpty);
+        Assert.Equal(AkburaSymbolKind.State, symbol.Kind);
+        Assert.Equal(SymbolLanguage.Akbura, symbol.Language);
+        Assert.Equal("isOpen", symbol.Name);
+        Assert.True(symbol.HasExplicitType);
+        Assert.False(symbol.Type.IsDefault);
+        Assert.Equal("Boolean", symbol.Type.Name);
+        Assert.True(SymbolEqualityComparer.Default.Equals(
+            semanticModel.Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean),
+            symbol.Type.Symbol));
+        Assert.Same(state, symbol.DeclarationSyntax);
+        Assert.True(symbol.CSharpDefinition.IsDefault);
+        Assert.Equal("state Boolean isOpen", symbol.ToDisplayString());
+
+        var cachedSymbolInfo = semanticModel.GetSymbolInfo(state);
         Assert.Same(symbol, cachedSymbolInfo.Symbol);
     }
 

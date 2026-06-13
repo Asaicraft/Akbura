@@ -1,6 +1,7 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
+using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -43,12 +44,67 @@ internal sealed class AkburaSemanticModel
 
         symbolInfo = syntax switch
         {
+            StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         };
 
         _symbolInfoCache.Add(syntax, symbolInfo);
         return symbolInfo;
+    }
+
+    private AkburaSymbolInfo ResolveState(StateDeclarationSyntax stateDeclaration)
+    {
+        var name = stateDeclaration.Name.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var hasExplicitType = stateDeclaration.Type != null;
+        var type = ResolveExplicitStateType(stateDeclaration);
+        return AkburaSymbolInfo.Success(new StateSymbol(stateDeclaration, type, hasExplicitType));
+    }
+
+    private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
+    {
+        var typeSyntax = stateDeclaration.Type;
+        if (typeSyntax == null)
+        {
+            return default;
+        }
+
+        var typeName = typeSyntax.ToFullString().Trim();
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            return default;
+        }
+
+        var typeSymbol = ResolveCSharpType(typeName);
+        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+    }
+
+    private ITypeSymbol? ResolveCSharpType(string typeName)
+    {
+        return typeName switch
+        {
+            "bool" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean),
+            "byte" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Byte),
+            "char" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Char),
+            "decimal" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Decimal),
+            "double" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Double),
+            "float" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Single),
+            "int" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Int32),
+            "long" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Int64),
+            "object" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object),
+            "sbyte" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_SByte),
+            "short" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Int16),
+            "string" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_String),
+            "uint" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_UInt32),
+            "ulong" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_UInt64),
+            "ushort" => Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_UInt16),
+            _ => Compilation.CSharpCompilation.GetTypeByMetadataName(typeName),
+        };
     }
 
     private AkburaSymbolInfo ResolveMarkupComponent(MarkupElementSyntax markupElement)

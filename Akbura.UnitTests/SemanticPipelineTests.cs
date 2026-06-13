@@ -376,6 +376,109 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ResolvesDefaultParamSymbol()
+    {
+        const string code = "param int UserId = 1;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var param = Assert.IsType<ParamDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbolInfo = semanticModel.GetSymbolInfo(param);
+
+        var symbol = Assert.IsAssignableFrom<IParamSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.True(symbolInfo.CandidateSymbols.IsEmpty);
+        Assert.Equal(AkburaSymbolKind.Parameter, symbol.Kind);
+        Assert.Equal(SymbolLanguage.Akbura, symbol.Language);
+        Assert.Equal("UserId", symbol.Name);
+        Assert.Equal(ParamBindingKind.Default, symbol.BindingKind);
+        Assert.True(symbol.ReceivesValueFromParent);
+        Assert.False(symbol.SendsValueToParent);
+        Assert.False(symbol.IsTwoWayBinding);
+        Assert.True(symbol.HasExplicitType);
+        Assert.True(symbol.HasDefaultValue);
+        Assert.False(symbol.Type.IsDefault);
+        Assert.False(symbol.DefaultValueType.IsDefault);
+        Assert.Equal("Int32", symbol.Type.Name);
+        Assert.Equal("Int32", symbol.DefaultValueType.Name);
+        Assert.Same(param, symbol.DeclarationSyntax);
+        Assert.Same(param.DefaultValue, symbol.DefaultValueSyntax);
+        Assert.Equal("param Int32 UserId", symbol.ToDisplayString());
+        Assert.True(semanticModel.GetSemanticDiagnostics(param).IsEmpty);
+
+        var cachedSymbolInfo = semanticModel.GetSymbolInfo(param);
+        Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesBindParamSymbol()
+    {
+        const string code = "param bind string Search = \"\";";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var param = Assert.IsType<ParamDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbol = Assert.IsAssignableFrom<IParamSymbol>(semanticModel.GetSymbolInfo(param).Symbol);
+
+        Assert.Equal("Search", symbol.Name);
+        Assert.Equal(ParamBindingKind.Bind, symbol.BindingKind);
+        Assert.True(symbol.ReceivesValueFromParent);
+        Assert.True(symbol.SendsValueToParent);
+        Assert.True(symbol.IsTwoWayBinding);
+        Assert.True(symbol.HasExplicitType);
+        Assert.True(symbol.HasDefaultValue);
+        Assert.Equal("String", symbol.Type.Name);
+        Assert.Equal("String", symbol.DefaultValueType.Name);
+        Assert.Equal("param bind String Search", symbol.ToDisplayString());
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesOutParamSymbol()
+    {
+        const string code = "param out SelectedTask;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var param = Assert.IsType<ParamDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbol = Assert.IsAssignableFrom<IParamSymbol>(semanticModel.GetSymbolInfo(param).Symbol);
+
+        Assert.Equal("SelectedTask", symbol.Name);
+        Assert.Equal(ParamBindingKind.Out, symbol.BindingKind);
+        Assert.False(symbol.ReceivesValueFromParent);
+        Assert.True(symbol.SendsValueToParent);
+        Assert.False(symbol.IsTwoWayBinding);
+        Assert.False(symbol.HasExplicitType);
+        Assert.False(symbol.HasDefaultValue);
+        Assert.True(symbol.Type.IsDefault);
+        Assert.True(symbol.DefaultValueType.IsDefault);
+        Assert.Null(symbol.DefaultValueSyntax);
+        Assert.Equal("param out SelectedTask", symbol.ToDisplayString());
+    }
+
+    [Fact]
+    public void SemanticModel_InfersImplicitParamTypeFromDefaultValue()
+    {
+        const string code = "param Search = \"\";";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var param = Assert.IsType<ParamDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbol = Assert.IsAssignableFrom<IParamSymbol>(semanticModel.GetSymbolInfo(param).Symbol);
+
+        Assert.Equal("Search", symbol.Name);
+        Assert.False(symbol.HasExplicitType);
+        Assert.True(symbol.HasDefaultValue);
+        Assert.Equal(ParamBindingKind.Default, symbol.BindingKind);
+        Assert.Equal("String", symbol.Type.Name);
+        Assert.Equal("String", symbol.DefaultValueType.Name);
+        Assert.Equal("param String Search", symbol.ToDisplayString());
+    }
+
+    [Fact]
     public void SemanticModel_BindStateWithInpcSource_HasNoBindingDiagnostics()
     {
         const string code =

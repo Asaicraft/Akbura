@@ -47,6 +47,7 @@ internal sealed class AkburaSemanticModel
         symbolInfo = syntax switch
         {
             StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
+            ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         };
@@ -102,6 +103,31 @@ internal sealed class AkburaSemanticModel
             bindingKind));
     }
 
+    private AkburaSymbolInfo ResolveParam(ParamDeclarationSyntax paramDeclaration)
+    {
+        var name = paramDeclaration.Name.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var hasExplicitType = paramDeclaration.Type != null;
+        var defaultValueType = ResolveParamDefaultValueType(paramDeclaration);
+        var type = hasExplicitType
+            ? ResolveExplicitParamType(paramDeclaration)
+            : defaultValueType;
+        var bindingKind = GetParamBindingKind(paramDeclaration);
+
+        SetSemanticDiagnostics(paramDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(new ParamSymbol(
+            paramDeclaration,
+            type,
+            defaultValueType,
+            hasExplicitType,
+            bindingKind));
+    }
+
     private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
     {
         var typeSyntax = stateDeclaration.Type;
@@ -121,6 +147,52 @@ internal sealed class AkburaSemanticModel
         }
 
         var binding = BindCSharpType(csharpType);
+        var typeSymbol = binding.TypeSymbol;
+        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+    }
+
+    private CSharpSymbolDefinition ResolveExplicitParamType(ParamDeclarationSyntax paramDeclaration)
+    {
+        var typeSyntax = paramDeclaration.Type;
+        if (typeSyntax == null)
+        {
+            return default;
+        }
+
+        CSharp.TypeSyntax csharpType;
+        try
+        {
+            csharpType = typeSyntax.ToCSharp();
+        }
+        catch (InvalidOperationException)
+        {
+            return default;
+        }
+
+        var binding = BindCSharpType(csharpType);
+        var typeSymbol = binding.TypeSymbol;
+        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+    }
+
+    private CSharpSymbolDefinition ResolveParamDefaultValueType(ParamDeclarationSyntax paramDeclaration)
+    {
+        var defaultValue = paramDeclaration.DefaultValue;
+        if (defaultValue == null)
+        {
+            return default;
+        }
+
+        CSharp.ExpressionSyntax csharpExpression;
+        try
+        {
+            csharpExpression = CSharpSyntaxFactory.ParseExpression(defaultValue.ToFullString());
+        }
+        catch (ArgumentException)
+        {
+            return default;
+        }
+
+        var binding = BindCSharpExpression(csharpExpression);
         var typeSymbol = binding.TypeSymbol;
         return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
     }
@@ -156,6 +228,16 @@ internal sealed class AkburaSemanticModel
             Akbura.Language.Syntax.SyntaxKind.OutToken => StateBindingKind.Out,
             Akbura.Language.Syntax.SyntaxKind.BindToken => StateBindingKind.Bind,
             _ => StateBindingKind.None,
+        };
+    }
+
+    private static ParamBindingKind GetParamBindingKind(ParamDeclarationSyntax paramDeclaration)
+    {
+        return paramDeclaration.BindingKeyword.Kind switch
+        {
+            Akbura.Language.Syntax.SyntaxKind.BindToken => ParamBindingKind.Bind,
+            Akbura.Language.Syntax.SyntaxKind.OutToken => ParamBindingKind.Out,
+            _ => ParamBindingKind.Default,
         };
     }
 

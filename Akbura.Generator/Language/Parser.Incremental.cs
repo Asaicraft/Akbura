@@ -1197,7 +1197,7 @@ internal sealed partial class Parser
         {
             if (PeekIncrementalTokenKind() is not (SyntaxKind.CloseBraceToken or SyntaxKind.EndOfFileToken))
             {
-                arguments.Add(ParseIncrementalCSharpType());
+                arguments.Add(ParseIncrementalMarkupGenericArgumentType());
 
                 while (PeekIncrementalTokenKind() == SyntaxKind.CommaToken)
                 {
@@ -1208,7 +1208,7 @@ internal sealed partial class Parser
                         break;
                     }
 
-                    arguments.Add(ParseIncrementalCSharpType());
+                    arguments.Add(ParseIncrementalMarkupGenericArgumentType());
                 }
             }
 
@@ -1236,10 +1236,17 @@ internal sealed partial class Parser
                     : ConvertToIdentifier(identifier));
         }
 
-        return ParseMarkupSimpleName();
+          return ParseMarkupSimpleName();
+      }
+
+    private GreenCSharpTypeSyntax ParseIncrementalMarkupGenericArgumentType()
+    {
+        return TryReadReusableIncrementalNode<GreenCSharpTypeSyntax>(out var type)
+            ? type
+            : ParseMarkupGenericArgumentType();
     }
 
-    private GreenIdentifierNameSyntax ParseIncrementalTailwindSimpleName()
+      private GreenIdentifierNameSyntax ParseIncrementalTailwindSimpleName()
     {
         if (TryReadReusableIncrementalNode<GreenIdentifierNameSyntax>(out var name))
         {

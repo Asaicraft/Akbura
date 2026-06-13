@@ -14,129 +14,129 @@ namespace Akbura;
 
 public abstract class AkburaControl : Control
 {
-    public static readonly DirectProperty<AkburaControl, Control?> ChildProperty =
-        AvaloniaProperty.RegisterDirect<AkburaControl, Control?>(nameof(Child), getter: x => x.Child);
+	public static readonly DirectProperty<AkburaControl, Control?> ChildProperty =
+		AvaloniaProperty.RegisterDirect<AkburaControl, Control?>(nameof(Child), getter: x => x.Child);
 
-    public static readonly StyledProperty<Thickness> PaddingProperty =
-            Decorator.PaddingProperty.AddOwner<TemplatedControl>();
+	public static readonly StyledProperty<Thickness> PaddingProperty =
+			Decorator.PaddingProperty.AddOwner<TemplatedControl>();
 
-    public static readonly AttachedProperty<ImmutableArray<TailwindUtilityActivator>> TailwindUtilitiesProperty =
-        AvaloniaProperty.RegisterAttached<AkburaControl, Control, ImmutableArray<TailwindUtilityActivator>>(
-            "TailwindUtilities",
-            coerce: CoerceTailwindUtilities);
+	public static readonly AttachedProperty<ImmutableArray<TailwindUtilityActivator>> TailwindUtilitiesProperty =
+		AvaloniaProperty.RegisterAttached<AkburaControl, Control, ImmutableArray<TailwindUtilityActivator>>(
+			"TailwindUtilities",
+			coerce: CoerceTailwindUtilities);
 
-    /// <summary>
-    /// Initializes static members of the <see cref="Decorator"/> class.
-    /// </summary>
-    static AkburaControl()
-    {
-        AffectsMeasure<AkburaControl>(ChildProperty, PaddingProperty);
-        ChildProperty.Changed.AddClassHandler<AkburaControl>((x, e) => x.ChildChanged(e));
-    }
+	/// <summary>
+	/// Initializes static members of the <see cref="Decorator"/> class.
+	/// </summary>
+	static AkburaControl()
+	{
+		AffectsMeasure<AkburaControl>(ChildProperty, PaddingProperty);
+		ChildProperty.Changed.AddClassHandler<AkburaControl>((x, e) => x.ChildChanged(e));
+	}
 
-    public Control? Child
-    {
-        get; private set => SetAndRaise(ChildProperty, ref field, value);
-    }
+	public Control? Child
+	{
+		get; private set => SetAndRaise(ChildProperty, ref field, value);
+	}
 
-    /// <summary>
-    /// Gets or sets the padding placed between the border of the control and its content.
-    /// </summary>
-    public Thickness Padding
-    {
-        get => GetValue(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
-    }
+	/// <summary>
+	/// Gets or sets the padding placed between the border of the control and its content.
+	/// </summary>
+	public Thickness Padding
+	{
+		get => GetValue(PaddingProperty);
+		set => SetValue(PaddingProperty, value);
+	}
 
-    public static ImmutableArray<TailwindUtilityActivator> GetTailwindUtilities(Control control)
-    {
-        ArgumentNullException.ThrowIfNull(control);
+	public static ImmutableArray<TailwindUtilityActivator> GetTailwindUtilities(Control control)
+	{
+		ArgumentNullException.ThrowIfNull(control);
 
-        var utilities = control.GetValue(TailwindUtilitiesProperty);
-        return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
-    }
+		var utilities = control.GetValue(TailwindUtilitiesProperty);
+		return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
+	}
 
-    public static void SetTailwindUtilities(
-        Control control,
-        ImmutableArray<TailwindUtilityActivator> utilities)
-    {
-        ArgumentNullException.ThrowIfNull(control);
+	public static void SetTailwindUtilities(
+		Control control,
+		ImmutableArray<TailwindUtilityActivator> utilities)
+	{
+		ArgumentNullException.ThrowIfNull(control);
 
-        if (control.IsSet(TailwindUtilitiesProperty))
-        {
-            throw new InvalidOperationException("TailwindUtilities has already been set.");
-        }
+		if (control.IsSet(TailwindUtilitiesProperty))
+		{
+			throw new InvalidOperationException("TailwindUtilities has already been set.");
+		}
 
-        control.SetValue(
-            TailwindUtilitiesProperty,
-            utilities.IsDefault ? [] : utilities);
-    }
+		control.SetValue(
+			TailwindUtilitiesProperty,
+			utilities.IsDefault ? [] : utilities);
+	}
 
-    public static void ExecuteTailwindUtilities(Control control)
-    {
-        foreach (var utility in GetTailwindUtilities(control))
-        {
-            if (utility.Condition)
-            {
-                utility.Execute(control);
-            }
-        }
-    }
+	public static void ExecuteTailwindUtilities(Control control)
+	{
+		foreach (var utility in GetTailwindUtilities(control))
+		{
+			if (utility.Condition)
+			{
+				utility.Execute(control);
+			}
+		}
+	}
 
-    private static ImmutableArray<TailwindUtilityActivator> CoerceTailwindUtilities(
-        AvaloniaObject sender,
-        ImmutableArray<TailwindUtilityActivator> utilities)
-    {
-        if (TailwindUtilitiesProperty != null &&
-            sender.IsSet(TailwindUtilitiesProperty))
-        {
-            throw new InvalidOperationException("TailwindUtilities has already been set.");
-        }
+	private static ImmutableArray<TailwindUtilityActivator> CoerceTailwindUtilities(
+		AvaloniaObject sender,
+		ImmutableArray<TailwindUtilityActivator> utilities)
+	{
+		if (TailwindUtilitiesProperty != null &&
+			sender.IsSet(TailwindUtilitiesProperty))
+		{
+			throw new InvalidOperationException("TailwindUtilities has already been set.");
+		}
 
-        return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
-    }
+		return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
+	}
 
 
-    public void InvalidState()
-    {
-        Child = Update();
-    }
+	public void InvalidState()
+	{
+		Child = Update();
+	}
 
-    protected abstract Control Update();
+	protected abstract Control Update();
 
-    /// <inheritdoc/>
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        return LayoutHelper.MeasureChild(Child, availableSize, Padding);
-    }
+	/// <inheritdoc/>
+	protected override Size MeasureOverride(Size availableSize)
+	{
+		return LayoutHelper.MeasureChild(Child, availableSize, Padding);
+	}
 
-    /// <inheritdoc/>
-    protected override Size ArrangeOverride(Size finalSize)
-    {
-        return LayoutHelper.ArrangeChild(Child, finalSize, Padding);
-    }
+	/// <inheritdoc/>
+	protected override Size ArrangeOverride(Size finalSize)
+	{
+		return LayoutHelper.ArrangeChild(Child, finalSize, Padding);
+	}
 
-    /// <summary>
-    /// Called when the <see cref="Child"/> property changes.
-    /// </summary>
-    /// <param name="e">The event args.</param>
-    private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
-    {
-        var oldChild = (Control?)e.OldValue;
-        var newChild = (Control?)e.NewValue;
+	/// <summary>
+	/// Called when the <see cref="Child"/> property changes.
+	/// </summary>
+	/// <param name="e">The event args.</param>
+	private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
+	{
+		var oldChild = (Control?)e.OldValue;
+		var newChild = (Control?)e.NewValue;
 
-        if (oldChild != null)
-        {
-            ((ISetLogicalParent)oldChild).SetParent(null);
-            LogicalChildren.Clear();
-            VisualChildren.Remove(oldChild);
-        }
+		if (oldChild != null)
+		{
+			((ISetLogicalParent)oldChild).SetParent(null);
+			LogicalChildren.Clear();
+			VisualChildren.Remove(oldChild);
+		}
 
-        if (newChild != null)
-        {
-            ((ISetLogicalParent)newChild).SetParent(this);
-            VisualChildren.Add(newChild);
-            LogicalChildren.Add(newChild);
-        }
-    }
+		if (newChild != null)
+		{
+			((ISetLogicalParent)newChild).SetParent(this);
+			VisualChildren.Add(newChild);
+			LogicalChildren.Add(newChild);
+		}
+	}
 }

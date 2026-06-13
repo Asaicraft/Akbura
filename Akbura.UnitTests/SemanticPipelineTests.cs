@@ -178,6 +178,128 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ButtonContent_AllowsTextChild()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Button>Hello !</Button>";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var diagnostics = semanticModel.GetSemanticDiagnostics(element);
+
+        Assert.True(diagnostics.IsEmpty);
+        Assert.Equal("Content", symbol.ContentModel.ContentProperty.Name);
+        Assert.Equal(SpecialType.System_Object, Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.ContentModel.AllowedChildType.Symbol).SpecialType);
+        Assert.True(symbol.ContentModel.AllowsText);
+        var child = Assert.Single(symbol.Children);
+        Assert.Equal(MarkupChildKind.Text, child.Kind);
+        Assert.Equal("Hello !", child.Text);
+    }
+
+    [Fact]
+    public void SemanticModel_BorderContent_RejectsTextChild()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Border>Hello world!</Border>";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(element));
+
+        Assert.Equal("Child", symbol.ContentModel.ContentProperty.Name);
+        Assert.Equal("Control", symbol.ContentModel.AllowedChildType.Name);
+        Assert.False(symbol.ContentModel.AllowsText);
+        Assert.Equal(AkburaSemanticModel.InvalidMarkupChildDiagnosticCode, diagnostic.Code);
+        Assert.Contains("string", diagnostic.Message);
+        Assert.Contains("Avalonia.Controls.Control", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_BorderContent_AllowsControlChild()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Border><TextBlock /></Border>";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(element).IsEmpty);
+        var child = Assert.Single(symbol.Children);
+        Assert.Equal(MarkupChildKind.Element, child.Kind);
+        Assert.NotNull(child.ComponentSymbol);
+        Assert.Equal("TextBlock", child.ComponentSymbol!.Name);
+        Assert.Equal("Control", symbol.ContentModel.AllowedChildType.Name);
+    }
+
+    [Fact]
+    public void SemanticModel_NonAvaloniaList_AllowsElementChildrenOfItemType()
+    {
+        const string code =
+            "using System.Collections.Generic;\n" +
+            "\n" +
+            "<List{MyObject}><MyObject/><MyObject/></List>";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation("public class MyObject { }"));
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(element).IsEmpty);
+        Assert.True(symbol.ContentModel.IsCollection);
+        Assert.True(symbol.ContentModel.ContentProperty.IsDefault);
+        Assert.Equal("MyObject", symbol.ContentModel.AllowedChildType.Name);
+        Assert.Equal(2, symbol.Children.Length);
+        Assert.All(symbol.Children, child =>
+        {
+            Assert.Equal(MarkupChildKind.Element, child.Kind);
+            Assert.Equal("MyObject", child.ComponentSymbol?.Name);
+        });
+    }
+
+    [Fact]
+    public void SemanticModel_NonAvaloniaList_RejectsElementChildOfDifferentType()
+    {
+        const string code =
+            "using System.Collections.Generic;\n" +
+            "\n" +
+            "<List{MyObject}><OtherObject/></List>";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "public class MyObject { }\n" +
+                "public class OtherObject { }"));
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(element));
+
+        Assert.Equal("MyObject", symbol.ContentModel.AllowedChildType.Name);
+        Assert.Equal(AkburaSemanticModel.InvalidMarkupChildDiagnosticCode, diagnostic.Code);
+        Assert.Contains("OtherObject", diagnostic.Message);
+        Assert.Contains("MyObject", diagnostic.Message);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesStateSymbol()
     {
         const string code =

@@ -162,6 +162,9 @@
   <data name="ERR_UnexpectedCharacter" xml:space="preserve">
     <value>Unexpected character: {0}</value>
   </data>
+  <data name="AKBURA_SEMANTIC_InvalidMarkupChild" xml:space="preserve">
+    <value>Markup child '{0}' is not assignable to expected content type '{1}'.</value>
+  </data>
   <data name="WRN_ErrorOverride" xml:space="preserve">
     <value>Error '{0}' was reported as a warning.</value>
   </data>

@@ -9,6 +9,8 @@ internal sealed class MarkupComponentSymbol : Symbol
     public MarkupComponentSymbol(
         string name,
         CSharpSymbolDefinition csharpDefinition,
+        MarkupContentModel contentModel = default,
+        ImmutableArray<MarkupChildContent> children = default,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -27,6 +29,10 @@ internal sealed class MarkupComponentSymbol : Symbol
 
         Name = name;
         CSharpDefinition = csharpDefinition;
+        ContentModel = contentModel;
+        Children = children.IsDefault
+            ? ImmutableArray<MarkupChildContent>.Empty
+            : children;
     }
 
     public override SymbolKind Kind => SymbolKind.MarkupComponent;
@@ -42,6 +48,10 @@ internal sealed class MarkupComponentSymbol : Symbol
     public override CSharpSymbolDefinition CSharpDefinition { get; }
 
     public INamedTypeSymbol? ComponentType => CSharpDefinition.NamedType;
+
+    public MarkupContentModel ContentModel { get; }
+
+    public ImmutableArray<MarkupChildContent> Children { get; }
 
     public override string ToDisplayString()
     {

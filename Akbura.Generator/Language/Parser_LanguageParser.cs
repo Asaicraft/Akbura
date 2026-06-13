@@ -1490,7 +1490,7 @@ partial class Parser
 			if (CurrentToken.Kind != SyntaxKind.CloseBraceToken &&
 				CurrentToken.Kind != SyntaxKind.EndOfFileToken)
 			{
-				list.Add(ParseCShaprType());
+				list.Add(ParseMarkupGenericArgumentType());
 
 				while (CurrentToken.Kind == SyntaxKind.CommaToken)
 				{
@@ -1503,7 +1503,7 @@ partial class Parser
 						break;
 					}
 
-					list.Add(ParseCShaprType());
+					list.Add(ParseMarkupGenericArgumentType());
 				}
 			}
 
@@ -1520,6 +1520,54 @@ partial class Parser
 	#endregion
 
 	#region IdentifierNameSyntax
+
+	private GreenCSharpTypeSyntax ParseMarkupGenericArgumentType()
+	{
+		var rawText = new StringBuilder();
+		var angleDepth = 0;
+		var parenDepth = 0;
+		var bracketDepth = 0;
+
+		while (CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+		{
+			var kind = CurrentToken.Kind;
+			if (angleDepth == 0 &&
+				parenDepth == 0 &&
+				bracketDepth == 0 &&
+				(kind == SyntaxKind.CommaToken || kind == SyntaxKind.CloseBraceToken))
+			{
+				break;
+			}
+
+			var token = EatToken();
+			rawText.Append(token.ToFullString());
+
+			switch (kind)
+			{
+				case SyntaxKind.LessThanToken:
+					angleDepth++;
+					break;
+				case SyntaxKind.GreaterThanToken when angleDepth > 0:
+					angleDepth--;
+					break;
+				case SyntaxKind.OpenParenToken:
+					parenDepth++;
+					break;
+				case SyntaxKind.CloseParenToken when parenDepth > 0:
+					parenDepth--;
+					break;
+				case SyntaxKind.OpenBracketToken:
+					bracketDepth++;
+					break;
+				case SyntaxKind.CloseBracketToken when bracketDepth > 0:
+					bracketDepth--;
+					break;
+			}
+		}
+
+		return GreenSyntaxFactory.CSharpTypeSyntax(
+			GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText.ToString())));
+	}
 
 	private GreenIdentifierNameSyntax ParseMarkupSimpleName()
 	{

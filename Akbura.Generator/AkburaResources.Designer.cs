@@ -194,6 +194,15 @@ namespace Akbura {
                 return ResourceManager.GetString("ERR_UnexpectedCharacter", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Markup child &apos;{0}&apos; is not assignable to expected content type &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_InvalidMarkupChild {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_InvalidMarkupChild", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Error &apos;{0}&apos; was reported as a warning..

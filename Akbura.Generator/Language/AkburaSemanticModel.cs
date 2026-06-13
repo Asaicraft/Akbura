@@ -17,7 +17,10 @@ namespace Akbura.Language;
 
 internal sealed class AkburaSemanticModel
 {
+    public const string InvalidMarkupChildDiagnosticCode = "AKBURA_SEMANTIC_InvalidMarkupChild";
+
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache = new();
+    private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
 
     public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
@@ -36,10 +39,7 @@ internal sealed class AkburaSemanticModel
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        if (!ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()))
-        {
-            throw new ArgumentException("Syntax node is not part of this semantic model syntax tree.", nameof(syntax));
-        }
+        ValidateSyntaxTreeOwnership(syntax);
 
         if (_symbolInfoCache.TryGetValue(syntax, out var symbolInfo))
         {
@@ -55,6 +55,21 @@ internal sealed class AkburaSemanticModel
 
         _symbolInfoCache.Add(syntax, symbolInfo);
         return symbolInfo;
+    }
+
+    public ImmutableArray<AkburaSemanticDiagnostic> GetSemanticDiagnostics(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        ValidateSyntaxTreeOwnership(syntax);
+        _ = GetSymbolInfo(syntax);
+
+        return _semanticDiagnosticsCache.TryGetValue(syntax, out var diagnostics)
+            ? diagnostics
+            : ImmutableArray<AkburaSemanticDiagnostic>.Empty;
     }
 
     private AkburaSymbolInfo ResolveState(StateDeclarationSyntax stateDeclaration)
@@ -122,10 +137,18 @@ internal sealed class AkburaSemanticModel
         if (binding.TypeSymbol is INamedTypeSymbol namedType &&
             namedType.TypeKind != TypeKind.Error)
         {
+            var contentModel = CreateMarkupContentModel(namedType);
+            var children = CreateMarkupChildren(markupElement, contentModel, out var diagnostics);
+            SetSemanticDiagnostics(markupElement, diagnostics);
+
             return AkburaSymbolInfo.Success(new MarkupComponentSymbol(
                 componentNameText,
-                new CSharpSymbolDefinition(namedType)));
+                new CSharpSymbolDefinition(namedType),
+                contentModel,
+                children));
         }
+
+        SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
 
         var candidates = CreateMarkupComponentCandidates(componentNameText, binding.CandidateSymbols);
         if (candidates.Length > 0)
@@ -134,6 +157,294 @@ internal sealed class AkburaSemanticModel
         }
 
         return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+    }
+
+    private MarkupContentModel CreateMarkupContentModel(INamedTypeSymbol componentType)
+    {
+        if (TryGetAvaloniaControlType(out var controlType) &&
+            IsAssignableTo(componentType, controlType))
+        {
+            var contentProperty = FindAvaloniaContentProperty(componentType);
+            if (contentProperty == null)
+            {
+                return default;
+            }
+
+            var contentType = contentProperty.Type;
+            if (TryGetIListElementType(contentType, out var itemType))
+            {
+                return new MarkupContentModel(
+                    new CSharpSymbolDefinition(contentProperty),
+                    new CSharpSymbolDefinition(itemType),
+                    isCollection: true,
+                    allowsText: AllowsTextContent(itemType));
+            }
+
+            return new MarkupContentModel(
+                new CSharpSymbolDefinition(contentProperty),
+                new CSharpSymbolDefinition(contentType),
+                isCollection: false,
+                allowsText: AllowsTextContent(contentType));
+        }
+
+        if (TryGetIListElementType(componentType, out var elementType))
+        {
+            return new MarkupContentModel(
+                contentProperty: default,
+                allowedChildType: new CSharpSymbolDefinition(elementType),
+                isCollection: true,
+                allowsText: AllowsTextContent(elementType));
+        }
+
+        return default;
+    }
+
+    private ImmutableArray<MarkupChildContent> CreateMarkupChildren(
+        MarkupElementSyntax markupElement,
+        MarkupContentModel contentModel,
+        out ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+    {
+        using var childrenBuilder = ImmutableArrayBuilder<MarkupChildContent>.Rent();
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
+        foreach (var childSyntax in markupElement.Body)
+        {
+            switch (childSyntax)
+            {
+                case MarkupElementContentSyntax elementContent:
+                    AddElementChild(elementContent, contentModel, childrenBuilder, diagnosticsBuilder);
+                    break;
+
+                case MarkupTextLiteralSyntax textLiteral:
+                    AddTextChild(textLiteral, contentModel, childrenBuilder, diagnosticsBuilder);
+                    break;
+
+                case MarkupInlineExpressionSyntax inlineExpression:
+                    AddExpressionChild(inlineExpression, contentModel, childrenBuilder, diagnosticsBuilder);
+                    break;
+            }
+        }
+
+        diagnostics = diagnosticsBuilder.ToImmutable();
+        return childrenBuilder.ToImmutable();
+    }
+
+    private void AddElementChild(
+        MarkupElementContentSyntax elementContent,
+        MarkupContentModel contentModel,
+        ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        var symbolInfo = GetSymbolInfo(elementContent.Element);
+        var componentSymbol = symbolInfo.Symbol as MarkupComponentSymbol;
+        var childType = componentSymbol?.CSharpDefinition ?? default;
+
+        childrenBuilder.Add(new MarkupChildContent(
+            elementContent,
+            MarkupChildKind.Element,
+            childType,
+            componentSymbol));
+
+        if (componentSymbol?.ComponentType == null)
+        {
+            return;
+        }
+
+        if (!IsAllowedMarkupChildType(componentSymbol.ComponentType, contentModel))
+        {
+            diagnosticsBuilder.Add(CreateInvalidMarkupChildDiagnostic(
+                elementContent,
+                componentSymbol.CSharpDefinition,
+                contentModel));
+        }
+    }
+
+    private void AddTextChild(
+        MarkupTextLiteralSyntax textLiteral,
+        MarkupContentModel contentModel,
+        ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        var text = textLiteral.ToFullString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        var stringType = Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_String);
+        var textType = new CSharpSymbolDefinition(stringType);
+        childrenBuilder.Add(new MarkupChildContent(
+            textLiteral,
+            MarkupChildKind.Text,
+            textType,
+            text: text));
+
+        if (!contentModel.AllowsText)
+        {
+            diagnosticsBuilder.Add(CreateInvalidMarkupChildDiagnostic(
+                textLiteral,
+                textType,
+                contentModel));
+        }
+    }
+
+    private void AddExpressionChild(
+        MarkupInlineExpressionSyntax inlineExpression,
+        MarkupContentModel contentModel,
+        ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        childrenBuilder.Add(new MarkupChildContent(
+            inlineExpression,
+            MarkupChildKind.Expression,
+            type: default));
+
+        if (!contentModel.AllowsChildren)
+        {
+            diagnosticsBuilder.Add(CreateInvalidMarkupChildDiagnostic(
+                inlineExpression,
+                childType: default,
+                contentModel));
+        }
+    }
+
+    private AkburaSemanticDiagnostic CreateInvalidMarkupChildDiagnostic(
+        MarkupContentSyntax syntax,
+        CSharpSymbolDefinition childType,
+        MarkupContentModel contentModel)
+    {
+        var childTypeText = childType.IsDefault
+            ? "expression"
+            : childType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var expectedTypeText = contentModel.AllowedChildType.IsDefault
+            ? "no children"
+            : contentModel.AllowedChildType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            InvalidMarkupChildDiagnosticCode,
+            [childTypeText, expectedTypeText]);
+    }
+
+    private bool IsAllowedMarkupChildType(ITypeSymbol childType, MarkupContentModel contentModel)
+    {
+        return contentModel.AllowedChildType.Symbol is ITypeSymbol allowedType &&
+            IsAssignableTo(childType, allowedType);
+    }
+
+    private bool AllowsTextContent(ITypeSymbol type)
+    {
+        return type.SpecialType is SpecialType.System_Object or SpecialType.System_String;
+    }
+
+    private IPropertySymbol? FindAvaloniaContentProperty(INamedTypeSymbol type)
+    {
+        for (var current = type; current != null; current = current.BaseType)
+        {
+            foreach (var property in current.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (property.IsStatic ||
+                    property.DeclaredAccessibility != Accessibility.Public)
+                {
+                    continue;
+                }
+
+                if (HasAvaloniaContentAttribute(property))
+                {
+                    return property;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private bool HasAvaloniaContentAttribute(IPropertySymbol property)
+    {
+        foreach (var attribute in property.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==
+                "global::Avalonia.Metadata.ContentAttribute")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryGetAvaloniaControlType(out INamedTypeSymbol controlType)
+    {
+        controlType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Controls.Control")!;
+        return controlType != null;
+    }
+
+    private bool TryGetIListElementType(ITypeSymbol type, out ITypeSymbol elementType)
+    {
+        if (type is INamedTypeSymbol namedType &&
+            IsIListOfT(namedType))
+        {
+            elementType = namedType.TypeArguments[0];
+            return true;
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (IsIListOfT(@interface))
+            {
+                elementType = @interface.TypeArguments[0];
+                return true;
+            }
+        }
+
+        elementType = null!;
+        return false;
+    }
+
+    private static bool IsIListOfT(INamedTypeSymbol type)
+    {
+        var original = type.OriginalDefinition;
+        return original.Name == "IList" &&
+            original.Arity == 1 &&
+            original.ContainingNamespace.ToDisplayString() == "System.Collections.Generic";
+    }
+
+    private static bool IsAssignableTo(ITypeSymbol source, ITypeSymbol target)
+    {
+        if (target.SpecialType == SpecialType.System_Object ||
+            IsSameType(source, target))
+        {
+            return true;
+        }
+
+        if (source is INamedTypeSymbol namedSource &&
+            target is INamedTypeSymbol namedTarget)
+        {
+            for (var current = namedSource.BaseType; current != null; current = current.BaseType)
+            {
+                if (IsSameType(current, namedTarget))
+                {
+                    return true;
+                }
+            }
+        }
+
+        foreach (var @interface in source.AllInterfaces)
+        {
+            if (IsSameType(@interface, target))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSameType(ITypeSymbol left, ITypeSymbol right)
+    {
+        return SymbolEqualityComparer.Default.Equals(left, right) ||
+            left.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==
+            right.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
 
     private CSharpTypeBinding BindCSharpType(CSharp.TypeSyntax typeSyntax)
@@ -269,6 +580,23 @@ internal sealed class AkburaSemanticModel
         }
 
         return builder.ToImmutable();
+    }
+
+    private void ValidateSyntaxTreeOwnership(AkburaSyntax syntax)
+    {
+        if (!ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()))
+        {
+            throw new ArgumentException("Syntax node is not part of this semantic model syntax tree.", nameof(syntax));
+        }
+    }
+
+    private void SetSemanticDiagnostics(
+        AkburaSyntax syntax,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+    {
+        _semanticDiagnosticsCache[syntax] = diagnostics.IsDefault
+            ? ImmutableArray<AkburaSemanticDiagnostic>.Empty
+            : diagnostics;
     }
 
     private readonly struct CSharpTypeBinding

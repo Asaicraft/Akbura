@@ -47,6 +47,7 @@ public class SymbolTests
         return
         [
             MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(System.ComponentModel.INotifyPropertyChanged).Assembly.Location),
             MetadataReference.CreateFromFile(avaloniaControlsAssembly.Location),
         ];
     }

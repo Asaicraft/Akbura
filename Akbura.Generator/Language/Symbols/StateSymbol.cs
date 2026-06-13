@@ -10,7 +10,9 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
     public StateSymbol(
         StateDeclarationSyntax declarationSyntax,
         CSharpSymbolDefinition type,
+        CSharpSymbolDefinition initializerType,
         bool hasExplicitType,
+        StateBindingKind bindingKind,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -27,7 +29,9 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
 
         Name = name;
         Type = type;
+        InitializerType = initializerType;
         HasExplicitType = hasExplicitType;
+        BindingKind = bindingKind;
     }
 
     public override SymbolKind Kind => SymbolKind.State;
@@ -38,9 +42,21 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
 
     public StateDeclarationSyntax DeclarationSyntax { get; }
 
+    public StateInitializerSyntax InitializerSyntax => DeclarationSyntax.Initializer;
+
+    public CSharpExpressionSyntax InitializerExpression => InitializerSyntax.Expression;
+
     public CSharpSymbolDefinition Type { get; }
 
+    public CSharpSymbolDefinition InitializerType { get; }
+
     public bool HasExplicitType { get; }
+
+    public bool IsBindable => BindingKind != StateBindingKind.None;
+
+    public bool IsReadOnly => BindingKind == StateBindingKind.Out;
+
+    public StateBindingKind BindingKind { get; }
 
     public override string ToDisplayString()
     {

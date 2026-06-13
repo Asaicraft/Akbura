@@ -220,7 +220,7 @@ public class SemanticPipelineTests
         Assert.Equal("Child", symbol.ContentModel.ContentProperty.Name);
         Assert.Equal("Control", symbol.ContentModel.AllowedChildType.Name);
         Assert.False(symbol.ContentModel.AllowsText);
-        Assert.Equal(AkburaSemanticModel.InvalidMarkupChildDiagnosticCode, diagnostic.Code);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_InvalidMarkupChild, diagnostic.Code);
         Assert.Contains("string", diagnostic.Message);
         Assert.Contains("Avalonia.Controls.Control", diagnostic.Message);
     }
@@ -295,7 +295,7 @@ public class SemanticPipelineTests
         var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(element));
 
         Assert.Equal("MyObject", symbol.ContentModel.AllowedChildType.Name);
-        Assert.Equal(AkburaSemanticModel.InvalidMarkupChildDiagnosticCode, diagnostic.Code);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_InvalidMarkupChild, diagnostic.Code);
         Assert.Contains("OtherObject", diagnostic.Message);
         Assert.Contains("MyObject", diagnostic.Message);
     }
@@ -324,17 +324,238 @@ public class SemanticPipelineTests
         Assert.Equal(SymbolLanguage.Akbura, symbol.Language);
         Assert.Equal("isOpen", symbol.Name);
         Assert.True(symbol.HasExplicitType);
+        Assert.False(symbol.IsBindable);
+        Assert.Equal(StateBindingKind.None, symbol.BindingKind);
         Assert.False(symbol.Type.IsDefault);
         Assert.Equal("Boolean", symbol.Type.Name);
+        Assert.False(symbol.InitializerType.IsDefault);
+        Assert.Equal("Boolean", symbol.InitializerType.Name);
         Assert.True(SymbolEqualityComparer.Default.Equals(
             semanticModel.Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean),
             symbol.Type.Symbol));
+        Assert.True(SymbolEqualityComparer.Default.Equals(
+            semanticModel.Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean),
+            symbol.InitializerType.Symbol));
         Assert.Same(state, symbol.DeclarationSyntax);
+        Assert.Same(state.Initializer, symbol.InitializerSyntax);
+        Assert.Same(state.Initializer.Expression, symbol.InitializerExpression);
         Assert.True(symbol.CSharpDefinition.IsDefault);
         Assert.Equal("state Boolean isOpen", symbol.ToDisplayString());
 
         var cachedSymbolInfo = semanticModel.GetSymbolInfo(state);
         Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesBindableImplicitStateSymbol()
+    {
+        const string code = "state isBusy = bind true;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var state = Assert.IsType<StateDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbolInfo = semanticModel.GetSymbolInfo(state);
+
+        var symbol = Assert.IsAssignableFrom<IStateSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.Equal("isBusy", symbol.Name);
+        Assert.False(symbol.HasExplicitType);
+        Assert.True(symbol.IsBindable);
+        Assert.Equal(StateBindingKind.Bind, symbol.BindingKind);
+        Assert.False(symbol.Type.IsDefault);
+        Assert.False(symbol.InitializerType.IsDefault);
+        Assert.Equal("Boolean", symbol.Type.Name);
+        Assert.Equal("Boolean", symbol.InitializerType.Name);
+        Assert.True(SymbolEqualityComparer.Default.Equals(
+            semanticModel.Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean),
+            symbol.Type.Symbol));
+        Assert.Same(state.Initializer, symbol.InitializerSyntax);
+        Assert.Same(state.Initializer.Expression, symbol.InitializerExpression);
+        Assert.Equal("state Boolean isBusy", symbol.ToDisplayString());
+    }
+
+    [Fact]
+    public void SemanticModel_BindStateWithInpcSource_HasNoBindingDiagnostics()
+    {
+        const string code =
+            "state MyViewModel vm = new MyViewModel();\n" +
+            "state string name = bind vm.Name;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "using System.ComponentModel;\n" +
+                "public sealed class MyViewModel : INotifyPropertyChanged\n" +
+                "{\n" +
+                "    public event PropertyChangedEventHandler? PropertyChanged;\n" +
+                "    public string Name { get; set; } = \"\";\n" +
+                "}"));
+        var state = GetStateDeclaration(syntaxTree, "name");
+
+        var symbol = Assert.IsAssignableFrom<IStateSymbol>(semanticModel.GetSymbolInfo(state).Symbol);
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(state).IsEmpty);
+        Assert.True(symbol.IsBindable);
+        Assert.False(symbol.IsReadOnly);
+        Assert.Equal(StateBindingKind.Bind, symbol.BindingKind);
+        Assert.Equal("String", symbol.Type.Name);
+        Assert.Equal("String", symbol.InitializerType.Name);
+    }
+
+    [Fact]
+    public void SemanticModel_BindStateWithoutObservableSource_ProducesWarning()
+    {
+        const string code =
+            "state MyViewModel vm = new MyViewModel();\n" +
+            "state string name = bind vm.Name;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "public sealed class MyViewModel\n" +
+                "{\n" +
+                "    public string Name { get; set; } = \"\";\n" +
+                "}"));
+        var state = GetStateDeclaration(syntaxTree, "name");
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(state));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_StateBindingSourceNotObservable, diagnostic.Code);
+        Assert.Equal(AkburaDiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Contains("vm.Name", diagnostic.Message);
+        Assert.Contains("string", diagnostic.Message);
+        Assert.Contains("MyViewModel", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_OutStateWithObservableSource_IsReadonlyAndHasNoBindingDiagnostics()
+    {
+        const string code =
+            "state MyViewModel vm = new MyViewModel();\n" +
+            "state string fullName = out vm.FullName;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "using System;\n" +
+                "public sealed class MyViewModel\n" +
+                "{\n" +
+                "    public IObservable<string> FullName { get; } = null!;\n" +
+                "}"));
+        var state = GetStateDeclaration(syntaxTree, "fullName");
+
+        var symbol = Assert.IsAssignableFrom<IStateSymbol>(semanticModel.GetSymbolInfo(state).Symbol);
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(state).IsEmpty);
+        Assert.True(symbol.IsBindable);
+        Assert.True(symbol.IsReadOnly);
+        Assert.Equal(StateBindingKind.Out, symbol.BindingKind);
+        Assert.Equal("String", symbol.Type.Name);
+        Assert.Equal("IObservable", symbol.InitializerType.Name);
+    }
+
+    [Fact]
+    public void SemanticModel_InStateWithGetOnlyProperty_ProducesWritableTargetError()
+    {
+        const string code =
+            "state MyViewModel vm = new MyViewModel();\n" +
+            "state string surname = in vm.Surname;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "public sealed class MyViewModel\n" +
+                "{\n" +
+                "    public string Surname { get; } = \"\";\n" +
+                "}"));
+        var state = GetStateDeclaration(syntaxTree, "surname");
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(state));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_StateBindingTargetNotWritable, diagnostic.Code);
+        Assert.Equal(AkburaDiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("vm.Surname", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_InStateWithReadonlyField_ProducesWritableTargetError()
+    {
+        const string code =
+            "state MyViewModel vm = new MyViewModel();\n" +
+            "state string surname = in vm.Surname;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "public sealed class MyViewModel\n" +
+                "{\n" +
+                "    public readonly string Surname = \"\";\n" +
+                "}"));
+        var state = GetStateDeclaration(syntaxTree, "surname");
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(state));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_StateBindingTargetNotWritable, diagnostic.Code);
+        Assert.Equal(AkburaDiagnosticSeverity.Error, diagnostic.Severity);
+    }
+
+    [Fact]
+    public void SemanticModel_InState_AllowsBindingPathExpressions()
+    {
+        const string code =
+            "state MyViewModel vm = new MyViewModel();\n" +
+            "state MyViewModel sameVm = in vm;\n" +
+            "state string name = in vm.Name;\n" +
+            "state string firstName = in vm.Persons[0].Name;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "using System.Collections.Generic;\n" +
+                "public sealed class MyViewModel\n" +
+                "{\n" +
+                "    public string Name { get; set; } = \"\";\n" +
+                "    public List<Person> Persons { get; } = new();\n" +
+                "}\n" +
+                "public sealed class Person\n" +
+                "{\n" +
+                "    public string Name { get; set; } = \"\";\n" +
+                "}"));
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(GetStateDeclaration(syntaxTree, "sameVm")).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(GetStateDeclaration(syntaxTree, "name")).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(GetStateDeclaration(syntaxTree, "firstName")).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_BindableStateWithNonPathExpression_ProducesBindingExpressionError()
+    {
+        const string code =
+            "state MyViewModel vm = new MyViewModel();\n" +
+            "state int age = in vm.Age + 1;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "public sealed class MyViewModel\n" +
+                "{\n" +
+                "    public int Age { get; set; }\n" +
+                "}"));
+        var state = GetStateDeclaration(syntaxTree, "age");
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(state));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_StateBindingExpressionExpected, diagnostic.Code);
+        Assert.Equal(AkburaDiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("vm.Age + 1", diagnostic.Message);
     }
 
     [Fact]
@@ -394,6 +615,14 @@ public class SemanticPipelineTests
         var root = syntaxTree.GetRoot();
         var markupRoot = Assert.IsType<MarkupRootSyntax>(root.Members.Single(member => member is MarkupRootSyntax));
         return markupRoot.Element;
+    }
+
+    private static StateDeclarationSyntax GetStateDeclaration(AkburaSyntaxTree syntaxTree, string name)
+    {
+        return Assert.IsType<StateDeclarationSyntax>(
+            syntaxTree.GetRoot().Members.Single(member =>
+                member is StateDeclarationSyntax state &&
+                state.Name.Identifier.ValueText == name));
     }
 
     private static void AssertResolvedAvaloniaButton(

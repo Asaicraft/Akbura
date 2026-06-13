@@ -165,6 +165,15 @@
   <data name="AKBURA_SEMANTIC_InvalidMarkupChild" xml:space="preserve">
     <value>Markup child '{0}' is not assignable to expected content type '{1}'.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_StateBindingExpressionExpected" xml:space="preserve">
+    <value>State binding expression '{0}' must be a binding path such as 'vm', 'vm.Name', or 'vm.Items[0].Name'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_StateBindingSourceNotObservable" xml:space="preserve">
+    <value>State binding source '{0}' cannot be observed as '{1}'. Use IObservable&lt;{1}&gt; or implement INotifyPropertyChanged on '{2}'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_StateBindingTargetNotWritable" xml:space="preserve">
+    <value>State binding target '{0}' must be a writable property or field.</value>
+  </data>
   <data name="WRN_ErrorOverride" xml:space="preserve">
     <value>Error '{0}' was reported as a warning.</value>
   </data>

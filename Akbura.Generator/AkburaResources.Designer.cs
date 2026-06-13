@@ -203,6 +203,33 @@ namespace Akbura {
                 return ResourceManager.GetString("AKBURA_SEMANTIC_InvalidMarkupChild", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to State binding expression &apos;{0}&apos; must be a binding path such as &apos;vm&apos;, &apos;vm.Name&apos;, or &apos;vm.Items[0].Name&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_StateBindingExpressionExpected {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingExpressionExpected", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to State binding source &apos;{0}&apos; cannot be observed as &apos;{1}&apos;. Use IObservable&lt;{1}&gt; or implement INotifyPropertyChanged on &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_StateBindingSourceNotObservable {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingSourceNotObservable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to State binding target &apos;{0}&apos; must be a writable property or field..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_StateBindingTargetNotWritable {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingTargetNotWritable", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Error &apos;{0}&apos; was reported as a warning..

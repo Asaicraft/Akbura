@@ -20,5 +20,9 @@ internal static class ErrorCodes
     public const string ERR_LbraceExpected = nameof(ERR_LbraceExpected);
     public const string ERR_RbraceExpected = nameof(ERR_RbraceExpected);
     public const string ERR_SyntaxError = nameof(ERR_SyntaxError);
+    public const string AKBURA_SEMANTIC_InvalidMarkupChild = nameof(AKBURA_SEMANTIC_InvalidMarkupChild);
+    public const string AKBURA_SEMANTIC_StateBindingExpressionExpected = nameof(AKBURA_SEMANTIC_StateBindingExpressionExpected);
+    public const string AKBURA_SEMANTIC_StateBindingSourceNotObservable = nameof(AKBURA_SEMANTIC_StateBindingSourceNotObservable);
+    public const string AKBURA_SEMANTIC_StateBindingTargetNotWritable = nameof(AKBURA_SEMANTIC_StateBindingTargetNotWritable);
     public const string WRN_ErrorOverride = nameof(WRN_ErrorOverride);
 }

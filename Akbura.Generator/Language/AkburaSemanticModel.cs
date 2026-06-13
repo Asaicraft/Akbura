@@ -17,8 +17,6 @@ namespace Akbura.Language;
 
 internal sealed class AkburaSemanticModel
 {
-    public const string InvalidMarkupChildDiagnosticCode = "AKBURA_SEMANTIC_InvalidMarkupChild";
-
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
 
@@ -81,8 +79,27 @@ internal sealed class AkburaSemanticModel
         }
 
         var hasExplicitType = stateDeclaration.Type != null;
-        var type = ResolveExplicitStateType(stateDeclaration);
-        return AkburaSymbolInfo.Success(new StateSymbol(stateDeclaration, type, hasExplicitType));
+        var initializerBinding = BindStateInitializerExpression(stateDeclaration);
+        var initializerType = initializerBinding.TypeSymbol == null
+            ? default
+            : new CSharpSymbolDefinition(initializerBinding.TypeSymbol);
+        var type = hasExplicitType
+            ? ResolveExplicitStateType(stateDeclaration)
+            : initializerType;
+        var bindingKind = GetStateBindingKind(stateDeclaration.Initializer);
+        var diagnostics = CreateStateBindingDiagnostics(
+            stateDeclaration,
+            bindingKind,
+            type,
+            initializerBinding);
+        SetSemanticDiagnostics(stateDeclaration, diagnostics);
+
+        return AkburaSymbolInfo.Success(new StateSymbol(
+            stateDeclaration,
+            type,
+            initializerType,
+            hasExplicitType,
+            bindingKind));
     }
 
     private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
@@ -106,6 +123,237 @@ internal sealed class AkburaSemanticModel
         var binding = BindCSharpType(csharpType);
         var typeSymbol = binding.TypeSymbol;
         return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+    }
+
+    private CSharpTypeBinding BindStateInitializerExpression(StateDeclarationSyntax stateDeclaration)
+    {
+        CSharp.ExpressionSyntax csharpExpression;
+        try
+        {
+            csharpExpression = CSharpSyntaxFactory.ParseExpression(stateDeclaration.Initializer.Expression.ToFullString());
+        }
+        catch (ArgumentException)
+        {
+            return CSharpTypeBinding.Empty;
+        }
+
+        return BindCSharpExpression(
+            csharpExpression,
+            stateDeclaration,
+            isBindingPath: IsStateBindingPath(csharpExpression));
+    }
+
+    private static StateBindingKind GetStateBindingKind(StateInitializerSyntax initializer)
+    {
+        if (initializer is not BindableStateInitializerSyntax bindableInitializer)
+        {
+            return StateBindingKind.None;
+        }
+
+        return bindableInitializer.BindingKeyword.Kind switch
+        {
+            Akbura.Language.Syntax.SyntaxKind.InToken => StateBindingKind.In,
+            Akbura.Language.Syntax.SyntaxKind.OutToken => StateBindingKind.Out,
+            Akbura.Language.Syntax.SyntaxKind.BindToken => StateBindingKind.Bind,
+            _ => StateBindingKind.None,
+        };
+    }
+
+    private ImmutableArray<AkburaSemanticDiagnostic> CreateStateBindingDiagnostics(
+        StateDeclarationSyntax stateDeclaration,
+        StateBindingKind bindingKind,
+        CSharpSymbolDefinition stateType,
+        CSharpTypeBinding initializerBinding)
+    {
+        if (bindingKind == StateBindingKind.None)
+        {
+            return ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+        }
+
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
+        if (!initializerBinding.IsBindingPath)
+        {
+            diagnosticsBuilder.Add(CreateStateBindingExpressionExpectedDiagnostic(stateDeclaration));
+            return diagnosticsBuilder.ToImmutable();
+        }
+
+        if (RequiresWritableStateBindingTarget(bindingKind) &&
+            !IsWritableStateBindingTarget(initializerBinding.Symbol))
+        {
+            diagnosticsBuilder.Add(CreateStateBindingTargetNotWritableDiagnostic(stateDeclaration));
+        }
+
+        if (RequiresObservableStateBindingSource(bindingKind) &&
+            !CanObserveStateBindingSource(initializerBinding, stateType))
+        {
+            diagnosticsBuilder.Add(CreateStateBindingSourceNotObservableDiagnostic(
+                stateDeclaration,
+                stateType,
+                initializerBinding));
+        }
+
+        return diagnosticsBuilder.ToImmutable();
+    }
+
+    private static bool RequiresWritableStateBindingTarget(StateBindingKind bindingKind)
+    {
+        return bindingKind is StateBindingKind.Bind or StateBindingKind.In;
+    }
+
+    private static bool RequiresObservableStateBindingSource(StateBindingKind bindingKind)
+    {
+        return bindingKind is StateBindingKind.Bind or StateBindingKind.Out;
+    }
+
+    private static bool IsWritableStateBindingTarget(RoslynSymbol? symbol)
+    {
+        return symbol switch
+        {
+            IPropertySymbol property => property.SetMethod?.DeclaredAccessibility == Accessibility.Public,
+            IFieldSymbol field => !field.IsReadOnly && !field.IsConst,
+            null => true,
+            _ => false,
+        };
+    }
+
+    private bool CanObserveStateBindingSource(
+        CSharpTypeBinding binding,
+        CSharpSymbolDefinition stateType)
+    {
+        if (binding.TypeSymbol != null &&
+            TryGetIObservableElementType(binding.TypeSymbol, out var observableElementType) &&
+            (stateType.Symbol is not ITypeSymbol expectedType ||
+             IsSameType(observableElementType, expectedType)))
+        {
+            return true;
+        }
+
+        var containingType = GetBindingSourceContainingType(binding.Symbol) ??
+            binding.ReceiverType as INamedTypeSymbol;
+
+        if (containingType != null &&
+            ImplementsINotifyPropertyChanged(containingType))
+        {
+            return true;
+        }
+
+        return binding.Symbol is IFieldSymbol or IPropertySymbol &&
+            binding.ReceiverType == null &&
+            binding.TypeSymbol != null &&
+            ImplementsINotifyPropertyChanged(binding.TypeSymbol);
+    }
+
+    private static bool IsStateBindingPath(CSharp.ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            CSharp.IdentifierNameSyntax => true,
+            CSharp.ThisExpressionSyntax => true,
+            CSharp.BaseExpressionSyntax => true,
+            CSharp.ParenthesizedExpressionSyntax parenthesized => IsStateBindingPath(parenthesized.Expression),
+            CSharp.MemberAccessExpressionSyntax memberAccess => IsStateBindingPath(memberAccess.Expression),
+            CSharp.ElementAccessExpressionSyntax elementAccess => IsStateBindingPath(elementAccess.Expression),
+            _ => false,
+        };
+    }
+
+    private static INamedTypeSymbol? GetBindingSourceContainingType(RoslynSymbol? symbol)
+    {
+        return symbol switch
+        {
+            IPropertySymbol property => property.ContainingType,
+            IFieldSymbol field => field.ContainingType,
+            _ => null,
+        };
+    }
+
+    private static bool ImplementsINotifyPropertyChanged(ITypeSymbol type)
+    {
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (@interface.Name == "INotifyPropertyChanged" &&
+                @interface.ContainingNamespace.ToDisplayString() == "System.ComponentModel")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryGetIObservableElementType(ITypeSymbol type, out ITypeSymbol elementType)
+    {
+        if (type is INamedTypeSymbol namedType &&
+            IsIObservableOfT(namedType))
+        {
+            elementType = namedType.TypeArguments[0];
+            return true;
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (IsIObservableOfT(@interface))
+            {
+                elementType = @interface.TypeArguments[0];
+                return true;
+            }
+        }
+
+        elementType = null!;
+        return false;
+    }
+
+    private static bool IsIObservableOfT(INamedTypeSymbol type)
+    {
+        var original = type.OriginalDefinition;
+        return original.Name == "IObservable" &&
+            original.Arity == 1 &&
+            original.ContainingNamespace.ToDisplayString() == "System";
+    }
+
+    private AkburaSemanticDiagnostic CreateStateBindingSourceNotObservableDiagnostic(
+        StateDeclarationSyntax stateDeclaration,
+        CSharpSymbolDefinition stateType,
+        CSharpTypeBinding binding)
+    {
+        var sourceText = stateDeclaration.Initializer.Expression.ToFullString().Trim();
+        var stateTypeText = stateType.IsDefault
+            ? "state type"
+            : stateType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var ownerText = GetBindingSourceContainingType(binding.Symbol)?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) ??
+            binding.ReceiverType?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) ??
+            "source object";
+
+        return new AkburaSemanticDiagnostic(
+            stateDeclaration,
+            ErrorCodes.AKBURA_SEMANTIC_StateBindingSourceNotObservable,
+            [sourceText, stateTypeText, ownerText],
+            AkburaDiagnosticSeverity.Warning);
+    }
+
+    private AkburaSemanticDiagnostic CreateStateBindingExpressionExpectedDiagnostic(
+        StateDeclarationSyntax stateDeclaration)
+    {
+        var expressionText = stateDeclaration.Initializer.Expression.ToFullString().Trim();
+
+        return new AkburaSemanticDiagnostic(
+            stateDeclaration,
+            ErrorCodes.AKBURA_SEMANTIC_StateBindingExpressionExpected,
+            [expressionText],
+            AkburaDiagnosticSeverity.Error);
+    }
+
+    private AkburaSemanticDiagnostic CreateStateBindingTargetNotWritableDiagnostic(
+        StateDeclarationSyntax stateDeclaration)
+    {
+        var targetText = stateDeclaration.Initializer.Expression.ToFullString().Trim();
+
+        return new AkburaSemanticDiagnostic(
+            stateDeclaration,
+            ErrorCodes.AKBURA_SEMANTIC_StateBindingTargetNotWritable,
+            [targetText],
+            AkburaDiagnosticSeverity.Error);
     }
 
     private AkburaSymbolInfo ResolveMarkupComponent(MarkupElementSyntax markupElement)
@@ -322,7 +570,7 @@ internal sealed class AkburaSemanticModel
 
         return new AkburaSemanticDiagnostic(
             syntax,
-            InvalidMarkupChildDiagnosticCode,
+            ErrorCodes.AKBURA_SEMANTIC_InvalidMarkupChild,
             [childTypeText, expectedTypeText]);
     }
 
@@ -498,10 +746,180 @@ internal sealed class AkburaSemanticModel
 
         return new CSharpTypeBinding(
             typeSymbol,
+            symbolInfo.Symbol,
+            receiverType: null,
+            isBindingPath: true,
             symbolInfo.CandidateSymbols,
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
                 : AkburaCandidateReason.NotFound);
+    }
+
+    private CSharpTypeBinding BindCSharpExpression(
+        CSharp.ExpressionSyntax expressionSyntax,
+        StateDeclarationSyntax? scopeStateDeclaration = null,
+        bool isBindingPath = true)
+    {
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                "__AkburaSemanticProbe")
+            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
+
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        if (scopeStateDeclaration != null)
+        {
+            foreach (var field in CreateStateProbeFieldsBefore(scopeStateDeclaration))
+            {
+                membersBuilder.Add(field);
+            }
+        }
+
+        membersBuilder.Add(method);
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
+
+        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
+        if (namespaceDeclaration != null)
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
+                    namespaceDeclaration.WithMembers(
+                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
+        }
+        else
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
+        }
+
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeExpression = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.ReturnStatementSyntax>()
+            .Single()
+            .Expression;
+
+        if (probeExpression == null)
+        {
+            return CSharpTypeBinding.Empty;
+        }
+
+        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
+        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
+        var receiverType = GetExpressionReceiverType(semanticModel, probeExpression);
+        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
+            ? null
+            : typeInfo.Type;
+
+        return new CSharpTypeBinding(
+            typeSymbol,
+            symbolInfo.Symbol,
+            receiverType,
+            isBindingPath,
+            symbolInfo.CandidateSymbols,
+            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
+                ? AkburaCandidateReason.Ambiguous
+                : AkburaCandidateReason.NotFound);
+    }
+
+    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateStateProbeFieldsBefore(
+        StateDeclarationSyntax scopeStateDeclaration)
+    {
+        using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        foreach (var member in SyntaxTree.GetRoot().Members)
+        {
+            if (member.Position >= scopeStateDeclaration.Position)
+            {
+                break;
+            }
+
+            if (member is StateDeclarationSyntax stateDeclaration &&
+                TryCreateStateProbeField(stateDeclaration, out var field))
+            {
+                builder.Add(field);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private bool TryCreateStateProbeField(
+        StateDeclarationSyntax stateDeclaration,
+        out CSharp.FieldDeclarationSyntax field)
+    {
+        field = null!;
+
+        var name = stateDeclaration.Name.ToFullString().Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        var type = GetStateProbeFieldType(stateDeclaration);
+        if (type == null)
+        {
+            return false;
+        }
+
+        field = CSharpSyntaxFactory.FieldDeclaration(
+                CSharpSyntaxFactory.VariableDeclaration(type)
+                    .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
+                        CSharpSyntaxFactory.VariableDeclarator(
+                            CSharpSyntaxFactory.Identifier(name)))))
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword)));
+
+        return true;
+    }
+
+    private CSharp.TypeSyntax? GetStateProbeFieldType(StateDeclarationSyntax stateDeclaration)
+    {
+        if (stateDeclaration.Type != null)
+        {
+            try
+            {
+                return stateDeclaration.Type.ToCSharp();
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        if (GetSymbolInfo(stateDeclaration).Symbol is not IStateSymbol stateSymbol ||
+            stateSymbol.Type.Symbol is not ITypeSymbol typeSymbol)
+        {
+            return null;
+        }
+
+        return CSharpSyntaxFactory.ParseTypeName(
+            typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+    }
+
+    private static ITypeSymbol? GetExpressionReceiverType(
+        SemanticModel semanticModel,
+        CSharp.ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            CSharp.MemberAccessExpressionSyntax memberAccess =>
+                semanticModel.GetTypeInfo(memberAccess.Expression).Type,
+            CSharp.ConditionalAccessExpressionSyntax conditionalAccess =>
+                semanticModel.GetTypeInfo(conditionalAccess.Expression).Type,
+            _ => null,
+        };
     }
 
     private ImmutableArray<CSharp.UsingDirectiveSyntax> GetCSharpUsingDirectives()
@@ -601,12 +1019,26 @@ internal sealed class AkburaSemanticModel
 
     private readonly struct CSharpTypeBinding
     {
+        public static CSharpTypeBinding Empty { get; } = new(
+            typeSymbol: null,
+            symbol: null,
+            receiverType: null,
+            isBindingPath: false,
+            candidateSymbols: ImmutableArray<RoslynSymbol>.Empty,
+            candidateReason: AkburaCandidateReason.NotFound);
+
         public CSharpTypeBinding(
             ITypeSymbol? typeSymbol,
+            RoslynSymbol? symbol,
+            ITypeSymbol? receiverType,
+            bool isBindingPath,
             ImmutableArray<RoslynSymbol> candidateSymbols,
             AkburaCandidateReason candidateReason)
         {
             TypeSymbol = typeSymbol;
+            Symbol = symbol;
+            ReceiverType = receiverType;
+            IsBindingPath = isBindingPath;
             CandidateSymbols = candidateSymbols.IsDefault
                 ? ImmutableArray<RoslynSymbol>.Empty
                 : candidateSymbols;
@@ -614,6 +1046,12 @@ internal sealed class AkburaSemanticModel
         }
 
         public ITypeSymbol? TypeSymbol { get; }
+
+        public RoslynSymbol? Symbol { get; }
+
+        public ITypeSymbol? ReceiverType { get; }
+
+        public bool IsBindingPath { get; }
 
         public ImmutableArray<RoslynSymbol> CandidateSymbols { get; }
 

@@ -6,7 +6,19 @@ internal interface IStateSymbol : ISymbol
 {
     StateDeclarationSyntax DeclarationSyntax { get; }
 
+    StateInitializerSyntax InitializerSyntax { get; }
+
+    CSharpExpressionSyntax InitializerExpression { get; }
+
     CSharpSymbolDefinition Type { get; }
 
+    CSharpSymbolDefinition InitializerType { get; }
+
     bool HasExplicitType { get; }
+
+    bool IsBindable { get; }
+
+    bool IsReadOnly { get; }
+
+    StateBindingKind BindingKind { get; }
 }

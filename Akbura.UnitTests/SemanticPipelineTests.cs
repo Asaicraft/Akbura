@@ -479,6 +479,42 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ResolvesInjectSymbol()
+    {
+        const string code = "inject ILogger<MyComponent> logger;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "public interface ILogger<T> { }\n" +
+                "public sealed class MyComponent { }"));
+        var inject = Assert.IsType<InjectDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbolInfo = semanticModel.GetSymbolInfo(inject);
+
+        var symbol = Assert.IsAssignableFrom<IInjectSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.True(symbolInfo.CandidateSymbols.IsEmpty);
+        Assert.Equal(AkburaSymbolKind.InjectedService, symbol.Kind);
+        Assert.Equal(SymbolLanguage.Akbura, symbol.Language);
+        Assert.Equal("logger", symbol.Name);
+        Assert.True(symbol.IsRequired);
+        Assert.False(symbol.Type.IsDefault);
+        Assert.Equal("ILogger", symbol.Type.Name);
+        var loggerType = Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.Type.Symbol);
+        Assert.True(loggerType.IsGenericType);
+        Assert.Equal("MyComponent", loggerType.TypeArguments.Single().Name);
+        Assert.Same(inject, symbol.DeclarationSyntax);
+        Assert.True(symbol.CSharpDefinition.IsDefault);
+        Assert.Equal("inject global::ILogger<global::MyComponent> logger", symbol.ToDisplayString());
+        Assert.True(semanticModel.GetSemanticDiagnostics(inject).IsEmpty);
+
+        var cachedSymbolInfo = semanticModel.GetSymbolInfo(inject);
+        Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
     public void SemanticModel_BindStateWithInpcSource_HasNoBindingDiagnostics()
     {
         const string code =

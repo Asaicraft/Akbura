@@ -48,6 +48,7 @@ internal sealed class AkburaSemanticModel
         {
             StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
             ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
+            InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         };
@@ -128,6 +129,21 @@ internal sealed class AkburaSemanticModel
             bindingKind));
     }
 
+    private AkburaSymbolInfo ResolveInject(InjectDeclarationSyntax injectDeclaration)
+    {
+        var name = injectDeclaration.Name.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var type = ResolveInjectType(injectDeclaration);
+
+        SetSemanticDiagnostics(injectDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
+    }
+
     private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
     {
         var typeSyntax = stateDeclaration.Type;
@@ -163,6 +179,23 @@ internal sealed class AkburaSemanticModel
         try
         {
             csharpType = typeSyntax.ToCSharp();
+        }
+        catch (InvalidOperationException)
+        {
+            return default;
+        }
+
+        var binding = BindCSharpType(csharpType);
+        var typeSymbol = binding.TypeSymbol;
+        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+    }
+
+    private CSharpSymbolDefinition ResolveInjectType(InjectDeclarationSyntax injectDeclaration)
+    {
+        CSharp.TypeSyntax csharpType;
+        try
+        {
+            csharpType = injectDeclaration.Type.ToCSharp();
         }
         catch (InvalidOperationException)
         {

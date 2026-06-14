@@ -516,6 +516,42 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ResolvesCommandSymbol()
+    {
+        const string code = "command System.Threading.Tasks.Task<int> Click(int a);";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var command = Assert.IsType<CommandDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbolInfo = semanticModel.GetSymbolInfo(command);
+
+        var symbol = Assert.IsAssignableFrom<ICommandSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.Equal(AkburaSymbolKind.Command, symbol.Kind);
+        Assert.Equal(SymbolLanguage.Akbura, symbol.Language);
+        Assert.Equal("Click", symbol.Name);
+        Assert.False(symbol.IsVoid);
+        Assert.True(symbol.IsAsyncLike);
+        Assert.True(symbol.HasResult);
+        Assert.True(symbol.SupportsIsExecuting);
+        Assert.Equal("Task", symbol.ReturnType.Name);
+        Assert.Equal("Int32", symbol.ResultType.Name);
+        Assert.Same(command, symbol.DeclarationSyntax);
+
+        var parameter = Assert.Single(symbol.Parameters);
+        Assert.Equal(0, parameter.Ordinal);
+        Assert.Equal("a", parameter.Name);
+        Assert.Equal("Int32", parameter.Type.Name);
+        Assert.Equal("Int32 a", parameter.ToDisplayString());
+        Assert.Equal("command Task Click", symbol.ToDisplayString());
+        Assert.True(semanticModel.GetSemanticDiagnostics(command).IsEmpty);
+
+        var cachedSymbolInfo = semanticModel.GetSymbolInfo(command);
+        Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
     public void SemanticModel_BindStateWithInpcSource_HasNoBindingDiagnostics()
     {
         const string code =
@@ -853,6 +889,45 @@ public class SemanticPipelineTests
         Assert.False(propertySymbol.IsAvaloniaProperty);
         Assert.False(propertySymbol.IsClrProperty);
         Assert.Same(paramSymbol, propertySymbol.Parameter);
+        Assert.Equal("Int32", propertySymbol.Type.Name);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesAkburaComponentCommandAsMarkupProperty()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "command int Click(int a);";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "<A Click={x => x * 2}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var componentSymbol = Assert.IsType<AkburaMarkupComponentSymbol>(
+            semanticModel.GetSymbolInfo(element).Symbol);
+        var commandSymbol = Assert.Single(componentSymbol.Commands);
+        var propertySymbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(attribute).Symbol);
+
+        Assert.Equal("Click", commandSymbol.Name);
+        Assert.Equal("Int32", commandSymbol.ReturnType.Name);
+        Assert.Equal("a", Assert.Single(commandSymbol.Parameters).Name);
+
+        Assert.Equal("Click", propertySymbol.Name);
+        Assert.True(propertySymbol.IsCommand);
+        Assert.False(propertySymbol.IsParameter);
+        Assert.False(propertySymbol.IsAvaloniaProperty);
+        Assert.False(propertySymbol.IsClrProperty);
+        Assert.Same(commandSymbol, propertySymbol.Command);
         Assert.Equal("Int32", propertySymbol.Type.Name);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }

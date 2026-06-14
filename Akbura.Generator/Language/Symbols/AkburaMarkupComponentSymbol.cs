@@ -13,6 +13,7 @@ internal sealed class AkburaMarkupComponentSymbol : Symbol, IMarkupComponentSymb
         string metadataName,
         AkburaSyntaxTree syntaxTree,
         ImmutableArray<IParamSymbol> parameters,
+        ImmutableArray<ICommandSymbol> commands,
         MarkupContentModel contentModel = default,
         ImmutableArray<MarkupChildContent> children = default,
         ISymbol? containingSymbol = null,
@@ -32,6 +33,9 @@ internal sealed class AkburaMarkupComponentSymbol : Symbol, IMarkupComponentSymb
         Parameters = parameters.IsDefault
             ? ImmutableArray<IParamSymbol>.Empty
             : parameters;
+        Commands = commands.IsDefault
+            ? ImmutableArray<ICommandSymbol>.Empty
+            : commands;
         ContentModel = contentModel;
         Children = children.IsDefault
             ? ImmutableArray<MarkupChildContent>.Empty
@@ -55,6 +59,8 @@ internal sealed class AkburaMarkupComponentSymbol : Symbol, IMarkupComponentSymb
     public ImmutableArray<MarkupChildContent> Children { get; }
 
     public ImmutableArray<IParamSymbol> Parameters { get; }
+
+    public ImmutableArray<ICommandSymbol> Commands { get; }
 
     public override string ToDisplayString()
     {

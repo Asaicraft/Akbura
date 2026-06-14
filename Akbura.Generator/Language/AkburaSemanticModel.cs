@@ -1,5 +1,6 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -51,6 +52,7 @@ internal sealed class AkburaSemanticModel
             StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
             ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
             InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
+            CommandDeclarationSyntax commandDeclaration => ResolveCommand(commandDeclaration),
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
             MarkupAttributeSyntax markupAttribute => ResolveMarkupProperty(markupAttribute),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
@@ -147,6 +149,34 @@ internal sealed class AkburaSemanticModel
         return AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
     }
 
+    private AkburaSymbolInfo ResolveCommand(CommandDeclarationSyntax commandDeclaration)
+    {
+        var name = commandDeclaration.Name.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var returnType = ResolveCommandReturnType(commandDeclaration);
+        var parameters = CreateCommandParameters(commandDeclaration);
+        var isVoid = returnType.Symbol is ITypeSymbol { SpecialType: SpecialType.System_Void };
+        var isAsyncLike = returnType.Symbol is ITypeSymbol returnTypeSymbol &&
+            IsTaskLikeType(returnTypeSymbol);
+        var resultType = GetCommandResultType(returnType, isVoid, isAsyncLike);
+        var hasResult = !resultType.IsDefault;
+
+        SetSemanticDiagnostics(commandDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(new CommandSymbol(
+            commandDeclaration,
+            returnType,
+            resultType,
+            parameters,
+            isVoid,
+            isAsyncLike,
+            hasResult));
+    }
+
     private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
     {
         var typeSyntax = stateDeclaration.Type;
@@ -208,6 +238,128 @@ internal sealed class AkburaSemanticModel
         var binding = BindCSharpType(csharpType);
         var typeSymbol = binding.TypeSymbol;
         return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+    }
+
+    private CSharpSymbolDefinition ResolveCommandReturnType(CommandDeclarationSyntax commandDeclaration)
+    {
+        CSharp.TypeSyntax csharpType;
+        try
+        {
+            csharpType = commandDeclaration.ReturnType.ToCSharp();
+        }
+        catch (InvalidOperationException)
+        {
+            return default;
+        }
+
+        var binding = BindCSharpType(csharpType);
+        var typeSymbol = binding.TypeSymbol;
+        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+    }
+
+    private ImmutableArray<ICommandParameterSymbol> CreateCommandParameters(
+        CommandDeclarationSyntax commandDeclaration)
+    {
+        var csharpParameters = GetCSharpParameterList(commandDeclaration.Parameters);
+        if (csharpParameters == null)
+        {
+            return ImmutableArray<ICommandParameterSymbol>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<ICommandParameterSymbol>.Rent();
+        for (var index = 0; index < csharpParameters.Parameters.Count; index++)
+        {
+            var parameter = csharpParameters.Parameters[index];
+            var name = parameter.Identifier.ValueText;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            var type = parameter.Type == null
+                ? default
+                : ResolveCSharpParameterType(parameter.Type);
+
+            builder.Add(new CommandParameterSymbol(
+                name,
+                index,
+                type));
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private CSharpSymbolDefinition ResolveCSharpParameterType(CSharp.TypeSyntax typeSyntax)
+    {
+        var binding = BindCSharpType(typeSyntax);
+        return binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol);
+    }
+
+    private static CSharp.ParameterListSyntax? GetCSharpParameterList(
+        CSharpParameterListSyntax parameterListSyntax)
+    {
+        return parameterListSyntax.Parameters.Node is GreenSyntaxToken.CSharpRawToken rawToken
+            ? rawToken.RawNode as CSharp.ParameterListSyntax
+            : null;
+    }
+
+    private CSharpSymbolDefinition GetCommandResultType(
+        CSharpSymbolDefinition returnType,
+        bool isVoid,
+        bool isAsyncLike)
+    {
+        if (returnType.Symbol is not ITypeSymbol returnTypeSymbol ||
+            isVoid)
+        {
+            return default;
+        }
+
+        if (isAsyncLike)
+        {
+            return TryGetTaskLikeResultType(returnTypeSymbol, out var resultType)
+                ? new CSharpSymbolDefinition(resultType)
+                : default;
+        }
+
+        return returnType;
+    }
+
+    private static bool IsTaskLikeType(ITypeSymbol type)
+    {
+        return IsTaskLikeMetadataName(type, genericOnly: false);
+    }
+
+    private static bool TryGetTaskLikeResultType(
+        ITypeSymbol type,
+        out ITypeSymbol resultType)
+    {
+        if (type is INamedTypeSymbol namedType &&
+            namedType.TypeArguments.Length == 1 &&
+            IsTaskLikeMetadataName(namedType, genericOnly: true))
+        {
+            resultType = namedType.TypeArguments[0];
+            return true;
+        }
+
+        resultType = null!;
+        return false;
+    }
+
+    private static bool IsTaskLikeMetadataName(
+        ITypeSymbol type,
+        bool genericOnly)
+    {
+        if (type is not INamedTypeSymbol namedType)
+        {
+            return false;
+        }
+
+        var metadataName = namedType.OriginalDefinition.ToDisplayString();
+        return metadataName is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask" ||
+            (!genericOnly &&
+             metadataName is "System.Threading.Tasks.Task<TResult>" or "System.Threading.Tasks.ValueTask<TResult>") ||
+            (genericOnly &&
+             metadataName is "System.Threading.Tasks.Task<TResult>" or "System.Threading.Tasks.ValueTask<TResult>");
     }
 
     private CSharpSymbolDefinition ResolveParamDefaultValueType(ParamDeclarationSyntax paramDeclaration)
@@ -550,7 +702,8 @@ internal sealed class AkburaSemanticModel
                     componentNameText,
                     metadataName,
                     syntaxTree,
-                    CreateAkburaComponentParameters(syntaxTree));
+                    CreateAkburaComponentParameters(syntaxTree),
+                    CreateAkburaComponentCommands(syntaxTree));
 
                 SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
                 return true;
@@ -640,6 +793,23 @@ internal sealed class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
+    private ImmutableArray<ICommandSymbol> CreateAkburaComponentCommands(AkburaSyntaxTree syntaxTree)
+    {
+        using var builder = ImmutableArrayBuilder<ICommandSymbol>.Rent();
+        var semanticModel = Compilation.GetSemanticModel(syntaxTree);
+
+        foreach (var member in syntaxTree.GetRoot().Members)
+        {
+            if (member is CommandDeclarationSyntax commandDeclaration &&
+                semanticModel.GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
+            {
+                builder.Add(commandSymbol);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
     private static string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
     {
         var componentName = syntaxTree.ComponentName;
@@ -690,6 +860,7 @@ internal sealed class AkburaSemanticModel
 
         var componentType = componentSymbol.ComponentType;
         var parameter = FindComponentParameter(componentSymbol, propertyName);
+        var command = FindComponentCommand(componentSymbol, propertyName);
         RoslynPropertySymbol? clrProperty = null;
         RoslynFieldSymbol? avaloniaProperty = null;
 
@@ -700,6 +871,7 @@ internal sealed class AkburaSemanticModel
         }
 
         if (parameter == null &&
+            command == null &&
             clrProperty == null &&
             avaloniaProperty == null)
         {
@@ -717,10 +889,11 @@ internal sealed class AkburaSemanticModel
 
         return AkburaSymbolInfo.Success(new PropertySymbol(
             propertyName,
-            GetMarkupPropertyType(parameter, clrProperty, avaloniaProperty),
+            GetMarkupPropertyType(parameter, command, clrProperty, avaloniaProperty),
             avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
             clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
             parameter,
+            command,
             containingSymbol: componentSymbol));
     }
 
@@ -756,6 +929,21 @@ internal sealed class AkburaSemanticModel
             if (parameter.Name == propertyName)
             {
                 return parameter;
+            }
+        }
+
+        return null;
+    }
+
+    private static ICommandSymbol? FindComponentCommand(
+        IMarkupComponentSymbol componentSymbol,
+        string propertyName)
+    {
+        foreach (var command in componentSymbol.Commands)
+        {
+            if (command.Name == propertyName)
+            {
+                return command;
             }
         }
 
@@ -843,12 +1031,18 @@ internal sealed class AkburaSemanticModel
 
     private static CSharpSymbolDefinition GetMarkupPropertyType(
         IParamSymbol? parameter,
+        ICommandSymbol? command,
         RoslynPropertySymbol? clrProperty,
         RoslynFieldSymbol? avaloniaProperty)
     {
         if (parameter != null)
         {
             return parameter.Type;
+        }
+
+        if (command != null)
+        {
+            return command.ReturnType;
         }
 
         if (clrProperty?.Type is { TypeKind: not TypeKind.Error } clrPropertyType)

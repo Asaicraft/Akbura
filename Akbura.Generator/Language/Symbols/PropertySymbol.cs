@@ -13,6 +13,7 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         CSharpSymbolDefinition avaloniaPropertyDefinition = default,
         CSharpSymbolDefinition clrPropertyDefinition = default,
         IParamSymbol? parameter = null,
+        ICommandSymbol? command = null,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -29,6 +30,7 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         AvaloniaPropertyDefinition = avaloniaPropertyDefinition;
         ClrPropertyDefinition = clrPropertyDefinition;
         Parameter = parameter;
+        Command = command;
     }
 
     public override SymbolKind Kind => SymbolKind.Property;
@@ -45,17 +47,23 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
 
     public IParamSymbol? Parameter { get; }
 
+    public ICommandSymbol? Command { get; }
+
     public bool IsAvaloniaProperty => !AvaloniaPropertyDefinition.IsDefault;
 
     public bool IsClrProperty => !ClrPropertyDefinition.IsDefault;
 
     public bool IsParameter => Parameter != null;
 
+    public bool IsCommand => Command != null;
+
     public bool CanRead => Parameter != null ||
+        Command != null ||
         IsAvaloniaProperty ||
         ClrPropertyDefinition.Symbol is RoslynPropertySymbol { GetMethod.DeclaredAccessibility: Accessibility.Public };
 
     public bool CanWrite => Parameter != null ||
+        Command != null ||
         ClrPropertyDefinition.Symbol is RoslynPropertySymbol { SetMethod.DeclaredAccessibility: Accessibility.Public } ||
         (ClrPropertyDefinition.IsDefault && IsAvaloniaProperty);
 

@@ -10,11 +10,15 @@ internal interface IPropertySymbol : ISymbol
 
     IParamSymbol? Parameter { get; }
 
+    ICommandSymbol? Command { get; }
+
     bool IsAvaloniaProperty { get; }
 
     bool IsClrProperty { get; }
 
     bool IsParameter { get; }
+
+    bool IsCommand { get; }
 
     bool CanRead { get; }
 

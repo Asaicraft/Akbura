@@ -12,4 +12,6 @@ internal interface IMarkupComponentSymbol : ISymbol
     ImmutableArray<MarkupChildContent> Children { get; }
 
     ImmutableArray<IParamSymbol> Parameters { get; }
+
+    ImmutableArray<ICommandSymbol> Commands { get; }
 }

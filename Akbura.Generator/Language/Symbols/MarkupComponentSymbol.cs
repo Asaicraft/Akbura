@@ -12,6 +12,7 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
         MarkupContentModel contentModel = default,
         ImmutableArray<MarkupChildContent> children = default,
         ImmutableArray<IParamSymbol> parameters = default,
+        ImmutableArray<ICommandSymbol> commands = default,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -37,6 +38,9 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
         Parameters = parameters.IsDefault
             ? ImmutableArray<IParamSymbol>.Empty
             : parameters;
+        Commands = commands.IsDefault
+            ? ImmutableArray<ICommandSymbol>.Empty
+            : commands;
     }
 
     public override SymbolKind Kind => SymbolKind.MarkupComponent;
@@ -58,6 +62,8 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
     public ImmutableArray<MarkupChildContent> Children { get; }
 
     public ImmutableArray<IParamSymbol> Parameters { get; }
+
+    public ImmutableArray<ICommandSymbol> Commands { get; }
 
     public override string ToDisplayString()
     {

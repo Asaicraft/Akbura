@@ -205,6 +205,15 @@ namespace Akbura {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Property &apos;{0}&apos; was not found on component &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupPropertyNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupPropertyNotFound", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to State binding expression &apos;{0}&apos; must be a binding path such as &apos;vm&apos;, &apos;vm.Name&apos;, or &apos;vm.Items[0].Name&apos;..
         /// </summary>
         internal static string AKBURA_SEMANTIC_StateBindingExpressionExpected {

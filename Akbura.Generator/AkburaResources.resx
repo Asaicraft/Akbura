@@ -165,6 +165,9 @@
   <data name="AKBURA_SEMANTIC_InvalidMarkupChild" xml:space="preserve">
     <value>Markup child '{0}' is not assignable to expected content type '{1}'.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyNotFound" xml:space="preserve">
+    <value>Property '{0}' was not found on component '{1}'.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_StateBindingExpressionExpected" xml:space="preserve">
     <value>State binding expression '{0}' must be a binding path such as 'vm', 'vm.Name', or 'vm.Items[0].Name'.</value>
   </data>

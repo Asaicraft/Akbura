@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
+using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
 
 namespace Akbura.UnitTests;
@@ -695,6 +696,165 @@ public class SemanticPipelineTests
         Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_StateBindingExpressionExpected, diagnostic.Code);
         Assert.Equal(AkburaDiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("vm.Age + 1", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesAvaloniaMarkupPropertySymbol()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Button Content=\"Hello\" />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var symbolInfo = semanticModel.GetSymbolInfo(attribute);
+
+        var symbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.Equal(AkburaSymbolKind.Property, symbol.Kind);
+        Assert.Equal(SymbolLanguage.Markup, symbol.Language);
+        Assert.Equal("Content", symbol.Name);
+        Assert.True(symbol.IsAvaloniaProperty);
+        Assert.True(symbol.IsClrProperty);
+        Assert.False(symbol.IsParameter);
+        Assert.True(symbol.CanRead);
+        Assert.True(symbol.CanWrite);
+        Assert.Equal("ContentProperty", symbol.AvaloniaPropertyDefinition.Name);
+        Assert.Equal("Content", symbol.ClrPropertyDefinition.Name);
+        Assert.Equal(SpecialType.System_Object, Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.Type.Symbol).SpecialType);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+
+        var cachedSymbolInfo = semanticModel.GetSymbolInfo(attribute);
+        Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesAkburaControlAvaloniaPropertySymbol()
+    {
+        const string code =
+            "using Akbura;\n" +
+            "\n" +
+            "<AkburaControl Padding=\"12\" />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var symbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(semanticModel.GetSymbolInfo(attribute).Symbol);
+
+        Assert.Equal("Padding", symbol.Name);
+        Assert.True(symbol.IsAvaloniaProperty);
+        Assert.True(symbol.IsClrProperty);
+        Assert.False(symbol.IsParameter);
+        Assert.True(symbol.CanRead);
+        Assert.True(symbol.CanWrite);
+        Assert.Equal("PaddingProperty", symbol.AvaloniaPropertyDefinition.Name);
+        Assert.Equal("Padding", symbol.ClrPropertyDefinition.Name);
+        Assert.Equal("Thickness", symbol.Type.Name);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesPlainCSharpMarkupPropertySymbol()
+    {
+        const string code = "<PlainComponent Title=\"Hello\" />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                "public sealed class PlainComponent\n" +
+                "{\n" +
+                "    public string Title { get; set; } = \"\";\n" +
+                "}"));
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var symbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(semanticModel.GetSymbolInfo(attribute).Symbol);
+
+        Assert.Equal("Title", symbol.Name);
+        Assert.False(symbol.IsAvaloniaProperty);
+        Assert.True(symbol.IsClrProperty);
+        Assert.False(symbol.IsParameter);
+        Assert.True(symbol.CanRead);
+        Assert.True(symbol.CanWrite);
+        Assert.True(symbol.AvaloniaPropertyDefinition.IsDefault);
+        Assert.Equal("Title", symbol.ClrPropertyDefinition.Name);
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.Type.Symbol).SpecialType);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MissingMarkupProperty_ProducesDiagnostic()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Button Missing=\"1\" />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var symbolInfo = semanticModel.GetSymbolInfo(attribute);
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.Null(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.NotFound, symbolInfo.CandidateReason);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyNotFound, diagnostic.Code);
+        Assert.Equal(AkburaDiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("Missing", diagnostic.Message);
+        Assert.Contains("Button", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesAkburaComponentParamAsMarkupProperty()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "param int Hello;";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "namespace Hi;\n" +
+            "\n" +
+            "<A Hello={1}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var componentSymbolInfo = semanticModel.GetSymbolInfo(element);
+        var componentSymbol = Assert.IsType<AkburaMarkupComponentSymbol>(componentSymbolInfo.Symbol);
+        var paramSymbol = Assert.Single(componentSymbol.Parameters);
+        var propertySymbolInfo = semanticModel.GetSymbolInfo(attribute);
+        var propertySymbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(propertySymbolInfo.Symbol);
+
+        Assert.Equal(AkburaCandidateReason.None, componentSymbolInfo.CandidateReason);
+        Assert.Equal("A", componentSymbol.Name);
+        Assert.Equal("SomeNs.A", componentSymbol.MetadataName);
+        Assert.Same(aSyntaxTree, componentSymbol.SyntaxTree);
+        Assert.Equal("Hello", paramSymbol.Name);
+        Assert.Equal("Int32", paramSymbol.Type.Name);
+
+        Assert.Equal(AkburaCandidateReason.None, propertySymbolInfo.CandidateReason);
+        Assert.Equal("Hello", propertySymbol.Name);
+        Assert.True(propertySymbol.IsParameter);
+        Assert.False(propertySymbol.IsAvaloniaProperty);
+        Assert.False(propertySymbol.IsClrProperty);
+        Assert.Same(paramSymbol, propertySymbol.Parameter);
+        Assert.Equal("Int32", propertySymbol.Type.Name);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
 
     [Fact]

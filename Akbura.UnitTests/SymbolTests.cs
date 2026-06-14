@@ -48,7 +48,10 @@ public class SymbolTests
         [
             MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(System.ComponentModel.INotifyPropertyChanged).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(System.Collections.Immutable.ImmutableArray<>).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Avalonia.AvaloniaObject).Assembly.Location),
             MetadataReference.CreateFromFile(avaloniaControlsAssembly.Location),
+            MetadataReference.CreateFromFile(typeof(Akbura.AkburaControl).Assembly.Location),
         ];
     }
 }

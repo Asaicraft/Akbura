@@ -1,17 +1,20 @@
+using Akbura.Language;
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
 
 namespace Akbura.Language.Symbols;
 
-internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
+internal sealed class AkburaMarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 {
-    public MarkupComponentSymbol(
+    public AkburaMarkupComponentSymbol(
         string name,
-        CSharpSymbolDefinition csharpDefinition,
+        string metadataName,
+        AkburaSyntaxTree syntaxTree,
+        ImmutableArray<IParamSymbol> parameters,
         MarkupContentModel contentModel = default,
         ImmutableArray<MarkupChildContent> children = default,
-        ImmutableArray<IParamSymbol> parameters = default,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -23,20 +26,16 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
             throw new ArgumentException("Markup component name cannot be empty.", nameof(name));
         }
 
-        if (csharpDefinition.IsDefault)
-        {
-            throw new ArgumentException("Markup component must reference a C# symbol.", nameof(csharpDefinition));
-        }
-
         Name = name;
-        CSharpDefinition = csharpDefinition;
+        MetadataName = string.IsNullOrWhiteSpace(metadataName) ? name : metadataName;
+        SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
+        Parameters = parameters.IsDefault
+            ? ImmutableArray<IParamSymbol>.Empty
+            : parameters;
         ContentModel = contentModel;
         Children = children.IsDefault
             ? ImmutableArray<MarkupChildContent>.Empty
             : children;
-        Parameters = parameters.IsDefault
-            ? ImmutableArray<IParamSymbol>.Empty
-            : parameters;
     }
 
     public override SymbolKind Kind => SymbolKind.MarkupComponent;
@@ -45,13 +44,11 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 
     public override string Name { get; }
 
-    public override string MetadataName => string.IsNullOrEmpty(CSharpDefinition.MetadataName)
-        ? Name
-        : CSharpDefinition.MetadataName;
+    public override string MetadataName { get; }
 
-    public override CSharpSymbolDefinition CSharpDefinition { get; }
+    public AkburaSyntaxTree SyntaxTree { get; }
 
-    public INamedTypeSymbol? ComponentType => CSharpDefinition.NamedType;
+    public INamedTypeSymbol? ComponentType => null;
 
     public MarkupContentModel ContentModel { get; }
 
@@ -61,7 +58,6 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 
     public override string ToDisplayString()
     {
-        var csharpDisplay = CSharpDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        return string.IsNullOrEmpty(csharpDisplay) ? Name : $"{Name} -> {csharpDisplay}";
+        return $"{Name} -> {MetadataName}";
     }
 }

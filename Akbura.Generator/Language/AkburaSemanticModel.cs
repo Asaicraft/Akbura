@@ -11,6 +11,8 @@ using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using RoslynFieldSymbol = Microsoft.CodeAnalysis.IFieldSymbol;
+using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language;
@@ -50,6 +52,7 @@ internal sealed class AkburaSemanticModel
             ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
             InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
+            MarkupAttributeSyntax markupAttribute => ResolveMarkupProperty(markupAttribute),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         };
 
@@ -325,8 +328,8 @@ internal sealed class AkburaSemanticModel
     {
         return symbol switch
         {
-            IPropertySymbol property => property.SetMethod?.DeclaredAccessibility == Accessibility.Public,
-            IFieldSymbol field => !field.IsReadOnly && !field.IsConst,
+            RoslynPropertySymbol property => property.SetMethod?.DeclaredAccessibility == Accessibility.Public,
+            RoslynFieldSymbol field => !field.IsReadOnly && !field.IsConst,
             null => true,
             _ => false,
         };
@@ -353,7 +356,7 @@ internal sealed class AkburaSemanticModel
             return true;
         }
 
-        return binding.Symbol is IFieldSymbol or IPropertySymbol &&
+        return binding.Symbol is RoslynFieldSymbol or RoslynPropertySymbol &&
             binding.ReceiverType == null &&
             binding.TypeSymbol != null &&
             ImplementsINotifyPropertyChanged(binding.TypeSymbol);
@@ -377,8 +380,8 @@ internal sealed class AkburaSemanticModel
     {
         return symbol switch
         {
-            IPropertySymbol property => property.ContainingType,
-            IFieldSymbol field => field.ContainingType,
+            RoslynPropertySymbol property => property.ContainingType,
+            RoslynFieldSymbol field => field.ContainingType,
             _ => null,
         };
     }
@@ -519,7 +522,379 @@ internal sealed class AkburaSemanticModel
             return AkburaSymbolInfo.Candidates(candidates, binding.CandidateReason);
         }
 
+        if (TryResolveAkburaMarkupComponent(markupElement, componentNameText, out var akburaComponentSymbol))
+        {
+            return AkburaSymbolInfo.Success(akburaComponentSymbol);
+        }
+
         return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+    }
+
+    private bool TryResolveAkburaMarkupComponent(
+        MarkupElementSyntax markupElement,
+        string componentNameText,
+        out IMarkupComponentSymbol symbol)
+    {
+        foreach (var candidateMetadataName in GetAkburaComponentCandidateMetadataNames(markupElement.StartTag!.Name))
+        {
+            foreach (var syntaxTree in Compilation.SyntaxTrees)
+            {
+                var metadataName = GetAkburaComponentMetadataName(syntaxTree);
+                if (metadataName.Length == 0 ||
+                    metadataName != candidateMetadataName)
+                {
+                    continue;
+                }
+
+                symbol = new AkburaMarkupComponentSymbol(
+                    componentNameText,
+                    metadataName,
+                    syntaxTree,
+                    CreateAkburaComponentParameters(syntaxTree));
+
+                SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+                return true;
+            }
+        }
+
+        symbol = null!;
+        return false;
+    }
+
+    private IEnumerable<string> GetAkburaComponentCandidateMetadataNames(
+        MarkupComponentNameSyntax componentName)
+    {
+        var nameText = componentName.ToFullString().Trim();
+        if (string.IsNullOrWhiteSpace(nameText))
+        {
+            yield break;
+        }
+
+        if (nameText.StartsWith("global::", StringComparison.Ordinal))
+        {
+            yield return nameText["global::".Length..];
+            yield break;
+        }
+
+        if (nameText.IndexOf("::", StringComparison.Ordinal) >= 0)
+        {
+            yield break;
+        }
+
+        if (nameText.IndexOf(".", StringComparison.Ordinal) >= 0)
+        {
+            yield return nameText;
+            yield break;
+        }
+
+        foreach (var @namespace in GetAkburaUsingNamespaces())
+        {
+            yield return @namespace + "." + nameText;
+        }
+
+        var currentNamespace = GetAkburaNamespaceText(SyntaxTree.GetRoot());
+        if (currentNamespace.Length > 0)
+        {
+            yield return currentNamespace + "." + nameText;
+        }
+
+        yield return nameText;
+    }
+
+    private ImmutableArray<string> GetAkburaUsingNamespaces()
+    {
+        using var builder = ImmutableArrayBuilder<string>.Rent();
+        foreach (var member in SyntaxTree.GetRoot().Members)
+        {
+            if (member is not UsingDirectiveSyntax usingDirective ||
+                usingDirective.Alias != null ||
+                usingDirective.StaticKeyword.RawKind != 0)
+            {
+                continue;
+            }
+
+            var namespaceText = usingDirective.Name.ToFullString().Trim();
+            if (namespaceText.Length > 0)
+            {
+                builder.Add(namespaceText);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<IParamSymbol> CreateAkburaComponentParameters(AkburaSyntaxTree syntaxTree)
+    {
+        using var builder = ImmutableArrayBuilder<IParamSymbol>.Rent();
+        var semanticModel = Compilation.GetSemanticModel(syntaxTree);
+
+        foreach (var member in syntaxTree.GetRoot().Members)
+        {
+            if (member is ParamDeclarationSyntax paramDeclaration &&
+                semanticModel.GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
+            {
+                builder.Add(paramSymbol);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
+    {
+        var componentName = syntaxTree.ComponentName;
+        if (componentName.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var namespaceText = GetAkburaNamespaceText(syntaxTree.GetRoot());
+        return namespaceText.Length == 0
+            ? componentName
+            : namespaceText + "." + componentName;
+    }
+
+    private static string GetAkburaNamespaceText(AkburaDocumentSyntax root)
+    {
+        foreach (var member in root.Members)
+        {
+            if (member is NamespaceDeclarationSyntax namespaceDeclaration)
+            {
+                return namespaceDeclaration.Name.ToFullString().Trim();
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private AkburaSymbolInfo ResolveMarkupProperty(MarkupAttributeSyntax markupAttribute)
+    {
+        var propertyName = GetMarkupPropertyName(markupAttribute);
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var markupElement = GetContainingMarkupElement(markupAttribute);
+        if (markupElement == null)
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var componentSymbolInfo = GetSymbolInfo(markupElement);
+        if (componentSymbolInfo.Symbol is not IMarkupComponentSymbol componentSymbol)
+        {
+            SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.None(componentSymbolInfo.CandidateReason);
+        }
+
+        var componentType = componentSymbol.ComponentType;
+        var parameter = FindComponentParameter(componentSymbol, propertyName);
+        RoslynPropertySymbol? clrProperty = null;
+        RoslynFieldSymbol? avaloniaProperty = null;
+
+        if (componentType != null)
+        {
+            clrProperty = FindPublicClrProperty(componentType, propertyName);
+            avaloniaProperty = FindAvaloniaPropertyField(componentType, propertyName);
+        }
+
+        if (parameter == null &&
+            clrProperty == null &&
+            avaloniaProperty == null)
+        {
+            SetSemanticDiagnostics(
+                markupAttribute,
+                ImmutableArray.Create(CreateMarkupPropertyNotFoundDiagnostic(
+                    markupAttribute,
+                    propertyName,
+                    componentSymbol)));
+
+            return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+        }
+
+        SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(new PropertySymbol(
+            propertyName,
+            GetMarkupPropertyType(parameter, clrProperty, avaloniaProperty),
+            avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
+            clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
+            parameter,
+            containingSymbol: componentSymbol));
+    }
+
+    private static string GetMarkupPropertyName(MarkupAttributeSyntax markupAttribute)
+    {
+        return markupAttribute switch
+        {
+            MarkupPlainAttributeSyntax plainAttribute => plainAttribute.Name.Identifier.ValueText,
+            MarkupPrefixedAttributeSyntax prefixedAttribute => prefixedAttribute.Name.Identifier.ValueText,
+            _ => string.Empty,
+        };
+    }
+
+    private static MarkupElementSyntax? GetContainingMarkupElement(MarkupAttributeSyntax markupAttribute)
+    {
+        for (var node = markupAttribute.Parent; node != null; node = node.Parent)
+        {
+            if (node is MarkupElementSyntax markupElement)
+            {
+                return markupElement;
+            }
+        }
+
+        return null;
+    }
+
+    private static IParamSymbol? FindComponentParameter(
+        IMarkupComponentSymbol componentSymbol,
+        string propertyName)
+    {
+        foreach (var parameter in componentSymbol.Parameters)
+        {
+            if (parameter.Name == propertyName)
+            {
+                return parameter;
+            }
+        }
+
+        return null;
+    }
+
+    private AkburaSemanticDiagnostic CreateMarkupPropertyNotFoundDiagnostic(
+        MarkupAttributeSyntax syntax,
+        string propertyName,
+        IMarkupComponentSymbol componentSymbol)
+    {
+        var componentName = componentSymbol.CSharpDefinition.IsDefault
+            ? componentSymbol.Name
+            : componentSymbol.CSharpDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyNotFound,
+            [propertyName, componentName]);
+    }
+
+    private static RoslynPropertySymbol? FindPublicClrProperty(
+        INamedTypeSymbol componentType,
+        string propertyName)
+    {
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var property in current.GetMembers(propertyName).OfType<RoslynPropertySymbol>())
+            {
+                if (!property.IsStatic &&
+                    property.DeclaredAccessibility == Accessibility.Public)
+                {
+                    return property;
+                }
+            }
+        }
+
+        foreach (var @interface in componentType.AllInterfaces)
+        {
+            foreach (var property in @interface.GetMembers(propertyName).OfType<RoslynPropertySymbol>())
+            {
+                if (!property.IsStatic &&
+                    property.DeclaredAccessibility == Accessibility.Public)
+                {
+                    return property;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private RoslynFieldSymbol? FindAvaloniaPropertyField(
+        INamedTypeSymbol componentType,
+        string propertyName)
+    {
+        var avaloniaPropertyName = propertyName + "Property";
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var field in current.GetMembers(avaloniaPropertyName).OfType<RoslynFieldSymbol>())
+            {
+                if (field.IsStatic &&
+                    field.DeclaredAccessibility == Accessibility.Public &&
+                    IsAvaloniaPropertyType(field.Type))
+                {
+                    return field;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsAvaloniaPropertyType(ITypeSymbol type)
+    {
+        return TryGetAvaloniaPropertyType(out var avaloniaPropertyType) &&
+            IsAssignableTo(type, avaloniaPropertyType);
+    }
+
+    private bool TryGetAvaloniaPropertyType(out INamedTypeSymbol avaloniaPropertyType)
+    {
+        avaloniaPropertyType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.AvaloniaProperty")!;
+        return avaloniaPropertyType != null;
+    }
+
+    private static CSharpSymbolDefinition GetMarkupPropertyType(
+        IParamSymbol? parameter,
+        RoslynPropertySymbol? clrProperty,
+        RoslynFieldSymbol? avaloniaProperty)
+    {
+        if (parameter != null)
+        {
+            return parameter.Type;
+        }
+
+        if (clrProperty?.Type is { TypeKind: not TypeKind.Error } clrPropertyType)
+        {
+            return new CSharpSymbolDefinition(clrPropertyType);
+        }
+
+        if (avaloniaProperty != null &&
+            TryGetAvaloniaPropertyValueType(avaloniaProperty.Type, out var avaloniaPropertyType))
+        {
+            return new CSharpSymbolDefinition(avaloniaPropertyType);
+        }
+
+        return default;
+    }
+
+    private static bool TryGetAvaloniaPropertyValueType(
+        ITypeSymbol propertyType,
+        out ITypeSymbol valueType)
+    {
+        for (var current = propertyType as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            if (current.ContainingNamespace.ToDisplayString() != "Avalonia")
+            {
+                continue;
+            }
+
+            if (current.Name is "StyledProperty" or "AttachedProperty" or "AvaloniaProperty" &&
+                current.TypeArguments.Length == 1 &&
+                current.TypeArguments[0].TypeKind != TypeKind.Error)
+            {
+                valueType = current.TypeArguments[0];
+                return true;
+            }
+
+            if (current.Name == "DirectProperty" &&
+                current.TypeArguments.Length == 2 &&
+                current.TypeArguments[1].TypeKind != TypeKind.Error)
+            {
+                valueType = current.TypeArguments[1];
+                return true;
+            }
+        }
+
+        valueType = null!;
+        return false;
     }
 
     private MarkupContentModel CreateMarkupContentModel(INamedTypeSymbol componentType)
@@ -700,11 +1075,11 @@ internal sealed class AkburaSemanticModel
         return type.SpecialType is SpecialType.System_Object or SpecialType.System_String;
     }
 
-    private IPropertySymbol? FindAvaloniaContentProperty(INamedTypeSymbol type)
+    private RoslynPropertySymbol? FindAvaloniaContentProperty(INamedTypeSymbol type)
     {
         for (var current = type; current != null; current = current.BaseType)
         {
-            foreach (var property in current.GetMembers().OfType<IPropertySymbol>())
+            foreach (var property in current.GetMembers().OfType<RoslynPropertySymbol>())
             {
                 if (property.IsStatic ||
                     property.DeclaredAccessibility != Accessibility.Public)
@@ -722,7 +1097,7 @@ internal sealed class AkburaSemanticModel
         return null;
     }
 
-    private bool HasAvaloniaContentAttribute(IPropertySymbol property)
+    private bool HasAvaloniaContentAttribute(RoslynPropertySymbol property)
     {
         foreach (var attribute in property.GetAttributes())
         {

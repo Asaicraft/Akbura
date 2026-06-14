@@ -10,4 +10,6 @@ internal interface IMarkupComponentSymbol : ISymbol
     MarkupContentModel ContentModel { get; }
 
     ImmutableArray<MarkupChildContent> Children { get; }
+
+    ImmutableArray<IParamSymbol> Parameters { get; }
 }

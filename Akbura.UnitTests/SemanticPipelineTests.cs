@@ -552,6 +552,132 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ResolvesAkcssStyleSymbols()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Background: \"Red\";\n" +
+            "    }\n" +
+            "\n" +
+            "    Button.hello {\n" +
+            "        Background: \"Blue\";\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
+        var globalRule = Assert.IsType<AkcssStyleRuleSyntax>(inlineAkcss.Members[0]);
+        var buttonRule = Assert.IsType<AkcssStyleRuleSyntax>(inlineAkcss.Members[1]);
+
+        var globalSymbolInfo = semanticModel.GetSymbolInfo(globalRule);
+        var globalSymbol = Assert.IsType<AkcssStyleSymbol>(globalSymbolInfo.Symbol);
+        Assert.IsAssignableFrom<IAkcssSymbol>(globalSymbol);
+        Assert.Equal(AkburaCandidateReason.None, globalSymbolInfo.CandidateReason);
+        Assert.Equal(AkburaSymbolKind.AkcssClass, globalSymbol.Kind);
+        Assert.Equal(SymbolLanguage.Akcss, globalSymbol.Language);
+        Assert.Equal("hello", globalSymbol.Name);
+        Assert.Equal("hello", globalSymbol.MetadataName);
+        Assert.False(globalSymbol.HasTargetType);
+        Assert.True(globalSymbol.TargetType.IsDefault);
+        Assert.Same(globalRule, globalSymbol.DeclarationSyntax);
+        Assert.Equal("style hello", globalSymbol.ToDisplayString());
+        Assert.True(semanticModel.GetSemanticDiagnostics(globalRule).IsEmpty);
+
+        var buttonSymbolInfo = semanticModel.GetSymbolInfo(buttonRule);
+        var buttonSymbol = Assert.IsType<AkcssStyleSymbol>(buttonSymbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, buttonSymbolInfo.CandidateReason);
+        Assert.True(buttonSymbol.HasTargetType);
+        Assert.Equal("Button", buttonSymbol.TargetType.Name);
+        Assert.Equal("Button.hello", buttonSymbol.MetadataName);
+        Assert.Equal("style Button.hello", buttonSymbol.ToDisplayString());
+        AssertResolvedAvaloniaButton(semanticModel, buttonSymbol.TargetType);
+
+        var cachedSymbolInfo = semanticModel.GetSymbolInfo(buttonRule);
+        Assert.Same(buttonSymbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssStyleTargetType_MustBeAvaloniaControl()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    PlainObject.hello {\n" +
+            "        Background: \"Red\";\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation("public sealed class PlainObject { }"));
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
+        var rule = Assert.IsType<AkcssStyleRuleSyntax>(Assert.Single(inlineAkcss.Members));
+
+        var symbolInfo = semanticModel.GetSymbolInfo(rule);
+
+        Assert.Null(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.NotFound, symbolInfo.CandidateReason);
+        Assert.True(semanticModel.GetSemanticDiagnostics(rule).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesTailwindUtilitySymbols()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        .w-(double value) {\n" +
+            "            Width: value;\n" +
+            "        }\n" +
+            "\n" +
+            "        Button.btn-(string variant) {\n" +
+            "            Width: 10;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
+        var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(Assert.Single(inlineAkcss.Members));
+
+        var widthUtilityInfo = semanticModel.GetSymbolInfo(utilities.Utilities[0]);
+        var widthUtility = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(widthUtilityInfo.Symbol);
+        Assert.IsAssignableFrom<IAkcssSymbol>(widthUtility);
+        Assert.Equal(AkburaCandidateReason.None, widthUtilityInfo.CandidateReason);
+        Assert.Equal(AkburaSymbolKind.AkcssUtility, widthUtility.Kind);
+        Assert.Equal(SymbolLanguage.Akcss, widthUtility.Language);
+        Assert.Equal("w", widthUtility.Name);
+        Assert.Equal("w", widthUtility.MetadataName);
+        Assert.False(widthUtility.HasTargetType);
+        Assert.True(widthUtility.TargetType.IsDefault);
+        Assert.Same(utilities.Utilities[0], widthUtility.DeclarationSyntax);
+        var widthParameter = Assert.Single(widthUtility.Parameters);
+        Assert.Equal("value", widthParameter.Name);
+        Assert.Equal(0, widthParameter.Ordinal);
+        Assert.Equal(SymbolLanguage.Akcss, widthParameter.Language);
+        Assert.Equal("Double", widthParameter.Type.Name);
+        Assert.NotNull(widthParameter.CSharpParameter);
+        Assert.Equal("Double value", widthParameter.ToDisplayString());
+        Assert.Equal("utility w/1", widthUtility.ToDisplayString());
+        Assert.True(semanticModel.GetSemanticDiagnostics(utilities.Utilities[0]).IsEmpty);
+
+        var buttonUtility = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            semanticModel.GetSymbolInfo(utilities.Utilities[1]).Symbol);
+        Assert.Equal("btn", buttonUtility.Name);
+        Assert.True(buttonUtility.HasTargetType);
+        Assert.Equal("Button", buttonUtility.TargetType.Name);
+        AssertResolvedAvaloniaButton(semanticModel, buttonUtility.TargetType);
+        Assert.Equal("Button.btn", buttonUtility.MetadataName);
+        var variantParameter = Assert.Single(buttonUtility.Parameters);
+        Assert.Equal("variant", variantParameter.Name);
+        Assert.Equal("String", variantParameter.Type.Name);
+        Assert.NotNull(variantParameter.CSharpParameter);
+    }
+
+    [Fact]
     public void SemanticModel_BindStateWithInpcSource_HasNoBindingDiagnostics()
     {
         const string code =
@@ -1003,9 +1129,16 @@ public class SemanticPipelineTests
         AkburaSemanticModel semanticModel,
         MarkupComponentSymbol symbol)
     {
+        AssertResolvedAvaloniaButton(semanticModel, symbol.CSharpDefinition);
+    }
+
+    private static void AssertResolvedAvaloniaButton(
+        AkburaSemanticModel semanticModel,
+        CSharpSymbolDefinition definition)
+    {
         var avaloniaButton = semanticModel.Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Controls.Button");
         Assert.NotNull(avaloniaButton);
-        Assert.True(SymbolEqualityComparer.Default.Equals(avaloniaButton, symbol.CSharpDefinition.Symbol));
+        Assert.True(SymbolEqualityComparer.Default.Equals(avaloniaButton, definition.Symbol));
     }
 
     private static MetadataReference[] CreateExternAliasAvaloniaReferences(string alias)

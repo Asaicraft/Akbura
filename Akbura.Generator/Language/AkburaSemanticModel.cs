@@ -53,6 +53,8 @@ internal sealed class AkburaSemanticModel
             ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
             InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
             CommandDeclarationSyntax commandDeclaration => ResolveCommand(commandDeclaration),
+            AkcssStyleRuleSyntax styleRule => ResolveAkcssStyle(styleRule),
+            AkcssUtilityDeclarationSyntax utilityDeclaration => ResolveTailwindUtility(utilityDeclaration),
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
             MarkupAttributeSyntax markupAttribute => ResolveMarkupProperty(markupAttribute),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
@@ -177,6 +179,49 @@ internal sealed class AkburaSemanticModel
             hasResult));
     }
 
+    private AkburaSymbolInfo ResolveAkcssStyle(
+        AkcssStyleRuleSyntax styleRule)
+    {
+        var name = styleRule.Selector.Name.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        if (!TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var targetType))
+        {
+            SetSemanticDiagnostics(styleRule, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+        }
+
+        SetSemanticDiagnostics(styleRule, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(new AkcssStyleSymbol(styleRule, targetType));
+    }
+
+    private AkburaSymbolInfo ResolveTailwindUtility(
+        AkcssUtilityDeclarationSyntax utilityDeclaration)
+    {
+        var name = utilityDeclaration.Selector.Name.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        if (!TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var targetType))
+        {
+            SetSemanticDiagnostics(utilityDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+        }
+
+        SetSemanticDiagnostics(utilityDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(new TailwindUtilitySymbol(
+            utilityDeclaration,
+            targetType,
+            CreateTailwindUtilityParameters(utilityDeclaration)));
+    }
+
     private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
     {
         var typeSyntax = stateDeclaration.Type;
@@ -293,6 +338,156 @@ internal sealed class AkburaSemanticModel
     {
         var binding = BindCSharpType(typeSyntax);
         return binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol);
+    }
+
+    private ImmutableArray<ITailwindUtilityParameterSymbol> CreateTailwindUtilityParameters(
+        AkcssUtilityDeclarationSyntax utilityDeclaration)
+    {
+        var csharpParameters = BindTailwindUtilityCSharpParameters(utilityDeclaration);
+        using var builder = ImmutableArrayBuilder<ITailwindUtilityParameterSymbol>.Rent();
+
+        for (var index = 0; index < utilityDeclaration.Selector.Parameters.Count; index++)
+        {
+            var parameter = utilityDeclaration.Selector.Parameters[index];
+            var csharpParameter = index < csharpParameters.Length
+                ? csharpParameters[index]
+                : null;
+            var type = csharpParameter?.Type == null
+                ? ResolveTailwindUtilityParameterType(parameter)
+                : new CSharpSymbolDefinition(csharpParameter.Type);
+
+            builder.Add(new TailwindUtilityParameterSymbol(
+                parameter,
+                index,
+                type,
+                csharpParameter));
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<IParameterSymbol> BindTailwindUtilityCSharpParameters(
+        AkcssUtilityDeclarationSyntax utilityDeclaration)
+    {
+        using var parametersBuilder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
+        foreach (var parameter in utilityDeclaration.Selector.Parameters)
+        {
+            var parameterName = parameter.ParamName.Identifier.ValueText;
+            if (string.IsNullOrWhiteSpace(parameterName))
+            {
+                return ImmutableArray<IParameterSymbol>.Empty;
+            }
+
+            try
+            {
+                parametersBuilder.Add(CSharpSyntaxFactory.Parameter(
+                        CSharpSyntaxFactory.Identifier(parameterName))
+                    .WithType(parameter.Type.ToCSharp()));
+            }
+            catch (InvalidOperationException)
+            {
+                return ImmutableArray<IParameterSymbol>.Empty;
+            }
+        }
+
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(
+                    CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
+                "__AkburaUtility")
+            .WithParameterList(CSharpSyntaxFactory.ParameterList(
+                CSharpSyntaxFactory.SeparatedList(parametersBuilder.ToImmutable())))
+            .WithBody(CSharpSyntaxFactory.Block());
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
+
+        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
+        if (namespaceDeclaration != null)
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
+                    namespaceDeclaration.WithMembers(
+                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
+        }
+        else
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
+        }
+
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeMethod = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.MethodDeclarationSyntax>()
+            .Single();
+
+        return semanticModel.GetDeclaredSymbol(probeMethod)?.Parameters ??
+            ImmutableArray<IParameterSymbol>.Empty;
+    }
+
+    private CSharpSymbolDefinition ResolveTailwindUtilityParameterType(
+        AkcssUtilityParameterSyntax parameter)
+    {
+        try
+        {
+            return ResolveCSharpParameterType(parameter.Type.ToCSharp());
+        }
+        catch (InvalidOperationException)
+        {
+            return default;
+        }
+    }
+
+    private bool TryResolveAkcssTargetType(
+        SimpleNameSyntax? targetTypeSyntax,
+        out CSharpSymbolDefinition targetType)
+    {
+        targetType = default;
+        if (targetTypeSyntax == null)
+        {
+            return true;
+        }
+
+        var targetTypeName = targetTypeSyntax.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(targetTypeName))
+        {
+            return false;
+        }
+
+        var binding = BindCSharpType(CSharpSyntaxFactory.ParseTypeName(targetTypeName));
+        if (binding.TypeSymbol is INamedTypeSymbol boundType &&
+            IsAvaloniaControlTargetType(boundType))
+        {
+            targetType = new CSharpSymbolDefinition(boundType);
+            return true;
+        }
+
+        var avaloniaType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.Controls." + targetTypeName);
+        if (avaloniaType != null &&
+            IsAvaloniaControlTargetType(avaloniaType))
+        {
+            targetType = new CSharpSymbolDefinition(avaloniaType);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsAvaloniaControlTargetType(INamedTypeSymbol type)
+    {
+        return TryGetAvaloniaControlType(out var controlType) &&
+            IsAssignableTo(type, controlType);
     }
 
     private static CSharp.ParameterListSyntax? GetCSharpParameterList(

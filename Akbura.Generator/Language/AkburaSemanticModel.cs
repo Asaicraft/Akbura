@@ -100,6 +100,7 @@ internal sealed class AkburaSemanticModel
         operation = syntax switch
         {
             AkcssAssignmentSyntax assignment => ResolveAkcssPropertySetterOperation(assignment),
+            AkcssIfDirectiveSyntax ifDirective => ResolveAkcssIfOperation(ifDirective),
             _ => null,
         };
 
@@ -495,6 +496,13 @@ internal sealed class AkburaSemanticModel
         {
             if (member is not AkcssAssignmentSyntax assignment)
             {
+                if (member is AkcssIfDirectiveSyntax ifDirective)
+                {
+                    var ifOperation = CreateAkcssIfOperation(ifDirective, containingSymbol);
+                    _operationCache[ifDirective] = ifOperation;
+                    builder.Add(ifOperation);
+                }
+
                 continue;
             }
 
@@ -523,9 +531,26 @@ internal sealed class AkburaSemanticModel
         return CreateAkcssPropertySetterOperation(assignment, containingSymbol);
     }
 
-    private IAkcssSymbol? GetContainingAkcssSymbol(AkcssAssignmentSyntax assignment)
+    private AkburaOperation? ResolveAkcssIfOperation(AkcssIfDirectiveSyntax ifDirective)
     {
-        for (var node = assignment.Parent; node != null; node = node.Parent)
+        var containingSymbol = GetContainingAkcssSymbol(ifDirective);
+        if (containingSymbol == null)
+        {
+            SetSemanticDiagnostics(ifDirective, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return null;
+        }
+
+        if (_operationCache.TryGetValue(ifDirective, out var cachedOperation))
+        {
+            return cachedOperation;
+        }
+
+        return CreateAkcssIfOperation(ifDirective, containingSymbol);
+    }
+
+    private IAkcssSymbol? GetContainingAkcssSymbol(AkburaSyntax syntax)
+    {
+        for (var node = syntax.Parent; node != null; node = node.Parent)
         {
             if (node is AkcssStyleRuleSyntax styleRule)
             {
@@ -539,6 +564,30 @@ internal sealed class AkburaSemanticModel
         }
 
         return null;
+    }
+
+    private AkcssIfOperation CreateAkcssIfOperation(
+        AkcssIfDirectiveSyntax ifDirective,
+        IAkcssSymbol containingSymbol)
+    {
+        var expression = ParseAkcssConditionExpression(ifDirective);
+        var binding = expression == null
+            ? CSharpTypeBinding.Empty
+            : BindAkcssExpression(expression, containingSymbol);
+        var conditionType = binding.TypeSymbol == null
+            ? default
+            : new CSharpSymbolDefinition(binding.TypeSymbol);
+        var operations = CreateAkcssOperations(ifDirective.Members, containingSymbol);
+
+        SetSemanticDiagnostics(ifDirective, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return new AkcssIfOperation(
+            ifDirective,
+            containingSymbol,
+            conditionType,
+            binding.OperationDefinition,
+            operations,
+            hasErrors: expression == null || operations.Any(static operation => operation.HasErrors));
     }
 
     private AkcssPropertySetterOperation CreateAkcssPropertySetterOperation(
@@ -732,6 +781,18 @@ internal sealed class AkburaSemanticModel
         try
         {
             return CSharpSyntaxFactory.ParseExpression(assignment.Expression.ToFullString());
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static CSharp.ExpressionSyntax? ParseAkcssConditionExpression(AkcssIfDirectiveSyntax ifDirective)
+    {
+        try
+        {
+            return CSharpSyntaxFactory.ParseExpression(ifDirective.Condition.ToFullString());
         }
         catch (ArgumentException)
         {

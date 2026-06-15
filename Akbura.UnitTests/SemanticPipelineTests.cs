@@ -914,6 +914,68 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssIfDirective_CreatesNestedOperations()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        @if(true) {\n" +
+            "            Background: White;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(Assert.Single(rule.Members));
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var ifOperation = Assert.IsAssignableFrom<IAkcssIfOperation>(Assert.Single(symbol.Operations));
+
+        Assert.Same(ifDirective, ifOperation.Syntax);
+        Assert.Same(ifOperation, semanticModel.GetOperation(ifDirective));
+        Assert.Equal(AkcssPropertyValueKind.ColorLiteral,
+            Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(ifOperation.Operations)).ValueKind);
+        Assert.Equal("Boolean", ifOperation.ConditionType.Name);
+        Assert.False(ifOperation.ConditionOperation.IsDefault);
+        Assert.Single(ifOperation.Children);
+        Assert.False(ifOperation.HasErrors);
+        Assert.Equal("@if(true)", ifOperation.ToDisplayString());
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssUtilityIfDirective_BindsConditionInUtilityParameterScope()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        .w-(double value) {\n" +
+            "            @if(value > 0) {\n" +
+            "                Width: value;\n" +
+            "            }\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var utility = GetOnlyAkcssUtility(syntaxTree);
+        var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(Assert.Single(utility.Members));
+        var symbol = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            semanticModel.GetSymbolInfo(utility).Symbol);
+        var ifOperation = Assert.IsAssignableFrom<IAkcssIfOperation>(Assert.Single(symbol.Operations));
+
+        Assert.Equal("value", Assert.Single(symbol.Parameters).Name);
+        Assert.Same(ifDirective, ifOperation.Syntax);
+        Assert.Equal("Boolean", ifOperation.ConditionType.Name);
+        Assert.False(ifOperation.ConditionOperation.IsDefault);
+        var setter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(ifOperation.Operations));
+        Assert.Equal("Width", setter.Property?.Name);
+        Assert.Equal("Double", setter.ValueType.Name);
+        Assert.False(ifOperation.HasErrors);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssInvalidValues_ProduceDiagnostics()
     {
         const string code =

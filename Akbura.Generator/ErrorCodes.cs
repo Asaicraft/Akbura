@@ -21,6 +21,9 @@ internal static class ErrorCodes
     public const string ERR_RbraceExpected = nameof(ERR_RbraceExpected);
     public const string ERR_SyntaxError = nameof(ERR_SyntaxError);
     public const string AKBURA_SEMANTIC_InvalidMarkupChild = nameof(AKBURA_SEMANTIC_InvalidMarkupChild);
+    public const string AKBURA_SEMANTIC_AkcssInvalidColor = nameof(AKBURA_SEMANTIC_AkcssInvalidColor);
+    public const string AKBURA_SEMANTIC_AkcssInvalidThickness = nameof(AKBURA_SEMANTIC_AkcssInvalidThickness);
+    public const string AKBURA_SEMANTIC_AkcssPropertyNotFound = nameof(AKBURA_SEMANTIC_AkcssPropertyNotFound);
     public const string AKBURA_SEMANTIC_MarkupPropertyNotFound = nameof(AKBURA_SEMANTIC_MarkupPropertyNotFound);
     public const string AKBURA_SEMANTIC_StateBindingExpressionExpected = nameof(AKBURA_SEMANTIC_StateBindingExpressionExpected);
     public const string AKBURA_SEMANTIC_StateBindingSourceNotObservable = nameof(AKBURA_SEMANTIC_StateBindingSourceNotObservable);

@@ -14,6 +14,7 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         CSharpSymbolDefinition clrPropertyDefinition = default,
         IParamSymbol? parameter = null,
         ICommandSymbol? command = null,
+        SymbolLanguage language = SymbolLanguage.Markup,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -31,11 +32,12 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         ClrPropertyDefinition = clrPropertyDefinition;
         Parameter = parameter;
         Command = command;
+        Language = language;
     }
 
     public override SymbolKind Kind => SymbolKind.Property;
 
-    public override SymbolLanguage Language => SymbolLanguage.Markup;
+    public override SymbolLanguage Language { get; }
 
     public override string Name { get; }
 

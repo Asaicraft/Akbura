@@ -165,6 +165,15 @@
   <data name="AKBURA_SEMANTIC_InvalidMarkupChild" xml:space="preserve">
     <value>Markup child '{0}' is not assignable to expected content type '{1}'.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_AkcssInvalidColor" xml:space="preserve">
+    <value>AKCSS color value '{0}' is not valid for property '{1}'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssInvalidThickness" xml:space="preserve">
+    <value>AKCSS thickness tuple '{0}' is not valid for property '{1}'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssPropertyNotFound" xml:space="preserve">
+    <value>AKCSS property '{0}' was not found on style target '{1}'.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_MarkupPropertyNotFound" xml:space="preserve">
     <value>Property '{0}' was not found on component '{1}'.</value>
   </data>

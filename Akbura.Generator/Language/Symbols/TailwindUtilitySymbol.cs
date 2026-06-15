@@ -1,3 +1,4 @@
+using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using System;
 using System.Collections.Immutable;
@@ -11,6 +12,7 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
         AkcssUtilityDeclarationSyntax declarationSyntax,
         CSharpSymbolDefinition targetType,
         ImmutableArray<ITailwindUtilityParameterSymbol> parameters,
+        ImmutableArray<IAkcssOperation> operations,
         ISymbol? containingSymbol = null,
         ImmutableArray<RoslynLocation> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -30,6 +32,9 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
         Parameters = parameters.IsDefault
             ? ImmutableArray<ITailwindUtilityParameterSymbol>.Empty
             : parameters;
+        Operations = operations.IsDefault
+            ? ImmutableArray<IAkcssOperation>.Empty
+            : operations;
     }
 
     public override SymbolKind Kind => SymbolKind.AkcssUtility;
@@ -47,6 +52,15 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
     public CSharpSymbolDefinition TargetType { get; }
 
     public ImmutableArray<ITailwindUtilityParameterSymbol> Parameters { get; }
+
+    public ImmutableArray<IAkcssOperation> Operations { get; private set; }
+
+    internal void SetOperations(ImmutableArray<IAkcssOperation> operations)
+    {
+        Operations = operations.IsDefault
+            ? ImmutableArray<IAkcssOperation>.Empty
+            : operations;
+    }
 
     public override string MetadataName => !HasTargetType
         ? Name

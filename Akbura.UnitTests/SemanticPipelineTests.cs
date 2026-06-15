@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -678,6 +679,270 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssDefaultStyle_BackgroundWhite_CreatesColorSetterOperation()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Background: White;\n" +
+            "    }\n" +
+            "}";
+
+        var (semanticModel, assignment, operation, symbol) = GetSingleStyleOperation(code);
+
+        Assert.False(symbol.HasTargetType);
+        Assert.Equal("Background", operation.Property?.Name);
+        Assert.Equal(SymbolLanguage.Akcss, operation.Property?.Language);
+        Assert.True(operation.Property?.IsAvaloniaProperty);
+        Assert.Equal("BackgroundProperty", operation.Property?.AvaloniaPropertyDefinition.Name);
+        Assert.Equal(AkcssPropertyValueKind.ColorLiteral, operation.ValueKind);
+        Assert.True(operation.RequiresBrushConversion);
+        Assert.Equal("Color", operation.ValueType.Name);
+        var colorSymbol = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
+        Assert.Equal("White", colorSymbol.Name);
+        AssertAvaloniaColorsProperty(colorSymbol, "White");
+        Assert.False(operation.ValueOperation.IsDefault);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(assignment).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssButtonStyle_BackgroundWhite_ResolvesTargetAndProperty()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    Button.hello {\n" +
+            "        Background: White;\n" +
+            "    }\n" +
+            "}";
+
+        var (semanticModel, _, operation, symbol) = GetSingleStyleOperation(code);
+
+        Assert.True(symbol.HasTargetType);
+        AssertResolvedAvaloniaButton(semanticModel, symbol.TargetType);
+        Assert.Equal("Background", operation.Property?.Name);
+        Assert.Equal("BackgroundProperty", operation.Property?.AvaloniaPropertyDefinition.Name);
+        Assert.Equal(AkcssPropertyValueKind.ColorLiteral, operation.ValueKind);
+        var colorSymbol = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
+        AssertAvaloniaColorsProperty(colorSymbol, "White");
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_GetAkcssOperationBeforeSymbolInfo_ReusesSymbolOperation()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Background: White;\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(Assert.Single(rule.Members));
+
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            semanticModel.GetOperation(assignment));
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rule).Symbol);
+
+        Assert.Same(operation, Assert.Single(symbol.Operations));
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssColorStringLiteral_ParsesColorValue()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Background: \"#FFAA\";\n" +
+            "    }\n" +
+            "}";
+
+        var (_, _, operation, _) = GetSingleStyleOperation(code);
+
+        Assert.Equal(AkcssPropertyValueKind.ColorLiteral, operation.ValueKind);
+        var color = Assert.IsType<AkcssColorValue>(operation.ConvertedValue);
+        Assert.Equal(0xFFFFAAAAu, color.ToUInt32());
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssNamedColorStringLiteral_ResolvesAvaloniaColorsSymbol()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Background: \"DodgerBlue\";\n" +
+            "    }\n" +
+            "}";
+
+        var (_, _, operation, _) = GetSingleStyleOperation(code);
+
+        Assert.Equal(AkcssPropertyValueKind.ColorLiteral, operation.ValueKind);
+        var colorSymbol = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
+        AssertAvaloniaColorsProperty(colorSymbol, "DodgerBlue");
+        Assert.False(operation.ValueOperation.IsDefault);
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssColorCSharpExpression_BindsThroughImplicitAvaloniaMediaUsing()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Foreground: Color.FromRgb(33, 11, 231);\n" +
+            "    }\n" +
+            "}";
+
+        var (_, _, operation, _) = GetSingleStyleOperation(code);
+
+        Assert.Equal(AkcssPropertyValueKind.CSharpExpression, operation.ValueKind);
+        Assert.True(operation.RequiresBrushConversion);
+        Assert.Equal("Color", operation.ValueType.Name);
+        Assert.False(operation.ValueOperation.IsDefault);
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssThicknessTuples_CreateConvertedValues()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    Button.hello {\n" +
+            "        Padding: (10, 20);\n" +
+            "        Margin: (10, 20, 30, 40);\n" +
+            "        Padding: (top: 10, bottom: 30);\n" +
+            "        Margin: (vertical: 5);\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+
+        Assert.Equal(4, symbol.Operations.Length);
+        AssertThickness(symbol.Operations[0], 10, 20, 10, 20);
+        AssertThickness(symbol.Operations[1], 10, 20, 30, 40);
+        AssertThickness(symbol.Operations[2], 0, 10, 0, 30);
+        AssertThickness(symbol.Operations[3], 0, 5, 0, 5);
+        Assert.All(rule.Members.OfType<AkcssAssignmentSyntax>(), assignment =>
+            Assert.True(semanticModel.GetSemanticDiagnostics(assignment).IsEmpty));
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssThicknessTuple_AllowsRuntimeSideExpressions()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        .px-(double width) {\n" +
+            "            Padding: (horizontal: Amx.DynamicResource<double>(\"--spacing\") * width);\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var utility = GetOnlyAkcssUtility(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            semanticModel.GetSymbolInfo(utility).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.Equal(AkcssPropertyValueKind.ThicknessTuple, operation.ValueKind);
+        Assert.Equal("Thickness", operation.ValueType.Name);
+        var value = Assert.IsType<AkcssThicknessExpressionValue>(operation.ConvertedValue);
+        Assert.Equal("Amx.DynamicResource<double>(\"--spacing\") * width", value.Left.ToString());
+        Assert.Equal("0", value.Top.ToString());
+        Assert.Equal("Amx.DynamicResource<double>(\"--spacing\") * width", value.Right.ToString());
+        Assert.Equal("0", value.Bottom.ToString());
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssThicknessCSharpExpression_RemainsCSharpExpression()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    Button.hello {\n" +
+            "        Margin: new Thickness(10, 5) - new Thickness(3, 17);\n" +
+            "    }\n" +
+            "}";
+
+        var (_, _, operation, _) = GetSingleStyleOperation(code);
+
+        Assert.Equal(AkcssPropertyValueKind.CSharpExpression, operation.ValueKind);
+        Assert.Equal("Thickness", operation.ValueType.Name);
+        Assert.False(operation.ValueOperation.IsDefault);
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssUtilityAssignment_ResolvesParameterAndDetectsAmxInvocation()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        .w-(double value) {\n" +
+            "            Width: value * Amx.DynamicResource<double>(\"--spacing\");\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var utility = GetOnlyAkcssUtility(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            semanticModel.GetSymbolInfo(utility).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.Equal("value", Assert.Single(symbol.Parameters).Name);
+        Assert.Equal("Width", operation.Property?.Name);
+        Assert.Equal(AkcssPropertyValueKind.AmxInvocation, operation.ValueKind);
+        Assert.Equal("Double", operation.ValueType.Name);
+        var amx = Assert.IsType<AkcssAmxInvocationValue>(operation.ConvertedValue);
+        Assert.Equal(AkcssAmxInvocationKind.DynamicResource, amx.Kind);
+        Assert.Equal("Double", amx.TypeArgument.Name);
+        Assert.Equal("\"--spacing\"", Assert.Single(amx.Arguments).ToString());
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssInvalidValues_ProduceDiagnostics()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Missing: 1;\n" +
+            "        Background: \"#not\";\n" +
+            "        Padding: (foo: 1);\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+
+        Assert.Equal(3, symbol.Operations.Length);
+        var assignments = rule.Members.OfType<AkcssAssignmentSyntax>().ToArray();
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(assignments[0])).Code);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssInvalidColor,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(assignments[1])).Code);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssInvalidThickness,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(assignments[2])).Code);
+        Assert.All(symbol.Operations, operation => Assert.True(operation.HasErrors));
+    }
+
+    [Fact]
     public void SemanticModel_BindStateWithInpcSource_HasNoBindingDiagnostics()
     {
         const string code =
@@ -1085,6 +1350,69 @@ public class SemanticPipelineTests
         var compilation = new AkburaCompilation(CreateCSharpCompilation(), [ownedTree]);
 
         Assert.Throws<ArgumentException>(() => compilation.GetSemanticModel(foreignTree));
+    }
+
+    private static (
+        AkburaSemanticModel SemanticModel,
+        AkcssAssignmentSyntax Assignment,
+        IAkcssPropertySetterOperation Operation,
+        IAkcssSymbol Symbol) GetSingleStyleOperation(string code)
+    {
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(Assert.Single(rule.Members));
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.Same(assignment, operation.Syntax);
+        Assert.Same(operation, semanticModel.GetOperation(assignment));
+        return (semanticModel, assignment, operation, symbol);
+    }
+
+    private static AkcssStyleRuleSyntax GetOnlyAkcssStyleRule(AkburaSyntaxTree syntaxTree)
+    {
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(
+            syntaxTree.GetRoot().Members.Single(member => member is InlineAkcssBlockSyntax));
+        return Assert.IsType<AkcssStyleRuleSyntax>(
+            Assert.Single(inlineAkcss.Members.OfType<AkcssStyleRuleSyntax>()));
+    }
+
+    private static AkcssUtilityDeclarationSyntax GetOnlyAkcssUtility(AkburaSyntaxTree syntaxTree)
+    {
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(
+            syntaxTree.GetRoot().Members.Single(member => member is InlineAkcssBlockSyntax));
+        var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(
+            Assert.Single(inlineAkcss.Members.OfType<AkcssUtilitiesSectionSyntax>()));
+        return Assert.Single(utilities.Utilities);
+    }
+
+    private static void AssertThickness(
+        IAkcssOperation operation,
+        double left,
+        double top,
+        double right,
+        double bottom)
+    {
+        var setter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(operation);
+        Assert.Equal(AkcssPropertyValueKind.ThicknessTuple, setter.ValueKind);
+        var value = Assert.IsType<AkcssThicknessValue>(setter.ConvertedValue);
+        Assert.Equal(left, value.Left);
+        Assert.Equal(top, value.Top);
+        Assert.Equal(right, value.Right);
+        Assert.Equal(bottom, value.Bottom);
+        Assert.False(setter.HasErrors);
+    }
+
+    private static void AssertAvaloniaColorsProperty(
+        CSharpSymbolDefinition definition,
+        string name)
+    {
+        var property = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IPropertySymbol>(definition.Symbol);
+        Assert.Equal(name, property.Name);
+        Assert.Equal("global::Avalonia.Media.Colors",
+            property.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
     }
 
     private static AkburaSemanticModel CreateSemanticModel(AkburaSyntaxTree syntaxTree)

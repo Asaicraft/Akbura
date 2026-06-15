@@ -1,3 +1,4 @@
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
@@ -13,6 +14,8 @@ using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using RoslynFieldSymbol = Microsoft.CodeAnalysis.IFieldSymbol;
+using AkburaOperation = Akbura.Language.Operations.IOperation;
+using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
@@ -21,6 +24,7 @@ namespace Akbura.Language;
 internal sealed class AkburaSemanticModel
 {
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache = new();
+    private readonly Dictionary<AkburaSyntax, AkburaOperation?> _operationCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
 
     public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
@@ -77,6 +81,30 @@ internal sealed class AkburaSemanticModel
         return _semanticDiagnosticsCache.TryGetValue(syntax, out var diagnostics)
             ? diagnostics
             : ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+    }
+
+    public AkburaOperation? GetOperation(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        ValidateSyntaxTreeOwnership(syntax);
+
+        if (_operationCache.TryGetValue(syntax, out var operation))
+        {
+            return operation;
+        }
+
+        operation = syntax switch
+        {
+            AkcssAssignmentSyntax assignment => ResolveAkcssPropertySetterOperation(assignment),
+            _ => null,
+        };
+
+        _operationCache[syntax] = operation;
+        return operation;
     }
 
     private AkburaSymbolInfo ResolveState(StateDeclarationSyntax stateDeclaration)
@@ -194,9 +222,15 @@ internal sealed class AkburaSemanticModel
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
         }
 
+        var symbol = new AkcssStyleSymbol(
+            styleRule,
+            targetType,
+            ImmutableArray<IAkcssOperation>.Empty);
+        symbol.SetOperations(CreateAkcssOperations(styleRule.Members, symbol));
+
         SetSemanticDiagnostics(styleRule, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
 
-        return AkburaSymbolInfo.Success(new AkcssStyleSymbol(styleRule, targetType));
+        return AkburaSymbolInfo.Success(symbol);
     }
 
     private AkburaSymbolInfo ResolveTailwindUtility(
@@ -214,12 +248,16 @@ internal sealed class AkburaSemanticModel
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
         }
 
-        SetSemanticDiagnostics(utilityDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
-        return AkburaSymbolInfo.Success(new TailwindUtilitySymbol(
+        var symbol = new TailwindUtilitySymbol(
             utilityDeclaration,
             targetType,
-            CreateTailwindUtilityParameters(utilityDeclaration)));
+            CreateTailwindUtilityParameters(utilityDeclaration),
+            ImmutableArray<IAkcssOperation>.Empty);
+        symbol.SetOperations(CreateAkcssOperations(utilityDeclaration.Members, symbol));
+
+        SetSemanticDiagnostics(utilityDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(symbol);
     }
 
     private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
@@ -446,6 +484,668 @@ internal sealed class AkburaSemanticModel
         {
             return default;
         }
+    }
+
+    private ImmutableArray<IAkcssOperation> CreateAkcssOperations(
+        Akbura.Language.Syntax.SyntaxList<AkcssBodyMemberSyntax> members,
+        IAkcssSymbol containingSymbol)
+    {
+        using var builder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
+        foreach (var member in members)
+        {
+            if (member is not AkcssAssignmentSyntax assignment)
+            {
+                continue;
+            }
+
+            var operation = CreateAkcssPropertySetterOperation(assignment, containingSymbol);
+            _operationCache[assignment] = operation;
+            builder.Add(operation);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private AkburaOperation? ResolveAkcssPropertySetterOperation(AkcssAssignmentSyntax assignment)
+    {
+        var containingSymbol = GetContainingAkcssSymbol(assignment);
+        if (containingSymbol == null)
+        {
+            SetSemanticDiagnostics(assignment, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return null;
+        }
+
+        if (_operationCache.TryGetValue(assignment, out var cachedOperation))
+        {
+            return cachedOperation;
+        }
+
+        return CreateAkcssPropertySetterOperation(assignment, containingSymbol);
+    }
+
+    private IAkcssSymbol? GetContainingAkcssSymbol(AkcssAssignmentSyntax assignment)
+    {
+        for (var node = assignment.Parent; node != null; node = node.Parent)
+        {
+            if (node is AkcssStyleRuleSyntax styleRule)
+            {
+                return GetSymbolInfo(styleRule).Symbol as IAkcssSymbol;
+            }
+
+            if (node is AkcssUtilityDeclarationSyntax utilityDeclaration)
+            {
+                return GetSymbolInfo(utilityDeclaration).Symbol as IAkcssSymbol;
+            }
+        }
+
+        return null;
+    }
+
+    private AkcssPropertySetterOperation CreateAkcssPropertySetterOperation(
+        AkcssAssignmentSyntax assignment,
+        IAkcssSymbol containingSymbol)
+    {
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
+        var property = ResolveAkcssProperty(assignment, containingSymbol, diagnosticsBuilder);
+        var expression = ParseAkcssAssignmentExpression(assignment);
+        var binding = expression == null
+            ? CSharpTypeBinding.Empty
+            : BindAkcssExpression(expression, containingSymbol);
+
+        var valueType = binding.TypeSymbol == null
+            ? default
+            : new CSharpSymbolDefinition(binding.TypeSymbol);
+        var valueOperation = binding.OperationDefinition;
+        var valueKind = AkcssPropertyValueKind.CSharpExpression;
+        var requiresBrushConversion = false;
+        object? convertedValue = null;
+
+        if (property?.Type.Symbol is ITypeSymbol expectedType && expression != null)
+        {
+            if (IsAkcssColorPropertyType(expectedType))
+            {
+                if (TryGetAkcssColorIdentifierText(expression, out var colorName))
+                {
+                    if (TryBindAvaloniaNamedColor(colorName, containingSymbol, out var namedColorBinding))
+                    {
+                        valueKind = AkcssPropertyValueKind.ColorLiteral;
+                        convertedValue = new CSharpSymbolDefinition(namedColorBinding.Symbol!);
+                        valueOperation = namedColorBinding.OperationDefinition;
+                        requiresBrushConversion = IsAvaloniaBrushType(expectedType);
+                        valueType = namedColorBinding.TypeSymbol == null
+                            ? valueType
+                            : new CSharpSymbolDefinition(namedColorBinding.TypeSymbol);
+                    }
+                    else
+                    {
+                        valueKind = AkcssPropertyValueKind.Error;
+                        diagnosticsBuilder.Add(CreateAkcssInvalidColorDiagnostic(
+                            assignment,
+                            colorName,
+                            property.Name));
+                    }
+                }
+                else if (TryGetAkcssColorStringLiteralText(expression, out var colorText))
+                {
+                    if (ColorParser.TryParse(colorText, out var color))
+                    {
+                        valueKind = AkcssPropertyValueKind.ColorLiteral;
+                        convertedValue = color;
+                        requiresBrushConversion = IsAvaloniaBrushType(expectedType);
+                        if (TryGetAvaloniaColorType(out var colorType))
+                        {
+                            valueType = new CSharpSymbolDefinition(colorType);
+                        }
+                    }
+                    else if (TryBindAvaloniaNamedColor(colorText, containingSymbol, out var namedColorBinding))
+                    {
+                        valueKind = AkcssPropertyValueKind.ColorLiteral;
+                        convertedValue = new CSharpSymbolDefinition(namedColorBinding.Symbol!);
+                        valueOperation = namedColorBinding.OperationDefinition;
+                        requiresBrushConversion = IsAvaloniaBrushType(expectedType);
+                        valueType = namedColorBinding.TypeSymbol == null
+                            ? valueType
+                            : new CSharpSymbolDefinition(namedColorBinding.TypeSymbol);
+                    }
+                    else
+                    {
+                        valueKind = AkcssPropertyValueKind.Error;
+                        diagnosticsBuilder.Add(CreateAkcssInvalidColorDiagnostic(
+                            assignment,
+                            colorText,
+                            property.Name));
+                    }
+                }
+                else if (binding.TypeSymbol != null &&
+                         IsAvaloniaColorType(binding.TypeSymbol) &&
+                         IsAvaloniaBrushType(expectedType))
+                {
+                    requiresBrushConversion = true;
+                }
+            }
+
+            var isThicknessPropertyType = IsAvaloniaThicknessType(expectedType);
+            var isThicknessTuple = false;
+            object? thickness = null;
+            if (isThicknessPropertyType &&
+                TryCreateAkcssThicknessValue(
+                    expression,
+                    assignment.Expression.ToFullString(),
+                    out thickness,
+                    out isThicknessTuple))
+            {
+                valueKind = AkcssPropertyValueKind.ThicknessTuple;
+                convertedValue = thickness;
+                valueType = new CSharpSymbolDefinition(expectedType);
+            }
+            else if (isThicknessPropertyType && isThicknessTuple)
+            {
+                valueKind = AkcssPropertyValueKind.Error;
+                diagnosticsBuilder.Add(CreateAkcssInvalidThicknessDiagnostic(
+                    assignment,
+                    assignment.Expression.ToFullString().Trim(),
+                    property.Name));
+            }
+
+            if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
+                TryCreateAkcssAmxInvocationValue(expression, out var amxInvocation))
+            {
+                valueKind = AkcssPropertyValueKind.AmxInvocation;
+                convertedValue = amxInvocation;
+            }
+        }
+
+        var diagnostics = diagnosticsBuilder.ToImmutable();
+        SetSemanticDiagnostics(assignment, diagnostics);
+
+        return new AkcssPropertySetterOperation(
+            assignment,
+            containingSymbol,
+            property,
+            valueType,
+            valueOperation,
+            valueKind,
+            requiresBrushConversion,
+            convertedValue,
+            property == null || valueKind == AkcssPropertyValueKind.Error || diagnostics.Length > 0);
+    }
+
+    private AkburaPropertySymbol? ResolveAkcssProperty(
+        AkcssAssignmentSyntax assignment,
+        IAkcssSymbol containingSymbol,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        var propertyName = assignment.PropertyName.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(propertyName) ||
+            !TryGetAkcssPropertyOwner(containingSymbol, out var ownerType))
+        {
+            return null;
+        }
+
+        var clrProperty = FindPublicClrProperty(ownerType, propertyName);
+        var avaloniaProperty = FindAvaloniaPropertyField(ownerType, propertyName);
+        if (clrProperty == null && avaloniaProperty == null)
+        {
+            diagnosticsBuilder.Add(CreateAkcssPropertyNotFoundDiagnostic(
+                assignment,
+                propertyName,
+                ownerType));
+            return null;
+        }
+
+        return new PropertySymbol(
+            propertyName,
+            GetMarkupPropertyType(
+                parameter: null,
+                command: null,
+                clrProperty,
+                avaloniaProperty),
+            avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
+            clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
+            language: SymbolLanguage.Akcss,
+            containingSymbol: containingSymbol);
+    }
+
+    private bool TryGetAkcssPropertyOwner(
+        IAkcssSymbol containingSymbol,
+        out INamedTypeSymbol ownerType)
+    {
+        if (containingSymbol.TargetType.Symbol is INamedTypeSymbol targetType)
+        {
+            ownerType = targetType;
+            return true;
+        }
+
+        return TryGetDefaultAkcssStyleTargetType(out ownerType);
+    }
+
+    private bool TryGetDefaultAkcssStyleTargetType(out INamedTypeSymbol targetType)
+    {
+        targetType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.Controls.Primitives.TemplatedControl")!;
+        return targetType != null;
+    }
+
+    private static CSharp.ExpressionSyntax? ParseAkcssAssignmentExpression(AkcssAssignmentSyntax assignment)
+    {
+        try
+        {
+            return CSharpSyntaxFactory.ParseExpression(assignment.Expression.ToFullString());
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryGetAkcssColorIdentifierText(
+        CSharp.ExpressionSyntax expression,
+        out string text)
+    {
+        text = expression is CSharp.IdentifierNameSyntax identifier
+            ? identifier.Identifier.ValueText
+            : string.Empty;
+
+        return text.Length > 0;
+    }
+
+    private static bool TryGetAkcssColorStringLiteralText(
+        CSharp.ExpressionSyntax expression,
+        out string text)
+    {
+        text = expression is CSharp.LiteralExpressionSyntax literal &&
+            literal.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralExpression)
+                ? literal.Token.ValueText
+                : string.Empty;
+
+        return text.Length > 0;
+    }
+
+    private bool TryBindAvaloniaNamedColor(
+        string colorName,
+        IAkcssSymbol containingSymbol,
+        out CSharpTypeBinding binding)
+    {
+        binding = CSharpTypeBinding.Empty;
+        if (string.IsNullOrWhiteSpace(colorName) ||
+            !IsValidCSharpIdentifier(colorName))
+        {
+            return false;
+        }
+
+        var expression = CSharpSyntaxFactory.ParseExpression(
+            "global::Avalonia.Media.Colors." + colorName);
+        binding = BindAkcssExpression(expression, containingSymbol);
+        return binding.Symbol is RoslynPropertySymbol property &&
+            property.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==
+            "global::Avalonia.Media.Colors" &&
+            binding.TypeSymbol != null &&
+            IsAvaloniaColorType(binding.TypeSymbol);
+    }
+
+    private static bool IsValidCSharpIdentifier(string text)
+    {
+        if (text.Length == 0 ||
+            !Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierStartCharacter(text[0]))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < text.Length; i++)
+        {
+            if (!Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(text[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryCreateAkcssThicknessValue(
+        CSharp.ExpressionSyntax expression,
+        string rawText,
+        out object? thickness,
+        out bool isThicknessTuple)
+    {
+        if (expression is CSharp.TupleExpressionSyntax tupleExpression)
+        {
+            isThicknessTuple = true;
+            if (TryCreateAkcssThicknessValue(tupleExpression, out thickness))
+            {
+                return true;
+            }
+
+            var tupleText = rawText.Trim();
+            return tupleText.StartsWith("(", StringComparison.Ordinal) &&
+                tupleText.EndsWith(")", StringComparison.Ordinal) &&
+                tupleText.IndexOf(':') >= 0 &&
+                TryCreateNamedAkcssThicknessValue(tupleText[1..^1], out thickness);
+        }
+
+        var text = rawText.Trim();
+        if (!text.StartsWith("(", StringComparison.Ordinal) ||
+            !text.EndsWith(")", StringComparison.Ordinal) ||
+            text.IndexOf(':') < 0)
+        {
+            thickness = default;
+            isThicknessTuple = false;
+            return false;
+        }
+
+        isThicknessTuple = true;
+        return TryCreateNamedAkcssThicknessValue(text[1..^1], out thickness);
+    }
+
+    private static bool TryCreateAkcssThicknessValue(
+        CSharp.TupleExpressionSyntax tupleExpression,
+        out object? thickness)
+    {
+        thickness = null;
+        var arguments = tupleExpression.Arguments;
+
+        if (arguments.Count == 2 &&
+            arguments[0].NameColon == null &&
+            arguments[1].NameColon == null)
+        {
+            return TryCreateAkcssThicknessValue(
+                arguments[0].Expression,
+                arguments[1].Expression,
+                arguments[0].Expression,
+                arguments[1].Expression,
+                out thickness);
+        }
+
+        if (arguments.Count == 4 &&
+            arguments.All(static argument => argument.NameColon == null))
+        {
+            return TryCreateAkcssThicknessValue(
+                arguments[0].Expression,
+                arguments[1].Expression,
+                arguments[2].Expression,
+                arguments[3].Expression,
+                out thickness);
+        }
+
+        var zero = CreateAkcssZeroExpression();
+        var left = zero;
+        var top = zero;
+        var right = zero;
+        var bottom = zero;
+        foreach (var argument in arguments)
+        {
+            if (argument.NameColon == null)
+            {
+                return false;
+            }
+
+            switch (argument.NameColon.Name.Identifier.ValueText)
+            {
+                case "left":
+                    left = argument.Expression;
+                    break;
+                case "top":
+                    top = argument.Expression;
+                    break;
+                case "right":
+                    right = argument.Expression;
+                    break;
+                case "bottom":
+                    bottom = argument.Expression;
+                    break;
+                case "horizontal":
+                    left = right = argument.Expression;
+                    break;
+                case "vertical":
+                    top = bottom = argument.Expression;
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return arguments.Count > 0 &&
+            TryCreateAkcssThicknessValue(left, top, right, bottom, out thickness);
+    }
+
+    private static bool TryCreateNamedAkcssThicknessValue(
+        string text,
+        out object? thickness)
+    {
+        thickness = null;
+        var zero = CreateAkcssZeroExpression();
+        var left = zero;
+        var top = zero;
+        var right = zero;
+        var bottom = zero;
+
+        foreach (var component in text.Split(','))
+        {
+            var separatorIndex = component.IndexOf(':');
+            if (separatorIndex <= 0 ||
+                separatorIndex == component.Length - 1)
+            {
+                return false;
+            }
+
+            CSharp.ExpressionSyntax expression;
+            try
+            {
+                expression = CSharpSyntaxFactory.ParseExpression(
+                    component[(separatorIndex + 1)..].Trim());
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+
+            switch (component[..separatorIndex].Trim())
+            {
+                case "left":
+                    left = expression;
+                    break;
+                case "top":
+                    top = expression;
+                    break;
+                case "right":
+                    right = expression;
+                    break;
+                case "bottom":
+                    bottom = expression;
+                    break;
+                case "horizontal":
+                    left = right = expression;
+                    break;
+                case "vertical":
+                    top = bottom = expression;
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return TryCreateAkcssThicknessValue(left, top, right, bottom, out thickness);
+    }
+
+    private static bool TryCreateAkcssThicknessValue(
+        CSharp.ExpressionSyntax left,
+        CSharp.ExpressionSyntax top,
+        CSharp.ExpressionSyntax right,
+        CSharp.ExpressionSyntax bottom,
+        out object thickness)
+    {
+        if (TryParseAkcssDouble(left, out var leftValue) &&
+            TryParseAkcssDouble(top, out var topValue) &&
+            TryParseAkcssDouble(right, out var rightValue) &&
+            TryParseAkcssDouble(bottom, out var bottomValue))
+        {
+            thickness = new AkcssThicknessValue(leftValue, topValue, rightValue, bottomValue);
+            return true;
+        }
+
+        thickness = new AkcssThicknessExpressionValue(left, top, right, bottom);
+        return true;
+    }
+
+    private static CSharp.ExpressionSyntax CreateAkcssZeroExpression()
+    {
+        return CSharpSyntaxFactory.LiteralExpression(
+            Microsoft.CodeAnalysis.CSharp.SyntaxKind.NumericLiteralExpression,
+            CSharpSyntaxFactory.Literal(0));
+    }
+
+    private static bool TryParseAkcssDouble(
+        CSharp.ExpressionSyntax expression,
+        out double value)
+    {
+        return double.TryParse(
+            expression.ToString(),
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out value);
+    }
+
+    private bool TryCreateAkcssAmxInvocationValue(
+        CSharp.ExpressionSyntax expression,
+        out AkcssAmxInvocationValue value)
+    {
+        foreach (var invocation in expression
+                     .DescendantNodesAndSelf()
+                     .OfType<CSharp.InvocationExpressionSyntax>())
+        {
+            if (!TryGetAkcssAmxInvocationKind(invocation.Expression, out var kind, out var genericName))
+            {
+                continue;
+            }
+
+            var typeArgument = default(CSharpSymbolDefinition);
+            if (genericName?.TypeArgumentList.Arguments.Count == 1)
+            {
+                var binding = BindCSharpType(genericName.TypeArgumentList.Arguments[0]);
+                if (binding.TypeSymbol != null)
+                {
+                    typeArgument = new CSharpSymbolDefinition(binding.TypeSymbol);
+                }
+            }
+
+            value = new AkcssAmxInvocationValue(
+                kind,
+                typeArgument,
+                invocation.ArgumentList.Arguments.Select(static argument => argument.Expression).ToImmutableArray(),
+                methodSymbol: null);
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static bool TryGetAkcssAmxInvocationKind(
+        CSharp.ExpressionSyntax expression,
+        out AkcssAmxInvocationKind kind,
+        out CSharp.GenericNameSyntax? genericName)
+    {
+        kind = AkcssAmxInvocationKind.None;
+        genericName = null;
+
+        if (expression is not CSharp.MemberAccessExpressionSyntax memberAccess ||
+            memberAccess.Expression.ToString() != "Amx")
+        {
+            return false;
+        }
+
+        var methodName = memberAccess.Name switch
+        {
+            CSharp.GenericNameSyntax name => name.Identifier.ValueText,
+            CSharp.IdentifierNameSyntax name => name.Identifier.ValueText,
+            _ => string.Empty,
+        };
+
+        genericName = memberAccess.Name as CSharp.GenericNameSyntax;
+        kind = methodName switch
+        {
+            "Extend" => AkcssAmxInvocationKind.Extend,
+            "StaticResource" => AkcssAmxInvocationKind.StaticResource,
+            "DynamicResource" => AkcssAmxInvocationKind.DynamicResource,
+            _ => AkcssAmxInvocationKind.None,
+        };
+
+        return kind != AkcssAmxInvocationKind.None;
+    }
+
+    private bool IsAkcssColorPropertyType(ITypeSymbol type)
+    {
+        return IsAvaloniaColorType(type) || IsAvaloniaBrushType(type);
+    }
+
+    private bool IsAvaloniaColorType(ITypeSymbol type)
+    {
+        return TryGetAvaloniaColorType(out var colorType) &&
+            IsSameType(type, colorType);
+    }
+
+    private bool IsAvaloniaBrushType(ITypeSymbol type)
+    {
+        return TryGetAvaloniaBrushType(out var brushType) &&
+            IsAssignableTo(type, brushType);
+    }
+
+    private bool IsAvaloniaThicknessType(ITypeSymbol type)
+    {
+        return TryGetAvaloniaThicknessType(out var thicknessType) &&
+            IsSameType(type, thicknessType);
+    }
+
+    private bool TryGetAvaloniaColorType(out INamedTypeSymbol colorType)
+    {
+        colorType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Media.Color")!;
+        return colorType != null;
+    }
+
+    private bool TryGetAvaloniaBrushType(out INamedTypeSymbol brushType)
+    {
+        brushType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Media.IBrush")!;
+        return brushType != null;
+    }
+
+    private bool TryGetAvaloniaThicknessType(out INamedTypeSymbol thicknessType)
+    {
+        thicknessType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Thickness")!;
+        return thicknessType != null;
+    }
+
+    private AkburaSemanticDiagnostic CreateAkcssPropertyNotFoundDiagnostic(
+        AkcssAssignmentSyntax syntax,
+        string propertyName,
+        INamedTypeSymbol ownerType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound,
+            [propertyName, ownerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
+    }
+
+    private AkburaSemanticDiagnostic CreateAkcssInvalidColorDiagnostic(
+        AkcssAssignmentSyntax syntax,
+        string colorText,
+        string propertyName)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_AkcssInvalidColor,
+            [colorText, propertyName]);
+    }
+
+    private AkburaSemanticDiagnostic CreateAkcssInvalidThicknessDiagnostic(
+        AkcssAssignmentSyntax syntax,
+        string tupleText,
+        string propertyName)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_AkcssInvalidThickness,
+            [tupleText, propertyName]);
     }
 
     private bool TryResolveAkcssTargetType(
@@ -1631,7 +2331,8 @@ internal sealed class AkburaSemanticModel
             symbolInfo.CandidateSymbols,
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
-                : AkburaCandidateReason.NotFound);
+                : AkburaCandidateReason.NotFound,
+            operationDefinition: default);
     }
 
     private CSharpTypeBinding BindCSharpExpression(
@@ -1697,6 +2398,7 @@ internal sealed class AkburaSemanticModel
 
         var typeInfo = semanticModel.GetTypeInfo(probeExpression);
         var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
+        var operation = semanticModel.GetOperation(probeExpression);
         var receiverType = GetExpressionReceiverType(semanticModel, probeExpression);
         var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
             ? null
@@ -1710,7 +2412,103 @@ internal sealed class AkburaSemanticModel
             symbolInfo.CandidateSymbols,
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
-                : AkburaCandidateReason.NotFound);
+                : AkburaCandidateReason.NotFound,
+            operation == null ? default : new CSharpOperationDefinition(operation));
+    }
+
+    private CSharpTypeBinding BindAkcssExpression(
+        CSharp.ExpressionSyntax expressionSyntax,
+        IAkcssSymbol containingSymbol)
+    {
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                "__AkburaSemanticProbe")
+            .WithParameterList(CreateAkcssExpressionParameterList(containingSymbol))
+            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(GetAkcssCSharpUsingDirectives()));
+
+        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
+        if (namespaceDeclaration != null)
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
+                    namespaceDeclaration.WithMembers(
+                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
+        }
+        else
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
+        }
+
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeExpression = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.ReturnStatementSyntax>()
+            .Single()
+            .Expression;
+
+        if (probeExpression == null)
+        {
+            return CSharpTypeBinding.Empty;
+        }
+
+        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
+        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
+        var operation = semanticModel.GetOperation(probeExpression);
+        var receiverType = GetExpressionReceiverType(semanticModel, probeExpression);
+        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
+            ? null
+            : typeInfo.Type;
+
+        return new CSharpTypeBinding(
+            typeSymbol,
+            symbolInfo.Symbol,
+            receiverType,
+            isBindingPath: true,
+            symbolInfo.CandidateSymbols,
+            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
+                ? AkburaCandidateReason.Ambiguous
+                : AkburaCandidateReason.NotFound,
+            operation == null ? default : new CSharpOperationDefinition(operation));
+    }
+
+    private CSharp.ParameterListSyntax CreateAkcssExpressionParameterList(IAkcssSymbol containingSymbol)
+    {
+        if (containingSymbol is not ITailwindUtilitySymbol utilitySymbol ||
+            utilitySymbol.Parameters.Length == 0)
+        {
+            return CSharpSyntaxFactory.ParameterList();
+        }
+
+        using var builder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
+        foreach (var parameter in utilitySymbol.Parameters)
+        {
+            var parameterType = parameter.Type.Symbol == null
+                ? CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword))
+                : CSharpSyntaxFactory.ParseTypeName(
+                    parameter.Type.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+
+            builder.Add(CSharpSyntaxFactory.Parameter(
+                    CSharpSyntaxFactory.Identifier(parameter.Name))
+                .WithType(parameterType));
+        }
+
+        return CSharpSyntaxFactory.ParameterList(
+            CSharpSyntaxFactory.SeparatedList(builder.ToImmutable()));
     }
 
     private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateStateProbeFieldsBefore(
@@ -1815,6 +2613,28 @@ internal sealed class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
+    private ImmutableArray<CSharp.UsingDirectiveSyntax> GetAkcssCSharpUsingDirectives()
+    {
+        using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
+        foreach (var usingDirective in GetCSharpUsingDirectives())
+        {
+            builder.Add(usingDirective);
+        }
+
+        AddAkcssImplicitUsing(builder, "Avalonia");
+        AddAkcssImplicitUsing(builder, "Avalonia.Media");
+        AddAkcssImplicitUsing(builder, "Akbura");
+        return builder.ToImmutable();
+    }
+
+    private static void AddAkcssImplicitUsing(
+        ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax> builder,
+        string namespaceName)
+    {
+        builder.Add(CSharpSyntaxFactory.UsingDirective(
+            CSharpSyntaxFactory.ParseName(namespaceName)));
+    }
+
     private ImmutableArray<CSharp.ExternAliasDirectiveSyntax> GetCSharpExternAliases()
     {
         using var builder = ImmutableArrayBuilder<CSharp.ExternAliasDirectiveSyntax>.Rent();
@@ -1904,7 +2724,8 @@ internal sealed class AkburaSemanticModel
             receiverType: null,
             isBindingPath: false,
             candidateSymbols: ImmutableArray<RoslynSymbol>.Empty,
-            candidateReason: AkburaCandidateReason.NotFound);
+            candidateReason: AkburaCandidateReason.NotFound,
+            operationDefinition: default);
 
         public CSharpTypeBinding(
             ITypeSymbol? typeSymbol,
@@ -1912,7 +2733,8 @@ internal sealed class AkburaSemanticModel
             ITypeSymbol? receiverType,
             bool isBindingPath,
             ImmutableArray<RoslynSymbol> candidateSymbols,
-            AkburaCandidateReason candidateReason)
+            AkburaCandidateReason candidateReason,
+            CSharpOperationDefinition operationDefinition)
         {
             TypeSymbol = typeSymbol;
             Symbol = symbol;
@@ -1922,6 +2744,7 @@ internal sealed class AkburaSemanticModel
                 ? ImmutableArray<RoslynSymbol>.Empty
                 : candidateSymbols;
             CandidateReason = candidateReason;
+            OperationDefinition = operationDefinition;
         }
 
         public ITypeSymbol? TypeSymbol { get; }
@@ -1935,5 +2758,7 @@ internal sealed class AkburaSemanticModel
         public ImmutableArray<RoslynSymbol> CandidateSymbols { get; }
 
         public AkburaCandidateReason CandidateReason { get; }
+
+        public CSharpOperationDefinition OperationDefinition { get; }
     }
 }

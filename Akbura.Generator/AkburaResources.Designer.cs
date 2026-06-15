@@ -205,6 +205,33 @@ namespace Akbura {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to AKCSS color value &apos;{0}&apos; is not valid for property &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssInvalidColor {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInvalidColor", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS thickness tuple &apos;{0}&apos; is not valid for property &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssInvalidThickness {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInvalidThickness", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS property &apos;{0}&apos; was not found on style target &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssPropertyNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssPropertyNotFound", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Property &apos;{0}&apos; was not found on component &apos;{1}&apos;..
         /// </summary>
         internal static string AKBURA_SEMANTIC_MarkupPropertyNotFound {

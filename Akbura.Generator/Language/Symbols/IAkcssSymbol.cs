@@ -1,10 +1,14 @@
+using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
+using System.Collections.Immutable;
 
 namespace Akbura.Language.Symbols;
 
 internal interface IAkcssSymbol : ISymbol
 {
     AkburaSyntax DeclarationSyntax { get; }
+
+    ImmutableArray<IAkcssOperation> Operations { get; }
 
     bool HasTargetType { get; }
 

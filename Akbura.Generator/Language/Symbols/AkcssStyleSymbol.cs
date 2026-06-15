@@ -1,3 +1,4 @@
+using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using System;
 using System.Collections.Immutable;
@@ -10,6 +11,7 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
     public AkcssStyleSymbol(
         AkcssStyleRuleSyntax declarationSyntax,
         CSharpSymbolDefinition targetType,
+        ImmutableArray<IAkcssOperation> operations,
         ISymbol? containingSymbol = null,
         ImmutableArray<RoslynLocation> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -26,6 +28,9 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
 
         Name = name;
         TargetType = targetType;
+        Operations = operations.IsDefault
+            ? ImmutableArray<IAkcssOperation>.Empty
+            : operations;
     }
 
     public override SymbolKind Kind => SymbolKind.AkcssClass;
@@ -37,6 +42,15 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
     AkburaSyntax IAkcssSymbol.DeclarationSyntax => DeclarationSyntax;
 
     public AkcssStyleRuleSyntax DeclarationSyntax { get; }
+
+    public ImmutableArray<IAkcssOperation> Operations { get; private set; }
+
+    internal void SetOperations(ImmutableArray<IAkcssOperation> operations)
+    {
+        Operations = operations.IsDefault
+            ? ImmutableArray<IAkcssOperation>.Empty
+            : operations;
+    }
 
     public bool HasTargetType => !TargetType.IsDefault;
 

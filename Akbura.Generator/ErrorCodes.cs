@@ -25,6 +25,13 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_AkcssInvalidThickness = nameof(AKBURA_SEMANTIC_AkcssInvalidThickness);
     public const string AKBURA_SEMANTIC_AkcssPropertyNotFound = nameof(AKBURA_SEMANTIC_AkcssPropertyNotFound);
     public const string AKBURA_SEMANTIC_MarkupPropertyNotFound = nameof(AKBURA_SEMANTIC_MarkupPropertyNotFound);
+    public const string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert = nameof(AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert);
+    public const string AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed = nameof(AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed);
+    public const string AKBURA_SEMANTIC_MarkupDuplicatePropertySetter = nameof(AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);
+    public const string AKBURA_SEMANTIC_TailwindUtilityNotFound = nameof(AKBURA_SEMANTIC_TailwindUtilityNotFound);
+    public const string AKBURA_SEMANTIC_TailwindUtilityAmbiguous = nameof(AKBURA_SEMANTIC_TailwindUtilityAmbiguous);
+    public const string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch = nameof(AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch);
+    public const string AKBURA_SEMANTIC_AkcssImportNotFound = nameof(AKBURA_SEMANTIC_AkcssImportNotFound);
     public const string AKBURA_SEMANTIC_StateBindingExpressionExpected = nameof(AKBURA_SEMANTIC_StateBindingExpressionExpected);
     public const string AKBURA_SEMANTIC_StateBindingSourceNotObservable = nameof(AKBURA_SEMANTIC_StateBindingSourceNotObservable);
     public const string AKBURA_SEMANTIC_StateBindingTargetNotWritable = nameof(AKBURA_SEMANTIC_StateBindingTargetNotWritable);

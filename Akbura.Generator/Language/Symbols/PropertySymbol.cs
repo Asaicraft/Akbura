@@ -59,12 +59,12 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
 
     public bool IsCommand => Command != null;
 
-    public bool CanRead => Parameter != null ||
+    public bool CanRead => Parameter?.SendsValueToParent == true ||
         Command != null ||
         IsAvaloniaProperty ||
         ClrPropertyDefinition.Symbol is RoslynPropertySymbol { GetMethod.DeclaredAccessibility: Accessibility.Public };
 
-    public bool CanWrite => Parameter != null ||
+    public bool CanWrite => Parameter?.ReceivesValueFromParent == true ||
         Command != null ||
         ClrPropertyDefinition.Symbol is RoslynPropertySymbol { SetMethod.DeclaredAccessibility: Accessibility.Public } ||
         (ClrPropertyDefinition.IsDefault && IsAvaloniaProperty);

@@ -241,6 +241,69 @@ namespace Akbura {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Markup attribute value for &apos;{0}&apos; cannot be converted from &apos;{1}&apos; to &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Markup attribute binding &apos;{0}&apos; is not allowed for parameter &apos;{1}&apos; declared as &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Markup property &apos;{0}&apos; already has a setter on this element..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupDuplicatePropertySetter {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupDuplicatePropertySetter", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; was not found for component &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_TailwindUtilityNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityNotFound", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; is ambiguous for component &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_TailwindUtilityAmbiguous {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityAmbiguous", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; expects {1} argument(s), but {2} were provided..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS import &apos;{0}&apos; was not found..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssImportNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssImportNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to State binding expression &apos;{0}&apos; must be a binding path such as &apos;vm&apos;, &apos;vm.Name&apos;, or &apos;vm.Items[0].Name&apos;..
         /// </summary>
         internal static string AKBURA_SEMANTIC_StateBindingExpressionExpected {

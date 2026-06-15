@@ -12,21 +12,42 @@ internal sealed class AkburaCompilation
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
         IEnumerable<AkburaSyntaxTree> syntaxTrees)
-        : this(csharpCompilation, syntaxTrees.ToImmutableArray())
+        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), ImmutableArray<AkcssSyntaxTree>.Empty)
+    {
+    }
+
+    public AkburaCompilation(
+        CSharpCompilation csharpCompilation,
+        IEnumerable<AkburaSyntaxTree> syntaxTrees,
+        IEnumerable<AkcssSyntaxTree> akcssSyntaxTrees)
+        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), akcssSyntaxTrees.ToImmutableArray())
     {
     }
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
         ImmutableArray<AkburaSyntaxTree> syntaxTrees)
+        : this(csharpCompilation, syntaxTrees, ImmutableArray<AkcssSyntaxTree>.Empty)
+    {
+    }
+
+    public AkburaCompilation(
+        CSharpCompilation csharpCompilation,
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
     {
         CSharpCompilation = csharpCompilation ?? throw new ArgumentNullException(nameof(csharpCompilation));
         SyntaxTrees = syntaxTrees.IsDefault ? ImmutableArray<AkburaSyntaxTree>.Empty : syntaxTrees;
+        AkcssSyntaxTrees = akcssSyntaxTrees.IsDefault
+            ? ImmutableArray<AkcssSyntaxTree>.Empty
+            : akcssSyntaxTrees;
     }
 
     public CSharpCompilation CSharpCompilation { get; }
 
     public ImmutableArray<AkburaSyntaxTree> SyntaxTrees { get; }
+
+    public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees { get; }
 
     public AkburaSemanticModel GetSemanticModel(AkburaSyntaxTree syntaxTree)
     {

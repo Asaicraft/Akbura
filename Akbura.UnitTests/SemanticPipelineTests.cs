@@ -5,6 +5,7 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
+using System.IO;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
@@ -1303,6 +1304,246 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupPlainAttribute_CreatesPropertySetterOperation()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Button Content=\"Hello\" />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(Akbura.Language.Operations.OperationKind.MarkupAttribute, operation.Kind);
+        Assert.Equal(OperationLanguage.Markup, operation.Language);
+        Assert.Equal(MarkupAttributeBindingKind.None, operation.BindingKind);
+        Assert.Equal(MarkupAttributeValueKind.Literal, operation.ValueKind);
+        Assert.Equal("Hello", operation.LiteralValue);
+        Assert.Equal("Content", operation.Property?.Name);
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
+        Assert.False(operation.HasErrors);
+        Assert.Same(operation, semanticModel.GetOperation(attribute));
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupDynamicAttribute_BindsInComponentScope()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state bool isOpen = false;\n" +
+            "\n" +
+            "<Button IsVisible={isOpen} />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupAttributeValueKind.DynamicExpression, operation.ValueKind);
+        Assert.Equal("IsVisible", operation.Property?.Name);
+        Assert.Equal(SpecialType.System_Boolean, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
+        Assert.False(operation.ValueOperation.IsDefault);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupPrefixedAttributes_PreserveBindingKind()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state string name = \"\";\n" +
+            "\n" +
+            "<TextBox bind:Text={name} out:Watermark={name} />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attributes = element.StartTag!.Attributes;
+
+        var bindOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attributes[0]));
+        var outOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attributes[1]));
+
+        Assert.Equal(MarkupAttributeBindingKind.Bind, bindOperation.BindingKind);
+        Assert.Equal("Text", bindOperation.Property?.Name);
+        Assert.Equal(MarkupAttributeBindingKind.Out, outOperation.BindingKind);
+        Assert.Equal("Watermark", outOperation.Property?.Name);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_ResolvesFromCompanionAkcss()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Button w-30 />";
+        const string akcss =
+            "@utilities {\n" +
+            "    .w-(double value) { Width: value; }\n" +
+            "}";
+
+        var componentPath = Path.Combine("C:\\Project", "Button.akbura");
+        var akcssPath = Path.Combine("C:\\Project", "Button.akcss");
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, componentPath);
+        var akcssTree = AkcssSyntaxTree.ParseText(akcss, akcssPath);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(), [akcssTree]);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<TailwindFullAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal("w", operation.UtilityName);
+        Assert.NotNull(operation.Utility);
+        Assert.Equal("w", operation.Utility!.Name);
+        Assert.Single(operation.Arguments);
+        Assert.Equal("30", operation.Arguments[0].Text);
+        Assert.False(operation.HasCondition);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_ResolvesFromAkcssUsingImport()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "using My.NameSpace.FileName.akcss;\n" +
+            "\n" +
+            "<Button flex />";
+        const string akcss =
+            "@utilities {\n" +
+            "    .flex { Width: 10; }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Root.akbura");
+        var akcssTree = AkcssSyntaxTree.ParseText(
+            akcss,
+            "FileName.akcss",
+            "My.NameSpace.FileName.akcss");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(), [akcssTree]);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<TailwindFlagAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var componentSymbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            semanticModel.GetSymbolInfo(element).Symbol);
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal("Button", componentSymbol.Name);
+        Assert.Equal("flex", operation.UtilityName);
+        Assert.NotNull(operation.Utility);
+        Assert.Equal("flex", operation.Utility!.Name);
+        Assert.True(operation.Arguments.IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_LocalAkcssWinsOverImportedAkcss()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "using Shared.Utilities.akcss;\n" +
+            "\n" +
+            "<Button w-30 />";
+        const string localAkcss =
+            "@utilities { .w-(double value) { Width: value; } }";
+        const string importedAkcss =
+            "@utilities { .w-(double value) { Height: value; } }";
+
+        var componentPath = Path.Combine("C:\\Project", "Button.akbura");
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, componentPath);
+        var localTree = AkcssSyntaxTree.ParseText(
+            localAkcss,
+            Path.Combine("C:\\Project", "Button.akcss"));
+        var importedTree = AkcssSyntaxTree.ParseText(
+            importedAkcss,
+            "Utilities.akcss",
+            "Shared.Utilities.akcss");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(), [localTree, importedTree]);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<TailwindFullAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+        var localUtility = Assert.Single(Assert.IsType<AkcssUtilitiesSectionSyntax>(
+            Assert.Single(localTree.GetRoot().Members)).Utilities);
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.NotNull(operation.Utility);
+        Assert.Same(localUtility, operation.Utility!.DeclarationSyntax);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_DuplicateLocalUtilitiesProduceAmbiguity()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "@akcss { @utilities { .w-(double value) { Width: value; } } }\n" +
+            "\n" +
+            "<Button w-30 />";
+        const string companionAkcss =
+            "@utilities { .w-(double value) { Height: value; } }";
+
+        var componentPath = Path.Combine("C:\\Project", "Button.akbura");
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, componentPath);
+        var companionTree = AkcssSyntaxTree.ParseText(
+            companionAkcss,
+            Path.Combine("C:\\Project", "Button.akcss"));
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(), [companionTree]);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<TailwindFullAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.Null(operation.Utility);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_TailwindUtilityAmbiguous, diagnostic.Code);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_MissingAkcssImportProducesDiagnostic()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "using Missing.Utilities.akcss;\n" +
+            "\n" +
+            "<Button flex />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Root.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<TailwindFlagAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostics = semanticModel.GetSemanticDiagnostics(attribute);
+
+        Assert.Null(operation.Utility);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_AkcssImportNotFound);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_TailwindUtilityNotFound);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesAkburaComponentParamAsMarkupProperty()
     {
         const string aCode =
@@ -1344,6 +1585,192 @@ public class SemanticPipelineTests
         Assert.Same(paramSymbol, propertySymbol.Parameter);
         Assert.Equal("Int32", propertySymbol.Type.Name);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_OutParam_IsReadonlyForPlainMarkupAttribute()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "param out int Result;";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "<A Result={1}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(attribute).Symbol);
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.True(property.IsParameter);
+        Assert.Equal(ParamBindingKind.Out, property.Parameter!.BindingKind);
+        Assert.False(property.CanWrite);
+        Assert.True(property.CanRead);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed, diagnostic.Code);
+        Assert.Contains("param out", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_OutPrefixedAttribute_AllowsOutParam()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "param out int Result;";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "state int value = 0;\n" +
+            "\n" +
+            "<A out:Result={value}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPrefixedAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(attribute).Symbol);
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(ParamBindingKind.Out, property.Parameter!.BindingKind);
+        Assert.Equal(MarkupAttributeBindingKind.Out, operation.BindingKind);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_BindPrefixedAttribute_RejectsDefaultParam()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "param int Value;";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "state int value = 0;\n" +
+            "\n" +
+            "<A bind:Value={value}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPrefixedAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(attribute).Symbol);
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.Equal(ParamBindingKind.Default, property.Parameter!.BindingKind);
+        Assert.True(property.CanWrite);
+        Assert.False(property.CanRead);
+        Assert.Equal(MarkupAttributeBindingKind.Bind, operation.BindingKind);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed, diagnostic.Code);
+        Assert.Contains("param", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("Text=\"Hello\"", (int)MarkupAttributeBindingKind.None)]
+    [InlineData("bind:Text={text}", (int)MarkupAttributeBindingKind.Bind)]
+    [InlineData("out:Text={text}", (int)MarkupAttributeBindingKind.Out)]
+    public void SemanticModel_BindParam_AllowsEveryMarkupBindingDirection(
+        string attributeText,
+        int expectedBindingKind)
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "param bind string Text = \"\";";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "state string text = \"\";\n" +
+            "\n" +
+            "<A ";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode + attributeText + "/>", "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.Single(element.StartTag!.Attributes);
+
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(attribute).Symbol);
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.True(property.IsParameter);
+        Assert.Equal(ParamBindingKind.Bind, property.Parameter!.BindingKind);
+        Assert.True(property.CanRead);
+        Assert.True(property.CanWrite);
+        Assert.Equal((MarkupAttributeBindingKind)expectedBindingKind, operation.BindingKind);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Theory]
+    [InlineData("<TextBlock bind:Text={mystate} out:Text={myotherState}/>", false)]
+    [InlineData("<TextBlock bind:Text={mystate} Text={myotherState}/>", true)]
+    [InlineData("<TextBlock Text={mystate} Text={myotherState}/>", true)]
+    [InlineData("<TextBlock Text={mystate} out:Text={myotherState}/>", false)]
+    [InlineData("<TextBlock out:Text={mystate} out:Text={myotherState}/>", false)]
+    public void SemanticModel_DetectsOnlyDuplicateMarkupPropertySetters(
+        string markup,
+        bool expectDuplicateSetter)
+    {
+        var code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state string mystate = \"\";\n" +
+            "state string myotherState = \"\";\n" +
+            "\n" +
+            markup;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attributes = element.StartTag!.Attributes;
+
+        Assert.Equal(2, attributes.Count);
+
+        var firstDiagnostics = semanticModel.GetSemanticDiagnostics(attributes[0]);
+        var secondDiagnostics = semanticModel.GetSemanticDiagnostics(attributes[1]);
+
+        Assert.DoesNotContain(firstDiagnostics, diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);
+
+        if (expectDuplicateSetter)
+        {
+            var diagnostic = Assert.Single(secondDiagnostics, diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);
+            Assert.Contains("Text", diagnostic.Message);
+        }
+        else
+        {
+            Assert.DoesNotContain(secondDiagnostics, diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);
+        }
     }
 
     [Fact]
@@ -1487,6 +1914,15 @@ public class SemanticPipelineTests
         CSharpCompilation csharpCompilation)
     {
         var compilation = new AkburaCompilation(csharpCompilation, [syntaxTree]);
+        return compilation.GetSemanticModel(syntaxTree);
+    }
+
+    private static AkburaSemanticModel CreateSemanticModel(
+        AkburaSyntaxTree syntaxTree,
+        CSharpCompilation csharpCompilation,
+        IEnumerable<AkcssSyntaxTree> akcssSyntaxTrees)
+    {
+        var compilation = new AkburaCompilation(csharpCompilation, [syntaxTree], akcssSyntaxTrees);
         return compilation.GetSemanticModel(syntaxTree);
     }
 

@@ -21,7 +21,7 @@ using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language;
 
-internal sealed class AkburaSemanticModel
+internal sealed partial class AkburaSemanticModel
 {
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache = new();
     private readonly Dictionary<AkburaSyntax, AkburaOperation?> _operationCache = new();
@@ -77,6 +77,10 @@ internal sealed class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(syntax);
         _ = GetSymbolInfo(syntax);
+        if (syntax is MarkupAttributeSyntax or AkcssAssignmentSyntax or AkcssIfDirectiveSyntax)
+        {
+            _ = GetOperation(syntax);
+        }
 
         return _semanticDiagnosticsCache.TryGetValue(syntax, out var diagnostics)
             ? diagnostics
@@ -101,6 +105,7 @@ internal sealed class AkburaSemanticModel
         {
             AkcssAssignmentSyntax assignment => ResolveAkcssPropertySetterOperation(assignment),
             AkcssIfDirectiveSyntax ifDirective => ResolveAkcssIfOperation(ifDirective),
+            MarkupAttributeSyntax markupAttribute => ResolveMarkupAttributeOperation(markupAttribute),
             _ => null,
         };
 
@@ -1717,7 +1722,8 @@ internal sealed class AkburaSemanticModel
         {
             if (member is not UsingDirectiveSyntax usingDirective ||
                 usingDirective.Alias != null ||
-                usingDirective.StaticKeyword.RawKind != 0)
+                usingDirective.StaticKeyword.RawKind != 0 ||
+                IsAkcssUsingDirective(usingDirective))
             {
                 continue;
             }
@@ -2667,6 +2673,11 @@ internal sealed class AkburaSemanticModel
         {
             if (member is UsingDirectiveSyntax usingDirective)
             {
+                if (IsAkcssUsingDirective(usingDirective))
+                {
+                    continue;
+                }
+
                 builder.Add(usingDirective.ToCSharp());
             }
         }

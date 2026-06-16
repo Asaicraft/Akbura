@@ -722,7 +722,7 @@ internal sealed partial class AkburaSemanticModel
         {
             var resultBinding = BindCommandHandlerResultExpression(command, parameterNames, expressionBody);
             operation = resultBinding.OperationDefinition;
-            if (TryGetAwaitedLocalCommandInvokeResultType(expressionBody, out var awaitedCommandResultType))
+            if (TryGetAwaitedLocalCommandExecuteResultType(expressionBody, out var awaitedCommandResultType))
             {
                 resultMode = MarkupCommandResultMode.ReturnsResult;
                 resultType = awaitedCommandResultType;
@@ -790,7 +790,7 @@ internal sealed partial class AkburaSemanticModel
             operation);
     }
 
-    private bool TryGetAwaitedLocalCommandInvokeResultType(
+    private bool TryGetAwaitedLocalCommandExecuteResultType(
         CSharp.ExpressionSyntax expression,
         out CSharpSymbolDefinition resultType)
     {
@@ -799,7 +799,7 @@ internal sealed partial class AkburaSemanticModel
         if (expression is not CSharp.AwaitExpressionSyntax awaitExpression ||
             awaitExpression.Expression is not CSharp.InvocationExpressionSyntax invocation ||
             invocation.Expression is not CSharp.MemberAccessExpressionSyntax memberAccess ||
-            memberAccess.Name.Identifier.ValueText != "Invoke" ||
+            memberAccess.Name.Identifier.ValueText != "Execute" ||
             memberAccess.Expression is not CSharp.IdentifierNameSyntax receiver)
         {
             return false;
@@ -854,23 +854,7 @@ internal sealed partial class AkburaSemanticModel
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
-        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
-            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
-            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
-
-        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
-        if (namespaceDeclaration != null)
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
-                    namespaceDeclaration.WithMembers(
-                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
-        }
-        else
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
-        }
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
         var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -932,23 +916,7 @@ internal sealed partial class AkburaSemanticModel
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
-        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
-            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
-            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
-
-        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
-        if (namespaceDeclaration != null)
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
-                    namespaceDeclaration.WithMembers(
-                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
-        }
-        else
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
-        }
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
         var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -1027,23 +995,7 @@ internal sealed partial class AkburaSemanticModel
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
-        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
-            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
-            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
-
-        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
-        if (namespaceDeclaration != null)
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
-                    namespaceDeclaration.WithMembers(
-                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
-        }
-        else
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
-        }
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
         var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -1217,28 +1169,35 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
 
         builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
-                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.BoolKeyword)),
+                CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
                 "IsExecuting")
+            .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
+                CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))
+            .WithSemicolonToken(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SemicolonToken)));
+
+        builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
+                CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
+                "CanExecute")
             .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
                 CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))
             .WithSemicolonToken(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SemicolonToken)));
 
         var parameterList = GetCSharpParameterList(commandDeclaration.Parameters) ??
             CSharpSyntaxFactory.ParameterList();
-        var invoke = CSharpSyntaxFactory.MethodDeclaration(
-                GetCommandInvokeReturnTypeSyntax(command),
-                "Invoke")
+        var execute = CSharpSyntaxFactory.MethodDeclaration(
+                GetCommandExecuteReturnTypeSyntax(command),
+                "Execute")
             .WithParameterList(parameterList)
             .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.ThrowStatement(
                 CSharpSyntaxFactory.ObjectCreationExpression(
                         CSharpSyntaxFactory.ParseTypeName("global::System.NotImplementedException"))
                     .WithArgumentList(CSharpSyntaxFactory.ArgumentList()))));
 
-        builder.Add(invoke);
+        builder.Add(execute);
         return builder.ToImmutable();
     }
 
-    private static CSharp.TypeSyntax GetCommandInvokeReturnTypeSyntax(ICommandSymbol command)
+    private static CSharp.TypeSyntax GetCommandExecuteReturnTypeSyntax(ICommandSymbol command)
     {
         if (command.HasResult &&
             !command.ResultType.IsDefault)

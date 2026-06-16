@@ -320,7 +320,8 @@ node EffectFinallyBlockSyntax : UseEffectTailBlockSyntax {
 ///       <CustomButton Click={...} />
 ///   • Inside the component the symbol provides:
 ///       CustomClick.IsExecuting
-///       await CustomClick.Invoke(arg)
+///       CustomClick.CanExecute
+///       await CustomClick.Execute(arg)
 ///     (both are interpreted at semantic/codegen layer, not by grammar).
 /// </summary>
 node CommandDeclarationSyntax : AkTopLevelMember {

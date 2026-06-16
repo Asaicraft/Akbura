@@ -445,23 +445,7 @@ internal sealed partial class AkburaSemanticModel
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
             .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
 
-        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
-            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
-            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
-
-        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
-        if (namespaceDeclaration != null)
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
-                    namespaceDeclaration.WithMembers(
-                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
-        }
-        else
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
-        }
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
         var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -2351,23 +2335,7 @@ internal sealed partial class AkburaSemanticModel
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
             .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(field));
 
-        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
-            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
-            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
-
-        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
-        if (namespaceDeclaration != null)
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
-                    namespaceDeclaration.WithMembers(
-                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
-        }
-        else
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
-        }
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
         var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -2427,23 +2395,7 @@ internal sealed partial class AkburaSemanticModel
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
-        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
-            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
-            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
-
-        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
-        if (namespaceDeclaration != null)
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
-                    namespaceDeclaration.WithMembers(
-                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
-        }
-        else
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
-        }
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
         var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -2497,23 +2449,9 @@ internal sealed partial class AkburaSemanticModel
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
             .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
 
-        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
-            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
-            .WithUsings(CSharpSyntaxFactory.List(GetAkcssCSharpUsingDirectives()));
-
-        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
-        if (namespaceDeclaration != null)
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
-                    namespaceDeclaration.WithMembers(
-                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
-        }
-        else
-        {
-            compilationUnit = compilationUnit.WithMembers(
-                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
-        }
+        var compilationUnit = CreateCSharpProbeCompilationUnit(
+            probeClass,
+            GetAkcssCSharpUsingDirectives());
 
         var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -2741,6 +2679,74 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return null;
+    }
+
+    private CSharp.CompilationUnitSyntax CreateCSharpProbeCompilationUnit(
+        CSharp.MemberDeclarationSyntax member,
+        ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives = default)
+    {
+        return CreateCSharpProbeCompilationUnit(
+            ImmutableArray.Create(member),
+            usingDirectives);
+    }
+
+    private CSharp.CompilationUnitSyntax CreateCSharpProbeCompilationUnit(
+        ImmutableArray<CSharp.MemberDeclarationSyntax> members,
+        ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives = default)
+    {
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        if (TryCreateCurrentComponentProbeType(out var componentType))
+        {
+            membersBuilder.Add(componentType);
+        }
+
+        foreach (var member in members)
+        {
+            membersBuilder.Add(member);
+        }
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(
+                usingDirectives.IsDefault
+                    ? GetCSharpUsingDirectives()
+                    : usingDirectives));
+
+        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
+        if (namespaceDeclaration != null)
+        {
+            return compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
+                    namespaceDeclaration.WithMembers(
+                        CSharpSyntaxFactory.List(membersBuilder.ToImmutable()))));
+        }
+
+        return compilationUnit.WithMembers(
+            CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+    }
+
+    private bool TryCreateCurrentComponentProbeType(
+        out CSharp.ClassDeclarationSyntax componentType)
+    {
+        componentType = null!;
+
+        var componentName = SyntaxTree.ComponentName;
+        if (string.IsNullOrWhiteSpace(componentName))
+        {
+            return false;
+        }
+
+        var metadataName = GetAkburaComponentMetadataName(SyntaxTree);
+        if (metadataName.Length > 0 &&
+            Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName) != null)
+        {
+            return false;
+        }
+
+        componentType = CSharpSyntaxFactory.ClassDeclaration(ToCSharpIdentifier(componentName))
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SealedKeyword)));
+        return true;
     }
 
     private static ImmutableArray<AkburaSymbol> CreateMarkupComponentCandidates(

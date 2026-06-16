@@ -518,6 +518,125 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ResolvesCurrentComponentType_FromFileNameInInject()
+    {
+        const string code = "inject ILogger<Counter> logger;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation("public interface ILogger<T> { }"));
+        var inject = Assert.IsType<InjectDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var symbol = Assert.IsAssignableFrom<IInjectSymbol>(
+            semanticModel.GetSymbolInfo(inject).Symbol);
+
+        Assert.Equal("Counter", syntaxTree.ComponentName);
+        Assert.Equal("ILogger", symbol.Type.Name);
+        var loggerType = Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.Type.Symbol);
+        var componentType = Assert.IsAssignableFrom<INamedTypeSymbol>(loggerType.TypeArguments.Single());
+        Assert.Equal("Counter", componentType.Name);
+        Assert.Equal("Counter", componentType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+        Assert.True(semanticModel.GetSemanticDiagnostics(inject).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_CSharpStatementReferences_MapBackToAkburaSymbols()
+    {
+        const string code =
+            "using Demo;\n" +
+            "\n" +
+            "inject ILogger<Counter> logger;\n" +
+            "\n" +
+            "state count = 0;\n" +
+            "\n" +
+            "logger.LogInformation(\"Counts is {0}\", count);";
+        const string csharpCode =
+            "namespace Demo\n" +
+            "{\n" +
+            "    public interface ILogger<T>\n" +
+            "    {\n" +
+            "        void LogInformation(string message, params object[] args);\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var root = syntaxTree.GetRoot();
+        var inject = Assert.IsType<InjectDeclarationSyntax>(root.Members[1]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
+        var statement = Assert.IsType<CSharpStatementSyntax>(root.Members[3]);
+
+        var references = semanticModel.GetCSharpSymbolReferences(statement);
+
+        var loggerReference = Assert.Single(references, reference => reference.Name == "logger");
+        var loggerLocal = Assert.IsAssignableFrom<ILocalSymbol>(loggerReference.CSharpDefinition.Symbol);
+        var loggerSymbol = Assert.IsAssignableFrom<IInjectSymbol>(loggerReference.AkburaSymbol);
+        Assert.Equal("logger", loggerLocal.Name);
+        Assert.Same(semanticModel.GetSymbolInfo(inject).Symbol, loggerSymbol);
+        var loggerType = Assert.IsAssignableFrom<INamedTypeSymbol>(loggerSymbol.Type.Symbol);
+        Assert.Equal("Counter", loggerType.TypeArguments.Single().Name);
+
+        var countReference = Assert.Single(references, reference => reference.Name == "count");
+        var countLocal = Assert.IsAssignableFrom<ILocalSymbol>(countReference.CSharpDefinition.Symbol);
+        var countSymbol = Assert.IsAssignableFrom<IStateSymbol>(countReference.AkburaSymbol);
+        Assert.Equal("count", countLocal.Name);
+        Assert.Same(semanticModel.GetSymbolInfo(state).Symbol, countSymbol);
+        Assert.Equal("Int32", countSymbol.Type.Name);
+
+        var methodReference = Assert.Single(references, reference => reference.Name == "LogInformation");
+        Assert.IsAssignableFrom<IMethodSymbol>(methodReference.CSharpDefinition.Symbol);
+        Assert.Null(methodReference.AkburaSymbol);
+    }
+
+    [Fact]
+    public void SemanticModel_CSharpStatementReferences_MapCommandFacadeMembersBackToCommandSymbol()
+    {
+        const string code =
+            "command bool IsHi();\n" +
+            "\n" +
+            "var result = IsHi.Execute();\n" +
+            "var canExecute = IsHi.CanExecute;\n" +
+            "var isExecuting = IsHi.IsExecuting;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var command = Assert.IsType<CommandDeclarationSyntax>(root.Members[0]);
+        var commandSymbol = Assert.IsAssignableFrom<ICommandSymbol>(
+            semanticModel.GetSymbolInfo(command).Symbol);
+
+        var references = root.Members
+            .OfType<CSharpStatementSyntax>()
+            .SelectMany(statement => semanticModel.GetCSharpSymbolReferences(statement))
+            .ToArray();
+
+        var commandReceivers = references.Where(reference => reference.Name == "IsHi").ToArray();
+        Assert.Equal(3, commandReceivers.Length);
+        Assert.All(commandReceivers, reference =>
+        {
+            Assert.Same(commandSymbol, reference.AkburaSymbol);
+            Assert.True(reference.CSharpDefinition.Symbol is IFieldSymbol);
+        });
+
+        var execute = Assert.Single(references, reference => reference.Name == "Execute");
+        Assert.IsAssignableFrom<IMethodSymbol>(execute.CSharpDefinition.Symbol);
+        Assert.Same(commandSymbol, execute.AkburaSymbol);
+
+        var canExecute = Assert.Single(references, reference => reference.Name == "CanExecute");
+        var canExecuteProperty = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IPropertySymbol>(
+            canExecute.CSharpDefinition.Symbol);
+        Assert.Equal("IObservable", canExecuteProperty.Type.Name);
+        Assert.Same(commandSymbol, canExecute.AkburaSymbol);
+
+        var isExecuting = Assert.Single(references, reference => reference.Name == "IsExecuting");
+        var isExecutingProperty = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IPropertySymbol>(
+            isExecuting.CSharpDefinition.Symbol);
+        Assert.Equal("IObservable", isExecutingProperty.Type.Name);
+        Assert.Same(commandSymbol, isExecuting.AkburaSymbol);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesCommandSymbol()
     {
         const string code = "command System.Threading.Tasks.Task<int> Click(int a);";
@@ -1926,22 +2045,24 @@ public class SemanticPipelineTests
             "\n" +
             "command int CustomClick(int a);\n" +
             "\n" +
-            "<TextBlock IsVisible={CustomClick.IsExecuting} />";
+            "<TextBlock Tag={CustomClick.IsExecuting} />";
 
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var element = GetOnlyMarkupElement(syntaxTree);
         var attributes = element.StartTag!.Attributes;
 
-        var isVisible = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+        var tag = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
             semanticModel.GetOperation(Assert.Single(attributes)));
 
-        Assert.Equal("Boolean", isVisible.ValueType.Name);
+        Assert.Equal("IObservable", tag.ValueType.Name);
+        var observable = Assert.IsAssignableFrom<INamedTypeSymbol>(tag.ValueType.Symbol);
+        Assert.Equal("Boolean", Assert.Single(observable.TypeArguments).Name);
         Assert.True(semanticModel.GetSemanticDiagnostics(Assert.Single(attributes)).IsEmpty);
     }
 
     [Fact]
-    public void SemanticModel_LocalCommandInvoke_BindsAsAwaitableInCommandHandler()
+    public void SemanticModel_LocalCommandExecute_BindsAsAwaitableInCommandHandler()
     {
         const string aCode =
             "namespace SomeNs;\n" +
@@ -1953,7 +2074,7 @@ public class SemanticPipelineTests
             "command int CustomClick(int a);\n" +
             "state int clicked = 0;\n" +
             "\n" +
-            "<A Click={async x => await CustomClick.Invoke(clicked)}/>";
+            "<A Click={async x => await CustomClick.Execute(clicked)}/>";
 
         var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
         var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");

@@ -113,7 +113,7 @@ public class FullComponentSyntaxParseTests
 			"\n" +
 			"<Block p-4 {CustomClick.IsExecuting}:disabled>\n" +
 			"\t<Button Click={() => {\n" +
-			"\t\tvar result = await CustomClick.Invoke(clicked++);\n" +
+			"\t\tvar result = await CustomClick.Execute(clicked++);\n" +
 			"\t\tConsole.WriteLine($\"Result is {result}\");\n" +
 			"\t}}/>\n" +
 			"</Block>";

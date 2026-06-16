@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -39,6 +40,7 @@ internal sealed partial class AkburaSemanticModel
         var literalValue = default(string);
         var valueType = default(CSharpSymbolDefinition);
         var valueOperation = default(CSharpOperationDefinition);
+        var dynamicExpression = default(CSharp.ExpressionSyntax);
 
         if (valueSyntax is MarkupLiteralAttributeValueSyntax literalValueSyntax)
         {
@@ -59,6 +61,7 @@ internal sealed partial class AkburaSemanticModel
             }
             else
             {
+                dynamicExpression = expression;
                 valueKind = MarkupAttributeValueKind.DynamicExpression;
                 var binding = BindMarkupAttributeExpression(expression);
                 valueType = binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol);
@@ -97,6 +100,34 @@ internal sealed partial class AkburaSemanticModel
 
             diagnostics = diagnosticsBuilder.ToImmutable();
             SetSemanticDiagnostics(markupAttribute, diagnostics);
+        }
+
+        if (property?.Command is { } command)
+        {
+            var handler = AnalyzeMarkupCommandHandler(
+                command,
+                dynamicExpression,
+                valueType,
+                valueOperation);
+
+            return new MarkupCommandBindingOperation(
+                markupAttribute,
+                containingComponent,
+                property,
+                command,
+                bindingKind,
+                valueKind,
+                valueSyntax,
+                handler.Kind,
+                handler.ArgumentMode,
+                handler.ResultMode,
+                handler.ParameterCount,
+                handler.IsAsync,
+                handler.ContainsAwait,
+                handler.Type,
+                handler.ResultType,
+                handler.Operation,
+                valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
         }
 
         return new MarkupPropertySetterOperation(
@@ -631,6 +662,352 @@ internal sealed partial class AkburaSemanticModel
             [property.Name, sourceTypeText, targetTypeText]));
     }
 
+    private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandHandler(
+        ICommandSymbol command,
+        CSharp.ExpressionSyntax? expression,
+        CSharpSymbolDefinition handlerType,
+        CSharpOperationDefinition handlerOperation)
+    {
+        if (expression == null)
+        {
+            return MarkupCommandHandlerAnalysis.Error;
+        }
+
+        return expression switch
+        {
+            CSharp.ParenthesizedLambdaExpressionSyntax lambda => AnalyzeMarkupCommandLambda(
+                command,
+                lambda.ParameterList.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray(),
+                lambda.AsyncKeyword.RawKind != 0,
+                lambda.Body),
+            CSharp.SimpleLambdaExpressionSyntax lambda => AnalyzeMarkupCommandLambda(
+                command,
+                ImmutableArray.Create(lambda.Parameter.Identifier.ValueText),
+                lambda.AsyncKeyword.RawKind != 0,
+                lambda.Body),
+            CSharp.AnonymousMethodExpressionSyntax anonymousMethod => AnalyzeMarkupCommandLambda(
+                command,
+                anonymousMethod.ParameterList?.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray() ??
+                    ImmutableArray<string>.Empty,
+                anonymousMethod.AsyncKeyword.RawKind != 0,
+                anonymousMethod.Body),
+            _ => new MarkupCommandHandlerAnalysis(
+                MarkupCommandHandlerKind.DirectReference,
+                MarkupCommandArgumentMode.None,
+                MarkupCommandResultMode.Unknown,
+                parameterCount: 0,
+                isAsync: ContainsAwaitExpression(expression),
+                containsAwait: ContainsAwaitExpression(expression),
+                handlerType,
+                resultType: default,
+                handlerOperation),
+        };
+    }
+
+    private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandLambda(
+        ICommandSymbol command,
+        ImmutableArray<string> parameterNames,
+        bool isAsync,
+        SyntaxNode body)
+    {
+        var containsAwait = ContainsAwaitExpression(body);
+        var argumentMode = parameterNames.Length == 0
+            ? MarkupCommandArgumentMode.IgnoresCommandArgument
+            : MarkupCommandArgumentMode.ReceivesCommandArgument;
+        var resultMode = MarkupCommandResultMode.NoResult;
+        var resultType = default(CSharpSymbolDefinition);
+        var operation = default(CSharpOperationDefinition);
+
+        if (body is CSharp.ExpressionSyntax expressionBody)
+        {
+            var resultBinding = BindCommandHandlerResultExpression(command, parameterNames, expressionBody);
+            operation = resultBinding.OperationDefinition;
+            if (TryGetAwaitedLocalCommandInvokeResultType(expressionBody, out var awaitedCommandResultType))
+            {
+                resultMode = MarkupCommandResultMode.ReturnsResult;
+                resultType = awaitedCommandResultType;
+            }
+            else if (resultBinding.TypeSymbol is { SpecialType: SpecialType.System_Void } ||
+                resultBinding.Symbol is IMethodSymbol { ReturnsVoid: true })
+            {
+                resultMode = MarkupCommandResultMode.NoResult;
+            }
+            else if (resultBinding.TypeSymbol != null)
+            {
+                resultMode = MarkupCommandResultMode.ReturnsResult;
+                resultType = new CSharpSymbolDefinition(resultBinding.TypeSymbol);
+            }
+            else if (expressionBody is CSharp.InvocationExpressionSyntax)
+            {
+                var statementBinding = BindCommandHandlerStatementExpression(command, parameterNames, expressionBody);
+                operation = statementBinding.OperationDefinition;
+                if (statementBinding.Symbol is IMethodSymbol { ReturnsVoid: true })
+                {
+                    resultMode = MarkupCommandResultMode.NoResult;
+                }
+                else if (statementBinding.TypeSymbol != null)
+                {
+                    resultMode = MarkupCommandResultMode.ReturnsResult;
+                    resultType = new CSharpSymbolDefinition(statementBinding.TypeSymbol);
+                }
+                else
+                {
+                    resultMode = MarkupCommandResultMode.Unknown;
+                }
+            }
+            else
+            {
+                resultMode = MarkupCommandResultMode.Unknown;
+            }
+        }
+        else if (body is CSharp.BlockSyntax block)
+        {
+            var returnExpression = block
+                .DescendantNodes()
+                .OfType<CSharp.ReturnStatementSyntax>()
+                .Select(static returnStatement => returnStatement.Expression)
+                .FirstOrDefault(expression => expression != null);
+            if (returnExpression != null)
+            {
+                var resultBinding = BindCommandHandlerResultExpression(command, parameterNames, returnExpression);
+                operation = resultBinding.OperationDefinition;
+                resultMode = MarkupCommandResultMode.ReturnsResult;
+                resultType = resultBinding.TypeSymbol == null
+                    ? default
+                    : new CSharpSymbolDefinition(resultBinding.TypeSymbol);
+            }
+        }
+
+        return new MarkupCommandHandlerAnalysis(
+            MarkupCommandHandlerKind.Lambda,
+            argumentMode,
+            resultMode,
+            parameterNames.Length,
+            isAsync || containsAwait,
+            containsAwait,
+            type: default,
+            resultType,
+            operation);
+    }
+
+    private bool TryGetAwaitedLocalCommandInvokeResultType(
+        CSharp.ExpressionSyntax expression,
+        out CSharpSymbolDefinition resultType)
+    {
+        resultType = default;
+
+        if (expression is not CSharp.AwaitExpressionSyntax awaitExpression ||
+            awaitExpression.Expression is not CSharp.InvocationExpressionSyntax invocation ||
+            invocation.Expression is not CSharp.MemberAccessExpressionSyntax memberAccess ||
+            memberAccess.Name.Identifier.ValueText != "Invoke" ||
+            memberAccess.Expression is not CSharp.IdentifierNameSyntax receiver)
+        {
+            return false;
+        }
+
+        var commandName = receiver.Identifier.ValueText;
+        foreach (var member in SyntaxTree.GetRoot().Members)
+        {
+            if (member is not CommandDeclarationSyntax commandDeclaration ||
+                commandDeclaration.Name.Identifier.ValueText != commandName ||
+                GetSymbolInfo(commandDeclaration).Symbol is not ICommandSymbol command ||
+                command.ResultType.IsDefault)
+            {
+                continue;
+            }
+
+            resultType = command.ResultType;
+            return true;
+        }
+
+        return false;
+    }
+
+    private CSharpTypeBinding BindCommandHandlerResultExpression(
+        ICommandSymbol command,
+        ImmutableArray<string> parameterNames,
+        CSharp.ExpressionSyntax expressionSyntax)
+    {
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                ContainsAwaitExpression(expressionSyntax)
+                    ? CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.Task<object>")
+                    : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                "__AkburaCommandHandlerProbe")
+            .WithParameterList(CreateCommandHandlerProbeParameterList(command, parameterNames))
+            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
+
+        if (ContainsAwaitExpression(expressionSyntax))
+        {
+            method = method.WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsyncKeyword)));
+        }
+
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        foreach (var field in CreateMarkupAttributeProbeFields())
+        {
+            membersBuilder.Add(field);
+        }
+
+        membersBuilder.Add(method);
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
+
+        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
+        if (namespaceDeclaration != null)
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
+                    namespaceDeclaration.WithMembers(
+                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
+        }
+        else
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
+        }
+
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeExpression = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.ReturnStatementSyntax>()
+            .Single()
+            .Expression;
+
+        if (probeExpression == null)
+        {
+            return CSharpTypeBinding.Empty;
+        }
+
+        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
+        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
+        var operation = semanticModel.GetOperation(probeExpression);
+        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
+            ? null
+            : typeInfo.Type;
+
+        return new CSharpTypeBinding(
+            typeSymbol,
+            symbolInfo.Symbol,
+            receiverType: null,
+            isBindingPath: false,
+            symbolInfo.CandidateSymbols,
+            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
+                ? AkburaCandidateReason.Ambiguous
+                : AkburaCandidateReason.NotFound,
+            operation == null ? default : new CSharpOperationDefinition(operation));
+    }
+
+    private CSharpTypeBinding BindCommandHandlerStatementExpression(
+        ICommandSymbol command,
+        ImmutableArray<string> parameterNames,
+        CSharp.ExpressionSyntax expressionSyntax)
+    {
+        var statement = CSharpSyntaxFactory.ExpressionStatement(expressionSyntax);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
+                "__AkburaCommandHandlerProbe")
+            .WithParameterList(CreateCommandHandlerProbeParameterList(command, parameterNames))
+            .WithBody(CSharpSyntaxFactory.Block(statement));
+
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        foreach (var field in CreateMarkupAttributeProbeFields())
+        {
+            membersBuilder.Add(field);
+        }
+
+        membersBuilder.Add(method);
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(GetCSharpUsingDirectives()));
+
+        var namespaceDeclaration = GetCSharpNamespaceDeclaration();
+        if (namespaceDeclaration != null)
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(
+                    namespaceDeclaration.WithMembers(
+                        CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass))));
+        }
+        else
+        {
+            compilationUnit = compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeClass));
+        }
+
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeExpression = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.ExpressionStatementSyntax>()
+            .Single()
+            .Expression;
+
+        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
+        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
+        var operation = semanticModel.GetOperation(probeExpression);
+        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
+            ? null
+            : typeInfo.Type;
+
+        return new CSharpTypeBinding(
+            typeSymbol,
+            symbolInfo.Symbol,
+            receiverType: null,
+            isBindingPath: false,
+            symbolInfo.CandidateSymbols,
+            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
+                ? AkburaCandidateReason.Ambiguous
+                : AkburaCandidateReason.NotFound,
+            operation == null ? default : new CSharpOperationDefinition(operation));
+    }
+
+    private static CSharp.ParameterListSyntax CreateCommandHandlerProbeParameterList(
+        ICommandSymbol command,
+        ImmutableArray<string> parameterNames)
+    {
+        using var parameters = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
+        for (var index = 0; index < parameterNames.Length; index++)
+        {
+            var name = string.IsNullOrWhiteSpace(parameterNames[index])
+                ? "__arg" + index
+                : parameterNames[index];
+            var type = index < command.Parameters.Length && !command.Parameters[index].Type.IsDefault
+                ? CSharpSyntaxFactory.ParseTypeName(command.Parameters[index].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword));
+
+            parameters.Add(CSharpSyntaxFactory.Parameter(CSharpSyntaxFactory.Identifier(name)).WithType(type));
+        }
+
+        return CSharpSyntaxFactory.ParameterList(
+            CSharpSyntaxFactory.SeparatedList(parameters.ToImmutable()));
+    }
+
+    private static bool ContainsAwaitExpression(SyntaxNode node)
+    {
+        return node.DescendantNodesAndSelf().OfType<CSharp.AwaitExpressionSyntax>().Any();
+    }
+
     private CSharpTypeBinding BindMarkupAttributeExpression(CSharp.ExpressionSyntax expressionSyntax)
     {
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
@@ -736,6 +1113,14 @@ internal sealed partial class AkburaSemanticModel
                     }
 
                     break;
+
+                case CommandDeclarationSyntax commandDeclaration:
+                    foreach (var commandMember in CreateCommandProbeMembers(commandDeclaration))
+                    {
+                        builder.Add(commandMember);
+                    }
+
+                    break;
             }
         }
 
@@ -803,6 +1188,87 @@ internal sealed partial class AkburaSemanticModel
         {
             return false;
         }
+    }
+
+    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeMembers(
+        CommandDeclarationSyntax commandDeclaration)
+    {
+        if (GetSymbolInfo(commandDeclaration).Symbol is not ICommandSymbol command)
+        {
+            return ImmutableArray<CSharp.MemberDeclarationSyntax>.Empty;
+        }
+
+        var commandTypeName = "__AkburaCommand_" + ToCSharpIdentifier(command.Name);
+        var commandType = CSharpSyntaxFactory.IdentifierName(commandTypeName);
+        var commandClass = CSharpSyntaxFactory.ClassDeclaration(commandTypeName)
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword),
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SealedKeyword)))
+            .WithMembers(CSharpSyntaxFactory.List(CreateCommandProbeTypeMembers(commandDeclaration, command)));
+        var commandField = CreateProbeField(commandType, command.Name);
+
+        return ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(commandClass, commandField);
+    }
+
+    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(
+        CommandDeclarationSyntax commandDeclaration,
+        ICommandSymbol command)
+    {
+        using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+
+        builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.BoolKeyword)),
+                "IsExecuting")
+            .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
+                CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))
+            .WithSemicolonToken(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SemicolonToken)));
+
+        var parameterList = GetCSharpParameterList(commandDeclaration.Parameters) ??
+            CSharpSyntaxFactory.ParameterList();
+        var invoke = CSharpSyntaxFactory.MethodDeclaration(
+                GetCommandInvokeReturnTypeSyntax(command),
+                "Invoke")
+            .WithParameterList(parameterList)
+            .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.ThrowStatement(
+                CSharpSyntaxFactory.ObjectCreationExpression(
+                        CSharpSyntaxFactory.ParseTypeName("global::System.NotImplementedException"))
+                    .WithArgumentList(CSharpSyntaxFactory.ArgumentList()))));
+
+        builder.Add(invoke);
+        return builder.ToImmutable();
+    }
+
+    private static CSharp.TypeSyntax GetCommandInvokeReturnTypeSyntax(ICommandSymbol command)
+    {
+        if (command.HasResult &&
+            !command.ResultType.IsDefault)
+        {
+            return CSharpSyntaxFactory.ParseTypeName(
+                "global::System.Threading.Tasks.ValueTask<" +
+                command.ResultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                ">");
+        }
+
+        return CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.ValueTask");
+    }
+
+    private static string ToCSharpIdentifier(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "_";
+        }
+
+        var builder = new StringBuilder(value.Length);
+        for (var index = 0; index < value.Length; index++)
+        {
+            var ch = value[index];
+            builder.Append(index == 0
+                ? Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierStartCharacter(ch) ? ch : '_'
+                : Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(ch) ? ch : '_');
+        }
+
+        return builder.ToString();
     }
 
     private static CSharp.FieldDeclarationSyntax CreateProbeField(
@@ -933,5 +1399,59 @@ internal sealed partial class AkburaSemanticModel
             SyntaxTree.GetRoot(),
             ErrorCodes.AKBURA_SEMANTIC_AkcssImportNotFound,
             [importName]);
+    }
+
+    private readonly struct MarkupCommandHandlerAnalysis
+    {
+        public static MarkupCommandHandlerAnalysis Error { get; } = new(
+            MarkupCommandHandlerKind.Error,
+            MarkupCommandArgumentMode.None,
+            MarkupCommandResultMode.Unknown,
+            parameterCount: 0,
+            isAsync: false,
+            containsAwait: false,
+            type: default,
+            resultType: default,
+            operation: default);
+
+        public MarkupCommandHandlerAnalysis(
+            MarkupCommandHandlerKind kind,
+            MarkupCommandArgumentMode argumentMode,
+            MarkupCommandResultMode resultMode,
+            int parameterCount,
+            bool isAsync,
+            bool containsAwait,
+            CSharpSymbolDefinition type,
+            CSharpSymbolDefinition resultType,
+            CSharpOperationDefinition operation)
+        {
+            Kind = kind;
+            ArgumentMode = argumentMode;
+            ResultMode = resultMode;
+            ParameterCount = parameterCount;
+            IsAsync = isAsync;
+            ContainsAwait = containsAwait;
+            Type = type;
+            ResultType = resultType;
+            Operation = operation;
+        }
+
+        public MarkupCommandHandlerKind Kind { get; }
+
+        public MarkupCommandArgumentMode ArgumentMode { get; }
+
+        public MarkupCommandResultMode ResultMode { get; }
+
+        public int ParameterCount { get; }
+
+        public bool IsAsync { get; }
+
+        public bool ContainsAwait { get; }
+
+        public CSharpSymbolDefinition Type { get; }
+
+        public CSharpSymbolDefinition ResultType { get; }
+
+        public CSharpOperationDefinition Operation { get; }
     }
 }

@@ -27,6 +27,7 @@ internal enum OperationKind
     AkcssUtilityDeclaration,
     AkcssAssignment,
     AkcssIf,
+    MarkupCommandBinding,
     TailwindUtility,
     Error,
 }

@@ -1813,6 +1813,169 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupCommandAttribute_CreatesCommandBindingOperation()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "command int Click(int a);";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "<A Click={x => x * 2}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(Akbura.Language.Operations.OperationKind.MarkupCommandBinding, operation.Kind);
+        Assert.Equal("Click", operation.Command.Name);
+        Assert.Same(operation.Command, operation.TargetSymbol);
+        Assert.True(operation.Property.IsCommand);
+        Assert.Same(operation.Command, operation.Property.Command);
+        Assert.Equal("Int32", operation.ReturnType.Name);
+        Assert.Equal("Int32", operation.ResultType.Name);
+        Assert.Equal("a", Assert.Single(operation.Parameters).Name);
+        Assert.Equal(MarkupAttributeBindingKind.None, operation.BindingKind);
+        Assert.Equal(MarkupAttributeValueKind.DynamicExpression, operation.ValueKind);
+        Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
+        Assert.Equal(MarkupCommandArgumentMode.ReceivesCommandArgument, operation.ArgumentMode);
+        Assert.Equal(MarkupCommandResultMode.ReturnsResult, operation.ResultMode);
+        Assert.Equal(1, operation.HandlerParameterCount);
+        Assert.False(operation.IsAsync);
+        Assert.False(operation.ContainsAwait);
+        Assert.Equal("Int32", operation.HandlerResultType.Name);
+        Assert.Same(attribute.Value, operation.ValueSyntax);
+        Assert.False(operation.HasErrors);
+        Assert.Same(operation, semanticModel.GetOperation(attribute));
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Theory]
+    [InlineData("() => Vm.Notify()", (int)MarkupCommandHandlerKind.Lambda, (int)MarkupCommandArgumentMode.IgnoresCommandArgument, (int)MarkupCommandResultMode.NoResult, 0, false, false, null)]
+    [InlineData("x => Vm.NotifyWith(x)", (int)MarkupCommandHandlerKind.Lambda, (int)MarkupCommandArgumentMode.ReceivesCommandArgument, (int)MarkupCommandResultMode.NoResult, 1, false, false, null)]
+    [InlineData("x => x * 2", (int)MarkupCommandHandlerKind.Lambda, (int)MarkupCommandArgumentMode.ReceivesCommandArgument, (int)MarkupCommandResultMode.ReturnsResult, 1, false, false, "Int32")]
+    [InlineData("async x => await Vm.Fetch(x)", (int)MarkupCommandHandlerKind.Lambda, (int)MarkupCommandArgumentMode.ReceivesCommandArgument, (int)MarkupCommandResultMode.ReturnsResult, 1, true, true, "Int32")]
+    [InlineData("Vm.MyCommand", (int)MarkupCommandHandlerKind.DirectReference, (int)MarkupCommandArgumentMode.None, (int)MarkupCommandResultMode.Unknown, 0, false, false, null)]
+    public void SemanticModel_MarkupCommandAttribute_AnalyzesHandlerShape(
+        string handler,
+        int expectedHandlerKind,
+        int expectedArgumentMode,
+        int expectedResultMode,
+        int expectedParameterCount,
+        bool expectedIsAsync,
+        bool expectedContainsAwait,
+        string? expectedResultTypeName)
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "command int Click(int a);";
+        var bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "inject RootVm Vm;\n" +
+            "\n" +
+            "<A Click={" + handler + "}/>";
+        const string csharpCode =
+            "public sealed class RootVm\n" +
+            "{\n" +
+            "    public void Notify() { }\n" +
+            "    public void NotifyWith(int value) { }\n" +
+            "    public System.Threading.Tasks.Task<int> Fetch(int value) => System.Threading.Tasks.Task.FromResult(value);\n" +
+            "    public System.Func<int, int> MyCommand { get; } = value => value * 2;\n" +
+            "}";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(csharpCode), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal((MarkupCommandHandlerKind)expectedHandlerKind, operation.HandlerKind);
+        Assert.Equal((MarkupCommandArgumentMode)expectedArgumentMode, operation.ArgumentMode);
+        Assert.Equal((MarkupCommandResultMode)expectedResultMode, operation.ResultMode);
+        Assert.Equal(expectedParameterCount, operation.HandlerParameterCount);
+        Assert.Equal(expectedIsAsync, operation.IsAsync);
+        Assert.Equal(expectedContainsAwait, operation.ContainsAwait);
+        if (expectedResultTypeName == null)
+        {
+            Assert.True(operation.HandlerResultType.IsDefault);
+        }
+        else
+        {
+            Assert.Equal(expectedResultTypeName, operation.HandlerResultType.Name);
+        }
+    }
+
+    [Fact]
+    public void SemanticModel_LocalCommandIsExecuting_BindsInMarkupExpression()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "command int CustomClick(int a);\n" +
+            "\n" +
+            "<TextBlock IsVisible={CustomClick.IsExecuting} />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attributes = element.StartTag!.Attributes;
+
+        var isVisible = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(Assert.Single(attributes)));
+
+        Assert.Equal("Boolean", isVisible.ValueType.Name);
+        Assert.True(semanticModel.GetSemanticDiagnostics(Assert.Single(attributes)).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_LocalCommandInvoke_BindsAsAwaitableInCommandHandler()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "command int Click(int a);";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "command int CustomClick(int a);\n" +
+            "state int clicked = 0;\n" +
+            "\n" +
+            "<A Click={async x => await CustomClick.Invoke(clicked)}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
+        Assert.Equal(MarkupCommandArgumentMode.ReceivesCommandArgument, operation.ArgumentMode);
+        Assert.Equal(MarkupCommandResultMode.ReturnsResult, operation.ResultMode);
+        Assert.True(operation.IsAsync);
+        Assert.True(operation.ContainsAwait);
+        Assert.Equal("Int32", operation.HandlerResultType.Name);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
     public void SemanticModel_UnresolvedMarkupComponent_ReturnsNotFound()
     {
         const string code =

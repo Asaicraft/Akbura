@@ -26,7 +26,7 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         ImmutableArray<ICommandSymbol> commands,
         ImmutableArray<UseEffectDeclarationSyntax> useEffects,
         ImmutableArray<UserHookSyntax> userHooks,
-        ImmutableArray<InlineAkcssBlockSyntax> inlineAkcssBlocks,
+        ImmutableArray<IAkcssModuleSymbol> akcssModules,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -70,9 +70,9 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         UserHooks = userHooks.IsDefault
             ? ImmutableArray<UserHookSyntax>.Empty
             : userHooks;
-        InlineAkcssBlocks = inlineAkcssBlocks.IsDefault
-            ? ImmutableArray<InlineAkcssBlockSyntax>.Empty
-            : inlineAkcssBlocks;
+        AkcssModules = akcssModules.IsDefault
+            ? ImmutableArray<IAkcssModuleSymbol>.Empty
+            : akcssModules;
 
         var csharpType = PartialTypes.Length == 1
             ? PartialTypes[0]
@@ -126,7 +126,14 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
 
     public ImmutableArray<UserHookSyntax> UserHooks { get; }
 
-    public ImmutableArray<InlineAkcssBlockSyntax> InlineAkcssBlocks { get; }
+    public ImmutableArray<IAkcssModuleSymbol> AkcssModules { get; private set; }
+
+    internal void SetAkcssModules(ImmutableArray<IAkcssModuleSymbol> akcssModules)
+    {
+        AkcssModules = akcssModules.IsDefault
+            ? ImmutableArray<IAkcssModuleSymbol>.Empty
+            : akcssModules;
+    }
 
     public override string ToDisplayString()
     {

@@ -794,6 +794,49 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ResolvesInlineAkcssModuleSymbol()
+    {
+        const string code =
+            "namespace Demo;\n" +
+            "\n" +
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        Background: \"Red\";\n" +
+            "    }\n" +
+            "\n" +
+            "    @utilities {\n" +
+            "        .w-(double value) {\n" +
+            "            Width: value;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(
+            root.Members.Single(member => member is InlineAkcssBlockSyntax));
+
+        var moduleInfo = semanticModel.GetSymbolInfo(inlineAkcss);
+
+        var module = Assert.IsAssignableFrom<IAkcssModuleSymbol>(moduleInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, moduleInfo.CandidateReason);
+        Assert.Equal(AkburaSymbolKind.AkcssModule, module.Kind);
+        Assert.True(module.IsInlined);
+        Assert.Null(module.Path);
+        Assert.Same(inlineAkcss, module.DeclaringSyntax);
+        Assert.Equal(2, module.AkcssSymbols.Length);
+        Assert.Contains(module.AkcssSymbols, symbol => symbol is AkcssStyleSymbol { Name: "hello" });
+        Assert.Contains(module.AkcssSymbols, symbol => symbol is ITailwindUtilitySymbol { Name: "w" });
+
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(root).Symbol);
+        var componentModule = Assert.Single(component.AkcssModules);
+        Assert.Same(module, componentModule);
+        Assert.Same(component, module.ContainingSymbol);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssStyleTargetType_MustBeAvaloniaControl()
     {
         const string code =

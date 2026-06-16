@@ -28,5 +28,5 @@ internal interface IAkburaComponentSymbol : IMarkupComponentSymbol
 
     ImmutableArray<UserHookSyntax> UserHooks { get; }
 
-    ImmutableArray<InlineAkcssBlockSyntax> InlineAkcssBlocks { get; }
+    ImmutableArray<IAkcssModuleSymbol> AkcssModules { get; }
 }

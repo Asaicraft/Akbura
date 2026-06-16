@@ -60,6 +60,7 @@ internal sealed partial class AkburaSemanticModel
             ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
             InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
             CommandDeclarationSyntax commandDeclaration => ResolveCommand(commandDeclaration),
+            InlineAkcssBlockSyntax inlineAkcssBlock => ResolveInlineAkcssModule(inlineAkcssBlock),
             AkcssStyleRuleSyntax styleRule => ResolveAkcssStyle(styleRule),
             AkcssUtilityDeclarationSyntax utilityDeclaration => ResolveTailwindUtility(utilityDeclaration),
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
@@ -166,9 +167,7 @@ internal sealed partial class AkburaSemanticModel
             }
         }
 
-        SetSemanticDiagnostics(document, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
-        return AkburaSymbolInfo.Success(new AkburaComponentSymbol(
+        var componentSymbol = new AkburaComponentSymbol(
             SyntaxTree,
             document,
             componentName,
@@ -183,7 +182,17 @@ internal sealed partial class AkburaSemanticModel
             commandsBuilder.ToImmutable(),
             useEffectsBuilder.ToImmutable(),
             userHooksBuilder.ToImmutable(),
-            inlineAkcssBuilder.ToImmutable()));
+            akcssModules: ImmutableArray<IAkcssModuleSymbol>.Empty);
+        var symbolInfo = AkburaSymbolInfo.Success(componentSymbol);
+        _symbolInfoCache[document] = symbolInfo;
+
+        componentSymbol.SetAkcssModules(CreateInlineAkcssModuleSymbols(
+            inlineAkcssBuilder.WrittenSpan,
+            componentSymbol));
+
+        SetSemanticDiagnostics(document, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return symbolInfo;
     }
 
     private void AddAkburaComponentMember(
@@ -294,6 +303,86 @@ internal sealed partial class AkburaSemanticModel
                     break;
             }
         }
+    }
+
+    private AkburaSymbolInfo ResolveInlineAkcssModule(InlineAkcssBlockSyntax inlineAkcssBlock)
+    {
+        var componentInfo = GetSymbolInfo(SyntaxTree.GetRoot());
+        if (_symbolInfoCache.TryGetValue(inlineAkcssBlock, out var cachedInfo))
+        {
+            return cachedInfo;
+        }
+
+        var containingComponent = componentInfo.Symbol as IAkburaComponentSymbol;
+        var symbol = CreateInlineAkcssModuleSymbol(inlineAkcssBlock, containingComponent);
+        var symbolInfo = AkburaSymbolInfo.Success(symbol);
+        _symbolInfoCache[inlineAkcssBlock] = symbolInfo;
+        SetSemanticDiagnostics(inlineAkcssBlock, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        return symbolInfo;
+    }
+
+    private ImmutableArray<IAkcssModuleSymbol> CreateInlineAkcssModuleSymbols(
+        ReadOnlySpan<InlineAkcssBlockSyntax> inlineAkcssBlocks,
+        IAkburaComponentSymbol containingComponent)
+    {
+        if (inlineAkcssBlocks.Length == 0)
+        {
+            return ImmutableArray<IAkcssModuleSymbol>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent(inlineAkcssBlocks.Length);
+        foreach (var inlineAkcssBlock in inlineAkcssBlocks)
+        {
+            var module = CreateInlineAkcssModuleSymbol(inlineAkcssBlock, containingComponent);
+            _symbolInfoCache[inlineAkcssBlock] = AkburaSymbolInfo.Success(module);
+            builder.Add(module);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private IAkcssModuleSymbol CreateInlineAkcssModuleSymbol(
+        InlineAkcssBlockSyntax inlineAkcssBlock,
+        IAkburaComponentSymbol? containingComponent)
+    {
+        return new AkcssModuleSymbol(
+            inlineAkcssBlock,
+            isInlined: true,
+            containingSymbol: containingComponent,
+            CreateAkcssSymbols(inlineAkcssBlock.Members),
+            path: null);
+    }
+
+    private ImmutableArray<IAkcssSymbol> CreateAkcssSymbols(
+        Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> members)
+    {
+        using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
+        foreach (var member in members)
+        {
+            switch (member)
+            {
+                case AkcssStyleRuleSyntax styleRule:
+                    if (GetSymbolInfo(styleRule).Symbol is IAkcssSymbol styleSymbol)
+                    {
+                        builder.Add(styleSymbol);
+                    }
+
+                    break;
+
+                case AkcssUtilitiesSectionSyntax utilitiesSection:
+                    foreach (var utilityDeclaration in utilitiesSection.Utilities)
+                    {
+                        if (GetSymbolInfo(utilityDeclaration).Symbol is IAkcssSymbol utilitySymbol)
+                        {
+                            builder.Add(utilitySymbol);
+                        }
+                    }
+
+                    break;
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     private ImmutableArray<INamedTypeSymbol> ResolveAkburaComponentPartialTypes(AkburaSyntaxTree syntaxTree)

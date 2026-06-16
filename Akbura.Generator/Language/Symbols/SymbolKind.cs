@@ -6,6 +6,7 @@ internal enum SymbolKind
     Namespace,
     Alias,
     Component,
+    AkburaComponent,
     MarkupComponent,
     Property,
     Event,

@@ -30,6 +30,80 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkburaComponentSymbol_CollectsTopLevelAndConditionalMarkup()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state bool isLoaded = true;\n" +
+            "\n" +
+            "if(!isLoaded)\n" +
+            "{\n" +
+            "    <TextBlock Text=\"Loading...\"/>\n" +
+            "}\n" +
+            "\n" +
+            "<TextBlock Text=\"Loaded\"/>";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Views/Counter.akbura");
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [syntaxTree],
+            rootNamespace: "Demo");
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+        var symbolInfo = semanticModel.GetSymbolInfo(syntaxTree.GetRoot());
+
+        var symbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaSymbolKind.AkburaComponent, symbol.Kind);
+        Assert.Equal("Counter", symbol.Name);
+        Assert.Equal("Demo.Views.Counter", symbol.MetadataName);
+        Assert.Equal("Demo.Views", symbol.NamespaceName);
+        Assert.Equal(2, symbol.MarkupRoots.Length);
+        Assert.All(symbol.MarkupRoots, markupRoot => Assert.Equal("TextBlock", markupRoot.Name));
+        Assert.Single(symbol.States);
+        Assert.Equal("isLoaded", symbol.States[0].Name);
+    }
+
+    [Fact]
+    public void SemanticModel_AkburaComponentSymbol_ResolvesDefaultNamespacePartialType()
+    {
+        const string code =
+            "inject ILogger<Counter> logger;\n" +
+            "\n" +
+            "<Button />";
+        const string csharpCode =
+            "namespace RootNamespace.MyNamespace;\n" +
+            "\n" +
+            "public interface ILogger<T> { }\n" +
+            "\n" +
+            "public partial class Counter\n" +
+            "{\n" +
+            "    public void First() { }\n" +
+            "}\n" +
+            "\n" +
+            "public partial class Counter\n" +
+            "{\n" +
+            "    public void Second() { }\n" +
+            "}";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "MyNamespace/Counter.akbura");
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(csharpCode),
+            [syntaxTree],
+            rootNamespace: "RootNamespace");
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+        var symbolInfo = semanticModel.GetSymbolInfo(syntaxTree.GetRoot());
+
+        var symbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(symbolInfo.Symbol);
+        var partialType = Assert.Single(symbol.PartialTypes);
+        Assert.Equal("RootNamespace.MyNamespace.Counter", partialType.ToDisplayString());
+        Assert.Equal(2, partialType.DeclaringSyntaxReferences.Length);
+        Assert.True(SymbolEqualityComparer.Default.Equals(partialType, symbol.CSharpDefinition.Symbol));
+
+        var inject = Assert.Single(symbol.InjectedServices);
+        Assert.Contains("RootNamespace.MyNamespace.Counter", inject.Type.ToDisplayString());
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesMarkupComponentSymbol_FromRealAvaloniaAssembly()
     {
         const string code =
@@ -1836,15 +1910,17 @@ public class SemanticPipelineTests
         var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
 
         var componentSymbolInfo = semanticModel.GetSymbolInfo(element);
-        var componentSymbol = Assert.IsType<AkburaMarkupComponentSymbol>(componentSymbolInfo.Symbol);
-        var paramSymbol = Assert.Single(componentSymbol.Parameters);
+        var componentSymbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(componentSymbolInfo.Symbol);
+        var akburaComponent = Assert.IsAssignableFrom<IAkburaComponentSymbol>(componentSymbol.AkburaComponent);
+        var paramSymbol = Assert.Single(akburaComponent.Parameters);
         var propertySymbolInfo = semanticModel.GetSymbolInfo(attribute);
         var propertySymbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(propertySymbolInfo.Symbol);
 
         Assert.Equal(AkburaCandidateReason.None, componentSymbolInfo.CandidateReason);
         Assert.Equal("A", componentSymbol.Name);
         Assert.Equal("SomeNs.A", componentSymbol.MetadataName);
-        Assert.Same(aSyntaxTree, componentSymbol.SyntaxTree);
+        Assert.Same(aSyntaxTree, akburaComponent.SyntaxTree);
+        Assert.Single(componentSymbol.AttributeOperations);
         Assert.Equal("Hello", paramSymbol.Name);
         Assert.Equal("Int32", paramSymbol.Type.Name);
 
@@ -2063,12 +2139,14 @@ public class SemanticPipelineTests
         var element = GetOnlyMarkupElement(bSyntaxTree);
         var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
 
-        var componentSymbol = Assert.IsType<AkburaMarkupComponentSymbol>(
+        var componentSymbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
             semanticModel.GetSymbolInfo(element).Symbol);
-        var commandSymbol = Assert.Single(componentSymbol.Commands);
+        var akburaComponent = Assert.IsAssignableFrom<IAkburaComponentSymbol>(componentSymbol.AkburaComponent);
+        var commandSymbol = Assert.Single(akburaComponent.Commands);
         var propertySymbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(
             semanticModel.GetSymbolInfo(attribute).Symbol);
 
+        Assert.Single(componentSymbol.AttributeOperations);
         Assert.Equal("Click", commandSymbol.Name);
         Assert.Equal("Int32", commandSymbol.ReturnType.Name);
         Assert.Equal("a", Assert.Single(commandSymbol.Parameters).Name);

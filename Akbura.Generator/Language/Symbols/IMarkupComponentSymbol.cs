@@ -1,3 +1,4 @@
+using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -11,7 +12,7 @@ internal interface IMarkupComponentSymbol : ISymbol
 
     ImmutableArray<MarkupChildContent> Children { get; }
 
-    ImmutableArray<IParamSymbol> Parameters { get; }
+    ImmutableArray<IMarkupAttributeOperation> AttributeOperations { get; }
 
-    ImmutableArray<ICommandSymbol> Commands { get; }
+    IAkburaComponentSymbol? AkburaComponent { get; }
 }

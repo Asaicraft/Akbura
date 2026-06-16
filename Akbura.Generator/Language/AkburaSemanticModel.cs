@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
@@ -54,6 +55,7 @@ internal sealed partial class AkburaSemanticModel
 
         symbolInfo = syntax switch
         {
+            AkburaDocumentSyntax document => ResolveAkburaComponent(document),
             StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
             ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
             InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
@@ -65,7 +67,7 @@ internal sealed partial class AkburaSemanticModel
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         };
 
-        _symbolInfoCache.Add(syntax, symbolInfo);
+        _symbolInfoCache[syntax] = symbolInfo;
         return symbolInfo;
     }
 
@@ -112,6 +114,200 @@ internal sealed partial class AkburaSemanticModel
 
         _operationCache[syntax] = operation;
         return operation;
+    }
+
+    private AkburaSymbolInfo ResolveAkburaComponent(AkburaDocumentSyntax document)
+    {
+        var componentName = SyntaxTree.ComponentName;
+        if (string.IsNullOrWhiteSpace(componentName))
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var namespaceName = GetAkburaNamespaceText(document, SyntaxTree);
+        var partialTypes = ResolveAkburaComponentPartialTypes(SyntaxTree);
+        var contentModel = partialTypes.Length > 0
+            ? CreateMarkupContentModel(partialTypes[0])
+            : default;
+
+        using var markupRootsBuilder = ImmutableArrayBuilder<MarkupRootSyntax>.Rent();
+        using var markupRootSymbolsBuilder = ImmutableArrayBuilder<IMarkupComponentSymbol>.Rent();
+        using var statesBuilder = ImmutableArrayBuilder<IStateSymbol>.Rent();
+        using var parametersBuilder = ImmutableArrayBuilder<IParamSymbol>.Rent();
+        using var injectedServicesBuilder = ImmutableArrayBuilder<IInjectSymbol>.Rent();
+        using var commandsBuilder = ImmutableArrayBuilder<ICommandSymbol>.Rent();
+        using var useEffectsBuilder = ImmutableArrayBuilder<UseEffectDeclarationSyntax>.Rent();
+        using var userHooksBuilder = ImmutableArrayBuilder<UserHookSyntax>.Rent();
+        using var inlineAkcssBuilder = ImmutableArrayBuilder<InlineAkcssBlockSyntax>.Rent();
+
+        foreach (var member in document.Members)
+        {
+            AddAkburaComponentMember(
+                member,
+                markupRootsBuilder,
+                statesBuilder,
+                parametersBuilder,
+                injectedServicesBuilder,
+                commandsBuilder,
+                useEffectsBuilder,
+                userHooksBuilder,
+                inlineAkcssBuilder);
+        }
+
+        var children = markupRootsBuilder.Count == 1
+            ? CreateMarkupChildren(markupRootsBuilder.WrittenSpan[0].Element, contentModel, out _)
+            : ImmutableArray<MarkupChildContent>.Empty;
+
+        foreach (var markupRoot in markupRootsBuilder.WrittenSpan)
+        {
+            if (GetSymbolInfo(markupRoot.Element).Symbol is IMarkupComponentSymbol markupComponentSymbol)
+            {
+                markupRootSymbolsBuilder.Add(markupComponentSymbol);
+            }
+        }
+
+        SetSemanticDiagnostics(document, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        return AkburaSymbolInfo.Success(new AkburaComponentSymbol(
+            SyntaxTree,
+            document,
+            componentName,
+            namespaceName,
+            partialTypes,
+            contentModel,
+            children,
+            markupRootSymbolsBuilder.ToImmutable(),
+            statesBuilder.ToImmutable(),
+            parametersBuilder.ToImmutable(),
+            injectedServicesBuilder.ToImmutable(),
+            commandsBuilder.ToImmutable(),
+            useEffectsBuilder.ToImmutable(),
+            userHooksBuilder.ToImmutable(),
+            inlineAkcssBuilder.ToImmutable()));
+    }
+
+    private void AddAkburaComponentMember(
+        AkTopLevelMemberSyntax member,
+        ImmutableArrayBuilder<MarkupRootSyntax> markupRootsBuilder,
+        ImmutableArrayBuilder<IStateSymbol> statesBuilder,
+        ImmutableArrayBuilder<IParamSymbol> parametersBuilder,
+        ImmutableArrayBuilder<IInjectSymbol> injectedServicesBuilder,
+        ImmutableArrayBuilder<ICommandSymbol> commandsBuilder,
+        ImmutableArrayBuilder<UseEffectDeclarationSyntax> useEffectsBuilder,
+        ImmutableArrayBuilder<UserHookSyntax> userHooksBuilder,
+        ImmutableArrayBuilder<InlineAkcssBlockSyntax> inlineAkcssBuilder)
+    {
+        switch (member)
+        {
+            case MarkupRootSyntax markupRoot:
+                markupRootsBuilder.Add(markupRoot);
+                break;
+
+            case StateDeclarationSyntax stateDeclaration:
+                if (GetSymbolInfo(stateDeclaration).Symbol is IStateSymbol stateSymbol)
+                {
+                    statesBuilder.Add(stateSymbol);
+                }
+
+                break;
+
+            case ParamDeclarationSyntax paramDeclaration:
+                if (GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
+                {
+                    parametersBuilder.Add(paramSymbol);
+                }
+
+                break;
+
+            case InjectDeclarationSyntax injectDeclaration:
+                if (GetSymbolInfo(injectDeclaration).Symbol is IInjectSymbol injectSymbol)
+                {
+                    injectedServicesBuilder.Add(injectSymbol);
+                }
+
+                break;
+
+            case CommandDeclarationSyntax commandDeclaration:
+                if (GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
+                {
+                    commandsBuilder.Add(commandSymbol);
+                }
+
+                break;
+
+            case UseEffectDeclarationSyntax useEffectDeclaration:
+                useEffectsBuilder.Add(useEffectDeclaration);
+                AddAkburaComponentBlockMarkup(useEffectDeclaration.Body, markupRootsBuilder);
+                foreach (var tail in useEffectDeclaration.Tails)
+                {
+                    AddAkburaComponentBlockMarkup(tail.Body, markupRootsBuilder);
+                }
+
+                break;
+
+            case UserHookSyntax userHook:
+                userHooksBuilder.Add(userHook);
+                AddAkburaComponentBlockMarkup(userHook.Body, markupRootsBuilder);
+                break;
+
+            case InlineAkcssBlockSyntax inlineAkcssBlock:
+                inlineAkcssBuilder.Add(inlineAkcssBlock);
+                break;
+
+            case CSharpStatementSyntax csharpStatement:
+                if (csharpStatement.Body != null)
+                {
+                    AddAkburaComponentBlockMarkup(csharpStatement.Body, markupRootsBuilder);
+                }
+
+                break;
+        }
+    }
+
+    private void AddAkburaComponentBlockMarkup(
+        CSharpBlockSyntax block,
+        ImmutableArrayBuilder<MarkupRootSyntax> markupRootsBuilder)
+    {
+        foreach (var member in block.Tokens)
+        {
+            switch (member)
+            {
+                case MarkupRootSyntax markupRoot:
+                    markupRootsBuilder.Add(markupRoot);
+                    break;
+
+                case CSharpStatementSyntax { Body: { } body }:
+                    AddAkburaComponentBlockMarkup(body, markupRootsBuilder);
+                    break;
+
+                case UseEffectDeclarationSyntax useEffectDeclaration:
+                    AddAkburaComponentBlockMarkup(useEffectDeclaration.Body, markupRootsBuilder);
+                    foreach (var tail in useEffectDeclaration.Tails)
+                    {
+                        AddAkburaComponentBlockMarkup(tail.Body, markupRootsBuilder);
+                    }
+
+                    break;
+
+                case UserHookSyntax userHook:
+                    AddAkburaComponentBlockMarkup(userHook.Body, markupRootsBuilder);
+                    break;
+            }
+        }
+    }
+
+    private ImmutableArray<INamedTypeSymbol> ResolveAkburaComponentPartialTypes(AkburaSyntaxTree syntaxTree)
+    {
+        var metadataName = GetAkburaComponentMetadataName(syntaxTree);
+        if (metadataName.Length == 0)
+        {
+            return ImmutableArray<INamedTypeSymbol>.Empty;
+        }
+
+        var type = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
+        return type == null
+            ? ImmutableArray<INamedTypeSymbol>.Empty
+            : ImmutableArray.Create(type);
     }
 
     private AkburaSymbolInfo ResolveState(StateDeclarationSyntax stateDeclaration)
@@ -1605,11 +1801,15 @@ internal sealed partial class AkburaSemanticModel
             var children = CreateMarkupChildren(markupElement, contentModel, out var diagnostics);
             SetSemanticDiagnostics(markupElement, diagnostics);
 
-            return AkburaSymbolInfo.Success(new MarkupComponentSymbol(
+            var symbol = new MarkupComponentSymbol(
                 componentNameText,
                 new CSharpSymbolDefinition(namedType),
                 contentModel,
-                children));
+                children);
+            _symbolInfoCache[markupElement] = AkburaSymbolInfo.Success(symbol);
+            symbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
+
+            return AkburaSymbolInfo.Success(symbol);
         }
 
         SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
@@ -1644,20 +1844,49 @@ internal sealed partial class AkburaSemanticModel
                     continue;
                 }
 
-                symbol = new AkburaMarkupComponentSymbol(
-                    componentNameText,
-                    metadataName,
-                    syntaxTree,
-                    CreateAkburaComponentParameters(syntaxTree),
-                    CreateAkburaComponentCommands(syntaxTree));
+                var componentSemanticModel = Compilation.GetSemanticModel(syntaxTree);
+                if (componentSemanticModel.GetSymbolInfo(syntaxTree.GetRoot()).Symbol is not IAkburaComponentSymbol componentSymbol)
+                {
+                    continue;
+                }
 
                 SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+                var usageSymbol = new MarkupComponentSymbol(
+                    componentNameText,
+                    componentSymbol.CSharpDefinition,
+                    componentSymbol.ContentModel,
+                    children: ImmutableArray<MarkupChildContent>.Empty,
+                    akburaComponent: componentSymbol);
+                _symbolInfoCache[markupElement] = AkburaSymbolInfo.Success(usageSymbol);
+                usageSymbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
+
+                symbol = usageSymbol;
                 return true;
             }
         }
 
         symbol = null!;
         return false;
+    }
+
+    private ImmutableArray<IMarkupAttributeOperation> CreateMarkupAttributeOperations(
+        MarkupElementSyntax markupElement)
+    {
+        if (markupElement.StartTag == null)
+        {
+            return ImmutableArray<IMarkupAttributeOperation>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<IMarkupAttributeOperation>.Rent();
+        foreach (var attribute in markupElement.StartTag.Attributes)
+        {
+            if (GetOperation(attribute) is IMarkupAttributeOperation operation)
+            {
+                builder.Add(operation);
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     private IEnumerable<string> GetAkburaComponentCandidateMetadataNames(
@@ -1691,7 +1920,7 @@ internal sealed partial class AkburaSemanticModel
             yield return @namespace + "." + nameText;
         }
 
-        var currentNamespace = GetAkburaNamespaceText(SyntaxTree.GetRoot());
+        var currentNamespace = GetAkburaNamespaceText(SyntaxTree.GetRoot(), SyntaxTree);
         if (currentNamespace.Length > 0)
         {
             yield return currentNamespace + "." + nameText;
@@ -1757,7 +1986,7 @@ internal sealed partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private static string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
+    private string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
     {
         var componentName = syntaxTree.ComponentName;
         if (componentName.Length == 0)
@@ -1765,13 +1994,13 @@ internal sealed partial class AkburaSemanticModel
             return string.Empty;
         }
 
-        var namespaceText = GetAkburaNamespaceText(syntaxTree.GetRoot());
+        var namespaceText = GetAkburaNamespaceText(syntaxTree.GetRoot(), syntaxTree);
         return namespaceText.Length == 0
             ? componentName
             : namespaceText + "." + componentName;
     }
 
-    private static string GetAkburaNamespaceText(AkburaDocumentSyntax root)
+    private string GetAkburaNamespaceText(AkburaDocumentSyntax root, AkburaSyntaxTree? syntaxTree = null)
     {
         foreach (var member in root.Members)
         {
@@ -1781,7 +2010,74 @@ internal sealed partial class AkburaSemanticModel
             }
         }
 
-        return string.Empty;
+        return syntaxTree == null
+            ? string.Empty
+            : GetDefaultAkburaNamespaceText(syntaxTree);
+    }
+
+    private string GetDefaultAkburaNamespaceText(AkburaSyntaxTree syntaxTree)
+    {
+        using var builder = ImmutableArrayBuilder<string>.Rent();
+        AddNamespaceSegments(builder, Compilation.RootNamespace);
+
+        var directory = GetAkburaRelativeDirectory(syntaxTree);
+        AddNamespaceSegments(builder, directory);
+
+        return string.Join(".", builder.ToImmutable());
+    }
+
+    private string GetAkburaRelativeDirectory(AkburaSyntaxTree syntaxTree)
+    {
+        if (string.IsNullOrWhiteSpace(syntaxTree.FilePath))
+        {
+            return string.Empty;
+        }
+
+        var filePath = syntaxTree.FilePath;
+        if (Path.IsPathRooted(filePath))
+        {
+            if (string.IsNullOrWhiteSpace(Compilation.ProjectDirectory))
+            {
+                return string.Empty;
+            }
+
+            var projectDirectory = Path.GetFullPath(Compilation.ProjectDirectory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var fullFilePath = Path.GetFullPath(filePath);
+            var prefix = projectDirectory + Path.DirectorySeparatorChar;
+            if (fullFilePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                filePath = fullFilePath[prefix.Length..];
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
+
+        return Path.GetDirectoryName(filePath) ?? string.Empty;
+    }
+
+    private static void AddNamespaceSegments(
+        ImmutableArrayBuilder<string> builder,
+        string namespaceText)
+    {
+        if (string.IsNullOrWhiteSpace(namespaceText))
+        {
+            return;
+        }
+
+        var normalized = namespaceText
+            .Replace(Path.DirectorySeparatorChar, '.')
+            .Replace(Path.AltDirectorySeparatorChar, '.');
+        foreach (var segment in normalized.Split(['.'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = segment.Trim();
+            if (trimmed.Length > 0)
+            {
+                builder.Add(trimmed);
+            }
+        }
     }
 
     private AkburaSymbolInfo ResolveMarkupProperty(MarkupAttributeSyntax markupAttribute)
@@ -1801,7 +2097,7 @@ internal sealed partial class AkburaSemanticModel
         var componentSymbolInfo = GetSymbolInfo(markupElement);
         if (componentSymbolInfo.Symbol is not IMarkupComponentSymbol componentSymbol)
         {
-            SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
             return AkburaSymbolInfo.None(componentSymbolInfo.CandidateReason);
         }
 
@@ -1844,7 +2140,7 @@ internal sealed partial class AkburaSemanticModel
             avaloniaProperty == null &&
             (clrEvent != null || avaloniaRoutedEvent != null))
         {
-            SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
 
             return AkburaSymbolInfo.Success(new RoutedEventSymbol(
                 propertyName,
@@ -1855,7 +2151,7 @@ internal sealed partial class AkburaSemanticModel
                 containingSymbol: componentSymbol));
         }
 
-        SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
 
         return AkburaSymbolInfo.Success(new PropertySymbol(
             propertyName,
@@ -1894,7 +2190,13 @@ internal sealed partial class AkburaSemanticModel
         IMarkupComponentSymbol componentSymbol,
         string propertyName)
     {
-        foreach (var parameter in componentSymbol.Parameters)
+        var akburaComponent = componentSymbol.AkburaComponent;
+        if (akburaComponent == null)
+        {
+            return null;
+        }
+
+        foreach (var parameter in akburaComponent.Parameters)
         {
             if (parameter.Name == propertyName)
             {
@@ -1909,7 +2211,13 @@ internal sealed partial class AkburaSemanticModel
         IMarkupComponentSymbol componentSymbol,
         string propertyName)
     {
-        foreach (var command in componentSymbol.Commands)
+        var akburaComponent = componentSymbol.AkburaComponent;
+        if (akburaComponent == null)
+        {
+            return null;
+        }
+
+        foreach (var command in akburaComponent.Commands)
         {
             if (command.Name == propertyName)
             {
@@ -2835,7 +3143,11 @@ internal sealed partial class AkburaSemanticModel
             }
         }
 
-        return null;
+        var namespaceText = GetDefaultAkburaNamespaceText(SyntaxTree);
+        return namespaceText.Length == 0
+            ? null
+            : CSharpSyntaxFactory.FileScopedNamespaceDeclaration(
+                CSharpSyntaxFactory.ParseName(namespaceText));
     }
 
     private CSharp.CompilationUnitSyntax CreateCSharpProbeCompilationUnit(
@@ -2949,6 +3261,16 @@ internal sealed partial class AkburaSemanticModel
         _semanticDiagnosticsCache[syntax] = diagnostics.IsDefault
             ? ImmutableArray<AkburaSemanticDiagnostic>.Empty
             : diagnostics;
+    }
+
+    private void SetSemanticDiagnosticsIfAbsent(
+        AkburaSyntax syntax,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+    {
+        if (!_semanticDiagnosticsCache.ContainsKey(syntax))
+        {
+            SetSemanticDiagnostics(syntax, diagnostics);
+        }
     }
 
     private readonly struct CSharpTypeBinding

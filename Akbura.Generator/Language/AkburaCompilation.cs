@@ -11,36 +11,46 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
-        IEnumerable<AkburaSyntaxTree> syntaxTrees)
-        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), ImmutableArray<AkcssSyntaxTree>.Empty)
+        IEnumerable<AkburaSyntaxTree> syntaxTrees,
+        string rootNamespace = "",
+        string projectDirectory = "")
+        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), ImmutableArray<AkcssSyntaxTree>.Empty, rootNamespace, projectDirectory)
     {
     }
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
         IEnumerable<AkburaSyntaxTree> syntaxTrees,
-        IEnumerable<AkcssSyntaxTree> akcssSyntaxTrees)
-        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), akcssSyntaxTrees.ToImmutableArray())
-    {
-    }
-
-    public AkburaCompilation(
-        CSharpCompilation csharpCompilation,
-        ImmutableArray<AkburaSyntaxTree> syntaxTrees)
-        : this(csharpCompilation, syntaxTrees, ImmutableArray<AkcssSyntaxTree>.Empty)
+        IEnumerable<AkcssSyntaxTree> akcssSyntaxTrees,
+        string rootNamespace = "",
+        string projectDirectory = "")
+        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), akcssSyntaxTrees.ToImmutableArray(), rootNamespace, projectDirectory)
     {
     }
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
-        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
+        string rootNamespace = "",
+        string projectDirectory = "")
+        : this(csharpCompilation, syntaxTrees, ImmutableArray<AkcssSyntaxTree>.Empty, rootNamespace, projectDirectory)
+    {
+    }
+
+    public AkburaCompilation(
+        CSharpCompilation csharpCompilation,
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
+        string rootNamespace = "",
+        string projectDirectory = "")
     {
         CSharpCompilation = csharpCompilation ?? throw new ArgumentNullException(nameof(csharpCompilation));
         SyntaxTrees = syntaxTrees.IsDefault ? ImmutableArray<AkburaSyntaxTree>.Empty : syntaxTrees;
         AkcssSyntaxTrees = akcssSyntaxTrees.IsDefault
             ? ImmutableArray<AkcssSyntaxTree>.Empty
             : akcssSyntaxTrees;
+        RootNamespace = rootNamespace ?? string.Empty;
+        ProjectDirectory = projectDirectory ?? string.Empty;
     }
 
     public CSharpCompilation CSharpCompilation { get; }
@@ -48,6 +58,10 @@ internal sealed class AkburaCompilation
     public ImmutableArray<AkburaSyntaxTree> SyntaxTrees { get; }
 
     public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees { get; }
+
+    public string RootNamespace { get; }
+
+    public string ProjectDirectory { get; }
 
     public AkburaSemanticModel GetSemanticModel(AkburaSyntaxTree syntaxTree)
     {

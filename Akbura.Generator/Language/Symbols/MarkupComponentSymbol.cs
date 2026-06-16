@@ -1,3 +1,4 @@
+using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
@@ -11,8 +12,8 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
         CSharpSymbolDefinition csharpDefinition,
         MarkupContentModel contentModel = default,
         ImmutableArray<MarkupChildContent> children = default,
-        ImmutableArray<IParamSymbol> parameters = default,
-        ImmutableArray<ICommandSymbol> commands = default,
+        ImmutableArray<IMarkupAttributeOperation> attributeOperations = default,
+        IAkburaComponentSymbol? akburaComponent = null,
         ISymbol? containingSymbol = null,
         ImmutableArray<Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -24,9 +25,9 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
             throw new ArgumentException("Markup component name cannot be empty.", nameof(name));
         }
 
-        if (csharpDefinition.IsDefault)
+        if (csharpDefinition.IsDefault && akburaComponent == null)
         {
-            throw new ArgumentException("Markup component must reference a C# symbol.", nameof(csharpDefinition));
+            throw new ArgumentException("Markup component must reference a C# or Akbura component symbol.", nameof(csharpDefinition));
         }
 
         Name = name;
@@ -35,12 +36,10 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
         Children = children.IsDefault
             ? ImmutableArray<MarkupChildContent>.Empty
             : children;
-        Parameters = parameters.IsDefault
-            ? ImmutableArray<IParamSymbol>.Empty
-            : parameters;
-        Commands = commands.IsDefault
-            ? ImmutableArray<ICommandSymbol>.Empty
-            : commands;
+        AttributeOperations = attributeOperations.IsDefault
+            ? ImmutableArray<IMarkupAttributeOperation>.Empty
+            : attributeOperations;
+        AkburaComponent = akburaComponent;
     }
 
     public override SymbolKind Kind => SymbolKind.MarkupComponent;
@@ -50,7 +49,7 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
     public override string Name { get; }
 
     public override string MetadataName => string.IsNullOrEmpty(CSharpDefinition.MetadataName)
-        ? Name
+        ? AkburaComponent?.MetadataName ?? Name
         : CSharpDefinition.MetadataName;
 
     public override CSharpSymbolDefinition CSharpDefinition { get; }
@@ -61,13 +60,27 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 
     public ImmutableArray<MarkupChildContent> Children { get; }
 
-    public ImmutableArray<IParamSymbol> Parameters { get; }
+    public ImmutableArray<IMarkupAttributeOperation> AttributeOperations { get; private set; }
 
-    public ImmutableArray<ICommandSymbol> Commands { get; }
+    public IAkburaComponentSymbol? AkburaComponent { get; }
+
+    internal void SetAttributeOperations(ImmutableArray<IMarkupAttributeOperation> attributeOperations)
+    {
+        AttributeOperations = attributeOperations.IsDefault
+            ? ImmutableArray<IMarkupAttributeOperation>.Empty
+            : attributeOperations;
+    }
 
     public override string ToDisplayString()
     {
         var csharpDisplay = CSharpDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        return string.IsNullOrEmpty(csharpDisplay) ? Name : $"{Name} -> {csharpDisplay}";
+        if (!string.IsNullOrEmpty(csharpDisplay))
+        {
+            return $"{Name} -> {csharpDisplay}";
+        }
+
+        return AkburaComponent == null
+            ? Name
+            : $"{Name} -> {AkburaComponent.MetadataName}";
     }
 }

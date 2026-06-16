@@ -8,6 +8,7 @@ internal enum SymbolKind
     Component,
     MarkupComponent,
     Property,
+    Event,
     State,
     Parameter,
     InjectedService,

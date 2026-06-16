@@ -268,6 +268,24 @@ namespace Akbura {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Markup event &apos;{0}&apos; does not support &apos;{1}&apos; binding. Use a normal event handler expression..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupEventBindingNotAllowed {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupEventBindingNotAllowed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Markup event &apos;{0}&apos; expects handler &apos;{1}&apos;, but received &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; was not found for component &apos;{1}&apos;..
         /// </summary>
         internal static string AKBURA_SEMANTIC_TailwindUtilityNotFound {

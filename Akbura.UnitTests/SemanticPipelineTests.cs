@@ -1475,6 +1475,158 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ResolvesAvaloniaRoutedEventSymbol()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Click={count++} />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var symbol = Assert.IsAssignableFrom<IRoutedEventSymbol>(
+            semanticModel.GetSymbolInfo(attribute).Symbol);
+
+        Assert.Equal(AkburaSymbolKind.Event, symbol.Kind);
+        Assert.Equal(SymbolLanguage.Markup, symbol.Language);
+        Assert.Equal("Click", symbol.Name);
+        Assert.True(symbol.IsAvaloniaRoutedEvent);
+        Assert.True(symbol.IsClrEvent);
+        Assert.Equal("ClickEvent", symbol.RoutedEventDefinition.Name);
+        Assert.Equal("Click", symbol.ClrEventDefinition.Name);
+        Assert.Equal("EventHandler", symbol.HandlerType.Name);
+        Assert.Equal("RoutedEventArgs", symbol.EventArgsType.Name);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupRoutedEventAttribute_BindsSimpleExpressionHandler()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Click={count++} />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(Akbura.Language.Operations.OperationKind.MarkupEventBinding, operation.Kind);
+        Assert.Equal("Click", operation.Event.Name);
+        Assert.Same(operation.Event, operation.TargetSymbol);
+        Assert.Equal(MarkupAttributeValueKind.DynamicExpression, operation.ValueKind);
+        Assert.Equal(MarkupCommandHandlerKind.Expression, operation.HandlerKind);
+        Assert.Equal(MarkupCommandArgumentMode.IgnoresCommandArgument, operation.ArgumentMode);
+        Assert.Equal(0, operation.HandlerParameterCount);
+        Assert.False(operation.IsAsync);
+        Assert.False(operation.ContainsAwait);
+        Assert.False(operation.HandlerOperation.IsDefault);
+        Assert.Equal("RoutedEventArgs", operation.EventArgsType.Name);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Theory]
+    [InlineData("(sender, args) => count++", 2, false)]
+    [InlineData("(_, args) => { if(count == 5) { Console.WriteLine(\"Hello!\"); } count++; }", 2, false)]
+    public void SemanticModel_MarkupRoutedEventAttribute_BindsLambdaHandlers(
+        string handler,
+        int expectedParameterCount,
+        bool expectedAsync)
+    {
+        var code =
+            "using Avalonia.Controls;\n" +
+            "using System;\n" +
+            "\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Click={" + handler + "} />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal("Click", operation.Event.Name);
+        Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
+        Assert.Equal(MarkupCommandArgumentMode.ReceivesCommandArgument, operation.ArgumentMode);
+        Assert.Equal(expectedParameterCount, operation.HandlerParameterCount);
+        Assert.Equal(expectedAsync, operation.IsAsync);
+        Assert.False(operation.HandlerOperation.IsDefault);
+        Assert.Equal("EventHandler", operation.HandlerType.Name);
+        Assert.Equal("RoutedEventArgs", operation.EventArgsType.Name);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Theory]
+    [InlineData("bind:Click={count++}")]
+    [InlineData("out:Click={count++}")]
+    public void SemanticModel_MarkupRoutedEventAttribute_RejectsDirectionalBinding(string attributeText)
+    {
+        var code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button " + attributeText + " />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<MarkupAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupEventBindingNotAllowed, diagnostic.Code);
+        Assert.Contains("Click", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("(sender) => count++")]
+    [InlineData("(string sender, args) => count++")]
+    public void SemanticModel_MarkupRoutedEventAttribute_RejectsInvalidHandlerSignature(string handler)
+    {
+        var code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Click={" + handler + "} />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch, diagnostic.Code);
+        Assert.Contains("Click", diagnostic.Message);
+        Assert.Contains("EventArgs", diagnostic.Message);
+    }
+
+    [Fact]
     public void SemanticModel_MarkupPrefixedAttributes_PreserveBindingKind()
     {
         const string code =

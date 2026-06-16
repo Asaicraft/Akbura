@@ -17,6 +17,7 @@ using RoslynFieldSymbol = Microsoft.CodeAnalysis.IFieldSymbol;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
+using RoslynEventSymbol = Microsoft.CodeAnalysis.IEventSymbol;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language;
@@ -1809,17 +1810,23 @@ internal sealed partial class AkburaSemanticModel
         var command = FindComponentCommand(componentSymbol, propertyName);
         RoslynPropertySymbol? clrProperty = null;
         RoslynFieldSymbol? avaloniaProperty = null;
+        RoslynEventSymbol? clrEvent = null;
+        RoslynFieldSymbol? avaloniaRoutedEvent = null;
 
         if (componentType != null)
         {
             clrProperty = FindPublicClrProperty(componentType, propertyName);
             avaloniaProperty = FindAvaloniaPropertyField(componentType, propertyName);
+            clrEvent = FindPublicClrEvent(componentType, propertyName);
+            avaloniaRoutedEvent = FindAvaloniaRoutedEventField(componentType, propertyName);
         }
 
         if (parameter == null &&
             command == null &&
             clrProperty == null &&
-            avaloniaProperty == null)
+            avaloniaProperty == null &&
+            clrEvent == null &&
+            avaloniaRoutedEvent == null)
         {
             SetSemanticDiagnostics(
                 markupAttribute,
@@ -1829,6 +1836,23 @@ internal sealed partial class AkburaSemanticModel
                     componentSymbol)));
 
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+        }
+
+        if (parameter == null &&
+            command == null &&
+            clrProperty == null &&
+            avaloniaProperty == null &&
+            (clrEvent != null || avaloniaRoutedEvent != null))
+        {
+            SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+            return AkburaSymbolInfo.Success(new RoutedEventSymbol(
+                propertyName,
+                GetMarkupEventHandlerType(clrEvent, avaloniaRoutedEvent),
+                GetMarkupEventArgsType(clrEvent, avaloniaRoutedEvent),
+                avaloniaRoutedEvent == null ? default : new CSharpSymbolDefinition(avaloniaRoutedEvent),
+                clrEvent == null ? default : new CSharpSymbolDefinition(clrEvent),
+                containingSymbol: componentSymbol));
         }
 
         SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
@@ -1963,6 +1987,58 @@ internal sealed partial class AkburaSemanticModel
         return null;
     }
 
+    private static RoslynEventSymbol? FindPublicClrEvent(
+        INamedTypeSymbol componentType,
+        string eventName)
+    {
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var @event in current.GetMembers(eventName).OfType<RoslynEventSymbol>())
+            {
+                if (!@event.IsStatic &&
+                    @event.DeclaredAccessibility == Accessibility.Public)
+                {
+                    return @event;
+                }
+            }
+        }
+
+        foreach (var @interface in componentType.AllInterfaces)
+        {
+            foreach (var @event in @interface.GetMembers(eventName).OfType<RoslynEventSymbol>())
+            {
+                if (!@event.IsStatic &&
+                    @event.DeclaredAccessibility == Accessibility.Public)
+                {
+                    return @event;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private RoslynFieldSymbol? FindAvaloniaRoutedEventField(
+        INamedTypeSymbol componentType,
+        string eventName)
+    {
+        var routedEventName = eventName + "Event";
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var field in current.GetMembers(routedEventName).OfType<RoslynFieldSymbol>())
+            {
+                if (field.IsStatic &&
+                    field.DeclaredAccessibility == Accessibility.Public &&
+                    IsAvaloniaRoutedEventType(field.Type))
+                {
+                    return field;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private bool IsAvaloniaPropertyType(ITypeSymbol type)
     {
         return TryGetAvaloniaPropertyType(out var avaloniaPropertyType) &&
@@ -1973,6 +2049,87 @@ internal sealed partial class AkburaSemanticModel
     {
         avaloniaPropertyType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.AvaloniaProperty")!;
         return avaloniaPropertyType != null;
+    }
+
+    private bool IsAvaloniaRoutedEventType(ITypeSymbol type)
+    {
+        return TryGetAvaloniaRoutedEventType(out var routedEventType) &&
+            IsAssignableTo(type, routedEventType);
+    }
+
+    private bool TryGetAvaloniaRoutedEventType(out INamedTypeSymbol routedEventType)
+    {
+        routedEventType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Interactivity.RoutedEvent")!;
+        return routedEventType != null;
+    }
+
+    private CSharpSymbolDefinition GetMarkupEventHandlerType(
+        RoslynEventSymbol? clrEvent,
+        RoslynFieldSymbol? avaloniaRoutedEvent)
+    {
+        if (clrEvent?.Type is { TypeKind: not TypeKind.Error } eventType)
+        {
+            return new CSharpSymbolDefinition(eventType);
+        }
+
+        if (GetMarkupEventArgsType(clrEvent, avaloniaRoutedEvent).Symbol is ITypeSymbol eventArgsType &&
+            Compilation.CSharpCompilation.GetTypeByMetadataName("System.EventHandler`1") is { } eventHandlerType)
+        {
+            return new CSharpSymbolDefinition(eventHandlerType.Construct(eventArgsType));
+        }
+
+        return default;
+    }
+
+    private static CSharpSymbolDefinition GetMarkupEventArgsType(
+        RoslynEventSymbol? clrEvent,
+        RoslynFieldSymbol? avaloniaRoutedEvent)
+    {
+        if (TryGetDelegateEventArgsType(clrEvent?.Type, out var delegateEventArgsType))
+        {
+            return new CSharpSymbolDefinition(delegateEventArgsType);
+        }
+
+        if (TryGetRoutedEventArgsType(avaloniaRoutedEvent?.Type, out var routedEventArgsType))
+        {
+            return new CSharpSymbolDefinition(routedEventArgsType);
+        }
+
+        return default;
+    }
+
+    private static bool TryGetDelegateEventArgsType(
+        ITypeSymbol? eventType,
+        out ITypeSymbol eventArgsType)
+    {
+        if (eventType is INamedTypeSymbol { DelegateInvokeMethod.Parameters.Length: >= 2 } delegateType)
+        {
+            eventArgsType = delegateType.DelegateInvokeMethod.Parameters[1].Type;
+            return eventArgsType.TypeKind != TypeKind.Error;
+        }
+
+        eventArgsType = null!;
+        return false;
+    }
+
+    private static bool TryGetRoutedEventArgsType(
+        ITypeSymbol? routedEventType,
+        out ITypeSymbol eventArgsType)
+    {
+        for (var current = routedEventType as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            if (current.Name == "RoutedEvent" &&
+                current.ContainingNamespace.ToDisplayString() == "Avalonia.Interactivity" &&
+                current.TypeArguments.Length == 1 &&
+                current.TypeArguments[0].TypeKind != TypeKind.Error)
+            {
+                eventArgsType = current.TypeArguments[0];
+                return true;
+            }
+        }
+
+        eventArgsType = null!;
+        return false;
     }
 
     private static CSharpSymbolDefinition GetMarkupPropertyType(

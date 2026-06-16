@@ -186,6 +186,12 @@
   <data name="AKBURA_SEMANTIC_MarkupDuplicatePropertySetter" xml:space="preserve">
     <value>Markup property '{0}' already has a setter on this element.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupEventBindingNotAllowed" xml:space="preserve">
+    <value>Markup event '{0}' does not support '{1}' binding. Use a normal event handler expression.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch" xml:space="preserve">
+    <value>Markup event '{0}' expects handler '{1}', but received '{2}'.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_TailwindUtilityNotFound" xml:space="preserve">
     <value>Tailwind utility '{0}' was not found for component '{1}'.</value>
   </data>

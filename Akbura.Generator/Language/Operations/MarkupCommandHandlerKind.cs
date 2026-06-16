@@ -6,4 +6,5 @@ internal enum MarkupCommandHandlerKind
     Lambda,
     DirectReference,
     Error,
+    Expression,
 }

@@ -24,9 +24,16 @@ internal sealed partial class AkburaSemanticModel
         return markupAttribute switch
         {
             TailwindAttributeSyntax tailwindAttribute => ResolveTailwindUtilityAttributeOperation(tailwindAttribute),
-            MarkupPlainAttributeSyntax or MarkupPrefixedAttributeSyntax => ResolveMarkupPropertySetterOperation(markupAttribute),
+            MarkupPlainAttributeSyntax or MarkupPrefixedAttributeSyntax => ResolveMarkupPropertyOrEventOperation(markupAttribute),
             _ => null,
         };
+    }
+
+    private AkburaOperation? ResolveMarkupPropertyOrEventOperation(MarkupAttributeSyntax markupAttribute)
+    {
+        return GetSymbolInfo(markupAttribute).Symbol is IRoutedEventSymbol routedEvent
+            ? ResolveMarkupRoutedEventBindingOperation(markupAttribute, routedEvent)
+            : ResolveMarkupPropertySetterOperation(markupAttribute);
     }
 
     private AkburaOperation? ResolveMarkupPropertySetterOperation(MarkupAttributeSyntax markupAttribute)
@@ -141,6 +148,61 @@ internal sealed partial class AkburaSemanticModel
             valueSyntax,
             literalValue,
             property == null || valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
+    }
+
+    private AkburaOperation ResolveMarkupRoutedEventBindingOperation(
+        MarkupAttributeSyntax markupAttribute,
+        IRoutedEventSymbol routedEvent)
+    {
+        var containingComponent = GetContainingMarkupComponentSymbol(markupAttribute);
+        var valueSyntax = GetMarkupAttributeValue(markupAttribute);
+        var bindingKind = GetMarkupAttributeBindingKind(markupAttribute);
+        var valueKind = MarkupAttributeValueKind.None;
+        var expression = default(CSharp.ExpressionSyntax);
+
+        if (valueSyntax is MarkupDynamicAttributeValueSyntax dynamicValueSyntax)
+        {
+            expression = ParseInlineExpression(dynamicValueSyntax.Expression);
+            valueKind = expression == null
+                ? MarkupAttributeValueKind.Error
+                : MarkupAttributeValueKind.DynamicExpression;
+        }
+        else if (valueSyntax is MarkupLiteralAttributeValueSyntax)
+        {
+            valueKind = MarkupAttributeValueKind.Literal;
+        }
+
+        var handler = AnalyzeMarkupEventHandler(routedEvent, expression);
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        AddMarkupEventBindingDiagnostics(
+            markupAttribute,
+            routedEvent,
+            bindingKind,
+            diagnosticsBuilder);
+        AddMarkupEventHandlerSignatureDiagnostics(
+            markupAttribute,
+            routedEvent,
+            expression,
+            diagnosticsBuilder);
+        var diagnostics = diagnosticsBuilder.ToImmutable();
+        SetSemanticDiagnostics(markupAttribute, diagnostics);
+
+        return new MarkupRoutedEventBindingOperation(
+            markupAttribute,
+            containingComponent,
+            routedEvent,
+            bindingKind,
+            valueKind,
+            valueSyntax,
+            handler.Kind,
+            handler.ArgumentMode,
+            handler.ParameterCount,
+            handler.IsAsync,
+            handler.ContainsAwait,
+            handler.Operation,
+            valueKind != MarkupAttributeValueKind.DynamicExpression ||
+                handler.Kind == MarkupCommandHandlerKind.Error ||
+                diagnostics.Length > 0);
     }
 
     private AkburaOperation ResolveTailwindUtilityAttributeOperation(TailwindAttributeSyntax attribute)
@@ -627,6 +689,152 @@ internal sealed partial class AkburaSemanticModel
         return bindingKind is MarkupAttributeBindingKind.None or MarkupAttributeBindingKind.Bind;
     }
 
+    private static void AddMarkupEventBindingDiagnostics(
+        MarkupAttributeSyntax markupAttribute,
+        IRoutedEventSymbol routedEvent,
+        MarkupAttributeBindingKind bindingKind,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (bindingKind == MarkupAttributeBindingKind.None)
+        {
+            return;
+        }
+
+        diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
+            markupAttribute,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupEventBindingNotAllowed,
+            [routedEvent.Name, GetMarkupAttributeBindingText(bindingKind)]));
+    }
+
+    private void AddMarkupEventHandlerSignatureDiagnostics(
+        MarkupAttributeSyntax markupAttribute,
+        IRoutedEventSymbol routedEvent,
+        CSharp.ExpressionSyntax? expression,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (expression == null ||
+            !TryGetLambdaParameterTypes(expression, out var parameterTypes))
+        {
+            return;
+        }
+
+        var expectedParameterTypes = GetEventHandlerParameterTypes(routedEvent);
+        if (expectedParameterTypes.IsDefaultOrEmpty ||
+            HasCompatibleEventHandlerParameters(expectedParameterTypes, parameterTypes))
+        {
+            return;
+        }
+
+        diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
+            markupAttribute,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch,
+            [
+                routedEvent.Name,
+                FormatEventHandlerSignature(expectedParameterTypes),
+                FormatEventHandlerSignature(parameterTypes)
+            ]));
+    }
+
+    private static bool TryGetLambdaParameterTypes(
+        CSharp.ExpressionSyntax expression,
+        out ImmutableArray<CSharp.TypeSyntax?> parameterTypes)
+    {
+        using var builder = ImmutableArrayBuilder<CSharp.TypeSyntax?>.Rent();
+        switch (expression)
+        {
+            case CSharp.ParenthesizedLambdaExpressionSyntax lambda:
+                foreach (var parameter in lambda.ParameterList.Parameters)
+                {
+                    builder.Add(parameter.Type);
+                }
+
+                parameterTypes = builder.ToImmutable();
+                return true;
+
+            case CSharp.SimpleLambdaExpressionSyntax lambda:
+                builder.Add(lambda.Parameter.Type);
+                parameterTypes = builder.ToImmutable();
+                return true;
+
+            case CSharp.AnonymousMethodExpressionSyntax { ParameterList: { } parameterList }:
+                foreach (var parameter in parameterList.Parameters)
+                {
+                    builder.Add(parameter.Type);
+                }
+
+                parameterTypes = builder.ToImmutable();
+                return true;
+        }
+
+        parameterTypes = default;
+        return false;
+    }
+
+    private static ImmutableArray<ITypeSymbol> GetEventHandlerParameterTypes(
+        IRoutedEventSymbol routedEvent)
+    {
+        if (routedEvent.HandlerType.Symbol is not INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod })
+        {
+            return ImmutableArray<ITypeSymbol>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<ITypeSymbol>.Rent();
+        foreach (var parameter in invokeMethod.Parameters)
+        {
+            builder.Add(parameter.Type);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private bool HasCompatibleEventHandlerParameters(
+        ImmutableArray<ITypeSymbol> expectedParameterTypes,
+        ImmutableArray<CSharp.TypeSyntax?> actualParameterTypes)
+    {
+        if (expectedParameterTypes.Length != actualParameterTypes.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < actualParameterTypes.Length; index++)
+        {
+            var actualParameterType = actualParameterTypes[index];
+            if (actualParameterType == null)
+            {
+                continue;
+            }
+
+            var binding = BindCSharpType(actualParameterType);
+            if (binding.TypeSymbol == null ||
+                !IsSameType(expectedParameterTypes[index], binding.TypeSymbol))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string FormatEventHandlerSignature(
+        ImmutableArray<ITypeSymbol> parameterTypes)
+    {
+        return "(" +
+            string.Join(
+                ", ",
+                parameterTypes.Select(static type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))) +
+            ")";
+    }
+
+    private static string FormatEventHandlerSignature(
+        ImmutableArray<CSharp.TypeSyntax?> parameterTypes)
+    {
+        return "(" +
+            string.Join(
+                ", ",
+                parameterTypes.Select(static type => type?.ToString() ?? "<inferred>")) +
+            ")";
+    }
+
     private static MarkupStartTagSyntax? GetContainingMarkupStartTag(MarkupAttributeSyntax markupAttribute)
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
@@ -702,6 +910,87 @@ internal sealed partial class AkburaSemanticModel
                 resultType: default,
                 handlerOperation),
         };
+    }
+
+    private MarkupEventHandlerAnalysis AnalyzeMarkupEventHandler(
+        IRoutedEventSymbol routedEvent,
+        CSharp.ExpressionSyntax? expression)
+    {
+        if (expression == null)
+        {
+            return MarkupEventHandlerAnalysis.Error;
+        }
+
+        return expression switch
+        {
+            CSharp.ParenthesizedLambdaExpressionSyntax lambda => AnalyzeMarkupEventLambda(
+                routedEvent,
+                lambda.ParameterList.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray(),
+                lambda.AsyncKeyword.RawKind != 0,
+                lambda.Body),
+            CSharp.SimpleLambdaExpressionSyntax lambda => AnalyzeMarkupEventLambda(
+                routedEvent,
+                ImmutableArray.Create(lambda.Parameter.Identifier.ValueText),
+                lambda.AsyncKeyword.RawKind != 0,
+                lambda.Body),
+            CSharp.AnonymousMethodExpressionSyntax anonymousMethod => AnalyzeMarkupEventLambda(
+                routedEvent,
+                anonymousMethod.ParameterList?.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray() ??
+                    ImmutableArray<string>.Empty,
+                anonymousMethod.AsyncKeyword.RawKind != 0,
+                anonymousMethod.Body),
+            CSharp.IdentifierNameSyntax or CSharp.MemberAccessExpressionSyntax => new MarkupEventHandlerAnalysis(
+                MarkupCommandHandlerKind.DirectReference,
+                MarkupCommandArgumentMode.None,
+                parameterCount: 0,
+                isAsync: ContainsAwaitExpression(expression),
+                containsAwait: ContainsAwaitExpression(expression),
+                BindMarkupAttributeExpression(expression).OperationDefinition),
+            _ => new MarkupEventHandlerAnalysis(
+                MarkupCommandHandlerKind.Expression,
+                MarkupCommandArgumentMode.IgnoresCommandArgument,
+                parameterCount: 0,
+                isAsync: ContainsAwaitExpression(expression),
+                containsAwait: ContainsAwaitExpression(expression),
+                BindMarkupEventHandlerStatementExpression(
+                    routedEvent,
+                    ImmutableArray<string>.Empty,
+                    expression,
+                    isAsync: false).OperationDefinition),
+        };
+    }
+
+    private MarkupEventHandlerAnalysis AnalyzeMarkupEventLambda(
+        IRoutedEventSymbol routedEvent,
+        ImmutableArray<string> parameterNames,
+        bool isAsync,
+        SyntaxNode body)
+    {
+        var containsAwait = ContainsAwaitExpression(body);
+        var operation = body switch
+        {
+            CSharp.ExpressionSyntax expression => BindMarkupEventHandlerStatementExpression(
+                routedEvent,
+                parameterNames,
+                expression,
+                isAsync || containsAwait).OperationDefinition,
+            CSharp.BlockSyntax block => BindMarkupEventHandlerBlock(
+                routedEvent,
+                parameterNames,
+                block,
+                isAsync || containsAwait).OperationDefinition,
+            _ => default,
+        };
+
+        return new MarkupEventHandlerAnalysis(
+            MarkupCommandHandlerKind.Lambda,
+            parameterNames.Length == 0
+                ? MarkupCommandArgumentMode.IgnoresCommandArgument
+                : MarkupCommandArgumentMode.ReceivesCommandArgument,
+            parameterNames.Length,
+            isAsync || containsAwait,
+            containsAwait,
+            operation);
     }
 
     private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandLambda(
@@ -950,6 +1239,130 @@ internal sealed partial class AkburaSemanticModel
             operation == null ? default : new CSharpOperationDefinition(operation));
     }
 
+    private CSharpTypeBinding BindMarkupEventHandlerStatementExpression(
+        IRoutedEventSymbol routedEvent,
+        ImmutableArray<string> parameterNames,
+        CSharp.ExpressionSyntax expressionSyntax,
+        bool isAsync)
+    {
+        var statement = CSharpSyntaxFactory.ExpressionStatement(expressionSyntax);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
+                "__AkburaEventHandlerProbe")
+            .WithParameterList(CreateEventHandlerProbeParameterList(routedEvent, parameterNames))
+            .WithBody(CSharpSyntaxFactory.Block(statement));
+
+        if (isAsync)
+        {
+            method = method.WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsyncKeyword)));
+        }
+
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        foreach (var field in CreateMarkupAttributeProbeFields())
+        {
+            membersBuilder.Add(field);
+        }
+
+        membersBuilder.Add(method);
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeExpression = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.ExpressionStatementSyntax>()
+            .Single()
+            .Expression;
+
+        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
+        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
+        var operation = semanticModel.GetOperation(probeExpression);
+        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
+            ? null
+            : typeInfo.Type;
+
+        return new CSharpTypeBinding(
+            typeSymbol,
+            symbolInfo.Symbol,
+            receiverType: null,
+            isBindingPath: false,
+            symbolInfo.CandidateSymbols,
+            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
+                ? AkburaCandidateReason.Ambiguous
+                : AkburaCandidateReason.NotFound,
+            operation == null ? default : new CSharpOperationDefinition(operation));
+    }
+
+    private CSharpTypeBinding BindMarkupEventHandlerBlock(
+        IRoutedEventSymbol routedEvent,
+        ImmutableArray<string> parameterNames,
+        CSharp.BlockSyntax block,
+        bool isAsync)
+    {
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
+                "__AkburaEventHandlerProbe")
+            .WithParameterList(CreateEventHandlerProbeParameterList(routedEvent, parameterNames))
+            .WithBody(block);
+
+        if (isAsync)
+        {
+            method = method.WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsyncKeyword)));
+        }
+
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        foreach (var field in CreateMarkupAttributeProbeFields())
+        {
+            membersBuilder.Add(field);
+        }
+
+        membersBuilder.Add(method);
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var probeBlock = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.MethodDeclarationSyntax>()
+            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == "__AkburaEventHandlerProbe")
+            .Body;
+
+        if (probeBlock == null)
+        {
+            return CSharpTypeBinding.Empty;
+        }
+
+        var operation = semanticModel.GetOperation(probeBlock);
+        return new CSharpTypeBinding(
+            typeSymbol: null,
+            symbol: null,
+            receiverType: null,
+            isBindingPath: false,
+            candidateSymbols: ImmutableArray<Microsoft.CodeAnalysis.ISymbol>.Empty,
+            candidateReason: AkburaCandidateReason.None,
+            operation == null ? default : new CSharpOperationDefinition(operation));
+    }
+
     private static CSharp.ParameterListSyntax CreateCommandHandlerProbeParameterList(
         ICommandSymbol command,
         ImmutableArray<string> parameterNames)
@@ -963,6 +1376,34 @@ internal sealed partial class AkburaSemanticModel
             var type = index < command.Parameters.Length && !command.Parameters[index].Type.IsDefault
                 ? CSharpSyntaxFactory.ParseTypeName(command.Parameters[index].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
                 : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword));
+
+            parameters.Add(CSharpSyntaxFactory.Parameter(CSharpSyntaxFactory.Identifier(name)).WithType(type));
+        }
+
+        return CSharpSyntaxFactory.ParameterList(
+            CSharpSyntaxFactory.SeparatedList(parameters.ToImmutable()));
+    }
+
+    private static CSharp.ParameterListSyntax CreateEventHandlerProbeParameterList(
+        IRoutedEventSymbol routedEvent,
+        ImmutableArray<string> parameterNames)
+    {
+        if (routedEvent.HandlerType.Symbol is not INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod })
+        {
+            return CSharpSyntaxFactory.ParameterList();
+        }
+
+        using var parameters = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
+        for (var index = 0; index < invokeMethod.Parameters.Length; index++)
+        {
+            var delegateParameter = invokeMethod.Parameters[index];
+            var name = index < parameterNames.Length && !string.IsNullOrWhiteSpace(parameterNames[index])
+                ? parameterNames[index]
+                : string.IsNullOrWhiteSpace(delegateParameter.Name)
+                    ? "__arg" + index
+                    : delegateParameter.Name;
+            var type = CSharpSyntaxFactory.ParseTypeName(
+                delegateParameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
 
             parameters.Add(CSharpSyntaxFactory.Parameter(CSharpSyntaxFactory.Identifier(name)).WithType(type));
         }
@@ -1410,6 +1851,45 @@ internal sealed partial class AkburaSemanticModel
         public CSharpSymbolDefinition Type { get; }
 
         public CSharpSymbolDefinition ResultType { get; }
+
+        public CSharpOperationDefinition Operation { get; }
+    }
+
+    private readonly struct MarkupEventHandlerAnalysis
+    {
+        public static MarkupEventHandlerAnalysis Error { get; } = new(
+            MarkupCommandHandlerKind.Error,
+            MarkupCommandArgumentMode.None,
+            parameterCount: 0,
+            isAsync: false,
+            containsAwait: false,
+            operation: default);
+
+        public MarkupEventHandlerAnalysis(
+            MarkupCommandHandlerKind kind,
+            MarkupCommandArgumentMode argumentMode,
+            int parameterCount,
+            bool isAsync,
+            bool containsAwait,
+            CSharpOperationDefinition operation)
+        {
+            Kind = kind;
+            ArgumentMode = argumentMode;
+            ParameterCount = parameterCount;
+            IsAsync = isAsync;
+            ContainsAwait = containsAwait;
+            Operation = operation;
+        }
+
+        public MarkupCommandHandlerKind Kind { get; }
+
+        public MarkupCommandArgumentMode ArgumentMode { get; }
+
+        public int ParameterCount { get; }
+
+        public bool IsAsync { get; }
+
+        public bool ContainsAwait { get; }
 
         public CSharpOperationDefinition Operation { get; }
     }

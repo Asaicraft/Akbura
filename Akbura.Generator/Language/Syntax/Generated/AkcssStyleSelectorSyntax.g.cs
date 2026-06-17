@@ -11,57 +11,96 @@ namespace Akbura.Language.Syntax.Green
 {
     internal sealed partial class GreenAkcssStyleSelectorSyntax : global::Akbura.Language.Syntax.Green.GreenNode
     {
-        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? TargetType;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken DotToken;
-        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax Name;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? OpenParen;
+        public readonly global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? TargetType;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? CloseParen;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? DotToken;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? Name;
 
         public GreenAkcssStyleSelectorSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? targetType,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken dotToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? openParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? targetType,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? closeParen,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? dotToken,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? name,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
             : base((ushort)global::Akbura.Language.Syntax.SyntaxKind.AkcssStyleSelectorSyntax, diagnostics, annotations)
         {
-            this.TargetType = targetType;
-            this.DotToken = dotToken;
-            this.Name = name;
+            OpenParen = openParen;
+            TargetType = targetType;
+            CloseParen = closeParen;
+            DotToken = dotToken;
+            Name = name;
 
-            AkburaDebug.Assert(this.DotToken != null);
-            AkburaDebug.Assert(this.Name != null);
+            if (OpenParen != null)
+            {
+                AkburaDebug.Assert(OpenParen.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenParenToken);
+            }
 
-            AkburaDebug.Assert(this.DotToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.DotToken);
+            if (CloseParen != null)
+            {
+                AkburaDebug.Assert(CloseParen.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseParenToken);
+            }
+
+            if (DotToken != null)
+            {
+                AkburaDebug.Assert(DotToken.Kind == global::Akbura.Language.Syntax.SyntaxKind.DotToken);
+            }
 
             var flags = Flags;
             var fullWidth = FullWidth;
+
+            if (OpenParen != null)
+            {
+                AdjustWidthAndFlags(OpenParen, ref fullWidth, ref flags);
+            }
 
             if (TargetType != null)
             {
                 AdjustWidthAndFlags(TargetType, ref fullWidth, ref flags);
             }
 
-            AdjustWidthAndFlags(DotToken, ref fullWidth, ref flags);
-            AdjustWidthAndFlags(Name, ref fullWidth, ref flags);
+            if (CloseParen != null)
+            {
+                AdjustWidthAndFlags(CloseParen, ref fullWidth, ref flags);
+            }
 
-            SlotCount = 3;
+            if (DotToken != null)
+            {
+                AdjustWidthAndFlags(DotToken, ref fullWidth, ref flags);
+            }
+
+            if (Name != null)
+            {
+                AdjustWidthAndFlags(Name, ref fullWidth, ref flags);
+            }
+
+            SlotCount = 5;
             FullWidth = fullWidth;
             Flags = flags;
         }
 
         public GreenAkcssStyleSelectorSyntax UpdateAkcssStyleSelectorSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? targetType,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken dotToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? openParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? targetType,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? closeParen,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? dotToken,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? name)
         {
-            if (this.TargetType == targetType &&
-                this.DotToken == dotToken &&
-                this.Name == name)
+            if (OpenParen == openParen &&
+                TargetType == targetType &&
+                CloseParen == closeParen &&
+                DotToken == dotToken &&
+                Name == name)
             {
                 return this;
             }
 
             var newNode = GreenSyntaxFactory.AkcssStyleSelectorSyntax(
+                openParen,
                 targetType,
+                closeParen,
                 dotToken,
                 name);
 
@@ -80,101 +119,85 @@ namespace Akbura.Language.Syntax.Green
             return newNode;
         }
 
-        public GreenAkcssStyleSelectorSyntax WithTargetType(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? targetType)
-        {
-            return UpdateAkcssStyleSelectorSyntax(targetType, this.DotToken, this.Name);
-        }
+        public GreenAkcssStyleSelectorSyntax WithOpenParen(global::Akbura.Language.Syntax.Green.GreenSyntaxToken? openParen)
+            => UpdateAkcssStyleSelectorSyntax(openParen, TargetType, CloseParen, DotToken, Name);
 
-        public GreenAkcssStyleSelectorSyntax WithDotToken(global::Akbura.Language.Syntax.Green.GreenSyntaxToken dotToken)
-        {
-            return UpdateAkcssStyleSelectorSyntax(this.TargetType, dotToken, this.Name);
-        }
+        public GreenAkcssStyleSelectorSyntax WithTargetType(global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? targetType)
+            => UpdateAkcssStyleSelectorSyntax(OpenParen, targetType, CloseParen, DotToken, Name);
 
-        public GreenAkcssStyleSelectorSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
-        {
-            return UpdateAkcssStyleSelectorSyntax(this.TargetType, this.DotToken, name);
-        }
+        public GreenAkcssStyleSelectorSyntax WithCloseParen(global::Akbura.Language.Syntax.Green.GreenSyntaxToken? closeParen)
+            => UpdateAkcssStyleSelectorSyntax(OpenParen, TargetType, closeParen, DotToken, Name);
+
+        public GreenAkcssStyleSelectorSyntax WithDotToken(global::Akbura.Language.Syntax.Green.GreenSyntaxToken? dotToken)
+            => UpdateAkcssStyleSelectorSyntax(OpenParen, TargetType, CloseParen, dotToken, Name);
+
+        public GreenAkcssStyleSelectorSyntax WithName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? name)
+            => UpdateAkcssStyleSelectorSyntax(OpenParen, TargetType, CloseParen, DotToken, name);
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
         {
             return index switch
             {
-                0 => TargetType,
-                1 => DotToken,
-                2 => Name,
+                0 => OpenParen,
+                1 => TargetType,
+                2 => CloseParen,
+                3 => DotToken,
+                4 => Name,
                 _ => null,
             };
         }
 
         public override global::Akbura.Language.Syntax.AkburaSyntax CreateRed(global::Akbura.Language.Syntax.AkburaSyntax? parent, int position)
-        {
-            return new global::Akbura.Language.Syntax.AkcssStyleSelectorSyntax(this, parent, position);
-        }
+            => new global::Akbura.Language.Syntax.AkcssStyleSelectorSyntax(this, parent, position);
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
-        {
-            return new GreenAkcssStyleSelectorSyntax(this.TargetType, this.DotToken, this.Name, diagnostics, GetAnnotations());
-        }
+            => new GreenAkcssStyleSelectorSyntax(OpenParen, TargetType, CloseParen, DotToken, Name, diagnostics, GetAnnotations());
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
-        {
-            return new GreenAkcssStyleSelectorSyntax(this.TargetType, this.DotToken, this.Name, GetDiagnostics(), annotations);
-        }
+            => new GreenAkcssStyleSelectorSyntax(OpenParen, TargetType, CloseParen, DotToken, Name, GetDiagnostics(), annotations);
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
-        {
-            greenSyntaxVisitor.VisitAkcssStyleSelectorSyntax(this);
-        }
+            => greenSyntaxVisitor.VisitAkcssStyleSelectorSyntax(this);
 
         public override TResult? Accept<TResult>(GreenSyntaxVisitor<TResult> greenSyntaxVisitor) where TResult : default
-        {
-            return greenSyntaxVisitor.VisitAkcssStyleSelectorSyntax(this);
-        }
+            => greenSyntaxVisitor.VisitAkcssStyleSelectorSyntax(this);
 
         public override TResult? Accept<TParameter, TResult>(GreenSyntaxVisitor<TParameter, TResult> greenSyntaxVisitor, TParameter argument) where TResult : default
-        {
-            return greenSyntaxVisitor.VisitAkcssStyleSelectorSyntax(this, argument);
-        }
+            => greenSyntaxVisitor.VisitAkcssStyleSelectorSyntax(this, argument);
     }
 
     internal static partial class GreenSyntaxFactory
     {
         public static GreenAkcssStyleSelectorSyntax AkcssStyleSelectorSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? targetType,
-            global::Akbura.Language.Syntax.Green.GreenSyntaxToken dotToken,
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax name)
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? openParen,
+            global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax? targetType,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? closeParen,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? dotToken,
+            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax? name)
         {
-            AkburaDebug.Assert(dotToken != null);
-            AkburaDebug.Assert(name != null);
-
-            AkburaDebug.Assert(dotToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.DotToken);
-
-            var kind = global::Akbura.Language.Syntax.SyntaxKind.AkcssStyleSelectorSyntax;
-            int hash;
-            var cache = Unsafe.As<GreenAkcssStyleSelectorSyntax?>(
-                GreenNodeCache.TryGetNode(
-                    (ushort)kind,
-                    targetType,
-                    dotToken,
-                    name,
-                    out hash));
-
-            if (cache != null)
+            if (openParen != null)
             {
-                return cache;
+                AkburaDebug.Assert(openParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenParenToken);
+            }
+
+            if (closeParen != null)
+            {
+                AkburaDebug.Assert(closeParen!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseParenToken);
+            }
+
+            if (dotToken != null)
+            {
+                AkburaDebug.Assert(dotToken!.Kind == global::Akbura.Language.Syntax.SyntaxKind.DotToken);
             }
 
             var result = new GreenAkcssStyleSelectorSyntax(
+                openParen,
                 targetType,
+                closeParen,
                 dotToken,
                 name,
                 diagnostics: null,
                 annotations: null);
-
-            if (hash > 0)
-            {
-                GreenNodeCache.AddNode(result, hash);
-            }
 
             return result;
         }
@@ -183,25 +206,19 @@ namespace Akbura.Language.Syntax.Green
     internal partial class GreenSyntaxVisitor
     {
         public virtual void VisitAkcssStyleSelectorSyntax(GreenAkcssStyleSelectorSyntax node)
-        {
-            DefaultVisit(node);
-        }
+            => DefaultVisit(node);
     }
 
     internal partial class GreenSyntaxVisitor<TResult>
     {
         public virtual TResult? VisitAkcssStyleSelectorSyntax(GreenAkcssStyleSelectorSyntax node)
-        {
-            return DefaultVisit(node);
-        }
+            => DefaultVisit(node);
     }
 
     internal partial class GreenSyntaxVisitor<TParameter, TResult>
     {
         public virtual TResult? VisitAkcssStyleSelectorSyntax(GreenAkcssStyleSelectorSyntax node, TParameter argument)
-        {
-            return DefaultVisit(node, argument);
-        }
+            => DefaultVisit(node, argument);
     }
 
     internal partial class GreenSyntaxRewriter
@@ -209,9 +226,11 @@ namespace Akbura.Language.Syntax.Green
         public override GreenNode? VisitAkcssStyleSelectorSyntax(GreenAkcssStyleSelectorSyntax node)
         {
             return node.UpdateAkcssStyleSelectorSyntax(
-                (GreenSimpleNameSyntax?)Visit(node.TargetType),
-                (GreenSyntaxToken)VisitToken(node.DotToken),
-                (GreenSimpleNameSyntax)Visit(node.Name)!);
+                (GreenSyntaxToken?)VisitToken(node.OpenParen),
+                (GreenCSharpTypeSyntax?)Visit(node.TargetType),
+                (GreenSyntaxToken?)VisitToken(node.CloseParen),
+                (GreenSyntaxToken?)VisitToken(node.DotToken),
+                (GreenSimpleNameSyntax?)Visit(node.Name));
         }
     }
 }
@@ -234,54 +253,51 @@ namespace Akbura.Language.Syntax
         internal new global::Akbura.Language.Syntax.Green.GreenAkcssStyleSelectorSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenAkcssStyleSelectorSyntax>(base.Green);
 
-        public SimpleNameSyntax? TargetType
-            => (SimpleNameSyntax?)GetRed(ref _targetType, 0);
+        public SyntaxToken OpenParen
+            => new(this, Green.OpenParen!, GetChildPosition(0), GetChildIndex(0));
+
+        public CSharpTypeSyntax? TargetType
+            => (CSharpTypeSyntax?)GetRed(ref _targetType, 1);
+
+        public SyntaxToken CloseParen
+            => new(this, Green.CloseParen!, GetChildPosition(2), GetChildIndex(2));
 
         public SyntaxToken DotToken
-            => new(this, this.Green.DotToken, GetChildPosition(1), GetChildIndex(1));
+            => new(this, Green.DotToken!, GetChildPosition(3), GetChildIndex(3));
 
-        public SimpleNameSyntax Name
-            => (SimpleNameSyntax)GetRed(ref _name, 2)!;
+        public SimpleNameSyntax? Name
+            => (SimpleNameSyntax?)GetRed(ref _name, 4);
 
         public AkcssStyleSelectorSyntax UpdateAkcssStyleSelectorSyntax(
-            SimpleNameSyntax? targetType,
-            SyntaxToken dotToken,
-            SimpleNameSyntax name)
+            SyntaxToken? openParen,
+            CSharpTypeSyntax? targetType,
+            SyntaxToken? closeParen,
+            SyntaxToken? dotToken,
+            SimpleNameSyntax? name)
         {
-            if (this.TargetType == targetType &&
-                this.DotToken == dotToken &&
-                this.Name == name)
+            if ((openParen ?? default) == (Green.OpenParen != null ? OpenParen : default) &&
+                TargetType == targetType &&
+                (closeParen ?? default) == (Green.CloseParen != null ? CloseParen : default) &&
+                (dotToken ?? default) == (Green.DotToken != null ? DotToken : default) &&
+                Name == name)
             {
                 return this;
             }
 
-            if (dotToken.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(dotToken), message: $"dotToken must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
-            }
-
-            if (dotToken.RawKind != (ushort)SyntaxKind.DotToken)
-            {
-                ThrowHelper.ThrowArgumentException(nameof(dotToken), message: $"dotToken must be SyntaxKind.DotToken");
-            }
-
-            if (name is null)
-            {
-                ThrowHelper.ThrowArgumentNullException(nameof(name));
-            }
-
             var newNode = SyntaxFactory.AkcssStyleSelectorSyntax(
+                openParen,
                 targetType,
+                closeParen,
                 dotToken,
                 name);
 
-            var annotations = this.GetAnnotations();
+            var annotations = GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
             {
                 newNode = (AkcssStyleSelectorSyntax)newNode.WithAnnotations(annotations);
             }
 
-            var diagnostics = this.GetDiagnostics();
+            var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
             {
                 newNode = (AkcssStyleSelectorSyntax)newNode.WithDiagnostics(diagnostics);
@@ -290,27 +306,27 @@ namespace Akbura.Language.Syntax
             return newNode;
         }
 
-        public AkcssStyleSelectorSyntax WithTargetType(SimpleNameSyntax? targetType)
-        {
-            return UpdateAkcssStyleSelectorSyntax(targetType, this.DotToken, this.Name);
-        }
+        public AkcssStyleSelectorSyntax WithOpenParen(SyntaxToken? openParen)
+            => UpdateAkcssStyleSelectorSyntax(openParen, TargetType, Green.CloseParen != null ? CloseParen : null, Green.DotToken != null ? DotToken : null, Name);
 
-        public AkcssStyleSelectorSyntax WithDotToken(SyntaxToken dotToken)
-        {
-            return UpdateAkcssStyleSelectorSyntax(this.TargetType, dotToken, this.Name);
-        }
+        public AkcssStyleSelectorSyntax WithTargetType(CSharpTypeSyntax? targetType)
+            => UpdateAkcssStyleSelectorSyntax(Green.OpenParen != null ? OpenParen : null, targetType, Green.CloseParen != null ? CloseParen : null, Green.DotToken != null ? DotToken : null, Name);
 
-        public AkcssStyleSelectorSyntax WithName(SimpleNameSyntax name)
-        {
-            return UpdateAkcssStyleSelectorSyntax(this.TargetType, this.DotToken, name);
-        }
+        public AkcssStyleSelectorSyntax WithCloseParen(SyntaxToken? closeParen)
+            => UpdateAkcssStyleSelectorSyntax(Green.OpenParen != null ? OpenParen : null, TargetType, closeParen, Green.DotToken != null ? DotToken : null, Name);
+
+        public AkcssStyleSelectorSyntax WithDotToken(SyntaxToken? dotToken)
+            => UpdateAkcssStyleSelectorSyntax(Green.OpenParen != null ? OpenParen : null, TargetType, Green.CloseParen != null ? CloseParen : null, dotToken, Name);
+
+        public AkcssStyleSelectorSyntax WithName(SimpleNameSyntax? name)
+            => UpdateAkcssStyleSelectorSyntax(Green.OpenParen != null ? OpenParen : null, TargetType, Green.CloseParen != null ? CloseParen : null, Green.DotToken != null ? DotToken : null, name);
 
         public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
         {
             return index switch
             {
-                0 => GetRed(ref _targetType, 0),
-                2 => GetRed(ref _name, 2),
+                1 => GetRed(ref _targetType, 1),
+                4 => GetRed(ref _name, 4),
                 _ => null,
             };
         }
@@ -319,64 +335,61 @@ namespace Akbura.Language.Syntax
         {
             return index switch
             {
-                0 => _targetType,
-                2 => _name,
+                1 => _targetType,
+                4 => _name,
                 _ => null,
             };
         }
 
         public override void Accept(SyntaxVisitor visitor)
-        {
-            visitor.VisitAkcssStyleSelectorSyntax(this);
-        }
+            => visitor.VisitAkcssStyleSelectorSyntax(this);
 
         public override TResult? Accept<TResult>(SyntaxVisitor<TResult> visitor) where TResult : default
-        {
-            return visitor.VisitAkcssStyleSelectorSyntax(this);
-        }
+            => visitor.VisitAkcssStyleSelectorSyntax(this);
 
         public override TResult? Accept<TParameter, TResult>(SyntaxVisitor<TParameter, TResult> visitor, TParameter argument) where TResult : default
-        {
-            return visitor.VisitAkcssStyleSelectorSyntax(this, argument);
-        }
+            => visitor.VisitAkcssStyleSelectorSyntax(this, argument);
 
         public new AkcssStyleSelectorSyntax WithLeadingTrivia(SyntaxTriviaList trivia)
-        {
-            return (AkcssStyleSelectorSyntax)base.WithLeadingTrivia(trivia);
-        }
+            => (AkcssStyleSelectorSyntax)base.WithLeadingTrivia(trivia);
 
         public new AkcssStyleSelectorSyntax WithTrailingTrivia(SyntaxTriviaList trivia)
-        {
-            return (AkcssStyleSelectorSyntax)base.WithTrailingTrivia(trivia);
-        }
+            => (AkcssStyleSelectorSyntax)base.WithTrailingTrivia(trivia);
     }
 
     internal static partial class SyntaxFactory
     {
         internal static AkcssStyleSelectorSyntax AkcssStyleSelectorSyntax(
-            SimpleNameSyntax? targetType,
-            SyntaxToken dotToken,
-            SimpleNameSyntax name)
+            SyntaxToken? openParen,
+            CSharpTypeSyntax? targetType,
+            SyntaxToken? closeParen,
+            SyntaxToken? dotToken,
+            SimpleNameSyntax? name)
         {
-            if (dotToken.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
+            if (openParen.HasValue &&
+                openParen.Value.RawKind != (ushort)SyntaxKind.OpenParenToken)
             {
-                ThrowHelper.ThrowArgumentException(nameof(dotToken), message: $"dotToken must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
+                ThrowHelper.ThrowArgumentException(nameof(openParen), message: $"openParen must be SyntaxKind.OpenParenToken");
             }
 
-            if (dotToken.RawKind != (ushort)SyntaxKind.DotToken)
+            if (closeParen.HasValue &&
+                closeParen.Value.RawKind != (ushort)SyntaxKind.CloseParenToken)
+            {
+                ThrowHelper.ThrowArgumentException(nameof(closeParen), message: $"closeParen must be SyntaxKind.CloseParenToken");
+            }
+
+            if (dotToken.HasValue &&
+                dotToken.Value.RawKind != (ushort)SyntaxKind.DotToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(dotToken), message: $"dotToken must be SyntaxKind.DotToken");
             }
 
-            if (name is null)
-            {
-                ThrowHelper.ThrowArgumentNullException(nameof(name));
-            }
-
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.AkcssStyleSelectorSyntax(
+                openParen.HasValue ? Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(openParen.Value.Node!) : null,
                 targetType?.Green,
-                Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(dotToken.Node!),
-                name.Green);
+                closeParen.HasValue ? Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(closeParen.Value.Node!) : null,
+                dotToken.HasValue ? Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(dotToken.Value.Node!) : null,
+                name?.Green);
 
             return Unsafe.As<AkcssStyleSelectorSyntax>(green.CreateRed(null, 0));
         }
@@ -385,25 +398,19 @@ namespace Akbura.Language.Syntax
     internal partial class SyntaxVisitor
     {
         public virtual void VisitAkcssStyleSelectorSyntax(AkcssStyleSelectorSyntax node)
-        {
-            DefaultVisit(node);
-        }
+            => DefaultVisit(node);
     }
 
     internal partial class SyntaxVisitor<TResult>
     {
         public virtual TResult? VisitAkcssStyleSelectorSyntax(AkcssStyleSelectorSyntax node)
-        {
-            return DefaultVisit(node);
-        }
+            => DefaultVisit(node);
     }
 
     internal partial class SyntaxVisitor<TParameter, TResult>
     {
         public virtual TResult? VisitAkcssStyleSelectorSyntax(AkcssStyleSelectorSyntax node, TParameter argument)
-        {
-            return DefaultVisit(node, argument);
-        }
+            => DefaultVisit(node, argument);
     }
 
     internal partial class SyntaxRewriter
@@ -411,9 +418,11 @@ namespace Akbura.Language.Syntax
         public override AkburaSyntax? VisitAkcssStyleSelectorSyntax(AkcssStyleSelectorSyntax node)
         {
             return node.UpdateAkcssStyleSelectorSyntax(
-                (SimpleNameSyntax?)Visit(node.TargetType),
-                VisitToken(node.DotToken),
-                (SimpleNameSyntax)Visit(node.Name)!);
+                node.Green.OpenParen != null ? VisitToken(node.OpenParen) : null,
+                (CSharpTypeSyntax?)Visit(node.TargetType),
+                node.Green.CloseParen != null ? VisitToken(node.CloseParen) : null,
+                node.Green.DotToken != null ? VisitToken(node.DotToken) : null,
+                (SimpleNameSyntax?)Visit(node.Name));
         }
     }
 }

@@ -220,10 +220,38 @@ internal sealed partial class Parser
             return member;
         }
 
-        return PeekIncrementalTokenKind() == SyntaxKind.AtToken &&
-            PeekIncrementalTokenKind(1) == SyntaxKind.UtilitiesKeyword
-                ? ParseIncrementalAkcssUtilitiesSectionSyntaxCore()
-                : ParseIncrementalAkcssStyleRuleSyntaxCore();
+        if (PeekIncrementalTokenKind() == SyntaxKind.AtToken &&
+            PeekIncrementalTokenKind(1) == SyntaxKind.UsingKeyword)
+        {
+            return ParseIncrementalAkcssUsingDirectiveSyntaxCore();
+        }
+
+        if (PeekIncrementalTokenKind() == SyntaxKind.AtToken &&
+            PeekIncrementalTokenKind(1) == SyntaxKind.UtilitiesKeyword)
+        {
+            return ParseIncrementalAkcssUtilitiesSectionSyntaxCore();
+        }
+
+        return ParseIncrementalAkcssStyleRuleSyntaxCore();
+    }
+
+    private GreenAkcssUsingDirectiveSyntax ParseIncrementalAkcssUsingDirectiveSyntaxCore()
+    {
+        if (TryReadReusableIncrementalNode<GreenAkcssUsingDirectiveSyntax>(out var directive))
+        {
+            return directive;
+        }
+
+        var atToken = ReadRequiredIncrementalToken(SyntaxKind.AtToken);
+        var usingKeyword = ReadRequiredIncrementalToken(SyntaxKind.UsingKeyword);
+        var name = ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind.SemicolonToken);
+        var semicolon = ReadRequiredIncrementalToken(SyntaxKind.SemicolonToken);
+
+        return GreenSyntaxFactory.AkcssUsingDirectiveSyntax(
+            atToken,
+            usingKeyword,
+            name,
+            semicolon);
     }
 
     private GreenAkcssStyleRuleSyntax ParseIncrementalAkcssStyleRuleSyntaxCore()
@@ -248,8 +276,8 @@ internal sealed partial class Parser
             return selector;
         }
 
-        var (targetType, dotToken, name) = ParseIncrementalAkcssDottedSelectorParts();
-        return GreenSyntaxFactory.AkcssStyleSelectorSyntax(targetType, dotToken, name);
+        var (openParen, targetType, closeParen, dotToken, name) = ParseIncrementalAkcssStyleSelectorParts();
+        return GreenSyntaxFactory.AkcssStyleSelectorSyntax(openParen, targetType, closeParen, dotToken, name);
     }
 
     private GreenAkcssUtilitiesSectionSyntax ParseIncrementalAkcssUtilitiesSectionSyntaxCore()
@@ -308,7 +336,7 @@ internal sealed partial class Parser
             return selector;
         }
 
-        var (targetType, dotToken, name) = ParseIncrementalAkcssDottedSelectorParts();
+        var (openParen, targetType, closeParen, dotToken, name) = ParseIncrementalAkcssUtilitySelectorParts();
         var parameters = _pool.Allocate<GreenAkcssUtilityParameterSyntax>();
 
         try
@@ -320,7 +348,9 @@ internal sealed partial class Parser
             }
 
             return GreenSyntaxFactory.AkcssUtilitySelectorSyntax(
+                openParen,
                 targetType,
+                closeParen,
                 dotToken,
                 name,
                 parameters.ToList());
@@ -384,6 +414,18 @@ internal sealed partial class Parser
             return ParseIncrementalAkcssIfDirectiveSyntax();
         }
 
+        if (PeekIncrementalTokenKind() == SyntaxKind.AtToken &&
+            PeekIncrementalTokenKind(1) == SyntaxKind.ApplyKeyword)
+        {
+            return ParseIncrementalAkcssApplyDirectiveSyntax();
+        }
+
+        if (PeekIncrementalTokenKind() == SyntaxKind.AtToken &&
+            PeekIncrementalTokenKind(1) == SyntaxKind.InterceptKeyword)
+        {
+            return ParseIncrementalAkcssInterceptDirectiveSyntax();
+        }
+
         if (PeekIncrementalTokenKind() == SyntaxKind.AtToken)
         {
             return ParseIncrementalAkcssPseudoBlockSyntax();
@@ -399,7 +441,7 @@ internal sealed partial class Parser
             return assignment;
         }
 
-        var propertyName = ParseIncrementalAkcssSimpleName();
+        var propertyName = ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind.ColonToken);
         var colon = ReadRequiredIncrementalToken(SyntaxKind.ColonToken);
         var expression = ParseIncrementalAkcssExpressionUntilSemicolonOrCloseBrace();
         var semicolon = PeekIncrementalTokenKind() == SyntaxKind.SemicolonToken
@@ -407,6 +449,56 @@ internal sealed partial class Parser
             : null;
 
         return GreenSyntaxFactory.AkcssAssignmentSyntax(propertyName, colon, expression, semicolon);
+    }
+
+    private GreenAkcssApplyDirectiveSyntax ParseIncrementalAkcssApplyDirectiveSyntax()
+    {
+        if (TryReadReusableIncrementalNode<GreenAkcssApplyDirectiveSyntax>(out var directive))
+        {
+            return directive;
+        }
+
+        var atToken = ReadRequiredIncrementalToken(SyntaxKind.AtToken);
+        var applyKeyword = ReadRequiredIncrementalToken(SyntaxKind.ApplyKeyword);
+        var items = _pool.Allocate<GreenSyntaxToken>();
+
+        try
+        {
+            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.SemicolonToken))
+            {
+                items.Add(ReadIncrementalToken());
+            }
+
+            var semicolon = ReadRequiredIncrementalToken(SyntaxKind.SemicolonToken);
+            return GreenSyntaxFactory.AkcssApplyDirectiveSyntax(
+                atToken,
+                applyKeyword,
+                items.ToList(),
+                semicolon);
+        }
+        finally
+        {
+            _pool.Free(items);
+        }
+    }
+
+    private GreenAkcssInterceptDirectiveSyntax ParseIncrementalAkcssInterceptDirectiveSyntax()
+    {
+        if (TryReadReusableIncrementalNode<GreenAkcssInterceptDirectiveSyntax>(out var directive))
+        {
+            return directive;
+        }
+
+        var atToken = ReadRequiredIncrementalToken(SyntaxKind.AtToken);
+        var interceptKeyword = ReadRequiredIncrementalToken(SyntaxKind.InterceptKeyword);
+        var type = ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind.SemicolonToken);
+        var semicolon = ReadRequiredIncrementalToken(SyntaxKind.SemicolonToken);
+
+        return GreenSyntaxFactory.AkcssInterceptDirectiveSyntax(
+            atToken,
+            interceptKeyword,
+            type,
+            semicolon);
     }
 
     private GreenAkcssIfDirectiveSyntax ParseIncrementalAkcssIfDirectiveSyntax()
@@ -494,21 +586,88 @@ internal sealed partial class Parser
         return GreenSyntaxFactory.AkcssAdditionalPseudoStateSyntax(atToken, state);
     }
 
-    private (GreenSimpleNameSyntax? TargetType, GreenSyntaxToken DotToken, GreenSimpleNameSyntax Name)
-        ParseIncrementalAkcssDottedSelectorParts()
+    private (
+        GreenSyntaxToken? OpenParen,
+        GreenCSharpTypeSyntax? TargetType,
+        GreenSyntaxToken? CloseParen,
+        GreenSyntaxToken? DotToken,
+        GreenSimpleNameSyntax? Name) ParseIncrementalAkcssStyleSelectorParts()
     {
-        GreenSimpleNameSyntax? targetType = null;
+        var (openParen, targetType, closeParen) = ParseIncrementalAkcssOptionalSelectorTarget();
+
+        if (PeekIncrementalTokenKind() == SyntaxKind.DotToken)
+        {
+            var dotToken = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
+            var name = ParseIncrementalAkcssSimpleName();
+            return (openParen, targetType, closeParen, dotToken, name);
+        }
+
+        return (openParen, targetType, closeParen, null, null);
+    }
+
+    private (
+        GreenSyntaxToken? OpenParen,
+        GreenCSharpTypeSyntax? TargetType,
+        GreenSyntaxToken? CloseParen,
+        GreenSyntaxToken DotToken,
+        GreenSimpleNameSyntax Name) ParseIncrementalAkcssUtilitySelectorParts()
+    {
+        var (openParen, targetType, closeParen) = ParseIncrementalAkcssOptionalSelectorTarget();
+        var dotToken = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
+        var name = ParseIncrementalAkcssSimpleName();
+        return (openParen, targetType, closeParen, dotToken, name);
+    }
+
+    private (
+        GreenSyntaxToken? OpenParen,
+        GreenCSharpTypeSyntax? TargetType,
+        GreenSyntaxToken? CloseParen) ParseIncrementalAkcssOptionalSelectorTarget()
+    {
+        if (PeekIncrementalTokenKind() == SyntaxKind.OpenParenToken)
+        {
+            var openParen = ReadRequiredIncrementalToken(SyntaxKind.OpenParenToken);
+            var targetType = ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind.CloseParenToken);
+            var closeParen = ReadRequiredIncrementalToken(SyntaxKind.CloseParenToken);
+            return (openParen, targetType, closeParen);
+        }
 
         if (IsIncrementalAkcssNameToken(PeekIncrementalTokenKind()) &&
             PeekIncrementalTokenKind(1) == SyntaxKind.DotToken)
         {
-            targetType = ParseIncrementalAkcssSimpleName();
+            var targetText = ReadIncrementalToken().ToFullString();
+            return (null, CreateIncrementalAkcssCSharpTypeSyntax(targetText), null);
         }
 
-        var dotToken = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
-        var name = ParseIncrementalAkcssSimpleName();
+        return (null, null, null);
+    }
 
-        return (targetType, dotToken, name);
+    private GreenCSharpTypeSyntax ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind terminator)
+    {
+        if (TryReadReusableIncrementalNode<GreenCSharpTypeSyntax>(out var type))
+        {
+            return type;
+        }
+
+        var rawText = new System.Text.StringBuilder();
+        while (PeekIncrementalTokenKind() is not SyntaxKind.EndOfFileToken &&
+               PeekIncrementalTokenKind() != terminator)
+        {
+            if (terminator == SyntaxKind.ColonToken &&
+                PeekIncrementalTokenKind() is SyntaxKind.SemicolonToken or SyntaxKind.CloseBraceToken)
+            {
+                break;
+            }
+
+            rawText.Append(ReadIncrementalToken().ToFullString());
+        }
+
+        return CreateIncrementalAkcssCSharpTypeSyntax(rawText.ToString());
+    }
+
+    private static GreenCSharpTypeSyntax CreateIncrementalAkcssCSharpTypeSyntax(string rawText)
+    {
+        return GreenSyntaxFactory.CSharpTypeSyntax(
+            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText)));
     }
 
     private GreenIdentifierNameSyntax ParseIncrementalAkcssSimpleName()

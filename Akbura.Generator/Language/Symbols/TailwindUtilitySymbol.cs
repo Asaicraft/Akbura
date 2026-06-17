@@ -43,6 +43,8 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
 
     public override string Name { get; }
 
+    public string? ClassName => null;
+
     AkburaSyntax IAkcssSymbol.DeclarationSyntax => DeclarationSyntax;
 
     public AkcssUtilityDeclarationSyntax DeclarationSyntax { get; }
@@ -50,6 +52,10 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
     public bool HasTargetType => !TargetType.IsDefault;
 
     public CSharpSymbolDefinition TargetType { get; }
+
+    public bool IsIntercepted => false;
+
+    public CSharpSymbolDefinition InterceptType => default;
 
     public ImmutableArray<ITailwindUtilityParameterSymbol> Parameters { get; }
 

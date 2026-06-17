@@ -11,13 +11,13 @@ namespace Akbura.Language.Syntax.Green
 {
     internal sealed partial class GreenAkcssAssignmentSyntax : global::Akbura.Language.Syntax.Green.GreenAkcssBodyMemberSyntax
     {
-        public readonly global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax PropertyName;
+        public readonly global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax PropertyName;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken Colon;
         public readonly global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax Expression;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? Semicolon;
 
         public GreenAkcssAssignmentSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax propertyName,
+            global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax propertyName,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken colon,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken? semicolon,
@@ -58,7 +58,7 @@ namespace Akbura.Language.Syntax.Green
         }
 
         public GreenAkcssAssignmentSyntax UpdateAkcssAssignmentSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax propertyName,
+            global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax propertyName,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken colon,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken? semicolon)
@@ -92,7 +92,7 @@ namespace Akbura.Language.Syntax.Green
             return newNode;
         }
 
-        public GreenAkcssAssignmentSyntax WithPropertyName(global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax propertyName)
+        public GreenAkcssAssignmentSyntax WithPropertyName(global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax propertyName)
         {
             return UpdateAkcssAssignmentSyntax(propertyName, this.Colon, this.Expression, this.Semicolon);
         }
@@ -158,7 +158,7 @@ namespace Akbura.Language.Syntax.Green
     internal static partial class GreenSyntaxFactory
     {
         public static GreenAkcssAssignmentSyntax AkcssAssignmentSyntax(
-            global::Akbura.Language.Syntax.Green.GreenSimpleNameSyntax propertyName,
+            global::Akbura.Language.Syntax.Green.GreenCSharpTypeSyntax propertyName,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken colon,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken? semicolon)
@@ -214,7 +214,7 @@ namespace Akbura.Language.Syntax.Green
         public override GreenNode? VisitAkcssAssignmentSyntax(GreenAkcssAssignmentSyntax node)
         {
             return node.UpdateAkcssAssignmentSyntax(
-                (GreenSimpleNameSyntax)Visit(node.PropertyName)!,
+                (GreenCSharpTypeSyntax)Visit(node.PropertyName)!,
                 (GreenSyntaxToken)VisitToken(node.Colon),
                 (GreenCSharpExpressionSyntax)Visit(node.Expression)!,
                 (GreenSyntaxToken?)VisitToken(node.Semicolon));
@@ -240,8 +240,8 @@ namespace Akbura.Language.Syntax
         internal new global::Akbura.Language.Syntax.Green.GreenAkcssAssignmentSyntax Green
             => Unsafe.As<global::Akbura.Language.Syntax.Green.GreenAkcssAssignmentSyntax>(base.Green);
 
-        public SimpleNameSyntax PropertyName
-            => (SimpleNameSyntax)GetRed(ref _propertyName, 0)!;
+        public CSharpTypeSyntax PropertyName
+            => (CSharpTypeSyntax)GetRed(ref _propertyName, 0)!;
 
         public SyntaxToken Colon
             => new(this, this.Green.Colon, GetChildPosition(1), GetChildIndex(1));
@@ -253,7 +253,7 @@ namespace Akbura.Language.Syntax
             => new(this, this.Green.Semicolon!, GetChildPosition(3), GetChildIndex(3));
 
         public AkcssAssignmentSyntax UpdateAkcssAssignmentSyntax(
-            SimpleNameSyntax propertyName,
+            CSharpTypeSyntax propertyName,
             SyntaxToken colon,
             CSharpExpressionSyntax expression,
             SyntaxToken? semicolon)
@@ -288,7 +288,7 @@ namespace Akbura.Language.Syntax
             return newNode;
         }
 
-        public AkcssAssignmentSyntax WithPropertyName(SimpleNameSyntax propertyName)
+        public AkcssAssignmentSyntax WithPropertyName(CSharpTypeSyntax propertyName)
         {
             return UpdateAkcssAssignmentSyntax(propertyName, this.Colon, this.Expression, this.Green.Semicolon != null ? this.Semicolon : (SyntaxToken?)null);
         }
@@ -357,7 +357,7 @@ namespace Akbura.Language.Syntax
     internal static partial class SyntaxFactory
     {
         internal static AkcssAssignmentSyntax AkcssAssignmentSyntax(
-            SimpleNameSyntax propertyName,
+            CSharpTypeSyntax propertyName,
             SyntaxToken colon,
             CSharpExpressionSyntax expression,
             SyntaxToken? semicolon)
@@ -437,7 +437,7 @@ namespace Akbura.Language.Syntax
         public override AkburaSyntax? VisitAkcssAssignmentSyntax(AkcssAssignmentSyntax node)
         {
             return node.UpdateAkcssAssignmentSyntax(
-                (SimpleNameSyntax)Visit(node.PropertyName)!,
+                (CSharpTypeSyntax)Visit(node.PropertyName)!,
                 VisitToken(node.Colon),
                 (CSharpExpressionSyntax)Visit(node.Expression)!,
                 node.Green.Semicolon != null ? VisitToken(node.Semicolon) : (SyntaxToken?)null);

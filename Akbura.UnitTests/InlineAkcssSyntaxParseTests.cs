@@ -16,11 +16,11 @@ public class InlineAkcssSyntaxParseTests
 		var syntax = parser.ParseAkcssStyleRuleSyntax();
 
 		Assert.Null(syntax.Selector.TargetType);
-		Assert.Equal("btn", syntax.Selector.Name.Identifier.ValueText);
+		Assert.Equal("btn", syntax.Selector.Name!.Identifier.ValueText);
 		Assert.Equal(1, syntax.Members.Count);
 
 		var assignment = Assert.IsType<GreenAkcssAssignmentSyntax>(syntax.Members[0]);
-		Assert.Equal("Background", assignment.PropertyName.Identifier.ValueText);
+		Assert.Equal("Background", assignment.PropertyName.ToFullString());
 		Assert.False(assignment.Colon.IsMissing);
 		Assert.NotNull(assignment.Semicolon);
 		Assert.Equal(code, syntax.ToFullString());
@@ -36,8 +36,8 @@ public class InlineAkcssSyntaxParseTests
 		var syntax = parser.ParseAkcssStyleRuleSyntax();
 
 		Assert.NotNull(syntax.Selector.TargetType);
-		Assert.Equal("Button", syntax.Selector.TargetType!.Identifier.ValueText);
-		Assert.Equal("btn", syntax.Selector.Name.Identifier.ValueText);
+		Assert.Equal("Button", syntax.Selector.TargetType!.ToFullString());
+		Assert.Equal("btn", syntax.Selector.Name!.Identifier.ValueText);
 
 		var ifDirective = Assert.IsType<GreenAkcssIfDirectiveSyntax>(syntax.Members[0]);
 		Assert.Equal("IsHovered", ifDirective.Condition.ToFullString());
@@ -61,6 +61,82 @@ public class InlineAkcssSyntaxParseTests
 		Assert.Equal(1, utility.Selector.Parameters.Count);
 		Assert.Equal(1, utility.Members.Count);
 		Assert.Equal(code, syntax.ToFullString());
+	}
+
+	[Fact]
+	public void AkcssDocument_WithUsingTypedSelectorsAndQualifiedProperty_RoundTrips()
+	{
+		const string code =
+			"@using MyNs;\n" +
+			"\n" +
+			".anyControl {\n" +
+			"    global::MyNs.MyClass.MyProperty: Expression.Hello;\n" +
+			"}\n" +
+			"\n" +
+			"Button.avaloniaControl {\n" +
+			"    Background: White;\n" +
+			"}\n" +
+			"\n" +
+			"(global::MyComponents.MyComponent) {\n" +
+			"    Padding: 5;\n" +
+			"}\n" +
+			"\n" +
+			"(global::MyComponents.MyComponent).withClass {\n" +
+			"    Padding: 10;\n" +
+			"}";
+
+		var parser = MakeParser(code);
+
+		var syntax = parser.ParseAkcssDocumentSyntax();
+
+		Assert.Equal(5, syntax.Members.Count);
+		Assert.IsType<GreenAkcssUsingDirectiveSyntax>(syntax.Members[0]);
+		var typedOnly = Assert.IsType<GreenAkcssStyleRuleSyntax>(syntax.Members[3]);
+		Assert.NotNull(typedOnly.Selector.OpenParen);
+		Assert.NotNull(typedOnly.Selector.TargetType);
+		Assert.Null(typedOnly.Selector.DotToken);
+		Assert.Null(typedOnly.Selector.Name);
+		var typedClass = Assert.IsType<GreenAkcssStyleRuleSyntax>(syntax.Members[4]);
+		Assert.NotNull(typedClass.Selector.OpenParen);
+		Assert.NotNull(typedClass.Selector.TargetType);
+		Assert.NotNull(typedClass.Selector.DotToken);
+		Assert.Equal("withClass", typedClass.Selector.Name!.Identifier.ValueText);
+		Assert.Equal(code, syntax.ToFullString());
+		Assert.Equal(code.Length, syntax.FullWidth);
+	}
+
+	[Fact]
+	public void AkcssDocument_WithApplyAndIntercept_RoundTrips()
+	{
+		const string code =
+			"@using MyComponents;\n" +
+			"@using Styles.akcss;\n" +
+			"@using Akbura.Styles.akcss;\n" +
+			"\n" +
+			"MyComponent.multiClass {\n" +
+			"    @apply anyControl avaloniaControl w-5;\n" +
+			"}\n" +
+			"\n" +
+			".myVeryComplexClass {\n" +
+			"    @intercept global::MyStyles.MyVeryComplexClass;\n" +
+			"}";
+
+		var parser = MakeParser(code);
+
+		var syntax = parser.ParseAkcssDocumentSyntax();
+
+		Assert.Equal(5, syntax.Members.Count);
+		Assert.IsType<GreenAkcssUsingDirectiveSyntax>(syntax.Members[0]);
+		Assert.IsType<GreenAkcssUsingDirectiveSyntax>(syntax.Members[1]);
+		Assert.IsType<GreenAkcssUsingDirectiveSyntax>(syntax.Members[2]);
+		var applyRule = Assert.IsType<GreenAkcssStyleRuleSyntax>(syntax.Members[3]);
+		Assert.Equal(1, applyRule.Members.Count);
+		Assert.IsType<GreenAkcssApplyDirectiveSyntax>(applyRule.Members[0]);
+		var interceptRule = Assert.IsType<GreenAkcssStyleRuleSyntax>(syntax.Members[4]);
+		Assert.Equal(1, interceptRule.Members.Count);
+		Assert.IsType<GreenAkcssInterceptDirectiveSyntax>(interceptRule.Members[0]);
+		Assert.Equal(code, syntax.ToFullString());
+		Assert.Equal(code.Length, syntax.FullWidth);
 	}
 
 	[Fact]

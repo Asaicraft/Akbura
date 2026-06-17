@@ -81,6 +81,8 @@ token UnsafeKeyword      = "unsafe";
 
 token UtilitiesKeyword    = "utilities";
 token AkcssKeyword        = "akcss";
+token ApplyKeyword        = "apply";
+token InterceptKeyword    = "intercept";
 
 [id 200]
 /*
@@ -588,10 +590,26 @@ node AkcssDocumentSyntax {
 
 /// <summary>
 /// Any top-level member inside an .akcss file:
+///   • @using My.Namespace;
 ///   • style rule: .myclass { ... }
 ///   • utilities section: @utilities { ... }
 /// </summary>
 abstract node AkcssTopLevelMember;
+
+/// <summary>
+/// AKCSS-local using directive:
+///   @using My.Namespace;
+///   @using Styles.akcss;
+///
+/// Names ending in ".akcss" are semantic style imports. Other names are C#
+/// namespace imports for property references, selectors, and expressions.
+/// </summary>
+node AkcssUsingDirectiveSyntax : AkcssTopLevelMember {
+	AtToken      : AtToken;
+	UsingKeyword : UsingKeyword;
+	Name         : CSharpTypeSyntax;
+	Semicolon    : SemicolonToken;
+}
 
 
 // ============================================================================
@@ -617,10 +635,35 @@ abstract node AkcssBodyMemberSyntax;
 /// Semicolon is optional to allow slightly looser formatting.
 /// </summary>
 node AkcssAssignmentSyntax : AkcssBodyMemberSyntax {
-	PropertyName : SimpleName;            // Background / Opacity / Width / ...
+	PropertyName : CSharpTypeSyntax;      // Background / global::My.Type.Prop / ...
 	Colon        : ColonToken;           // ':'
 	Expression   : CSharpExpressionSyntax;
 	Semicolon?   : SemicolonToken;       // optional ';'
+}
+
+/// <summary>
+/// Applies style classes or utilities to this style:
+///   @apply anyControl avaloniaControl w-5;
+///
+/// Items are intentionally stored as tokens because utility syntax is
+/// whitespace-separated and mirrors Tailwind attribute spelling.
+/// </summary>
+node AkcssApplyDirectiveSyntax : AkcssBodyMemberSyntax {
+	AtToken      : AtToken;
+	ApplyKeyword : ApplyKeyword;
+	Items        : TokenList;
+	Semicolon    : SemicolonToken;
+}
+
+/// <summary>
+/// Delegates a style to a hand-written C# AkcssStyle implementation:
+///   @intercept global::MyStyles.MyVeryComplexClass;
+/// </summary>
+node AkcssInterceptDirectiveSyntax : AkcssBodyMemberSyntax {
+	AtToken          : AtToken;
+	InterceptKeyword : InterceptKeyword;
+	Type             : CSharpTypeSyntax;
+	Semicolon        : SemicolonToken;
 }
 
 /// <summary>
@@ -731,16 +774,21 @@ node AkcssStyleRuleSyntax : AkcssTopLevelMember {
 ///
 ///   .myclass
 ///   Button.myclass
+///   (global::MyComponents.MyComponent)
+///   (global::MyComponents.MyComponent).myclass
 ///
 /// Parsed as:
-///   TargetType? : Button / Grid / Control / ...
-///   DotToken    : '.'
-///   Name        : 'myclass'
+///   TargetType? : Button / Grid / Control / global::...
+///   Name?       : 'myclass'
+///
+/// Name is optional only for typed selectors such as "(MyComponent)".
 /// </summary>
 node AkcssStyleSelectorSyntax {
-	TargetType? : SimpleName;  // optional type prefix: Button / Control / ...
-	DotToken    : DotToken;    // '.'
-	Name        : SimpleName;  // class name: myclass
+	OpenParen?  : OpenParenToken;
+	TargetType? : CSharpTypeSyntax;  // optional type prefix: Button / Control / ...
+	CloseParen? : CloseParenToken;
+	DotToken?   : DotToken;          // '.'
+	Name?       : SimpleName;        // class name: myclass
 }
 
 
@@ -815,7 +863,9 @@ node AkcssUtilityParameterSyntax {
 /// the utility as applicable to the default base type (e.g., Control).
 /// </summary>
 node AkcssUtilitySelectorSyntax {
-	TargetType? : SimpleName;                        // optional: Button / Control / ...
+	OpenParen?  : OpenParenToken;
+	TargetType? : CSharpTypeSyntax;                  // optional: Button / Control / ...
+	CloseParen? : CloseParenToken;
 	DotToken    : DotToken;                          // '.'
 	Name        : SimpleName;                        // utility name: w / flag / someutil / btn
 	Parameters  : syntaxlist<AkcssUtilityParameterSyntax>;

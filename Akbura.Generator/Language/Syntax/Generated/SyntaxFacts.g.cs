@@ -133,6 +133,8 @@ namespace Akbura.Language.Syntax
 
 				SyntaxKind.UtilitiesKeyword => "utilities",
 				SyntaxKind.AkcssKeyword => "akcss",
+				SyntaxKind.ApplyKeyword => "apply",
+				SyntaxKind.InterceptKeyword => "intercept",
 
 				_ => string.Empty,
 			};
@@ -176,6 +178,8 @@ namespace Akbura.Language.Syntax
 
 				case "utilities": return SyntaxKind.UtilitiesKeyword;
 				case "akcss": return SyntaxKind.AkcssKeyword;
+				case "apply": return SyntaxKind.ApplyKeyword;
+				case "intercept": return SyntaxKind.InterceptKeyword;
 
 				default:
 					return SyntaxKind.None;
@@ -239,6 +243,8 @@ namespace Akbura.Language.Syntax
 				case SyntaxKind.UnsafeKeyword:
 				case SyntaxKind.UtilitiesKeyword:
 				case SyntaxKind.AkcssKeyword:
+				case SyntaxKind.ApplyKeyword:
+				case SyntaxKind.InterceptKeyword:
 					return true;
 
 				default:

@@ -20,13 +20,15 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
     {
         DeclarationSyntax = declarationSyntax ?? throw new ArgumentNullException(nameof(declarationSyntax));
 
-        var name = declarationSyntax.Selector.Name.Identifier.ValueText;
-        if (string.IsNullOrWhiteSpace(name))
+        var className = declarationSyntax.Selector.Name?.Identifier.ValueText;
+        if (string.IsNullOrWhiteSpace(className) &&
+            targetType.IsDefault)
         {
             throw new ArgumentException("Akcss style symbol name cannot be empty.", nameof(declarationSyntax));
         }
 
-        Name = name;
+        ClassName = string.IsNullOrWhiteSpace(className) ? null : className;
+        Name = ClassName ?? targetType.Name;
         TargetType = targetType;
         Operations = operations.IsDefault
             ? ImmutableArray<IAkcssOperation>.Empty
@@ -38,6 +40,8 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
     public override SymbolLanguage Language => SymbolLanguage.Akcss;
 
     public override string Name { get; }
+
+    public string? ClassName { get; }
 
     AkburaSyntax IAkcssSymbol.DeclarationSyntax => DeclarationSyntax;
 
@@ -56,9 +60,21 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
 
     public CSharpSymbolDefinition TargetType { get; }
 
-    public override string MetadataName => HasTargetType
-        ? TargetType.Name + "." + Name
-        : Name;
+    public bool IsIntercepted => !InterceptType.IsDefault;
+
+    public CSharpSymbolDefinition InterceptType { get; private set; }
+
+    internal void SetInterceptType(CSharpSymbolDefinition interceptType)
+    {
+        InterceptType = interceptType;
+    }
+
+    public override string MetadataName => (HasTargetType, ClassName) switch
+    {
+        (true, { Length: > 0 } className) => TargetType.Name + "." + className,
+        (true, _) => TargetType.Name,
+        _ => Name,
+    };
 
     public override string ToDisplayString()
     {

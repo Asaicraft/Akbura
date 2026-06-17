@@ -100,8 +100,10 @@ namespace Akbura.Language.Syntax
 
 		UtilitiesKeyword = 163,
 		AkcssKeyword = 164,
+		ApplyKeyword = 165,
+		InterceptKeyword = 166,
 
-		LastTokenWithWellKnownText = AkcssKeyword,
+		LastTokenWithWellKnownText = InterceptKeyword,
 
 		// DSL-specific literal
 		AkTextLiteral = 201,
@@ -190,6 +192,7 @@ namespace Akbura.Language.Syntax
 		// AKCSS root
 		AkcssDocumentSyntax = 546,
 		AkcssTopLevelMember = 547,
+		AkcssUsingDirectiveSyntax = 560,
 
 		// Shared body members
 		AkcssBodyMemberSyntax = 548,
@@ -198,6 +201,8 @@ namespace Akbura.Language.Syntax
 		AkcssAdditionalPseudoStateSyntax = 551,
 		AkcssPseudoSelectorSyntax = 552,
 		AkcssPseudoBlockSyntax = 553,
+		AkcssApplyDirectiveSyntax = 561,
+		AkcssInterceptDirectiveSyntax = 562,
 
 		// AKCSS style rules
 		AkcssStyleRuleSyntax = 554,

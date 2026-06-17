@@ -857,7 +857,8 @@ public class SemanticPipelineTests
 
         Assert.Null(symbolInfo.Symbol);
         Assert.Equal(AkburaCandidateReason.NotFound, symbolInfo.CandidateReason);
-        Assert.True(semanticModel.GetSemanticDiagnostics(rule).IsEmpty);
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(rule));
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssSelectorTargetNotFound, diagnostic.Code);
     }
 
     [Fact]
@@ -963,6 +964,235 @@ public class SemanticPipelineTests
         var colorSymbol = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
         AssertAvaloniaColorsProperty(colorSymbol, "White");
         Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssUsing_ResolvesSelectorAndQualifiedProperty()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @using MyComponents;\n" +
+            "    @using MyNs;\n" +
+            "\n" +
+            "    MyComponent.multiClass {\n" +
+            "        MyClass.MyProperty: Expression.Hello;\n" +
+            "    }\n" +
+            "}";
+        const string csharpCode =
+            "namespace MyComponents\n" +
+            "{\n" +
+            "    public sealed class MyComponent : Avalonia.Controls.Control { }\n" +
+            "}\n" +
+            "\n" +
+            "namespace MyNs\n" +
+            "{\n" +
+            "    public static class MyClass\n" +
+            "    {\n" +
+            "        public static readonly Avalonia.StyledProperty<double> MyProperty = null!;\n" +
+            "    }\n" +
+            "    public static class Expression\n" +
+            "    {\n" +
+            "        public static double Hello => 1;\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.True(symbol.HasTargetType);
+        Assert.Equal("multiClass", symbol.ClassName);
+        Assert.Equal("global::MyComponents.MyComponent",
+            symbol.TargetType.Symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal("MyProperty", operation.Property?.Name);
+        Assert.Equal("MyProperty", operation.Property?.AvaloniaPropertyDefinition.Name);
+        Assert.Equal("Double", operation.ValueType.Name);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssParenthesizedSelectors_ResolveTypedAndTypedClassStyles()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    (global::MyComponents.MyComponent) {\n" +
+            "    }\n" +
+            "\n" +
+            "    (global::MyComponents.MyComponent).withClass {\n" +
+            "    }\n" +
+            "}";
+        const string csharpCode =
+            "namespace MyComponents;\n" +
+            "public sealed class MyComponent : Avalonia.Controls.Control { }";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
+        var rules = inlineAkcss.Members.OfType<AkcssStyleRuleSyntax>().ToArray();
+
+        var typedOnly = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rules[0]).Symbol);
+        var typedWithClass = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rules[1]).Symbol);
+
+        Assert.True(typedOnly.HasTargetType);
+        Assert.Null(typedOnly.ClassName);
+        Assert.Equal("MyComponent", typedOnly.Name);
+        Assert.True(typedWithClass.HasTargetType);
+        Assert.Equal("withClass", typedWithClass.ClassName);
+        Assert.Equal("MyComponent.withClass", typedWithClass.MetadataName);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssApply_ResolvesLocalThenImportedStylesAndUtilities()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @using Shared.Styles.akcss;\n" +
+            "\n" +
+            "    .local {\n" +
+            "    }\n" +
+            "\n" +
+            "    .multi {\n" +
+            "        @apply local imported w-5;\n" +
+            "    }\n" +
+            "}";
+        const string importedAkcss =
+            ".imported {\n" +
+            "}\n" +
+            "\n" +
+            "@utilities {\n" +
+            "    .w-(double value) { Width: value; }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var akcssTree = AkcssSyntaxTree.ParseText(
+            importedAkcss,
+            "Styles.akcss",
+            "Shared.Styles.akcss");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(), [akcssTree]);
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
+        var multiRule = inlineAkcss.Members
+            .OfType<AkcssStyleRuleSyntax>()
+            .Single(rule => rule.Selector.Name?.Identifier.ValueText == "multi");
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(multiRule).Symbol);
+        var apply = Assert.IsAssignableFrom<IAkcssApplyOperation>(Assert.Single(symbol.Operations));
+
+        Assert.Equal(["local", "imported", "w-5"], apply.Items.AsEnumerable());
+        Assert.Equal(3, apply.AppliedSymbols.Length);
+        Assert.Equal("local", apply.AppliedSymbols[0].ClassName);
+        Assert.Equal("imported", apply.AppliedSymbols[1].ClassName);
+        Assert.IsAssignableFrom<ITailwindUtilitySymbol>(apply.AppliedSymbols[2]);
+        Assert.False(apply.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(apply.Syntax).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssApply_DuplicateSameLayerCandidatesProduceDiagnostic()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .dup { }\n" +
+            "    .dup { }\n" +
+            "    .target { @apply dup; }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
+        var targetRule = inlineAkcss.Members
+            .OfType<AkcssStyleRuleSyntax>()
+            .Single(rule => rule.Selector.Name?.Identifier.ValueText == "target");
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(targetRule).Symbol);
+        var apply = Assert.IsAssignableFrom<IAkcssApplyOperation>(Assert.Single(symbol.Operations));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(apply.Syntax));
+
+        Assert.True(apply.HasErrors);
+        Assert.Empty(apply.AppliedSymbols);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssApplyItemAmbiguous, diagnostic.Code);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssIntercept_ResolvesAkcssStyleSubtype()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @using MyStyles;\n" +
+            "\n" +
+            "    .myVeryComplexClass {\n" +
+            "        @intercept MyVeryComplexClass;\n" +
+            "    }\n" +
+            "}";
+        const string csharpCode =
+            "namespace MyStyles;\n" +
+            "public sealed class MyVeryComplexClass : Akbura.Akcss.AkcssStyle { }";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssInterceptOperation>(Assert.Single(symbol.Operations));
+
+        Assert.True(symbol.IsIntercepted);
+        Assert.Equal("global::MyStyles.MyVeryComplexClass",
+            symbol.InterceptType.Symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Same(symbol.InterceptType.Symbol, operation.InterceptType.Symbol);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssIntercept_InvalidTypeProducesDiagnostic()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .myVeryComplexClass {\n" +
+            "        @intercept global::MyStyles.NotAStyle;\n" +
+            "    }\n" +
+            "}";
+        const string csharpCode =
+            "namespace MyStyles;\n" +
+            "public sealed class NotAStyle { }";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssInterceptOperation>(Assert.Single(symbol.Operations));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+
+        Assert.False(symbol.IsIntercepted);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssInterceptTypeInvalid, diagnostic.Code);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssQualifiedProperty_MissingOwnerPropertyProducesDiagnostic()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .hello {\n" +
+            "        global::MyNs.MyClass.MissingProperty: 1;\n" +
+            "    }\n" +
+            "}";
+        const string csharpCode =
+            "namespace MyNs;\n" +
+            "public static class MyClass { }";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(symbol.Operations));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+
+        Assert.Null(operation.Property);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound, diagnostic.Code);
     }
 
     [Fact]

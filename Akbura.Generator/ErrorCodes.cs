@@ -34,6 +34,11 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_TailwindUtilityAmbiguous = nameof(AKBURA_SEMANTIC_TailwindUtilityAmbiguous);
     public const string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch = nameof(AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch);
     public const string AKBURA_SEMANTIC_AkcssImportNotFound = nameof(AKBURA_SEMANTIC_AkcssImportNotFound);
+    public const string AKBURA_SEMANTIC_AkcssApplyItemNotFound = nameof(AKBURA_SEMANTIC_AkcssApplyItemNotFound);
+    public const string AKBURA_SEMANTIC_AkcssApplyItemAmbiguous = nameof(AKBURA_SEMANTIC_AkcssApplyItemAmbiguous);
+    public const string AKBURA_SEMANTIC_AkcssInterceptTypeNotFound = nameof(AKBURA_SEMANTIC_AkcssInterceptTypeNotFound);
+    public const string AKBURA_SEMANTIC_AkcssInterceptTypeInvalid = nameof(AKBURA_SEMANTIC_AkcssInterceptTypeInvalid);
+    public const string AKBURA_SEMANTIC_AkcssSelectorTargetNotFound = nameof(AKBURA_SEMANTIC_AkcssSelectorTargetNotFound);
     public const string AKBURA_SEMANTIC_StateBindingExpressionExpected = nameof(AKBURA_SEMANTIC_StateBindingExpressionExpected);
     public const string AKBURA_SEMANTIC_StateBindingSourceNotObservable = nameof(AKBURA_SEMANTIC_StateBindingSourceNotObservable);
     public const string AKBURA_SEMANTIC_StateBindingTargetNotWritable = nameof(AKBURA_SEMANTIC_StateBindingTargetNotWritable);

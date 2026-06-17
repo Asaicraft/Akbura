@@ -208,7 +208,9 @@ public class AkburaSyntaxFactoryTests
 
         // .myclass
         var myClassSelector = AkcssStyleSelectorSyntax(
+            openParen: null,
             targetType: null,
+            closeParen: null,
             dotToken: Token(SyntaxKind.DotToken),
             name: IdentifierName("myclass")
         );
@@ -221,7 +223,7 @@ public class AkburaSyntaxFactoryTests
         );
 
         var backgroundRedAssignment = AkcssAssignmentSyntax(
-            propertyName: IdentifierName("Background"),
+            propertyName: TypeReference("Background"),
             colon: TokenWithTrailingSpace(SyntaxKind.ColonToken),
             expression: redExpression,
             semicolon: Token(SyntaxKind.SemicolonToken)
@@ -238,7 +240,7 @@ public class AkburaSyntaxFactoryTests
         );
 
         var backgroundBlueAssignment = AkcssAssignmentSyntax(
-            propertyName: IdentifierName("Background"),
+            propertyName: TypeReference("Background"),
             colon: TokenWithTrailingSpace(SyntaxKind.ColonToken),
             expression: blueExpression,
             semicolon: Token(SyntaxKind.SemicolonToken)
@@ -310,7 +312,9 @@ public class AkburaSyntaxFactoryTests
         // ---- .rounded { CornerRadius: 4; } ----
 
         var roundedSelector = AkcssUtilitySelectorSyntax(
+            openParen: null,
             targetType: null,
+            closeParen: null,
             dotToken: Token(SyntaxKind.DotToken),
             name: IdentifierName("rounded"),
             parameters: List<AkcssUtilityParameterSyntax>()
@@ -323,7 +327,7 @@ public class AkburaSyntaxFactoryTests
         );
 
         var cornerRadiusAssignment = AkcssAssignmentSyntax(
-            propertyName: IdentifierName("CornerRadius"),
+            propertyName: TypeReference("CornerRadius"),
             colon: TokenWithTrailingSpace(SyntaxKind.ColonToken),
             expression: fourExpression,
             semicolon: Token(SyntaxKind.SemicolonToken)
@@ -367,7 +371,9 @@ public class AkburaSyntaxFactoryTests
         );
 
         var wSelector = AkcssUtilitySelectorSyntax(
+            openParen: null,
             targetType: null,
+            closeParen: null,
             dotToken: Token(SyntaxKind.DotToken),
             name: IdentifierName("w"),
             parameters: List(
@@ -382,7 +388,7 @@ public class AkburaSyntaxFactoryTests
         );
 
         var widthAssignment = AkcssAssignmentSyntax(
-            propertyName: IdentifierName("Width"),
+            propertyName: TypeReference("Width"),
             colon: TokenWithTrailingSpace(SyntaxKind.ColonToken),
             expression: widthTimesSpacingExpression,
             semicolon: Token(SyntaxKind.SemicolonToken)
@@ -433,7 +439,9 @@ public class AkburaSyntaxFactoryTests
         );
 
         var spaceSelector = AkcssUtilitySelectorSyntax(
+            openParen: null,
             targetType: null,
+            closeParen: null,
             dotToken: Token(SyntaxKind.DotToken),
             name: IdentifierName("space"),
             parameters: List(
@@ -449,7 +457,7 @@ public class AkburaSyntaxFactoryTests
         );
 
         var marginLeftAssignment = AkcssAssignmentSyntax(
-            propertyName: IdentifierName("MarginLeft"),
+            propertyName: TypeReference("MarginLeft"),
             colon: TokenWithTrailingSpace(SyntaxKind.ColonToken),
             expression: marginLeftExpr,
             semicolon: Token(SyntaxKind.SemicolonToken)
@@ -465,7 +473,7 @@ public class AkburaSyntaxFactoryTests
         );
 
         var marginTopAssignment = AkcssAssignmentSyntax(
-            propertyName: IdentifierName("MarginTop"),
+            propertyName: TypeReference("MarginTop"),
             colon: TokenWithTrailingSpace(SyntaxKind.ColonToken),
             expression: marginTopExpr,
             semicolon: Token(SyntaxKind.SemicolonToken)
@@ -488,7 +496,7 @@ public class AkburaSyntaxFactoryTests
         );
 
         var borderThicknessAssignment = AkcssAssignmentSyntax(
-            propertyName: IdentifierName("BorderThickness"),
+            propertyName: TypeReference("BorderThickness"),
             colon: TokenWithTrailingSpace(SyntaxKind.ColonToken),
             expression: borderThicknessExpr,
             semicolon: Token(SyntaxKind.SemicolonToken)
@@ -1132,6 +1140,11 @@ public class AkburaSyntaxFactoryTests
 
         Assert.Equal(expectedText, actual);
         AssertFullWidthMatchesText(expectedText, document);
+    }
+
+    private static CSharpTypeSyntax TypeReference(string text)
+    {
+        return CSharpTypeSyntax(TokenList(CSharpRawToken(text)));
     }
 
     private static void AssertFullWidthMatchesText(string expected, AkburaSyntax syntax)

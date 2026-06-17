@@ -27,6 +27,8 @@ internal enum OperationKind
     AkcssUtilityDeclaration,
     AkcssAssignment,
     AkcssIf,
+    AkcssApply,
+    AkcssIntercept,
     MarkupCommandBinding,
     MarkupEventBinding,
     TailwindUtility,

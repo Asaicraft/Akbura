@@ -10,6 +10,8 @@ internal interface IAkcssSymbol : ISymbol
 
     ImmutableArray<IAkcssOperation> Operations { get; }
 
+    string? ClassName { get; }
+
     bool HasTargetType { get; }
 
     /// <summary>
@@ -17,4 +19,8 @@ internal interface IAkcssSymbol : ISymbol
     /// Default for global selectors such as <c>.myclass</c>.
     /// </summary>
     CSharpSymbolDefinition TargetType { get; }
+
+    bool IsIntercepted { get; }
+
+    CSharpSymbolDefinition InterceptType { get; }
 }

@@ -8,5 +8,5 @@ using Avalonia.Controls;
 namespace Akbura.Akcss;
 public abstract class AkcssClass: AkcssStyle
 {
-    public abstract void Update(Control control);
+    public abstract void Update(object control);
 }

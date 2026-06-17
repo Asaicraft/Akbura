@@ -1,10 +1,5 @@
 ﻿using System;
-using Avalonia.Controls;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Akbura.Akcss;
 
@@ -20,30 +15,30 @@ public abstract class AkcssUtility : AkcssStyle
         get;
     }
 
-    public abstract void Update(Control control, params object[] parameters);
+    public abstract void Update(object target, params object[] parameters);
 }
 
-public abstract class ZeroAkcssUtility: AkcssUtility
+public abstract class ZeroAkcssUtility : AkcssUtility
 {
     public override ImmutableArray<Type> Parameters => [];
 
-    public abstract void Update(Control control);
+    public abstract void Update(object target);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control);
+        Update(target);
     }
 }
 
 public abstract class AkcssUtility<T1> : AkcssUtility
 {
     public override ImmutableArray<Type> Parameters => [typeof(T1)];
-    
-    public abstract void Update(Control control, T1 param1);
-    
-    public override void Update(Control control, params object[] parameters)
+
+    public abstract void Update(object target, T1 param1);
+
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control, (T1)parameters[0]);
+        Update(target, (T1)parameters[0]);
     }
 }
 
@@ -51,11 +46,11 @@ public abstract class AkcssUtility<T1, T2> : AkcssUtility
 {
     public override ImmutableArray<Type> Parameters => [typeof(T1), typeof(T2)];
 
-    public abstract void Update(Control control, T1 p1, T2 p2);
+    public abstract void Update(object target, T1 p1, T2 p2);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1]);
     }
@@ -65,11 +60,11 @@ public abstract class AkcssUtility<T1, T2, T3> : AkcssUtility
 {
     public override ImmutableArray<Type> Parameters => [typeof(T1), typeof(T2), typeof(T3)];
 
-    public abstract void Update(Control control, T1 p1, T2 p2, T3 p3);
+    public abstract void Update(object target, T1 p1, T2 p2, T3 p3);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2]);
@@ -80,11 +75,11 @@ public abstract class AkcssUtility<T1, T2, T3, T4> : AkcssUtility
 {
     public override ImmutableArray<Type> Parameters => [typeof(T1), typeof(T2), typeof(T3), typeof(T4)];
 
-    public abstract void Update(Control control, T1 p1, T2 p2, T3 p3, T4 p4);
+    public abstract void Update(object target, T1 p1, T2 p2, T3 p3, T4 p4);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -97,12 +92,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5> : AkcssUtility
     public override ImmutableArray<Type> Parameters =>
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -116,12 +111,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6> : AkcssUtility
     public override ImmutableArray<Type> Parameters =>
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -136,12 +131,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7> : AkcssUtility
     public override ImmutableArray<Type> Parameters =>
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -157,12 +152,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8> : AkcssUtilit
     public override ImmutableArray<Type> Parameters =>
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7), typeof(T8)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -179,12 +174,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9> : AkcssUt
     public override ImmutableArray<Type> Parameters =>
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7), typeof(T8), typeof(T9)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -203,12 +198,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : Ak
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7),
          typeof(T8), typeof(T9), typeof(T10)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -228,12 +223,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7),
          typeof(T8), typeof(T9), typeof(T10), typeof(T11)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10, T11 p11);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -254,12 +249,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7),
          typeof(T8), typeof(T9), typeof(T10), typeof(T11), typeof(T12)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10, T11 p11, T12 p12);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -281,12 +276,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7),
          typeof(T8), typeof(T9), typeof(T10), typeof(T11), typeof(T12), typeof(T13)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10, T11 p11, T12 p12, T13 p13);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -309,12 +304,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7),
          typeof(T8), typeof(T9), typeof(T10), typeof(T11), typeof(T12), typeof(T13), typeof(T14)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10, T11 p11, T12 p12, T13 p13, T14 p14);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -338,12 +333,12 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7),
          typeof(T8), typeof(T9), typeof(T10), typeof(T11), typeof(T12), typeof(T13), typeof(T14), typeof(T15)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10, T11 p11, T12 p12, T13 p13, T14 p14, T15 p15);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -368,13 +363,13 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,
         [typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6), typeof(T7),
          typeof(T8), typeof(T9), typeof(T10), typeof(T11), typeof(T12), typeof(T13), typeof(T14), typeof(T15), typeof(T16)];
 
-    public abstract void Update(Control control,
+    public abstract void Update(object target,
         T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10, T11 p11,
         T12 p12, T13 p13, T14 p14, T15 p15, T16 p16);
 
-    public override void Update(Control control, params object[] parameters)
+    public override void Update(object target, params object[] parameters)
     {
-        Update(control,
+        Update(target,
             (T1)parameters[0],
             (T2)parameters[1],
             (T3)parameters[2],
@@ -393,5 +388,3 @@ public abstract class AkcssUtility<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,
             (T16)parameters[15]);
     }
 }
-
-

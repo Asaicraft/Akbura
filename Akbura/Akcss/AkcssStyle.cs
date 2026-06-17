@@ -52,9 +52,9 @@ public abstract class AkcssStyle
     /// Returns a signal that this style should be applied again.
     /// Emitted values are always <see cref="AvaloniaProperty.UnsetValue"/> and should be ignored.
     /// </summary>
-    public virtual IObservable<object?> Watch(Control control)
+    public virtual IObservable<object?> Watch(object target)
     {
-        ArgumentNullException.ThrowIfNull(control);
+        ArgumentNullException.ThrowIfNull(target);
         return EmptyStyleSignal.Instance;
     }
 

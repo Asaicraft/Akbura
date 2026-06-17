@@ -11,6 +11,7 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
         StateDeclarationSyntax declarationSyntax,
         CSharpSymbolDefinition type,
         CSharpSymbolDefinition initializerType,
+        IUserHookSymbol? userHook,
         bool hasExplicitType,
         StateBindingKind bindingKind,
         ISymbol? containingSymbol = null,
@@ -30,6 +31,7 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
         Name = name;
         Type = type;
         InitializerType = initializerType;
+        UserHook = userHook;
         HasExplicitType = hasExplicitType;
         BindingKind = bindingKind;
     }
@@ -49,6 +51,8 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
     public CSharpSymbolDefinition Type { get; }
 
     public CSharpSymbolDefinition InitializerType { get; }
+
+    public IUserHookSymbol? UserHook { get; }
 
     public bool HasExplicitType { get; }
 

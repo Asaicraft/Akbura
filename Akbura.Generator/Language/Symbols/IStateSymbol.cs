@@ -14,6 +14,8 @@ internal interface IStateSymbol : ISymbol
 
     CSharpSymbolDefinition InitializerType { get; }
 
+    IUserHookSymbol? UserHook { get; }
+
     bool HasExplicitType { get; }
 
     bool IsBindable { get; }

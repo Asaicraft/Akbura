@@ -453,6 +453,77 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_StateInitializerUserHook_ResolvesCSharpHookSymbol()
+    {
+        const string code =
+            "using Hooks;\n" +
+            "\n" +
+            "state string query = \"\";\n" +
+            "state string name = useName(query);";
+        const string csharpCode =
+            "using Akbura.CompilerAnotations;\n" +
+            "\n" +
+            "namespace Hooks;\n" +
+            "\n" +
+            "[UserHook]\n" +
+            "public struct UseNameHook\n" +
+            "{\n" +
+            "    public string UseHook<T>(object component, T state)\n" +
+            "    {\n" +
+            "        return \"name\";\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var state = GetStateDeclaration(syntaxTree, "name");
+
+        var symbol = Assert.IsAssignableFrom<IStateSymbol>(semanticModel.GetSymbolInfo(state).Symbol);
+        var hook = Assert.IsAssignableFrom<IUserHookSymbol>(symbol.UserHook);
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(syntaxTree.GetRoot()).Symbol);
+
+        Assert.Equal(AkburaSymbolKind.UserHook, hook.Kind);
+        Assert.Equal("useName", hook.InvocationName);
+        Assert.Equal("useName", hook.Name);
+        Assert.Equal("UseNameHook", hook.HookType.Name);
+        Assert.Equal("UseHook", hook.UseHookMethod.Name);
+        Assert.Equal("String", hook.ReturnType.Name);
+        Assert.Equal("String", symbol.Type.Name);
+        Assert.Same(hook, component.States.Single(stateSymbol => stateSymbol.Name == "name").UserHook);
+    }
+
+    [Fact]
+    public void SemanticModel_StateInitializerUserHook_RequiresUsePrefixedHookType()
+    {
+        const string code =
+            "using Hooks;\n" +
+            "\n" +
+            "state string name = useName();";
+        const string csharpCode =
+            "using Akbura.CompilerAnotations;\n" +
+            "\n" +
+            "namespace Hooks;\n" +
+            "\n" +
+            "[UserHook]\n" +
+            "public struct NameHook\n" +
+            "{\n" +
+            "    public string UseHook()\n" +
+            "    {\n" +
+            "        return \"name\";\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var state = GetStateDeclaration(syntaxTree, "name");
+
+        var symbol = Assert.IsAssignableFrom<IStateSymbol>(semanticModel.GetSymbolInfo(state).Symbol);
+
+        Assert.Null(symbol.UserHook);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesDefaultParamSymbol()
     {
         const string code = "param int UserId = 1;";

@@ -415,8 +415,9 @@ internal sealed partial class AkburaSemanticModel
 
         var hasExplicitType = stateDeclaration.Type != null;
         var initializerBinding = BindStateInitializerExpression(stateDeclaration);
+        var userHook = ResolveStateUserHook(stateDeclaration);
         var initializerType = initializerBinding.TypeSymbol == null
-            ? default
+            ? userHook?.ReturnType ?? default
             : new CSharpSymbolDefinition(initializerBinding.TypeSymbol);
         var type = hasExplicitType
             ? ResolveExplicitStateType(stateDeclaration)
@@ -433,6 +434,7 @@ internal sealed partial class AkburaSemanticModel
             stateDeclaration,
             type,
             initializerType,
+            userHook,
             hasExplicitType,
             bindingKind));
     }
@@ -2116,6 +2118,172 @@ internal sealed partial class AkburaSemanticModel
             csharpExpression,
             stateDeclaration,
             isBindingPath: IsStateBindingPath(csharpExpression));
+    }
+
+    private IUserHookSymbol? ResolveStateUserHook(StateDeclarationSyntax stateDeclaration)
+    {
+        if (!TryGetStateUserHookInvocation(stateDeclaration, out var invocationName))
+        {
+            return null;
+        }
+
+        var candidates = GetUserHookTypeNameCandidates(invocationName);
+        foreach (var candidate in candidates)
+        {
+            foreach (var metadataName in GetUserHookMetadataNameCandidates(candidate))
+            {
+                var type = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
+                if (type != null &&
+                    TryCreateUserHookSymbol(invocationName, type, out var symbol))
+                {
+                    return symbol;
+                }
+            }
+        }
+
+        foreach (var type in GetAllNamedTypes(Compilation.CSharpCompilation.Assembly.GlobalNamespace))
+        {
+            if (candidates.Contains(type.Name, StringComparer.Ordinal) &&
+                TryCreateUserHookSymbol(invocationName, type, out var symbol))
+            {
+                return symbol;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryGetStateUserHookInvocation(
+        StateDeclarationSyntax stateDeclaration,
+        out string invocationName)
+    {
+        invocationName = string.Empty;
+        CSharp.ExpressionSyntax expression;
+        try
+        {
+            expression = CSharpSyntaxFactory.ParseExpression(
+                stateDeclaration.Initializer.Expression.ToFullString());
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        if (expression is not CSharp.InvocationExpressionSyntax invocation ||
+            invocation.Expression is not CSharp.IdentifierNameSyntax identifier)
+        {
+            return false;
+        }
+
+        invocationName = identifier.Identifier.ValueText;
+        return invocationName.StartsWith("use", StringComparison.Ordinal) &&
+            invocationName.Length > 3;
+    }
+
+    private static ImmutableArray<string> GetUserHookTypeNameCandidates(string invocationName)
+    {
+        var suffix = invocationName.StartsWith("use", StringComparison.Ordinal)
+            ? invocationName[3..]
+            : invocationName;
+        if (suffix.Length == 0)
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
+        var typeStem = "Use" + char.ToUpperInvariant(suffix[0]) + suffix[1..];
+        return ImmutableArray.Create(typeStem + "Hook", typeStem);
+    }
+
+    private IEnumerable<string> GetUserHookMetadataNameCandidates(string typeName)
+    {
+        foreach (var @namespace in GetAkburaUsingNamespaces())
+        {
+            yield return @namespace + "." + typeName;
+        }
+
+        var currentNamespace = GetAkburaNamespaceText(SyntaxTree.GetRoot(), SyntaxTree);
+        if (currentNamespace.Length > 0)
+        {
+            yield return currentNamespace + "." + typeName;
+        }
+
+        yield return typeName;
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetAllNamedTypes(INamespaceSymbol @namespace)
+    {
+        foreach (var type in @namespace.GetTypeMembers())
+        {
+            foreach (var nestedType in GetAllNamedTypes(type))
+            {
+                yield return nestedType;
+            }
+        }
+
+        foreach (var nestedNamespace in @namespace.GetNamespaceMembers())
+        {
+            foreach (var type in GetAllNamedTypes(nestedNamespace))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetAllNamedTypes(INamedTypeSymbol type)
+    {
+        yield return type;
+        foreach (var nestedType in type.GetTypeMembers())
+        {
+            foreach (var candidate in GetAllNamedTypes(nestedType))
+            {
+                yield return candidate;
+            }
+        }
+    }
+
+    private static bool TryCreateUserHookSymbol(
+        string invocationName,
+        INamedTypeSymbol type,
+        out IUserHookSymbol symbol)
+    {
+        symbol = null!;
+        if (!type.Name.StartsWith("Use", StringComparison.Ordinal) ||
+            !HasUserHookAttribute(type))
+        {
+            return false;
+        }
+
+        var useHookMethod = type.GetMembers("UseHook")
+            .OfType<IMethodSymbol>()
+            .FirstOrDefault(static method =>
+                method.DeclaredAccessibility == Accessibility.Public &&
+                method.MethodKind == MethodKind.Ordinary);
+        if (useHookMethod == null)
+        {
+            return false;
+        }
+
+        symbol = new UserHookSymbol(invocationName, type, useHookMethod);
+        return true;
+    }
+
+    private static bool HasUserHookAttribute(INamedTypeSymbol type)
+    {
+        foreach (var attribute in type.GetAttributes())
+        {
+            var attributeClass = attribute.AttributeClass;
+            if (attributeClass == null)
+            {
+                continue;
+            }
+
+            if (attributeClass.Name is "UserHook" or "UserHookAttribute")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static StateBindingKind GetStateBindingKind(StateInitializerSyntax initializer)

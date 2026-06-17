@@ -16,6 +16,7 @@ internal enum SymbolKind
     Command,
     Function,
     UserHook,
+    UseEffect,
     AkcssModule,
     AkcssClass,
     AkcssUtility,

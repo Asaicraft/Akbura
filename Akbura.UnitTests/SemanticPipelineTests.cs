@@ -14,6 +14,20 @@ namespace Akbura.UnitTests;
 
 public class SemanticPipelineTests
 {
+    private const string UserHookCSharpCode =
+        "using Akbura.CompilerAnotations;\n" +
+        "\n" +
+        "namespace Hooks;\n" +
+        "\n" +
+        "[UserHook]\n" +
+        "public struct UseNameHook\n" +
+        "{\n" +
+        "    public string UseHook<T>(object component, T state)\n" +
+        "    {\n" +
+        "        return \"name\";\n" +
+        "    }\n" +
+        "}";
+
     [Fact]
     public void SyntaxTree_ParseText_PreservesRootFullWidth()
     {
@@ -514,13 +528,61 @@ public class SemanticPipelineTests
             "    }\n" +
             "}";
 
-        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
         var state = GetStateDeclaration(syntaxTree, "name");
 
         var symbol = Assert.IsAssignableFrom<IStateSymbol>(semanticModel.GetSymbolInfo(state).Symbol);
 
         Assert.Null(symbol.UserHook);
+    }
+
+    [Fact]
+    public void SemanticModel_UserHookInsideIfBlock_ProducesDiagnostic()
+    {
+        const string code =
+            "using Hooks;\n" +
+            "\n" +
+            "state string query = \"\";\n" +
+            "\n" +
+            "if(true)\n" +
+            "{\n" +
+            "    useName(query);\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(UserHookCSharpCode));
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(
+            syntaxTree.GetRoot().Members.Single(member => member is CSharpStatementSyntax));
+        var hookStatement = Assert.IsType<CSharpStatementSyntax>(Assert.Single(ifStatement.Body!.Tokens));
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(hookStatement));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_UserHookMustBeTopLevel, diagnostic.Code);
+        Assert.Contains("useName", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_UserHookInsideForeachBlock_ProducesDiagnostic()
+    {
+        const string code =
+            "using Hooks;\n" +
+            "\n" +
+            "foreach(var item in items)\n" +
+            "{\n" +
+            "    useName(item);\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(UserHookCSharpCode));
+        var foreachStatement = Assert.IsType<CSharpStatementSyntax>(
+            syntaxTree.GetRoot().Members.Single(member => member is CSharpStatementSyntax));
+        var hookStatement = Assert.IsType<CSharpStatementSyntax>(Assert.Single(foreachStatement.Body!.Tokens));
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(hookStatement));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_UserHookMustBeTopLevel, diagnostic.Code);
+        Assert.Contains("useName", diagnostic.Message);
     }
 
     [Fact]
@@ -814,6 +876,70 @@ public class SemanticPipelineTests
         Assert.True(semanticModel.GetSemanticDiagnostics(command).IsEmpty);
 
         var cachedSymbolInfo = semanticModel.GetSymbolInfo(command);
+        Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesUseEffectSymbol()
+    {
+        const string code =
+            "param int UserId = 1;\n" +
+            "state int count = 0;\n" +
+            "inject IService service;\n" +
+            "command System.Threading.Tasks.Task Refresh(int userId);\n" +
+            "\n" +
+            "useEffect(UserId, count, service.Value, Refresh.IsExecuting) {\n" +
+            "    System.Console.WriteLine(count);\n" +
+            "} cancel {\n" +
+            "    System.Console.WriteLine(\"cancel\");\n" +
+            "} finally {\n" +
+            "    System.Console.WriteLine(\"finally\");\n" +
+            "}";
+        const string csharpCode =
+            "public interface IService\n" +
+            "{\n" +
+            "    int Value { get; }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var root = syntaxTree.GetRoot();
+        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[4]);
+
+        var symbolInfo = semanticModel.GetSymbolInfo(useEffect);
+
+        var symbol = Assert.IsAssignableFrom<IUseEffectSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.Equal(AkburaSymbolKind.UseEffect, symbol.Kind);
+        Assert.Equal(SymbolLanguage.Akbura, symbol.Language);
+        Assert.Equal("useEffect", symbol.Name);
+        Assert.Same(useEffect, symbol.DeclarationSyntax);
+        Assert.Same(useEffect.Arguments, symbol.ArgumentsSyntax);
+        Assert.Same(useEffect.Body, symbol.Body);
+        Assert.True(symbol.HasCancelBlock);
+        Assert.True(symbol.HasFinallyBlock);
+        Assert.NotNull(symbol.CancelBlock);
+        Assert.NotNull(symbol.FinallyBlock);
+
+        Assert.Equal(
+            ["UserId", "count", "service.Value", "Refresh.IsExecuting"],
+            symbol.Dependencies.Select(static dependency => dependency.ExpressionText));
+        Assert.IsAssignableFrom<IParamSymbol>(symbol.Dependencies[0].AkburaSymbol);
+        Assert.IsAssignableFrom<IStateSymbol>(symbol.Dependencies[1].AkburaSymbol);
+        Assert.IsAssignableFrom<IInjectSymbol>(symbol.Dependencies[2].AkburaSymbol);
+        Assert.IsAssignableFrom<ICommandSymbol>(symbol.Dependencies[3].AkburaSymbol);
+        Assert.Equal("UserId", symbol.Dependencies[0].CSharpDefinition.Name);
+        Assert.Equal("count", symbol.Dependencies[1].CSharpDefinition.Name);
+        Assert.Equal("Value", symbol.Dependencies[2].CSharpDefinition.Name);
+        Assert.True(symbol.Dependencies[3].IsResolved);
+        Assert.Equal("useEffect(UserId, count, service.Value, Refresh.IsExecuting)", symbol.ToDisplayString());
+        Assert.True(semanticModel.GetSemanticDiagnostics(useEffect).IsEmpty);
+
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(root).Symbol);
+        Assert.Same(symbol, Assert.Single(component.UseEffects));
+
+        var cachedSymbolInfo = semanticModel.GetSymbolInfo(useEffect);
         Assert.Same(symbol, cachedSymbolInfo.Symbol);
     }
 

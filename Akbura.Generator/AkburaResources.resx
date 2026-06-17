@@ -228,6 +228,9 @@
   <data name="AKBURA_SEMANTIC_StateBindingTargetNotWritable" xml:space="preserve">
     <value>State binding target '{0}' must be a writable property or field.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_UserHookMustBeTopLevel" xml:space="preserve">
+    <value>User hook '{0}' must be called only from a top-level state initializer.</value>
+  </data>
   <data name="WRN_ErrorOverride" xml:space="preserve">
     <value>Error '{0}' was reported as a warning.</value>
   </data>

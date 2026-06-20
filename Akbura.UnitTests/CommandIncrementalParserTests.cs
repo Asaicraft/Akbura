@@ -9,15 +9,15 @@ public sealed class CommandIncrementalParserTests
     [Fact]
     public void ReturnTypeEdit_ReusesNameParametersAndSemicolon()
     {
-        const string oldCode = "command Task Refresh(int userId);";
-        const string newCode = "command ValueTask Refresh(int userId);";
+        const string oldCode = "command int Refresh(int userId);";
+        const string newCode = "command long Refresh(int userId);";
 
         var (oldCommand, newCommand) = ParseCommandIncremental(
             newCode,
             oldCode,
-            oldCode.IndexOf("Task"),
-            oldLength: "Task".Length,
-            newLength: "ValueTask".Length);
+            oldCode.IndexOf("int"),
+            oldLength: "int".Length,
+            newLength: "long".Length);
 
         Assert.NotSame(oldCommand, newCommand);
         Assert.Same(oldCommand.CommandKeyword, newCommand.CommandKeyword);
@@ -31,8 +31,8 @@ public sealed class CommandIncrementalParserTests
     [Fact]
     public void NameEdit_ReusesReturnTypeAndParameters()
     {
-        const string oldCode = "command Task Refresh(int userId);";
-        const string newCode = "command Task Reload(int userId);";
+        const string oldCode = "command int Refresh(int userId);";
+        const string newCode = "command int Reload(int userId);";
 
         var (oldCommand, newCommand) = ParseCommandIncremental(
             newCode,
@@ -52,8 +52,8 @@ public sealed class CommandIncrementalParserTests
     [Fact]
     public void ParametersEdit_ReusesReturnTypeAndName()
     {
-        const string oldCode = "command Task Refresh(int userId);";
-        const string newCode = "command Task Refresh(long userId, bool force);";
+        const string oldCode = "command int Refresh(int userId);";
+        const string newCode = "command int Refresh(long userId, bool force);";
 
         var (oldCommand, newCommand) = ParseCommandIncremental(
             newCode,
@@ -73,7 +73,7 @@ public sealed class CommandIncrementalParserTests
     [Fact]
     public void InsertParameter_ReusesReturnTypeAndName()
     {
-        const string oldCode = "command Task Refresh();";
+        const string oldCode = "command void Refresh();";
         const string inserted = "int userId";
         var insertPosition = oldCode.IndexOf(")");
         var newCode = oldCode.Insert(insertPosition, inserted);

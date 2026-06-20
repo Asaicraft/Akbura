@@ -856,6 +856,7 @@ internal sealed partial class AkburaSemanticModel
     {
         if (valueType.Symbol is not ITypeSymbol sourceType ||
             property.Type.Symbol is not ITypeSymbol targetType ||
+            IsSameType(sourceType, targetType) ||
             Compilation.CSharpCompilation.ClassifyConversion(sourceType, targetType).IsImplicit)
         {
             return;

@@ -264,7 +264,7 @@ public class FullComponentSyntaxParseTests
 			"    log.LogInformation(\"Done\");\n" +
 			"}\n" +
 			"\n" +
-			"command Task Refresh(int userId);\n" +
+			"command void Refresh(int userId);\n" +
 			"\n" +
 			"if(isOpen)\n" +
 			"{\n" +

@@ -846,7 +846,7 @@ public class SemanticPipelineTests
     [Fact]
     public void SemanticModel_ResolvesCommandSymbol()
     {
-        const string code = "command System.Threading.Tasks.Task<int> Click(int a);";
+        const string code = "command int Click(int a);";
 
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(syntaxTree);
@@ -863,7 +863,7 @@ public class SemanticPipelineTests
         Assert.True(symbol.IsAsyncLike);
         Assert.True(symbol.HasResult);
         Assert.True(symbol.SupportsIsExecuting);
-        Assert.Equal("Task", symbol.ReturnType.Name);
+        Assert.Equal("Int32", symbol.ReturnType.Name);
         Assert.Equal("Int32", symbol.ResultType.Name);
         Assert.Same(command, symbol.DeclarationSyntax);
 
@@ -872,7 +872,7 @@ public class SemanticPipelineTests
         Assert.Equal("a", parameter.Name);
         Assert.Equal("Int32", parameter.Type.Name);
         Assert.Equal("Int32 a", parameter.ToDisplayString());
-        Assert.Equal("command Task Click", symbol.ToDisplayString());
+        Assert.Equal("command Int32 Click", symbol.ToDisplayString());
         Assert.True(semanticModel.GetSemanticDiagnostics(command).IsEmpty);
 
         var cachedSymbolInfo = semanticModel.GetSymbolInfo(command);
@@ -886,7 +886,7 @@ public class SemanticPipelineTests
             "param int UserId = 1;\n" +
             "state int count = 0;\n" +
             "inject IService service;\n" +
-            "command System.Threading.Tasks.Task Refresh(int userId);\n" +
+            "command void Refresh(int userId);\n" +
             "\n" +
             "useEffect(UserId, count, service.Value, Refresh.IsExecuting) {\n" +
             "    System.Console.WriteLine(count);\n" +
@@ -1326,7 +1326,10 @@ public class SemanticPipelineTests
             "}";
         const string csharpCode =
             "namespace MyStyles;\n" +
-            "public sealed class MyVeryComplexClass : Akbura.Akcss.AkcssStyle { }";
+            "public sealed class MyVeryComplexClass : Akbura.Akcss.AkcssClass\n" +
+            "{\n" +
+            "    public override void Update(object control) { }\n" +
+            "}";
 
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
@@ -1340,6 +1343,89 @@ public class SemanticPipelineTests
         Assert.Same(symbol.InterceptType.Symbol, operation.InterceptType.Symbol);
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssIntercept_IgnoresOtherStyleMembersWithWarnings()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @using MyStyles;\n" +
+            "\n" +
+            "    .myVeryComplexClass {\n" +
+            "        Background: White;\n" +
+            "        @apply other;\n" +
+            "        @if(true) {\n" +
+            "            Opacity: 1;\n" +
+            "        }\n" +
+            "        @intercept MyVeryComplexClass;\n" +
+            "    }\n" +
+            "\n" +
+            "    .other { Opacity: 1; }\n" +
+            "}";
+        const string csharpCode =
+            "namespace MyStyles;\n" +
+            "public sealed class MyVeryComplexClass : Akbura.Akcss.AkcssClass\n" +
+            "{\n" +
+            "    public override void Update(object control) { }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree, "myVeryComplexClass");
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var intercept = Assert.IsAssignableFrom<IAkcssInterceptOperation>(Assert.Single(symbol.Operations));
+
+        Assert.True(symbol.IsIntercepted);
+        Assert.False(intercept.HasErrors);
+
+        var ignoredMembers = rule.Members
+            .Where(static member => member is not AkcssInterceptDirectiveSyntax)
+            .ToArray();
+        Assert.Equal(3, ignoredMembers.Length);
+        foreach (var ignoredMember in ignoredMembers)
+        {
+            var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(ignoredMember));
+            Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssInterceptIgnoresMember, diagnostic.Code);
+            Assert.Equal(AkburaDiagnosticSeverity.Warning, diagnostic.Severity);
+            Assert.Null(semanticModel.GetOperation(ignoredMember));
+        }
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssUtilityIntercept_RequiresAkcssUtilitySubtype()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @using MyStyles;\n" +
+            "\n" +
+            "    @utilities {\n" +
+            "        .w-(double value) {\n" +
+            "            Width: value;\n" +
+            "            @intercept WidthUtility;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+        const string csharpCode =
+            "namespace MyStyles;\n" +
+            "public abstract class WidthUtility : Akbura.Akcss.AkcssUtility<double> { }";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var utility = GetOnlyAkcssUtility(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            semanticModel.GetSymbolInfo(utility).Symbol);
+        var intercept = Assert.IsAssignableFrom<IAkcssInterceptOperation>(Assert.Single(symbol.Operations));
+        var ignoredMember = Assert.IsType<AkcssAssignmentSyntax>(
+            Assert.Single(utility.Members, static member => member is AkcssAssignmentSyntax));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(ignoredMember));
+
+        Assert.True(symbol.IsIntercepted);
+        Assert.Equal("global::MyStyles.WidthUtility",
+            symbol.InterceptType.Symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Same(symbol.InterceptType.Symbol, intercept.InterceptType.Symbol);
+        Assert.False(intercept.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssInterceptIgnoresMember, diagnostic.Code);
     }
 
     [Fact]
@@ -2850,6 +2936,17 @@ public class SemanticPipelineTests
             syntaxTree.GetRoot().Members.Single(member => member is InlineAkcssBlockSyntax));
         return Assert.IsType<AkcssStyleRuleSyntax>(
             Assert.Single(inlineAkcss.Members.OfType<AkcssStyleRuleSyntax>()));
+    }
+
+    private static AkcssStyleRuleSyntax GetOnlyAkcssStyleRule(
+        AkburaSyntaxTree syntaxTree,
+        string className)
+    {
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(
+            syntaxTree.GetRoot().Members.Single(member => member is InlineAkcssBlockSyntax));
+        return Assert.Single(
+            inlineAkcss.Members.OfType<AkcssStyleRuleSyntax>(),
+            rule => rule.Selector.Name?.Identifier.ValueText == className);
     }
 
     private static AkcssUtilityDeclarationSyntax GetOnlyAkcssUtility(AkburaSyntaxTree syntaxTree)

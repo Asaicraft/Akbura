@@ -214,7 +214,10 @@
     <value>AKCSS intercept type '{0}' was not found.</value>
   </data>
   <data name="AKBURA_SEMANTIC_AkcssInterceptTypeInvalid" xml:space="preserve">
-    <value>AKCSS intercept type '{0}' must inherit from Akbura.Akcss.AkcssStyle.</value>
+    <value>AKCSS intercept type '{0}' must inherit from {1}.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssInterceptIgnoresMember" xml:space="preserve">
+    <value>AKCSS member '{0}' is ignored because '{1}' is intercepted by '{2}'.</value>
   </data>
   <data name="AKBURA_SEMANTIC_AkcssSelectorTargetNotFound" xml:space="preserve">
     <value>AKCSS selector target type '{0}' was not found.</value>

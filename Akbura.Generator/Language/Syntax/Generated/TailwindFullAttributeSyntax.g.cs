@@ -262,7 +262,7 @@ namespace Akbura.Language.Syntax
             get
             {
                 var red = GetRed(ref this._segments, 3);
-                return new SeparatedSyntaxList<TailwindSegmentSyntax>(red!, GetChildIndex(3));
+                return red != null ? new SeparatedSyntaxList<TailwindSegmentSyntax>(red, GetChildIndex(3)) : default;
             }
         }
 

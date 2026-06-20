@@ -53,9 +53,14 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
 
     public CSharpSymbolDefinition TargetType { get; }
 
-    public bool IsIntercepted => false;
+    public bool IsIntercepted => !InterceptType.IsDefault;
 
-    public CSharpSymbolDefinition InterceptType => default;
+    public CSharpSymbolDefinition InterceptType { get; private set; }
+
+    internal void SetInterceptType(CSharpSymbolDefinition interceptType)
+    {
+        InterceptType = interceptType;
+    }
 
     public ImmutableArray<ITailwindUtilityParameterSymbol> Parameters { get; }
 

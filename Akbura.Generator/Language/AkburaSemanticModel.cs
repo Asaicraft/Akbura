@@ -501,9 +501,8 @@ internal sealed partial class AkburaSemanticModel
         var returnType = ResolveCommandReturnType(commandDeclaration);
         var parameters = CreateCommandParameters(commandDeclaration);
         var isVoid = returnType.Symbol is ITypeSymbol { SpecialType: SpecialType.System_Void };
-        var isAsyncLike = returnType.Symbol is ITypeSymbol returnTypeSymbol &&
-            IsTaskLikeType(returnTypeSymbol);
-        var resultType = GetCommandResultType(returnType, isVoid, isAsyncLike);
+        var isAsyncLike = true;
+        var resultType = GetCommandResultType(returnType, isVoid);
         var hasResult = !resultType.IsDefault;
 
         SetSemanticDiagnostics(commandDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
@@ -836,6 +835,37 @@ internal sealed partial class AkburaSemanticModel
         Akbura.Language.Syntax.SyntaxList<AkcssBodyMemberSyntax> members,
         IAkcssSymbol containingSymbol)
     {
+        using var interceptOperationsBuilder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
+        foreach (var member in members)
+        {
+            if (member is not AkcssInterceptDirectiveSyntax interceptDirective)
+            {
+                continue;
+            }
+
+            var interceptOperation = CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
+            _operationCache[interceptDirective] = interceptOperation;
+            interceptOperationsBuilder.Add(interceptOperation);
+            if (!interceptOperation.InterceptType.IsDefault)
+            {
+                SetAkcssInterceptType(containingSymbol, interceptOperation.InterceptType);
+            }
+        }
+
+        var interceptOperations = interceptOperationsBuilder.ToImmutable();
+        if (containingSymbol.IsIntercepted)
+        {
+            foreach (var member in members)
+            {
+                if (member is not AkcssInterceptDirectiveSyntax)
+                {
+                    SetAkcssInterceptIgnoredDiagnostics(member, containingSymbol);
+                }
+            }
+
+            return interceptOperations;
+        }
+
         using var builder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
         foreach (var member in members)
         {
@@ -867,15 +897,10 @@ internal sealed partial class AkburaSemanticModel
 
                 case AkcssInterceptDirectiveSyntax interceptDirective:
                 {
-                    var interceptOperation = CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
+                    var interceptOperation = (IAkcssInterceptOperation?)_operationCache[interceptDirective] ??
+                        CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
                     _operationCache[interceptDirective] = interceptOperation;
                     builder.Add(interceptOperation);
-                    if (containingSymbol is AkcssStyleSymbol styleSymbol &&
-                        !interceptOperation.InterceptType.IsDefault)
-                    {
-                        styleSymbol.SetInterceptType(interceptOperation.InterceptType);
-                    }
-
                     break;
                 }
             }
@@ -898,6 +923,11 @@ internal sealed partial class AkburaSemanticModel
             return cachedOperation;
         }
 
+        if (TrySuppressAkcssOperationDueToIntercept(assignment, containingSymbol))
+        {
+            return null;
+        }
+
         return CreateAkcssPropertySetterOperation(assignment, containingSymbol);
     }
 
@@ -915,6 +945,11 @@ internal sealed partial class AkburaSemanticModel
             return cachedOperation;
         }
 
+        if (TrySuppressAkcssOperationDueToIntercept(ifDirective, containingSymbol))
+        {
+            return null;
+        }
+
         return CreateAkcssIfOperation(ifDirective, containingSymbol);
     }
 
@@ -930,6 +965,11 @@ internal sealed partial class AkburaSemanticModel
         if (_operationCache.TryGetValue(applyDirective, out var cachedOperation))
         {
             return cachedOperation;
+        }
+
+        if (TrySuppressAkcssOperationDueToIntercept(applyDirective, containingSymbol))
+        {
+            return null;
         }
 
         return CreateAkcssApplyOperation(applyDirective, containingSymbol);
@@ -968,6 +1008,43 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return null;
+    }
+
+    private bool TrySuppressAkcssOperationDueToIntercept(
+        AkcssBodyMemberSyntax member,
+        IAkcssSymbol containingSymbol)
+    {
+        if (!containingSymbol.IsIntercepted)
+        {
+            return false;
+        }
+
+        SetAkcssInterceptIgnoredDiagnostics(member, containingSymbol);
+        return true;
+    }
+
+    private void SetAkcssInterceptIgnoredDiagnostics(
+        AkcssBodyMemberSyntax member,
+        IAkcssSymbol containingSymbol)
+    {
+        SetSemanticDiagnostics(
+            member,
+            ImmutableArray.Create(CreateAkcssInterceptIgnoresMemberDiagnostic(member, containingSymbol)));
+    }
+
+    private static void SetAkcssInterceptType(
+        IAkcssSymbol containingSymbol,
+        CSharpSymbolDefinition interceptType)
+    {
+        switch (containingSymbol)
+        {
+            case AkcssStyleSymbol styleSymbol:
+                styleSymbol.SetInterceptType(interceptType);
+                break;
+            case TailwindUtilitySymbol utilitySymbol:
+                utilitySymbol.SetInterceptType(interceptType);
+                break;
+        }
     }
 
     private AkcssIfOperation CreateAkcssIfOperation(
@@ -1047,11 +1124,12 @@ internal sealed partial class AkburaSemanticModel
                 interceptDirective,
                 interceptDirective.Type.ToFullString().Trim()));
         }
-        else if (!IsAkcssStyleRuntimeType(namedType))
+        else if (!IsAkcssInterceptRuntimeType(namedType, containingSymbol, out var expectedBaseType))
         {
             diagnosticsBuilder.Add(CreateAkcssInterceptTypeInvalidDiagnostic(
                 interceptDirective,
-                namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+                namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                expectedBaseType));
         }
         else
         {
@@ -1957,12 +2035,30 @@ internal sealed partial class AkburaSemanticModel
 
     private AkburaSemanticDiagnostic CreateAkcssInterceptTypeInvalidDiagnostic(
         AkcssInterceptDirectiveSyntax syntax,
-        string typeName)
+        string typeName,
+        string expectedBaseType)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_AkcssInterceptTypeInvalid,
-            [typeName]);
+            [typeName, expectedBaseType]);
+    }
+
+    private AkburaSemanticDiagnostic CreateAkcssInterceptIgnoresMemberDiagnostic(
+        AkcssBodyMemberSyntax syntax,
+        IAkcssSymbol containingSymbol)
+    {
+        var memberText = syntax.ToFullString().Trim();
+        var styleName = string.IsNullOrEmpty(containingSymbol.ClassName)
+            ? containingSymbol.MetadataName
+            : containingSymbol.ClassName;
+        var interceptText = containingSymbol.InterceptType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_AkcssInterceptIgnoresMember,
+            [memberText, styleName, interceptText],
+            AkburaDiagnosticSeverity.Warning);
     }
 
     private AkburaSemanticDiagnostic CreateAkcssSelectorTargetNotFoundDiagnostic(
@@ -2027,11 +2123,18 @@ internal sealed partial class AkburaSemanticModel
             IsAssignableTo(type, controlType);
     }
 
-    private bool IsAkcssStyleRuntimeType(INamedTypeSymbol type)
+    private bool IsAkcssInterceptRuntimeType(
+        INamedTypeSymbol type,
+        IAkcssSymbol containingSymbol,
+        out string expectedBaseType)
     {
-        var styleType = Compilation.CSharpCompilation.GetTypeByMetadataName("Akbura.Akcss.AkcssStyle");
-        return styleType != null &&
-            IsAssignableTo(type, styleType);
+        expectedBaseType = containingSymbol is ITailwindUtilitySymbol
+            ? "Akbura.Akcss.AkcssUtility"
+            : "Akbura.Akcss.AkcssClass";
+
+        var runtimeType = Compilation.CSharpCompilation.GetTypeByMetadataName(expectedBaseType);
+        return runtimeType != null &&
+            IsAssignableTo(type, runtimeType);
     }
 
     private static CSharp.ParameterListSyntax? GetCSharpParameterList(
@@ -2159,8 +2262,7 @@ internal sealed partial class AkburaSemanticModel
 
     private CSharpSymbolDefinition GetCommandResultType(
         CSharpSymbolDefinition returnType,
-        bool isVoid,
-        bool isAsyncLike)
+        bool isVoid)
     {
         if (returnType.Symbol is not ITypeSymbol returnTypeSymbol ||
             isVoid)
@@ -2168,52 +2270,7 @@ internal sealed partial class AkburaSemanticModel
             return default;
         }
 
-        if (isAsyncLike)
-        {
-            return TryGetTaskLikeResultType(returnTypeSymbol, out var resultType)
-                ? new CSharpSymbolDefinition(resultType)
-                : default;
-        }
-
         return returnType;
-    }
-
-    private static bool IsTaskLikeType(ITypeSymbol type)
-    {
-        return IsTaskLikeMetadataName(type, genericOnly: false);
-    }
-
-    private static bool TryGetTaskLikeResultType(
-        ITypeSymbol type,
-        out ITypeSymbol resultType)
-    {
-        if (type is INamedTypeSymbol namedType &&
-            namedType.TypeArguments.Length == 1 &&
-            IsTaskLikeMetadataName(namedType, genericOnly: true))
-        {
-            resultType = namedType.TypeArguments[0];
-            return true;
-        }
-
-        resultType = null!;
-        return false;
-    }
-
-    private static bool IsTaskLikeMetadataName(
-        ITypeSymbol type,
-        bool genericOnly)
-    {
-        if (type is not INamedTypeSymbol namedType)
-        {
-            return false;
-        }
-
-        var metadataName = namedType.OriginalDefinition.ToDisplayString();
-        return metadataName is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask" ||
-            (!genericOnly &&
-             metadataName is "System.Threading.Tasks.Task<TResult>" or "System.Threading.Tasks.ValueTask<TResult>") ||
-            (genericOnly &&
-             metadataName is "System.Threading.Tasks.Task<TResult>" or "System.Threading.Tasks.ValueTask<TResult>");
     }
 
     private CSharpSymbolDefinition ResolveParamDefaultValueType(ParamDeclarationSyntax paramDeclaration)
@@ -2737,6 +2794,11 @@ internal sealed partial class AkburaSemanticModel
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
+        if (TryResolveAkburaMarkupComponent(markupElement, componentNameText, out var akburaComponentSymbol))
+        {
+            return AkburaSymbolInfo.Success(akburaComponentSymbol);
+        }
+
         var binding = BindCSharpType(csharpType);
         if (binding.TypeSymbol is INamedTypeSymbol namedType &&
             namedType.TypeKind != TypeKind.Error)
@@ -2764,11 +2826,6 @@ internal sealed partial class AkburaSemanticModel
             return AkburaSymbolInfo.Candidates(candidates, binding.CandidateReason);
         }
 
-        if (TryResolveAkburaMarkupComponent(markupElement, componentNameText, out var akburaComponentSymbol))
-        {
-            return AkburaSymbolInfo.Success(akburaComponentSymbol);
-        }
-
         return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
     }
 
@@ -2781,6 +2838,11 @@ internal sealed partial class AkburaSemanticModel
         {
             foreach (var syntaxTree in Compilation.SyntaxTrees)
             {
+                if (ReferenceEquals(syntaxTree, SyntaxTree))
+                {
+                    continue;
+                }
+
                 var metadataName = GetAkburaComponentMetadataName(syntaxTree);
                 if (metadataName.Length == 0 ||
                     metadataName != candidateMetadataName)

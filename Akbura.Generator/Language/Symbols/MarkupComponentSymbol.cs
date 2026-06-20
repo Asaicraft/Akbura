@@ -48,9 +48,10 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 
     public override string Name { get; }
 
-    public override string MetadataName => string.IsNullOrEmpty(CSharpDefinition.MetadataName)
-        ? AkburaComponent?.MetadataName ?? Name
-        : CSharpDefinition.MetadataName;
+    public override string MetadataName => AkburaComponent?.MetadataName
+        ?? (string.IsNullOrEmpty(CSharpDefinition.MetadataName)
+            ? Name
+            : CSharpDefinition.MetadataName);
 
     public override CSharpSymbolDefinition CSharpDefinition { get; }
 

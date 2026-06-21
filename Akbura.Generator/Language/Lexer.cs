@@ -1443,18 +1443,13 @@ internal sealed partial class Lexer : IDisposable
 				break;
 			}
 
-			// strings/chars via Roslyn
-			if (ScanCSharpStringOrChar())
+			// strings/chars via Roslyn. Interpolated strings are scanned as a
+			// whole expression so their interpolation braces do not terminate
+			// Akbura inline expressions.
+			if (TryScanCSharpStringOrCharText(out var stringOrCharText))
 			{
-				var token = ParseCSharpStringOrChar();
-
-				if (token.RawKind != 0)
-				{
-					_builder.Append(token.Text);
-					continue;
-				}
-
-				break;
+				_builder.Append(stringOrCharText);
+				continue;
 			}
 
 			// Stop before the terminator when it belongs to the Akbura grammar.
@@ -1581,18 +1576,12 @@ internal sealed partial class Lexer : IDisposable
 			if (character == SlidingTextWindow.InvalidCharacter)
 				break;
 
-			// handle strings/chars
-			if (ScanCSharpStringOrChar())
+			// handle strings/chars. Interpolated strings may contain nested
+			// braces, so they must be consumed as a single C# expression.
+			if (TryScanCSharpStringOrCharText(out var stringOrCharText))
 			{
-				var token = ParseCSharpStringOrChar();
-
-				if (token.RawKind != 0)
-				{
-					_builder.Append(token.Text);
-					continue;
-				}
-
-				break;
+				_builder.Append(stringOrCharText);
+				continue;
 			}
 
 			// Stop before Akbura-owned separators/closers. They must remain in

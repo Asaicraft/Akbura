@@ -48,16 +48,17 @@ internal sealed partial class AkburaSemanticModel
         var valueType = default(CSharpSymbolDefinition);
         var valueOperation = default(CSharpOperationDefinition);
         var dynamicExpression = default(CSharp.ExpressionSyntax);
+        var valueBinding = CSharpTypeBinding.Empty;
 
         if (valueSyntax is MarkupLiteralAttributeValueSyntax literalValueSyntax)
         {
             valueKind = MarkupAttributeValueKind.Literal;
             literalValue = GetMarkupLiteralAttributeValueText(literalValueSyntax);
-            var binding = BindMarkupAttributeExpression(CSharpSyntaxFactory.LiteralExpression(
+            valueBinding = BindMarkupAttributeExpression(CSharpSyntaxFactory.LiteralExpression(
                 Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralExpression,
                 CSharpSyntaxFactory.Literal(literalValue)));
-            valueType = binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol);
-            valueOperation = binding.OperationDefinition;
+            valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
+            valueOperation = valueBinding.OperationDefinition;
         }
         else if (valueSyntax is MarkupDynamicAttributeValueSyntax dynamicValueSyntax)
         {
@@ -70,10 +71,20 @@ internal sealed partial class AkburaSemanticModel
             {
                 dynamicExpression = expression;
                 valueKind = MarkupAttributeValueKind.DynamicExpression;
-                var binding = BindMarkupAttributeExpression(expression);
-                valueType = binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol);
-                valueOperation = binding.OperationDefinition;
+                valueBinding = BindMarkupAttributeExpression(expression);
+                valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
+                valueOperation = valueBinding.OperationDefinition;
             }
+        }
+
+        var commandHandler = default(MarkupCommandHandlerAnalysis);
+        if (property?.Command is { } propertyCommand)
+        {
+            commandHandler = AnalyzeMarkupCommandHandler(
+                propertyCommand,
+                dynamicExpression,
+                valueType,
+                valueOperation);
         }
 
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics;
@@ -98,6 +109,14 @@ internal sealed partial class AkburaSemanticModel
                 diagnosticsBuilder);
             if (valueSyntax != null && valueKind == MarkupAttributeValueKind.DynamicExpression)
             {
+                if (property.Command == null)
+                {
+                    AddMarkupExpressionDiagnostics(
+                        markupAttribute,
+                        valueBinding,
+                        diagnosticsBuilder);
+                }
+
                 AddMarkupAttributeValueDiagnostics(
                     markupAttribute,
                     property,
@@ -105,18 +124,17 @@ internal sealed partial class AkburaSemanticModel
                     diagnosticsBuilder);
             }
 
+            AddMarkupExpressionDiagnostics(
+                markupAttribute,
+                commandHandler.Diagnostics,
+                diagnosticsBuilder);
+
             diagnostics = diagnosticsBuilder.ToImmutable();
             SetSemanticDiagnostics(markupAttribute, diagnostics);
         }
 
         if (property?.Command is { } command)
         {
-            var handler = AnalyzeMarkupCommandHandler(
-                command,
-                dynamicExpression,
-                valueType,
-                valueOperation);
-
             return new MarkupCommandBindingOperation(
                 markupAttribute,
                 containingComponent,
@@ -125,15 +143,15 @@ internal sealed partial class AkburaSemanticModel
                 bindingKind,
                 valueKind,
                 valueSyntax,
-                handler.Kind,
-                handler.ArgumentMode,
-                handler.ResultMode,
-                handler.ParameterCount,
-                handler.IsAsync,
-                handler.ContainsAwait,
-                handler.Type,
-                handler.ResultType,
-                handler.Operation,
+                commandHandler.Kind,
+                commandHandler.ArgumentMode,
+                commandHandler.ResultMode,
+                commandHandler.ParameterCount,
+                commandHandler.IsAsync,
+                commandHandler.ContainsAwait,
+                commandHandler.Type,
+                commandHandler.ResultType,
+                commandHandler.Operation,
                 valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
         }
 
@@ -183,6 +201,10 @@ internal sealed partial class AkburaSemanticModel
             markupAttribute,
             routedEvent,
             expression,
+            diagnosticsBuilder);
+        AddMarkupExpressionDiagnostics(
+            markupAttribute,
+            handler.Diagnostics,
             diagnosticsBuilder);
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(markupAttribute, diagnostics);
@@ -871,6 +893,38 @@ internal sealed partial class AkburaSemanticModel
             [property.Name, sourceTypeText, targetTypeText]));
     }
 
+    private void AddMarkupExpressionDiagnostics(
+        MarkupAttributeSyntax markupAttribute,
+        CSharpTypeBinding binding,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        AddMarkupExpressionDiagnostics(
+            markupAttribute,
+            binding.Diagnostics,
+            diagnosticsBuilder);
+    }
+
+    private void AddMarkupExpressionDiagnostics(
+        MarkupAttributeSyntax markupAttribute,
+        ImmutableArray<Diagnostic> diagnostics,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (diagnostics.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in diagnostics)
+        {
+            if (diagnostic.Severity == DiagnosticSeverity.Error)
+            {
+                diagnosticsBuilder.Add(CreateMarkupExpressionErrorDiagnostic(
+                    markupAttribute,
+                    diagnostic));
+            }
+        }
+    }
+
     private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandHandler(
         ICommandSymbol command,
         CSharp.ExpressionSyntax? expression,
@@ -940,25 +994,43 @@ internal sealed partial class AkburaSemanticModel
                     ImmutableArray<string>.Empty,
                 anonymousMethod.AsyncKeyword.RawKind != 0,
                 anonymousMethod.Body),
-            CSharp.IdentifierNameSyntax or CSharp.MemberAccessExpressionSyntax => new MarkupEventHandlerAnalysis(
-                MarkupCommandHandlerKind.DirectReference,
-                MarkupCommandArgumentMode.None,
-                parameterCount: 0,
-                isAsync: ContainsAwaitExpression(expression),
-                containsAwait: ContainsAwaitExpression(expression),
-                BindMarkupAttributeExpression(expression).OperationDefinition),
-            _ => new MarkupEventHandlerAnalysis(
-                MarkupCommandHandlerKind.Expression,
-                MarkupCommandArgumentMode.IgnoresCommandArgument,
-                parameterCount: 0,
-                isAsync: ContainsAwaitExpression(expression),
-                containsAwait: ContainsAwaitExpression(expression),
-                BindMarkupEventHandlerStatementExpression(
-                    routedEvent,
-                    ImmutableArray<string>.Empty,
-                    expression,
-                    isAsync: false).OperationDefinition),
+            CSharp.IdentifierNameSyntax or CSharp.MemberAccessExpressionSyntax =>
+                CreateDirectMarkupEventHandlerAnalysis(expression),
+            _ => CreateExpressionMarkupEventHandlerAnalysis(routedEvent, expression),
         };
+    }
+
+    private MarkupEventHandlerAnalysis CreateDirectMarkupEventHandlerAnalysis(CSharp.ExpressionSyntax expression)
+    {
+        var binding = BindMarkupAttributeExpression(expression);
+        return new MarkupEventHandlerAnalysis(
+            MarkupCommandHandlerKind.DirectReference,
+            MarkupCommandArgumentMode.None,
+            parameterCount: 0,
+            isAsync: ContainsAwaitExpression(expression),
+            containsAwait: ContainsAwaitExpression(expression),
+            binding.OperationDefinition,
+            binding.Diagnostics);
+    }
+
+    private MarkupEventHandlerAnalysis CreateExpressionMarkupEventHandlerAnalysis(
+        IRoutedEventSymbol routedEvent,
+        CSharp.ExpressionSyntax expression)
+    {
+        var binding = BindMarkupEventHandlerStatementExpression(
+            routedEvent,
+            ImmutableArray<string>.Empty,
+            expression,
+            isAsync: false);
+
+        return new MarkupEventHandlerAnalysis(
+            MarkupCommandHandlerKind.Expression,
+            MarkupCommandArgumentMode.IgnoresCommandArgument,
+            parameterCount: 0,
+            isAsync: ContainsAwaitExpression(expression),
+            containsAwait: ContainsAwaitExpression(expression),
+            binding.OperationDefinition,
+            binding.Diagnostics);
     }
 
     private MarkupEventHandlerAnalysis AnalyzeMarkupEventLambda(
@@ -968,19 +1040,19 @@ internal sealed partial class AkburaSemanticModel
         SyntaxNode body)
     {
         var containsAwait = ContainsAwaitExpression(body);
-        var operation = body switch
+        var binding = body switch
         {
             CSharp.ExpressionSyntax expression => BindMarkupEventHandlerStatementExpression(
                 routedEvent,
                 parameterNames,
                 expression,
-                isAsync || containsAwait).OperationDefinition,
+                isAsync || containsAwait),
             CSharp.BlockSyntax block => BindMarkupEventHandlerBlock(
                 routedEvent,
                 parameterNames,
                 block,
-                isAsync || containsAwait).OperationDefinition,
-            _ => default,
+                isAsync || containsAwait),
+            _ => CSharpTypeBinding.Empty,
         };
 
         return new MarkupEventHandlerAnalysis(
@@ -991,7 +1063,8 @@ internal sealed partial class AkburaSemanticModel
             parameterNames.Length,
             isAsync || containsAwait,
             containsAwait,
-            operation);
+            binding.OperationDefinition,
+            binding.Diagnostics);
     }
 
     private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandLambda(
@@ -1007,11 +1080,13 @@ internal sealed partial class AkburaSemanticModel
         var resultMode = MarkupCommandResultMode.NoResult;
         var resultType = default(CSharpSymbolDefinition);
         var operation = default(CSharpOperationDefinition);
+        var diagnostics = ImmutableArray<Diagnostic>.Empty;
 
         if (body is CSharp.ExpressionSyntax expressionBody)
         {
             var resultBinding = BindCommandHandlerResultExpression(command, parameterNames, expressionBody);
             operation = resultBinding.OperationDefinition;
+            diagnostics = resultBinding.Diagnostics;
             if (TryGetAwaitedLocalCommandExecuteResultType(expressionBody, out var awaitedCommandResultType))
             {
                 resultMode = MarkupCommandResultMode.ReturnsResult;
@@ -1031,6 +1106,7 @@ internal sealed partial class AkburaSemanticModel
             {
                 var statementBinding = BindCommandHandlerStatementExpression(command, parameterNames, expressionBody);
                 operation = statementBinding.OperationDefinition;
+                diagnostics = statementBinding.Diagnostics;
                 if (statementBinding.Symbol is IMethodSymbol { ReturnsVoid: true })
                 {
                     resultMode = MarkupCommandResultMode.NoResult;
@@ -1061,6 +1137,7 @@ internal sealed partial class AkburaSemanticModel
             {
                 var resultBinding = BindCommandHandlerResultExpression(command, parameterNames, returnExpression);
                 operation = resultBinding.OperationDefinition;
+                diagnostics = resultBinding.Diagnostics;
                 resultMode = MarkupCommandResultMode.ReturnsResult;
                 resultType = resultBinding.TypeSymbol == null
                     ? default
@@ -1077,7 +1154,8 @@ internal sealed partial class AkburaSemanticModel
             containsAwait,
             type: default,
             resultType,
-            operation);
+            operation,
+            diagnostics);
     }
 
     private bool TryGetAwaitedLocalCommandExecuteResultType(
@@ -1167,6 +1245,7 @@ internal sealed partial class AkburaSemanticModel
         var typeInfo = semanticModel.GetTypeInfo(probeExpression);
         var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
         var operation = semanticModel.GetOperation(probeExpression);
+        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
         var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
             ? null
             : typeInfo.Type;
@@ -1180,7 +1259,8 @@ internal sealed partial class AkburaSemanticModel
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
                 : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation));
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
     }
 
     private CSharpTypeBinding BindCommandHandlerStatementExpression(
@@ -1224,6 +1304,7 @@ internal sealed partial class AkburaSemanticModel
         var typeInfo = semanticModel.GetTypeInfo(probeExpression);
         var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
         var operation = semanticModel.GetOperation(probeExpression);
+        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
         var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
             ? null
             : typeInfo.Type;
@@ -1237,7 +1318,8 @@ internal sealed partial class AkburaSemanticModel
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
                 : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation));
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
     }
 
     private CSharpTypeBinding BindMarkupEventHandlerStatementExpression(
@@ -1288,6 +1370,7 @@ internal sealed partial class AkburaSemanticModel
         var typeInfo = semanticModel.GetTypeInfo(probeExpression);
         var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
         var operation = semanticModel.GetOperation(probeExpression);
+        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
         var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
             ? null
             : typeInfo.Type;
@@ -1301,7 +1384,8 @@ internal sealed partial class AkburaSemanticModel
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
                 : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation));
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
     }
 
     private CSharpTypeBinding BindMarkupEventHandlerBlock(
@@ -1354,6 +1438,7 @@ internal sealed partial class AkburaSemanticModel
         }
 
         var operation = semanticModel.GetOperation(probeBlock);
+        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeBlock);
         return new CSharpTypeBinding(
             typeSymbol: null,
             symbol: null,
@@ -1361,7 +1446,8 @@ internal sealed partial class AkburaSemanticModel
             isBindingPath: false,
             candidateSymbols: ImmutableArray<Microsoft.CodeAnalysis.ISymbol>.Empty,
             candidateReason: AkburaCandidateReason.None,
-            operation == null ? default : new CSharpOperationDefinition(operation));
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
     }
 
     private static CSharp.ParameterListSyntax CreateCommandHandlerProbeParameterList(
@@ -1461,6 +1547,7 @@ internal sealed partial class AkburaSemanticModel
         var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
         var operation = semanticModel.GetOperation(probeExpression);
         var receiverType = GetExpressionReceiverType(semanticModel, probeExpression);
+        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
         var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
             ? null
             : typeInfo.Type;
@@ -1474,7 +1561,8 @@ internal sealed partial class AkburaSemanticModel
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
                 : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation));
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
     }
 
     private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateMarkupAttributeProbeFields()
@@ -1613,6 +1701,8 @@ internal sealed partial class AkburaSemanticModel
         builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
                 CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
                 "IsExecuting")
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PublicKeyword)))
             .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
                 CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))
             .WithSemicolonToken(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SemicolonToken)));
@@ -1620,6 +1710,8 @@ internal sealed partial class AkburaSemanticModel
         builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
                 CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
                 "CanExecute")
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PublicKeyword)))
             .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
                 CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))
             .WithSemicolonToken(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SemicolonToken)));
@@ -1629,6 +1721,8 @@ internal sealed partial class AkburaSemanticModel
         var execute = CSharpSyntaxFactory.MethodDeclaration(
                 GetCommandExecuteReturnTypeSyntax(command),
                 "Execute")
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PublicKeyword)))
             .WithParameterList(parameterList)
             .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.ThrowStatement(
                 CSharpSyntaxFactory.ObjectCreationExpression(
@@ -1794,6 +1888,20 @@ internal sealed partial class AkburaSemanticModel
             [utility.Name, utility.Parameters.Length, actualCount]);
     }
 
+    private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(
+        MarkupAttributeSyntax syntax,
+        Diagnostic diagnostic)
+    {
+        var valueSyntax = GetMarkupAttributeValue(syntax);
+        var expressionText = valueSyntax == null
+            ? syntax.ToFullString().Trim()
+            : valueSyntax.ToFullString().Trim();
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError,
+            [expressionText, diagnostic.GetMessage()]);
+    }
+
     private AkburaSemanticDiagnostic CreateAkcssImportNotFoundDiagnostic(string importName)
     {
         return new AkburaSemanticDiagnostic(
@@ -1813,7 +1921,8 @@ internal sealed partial class AkburaSemanticModel
             containsAwait: false,
             type: default,
             resultType: default,
-            operation: default);
+            operation: default,
+            diagnostics: ImmutableArray<Diagnostic>.Empty);
 
         public MarkupCommandHandlerAnalysis(
             MarkupCommandHandlerKind kind,
@@ -1824,7 +1933,8 @@ internal sealed partial class AkburaSemanticModel
             bool containsAwait,
             CSharpSymbolDefinition type,
             CSharpSymbolDefinition resultType,
-            CSharpOperationDefinition operation)
+            CSharpOperationDefinition operation,
+            ImmutableArray<Diagnostic> diagnostics = default)
         {
             Kind = kind;
             ArgumentMode = argumentMode;
@@ -1835,6 +1945,9 @@ internal sealed partial class AkburaSemanticModel
             Type = type;
             ResultType = resultType;
             Operation = operation;
+            Diagnostics = diagnostics.IsDefault
+                ? ImmutableArray<Diagnostic>.Empty
+                : diagnostics;
         }
 
         public MarkupCommandHandlerKind Kind { get; }
@@ -1854,6 +1967,8 @@ internal sealed partial class AkburaSemanticModel
         public CSharpSymbolDefinition ResultType { get; }
 
         public CSharpOperationDefinition Operation { get; }
+
+        public ImmutableArray<Diagnostic> Diagnostics { get; }
     }
 
     private readonly struct MarkupEventHandlerAnalysis
@@ -1864,7 +1979,8 @@ internal sealed partial class AkburaSemanticModel
             parameterCount: 0,
             isAsync: false,
             containsAwait: false,
-            operation: default);
+            operation: default,
+            diagnostics: ImmutableArray<Diagnostic>.Empty);
 
         public MarkupEventHandlerAnalysis(
             MarkupCommandHandlerKind kind,
@@ -1872,7 +1988,8 @@ internal sealed partial class AkburaSemanticModel
             int parameterCount,
             bool isAsync,
             bool containsAwait,
-            CSharpOperationDefinition operation)
+            CSharpOperationDefinition operation,
+            ImmutableArray<Diagnostic> diagnostics)
         {
             Kind = kind;
             ArgumentMode = argumentMode;
@@ -1880,6 +1997,9 @@ internal sealed partial class AkburaSemanticModel
             IsAsync = isAsync;
             ContainsAwait = containsAwait;
             Operation = operation;
+            Diagnostics = diagnostics.IsDefault
+                ? ImmutableArray<Diagnostic>.Empty
+                : diagnostics;
         }
 
         public MarkupCommandHandlerKind Kind { get; }
@@ -1893,5 +2013,7 @@ internal sealed partial class AkburaSemanticModel
         public bool ContainsAwait { get; }
 
         public CSharpOperationDefinition Operation { get; }
+
+        public ImmutableArray<Diagnostic> Diagnostics { get; }
     }
 }

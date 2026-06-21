@@ -1165,6 +1165,7 @@ internal sealed partial class AkburaSemanticModel
         var valueKind = AkcssPropertyValueKind.CSharpExpression;
         var requiresBrushConversion = false;
         object? convertedValue = null;
+        var activeBinding = binding;
 
         if (property?.Type.Symbol is ITypeSymbol expectedType && expression != null)
         {
@@ -1177,6 +1178,7 @@ internal sealed partial class AkburaSemanticModel
                         valueKind = AkcssPropertyValueKind.ColorLiteral;
                         convertedValue = new CSharpSymbolDefinition(namedColorBinding.Symbol!);
                         valueOperation = namedColorBinding.OperationDefinition;
+                        activeBinding = namedColorBinding;
                         requiresBrushConversion = IsAvaloniaBrushType(expectedType);
                         valueType = namedColorBinding.TypeSymbol == null
                             ? valueType
@@ -1208,6 +1210,7 @@ internal sealed partial class AkburaSemanticModel
                         valueKind = AkcssPropertyValueKind.ColorLiteral;
                         convertedValue = new CSharpSymbolDefinition(namedColorBinding.Symbol!);
                         valueOperation = namedColorBinding.OperationDefinition;
+                        activeBinding = namedColorBinding;
                         requiresBrushConversion = IsAvaloniaBrushType(expectedType);
                         valueType = namedColorBinding.TypeSymbol == null
                             ? valueType
@@ -1241,9 +1244,16 @@ internal sealed partial class AkburaSemanticModel
                     ? null
                     : new CSharpSymbolDefinition(expectedTypeMemberBinding.Symbol);
                 valueOperation = expectedTypeMemberBinding.OperationDefinition;
+                activeBinding = expectedTypeMemberBinding;
                 valueType = expectedTypeMemberBinding.TypeSymbol == null
                     ? valueType
                     : new CSharpSymbolDefinition(expectedTypeMemberBinding.TypeSymbol);
+            }
+            else if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
+                     TryAcceptExpectedTypeCastExpression(expression, expectedType, containingSymbol))
+            {
+                valueType = new CSharpSymbolDefinition(expectedType);
+                activeBinding = CSharpTypeBinding.Empty;
             }
 
             var isThicknessPropertyType = IsAvaloniaThicknessType(expectedType);
@@ -1259,6 +1269,7 @@ internal sealed partial class AkburaSemanticModel
                 valueKind = AkcssPropertyValueKind.ThicknessTuple;
                 convertedValue = thickness;
                 valueType = new CSharpSymbolDefinition(expectedType);
+                activeBinding = CSharpTypeBinding.Empty;
             }
             else if (isThicknessPropertyType && isThicknessTuple)
             {
@@ -1275,6 +1286,14 @@ internal sealed partial class AkburaSemanticModel
                 valueKind = AkcssPropertyValueKind.AmxInvocation;
                 convertedValue = amxInvocation;
             }
+        }
+
+        if (valueKind != AkcssPropertyValueKind.Error)
+        {
+            AddAkcssExpressionDiagnostics(
+                assignment,
+                activeBinding,
+                diagnosticsBuilder);
         }
 
         var diagnostics = diagnosticsBuilder.ToImmutable();
@@ -1303,6 +1322,27 @@ internal sealed partial class AkburaSemanticModel
         return text
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
             .ToImmutableArray();
+    }
+
+    private void AddAkcssExpressionDiagnostics(
+        AkcssAssignmentSyntax assignment,
+        CSharpTypeBinding binding,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (binding.Diagnostics.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in binding.Diagnostics)
+        {
+            if (diagnostic.Severity == DiagnosticSeverity.Error)
+            {
+                diagnosticsBuilder.Add(CreateAkcssExpressionErrorDiagnostic(
+                    assignment,
+                    diagnostic));
+            }
+        }
     }
 
     private IAkcssSymbol? ResolveAkcssApplyItem(
@@ -1683,6 +1723,24 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return false;
+    }
+
+    private bool TryAcceptExpectedTypeCastExpression(
+        CSharp.ExpressionSyntax expression,
+        ITypeSymbol expectedType,
+        IAkcssSymbol containingSymbol)
+    {
+        if (expression is not CSharp.CastExpressionSyntax castExpression ||
+            !TryGetStaticMemberOwnerType(expectedType, out var ownerType))
+        {
+            return false;
+        }
+
+        var typeBinding = BindCSharpType(
+            castExpression.Type,
+            GetAkcssCSharpUsingDirectives(containingSymbol));
+        return typeBinding.TypeSymbol != null &&
+            IsSameType(typeBinding.TypeSymbol, ownerType);
     }
 
     private static bool TryGetExpectedTypeMemberName(
@@ -2129,6 +2187,16 @@ internal sealed partial class AkburaSemanticModel
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_AkcssInvalidThickness,
             [tupleText, propertyName]);
+    }
+
+    private AkburaSemanticDiagnostic CreateAkcssExpressionErrorDiagnostic(
+        AkcssAssignmentSyntax syntax,
+        Diagnostic diagnostic)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_AkcssExpressionError,
+            [syntax.Expression.ToFullString().Trim(), diagnostic.GetMessage()]);
     }
 
     private AkburaSemanticDiagnostic CreateAkcssApplyItemNotFoundDiagnostic(
@@ -4040,6 +4108,7 @@ internal sealed partial class AkburaSemanticModel
         var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
         var operation = semanticModel.GetOperation(probeExpression);
         var receiverType = GetExpressionReceiverType(semanticModel, probeExpression);
+        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
         var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
             ? null
             : typeInfo.Type;
@@ -4053,7 +4122,8 @@ internal sealed partial class AkburaSemanticModel
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
                 : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation));
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
     }
 
     private CSharpTypeBinding BindAkcssExpression(
@@ -4096,6 +4166,7 @@ internal sealed partial class AkburaSemanticModel
         var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
         var operation = semanticModel.GetOperation(probeExpression);
         var receiverType = GetExpressionReceiverType(semanticModel, probeExpression);
+        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
         var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
             ? null
             : typeInfo.Type;
@@ -4109,7 +4180,8 @@ internal sealed partial class AkburaSemanticModel
             symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
                 ? AkburaCandidateReason.Ambiguous
                 : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation));
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
     }
 
     private CSharp.ParameterListSyntax CreateAkcssExpressionParameterList(IAkcssSymbol containingSymbol)
@@ -4135,6 +4207,31 @@ internal sealed partial class AkburaSemanticModel
 
         return CSharpSyntaxFactory.ParameterList(
             CSharpSyntaxFactory.SeparatedList(builder.ToImmutable()));
+    }
+
+    private static ImmutableArray<Diagnostic> GetCSharpProbeDiagnostics(
+        SemanticModel semanticModel,
+        SyntaxNode syntax)
+    {
+        using var builder = ImmutableArrayBuilder<Diagnostic>.Rent();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var diagnostic in semanticModel.GetDiagnostics(syntax.Span))
+        {
+            if (diagnostic.Severity != DiagnosticSeverity.Error ||
+                diagnostic.Id == "CS0012")
+            {
+                continue;
+            }
+
+            var key = diagnostic.Id + "|" + diagnostic.GetMessage() + "|" +
+                diagnostic.Location.SourceSpan.ToString();
+            if (seen.Add(key))
+            {
+                builder.Add(diagnostic);
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateStateProbeFieldsBefore(
@@ -4524,7 +4621,8 @@ internal sealed partial class AkburaSemanticModel
             isBindingPath: false,
             candidateSymbols: ImmutableArray<RoslynSymbol>.Empty,
             candidateReason: AkburaCandidateReason.NotFound,
-            operationDefinition: default);
+            operationDefinition: default,
+            diagnostics: ImmutableArray<Diagnostic>.Empty);
 
         public CSharpTypeBinding(
             ITypeSymbol? typeSymbol,
@@ -4533,7 +4631,8 @@ internal sealed partial class AkburaSemanticModel
             bool isBindingPath,
             ImmutableArray<RoslynSymbol> candidateSymbols,
             AkburaCandidateReason candidateReason,
-            CSharpOperationDefinition operationDefinition)
+            CSharpOperationDefinition operationDefinition,
+            ImmutableArray<Diagnostic> diagnostics = default)
         {
             TypeSymbol = typeSymbol;
             Symbol = symbol;
@@ -4544,6 +4643,9 @@ internal sealed partial class AkburaSemanticModel
                 : candidateSymbols;
             CandidateReason = candidateReason;
             OperationDefinition = operationDefinition;
+            Diagnostics = diagnostics.IsDefault
+                ? ImmutableArray<Diagnostic>.Empty
+                : diagnostics;
         }
 
         public ITypeSymbol? TypeSymbol { get; }
@@ -4559,5 +4661,7 @@ internal sealed partial class AkburaSemanticModel
         public AkburaCandidateReason CandidateReason { get; }
 
         public CSharpOperationDefinition OperationDefinition { get; }
+
+        public ImmutableArray<Diagnostic> Diagnostics { get; }
     }
 }

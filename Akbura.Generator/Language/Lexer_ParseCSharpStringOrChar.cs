@@ -8,6 +8,7 @@ using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
 using CodeAnalysisSyntaxNode = Microsoft.CodeAnalysis.SyntaxNode;
 using Microsoft.CodeAnalysis.CSharp;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language;
 
@@ -15,6 +16,71 @@ namespace Akbura.Language;
 
 partial class Lexer
 {
+    private bool TryScanCSharpStringOrCharText([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? text)
+    {
+        text = null;
+
+        if (!ScanCSharpStringOrChar())
+        {
+            return false;
+        }
+
+        if (IsCSharpInterpolatedStringStart())
+        {
+            var start = TextWindow.Position;
+            var expression = CSharpSyntaxFactory.ParseExpression(
+                TextWindow.Text.ToString(),
+                start,
+                options: null,
+                consumeFullText: false);
+
+            if (expression is not CSharp.InterpolatedStringExpressionSyntax ||
+                expression.FullSpan.Length <= 0)
+            {
+                return false;
+            }
+
+            text = TextWindow.GetText(start, expression.FullSpan.Length, intern: false);
+            TextWindow.Reset(start + expression.FullSpan.Length);
+            return true;
+        }
+
+        var token = ParseCSharpStringOrChar();
+        if (token.RawKind == 0)
+        {
+            return false;
+        }
+
+        text = token.Text;
+        return true;
+    }
+
+    private bool IsCSharpInterpolatedStringStart()
+    {
+        var ch = TextWindow.PeekChar();
+        if (ch == '@' && TextWindow.PeekChar(1) == '$')
+        {
+            return TextWindow.PeekChar(2) == '"';
+        }
+
+        if (ch != '$')
+        {
+            return false;
+        }
+
+        var offset = 1;
+        while (TextWindow.PeekChar(offset) == '$')
+        {
+            offset++;
+        }
+
+        if (TextWindow.PeekChar(offset) == '@')
+        {
+            offset++;
+        }
+
+        return TextWindow.PeekChar(offset) == '"';
+    }
 
     private bool ScanCSharpStringOrChar()
     {

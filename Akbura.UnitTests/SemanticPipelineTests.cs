@@ -1511,7 +1511,7 @@ public class SemanticPipelineTests
             "    }\n" +
             "}";
 
-        var (_, _, operation, _) = GetSingleStyleOperation(code);
+        var (semanticModel, _, operation, _) = GetSingleStyleOperation(code);
 
         Assert.Equal(AkcssPropertyValueKind.ColorLiteral, operation.ValueKind);
         var color = Assert.IsType<AkcssColorValue>(operation.ConvertedValue);
@@ -1529,7 +1529,7 @@ public class SemanticPipelineTests
             "    }\n" +
             "}";
 
-        var (_, _, operation, _) = GetSingleStyleOperation(code);
+        var (semanticModel, _, operation, _) = GetSingleStyleOperation(code);
 
         Assert.Equal(AkcssPropertyValueKind.ColorLiteral, operation.ValueKind);
         var colorSymbol = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
@@ -1569,7 +1569,7 @@ public class SemanticPipelineTests
             }
             """;
 
-        var (_, _, operation, _) = GetSingleStyleOperation(code);
+        var (semanticModel, _, operation, _) = GetSingleStyleOperation(code);
 
         Assert.Equal("FontWeight", operation.Property?.Name);
         Assert.Equal("FontWeight", operation.ValueType.Name);
@@ -1577,6 +1577,7 @@ public class SemanticPipelineTests
         var member = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
         Assert.Equal("Bold", member.Name);
         Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
     }
 
     [Fact]
@@ -1706,6 +1707,32 @@ public class SemanticPipelineTests
             Assert.False(operation.ValueOperation.IsDefault);
             Assert.False(operation.HasErrors);
         });
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssInvalidCSharpExpression_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            @akcss {
+                .myText {
+                    Padding: FontWeight.Bold * NotExisting.Constant;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(symbol.Operations));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+
+        Assert.Equal("Padding", operation.Property?.Name);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssExpressionError, diagnostic.Code);
+        Assert.Contains("NotExisting", diagnostic.Message);
     }
 
     [Fact]
@@ -2253,6 +2280,71 @@ public class SemanticPipelineTests
         Assert.Equal(SpecialType.System_Boolean, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
         Assert.False(operation.ValueOperation.IsDefault);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupInterpolatedStringAndEventExpression_BindComponentScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <StackPanel>
+                <TextBlock Text={$"Count: {count}"}/>
+                <Button Click={count++}>Increment</Button>
+            </StackPanel>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var attributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupPlainAttributeSyntax>()
+            .ToArray();
+        var textAttribute = Assert.Single(attributes, attribute => attribute.Name.Identifier.ValueText == "Text");
+        var clickAttribute = Assert.Single(attributes, attribute => attribute.Name.Identifier.ValueText == "Click");
+
+        var textOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var clickOperation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(clickAttribute));
+
+        Assert.Equal(MarkupAttributeValueKind.DynamicExpression, textOperation.ValueKind);
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(textOperation.ValueType.Symbol).SpecialType);
+        Assert.False(textOperation.ValueOperation.IsDefault);
+        Assert.False(textOperation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty);
+
+        Assert.Equal(MarkupCommandHandlerKind.Expression, clickOperation.HandlerKind);
+        Assert.False(clickOperation.HandlerOperation.IsDefault);
+        Assert.False(clickOperation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(clickAttribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupInvalidCSharpExpression_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <TextBlock Text={$"Count: {missing}"} />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError, diagnostic.Code);
+        Assert.Contains("missing", diagnostic.Message);
     }
 
     [Fact]

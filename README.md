@@ -1,779 +1,666 @@
-﻿[![Discord](https://img.shields.io/discord/1442893504085757984?color=8a2be2&label=discord)](https://discord.gg/zMj4MmJ9U5)
+[![Discord](https://img.shields.io/discord/1442893504085757984?color=8a2be2&label=discord)](https://discord.gg/zMj4MmJ9U5)
 [![Telegram](https://raw.githubusercontent.com/Patrolavia/telegram-badge/master/chat.svg)](https://t.me/akburaui)
 
 # Akbura
 
-Akbura is a UI framework for building applications using a declarative, component-based language.
+Akbura is an experimental .NET UI language and compiler built around declarative components, reactive state, Avalonia controls, and a typed styling language called AKCSS.
 
-Note: Akbura is still in an early experimental stage.
-The first usable preview version is expected around January 26, 2026
-Until then, the API, syntax, and compiler behavior may change frequently as the project evolves.
+Akbura is still early. Syntax, semantic rules, code generation, and runtime APIs may change while the compiler is being shaped.
 
-If you want to follow progress or contribute ideas, you are welcome to join the community on **Discord** or **Telegram**. All drafts, specifications, and current design notes can be found in the `drafts-concepts` folder.
+## Contents
 
-Akbura is an active exploration of what a modern reactive UI language for .NET could look like — and your feedback is invaluable.
-
-# Table of Contents
-
-* [Akbura](#akbura)
-
-  * [Getting Started](#getting-started)
-
-	* [1. Install the Package](#1-install-the-package)
-	* [2. Create Your First Component](#2-create-your-first-component)
-	* [3. Run the App](#3-run-the-app)
-  * [Getting Started with Avalonia](#getting-started-with-avalonia)
-
-	* [1. Install the Package](#1-install-the-package-1)
-	* [2. Create Your First Component](#2-create-your-first-component-1)
-	* [3. Use AkburaAvaloniaHost in your Avalonia App](#3-use-akburaavaloniahost-in-your-avalonia-app)
-* [States](#states)
-
-  * [Binding to viewmodel](#binding-to-viewmodel)
-* [Conditional Rendering](#conditional-rendering)
+* [Quick Start](#quick-start)
+* [Files And Component Names](#files-and-component-names)
+* [Top-Level Syntax](#top-level-syntax)
+* [Markup](#markup)
+* [State](#state)
 * [Parameters](#parameters)
-
-  * [Parameters Binding](#parameters-binding)
-  * [Modify Bindings](#modify-bindings)
-* [useEffect Declaration](#useeffect-declaration)
-
-  * [Basic useEffect](#basic-useeffect)
-  * [Async useEffect](#async-useeffect)
-  * [Cancellation Token Example](#cancellation-token-example)
 * [Dependency Injection](#dependency-injection)
-
-  * [Registering an IServiceProvider](#registering-an-iserviceprovider)
-
-	* [Using AkburaRoot](#using-akburaroot)
-	* [Using Avalonia Host](#using-avalonia-host)
-  * [Injecting Dependencies into Components](#injecting-dependencies-into-components)
 * [Commands](#commands)
-
-  * [Declaring a Command](#declaring-a-command)
-  * [Using Commands from Another Component](#using-commands-from-another-component)
+* [useEffect](#useeffect)
+* [Conditional Rendering](#conditional-rendering)
+* [User Hooks](#user-hooks)
 * [AKCSS](#akcss)
+* [AKCSS Utilities](#akcss-utilities)
+* [AKCSS Imports And Lookup](#akcss-imports-and-lookup)
+* [Current Limits](#current-limits)
 
-  * [Basic Example](#basic-example)
-  * [Generated C# Code](#generated-c-code)
-* [Akcss Utilities](#akcss-utilities)
-* [Akcss Utilities - Condition Prefix](#akcss-utilities---condition-prefix)
+## Quick Start
 
-
-## Getting Started
-
-Akbura is currently in active development. When the framework becomes production‑ready, creating a new Akbura application will be simple and familiar for any .NET developer.
-
----
-
-### 1. Install the Package
+Install the package:
 
 ```bash
 dotnet add package Akbura
 ```
 
-This will add the core Akbura runtime and code generator to your project.
-
----
-
-### 2. Create Your First Component
-
-Create a file named `Counter.akbura`:
+Create `Counter.akbura`:
 
 ```akbura
-// Counter.akbura
+using Avalonia.Controls;
+
+namespace Demo.Pages;
 
 state int count = 0;
 
-<Stack w-full h-full items-center>
-	<Text FontSize="24">Count: {count}</Text>
-	<Button Click={count++}>Increment</Button>
-</Stack>
+<StackPanel>
+    <TextBlock Text={$"Count: {count}"}/>
+    <Button Click={count++}>Increment</Button>
+</StackPanel>
 ```
 
-This defines a reactive component with one state variable and two UI elements.
-
----
-
-### 3. Run the App
-
-In your application's entry point (`Program.cs`):
+Run it from a host application:
 
 ```csharp
 using Akbura;
 
-AkburaRoot.Run<Counter>();
+AkburaRoot.Run<Demo.Pages.Counter>();
 ```
 
-This will:
+Avalonia applications can also host Akbura components through the Avalonia host integration:
 
-* Initialize the Akbura runtime
-* Instantiate your component
-* Create its generated view
-* Mount it as the root UI element
-
-## Getting Started with Avalonia
-
-To mount Akbura components inside an existing Avalonia application, you can use `AkburaAvaloniaHost`.
-
----
-
-### 1. Install the Package
-
-```bash
-dotnet add package Akbura
+```xml
+<akbura:AkburaAvaloniaHost Component="{x:Type local:Counter}" />
 ```
 
-This installs the core Akbura runtime and compiler.
+## Files And Component Names
 
----
+An `.akbura` file declares one component. By default, the component name is the file name.
 
-### 2. Create Your First Component
+```text
+Pages/Counter.akbura -> Counter
+```
 
-Create a file named `Counter.akbura`:
+The default namespace is derived from the project root namespace plus the file path. You can override it with a normal namespace declaration:
 
 ```akbura
-// Counter.akbura
+namespace Demo.Pages;
 
-state int count = 0;
-
-<Stack w-full h-full items-center>
-	<Text FontSize="24">Count: {count}</Text>
-	<Button Click={count++}>Increment</Button>
-</Stack>
+<TextBlock Text="Hello"/>
 ```
 
----
+C# partial classes can extend the generated component type:
 
-### 3. Use `AkburaAvaloniaHost` in your Avalonia App
-
-In your Avalonia XAML file:
-
-```xaml
-<Window xmlns="https://github.com/avaloniaui"
-		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-		xmlns:akbura="clr-namespace:Akbura.Avalonia;assembly=Akbura.Avalonia"
-		mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-		x:Class="AvaloniaApplication.MainWindow"
-		Title="AvaloniaApplication">
-
-	<akbura:AkburaAvaloniaHost Component="{x:Type Counter}" />
-</Window>
-```
-
-This will:
-
-* Load the compiled `Counter` component
-* Create its generated Avalonia view
-* Mount it inside the window automatically
-
----
-
-You can mount any Akbura component this way and freely mix Akbura UI with native Avalonia XAML.
-
-
-## States
-
-Akbura components can declare reactive state variables using the `state` keyword.
-
-```akbura
-// ExampleStates.akbura
-
-state a = 0; // default value 0, implicit type
-state MyDto b = new MyDto() { field1: "default", field2: 42 }; // explicit type + default value
-
-<Grid Rows="*, *">
-	
-	<Button Click={a++} row-0>
-		a = {a}
-	</Buttom>
-
-	<Stack row-1>
-		<Input bind:Value={b.field1}/>
-		<Input bind:Value={b.field2}/>
-	</Stack>
-
-</Grid>
-```
-
-Akbura compiler generates strongly-typed C# code:
 ```csharp
-[StaticMount]
-[AkburaComponent(AssemblyName="MyAssembly", Source = "ExampleStates.akbura")]
-public partial class ExampleStates: AkburaComponent
+namespace Demo.Pages;
+
+public partial class Counter
 {
-	[State("a")]
-	private int __a = 0;
-
-	[State("b")]
-	private MyDto __b = new MyDto { field1 = "default", field2 = 42 };
-
-	private __ExampleStates__View_0_? _view0;
-
-	protected override IBindedView Update()
-	{
-		return _view0 ??= new __ExampleStates__View_0_(this);
-	}
-
-	class __ExampleStates__View_0_: AvaloniaBindedView<ExampleStates>
-	{
-		[Component(Position = 166, Width = 189)]
-		private Grid _grid0;
-
-		[Component(...)]
-		private Button _button0;
-
-		[Component(...)]]
-		private StackPanel _stackPanel0;
-
-		[Component(...)]]
-		private TextBox _input0;
-
-		[Component(...)]]
-		private TextBox _input1;
-
-		public __ExampleStates__View_0_(ExampleStates owner) : base(owner)
-		{
-			_grid0 = new Grid();
-			//....
-			_button0 = new Button();
-			//....
-			_stackPanel = new StackPanel();
-			//....
-			_input0 = new TextBox();
-			//....
-			_input1 = new TextBox();
-			//....
-		}
-
-		protected override Update()
-		{
-			var a = Owner.__a;
-			var b = Owner.__b;
-
-			_button0.Content = $"a = {a}";
-
-			_input0 = b.field1;
-			_input1 = b.field2;
-		}
-	}
+    public void Reset()
+    {
+    }
 }
 ```
 
-### Binding to viewmodel
+## Top-Level Syntax
 
-Akbura supports param `bind/out/in` semantics for connecting component state to external viewmodels.
-
-```csharp
-state MyViewModel vm = new MyViewModel();
-
-state string name = bind vm.Name; // two-way binding to vm.Name property
-state string fullName = out vm.FullName; // one-way binding from vm.FullName property, state now is readonly
-state string surname = in vm.Surname; // one-way binding to vm.Surname property
-
-<Stack gap-2>
-	<Input bind:Value={name}    Placeholder="Name"/>
-	<Input bind:Value={surname} Placeholder="Surname"/>
-	<Input Value="Full Name: {fullName}"/>
-</Stack>
-```
-
-## Conditional Rendering
-
-Akbura supports top-level C# control-flow blocks in component files. This means a component can contain a normal `if` statement, and the body may contain regular C# statements and markup as siblings.
+An Akbura component can contain these top-level members:
 
 ```akbura
-state isOpen = false;
+using System;
+using Avalonia.Controls;
+using Demo.Styles.Shared.akcss;
+
+namespace Demo.Pages;
+
+@akcss {
+    .card { Padding: (10, 20); }
+}
+
+inject ILogger<DashboardPage> logger;
+
+param int UserId = 1;
+param bind string Search = "";
+param out TaskItem SelectedTask;
+
+state bool isOpen = false;
+state DashboardVm vm = new DashboardVm();
+state bool isBusy = bind vm.IsBusy;
+state TaskItem activeTask = in vm.ActiveTask;
+state TaskItem selectedTask = out vm.SelectedTask;
+
+command int Refresh(int userId);
+
+useEffect(UserId, isBusy, Refresh.IsExecuting) {
+    logger.LogInformation("Refreshing {0}", UserId);
+}
 
 if(isOpen)
 {
-	Console.WriteLine("Panel is open");
-
-	<TextBlock Text="Opened!"/>
+    Console.WriteLine("Panel opened");
+    <TextBlock Text="Opened"/>
 }
 
-<Button OnClick={isOpen = true}>Open</Button>
-```
-
-This syntax is intentionally top-level only. Akbura does not currently support Razor-style control flow inside markup content:
-
-```akbura
-<Button>
-	@if(isOpen)
-	{
-		<FirstControl/>
-	}
-	@else
-	{
-		<SecondControl/>
-	}
-</Button>
-```
-
-For now, the recommended production-style approach is still the classic visibility pattern: always declare the component in markup, then control whether it is visible.
-
-```akbura
-state isBox1Visible = true;
-state isBox2Visible = false;
-
-<StackPanel>
-	<Border class="box" IsVisible={isBox1Visible}/>
-	<Border class="box" {!isBox2Visible}:hidden/>
+<StackPanel class="card">
+    <TextBlock Text="Dashboard"/>
 </StackPanel>
 ```
 
-The top-level `if` form is useful for parser and future rendering work, but full conditional branch generation is still evolving. Prefer `IsVisible={...}` or conditional Tailwind utilities such as `{condition}:hidden` when you need predictable behavior today.
+Top-level C# statements are allowed. Akbura symbols such as `state`, `inject`, and `command` are made visible to C# semantic analysis where supported.
 
-## Parameters
+## Markup
 
-Parameters allow a component to receive data from its parent. They behave similarly to constructor arguments, but are fully declarative and compile into strongly-typed C# fields.
-
-A parameter:
-
-* Can have a **default value**, making it optional.
-* Can be **required** if no default value is provided.
-* Can be used anywhere inside the component (markup or expressions).
-
-### Example
+Markup uses Avalonia-style components and Akbura attributes:
 
 ```akbura
-// MyCoolComponent.akbura
+using Avalonia.Controls;
 
-param string Title = "Default Title"; // default value
-param int Count; // no default value, required
+state string title = "Dashboard";
+state bool isOpen = false;
 
-<Stack gap-2>
-	<Text FontSize="20" FontWeight="Bold">{Title}</Text>
-	<Text>Count: {Count}</Text>
-</Stack>
-
-// RootComponent.akbura
-
-<MyCoolComponent Title="Hello World" Count={5}/>
+<StackPanel class="card" w-30 {isOpen}:opacity-50>
+    <TextBlock Text={title}/>
+    <Button Click={isOpen = true}>Open</Button>
+    <Border IsVisible={isOpen}/>
+</StackPanel>
 ```
 
-
-## Parameters Binding
-
-Parameters support directional data flow. Unlike parameters in some frameworks, Akbura parameters explicitly describe how values move between **parent => component** and **component => parent**.
-
-### Parameter modes
-
-| Declaration      | Direction          | Description                                                     |
-| ---------------- | ------------------ | --------------------------------------------------------------- |
-| `param T x`      | Parent => Component | **Default**. Parent sets value. Component cannot modify parent. |
-| `param bind T x` | Parent <=> Component | Two-way binding. Changes sync both ways.                        |
-| `param out T x`  | Component => Parent | Readonly for parent. Component pushes changes upward.           |
-
- **`param in T x` does not exist** — the default `param T x` already behaves like `in`.
-
----
-
-## Example
+Supported component names include:
 
 ```akbura
-// BindableParam.akbura
-
-param bind string Text = "Default"; // two-way binding
-param out int Data = 0;              // component => parent only
-
-<Stack gap-2>
-	<Input bind:Value={Text}/>
-	<Input bind:Value={Data}/>
-</Stack>
-
-// Root.akbura
-
-state text = "";
-state data = 0;
-
-<BindableParam bind:Text={text} Data={42}/>        // ERROR: Data is readonly
-<BindableParam bind:Text={text} bind:Data={42}/>    // ERROR: Data is readonly
-<BindableParam bind:Text={text} out:Data={data}/>   // OK
+<Button/>
+<Avalonia.Controls.Button/>
+<global::Avalonia.Controls.Button/>
+<alias::Avalonia.Controls.Button/>
+<List{TaskItem}/>
 ```
 
-### Explanation
-
-* `Text` supports two-way binding => parent must also use `bind:`.
-* `Data` is declared `out`, so parent **cannot** assign directly.
-* Parent must specify `out:Data={...}` to receive updates.
-
----
-
-## Modify Bindings
-
-Akbura allows using `bind(...)` expression form for fine-grained control.
-This is useful when you need custom logic for reading or writing.
-
-✔ Only inside `bind(...)` you may use `@in` and `@out`.
-These *do not* exist in parameter declarations.
+Plain attributes set properties:
 
 ```akbura
-// Root.akbura
+<TextBlock Text="Hello"/>
+<TextBlock Text={title}/>
+```
 
-state text = "";
-state data = 0;
+Directional attributes express data flow:
 
-<BindableParam Text={bind(
-	@in: () => {
-		Console.WriteLine("Writing to param Text");
-		return text;
-	},
-	@out: value => {
-		Console.WriteLine("Reading from BindableParam " + value);
-		text = value;
-	}
-)}
+```akbura
+<TextBox bind:Text={title}/>
+<TaskList out:Selected={selectedTask}/>
+```
 
-out:Data={value => {
-	data = value * 2;
-	Console.WriteLine("Reading from readonly param BindableParam.Data");
+Routed events bind to expressions or delegates:
+
+```akbura
+state int count = 0;
+
+<Button Click={count++}/>
+<Button Click={(sender, args) => count++}/>
+<Button Click={(_, args) => {
+    if(count == 5) {
+        Console.WriteLine("Hello");
+    }
+
+    count++;
 }}/>
 ```
 
+`bind:` and `out:` are not valid for routed events.
 
-This fully reflects the correct behavior of parameter binding in Akbura.
+## State
 
-## useEffect Declaration
-
-Akbura provides an effect system similar to React’s `useEffect`. Effects run automatically in response to **state changes**, and can optionally be asynchronous with full cancellation support.
-
-Effects allow you to:
-
-* React to component lifecycle events
-* Run logic when specific state values change
-* Perform async work tied to component updates
-* Handle cancellation and finalization
-
----
-
-## Basic useEffect
+State is declared with `state`:
 
 ```akbura
-// UseEffectExample.akbura
-
-state int count = 0;
-state string message = "Hello";
-
-useEffect() {
-	Console.WriteLine("Component did mount");
-}
-
-// Reacts only to changes of `count`
-useEffect(count) {
-	Console.WriteLine($"Count changed to: {count}");
-	Console.WriteLine($"Old value is: {@old(count)}");
-}
-
-// Reacts only to `message` changes
-useEffect(message) {
-	Console.WriteLine($"Message changed to: {message}");
-	Console.WriteLine($"Old value is: {@old(message)}");
-}
-
-<Stack>
-	<Input bind:Value={count}/>
-	<Input bind:Value={message}/>
-</Stack>
+state count = 0;
+state int selectedIndex = 0;
+state string query = "";
+state ReactList tasks = bind viewModel.Tasks;
 ```
 
-
-## Async useEffect
-
-Effects can be asynchronous. Akbura automatically provides cancellation tokens and manages effect lifetimes.
+State can bind to view-model members:
 
 ```akbura
-state int? data = null;
+state MyViewModel vm = new MyViewModel();
 
-useEffect() {
-	await Task.Delay(2000); // async work
-	data = 42;
-}
-cancel {
-	Console.WriteLine("Effect was cancelled");
-}
-finally {
-	Console.WriteLine("Effect has completed");
-}
-
-if(data == null) {
-	<Text>Data is loading...</Text>
-}
-
-<Text>Data is fetched! Data is {data}</Text>
+state string name = bind vm.Name;
+state string fullName = out vm.FullName;
+state string surname = in vm.Surname;
 ```
 
-## Cancellation Token Example
+Binding modes:
 
-Akbura exposes the cancellation token via the special dependency `@cancel`.
+| Syntax | Meaning |
+| --- | --- |
+| `state T x = value;` | Local component state. |
+| `state T x = bind vm.Name;` | Two-way binding. |
+| `state T x = out vm.Name;` | Read from source, component state is readonly. |
+| `state T x = in vm.Name;` | Write to target. |
+
+`in`, `out`, and `bind` state initializers must use a binding path:
 
 ```akbura
-state int? data = null;
-state bool canceled = false;
-state string? query = 0;
+state string ok1 = in vm.Name;
+state string ok2 = in vm.People[0].Name;
+state int bad = in vm.Age + 1; // invalid binding expression
+```
 
-useEffect(query, @cancel) {
-	await Task.Delay(2000, @cancel);
+For `bind` and `out`, Akbura warns when the source cannot be observed as `IObservable<T>` and the owner does not implement `INotifyPropertyChanged`. For `in` and writable parts of `bind`, the target must be a writable property or field.
 
-	if(@cancel.IsCancellationRequested) {
-		canceled = true;
-		return;
-	}
+## Parameters
 
-	data = 42;
-}
-cancel {
-	canceled = true;
-	Console.WriteLine("Effect was cancelled");
-}
-finally {
-	Console.WriteLine("Effect has completed");
-}
+Parameters are component inputs and outputs:
 
-<Stack>
-	<Input bind:Value={query} Placeholder="Enter query"/>
-	<Text {!canceled}:hidden>Previous operation was canceled.</Text>
-	<Text {data == null}:hidden>Fetched data is {data}</Text>
-</Stack>
+```akbura
+param int UserId = 1;
+param string Title;
+param bind string Search = "";
+param out TaskItem SelectedTask;
+```
+
+Parameter modes:
+
+| Declaration | Direction | Description |
+| --- | --- | --- |
+| `param T x` | Parent to component | Default. Parent sets the value. |
+| `param bind T x` | Parent to component and component to parent | Two-way binding. |
+| `param out T x` | Component to parent | Component pushes values upward. |
+
+There is no `param in T x`; default `param T x` already behaves as input.
+
+Example child component:
+
+```akbura
+// TaskCard.akbura
+param TaskItem Item;
+param bind bool IsSelected = false;
+param out TaskItem SelectedItem;
+
+<Button Click={IsSelected = true}>
+    {Item.Title}
+</Button>
+```
+
+Example parent:
+
+```akbura
+state TaskItem selectedTask = null!;
+state bool selected = false;
+
+<TaskCard Item={task} bind:IsSelected={selected} out:SelectedItem={selectedTask}/>
+```
+
+Duplicate write setters are rejected:
+
+```akbura
+<TextBlock bind:Text={name} Text={other}/> // invalid
+<TextBlock Text={name} Text={other}/>      // invalid
+```
+
+Read-only output bindings can coexist with a setter:
+
+```akbura
+<TextBlock Text={name} out:Text={other}/>
+<TextBlock bind:Text={name} out:Text={other}/>
+<TextBlock out:Text={a} out:Text={b}/>
 ```
 
 ## Dependency Injection
 
-Akbura supports dependency injection (DI) to provide services and shared resources directly into components. Any component can declare injected dependencies, which are automatically resolved from the configured DI container.
-
-## Registering an `IServiceProvider`
-
-### Using `AkburaRoot`
-
-```csharp
-AkburaRoot.Builder()
-	.UseServiceProvider(yourServiceProvider)
-	.Run<MyRoot>();
-```
-
-This configures the DI provider for all Akbura components in the application.
-
-### Using Avalonia Host
-
-```xaml
-<akbura:AkburaAvaloniaHost
-	Component="{x:Type MyRoot}"
-	ServiceProvider="{... your service provider ...}" />
-```
-
-Here DI is bound per-host, allowing Akbura to interoperate with Avalonia and external DI systems.
-
-### Injecting Dependencies into Components
-
-To consume a service inside an Akbura component, use the `inject` keyword:
+Injected services are declared with `inject`:
 
 ```akbura
-inject ILogger<MyComponent> logger;
+inject ILogger<Counter> logger;
 
-useEffect() {
-	logger.LogInformation("MyComponent mounted");
-}
+state int count = 0;
 
-<Text>
-	Hello world!
-	ILogger hashcode: {logger.GetHashCode()}
-</Text>
+logger.LogInformation("Count is {0}", count);
+
+<Button Click={count++}>Increment</Button>
 ```
+
+The component file name is also available as the component type, so `ILogger<Counter>` works inside `Counter.akbura`.
 
 ## Commands
 
-Commands in Akbura behave similarly to UI events, but with additional capabilities:
-
-* **CanExecute semantics**
-* **IsExecuting state tracking**
-* **Async method support**
-* **Typed arguments and return values**
-* **Direct binding to C# commands**
-
-They allow components to expose rich interaction points that integrate with both state and asynchronous workflows.
-
-
-### Declaring a Command
-
-Inside a component:
+Commands expose interaction points from a component:
 
 ```akbura
 // CustomButton.akbura
-
-command int CustomClick(int a);
+command int Click(int value);
 
 state int clicked = 0;
 
-useEffect(CustomClick.IsExecuting) {
-	Console.WriteLine("Command is executing");
+useEffect(Click.IsExecuting) {
+    Console.WriteLine("Command is executing");
 }
 
-<Block p-4 {CustomClick.IsExecuting}:disabled>
-	<Button Click={() => {
-		var result = await CustomClick.Invoke(clicked++);
-		Console.WriteLine($"Result is {result}");
-	}}/>
-</Block>
+<Button Click={async () => {
+    var result = await Click.Execute(clicked++);
+    Console.WriteLine($"Result is {result}");
+}}>
+    Run
+</Button>
 ```
 
-### Generated Behavior
+A command facade provides:
 
-Every command automatically provides:
+| Member | Meaning |
+| --- | --- |
+| `Execute(args)` | Executes the command. The facade is asynchronous and returns `ValueTask<T>` for result commands. |
+| `CanExecute` | Reactive execution permission state. |
+| `IsExecuting` | Reactive execution state. |
 
-* **`.Invoke(args)`** — executes sync or async code
-* **`.IsExecuting`** — a reactive boolean state
-* 
-
-### Using Commands from Another Component
+Command declarations use the result type directly:
 
 ```akbura
-// Root.akbura
+command int Refresh(int userId);
+command void Save();
+```
 
-inject RootVm Vm;
+Do not declare the command as `Task<int>` just to make it asynchronous. The generated command facade provides the `ValueTask` execution shape.
 
-<Stack>
-	<CustomButton Click={() => Console.WriteLine("Hello world")} />
-	<!-- No argument → argument ignored, default return value, no async -->
+Parent components can bind to child commands:
 
-	<CustomButton Click={x => Console.WriteLine($"Hello world with {x}")} />
-	<!-- Receives argument, no return value, sync execution -->
+```akbura
+<CustomButton Click={() => Console.WriteLine("Hello")}/>
+<CustomButton Click={x => Console.WriteLine($"Clicked {x}")}/>
+<CustomButton Click={x => x * 2}/>
+<CustomButton Click={async x => await viewModel.Fetch(x)}/>
+<CustomButton Click={viewModel.MyCommand}/>
+```
 
-	<CustomButton Click={x => x * 2} />
-	<!-- Returns explicit value, still sync -->
+## useEffect
 
-	<CustomButton Click={x => await Vm.Fetch(x)} />
-	<!-- Async execution, awaited result passed to command -->
+`useEffect` declares effect code that reacts to dependencies:
 
-	<CustomButton Click={Vm.MyCommand} />
-	<!-- Direct reference to a C# ICommand-like method or handler -->
-</Stack>
+```akbura
+param int UserId = 1;
+state int count = 0;
+inject IDataService service;
+command void Refresh(int userId);
+
+useEffect(UserId, count, service.Value, Refresh.IsExecuting) {
+    Console.WriteLine(count);
+}
+cancel {
+    Console.WriteLine("cancel");
+}
+finally {
+    Console.WriteLine("done");
+}
+```
+
+`useEffect` dependencies can reference parameters, state, injected members, and command facade state.
+
+## Conditional Rendering
+
+Akbura supports normal top-level C# control flow. A top-level `if` block can contain C# statements and markup siblings:
+
+```akbura
+state bool isOpen = false;
+
+if(isOpen)
+{
+    Console.WriteLine("Opened");
+    <TextBlock Text="Opened"/>
+}
+
+<Button Click={isOpen = true}>Open</Button>
+```
+
+Razor-style markup control flow is intentionally not supported:
+
+```akbura
+<Button>
+    @if(isOpen) {
+        <TextBlock Text="Opened"/>
+    }
+</Button>
+```
+
+For predictable UI today, prefer classic visibility:
+
+```akbura
+state bool isBoxVisible = true;
+
+<StackPanel>
+    <Border class="box" IsVisible={isBoxVisible}/>
+    <Border class="box" {!isBoxVisible}:hidden/>
+</StackPanel>
+```
+
+## User Hooks
+
+User hooks are experimental. Hook calls are allowed only from top-level state initializers:
+
+```akbura
+state string query = "";
+state string name = useName(query);
+```
+
+Hooks cannot be called from conditional or loop bodies:
+
+```akbura
+if(query.Length > 0)
+{
+    useName(query); // invalid
+}
+```
+
+The C# hook type is expected to be annotated and to provide a `UseHook` method:
+
+```csharp
+[UserHook]
+public struct UseNameHook
+{
+    public string UseHook<T>(AkburaComponent component, StateInfo<T> state)
+    {
+        return state.FieldName ?? "Unnamed State";
+    }
+}
 ```
 
 ## AKCSS
 
-AKCSS is a CSS-inspired styling language designed for Akbura components.
-It provides a familiar declarative syntax while integrating tightly with component state, control state expressions, and the Akbura rendering model.
+AKCSS is Akbura's typed styling language. It can be written inline in an `.akbura` file or in `.akcss` files.
 
-AKCSS files allow you to define reusable style rules that are compiled into strongly typed C# classes.
-
----
-
-## Basic Example
-
-```akcss
-.myclass {
-	Background: "Red";
-
-	@if(IsHovered) {
-		Background: "Blue";
-	}
-
-	@if(this == Button) {
-		Padding: 10;
-	}
-
-	@if(this is Button) {
-		Padding: 5;
-	}
-}
-```
-
-Applied to a component:
+Inline AKCSS:
 
 ```akbura
-<Button class="myclass" />
+@akcss {
+    .card {
+        Padding: (10, 20);
+        Background: White;
+    }
+}
+
+<Border class="card"/>
 ```
 
----
+Standalone AKCSS:
 
-## Generated C# Code
-
-When compiled, Akcss generates an internal class representing the style logic:
-
-```csharp
-[AkcssClass("myclass", Source="...")]
-[Observes("IsHovered")]
-class __myclass_Akcss_ : AkcssStyleClass
-{
-	public override void ApplyOrUpdateStyle(AkburaControl control)
-	{
-		control.Background = "Red";
-
-		if (control.IsHovered)
-		{
-			control.Background = "Blue";
-		}
-
-		if (control.UnderlyingControl.GetType() == typeof(Button))
-		{
-			control.Padding = 10;
-		}
-
-		if (control.UnderlyingControl is Button)
-		{
-			control.Padding = 5;
-		}
-	}
+```akcss
+// DashboardPage.akcss
+.card {
+    Padding: (10, 20);
+    Background: White;
 }
 ```
 
-## Akcss Utilities
+Selectors:
 
-Akcss supports a utility system inspired by Tailwind, where concise class-like patterns expand into full property assignments. Utilities are defined inside an `@utilities` block.
+```akcss
+.anyControl {
+    Opacity: 1;
+}
+
+Button.primary {
+    Background: White;
+}
+
+(global::Demo.Components.TaskCard) {
+    Padding: 5;
+}
+
+(global::Demo.Components.TaskCard).selected {
+    Padding: 10;
+}
+```
+
+AKCSS supports namespace imports:
+
+```akcss
+@using Demo.Components;
+
+TaskCard.selected {
+    Padding: 10;
+}
+```
+
+Property values are semantically bound against the target property type:
+
+```akcss
+Button.primary {
+    Background: White;
+    Background: "#FFAA";
+    Foreground: Color.FromRgb(33, 11, 231);
+
+    FontWeight: Bold;
+    FontWeight: FontWeight.Bold;
+    FontWeight: (FontWeight)700;
+
+    HorizontalAlignment: Center;
+    VerticalAlignment: (VerticalAlignment)2;
+
+    Padding: (10, 20);
+    Padding: (10, 20, 30, 40);
+    Margin: (top: 10, bottom: 30);
+    Margin: (vertical: 5);
+
+    Width: Amx.DynamicResource<double>("--dashboard-width");
+}
+```
+
+For enum-like properties, a bare value such as `Bold`, `Center`, or `Compact` is resolved from the expected property type.
+
+AKCSS body directives:
+
+```akcss
+.card {
+    Background: White;
+
+    @if(IsHovered) {
+        Background: "#FFAA";
+    }
+
+    @apply surface shadow;
+}
+```
+
+`@intercept` hands a style to C#:
+
+```akcss
+.veryComplex {
+    @intercept global::Demo.Styles.DashboardStyle;
+}
+```
+
+The C# type must inherit from `Akbura.Akcss.AkcssClass`:
+
+```csharp
+public sealed class DashboardStyle : Akbura.Akcss.AkcssClass
+{
+    public override void Update(object control)
+    {
+    }
+}
+```
+
+If a style contains `@intercept`, other AKCSS body members in that same style are ignored and reported as warnings.
+
+## AKCSS Utilities
+
+Utilities are defined inside `@utilities`:
 
 ```akcss
 @utilities {
-	.rounded {
-		CornerRadius: 4;
-	}
+    .w-(double value) {
+        Width: value;
+    }
 
-	.w-(double width) {
-		Width: width * MyNamespace.MyStaticClass.Spacing;
-	}
+    .px-(double width) {
+        Padding: (horizontal: Amx.DynamicResource<double>("--spacing") * width);
+    }
 
-	.space-(int x)-(int y) {
-		MarginLeft: x * MyNamespace.MyStaticClass.Spacing;
-		MarginTop:  y * MyNamespace.MyStaticClass.Spacing;
+    .hidden {
+        IsVisible: false;
+    }
 
-		@if(x > y) {
-			BorderThickness: x - y;
-		}
-	}
+    Button.primary {
+        Background: White;
+    }
 }
 ```
 
-Using the utilities:
+Use utilities in markup:
 
 ```akbura
-<Block w-30 space-2-4 rounded />
+state bool isBusy = false;
+
+<StackPanel w-30 px-{12} {isBusy}:hidden/>
 ```
 
-## Akcss Utilities - Condition Prefix
+Utility arguments come from numeric segments and expression segments:
 
-Akcss utilities support **conditional prefixes**, allowing styles to be applied only when a specific condition expression is true.
+```akbura
+<Border w-30/>
+<Border w-{width}/>
+<Border px-{viewModel.Spacing}/>
+```
 
-This enables dynamic utility behavior without writing full AKCSS blocks.
+Conditional prefixes are supported:
+
+```akbura
+<Border {isBusy}:hidden/>
+<Border sm:w-20/>
+```
+
+Utility intercept types inherit from `Akbura.Akcss.AkcssUtility`:
 
 ```akcss
-state bool isMobile = false;
-
-<Box w-30 {isMobile}:w-20>
+@utilities {
+    .w-(double value) {
+        @intercept global::Demo.Styles.WidthUtility;
+    }
+}
 ```
 
-Here:
+## AKCSS Imports And Lookup
 
-* `w-30` applies normally.
-* `{isMobile}:w-20` applies *only when `isMobile` is true*.
+AKCSS lookup uses layers:
 
-Conditional prefixes may also use:
+1. Inline `@akcss` in the component.
+2. Companion AKCSS file next to the component, for example `Button.akbura` and `Button.akcss`.
+3. Explicit AKCSS imports in `using ...akcss;` declarations.
 
-* component boolean states
-* control state values such as `IsHovered` or `IsChecked`
-* parameter values
+Example component import:
 
-Akcss resolves utilities in the following order:
+```akbura
+using Demo.Styles.Shared.akcss;
 
-* If multiple utilities share the same base name, **only the last matching one is applied**.
-* Utilities have **higher priority** than regular AKCSS class styles.
-* Conditional utilities override unconditional ones if their condition evaluates to true.
+<Button primary w-30/>
+```
+
+Example AKCSS import:
+
+```akcss
+@using Demo.Styles.Shared.akcss;
+
+.primary {
+    @apply sharedStyle w-30;
+}
+```
+
+Local AKCSS utilities and styles win over imported ones. Duplicate matches in the same layer are reported as ambiguity diagnostics.
+
+## Current Limits
+
+Akbura is still evolving. The current compiler supports a growing syntax and semantic model, but some runtime/codegen behavior is still being built.
+
+Important current limits:
+
+* Markup-internal `@if`, `@else`, `@for`, and `@foreach` are not supported.
+* Top-level conditional rendering parses and has symbols, while full branch rendering code generation is still evolving.
+* AKCSS `@intercept` disables other body members in the same style.
+* AKCSS code generation and runtime optimization are still being refined.
+* User hooks are experimental and must stay in top-level state initializers.

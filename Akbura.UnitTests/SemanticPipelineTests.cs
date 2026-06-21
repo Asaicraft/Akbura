@@ -1558,6 +1558,157 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssExpectedTypeStaticMember_BindsBareFontWeight()
+    {
+        const string code =
+            """
+            @akcss {
+                TextBlock.hello {
+                    FontWeight: Bold;
+                }
+            }
+            """;
+
+        var (_, _, operation, _) = GetSingleStyleOperation(code);
+
+        Assert.Equal("FontWeight", operation.Property?.Name);
+        Assert.Equal("FontWeight", operation.ValueType.Name);
+        Assert.False(operation.ValueOperation.IsDefault);
+        var member = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
+        Assert.Equal("Bold", member.Name);
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssEnumValues_BindQualifiedAndCastExpressions()
+    {
+        const string code =
+            """
+            @akcss {
+                TextBlock.hello {
+                    FontWeight: FontWeight.Bold;
+                    FontWeight: (FontWeight)700;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operations = symbol.Operations
+            .Cast<IAkcssPropertySetterOperation>()
+            .ToArray();
+
+        Assert.Equal(2, operations.Length);
+        Assert.All(operations, operation =>
+        {
+            Assert.Equal("FontWeight", operation.Property?.Name);
+            Assert.Equal("FontWeight", operation.ValueType.Name);
+            Assert.False(operation.ValueOperation.IsDefault);
+            Assert.False(operation.HasErrors);
+        });
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssEnumValues_BindAvaloniaAlignmentProperties()
+    {
+        const string code =
+            """
+            @akcss {
+                Button.hello {
+                    HorizontalAlignment: Center;
+                    HorizontalAlignment: HorizontalAlignment.Right;
+                    VerticalAlignment: (VerticalAlignment)2;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operations = symbol.Operations
+            .Cast<IAkcssPropertySetterOperation>()
+            .ToArray();
+
+        Assert.Equal(3, operations.Length);
+        Assert.Equal("HorizontalAlignment", operations[0].Property?.Name);
+        Assert.Equal("HorizontalAlignment", operations[0].ValueType.Name);
+        var horizontalMember = Assert.IsType<CSharpSymbolDefinition>(operations[0].ConvertedValue);
+        Assert.Equal("Center", horizontalMember.Name);
+
+        Assert.Equal("HorizontalAlignment", operations[1].Property?.Name);
+        Assert.Equal("HorizontalAlignment", operations[1].ValueType.Name);
+
+        Assert.Equal("VerticalAlignment", operations[2].Property?.Name);
+        Assert.Equal("VerticalAlignment", operations[2].ValueType.Name);
+
+        Assert.All(operations, operation =>
+        {
+            Assert.False(operation.ValueOperation.IsDefault);
+            Assert.False(operation.HasErrors);
+        });
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssEnumValues_BindCustomEnumProperties()
+    {
+        const string code =
+            """
+            @akcss {
+                @using MyControls;
+
+                MyControl.hello {
+                    Density: Compact;
+                    Density: MyControls.MyEnums.Density.Comfortable;
+                    Density: (global::MyControls.MyEnums.Density)1;
+                }
+            }
+            """;
+        const string csharpCode =
+            """
+            namespace MyControls
+            {
+                public sealed class MyControl : Avalonia.Controls.Control
+                {
+                    public static readonly Avalonia.StyledProperty<MyEnums.Density> DensityProperty = null!;
+                }
+            }
+
+            namespace MyControls.MyEnums
+            {
+                public enum Density
+                {
+                    Compact,
+                    Comfortable
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operations = symbol.Operations
+            .Cast<IAkcssPropertySetterOperation>()
+            .ToArray();
+
+        Assert.Equal(3, operations.Length);
+        var member = Assert.IsType<CSharpSymbolDefinition>(operations[0].ConvertedValue);
+        Assert.Equal("Compact", member.Name);
+        Assert.Equal(AkcssPropertyValueKind.CSharpExpression, operations[1].ValueKind);
+        Assert.Equal(AkcssPropertyValueKind.CSharpExpression, operations[2].ValueKind);
+        Assert.All(operations, operation =>
+        {
+            Assert.Equal("Density", operation.Property?.Name);
+            Assert.Equal("Density", operation.ValueType.Name);
+            Assert.False(operation.ValueOperation.IsDefault);
+            Assert.False(operation.HasErrors);
+        });
+    }
+
+    [Fact]
     public void SemanticModel_AkcssThicknessTuples_CreateConvertedValues()
     {
         const string code =

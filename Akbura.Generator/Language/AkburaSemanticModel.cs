@@ -1230,6 +1230,22 @@ internal sealed partial class AkburaSemanticModel
                 }
             }
 
+            if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
+                TryBindExpectedTypeStaticMember(
+                    expression,
+                    expectedType,
+                    containingSymbol,
+                    out var expectedTypeMemberBinding))
+            {
+                convertedValue = expectedTypeMemberBinding.Symbol == null
+                    ? null
+                    : new CSharpSymbolDefinition(expectedTypeMemberBinding.Symbol);
+                valueOperation = expectedTypeMemberBinding.OperationDefinition;
+                valueType = expectedTypeMemberBinding.TypeSymbol == null
+                    ? valueType
+                    : new CSharpSymbolDefinition(expectedTypeMemberBinding.TypeSymbol);
+            }
+
             var isThicknessPropertyType = IsAvaloniaThicknessType(expectedType);
             var isThicknessTuple = false;
             object? thickness = null;
@@ -1637,6 +1653,118 @@ internal sealed partial class AkburaSemanticModel
             "global::Avalonia.Media.Colors" &&
             binding.TypeSymbol != null &&
             IsAvaloniaColorType(binding.TypeSymbol);
+    }
+
+    private bool TryBindExpectedTypeStaticMember(
+        CSharp.ExpressionSyntax expression,
+        ITypeSymbol expectedType,
+        IAkcssSymbol containingSymbol,
+        out CSharpTypeBinding binding)
+    {
+        binding = CSharpTypeBinding.Empty;
+        if (!TryGetExpectedTypeMemberName(expression, expectedType, out var memberName) ||
+            !IsValidCSharpIdentifier(memberName) ||
+            !TryGetStaticMemberOwnerType(expectedType, out var ownerType))
+        {
+            return false;
+        }
+
+        foreach (var memberExpressionText in GetExpectedTypeStaticMemberExpressionCandidates(ownerType, memberName))
+        {
+            var memberExpression = CSharpSyntaxFactory.ParseExpression(memberExpressionText);
+            var candidateBinding = BindAkcssExpression(memberExpression, containingSymbol);
+            if (candidateBinding.Symbol != null &&
+                candidateBinding.TypeSymbol != null &&
+                IsSameType(candidateBinding.TypeSymbol, ownerType))
+            {
+                binding = candidateBinding;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetExpectedTypeMemberName(
+        CSharp.ExpressionSyntax expression,
+        ITypeSymbol expectedType,
+        out string memberName)
+    {
+        memberName = string.Empty;
+        switch (expression)
+        {
+            case CSharp.IdentifierNameSyntax identifier:
+                memberName = identifier.Identifier.ValueText;
+                return memberName.Length > 0;
+
+            case CSharp.MemberAccessExpressionSyntax
+            {
+                Expression: CSharp.IdentifierNameSyntax receiver,
+                Name: CSharp.IdentifierNameSyntax name,
+            } when receiver.Identifier.ValueText == expectedType.Name:
+                memberName = name.Identifier.ValueText;
+                return memberName.Length > 0;
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryGetStaticMemberOwnerType(
+        ITypeSymbol expectedType,
+        out INamedTypeSymbol ownerType)
+    {
+        if (expectedType is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
+                TypeArguments.Length: 1,
+            } nullableType &&
+            nullableType.TypeArguments[0] is INamedTypeSymbol nullableArgument)
+        {
+            ownerType = nullableArgument;
+            return true;
+        }
+
+        if (expectedType is INamedTypeSymbol namedType)
+        {
+            ownerType = namedType;
+            return true;
+        }
+
+        ownerType = null!;
+        return false;
+    }
+
+    private IEnumerable<string> GetExpectedTypeStaticMemberExpressionCandidates(
+        INamedTypeSymbol ownerType,
+        string memberName)
+    {
+        var ownerTypeText = ownerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        yield return ownerTypeText + "." + memberName;
+        yield return ownerType.Name + "." + memberName;
+
+        if (TryGetCompanionStaticMemberOwnerType(ownerType, out var companionOwnerType))
+        {
+            yield return companionOwnerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                "." + memberName;
+            yield return companionOwnerType.Name + "." + memberName;
+        }
+    }
+
+    private bool TryGetCompanionStaticMemberOwnerType(
+        INamedTypeSymbol ownerType,
+        out INamedTypeSymbol companionOwnerType)
+    {
+        companionOwnerType = null!;
+        var namespaceText = ownerType.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : ownerType.ContainingNamespace.ToDisplayString();
+        var metadataName = string.IsNullOrEmpty(namespaceText)
+            ? ownerType.Name + "s"
+            : namespaceText + "." + ownerType.Name + "s";
+
+        companionOwnerType = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName)!;
+        return companionOwnerType != null;
     }
 
     private static bool IsValidCSharpIdentifier(string text)
@@ -4149,6 +4277,7 @@ internal sealed partial class AkburaSemanticModel
         }
 
         AddAkcssImplicitUsing(builder, "Avalonia");
+        AddAkcssImplicitUsing(builder, "Avalonia.Layout");
         AddAkcssImplicitUsing(builder, "Avalonia.Media");
         AddAkcssImplicitUsing(builder, "Akbura");
         return builder.ToImmutable();

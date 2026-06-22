@@ -1,3 +1,4 @@
+using Akbura.Language.Declarations;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
@@ -8,6 +9,7 @@ namespace Akbura.Language;
 internal sealed class AkburaCompilation
 {
     private readonly Dictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
+    private AkburaDeclarationTable? _declarationTable;
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
@@ -42,7 +44,8 @@ internal sealed class AkburaCompilation
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
         string rootNamespace = "",
-        string projectDirectory = "")
+        string projectDirectory = "",
+        AkburaCompilation? previousCompilation = null)
     {
         CSharpCompilation = csharpCompilation ?? throw new ArgumentNullException(nameof(csharpCompilation));
         SyntaxTrees = syntaxTrees.IsDefault ? ImmutableArray<AkburaSyntaxTree>.Empty : syntaxTrees;
@@ -51,6 +54,7 @@ internal sealed class AkburaCompilation
             : akcssSyntaxTrees;
         RootNamespace = rootNamespace ?? string.Empty;
         ProjectDirectory = projectDirectory ?? string.Empty;
+        PreviousCompilation = previousCompilation;
     }
 
     public CSharpCompilation CSharpCompilation { get; }
@@ -62,6 +66,54 @@ internal sealed class AkburaCompilation
     public string RootNamespace { get; }
 
     public string ProjectDirectory { get; }
+
+    public AkburaCompilation? PreviousCompilation { get; }
+
+    public AkburaDeclarationTable DeclarationTable =>
+        _declarationTable ??= AkburaDeclarationTable.Create(this);
+
+    public AkburaCompilation WithSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
+    {
+        return WithSyntaxTrees(syntaxTrees.ToImmutableArray());
+    }
+
+    public AkburaCompilation WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
+    {
+        return new AkburaCompilation(
+            CSharpCompilation,
+            syntaxTrees,
+            AkcssSyntaxTrees,
+            RootNamespace,
+            ProjectDirectory,
+            previousCompilation: this);
+    }
+
+    public AkburaCompilation WithAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> akcssSyntaxTrees)
+    {
+        return WithAkcssSyntaxTrees(akcssSyntaxTrees.ToImmutableArray());
+    }
+
+    public AkburaCompilation WithAkcssSyntaxTrees(ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
+    {
+        return new AkburaCompilation(
+            CSharpCompilation,
+            SyntaxTrees,
+            akcssSyntaxTrees,
+            RootNamespace,
+            ProjectDirectory,
+            previousCompilation: this);
+    }
+
+    public AkburaCompilation WithCSharpCompilation(CSharpCompilation csharpCompilation)
+    {
+        return new AkburaCompilation(
+            csharpCompilation,
+            SyntaxTrees,
+            AkcssSyntaxTrees,
+            RootNamespace,
+            ProjectDirectory,
+            previousCompilation: this);
+    }
 
     public AkburaSemanticModel GetSemanticModel(AkburaSyntaxTree syntaxTree)
     {
@@ -83,5 +135,22 @@ internal sealed class AkburaCompilation
         semanticModel = new AkburaSemanticModel(this, syntaxTree);
         _semanticModels.Add(syntaxTree, semanticModel);
         return semanticModel;
+    }
+
+    internal bool TryGetCachedSemanticModel(
+        string filePath,
+        out AkburaSemanticModel semanticModel)
+    {
+        foreach (var cached in _semanticModels)
+        {
+            if (cached.Key.FilePath == filePath)
+            {
+                semanticModel = cached.Value;
+                return true;
+            }
+        }
+
+        semanticModel = null!;
+        return false;
     }
 }

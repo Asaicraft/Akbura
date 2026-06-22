@@ -62,6 +62,23 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
 
     public StateBindingKind BindingKind { get; }
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitState(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitState(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitState(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return !Type.IsDefault ? $"state {Type.Name} {Name}" : $"state {Name}";

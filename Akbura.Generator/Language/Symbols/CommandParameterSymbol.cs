@@ -44,6 +44,23 @@ internal sealed class CommandParameterSymbol : Symbol, ICommandParameterSymbol
         ? default
         : new CSharpSymbolDefinition(CSharpParameter);
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitCommandParameter(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitCommandParameter(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitCommandParameter(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return !Type.IsDefault ? $"{Type.Name} {Name}" : Name;

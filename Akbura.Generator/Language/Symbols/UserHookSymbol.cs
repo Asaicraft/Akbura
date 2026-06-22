@@ -45,6 +45,23 @@ internal sealed class UserHookSymbol : Symbol, IUserHookSymbol
 
     public CSharpSymbolDefinition ReturnType { get; }
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitUserHook(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitUserHook(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitUserHook(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return $"{InvocationName} -> {HookType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}";

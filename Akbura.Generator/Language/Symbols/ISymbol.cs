@@ -29,5 +29,11 @@ internal interface ISymbol : IEquatable<ISymbol>
 
     bool IsImplicitlyDeclared { get; }
 
+    void Accept(SymbolVisitor visitor);
+
+    TResult Accept<TResult>(SymbolVisitor<TResult> visitor);
+
+    TResult Accept<TParameter, TResult>(SymbolVisitor<TParameter, TResult> visitor, TParameter parameter);
+
     string ToDisplayString();
 }

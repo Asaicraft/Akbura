@@ -40,6 +40,23 @@ internal sealed class InjectSymbol : Symbol, IInjectSymbol
 
     public bool IsRequired => true;
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitInject(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitInject(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitInject(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return !Type.IsDefault

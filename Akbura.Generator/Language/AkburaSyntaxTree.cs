@@ -1,7 +1,9 @@
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace Akbura.Language;
@@ -63,6 +65,31 @@ internal sealed class AkburaSyntaxTree
         using var parser = new Parser(lexer, cancellationToken);
 
         return new AkburaSyntaxTree(text, filePath, parser.ParseCompilationUnit());
+    }
+
+    public AkburaSyntaxTree WithChangedText(
+        SourceText newText,
+        IEnumerable<TextChangeRange>? changes = null,
+        CancellationToken cancellationToken = default)
+    {
+        var changeRanges = changes?.ToArray() ?? newText.GetChangeRanges(Text).ToArray();
+        if (changeRanges.Length == 0 && newText.ToString() == Text.ToString())
+        {
+            return this;
+        }
+
+        var lexer = new Lexer(newText);
+        using var parser = new Parser(lexer, cancellationToken, GetRoot(), changeRanges);
+
+        return new AkburaSyntaxTree(newText, FilePath, parser.ParseCompilationUnit());
+    }
+
+    public AkburaSyntaxTree WithChangedText(
+        string newText,
+        IEnumerable<TextChangeRange>? changes = null,
+        CancellationToken cancellationToken = default)
+    {
+        return WithChangedText(SourceText.From(newText), changes, cancellationToken);
     }
 
     public AkburaDocumentSyntax GetRoot()

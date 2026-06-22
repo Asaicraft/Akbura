@@ -76,6 +76,23 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
         _ => Name,
     };
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitAkcss(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitAkcss(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitAkcss(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return $"style {MetadataName}";

@@ -73,6 +73,23 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         ? ClrPropertyDefinition
         : AvaloniaPropertyDefinition;
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitProperty(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitProperty(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitProperty(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         if (!Type.IsDefault)

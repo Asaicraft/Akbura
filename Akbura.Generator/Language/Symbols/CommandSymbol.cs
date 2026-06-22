@@ -62,6 +62,23 @@ internal sealed class CommandSymbol : Symbol, ICommandSymbol
 
     public bool SupportsIsExecuting => true;
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitCommand(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitCommand(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitCommand(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         var returnType = ReturnType.IsDefault ? "unknown" : ReturnType.Name;

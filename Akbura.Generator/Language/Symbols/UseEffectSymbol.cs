@@ -61,6 +61,23 @@ internal sealed class UseEffectSymbol : Symbol, IUseEffectSymbol
 
     public bool HasFinallyBlock => FinallyBlock != null;
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitUseEffect(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitUseEffect(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitUseEffect(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return Dependencies.Length == 0

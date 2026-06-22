@@ -60,6 +60,23 @@ internal sealed class ParamSymbol : Symbol, IParamSymbol
 
     public bool IsTwoWayBinding => BindingKind == ParamBindingKind.Bind;
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitParameter(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitParameter(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitParameter(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         var bindingText = BindingKind switch

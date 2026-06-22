@@ -77,6 +77,23 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
         ? Name
         : TargetType.Name + "." + Name;
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitTailwindUtility(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitTailwindUtility(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitTailwindUtility(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return Parameters.Length == 0

@@ -29,5 +29,9 @@ internal interface IOperation : IEquatable<IOperation>
 
     object? ConstantValue { get; }
 
+    void Accept(OperationVisitor visitor);
+
+    TResult? Accept<TParameter, TResult>(OperationVisitor<TParameter, TResult> visitor, TParameter parameter);
+
     string ToDisplayString();
 }

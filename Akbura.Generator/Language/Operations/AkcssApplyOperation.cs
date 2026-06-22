@@ -55,6 +55,19 @@ internal sealed class AkcssApplyOperation : IAkcssApplyOperation
 
     public ImmutableArray<IAkcssSymbol> AppliedSymbols { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitAkcssApply(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitAkcssApply(this, parameter);
+    }
+
     public bool Equals(IOperation? other) => ReferenceEquals(this, other);
 
     public override bool Equals(object? obj) => obj is IOperation operation && Equals(operation);

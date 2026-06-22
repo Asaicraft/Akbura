@@ -74,6 +74,19 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
 
     public CSharpOperationDefinition ConditionOperation { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitTailwindUtilityAttribute(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitTailwindUtilityAttribute(this, parameter);
+    }
+
     public bool Equals(IOperation? other)
     {
         return ReferenceEquals(this, other);

@@ -68,6 +68,19 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
 
     public object? ConvertedValue { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitAkcssPropertySetter(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitAkcssPropertySetter(this, parameter);
+    }
+
     public bool Equals(IOperation? other)
     {
         return ReferenceEquals(this, other);

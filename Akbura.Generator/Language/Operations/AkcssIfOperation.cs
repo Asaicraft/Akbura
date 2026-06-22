@@ -67,6 +67,19 @@ internal sealed class AkcssIfOperation : IAkcssIfOperation
 
     public ImmutableArray<IAkcssOperation> Operations { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitAkcssIf(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitAkcssIf(this, parameter);
+    }
+
     public bool Equals(IOperation? other)
     {
         return ReferenceEquals(this, other);

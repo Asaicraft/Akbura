@@ -106,6 +106,19 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
 
     public CSharpOperationDefinition HandlerOperation { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitMarkupCommandBinding(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitMarkupCommandBinding(this, parameter);
+    }
+
     public bool Equals(IOperation? other)
     {
         return ReferenceEquals(this, other);

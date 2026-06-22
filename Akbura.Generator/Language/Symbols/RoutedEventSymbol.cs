@@ -52,6 +52,23 @@ internal sealed class RoutedEventSymbol : Symbol, IRoutedEventSymbol
         ? ClrEventDefinition
         : RoutedEventDefinition;
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitRoutedEvent(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitRoutedEvent(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitRoutedEvent(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         if (!HandlerType.IsDefault)

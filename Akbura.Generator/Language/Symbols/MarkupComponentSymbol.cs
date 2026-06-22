@@ -72,6 +72,23 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
             : attributeOperations;
     }
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitMarkupComponent(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitMarkupComponent(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitMarkupComponent(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         var csharpDisplay = CSharpDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);

@@ -50,6 +50,23 @@ internal sealed class TailwindUtilityParameterSymbol : Symbol, ITailwindUtilityP
         ? default
         : new CSharpSymbolDefinition(CSharpParameter);
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitTailwindUtilityParameter(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitTailwindUtilityParameter(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitTailwindUtilityParameter(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return Type.IsDefault ? Name : $"{Type.Name} {Name}";

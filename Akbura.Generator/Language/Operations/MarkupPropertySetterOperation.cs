@@ -72,6 +72,19 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
 
     public string? LiteralValue { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitMarkupPropertySetter(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitMarkupPropertySetter(this, parameter);
+    }
+
     public bool Equals(IOperation? other)
     {
         return ReferenceEquals(this, other);

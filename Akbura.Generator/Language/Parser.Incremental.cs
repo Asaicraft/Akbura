@@ -21,7 +21,7 @@ internal sealed partial class Parser
     public Parser(
         Lexer lexer,
         CancellationToken cancellationToken,
-        AkburaDocumentSyntax? oldTree,
+        AkburaSyntax? oldTree,
         IEnumerable<TextChangeRange>? changes)
         : this(lexer, cancellationToken)
     {

@@ -45,6 +45,23 @@ internal abstract class Symbol : ISymbol
 
     public bool IsImplicitlyDeclared { get; }
 
+    public virtual void Accept(SymbolVisitor visitor)
+    {
+        visitor.DefaultVisit(this);
+    }
+
+    public virtual TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.DefaultVisit(this);
+    }
+
+    public virtual TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.DefaultVisit(this, parameter);
+    }
+
     public virtual bool Equals(ISymbol? other)
     {
         return ReferenceEquals(this, other);

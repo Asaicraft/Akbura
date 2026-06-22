@@ -135,6 +135,23 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
             : akcssModules;
     }
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitAkburaComponent(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitAkburaComponent(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitAkburaComponent(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return MetadataName;

@@ -48,6 +48,19 @@ internal sealed class AkcssInterceptOperation : IAkcssInterceptOperation
 
     public CSharpSymbolDefinition InterceptType { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitAkcssIntercept(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitAkcssIntercept(this, parameter);
+    }
+
     public bool Equals(IOperation? other) => ReferenceEquals(this, other);
 
     public override bool Equals(object? obj) => obj is IOperation operation && Equals(operation);

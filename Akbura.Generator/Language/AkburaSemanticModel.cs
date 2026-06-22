@@ -1,3 +1,4 @@
+using Akbura.Language.Binding;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -28,11 +29,15 @@ internal sealed partial class AkburaSemanticModel
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache = new();
     private readonly Dictionary<AkburaSyntax, AkburaOperation?> _operationCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
+    private readonly SemanticBindingCache _bindingCache;
+    private readonly BinderFactory _binderFactory;
 
     public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
+        _bindingCache = new SemanticBindingCache(this, _symbolInfoCache, _operationCache, _semanticDiagnosticsCache);
+        _binderFactory = new BinderFactory(this);
     }
 
     public AkburaCompilation Compilation { get; }
@@ -48,12 +53,7 @@ internal sealed partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(syntax);
 
-        if (_symbolInfoCache.TryGetValue(syntax, out var symbolInfo))
-        {
-            return symbolInfo;
-        }
-
-        symbolInfo = syntax switch
+        return _bindingCache.GetSymbolInfo(syntax, () => syntax switch
         {
             AkburaDocumentSyntax document => ResolveAkburaComponent(document),
             StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
@@ -67,10 +67,7 @@ internal sealed partial class AkburaSemanticModel
             MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
             MarkupAttributeSyntax markupAttribute => ResolveMarkupProperty(markupAttribute),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
-        };
-
-        _symbolInfoCache[syntax] = symbolInfo;
-        return symbolInfo;
+        });
     }
 
     public ImmutableArray<AkburaSemanticDiagnostic> GetSemanticDiagnostics(AkburaSyntax syntax)
@@ -81,25 +78,28 @@ internal sealed partial class AkburaSemanticModel
         }
 
         ValidateSyntaxTreeOwnership(syntax);
-        _ = GetSymbolInfo(syntax);
-        if (syntax is MarkupAttributeSyntax or
-            AkcssAssignmentSyntax or
-            AkcssIfDirectiveSyntax or
-            AkcssApplyDirectiveSyntax or
-            AkcssInterceptDirectiveSyntax)
+        return _bindingCache.GetDiagnostics(syntax, () =>
         {
-            _ = GetOperation(syntax);
-        }
-        else if (syntax is CSharpStatementSyntax csharpStatement)
-        {
-            SetSemanticDiagnosticsIfAbsent(
-                csharpStatement,
-                CreateCSharpStatementUserHookDiagnostics(csharpStatement));
-        }
+            _ = GetSymbolInfo(syntax);
+            if (syntax is MarkupAttributeSyntax or
+                AkcssAssignmentSyntax or
+                AkcssIfDirectiveSyntax or
+                AkcssApplyDirectiveSyntax or
+                AkcssInterceptDirectiveSyntax)
+            {
+                _ = GetOperation(syntax);
+            }
+            else if (syntax is CSharpStatementSyntax csharpStatement)
+            {
+                SetSemanticDiagnosticsIfAbsent(
+                    csharpStatement,
+                    CreateCSharpStatementUserHookDiagnostics(csharpStatement));
+            }
 
-        return _semanticDiagnosticsCache.TryGetValue(syntax, out var diagnostics)
-            ? diagnostics
-            : ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+            return _semanticDiagnosticsCache.TryGetValue(syntax, out var diagnostics)
+                ? diagnostics
+                : ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+        });
     }
 
     public AkburaOperation? GetOperation(AkburaSyntax syntax)
@@ -111,12 +111,7 @@ internal sealed partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(syntax);
 
-        if (_operationCache.TryGetValue(syntax, out var operation))
-        {
-            return operation;
-        }
-
-        operation = syntax switch
+        return _bindingCache.GetOperation(syntax, () => syntax switch
         {
             AkcssAssignmentSyntax assignment => ResolveAkcssPropertySetterOperation(assignment),
             AkcssIfDirectiveSyntax ifDirective => ResolveAkcssIfOperation(ifDirective),
@@ -124,10 +119,63 @@ internal sealed partial class AkburaSemanticModel
             AkcssInterceptDirectiveSyntax interceptDirective => ResolveAkcssInterceptOperation(interceptDirective),
             MarkupAttributeSyntax markupAttribute => ResolveMarkupAttributeOperation(markupAttribute),
             _ => null,
-        };
+        });
+    }
 
-        _operationCache[syntax] = operation;
-        return operation;
+    internal Binder GetBinder(AkburaSyntax syntax)
+    {
+        return _binderFactory.GetBinder(syntax);
+    }
+
+    internal bool TryGetCachedSymbolInfoByGreen(
+        GreenNode green,
+        out AkburaSymbolInfo symbolInfo)
+    {
+        foreach (var cached in _symbolInfoCache)
+        {
+            if (ReferenceEquals(cached.Key.Green, green))
+            {
+                symbolInfo = cached.Value;
+                return true;
+            }
+        }
+
+        symbolInfo = default;
+        return false;
+    }
+
+    internal bool TryGetCachedOperationByGreen(
+        GreenNode green,
+        out AkburaOperation? operation)
+    {
+        foreach (var cached in _operationCache)
+        {
+            if (ReferenceEquals(cached.Key.Green, green))
+            {
+                operation = cached.Value;
+                return true;
+            }
+        }
+
+        operation = null;
+        return false;
+    }
+
+    internal bool TryGetCachedDiagnosticsByGreen(
+        GreenNode green,
+        out ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+    {
+        foreach (var cached in _semanticDiagnosticsCache)
+        {
+            if (ReferenceEquals(cached.Key.Green, green))
+            {
+                diagnostics = cached.Value;
+                return true;
+            }
+        }
+
+        diagnostics = default;
+        return false;
     }
 
     private AkburaSymbolInfo ResolveAkburaComponent(AkburaDocumentSyntax document)
@@ -994,20 +1042,47 @@ internal sealed partial class AkburaSemanticModel
 
     private IAkcssSymbol? GetContainingAkcssSymbol(AkburaSyntax syntax)
     {
-        for (var node = syntax.Parent; node != null; node = node.Parent)
+        if (TryGetContainingAkcssSymbolFromAncestors(syntax, out var symbol))
         {
-            if (node is AkcssStyleRuleSyntax styleRule)
-            {
-                return GetSymbolInfo(styleRule).Symbol as IAkcssSymbol;
-            }
+            return symbol;
+        }
 
-            if (node is AkcssUtilityDeclarationSyntax utilityDeclaration)
+        var root = SyntaxTree.GetRoot();
+        if (!ReferenceEquals(syntax.Root, root) &&
+            root.FullSpan.Contains(syntax.FullSpan))
+        {
+            var rebound = root.FindNode(syntax.FullSpan, getInnermostNodeForTie: true);
+            if (!ReferenceEquals(rebound, syntax) &&
+                TryGetContainingAkcssSymbolFromAncestors(rebound, out symbol))
             {
-                return GetSymbolInfo(utilityDeclaration).Symbol as IAkcssSymbol;
+                return symbol;
             }
         }
 
         return null;
+    }
+
+    private bool TryGetContainingAkcssSymbolFromAncestors(
+        AkburaSyntax syntax,
+        out IAkcssSymbol? symbol)
+    {
+        for (var node = syntax.Parent; node != null; node = node.Parent)
+        {
+            if (node is AkcssStyleRuleSyntax styleRule)
+            {
+                symbol = GetSymbolInfo(styleRule).Symbol as IAkcssSymbol;
+                return symbol != null;
+            }
+
+            if (node is AkcssUtilityDeclarationSyntax utilityDeclaration)
+            {
+                symbol = GetSymbolInfo(utilityDeclaration).Symbol as IAkcssSymbol;
+                return symbol != null;
+            }
+        }
+
+        symbol = null;
+        return false;
     }
 
     private bool TrySuppressAkcssOperationDueToIntercept(

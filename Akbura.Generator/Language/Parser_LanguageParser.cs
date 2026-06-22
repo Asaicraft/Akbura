@@ -222,8 +222,12 @@ partial class Parser
 
 		try
 		{
-			var members = ParseAkcssTopLevelMemberList(stopAtCloseBrace: false);
-			var eof = EatToken(SyntaxKind.EndOfFileToken);
+			var members = _isIncremental
+				? ParseIncrementalAkcssTopLevelMemberList(stopAtCloseBrace: false)
+				: ParseAkcssTopLevelMemberList(stopAtCloseBrace: false);
+			var eof = _isIncremental
+				? ReadRequiredIncrementalToken(SyntaxKind.EndOfFileToken)
+				: EatToken(SyntaxKind.EndOfFileToken);
 
 			return GreenSyntaxFactory.AkcssDocumentSyntax(members, eof);
 		}

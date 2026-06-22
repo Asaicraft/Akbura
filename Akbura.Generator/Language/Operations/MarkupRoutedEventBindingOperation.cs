@@ -88,6 +88,19 @@ internal sealed class MarkupRoutedEventBindingOperation : IMarkupRoutedEventBind
 
     public CSharpOperationDefinition HandlerOperation { get; }
 
+    public void Accept(OperationVisitor visitor)
+    {
+        visitor.VisitMarkupRoutedEventBinding(this);
+    }
+
+
+    public TResult? Accept<TParameter, TResult>(
+        OperationVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitMarkupRoutedEventBinding(this, parameter);
+    }
+
     public bool Equals(IOperation? other)
     {
         return ReferenceEquals(this, other);

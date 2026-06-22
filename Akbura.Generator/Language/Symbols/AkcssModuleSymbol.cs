@@ -46,6 +46,23 @@ internal sealed class AkcssModuleSymbol : Symbol, IAkcssModuleSymbol
 
     public AkburaSyntax DeclaringSyntax { get; }
 
+    public override void Accept(SymbolVisitor visitor)
+    {
+        visitor.VisitAkcssModule(this);
+    }
+
+    public override TResult Accept<TResult>(SymbolVisitor<TResult> visitor)
+    {
+        return visitor.VisitAkcssModule(this);
+    }
+
+    public override TResult Accept<TParameter, TResult>(
+        SymbolVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.VisitAkcssModule(this, parameter);
+    }
+
     public override string ToDisplayString()
     {
         return IsInlined

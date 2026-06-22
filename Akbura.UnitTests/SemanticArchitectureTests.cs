@@ -11,6 +11,7 @@ using System.Collections.Immutable;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaOperationKind = Akbura.Language.Operations.OperationKind;
 using AkburaSymbolVisitor = Akbura.Language.Symbols.SymbolVisitor;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.UnitTests;
 
@@ -338,6 +339,32 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void CSharpProbeBinder_BindsProbeExpressionsAndDiagnostics()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+
+        var validExpression = CSharpSyntaxFactory.ParseExpression("1 + 2");
+        var validBinding = binder.BindReturnExpression(
+            CreateReturnExpressionProbe(validExpression),
+            isBindingPath: true);
+
+        Assert.Equal("Int32", validBinding.TypeSymbol?.Name);
+        Assert.False(validBinding.OperationDefinition.IsDefault);
+        Assert.Empty(validBinding.Diagnostics);
+
+        var invalidExpression = CSharpSyntaxFactory.ParseExpression("NotExisting.Value");
+        var invalidBinding = binder.BindReturnExpression(
+            CreateReturnExpressionProbe(invalidExpression),
+            isBindingPath: true);
+
+        Assert.Null(invalidBinding.TypeSymbol);
+        Assert.NotEmpty(invalidBinding.Diagnostics);
+    }
+
+    [Fact]
     public void BindingDiagnosticBag_DeduplicatesSemanticAndCSharpDiagnostics()
     {
         const string code = "state int count = 0;";
@@ -459,6 +486,22 @@ public sealed class SemanticArchitectureTests
             "SemanticArchitectureTests",
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax CreateReturnExpressionProbe(
+        Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expression)
+    {
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(expression);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(
+                    CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                "__AkburaSemanticProbe")
+            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.SingletonList<Microsoft.CodeAnalysis.CSharp.Syntax.MemberDeclarationSyntax>(method));
+
+        return CSharpSyntaxFactory.CompilationUnit()
+            .WithMembers(CSharpSyntaxFactory.SingletonList<Microsoft.CodeAnalysis.CSharp.Syntax.MemberDeclarationSyntax>(probeClass));
     }
 
     private sealed class RecordingOperationWalker : OperationWalker

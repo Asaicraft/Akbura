@@ -1,3 +1,4 @@
+using Akbura.Language.Binding;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -10,7 +11,6 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
-using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
@@ -48,7 +48,7 @@ internal sealed partial class AkburaSemanticModel
         var valueType = default(CSharpSymbolDefinition);
         var valueOperation = default(CSharpOperationDefinition);
         var dynamicExpression = default(CSharp.ExpressionSyntax);
-        var valueBinding = CSharpTypeBinding.Empty;
+        var valueBinding = CSharpBindingResult.Empty;
 
         if (valueSyntax is MarkupLiteralAttributeValueSyntax literalValueSyntax)
         {
@@ -895,7 +895,7 @@ internal sealed partial class AkburaSemanticModel
 
     private void AddMarkupExpressionDiagnostics(
         MarkupAttributeSyntax markupAttribute,
-        CSharpTypeBinding binding,
+        CSharpBindingResult binding,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         AddMarkupExpressionDiagnostics(
@@ -1052,7 +1052,7 @@ internal sealed partial class AkburaSemanticModel
                 parameterNames,
                 block,
                 isAsync || containsAwait),
-            _ => CSharpTypeBinding.Empty,
+            _ => CSharpBindingResult.Empty,
         };
 
         return new MarkupEventHandlerAnalysis(
@@ -1191,7 +1191,7 @@ internal sealed partial class AkburaSemanticModel
         return false;
     }
 
-    private CSharpTypeBinding BindCommandHandlerResultExpression(
+    private CSharpBindingResult BindCommandHandlerResultExpression(
         ICommandSymbol command,
         ImmutableArray<string> parameterNames,
         CSharp.ExpressionSyntax expressionSyntax)
@@ -1223,47 +1223,12 @@ internal sealed partial class AkburaSemanticModel
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
-
-        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
-        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
-        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
-        var probeExpression = syntaxTree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.ReturnStatementSyntax>()
-            .Single()
-            .Expression;
-
-        if (probeExpression == null)
-        {
-            return CSharpTypeBinding.Empty;
-        }
-
-        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
-        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
-        var operation = semanticModel.GetOperation(probeExpression);
-        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
-        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
-            ? null
-            : typeInfo.Type;
-
-        return new CSharpTypeBinding(
-            typeSymbol,
-            symbolInfo.Symbol,
-            receiverType: null,
-            isBindingPath: false,
-            symbolInfo.CandidateSymbols,
-            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
-                ? AkburaCandidateReason.Ambiguous
-                : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation),
-            diagnostics);
+        return BindingSession
+            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .BindReturnExpression(compilationUnit, isBindingPath: false);
     }
 
-    private CSharpTypeBinding BindCommandHandlerStatementExpression(
+    private CSharpBindingResult BindCommandHandlerStatementExpression(
         ICommandSymbol command,
         ImmutableArray<string> parameterNames,
         CSharp.ExpressionSyntax expressionSyntax)
@@ -1287,42 +1252,12 @@ internal sealed partial class AkburaSemanticModel
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
-
-        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
-        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
-        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
-        var probeExpression = syntaxTree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.ExpressionStatementSyntax>()
-            .Single()
-            .Expression;
-
-        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
-        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
-        var operation = semanticModel.GetOperation(probeExpression);
-        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
-        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
-            ? null
-            : typeInfo.Type;
-
-        return new CSharpTypeBinding(
-            typeSymbol,
-            symbolInfo.Symbol,
-            receiverType: null,
-            isBindingPath: false,
-            symbolInfo.CandidateSymbols,
-            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
-                ? AkburaCandidateReason.Ambiguous
-                : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation),
-            diagnostics);
+        return BindingSession
+            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .BindExpressionStatement(compilationUnit, isBindingPath: false);
     }
 
-    private CSharpTypeBinding BindMarkupEventHandlerStatementExpression(
+    private CSharpBindingResult BindMarkupEventHandlerStatementExpression(
         IRoutedEventSymbol routedEvent,
         ImmutableArray<string> parameterNames,
         CSharp.ExpressionSyntax expressionSyntax,
@@ -1353,42 +1288,12 @@ internal sealed partial class AkburaSemanticModel
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
-
-        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
-        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
-        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
-        var probeExpression = syntaxTree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.ExpressionStatementSyntax>()
-            .Single()
-            .Expression;
-
-        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
-        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
-        var operation = semanticModel.GetOperation(probeExpression);
-        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
-        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
-            ? null
-            : typeInfo.Type;
-
-        return new CSharpTypeBinding(
-            typeSymbol,
-            symbolInfo.Symbol,
-            receiverType: null,
-            isBindingPath: false,
-            symbolInfo.CandidateSymbols,
-            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
-                ? AkburaCandidateReason.Ambiguous
-                : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation),
-            diagnostics);
+        return BindingSession
+            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .BindExpressionStatement(compilationUnit, isBindingPath: false);
     }
 
-    private CSharpTypeBinding BindMarkupEventHandlerBlock(
+    private CSharpBindingResult BindMarkupEventHandlerBlock(
         IRoutedEventSymbol routedEvent,
         ImmutableArray<string> parameterNames,
         CSharp.BlockSyntax block,
@@ -1418,36 +1323,9 @@ internal sealed partial class AkburaSemanticModel
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
-
-        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
-        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
-        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
-        var probeBlock = syntaxTree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.MethodDeclarationSyntax>()
-            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == "__AkburaEventHandlerProbe")
-            .Body;
-
-        if (probeBlock == null)
-        {
-            return CSharpTypeBinding.Empty;
-        }
-
-        var operation = semanticModel.GetOperation(probeBlock);
-        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeBlock);
-        return new CSharpTypeBinding(
-            typeSymbol: null,
-            symbol: null,
-            receiverType: null,
-            isBindingPath: false,
-            candidateSymbols: ImmutableArray<Microsoft.CodeAnalysis.ISymbol>.Empty,
-            candidateReason: AkburaCandidateReason.None,
-            operation == null ? default : new CSharpOperationDefinition(operation),
-            diagnostics);
+        return BindingSession
+            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .BindMethodBlock(compilationUnit, "__AkburaEventHandlerProbe");
     }
 
     private static CSharp.ParameterListSyntax CreateCommandHandlerProbeParameterList(
@@ -1504,7 +1382,7 @@ internal sealed partial class AkburaSemanticModel
         return node.DescendantNodesAndSelf().OfType<CSharp.AwaitExpressionSyntax>().Any();
     }
 
-    private CSharpTypeBinding BindMarkupAttributeExpression(CSharp.ExpressionSyntax expressionSyntax)
+    private CSharpBindingResult BindMarkupAttributeExpression(CSharp.ExpressionSyntax expressionSyntax)
     {
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
@@ -1524,45 +1402,9 @@ internal sealed partial class AkburaSemanticModel
             .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
-
-        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
-        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
-        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
-        var probeExpression = syntaxTree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.ReturnStatementSyntax>()
-            .Single()
-            .Expression;
-
-        if (probeExpression == null)
-        {
-            return CSharpTypeBinding.Empty;
-        }
-
-        var typeInfo = semanticModel.GetTypeInfo(probeExpression);
-        var symbolInfo = semanticModel.GetSymbolInfo(probeExpression);
-        var operation = semanticModel.GetOperation(probeExpression);
-        var receiverType = GetExpressionReceiverType(semanticModel, probeExpression);
-        var diagnostics = GetCSharpProbeDiagnostics(semanticModel, probeExpression);
-        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
-            ? null
-            : typeInfo.Type;
-
-        return new CSharpTypeBinding(
-            typeSymbol,
-            symbolInfo.Symbol,
-            receiverType,
-            isBindingPath: true,
-            symbolInfo.CandidateSymbols,
-            symbolInfo.CandidateReason == Microsoft.CodeAnalysis.CandidateReason.Ambiguous
-                ? AkburaCandidateReason.Ambiguous
-                : AkburaCandidateReason.NotFound,
-            operation == null ? default : new CSharpOperationDefinition(operation),
-            diagnostics);
+        return BindingSession
+            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .BindReturnExpression(compilationUnit, isBindingPath: true);
     }
 
     private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateMarkupAttributeProbeFields()
@@ -1819,7 +1661,7 @@ internal sealed partial class AkburaSemanticModel
         };
 
         var binding = expression == null
-            ? CSharpTypeBinding.Empty
+            ? CSharpBindingResult.Empty
             : BindMarkupAttributeExpression(expression);
 
         return new TailwindUtilityArgument(

@@ -30,14 +30,14 @@ internal sealed partial class AkburaSemanticModel
     private readonly Dictionary<AkburaSyntax, AkburaOperation?> _operationCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
     private readonly SemanticBindingCache _bindingCache;
-    private readonly BinderFactory _binderFactory;
+    private readonly BindingSession _bindingSession;
 
     public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
         _bindingCache = new SemanticBindingCache(this, _symbolInfoCache, _operationCache, _semanticDiagnosticsCache);
-        _binderFactory = new BinderFactory(this);
+        _bindingSession = new BindingSession(this);
     }
 
     public AkburaCompilation Compilation { get; }
@@ -124,7 +124,20 @@ internal sealed partial class AkburaSemanticModel
 
     internal Binder GetBinder(AkburaSyntax syntax)
     {
-        return _binderFactory.GetBinder(syntax);
+        return _bindingSession.GetBinder(syntax);
+    }
+
+    internal Binder GetBinder(AkburaSyntax syntax, BinderUsage usage)
+    {
+        return _bindingSession.GetBinder(syntax, usage);
+    }
+
+    internal BindingSession BindingSession
+    {
+        get
+        {
+            return _bindingSession;
+        }
     }
 
     internal bool TryGetCachedSymbolInfoByGreen(

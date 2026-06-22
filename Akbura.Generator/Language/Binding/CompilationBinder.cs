@@ -4,8 +4,13 @@ namespace Akbura.Language.Binding;
 
 internal sealed class CompilationBinder : Binder
 {
-    public CompilationBinder(AkburaCompilation compilation)
-        : base(compilation, parent: null, declaration: null)
+    public CompilationBinder(AkburaSemanticModel semanticModel)
+        : base(
+            semanticModel,
+            next: null,
+            declaration: null,
+            scopeDesignator: null,
+            flags: AkburaBinderFlags.None)
     {
     }
 

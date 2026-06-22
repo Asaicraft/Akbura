@@ -5,9 +5,15 @@ namespace Akbura.Language.Binding;
 internal sealed class CSharpProbeBinder : Binder
 {
     public CSharpProbeBinder(
-        AkburaCompilation compilation,
-        Binder parent)
-        : base(compilation, parent, declaration: null)
+        AkburaSemanticModel semanticModel,
+        Binder next,
+        AkburaBinderFlags flags = AkburaBinderFlags.None)
+        : base(
+            semanticModel,
+            next,
+            declaration: null,
+            scopeDesignator: next.ScopeDesignator,
+            flags: flags | AkburaBinderFlags.InCSharpProbe)
     {
     }
 

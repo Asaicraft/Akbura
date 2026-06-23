@@ -661,6 +661,27 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void Binder_ConversionsAreLazyAndStable()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+        var field = typeof(BinderType).GetField(
+            "_lazyConversions",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(field);
+        Assert.Null(field!.GetValue(binder));
+
+        var first = binder.Conversions;
+        var second = binder.Conversions;
+
+        Assert.Same(first, second);
+        Assert.Same(first, field.GetValue(binder));
+    }
+
+    [Fact]
     public void CSharpProbeBinder_ClassifiesConversionsThroughRoslyn()
     {
         const string code = "state int count = 0;";

@@ -37,24 +37,7 @@ internal sealed class CSharpProbeBinder : Binder
         ITypeSymbol? sourceType,
         ITypeSymbol? targetType)
     {
-        if (sourceType == null || targetType == null)
-        {
-            return AkburaConversion.None(sourceType, targetType);
-        }
-
-        var conversion = CSharpCompilation.ClassifyConversion(sourceType, targetType);
-        var kind = conversion.IsIdentity
-            ? AkburaConversionKind.Identity
-            : conversion.IsImplicit
-                ? AkburaConversionKind.Implicit
-                : conversion.IsExplicit
-                    ? AkburaConversionKind.Explicit
-                    : AkburaConversionKind.None;
-
-        return new AkburaConversion(
-            kind,
-            sourceType,
-            targetType);
+        return Conversions.ClassifyConversion(sourceType, targetType);
     }
 
     public CSharpBindingResult BindFieldType(CSharp.CompilationUnitSyntax compilationUnit)
@@ -137,7 +120,7 @@ internal sealed class CSharpProbeBinder : Binder
             return boundExpression;
         }
 
-        var conversion = ClassifyConversion(boundExpression.Type, targetType);
+        var conversion = Conversions.ClassifyConversion(boundExpression, targetType);
         return new BoundConversionExpression(
             syntax,
             this,

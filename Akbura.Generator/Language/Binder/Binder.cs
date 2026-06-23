@@ -13,6 +13,8 @@ namespace Akbura.Language.Binder;
 
 internal abstract class Binder
 {
+    private AkburaConversions? _lazyConversions;
+
     protected Binder(
         AkburaSemanticModel semanticModel,
         Binder? next,
@@ -42,6 +44,9 @@ internal abstract class Binder
     public AkburaSyntax? ScopeDesignator { get; }
 
     public AkburaBinderFlags Flags { get; }
+
+    public AkburaConversions Conversions =>
+        _lazyConversions ??= new AkburaConversions(this);
 
     public virtual string ScopeKey =>
         Declaration == null

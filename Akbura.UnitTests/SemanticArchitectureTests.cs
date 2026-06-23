@@ -682,6 +682,85 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void Binder_OverloadResolutionIsLazyAndStable()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+        var field = typeof(BinderType).GetField(
+            "_lazyOverloadResolution",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(field);
+        Assert.Null(field!.GetValue(binder));
+
+        var first = binder.OverloadResolution;
+        var second = binder.OverloadResolution;
+
+        Assert.Same(first, second);
+        Assert.Same(first, field.GetValue(binder));
+    }
+
+    [Fact]
+    public void OverloadResolver_SelectsBestMethodUsingImplicitConversions()
+    {
+        const string code = "state int count = 0;";
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public sealed class OverloadTarget
+            {
+                public void Pick(int value) { }
+                public void Pick(double value) { }
+                public void Widen(double value) { }
+                public void Widen(string value) { }
+                public void Ambiguous(long value) { }
+                public void Ambiguous(double value) { }
+                public void None(int value) { }
+            }
+            """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(csharpCode);
+        var csharpCompilation = CreateCSharpCompilation().AddSyntaxTrees(syntaxTree);
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = new AkburaCompilation(
+                csharpCompilation,
+                [tree],
+                rootNamespace: "Demo",
+                projectDirectory: Environment.CurrentDirectory)
+            .GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+        var target = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            csharpCompilation.GetTypeByMetadataName("Demo.OverloadTarget"));
+        var intType = csharpCompilation.GetSpecialType(SpecialType.System_Int32);
+        var stringType = csharpCompilation.GetSpecialType(SpecialType.System_String);
+
+        var exact = binder.OverloadResolution.ResolveMethodGroup(
+            target.GetMembers("Pick").OfType<IMethodSymbol>().ToImmutableArray(),
+            ImmutableArray.Create<ITypeSymbol?>(intType));
+        var implicitOnly = binder.OverloadResolution.ResolveMethodGroup(
+            target.GetMembers("Widen").OfType<IMethodSymbol>().ToImmutableArray(),
+            ImmutableArray.Create<ITypeSymbol?>(intType));
+        var ambiguous = binder.OverloadResolution.ResolveMethodGroup(
+            target.GetMembers("Ambiguous").OfType<IMethodSymbol>().ToImmutableArray(),
+            ImmutableArray.Create<ITypeSymbol?>(intType));
+        var notFound = binder.OverloadResolution.ResolveMethodGroup(
+            target.GetMembers("None").OfType<IMethodSymbol>().ToImmutableArray(),
+            ImmutableArray.Create<ITypeSymbol?>(stringType));
+
+        Assert.True(exact.IsSuccessful);
+        Assert.Equal("Int32", exact.SelectedMethod?.Parameters[0].Type.Name);
+        Assert.True(implicitOnly.IsSuccessful);
+        Assert.Equal("Double", implicitOnly.SelectedMethod?.Parameters[0].Type.Name);
+        Assert.False(ambiguous.IsSuccessful);
+        Assert.Equal(AkburaCandidateReason.Ambiguous, ambiguous.CandidateReason);
+        Assert.Equal(2, ambiguous.CandidateMethods.Length);
+        Assert.False(notFound.IsSuccessful);
+        Assert.Equal(AkburaCandidateReason.NotFound, notFound.CandidateReason);
+    }
+
+    [Fact]
     public void CSharpProbeBinder_ClassifiesConversionsThroughRoslyn()
     {
         const string code = "state int count = 0;";

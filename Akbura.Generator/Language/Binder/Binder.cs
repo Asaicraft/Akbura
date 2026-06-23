@@ -14,6 +14,7 @@ namespace Akbura.Language.Binder;
 internal abstract class Binder
 {
     private AkburaConversions? _lazyConversions;
+    private OverloadResolver? _lazyOverloadResolution;
 
     protected Binder(
         AkburaSemanticModel semanticModel,
@@ -47,6 +48,9 @@ internal abstract class Binder
 
     public AkburaConversions Conversions =>
         _lazyConversions ??= new AkburaConversions(this);
+
+    public OverloadResolver OverloadResolution =>
+        _lazyOverloadResolution ??= new OverloadResolver(this);
 
     public virtual string ScopeKey =>
         Declaration == null

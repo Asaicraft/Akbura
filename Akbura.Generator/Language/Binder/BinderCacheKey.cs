@@ -1,7 +1,7 @@
 using Akbura.Language.Declarations;
 using Akbura.Language.Syntax.Green;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal readonly struct BinderCacheKey
 {

@@ -1,15 +1,16 @@
+using BinderType = Akbura.Language.Binder.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.BoundTree;
 
 internal sealed class BoundDeclaration : BoundNode
 {
     public BoundDeclaration(
         AkburaSyntax syntax,
-        Binder binder,
+        BinderType binder,
         AkburaSymbolInfo symbolInfo,
         IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,

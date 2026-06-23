@@ -1,15 +1,16 @@
+using BinderType = Akbura.Language.Binder.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.BoundTree;
 
 internal abstract class BoundNode
 {
     protected BoundNode(
         AkburaSyntax syntax,
-        Binder binder,
+        BinderType binder,
         AkburaSymbolInfo symbolInfo,
         IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
@@ -29,7 +30,7 @@ internal abstract class BoundNode
 
     public AkburaSyntax Syntax { get; }
 
-    public Binder Binder { get; }
+    public BinderType Binder { get; }
 
     public AkburaSymbolInfo SymbolInfo { get; }
 
@@ -38,4 +39,27 @@ internal abstract class BoundNode
     public ImmutableArray<AkburaSemanticDiagnostic> Diagnostics { get; }
 
     public ImmutableArray<BoundNode> Children { get; }
+
+    public virtual bool IsError => false;
+
+    public bool HasErrors
+    {
+        get
+        {
+            if (IsError || Diagnostics.Length != 0)
+            {
+                return true;
+            }
+
+            foreach (var child in Children)
+            {
+                if (child.HasErrors)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 }

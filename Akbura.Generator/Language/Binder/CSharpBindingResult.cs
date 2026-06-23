@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal readonly struct CSharpBindingResult
 {

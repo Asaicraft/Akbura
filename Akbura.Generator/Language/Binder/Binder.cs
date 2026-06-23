@@ -8,7 +8,7 @@ using System.Linq;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal abstract class Binder
 {

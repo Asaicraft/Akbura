@@ -1,6 +1,6 @@
 using System;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 [Flags]
 internal enum BinderLookupOptions

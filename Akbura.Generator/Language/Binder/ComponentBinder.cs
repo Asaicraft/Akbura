@@ -3,7 +3,7 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal sealed class ComponentBinder : Binder
 {

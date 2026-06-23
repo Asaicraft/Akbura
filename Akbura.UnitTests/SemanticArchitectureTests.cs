@@ -1,5 +1,6 @@
 using Akbura.Language;
-using Akbura.Language.Binding;
+using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Declarations;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -11,8 +12,10 @@ using System.Collections.Immutable;
 using System.Threading.Tasks;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaOperationKind = Akbura.Language.Operations.OperationKind;
+using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using AkburaSymbolVisitor = Akbura.Language.Symbols.SymbolVisitor;
+using BinderType = Akbura.Language.Binder.Binder;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.UnitTests;
@@ -317,6 +320,64 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BoundWrapping_WithDeclaredSymbolsCreatesBoundBlock()
+    {
+        const string code =
+            "state int count = 0;\n" +
+            "<TextBlock Text=\"Hello\" />";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[1]);
+        var componentBinder = Assert.IsType<ComponentBinder>(model.GetBinder(root));
+        var markupBinder = Assert.IsType<MarkupBinder>(model.GetBinder(markup, BinderUsage.Markup));
+        var body = new BoundDeclaration(
+            root,
+            componentBinder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.None),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        var wrapped = componentBinder.WrapWithDeclaredSymbolsIfAny(root, body);
+        var unwrapped = markupBinder.WrapWithDeclaredSymbolsIfAny(markup, body);
+
+        var block = Assert.IsType<BoundBlock>(wrapped);
+        Assert.Contains(block.DeclaredSymbols, symbol => symbol is IStateSymbol { Name: "count" });
+        Assert.Same(body, Assert.Single(block.Statements));
+        Assert.False(block.HasErrors);
+        Assert.Same(body, unwrapped);
+    }
+
+    [Fact]
+    public void BoundErrorNodes_AreFailSoftAndPropagateHasErrors()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.GetBinder(state, BinderUsage.Expression);
+        var diagnostic = new AkburaSemanticDiagnostic(
+            state,
+            ErrorCodes.ERR_SyntaxError,
+            ["bad"]);
+        var errorExpression = new BoundErrorExpression(
+            state,
+            binder,
+            ImmutableArray.Create(diagnostic));
+        var badStatement = new BoundBadStatement(
+            state,
+            binder,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty,
+            ImmutableArray.Create<BoundNode>(errorExpression));
+
+        Assert.True(errorExpression.IsError);
+        Assert.True(errorExpression.HasErrors);
+        Assert.True(badStatement.IsError);
+        Assert.True(badStatement.HasErrors);
+        Assert.Same(errorExpression, Assert.Single(badStatement.Children));
+    }
+
+    [Fact]
     public void BindingSession_CachesBinderChainsBySyntaxAndUsage()
     {
         const string code = "state int count = 0;\n<TextBlock Text=\"Hello\" />";
@@ -347,7 +408,7 @@ public sealed class SemanticArchitectureTests
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var model = CreateCompilation(tree).GetSemanticModel(tree);
         var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
-        var binders = new Binder[64];
+        var binders = new BinderType[64];
 
         Parallel.For(0, binders.Length, index =>
         {

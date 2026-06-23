@@ -1,4 +1,4 @@
-using Akbura.Language.Binding;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -21,6 +21,7 @@ using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 using RoslynEventSymbol = Microsoft.CodeAnalysis.IEventSymbol;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
+using BinderType = Akbura.Language.Binder.Binder;
 
 namespace Akbura.Language;
 
@@ -122,12 +123,12 @@ internal sealed partial class AkburaSemanticModel
         });
     }
 
-    internal Binder GetBinder(AkburaSyntax syntax)
+    internal BinderType GetBinder(AkburaSyntax syntax)
     {
         return _bindingSession.GetBinder(syntax);
     }
 
-    internal Binder GetBinder(AkburaSyntax syntax, BinderUsage usage)
+    internal BinderType GetBinder(AkburaSyntax syntax, BinderUsage usage)
     {
         return _bindingSession.GetBinder(syntax, usage);
     }

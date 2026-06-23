@@ -10,7 +10,7 @@ using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynSemanticModel = Microsoft.CodeAnalysis.SemanticModel;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal sealed class CSharpProbeBinder : Binder
 {

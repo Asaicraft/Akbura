@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal sealed class BindingDiagnosticBag
 {

@@ -2,7 +2,7 @@ using Akbura.Language.Declarations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal sealed class MarkupBinder : Binder
 {

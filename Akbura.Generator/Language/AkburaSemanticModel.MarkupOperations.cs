@@ -1,4 +1,4 @@
-using Akbura.Language.Binding;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;

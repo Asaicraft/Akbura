@@ -4,7 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 
-namespace Akbura.Language.Binding;
+namespace Akbura.Language.Binder;
 
 internal sealed class BindingSession
 {

@@ -25,6 +25,10 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitConversionExpression(BoundConversionExpression node) => VisitExpression(node);
 
+    public virtual void VisitLiteralExpression(BoundLiteralExpression node) => VisitExpression(node);
+
+    public virtual void VisitBinaryExpression(BoundBinaryExpression node) => VisitExpression(node);
+
     public virtual void VisitErrorExpression(BoundErrorExpression node) => VisitExpression(node);
 }
 
@@ -55,6 +59,10 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitCSharpExpression(BoundCSharpExpression node) => VisitExpression(node);
 
     public virtual TResult? VisitConversionExpression(BoundConversionExpression node) => VisitExpression(node);
+
+    public virtual TResult? VisitLiteralExpression(BoundLiteralExpression node) => VisitExpression(node);
+
+    public virtual TResult? VisitBinaryExpression(BoundBinaryExpression node) => VisitExpression(node);
 
     public virtual TResult? VisitErrorExpression(BoundErrorExpression node) => VisitExpression(node);
 }
@@ -92,6 +100,12 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         VisitExpression(node, parameter);
 
     public virtual TResult? VisitConversionExpression(BoundConversionExpression node, TParameter parameter) =>
+        VisitExpression(node, parameter);
+
+    public virtual TResult? VisitLiteralExpression(BoundLiteralExpression node, TParameter parameter) =>
+        VisitExpression(node, parameter);
+
+    public virtual TResult? VisitBinaryExpression(BoundBinaryExpression node, TParameter parameter) =>
         VisitExpression(node, parameter);
 
     public virtual TResult? VisitErrorExpression(BoundErrorExpression node, TParameter parameter) =>

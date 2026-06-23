@@ -102,6 +102,39 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node;
     }
 
+    public override BoundNode? VisitLiteralExpression(BoundLiteralExpression node)
+    {
+        return node;
+    }
+
+    public override BoundNode? VisitBinaryExpression(BoundBinaryExpression node)
+    {
+        var left = (BoundExpression?)Visit(node.Left);
+        var right = (BoundExpression?)Visit(node.Right);
+        if (ReferenceEquals(left, node.Left) &&
+            ReferenceEquals(right, node.Right))
+        {
+            return node;
+        }
+
+        if (left == null || right == null)
+        {
+            return new BoundErrorExpression(
+                node.Syntax,
+                node.Binder,
+                node.Diagnostics);
+        }
+
+        return new BoundBinaryExpression(
+            node.Syntax,
+            node.Binder,
+            node.BindingResult,
+            node.OperatorKind,
+            left,
+            right,
+            node.Diagnostics);
+    }
+
     public override BoundNode? VisitConversionExpression(BoundConversionExpression node)
     {
         var operand = (BoundExpression?)Visit(node.Operand);

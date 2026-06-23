@@ -119,20 +119,25 @@ internal sealed class CSharpProbeBinder : Binder
             throw new ArgumentNullException(nameof(expression));
         }
 
-        var bindingResult = BindReturnExpression(
-            CreateReturnExpressionProbe(expression),
-            isBindingPath);
-        var boundExpression = new BoundCSharpExpression(
-            syntax,
-            this,
-            bindingResult);
+        var syntaxTree = CreateSyntaxTree(CreateReturnExpressionProbe(expression));
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var probeExpression = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.ReturnStatementSyntax>()
+            .Single()
+            .Expression;
+
+        var boundExpression = probeExpression == null
+            ? new BoundCSharpExpression(syntax, this, CSharpBindingResult.Empty)
+            : BindExpressionTree(syntax, semanticModel, probeExpression, isBindingPath);
 
         if (targetType == null)
         {
             return boundExpression;
         }
 
-        var conversion = ClassifyConversion(bindingResult.TypeSymbol, targetType);
+        var conversion = ClassifyConversion(boundExpression.Type, targetType);
         return new BoundConversionExpression(
             syntax,
             this,
@@ -218,6 +223,47 @@ internal sealed class CSharpProbeBinder : Binder
 
         return CSharpSyntaxFactory.CompilationUnit()
             .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));
+    }
+
+    private BoundExpression BindExpressionTree(
+        AkburaSyntax syntax,
+        RoslynSemanticModel semanticModel,
+        CSharp.ExpressionSyntax expression,
+        bool isBindingPath)
+    {
+        var bindingResult = BindExpression(semanticModel, expression, isBindingPath);
+
+        return expression switch
+        {
+            CSharp.LiteralExpressionSyntax literalExpression =>
+                new BoundLiteralExpression(
+                    syntax,
+                    this,
+                    bindingResult,
+                    GetConstantValue(semanticModel, literalExpression)),
+            CSharp.BinaryExpressionSyntax binaryExpression =>
+                new BoundBinaryExpression(
+                    syntax,
+                    this,
+                    bindingResult,
+                    binaryExpression.Kind(),
+                    BindExpressionTree(syntax, semanticModel, binaryExpression.Left, isBindingPath),
+                    BindExpressionTree(syntax, semanticModel, binaryExpression.Right, isBindingPath)),
+            _ => new BoundCSharpExpression(
+                syntax,
+                this,
+                bindingResult),
+        };
+    }
+
+    private static object? GetConstantValue(
+        RoslynSemanticModel semanticModel,
+        CSharp.LiteralExpressionSyntax expression)
+    {
+        var constant = semanticModel.GetConstantValue(expression);
+        return constant.HasValue
+            ? constant.Value
+            : expression.Token.Value;
     }
 
     private static CSharpBindingResult BindExpression(

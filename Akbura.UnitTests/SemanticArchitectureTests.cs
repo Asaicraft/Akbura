@@ -17,6 +17,7 @@ using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using AkburaSymbolVisitor = Akbura.Language.Symbols.SymbolVisitor;
 using BinderType = Akbura.Language.Binder.Binder;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.UnitTests;
 
@@ -172,8 +173,9 @@ public sealed class SemanticArchitectureTests
             state,
             CSharpSyntaxFactory.ParseExpression("2"));
 
-        var expression = Assert.IsType<BoundCSharpExpression>(first);
+        var expression = Assert.IsType<BoundLiteralExpression>(first);
         Assert.Equal("Int32", expression.Type?.Name);
+        Assert.Equal(1, expression.ConstantValue);
         Assert.Same(first, second);
     }
 
@@ -227,7 +229,7 @@ public sealed class SemanticArchitectureTests
             state,
             CSharpSyntaxFactory.ParseExpression("2"));
 
-        Assert.IsType<BoundCSharpExpression>(untyped);
+        Assert.IsType<BoundLiteralExpression>(untyped);
         var conversion = Assert.IsType<BoundConversionExpression>(converted);
         Assert.Equal(AkburaConversionKind.Implicit, conversion.Conversion.Kind);
         Assert.Same(untyped, cachedUntyped);
@@ -753,11 +755,37 @@ public sealed class SemanticArchitectureTests
             doubleType);
 
         var conversion = Assert.IsType<BoundConversionExpression>(bound);
-        var operand = Assert.IsType<BoundCSharpExpression>(conversion.Operand);
+        var operand = Assert.IsType<BoundLiteralExpression>(conversion.Operand);
         Assert.Equal("Int32", operand.Type?.Name);
+        Assert.Equal(1, operand.ConstantValue);
         Assert.Equal(AkburaConversionKind.Implicit, conversion.Conversion.Kind);
         Assert.Equal("Double", conversion.Type?.Name);
         Assert.False(conversion.HasErrors);
+    }
+
+    [Fact]
+    public void CSharpProbeBinder_BindExpressionBuildsLiteralAndBinaryBoundNodes()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+
+        var bound = binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("1 + 2"));
+
+        var binary = Assert.IsType<BoundBinaryExpression>(bound);
+        Assert.Equal(CSharpSyntaxKind.AddExpression, binary.OperatorKind);
+        Assert.Equal("Int32", binary.Type?.Name);
+
+        var left = Assert.IsType<BoundLiteralExpression>(binary.Left);
+        var right = Assert.IsType<BoundLiteralExpression>(binary.Right);
+        Assert.Equal(1, left.ConstantValue);
+        Assert.Equal(2, right.ConstantValue);
+        Assert.Same(left, binary.Children[0]);
+        Assert.Same(right, binary.Children[1]);
     }
 
     [Fact]
@@ -776,8 +804,9 @@ public sealed class SemanticArchitectureTests
             intType);
 
         var conversion = Assert.IsType<BoundConversionExpression>(bound);
-        var operand = Assert.IsType<BoundCSharpExpression>(conversion.Operand);
+        var operand = Assert.IsType<BoundLiteralExpression>(conversion.Operand);
         Assert.Equal("String", operand.Type?.Name);
+        Assert.Equal("text", operand.ConstantValue);
         Assert.Equal(AkburaConversionKind.None, conversion.Conversion.Kind);
         Assert.True(conversion.HasErrors);
     }

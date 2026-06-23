@@ -1,6 +1,7 @@
 using Akbura.Language.BoundTree;
 using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
@@ -103,12 +104,14 @@ internal sealed class BindingSession
     {
         foreach (var root in _semanticModel.Compilation.DeclarationTable.Roots)
         {
-            var builder = ImmutableArray.CreateBuilder<AkburaDeclaration>();
+            var builder = ArrayBuilder<AkburaDeclaration>.GetInstance();
             if (TryFindDeclarationPath(root, syntax, builder))
             {
-                path = builder.ToImmutable();
+                path = builder.ToImmutableAndFree();
                 return true;
             }
+
+            builder.Free();
         }
 
         path = default;
@@ -118,7 +121,7 @@ internal sealed class BindingSession
     private static bool TryFindDeclarationPath(
         AkburaDeclaration current,
         AkburaSyntax syntax,
-        ImmutableArray<AkburaDeclaration>.Builder path)
+        ArrayBuilder<AkburaDeclaration> path)
     {
         path.Add(current);
 

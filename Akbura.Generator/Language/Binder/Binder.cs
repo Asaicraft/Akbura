@@ -1,6 +1,7 @@
 using Akbura.Language.Declarations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
@@ -114,7 +115,7 @@ internal abstract class Binder
             return ImmutableArray<AkburaSymbol>.Empty;
         }
 
-        var builder = ImmutableArray.CreateBuilder<AkburaSymbol>();
+        var builder = ArrayBuilder<AkburaSymbol>.GetInstance();
         foreach (var declaration in declarations)
         {
             if (allowedKinds.Length != 0 &&
@@ -129,7 +130,7 @@ internal abstract class Binder
             }
         }
 
-        return builder.ToImmutable();
+        return builder.ToImmutableAndFree();
     }
 
     protected bool TryCreateDeclaredSymbol(AkburaDeclaration declaration, out AkburaSymbol symbol)

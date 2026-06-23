@@ -1,3 +1,4 @@
+using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -13,17 +14,20 @@ internal sealed class SemanticBindingCache
     private readonly AkburaSemanticModel _semanticModel;
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache;
     private readonly Dictionary<AkburaSyntax, IOperation?> _operationCache;
+    private readonly Dictionary<AkburaSyntax, BoundNode> _boundNodeCache;
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _diagnosticsCache;
 
     public SemanticBindingCache(
         AkburaSemanticModel semanticModel,
         Dictionary<AkburaSyntax, AkburaSymbolInfo> symbolInfoCache,
         Dictionary<AkburaSyntax, IOperation?> operationCache,
+        Dictionary<AkburaSyntax, BoundNode> boundNodeCache,
         Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> diagnosticsCache)
     {
         _semanticModel = semanticModel;
         _symbolInfoCache = symbolInfoCache;
         _operationCache = operationCache;
+        _boundNodeCache = boundNodeCache;
         _diagnosticsCache = diagnosticsCache;
     }
 
@@ -63,6 +67,25 @@ internal sealed class SemanticBindingCache
         operation = bind();
         _operationCache[syntax] = operation;
         return operation;
+    }
+
+    public BoundNode GetBoundNode(AkburaSyntax syntax, Func<BoundNode> bind)
+    {
+        if (_boundNodeCache.TryGetValue(syntax, out var boundNode))
+        {
+            return boundNode;
+        }
+
+        if (TryGetReusablePreviousSemanticModel(out var previousModel) &&
+            previousModel.TryGetCachedBoundNodeByGreen(syntax.Green, out boundNode))
+        {
+            _boundNodeCache[syntax] = boundNode;
+            return boundNode;
+        }
+
+        boundNode = bind();
+        _boundNodeCache[syntax] = boundNode;
+        return boundNode;
     }
 
     public ImmutableArray<AkburaSemanticDiagnostic> GetDiagnostics(

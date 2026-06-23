@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -29,6 +30,7 @@ internal sealed partial class AkburaSemanticModel
 {
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfoCache = new();
     private readonly Dictionary<AkburaSyntax, AkburaOperation?> _operationCache = new();
+    private readonly Dictionary<AkburaSyntax, BoundNode> _boundNodeCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
@@ -37,7 +39,7 @@ internal sealed partial class AkburaSemanticModel
     {
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
-        _bindingCache = new SemanticBindingCache(this, _symbolInfoCache, _operationCache, _semanticDiagnosticsCache);
+        _bindingCache = new SemanticBindingCache(this, _symbolInfoCache, _operationCache, _boundNodeCache, _semanticDiagnosticsCache);
         _bindingSession = new BindingSession(this);
     }
 
@@ -123,6 +125,22 @@ internal sealed partial class AkburaSemanticModel
         });
     }
 
+    internal BoundNode GetBoundNode(AkburaSyntax syntax, Func<BoundNode> bind)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        if (bind == null)
+        {
+            throw new ArgumentNullException(nameof(bind));
+        }
+
+        ValidateSyntaxTreeOwnership(syntax);
+        return _bindingCache.GetBoundNode(syntax, bind);
+    }
+
     internal BinderType GetBinder(AkburaSyntax syntax)
     {
         return _bindingSession.GetBinder(syntax);
@@ -172,6 +190,23 @@ internal sealed partial class AkburaSemanticModel
         }
 
         operation = null;
+        return false;
+    }
+
+    internal bool TryGetCachedBoundNodeByGreen(
+        GreenNode green,
+        out BoundNode boundNode)
+    {
+        foreach (var cached in _boundNodeCache)
+        {
+            if (ReferenceEquals(cached.Key.Green, green))
+            {
+                boundNode = cached.Value;
+                return true;
+            }
+        }
+
+        boundNode = null!;
         return false;
     }
 

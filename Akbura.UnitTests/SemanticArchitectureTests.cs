@@ -158,6 +158,65 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void SemanticBindingCache_CachesBoundNodesBySyntax()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+
+        var first = model.GetBoundNode(
+            state,
+            () => binder.BindExpression(
+                state,
+                CSharpSyntaxFactory.ParseExpression("1")));
+        var second = model.GetBoundNode(
+            state,
+            () => throw new InvalidOperationException("Bound node should come from cache."));
+
+        var expression = Assert.IsType<BoundCSharpExpression>(first);
+        Assert.Equal("Int32", expression.Type?.Name);
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void SemanticBindingCache_UnchangedGreenNodeReusesPreviousBoundNode()
+    {
+        const string oldCode =
+            "state int first = 0;\n" +
+            "state int changed = 0;";
+        const string newCode =
+            "state int first = 0;\n" +
+            "state int changed = 1;";
+        var changeStart = oldCode.IndexOf("changed = 0", StringComparison.Ordinal) + "changed = ".Length;
+        var change = new TextChangeRange(new TextSpan(changeStart, 1), newLength: 1);
+        var oldTree = AkburaSyntaxTree.ParseText(oldCode, "Counter.akbura");
+        var oldCompilation = CreateCompilation(oldTree);
+        var oldModel = oldCompilation.GetSemanticModel(oldTree);
+        var oldFirst = Assert.IsType<StateDeclarationSyntax>(oldTree.GetRoot().Members[0]);
+        var oldBinder = oldModel.BindingSession.GetCSharpProbeBinder(oldFirst, BinderUsage.Expression);
+        var oldBoundNode = oldModel.GetBoundNode(
+            oldFirst,
+            () => oldBinder.BindExpression(
+                oldFirst,
+                CSharpSyntaxFactory.ParseExpression("1")));
+
+        var newTree = oldTree.WithChangedText(SourceText.From(newCode), [change]);
+        var newCompilation = oldCompilation.WithSyntaxTrees([newTree]);
+        var newModel = newCompilation.GetSemanticModel(newTree);
+        var newFirst = Assert.IsType<StateDeclarationSyntax>(newTree.GetRoot().Members[0]);
+        var newBinder = newModel.BindingSession.GetCSharpProbeBinder(newFirst, BinderUsage.Expression);
+        var newBoundNode = newModel.GetBoundNode(
+            newFirst,
+            () => newBinder.BindExpression(
+                newFirst,
+                CSharpSyntaxFactory.ParseExpression("2")));
+
+        Assert.Same(oldBoundNode, newBoundNode);
+    }
+
+    [Fact]
     public void OperationWalker_VisitsAkcssOperationTree()
     {
         const string code =

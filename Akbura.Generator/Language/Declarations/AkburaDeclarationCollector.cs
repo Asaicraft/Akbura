@@ -143,7 +143,11 @@ internal sealed class AkburaDeclarationCollector : SyntaxVisitor
 
     public override void VisitMarkupRootSyntax(MarkupRootSyntax node)
     {
-        Add(AkburaDeclarationKind.MarkupRoot, node.Element.StartTag?.Name.ToFullString().Trim() ?? string.Empty, node);
+        Add(
+            AkburaDeclarationKind.MarkupRoot,
+            GetMarkupElementName(node.Element),
+            node,
+            CollectMarkupElementChildren(node.Element));
     }
 
     public override void VisitInlineAkcssBlockSyntax(InlineAkcssBlockSyntax node)
@@ -194,6 +198,36 @@ internal sealed class AkburaDeclarationCollector : SyntaxVisitor
         {
             nested.Free();
         }
+    }
+
+    private ImmutableArray<AkburaDeclaration> CollectMarkupElementChildren(MarkupElementSyntax element)
+    {
+        var builder = ImmutableArray.CreateBuilder<AkburaDeclaration>();
+        foreach (var content in element.Body)
+        {
+            if (content is MarkupElementContentSyntax elementContent)
+            {
+                builder.Add(CreateMarkupElementDeclaration(elementContent.Element));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private AkburaDeclaration CreateMarkupElementDeclaration(MarkupElementSyntax element)
+    {
+        return new AkburaDeclaration(
+            AkburaDeclarationKind.MarkupElement,
+            GetMarkupElementName(element),
+            element,
+            _syntaxTree,
+            _akcssSyntaxTree,
+            CollectMarkupElementChildren(element));
+    }
+
+    private static string GetMarkupElementName(MarkupElementSyntax element)
+    {
+        return element.StartTag?.Name.ToFullString().Trim() ?? string.Empty;
     }
 
     private void Add(

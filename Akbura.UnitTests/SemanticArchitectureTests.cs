@@ -693,6 +693,44 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BinderFactory_UsesPooledVisitor()
+    {
+        var poolField = typeof(BinderFactory).GetField(
+            "s_binderFactoryVisitorPool",
+            System.Reflection.BindingFlags.Static |
+            System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(poolField);
+        Assert.Same(
+            typeof(ObjectPool<BinderFactory.BinderFactoryVisitor>),
+            poolField.FieldType);
+    }
+
+    [Fact]
+    public void BinderFactoryVisitor_BuildsNestedMarkupBinderChain()
+    {
+        const string code = "<StackPanel><Button /></StackPanel>";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var markupRoot = Assert.IsType<MarkupRootSyntax>(root.Members[0]);
+        var childContent = Assert.IsType<MarkupElementContentSyntax>(markupRoot.Element.Body[0]);
+        var childElement = childContent.Element;
+
+        var childBinder = Assert.IsType<MarkupBinder>(model.GetBinder(childElement, BinderUsage.Markup));
+
+        Assert.Same(childElement, childBinder.ScopeDesignator);
+        Assert.True(childBinder.Flags.HasFlag(AkburaBinderFlags.InMarkup));
+
+        var parentMarkupBinder = Assert.IsType<MarkupBinder>(childBinder.NextRequired);
+        Assert.Same(markupRoot, parentMarkupBinder.ScopeDesignator);
+
+        Assert.IsType<ComponentBinder>(parentMarkupBinder.NextRequired);
+        Assert.IsType<CompilationBinder>(parentMarkupBinder.NextRequired.NextRequired);
+        Assert.Equal(1, model.BindingSession.CachedBinderCount);
+    }
+
+    [Fact]
     public void ComponentBinder_DeclaredSymbolsAreLazyAndStable()
     {
         const string code =

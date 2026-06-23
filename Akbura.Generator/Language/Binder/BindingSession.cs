@@ -14,11 +14,13 @@ internal sealed class BindingSession
 {
     private readonly AkburaSemanticModel _semanticModel;
     private readonly ConcurrentDictionary<BinderCacheKey, Binder> _binderCache = new();
+    private readonly BinderFactory _binderFactory;
 
     public BindingSession(AkburaSemanticModel semanticModel)
     {
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         RootBinder = new CompilationBinder(semanticModel);
+        _binderFactory = new BinderFactory(semanticModel, this);
     }
 
     public CompilationBinder RootBinder { get; }
@@ -38,20 +40,13 @@ internal sealed class BindingSession
             return RootBinder;
         }
 
-        var flags = GetPathFlags(path);
-        var declaration = path[path.Length - 1];
-        var scopeDesignator = GetScopeDesignator(path);
-        var nextScopeKey = GetNextScopeKey(path);
-        var key = new BinderCacheKey(
-            syntax.Green,
-            usage,
-            flags,
-            declaration.Kind,
-            scopeDesignator?.Green,
-            nextScopeKey);
-
-        var binder = CreateBinderChain(path, usage);
-        return _binderCache.GetOrAdd(key, binder);
+        var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
+            syntax,
+            path,
+            usage);
+        return _binderCache.GetOrAdd(
+            key,
+            _ => _binderFactory.CreateBinder(path, usage));
     }
 
     public CSharpProbeBinder GetCSharpProbeBinder(
@@ -106,116 +101,6 @@ internal sealed class BindingSession
         return finder.TryFind(
             _semanticModel.Compilation.DeclarationTable.Roots,
             out path);
-    }
-
-    private Binder CreateBinderChain(
-        ImmutableArray<AkburaDeclaration> path,
-        BinderUsage usage)
-    {
-        Binder current = RootBinder;
-        for (var index = 0; index < path.Length; index++)
-        {
-            var declaration = path[index];
-            current = declaration.Kind switch
-            {
-                AkburaDeclarationKind.Component => new ComponentBinder(
-                    _semanticModel,
-                    current,
-                    declaration,
-                    current.Flags | GetUsageFlags(usage)),
-
-                AkburaDeclarationKind.MarkupRoot or AkburaDeclarationKind.MarkupElement => new MarkupBinder(
-                    _semanticModel,
-                    current,
-                    declaration,
-                    current.Flags | GetUsageFlags(usage)),
-
-                AkburaDeclarationKind.AkcssModule => new AkcssModuleBinder(
-                    _semanticModel,
-                    current,
-                    declaration,
-                    current.Flags | GetUsageFlags(usage)),
-
-                AkburaDeclarationKind.AkcssStyle or AkburaDeclarationKind.AkcssUtility => new AkcssStyleBinder(
-                    _semanticModel,
-                    current,
-                    declaration,
-                    current.Flags | GetUsageFlags(usage)),
-
-                _ => current,
-            };
-        }
-
-        return current;
-    }
-
-    private static AkburaBinderFlags GetPathFlags(ImmutableArray<AkburaDeclaration> path)
-    {
-        var flags = AkburaBinderFlags.None;
-        foreach (var declaration in path)
-        {
-            flags |= declaration.Kind switch
-            {
-                AkburaDeclarationKind.Component => AkburaBinderFlags.InComponent,
-                AkburaDeclarationKind.MarkupRoot or AkburaDeclarationKind.MarkupElement => AkburaBinderFlags.InMarkup,
-                AkburaDeclarationKind.AkcssModule => AkburaBinderFlags.InAkcss,
-                AkburaDeclarationKind.AkcssStyle => AkburaBinderFlags.InAkcss | AkburaBinderFlags.InAkcssStyle,
-                AkburaDeclarationKind.AkcssUtility => AkburaBinderFlags.InAkcss | AkburaBinderFlags.InAkcssUtility,
-                _ => AkburaBinderFlags.None,
-            };
-        }
-
-        return flags;
-    }
-
-    private static AkburaBinderFlags GetUsageFlags(BinderUsage usage)
-    {
-        return usage switch
-        {
-            BinderUsage.Markup => AkburaBinderFlags.InMarkup,
-            BinderUsage.Akcss => AkburaBinderFlags.InAkcss,
-            _ => AkburaBinderFlags.None,
-        };
-    }
-
-    private static AkburaSyntax? GetScopeDesignator(ImmutableArray<AkburaDeclaration> path)
-    {
-        for (var index = path.Length - 1; index >= 0; index--)
-        {
-            var declaration = path[index];
-            switch (declaration.Kind)
-            {
-                case AkburaDeclarationKind.Component:
-                case AkburaDeclarationKind.MarkupRoot:
-                case AkburaDeclarationKind.MarkupElement:
-                case AkburaDeclarationKind.AkcssModule:
-                case AkburaDeclarationKind.AkcssStyle:
-                case AkburaDeclarationKind.AkcssUtility:
-                    return declaration.Syntax;
-            }
-        }
-
-        return null;
-    }
-
-    private static string GetNextScopeKey(ImmutableArray<AkburaDeclaration> path)
-    {
-        for (var index = path.Length - 2; index >= 0; index--)
-        {
-            var declaration = path[index];
-            switch (declaration.Kind)
-            {
-                case AkburaDeclarationKind.Component:
-                case AkburaDeclarationKind.MarkupRoot:
-                case AkburaDeclarationKind.MarkupElement:
-                case AkburaDeclarationKind.AkcssModule:
-                case AkburaDeclarationKind.AkcssStyle:
-                case AkburaDeclarationKind.AkcssUtility:
-                    return $"{declaration.Kind}:{declaration.Name}:{declaration.Syntax.FullSpan}";
-            }
-        }
-
-        return string.Empty;
     }
 
     private sealed class DeclarationPathFinder

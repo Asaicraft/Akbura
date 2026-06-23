@@ -164,16 +164,13 @@ public sealed class SemanticArchitectureTests
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var model = CreateCompilation(tree).GetSemanticModel(tree);
         var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
-        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
 
-        var first = model.GetBoundNode(
+        var first = model.BindingSession.BindExpression(
             state,
-            () => binder.BindExpression(
-                state,
-                CSharpSyntaxFactory.ParseExpression("1")));
-        var second = model.GetBoundNode(
+            CSharpSyntaxFactory.ParseExpression("1"));
+        var second = model.BindingSession.BindExpression(
             state,
-            () => throw new InvalidOperationException("Bound node should come from cache."));
+            CSharpSyntaxFactory.ParseExpression("2"));
 
         var expression = Assert.IsType<BoundCSharpExpression>(first);
         Assert.Equal("Int32", expression.Type?.Name);
@@ -195,25 +192,46 @@ public sealed class SemanticArchitectureTests
         var oldCompilation = CreateCompilation(oldTree);
         var oldModel = oldCompilation.GetSemanticModel(oldTree);
         var oldFirst = Assert.IsType<StateDeclarationSyntax>(oldTree.GetRoot().Members[0]);
-        var oldBinder = oldModel.BindingSession.GetCSharpProbeBinder(oldFirst, BinderUsage.Expression);
-        var oldBoundNode = oldModel.GetBoundNode(
+        var oldBoundNode = oldModel.BindingSession.BindExpression(
             oldFirst,
-            () => oldBinder.BindExpression(
-                oldFirst,
-                CSharpSyntaxFactory.ParseExpression("1")));
+            CSharpSyntaxFactory.ParseExpression("1"));
 
         var newTree = oldTree.WithChangedText(SourceText.From(newCode), [change]);
         var newCompilation = oldCompilation.WithSyntaxTrees([newTree]);
         var newModel = newCompilation.GetSemanticModel(newTree);
         var newFirst = Assert.IsType<StateDeclarationSyntax>(newTree.GetRoot().Members[0]);
-        var newBinder = newModel.BindingSession.GetCSharpProbeBinder(newFirst, BinderUsage.Expression);
-        var newBoundNode = newModel.GetBoundNode(
+        var newBoundNode = newModel.BindingSession.BindExpression(
             newFirst,
-            () => newBinder.BindExpression(
-                newFirst,
-                CSharpSyntaxFactory.ParseExpression("2")));
+            CSharpSyntaxFactory.ParseExpression("2"));
 
         Assert.Same(oldBoundNode, newBoundNode);
+    }
+
+    [Fact]
+    public void BindingSession_TargetTypedExpressionBindingDoesNotPolluteUntypedCache()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var doubleType = model.Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Double);
+
+        var untyped = model.BindingSession.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("1"));
+        var converted = model.BindingSession.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("1"),
+            doubleType);
+        var cachedUntyped = model.BindingSession.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("2"));
+
+        Assert.IsType<BoundCSharpExpression>(untyped);
+        var conversion = Assert.IsType<BoundConversionExpression>(converted);
+        Assert.Equal(AkburaConversionKind.Implicit, conversion.Conversion.Kind);
+        Assert.Same(untyped, cachedUntyped);
+        Assert.NotSame(untyped, converted);
     }
 
     [Fact]

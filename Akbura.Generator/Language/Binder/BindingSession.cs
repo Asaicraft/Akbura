@@ -1,8 +1,11 @@
+using Akbura.Language.BoundTree;
 using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
+using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language.Binder;
 
@@ -56,6 +59,42 @@ internal sealed class BindingSession
     {
         var next = GetBinder(syntax, usage);
         return new CSharpProbeBinder(_semanticModel, next);
+    }
+
+    public BoundExpression BindExpression(
+        AkburaSyntax syntax,
+        CSharp.ExpressionSyntax expression,
+        ITypeSymbol? targetType = null,
+        BinderUsage usage = BinderUsage.Expression,
+        bool isBindingPath = true)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        if (expression == null)
+        {
+            throw new ArgumentNullException(nameof(expression));
+        }
+
+        var probeBinder = GetCSharpProbeBinder(syntax, usage);
+        if (targetType != null)
+        {
+            return probeBinder.BindExpression(
+                syntax,
+                expression,
+                targetType,
+                isBindingPath);
+        }
+
+        return (BoundExpression)_semanticModel.GetBoundNode(
+            syntax,
+            () => probeBinder.BindExpression(
+                syntax,
+                expression,
+                targetType: null,
+                isBindingPath));
     }
 
     private bool TryFindDeclarationPath(

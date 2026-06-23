@@ -5,6 +5,7 @@ using Akbura.Language.Declarations;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -72,6 +73,45 @@ public sealed class SemanticArchitectureTests
         Assert.Equal("Demo.Pages.Dashboard.akcss", externalAkcss.Name);
         Assert.Contains(externalAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssUsing);
         Assert.Contains(externalAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssStyle);
+    }
+
+    [Fact]
+    public void DeclarationCollector_UsesPooledVisitorAndResetsState()
+    {
+        var poolField = typeof(AkburaDeclarationCollector).GetField(
+            "s_pool",
+            System.Reflection.BindingFlags.Static |
+            System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(poolField);
+        Assert.Same(
+            typeof(ObjectPool<AkburaDeclarationCollector>),
+            poolField.FieldType);
+
+        const string firstCode =
+            "@akcss { .first { Background: White; } }\n" +
+            "state int first = 0;";
+        const string secondCode =
+            "@akcss { .second { Background: White; } }\n" +
+            "state int second = 0;";
+
+        var first = AkburaDeclarationCollector.Collect(
+            AkburaSyntaxTree.ParseText(firstCode, "First.akbura"));
+        var second = AkburaDeclarationCollector.Collect(
+            AkburaSyntaxTree.ParseText(secondCode, "Second.akbura"));
+
+        Assert.Equal("First", first.Name);
+        Assert.Equal("Second", second.Name);
+        Assert.Contains(first.Children, declaration => declaration.Kind == AkburaDeclarationKind.State && declaration.Name == "first");
+        Assert.DoesNotContain(first.Children, declaration => declaration.Name == "second");
+        Assert.Contains(second.Children, declaration => declaration.Kind == AkburaDeclarationKind.State && declaration.Name == "second");
+        Assert.DoesNotContain(second.Children, declaration => declaration.Name == "first");
+
+        var firstInlineAkcss = Assert.Single(first.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssModule);
+        var secondInlineAkcss = Assert.Single(second.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssModule);
+        Assert.Contains(firstInlineAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssStyle && declaration.Name == ".first");
+        Assert.DoesNotContain(firstInlineAkcss.Children, declaration => declaration.Name == ".second");
+        Assert.Contains(secondInlineAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssStyle && declaration.Name == ".second");
+        Assert.DoesNotContain(secondInlineAkcss.Children, declaration => declaration.Name == ".first");
     }
 
     [Fact]
@@ -632,6 +672,24 @@ public sealed class SemanticArchitectureTests
 
         var first = binders[0];
         Assert.All(binders, binder => Assert.Same(first, binder));
+    }
+
+    [Fact]
+    public void BinderFactory_UsesSemanticModelBindingSessionCache()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var factory = new BinderFactory(model);
+
+        var fromModel = model.GetBinder(state);
+        var firstFromFactory = factory.GetBinder(state);
+        var secondFromFactory = factory.GetBinder(state);
+
+        Assert.Same(fromModel, firstFromFactory);
+        Assert.Same(firstFromFactory, secondFromFactory);
+        Assert.Equal(1, model.BindingSession.CachedBinderCount);
     }
 
     [Fact]

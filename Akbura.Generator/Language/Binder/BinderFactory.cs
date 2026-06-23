@@ -1,18 +1,19 @@
 using Akbura.Language.Syntax;
+using System;
 
 namespace Akbura.Language.Binder;
 
 internal sealed class BinderFactory
 {
-    private readonly BindingSession _bindingSession;
+    private readonly AkburaSemanticModel _semanticModel;
 
     public BinderFactory(AkburaSemanticModel semanticModel)
     {
-        _bindingSession = new BindingSession(semanticModel);
+        _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
     }
 
     public Binder GetBinder(AkburaSyntax syntax)
     {
-        return _bindingSession.GetBinder(syntax);
+        return _semanticModel.BindingSession.GetBinder(syntax);
     }
 }

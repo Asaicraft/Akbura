@@ -1,3 +1,4 @@
+using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
@@ -28,6 +29,30 @@ internal sealed class CSharpProbeBinder : Binder
     }
 
     public CSharpCompilation CSharpCompilation => Compilation.CSharpCompilation;
+
+    public AkburaConversion ClassifyConversion(
+        ITypeSymbol? sourceType,
+        ITypeSymbol? targetType)
+    {
+        if (sourceType == null || targetType == null)
+        {
+            return AkburaConversion.None(sourceType, targetType);
+        }
+
+        var conversion = CSharpCompilation.ClassifyConversion(sourceType, targetType);
+        var kind = conversion.IsIdentity
+            ? AkburaConversionKind.Identity
+            : conversion.IsImplicit
+                ? AkburaConversionKind.Implicit
+                : conversion.IsExplicit
+                    ? AkburaConversionKind.Explicit
+                    : AkburaConversionKind.None;
+
+        return new AkburaConversion(
+            kind,
+            sourceType,
+            targetType);
+    }
 
     public CSharpBindingResult BindFieldType(CSharp.CompilationUnitSyntax compilationUnit)
     {

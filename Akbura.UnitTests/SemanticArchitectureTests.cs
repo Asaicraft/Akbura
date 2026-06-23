@@ -476,6 +476,85 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void CSharpProbeBinder_ClassifiesConversionsThroughRoslyn()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+        var intBinding = binder.BindReturnExpression(
+            CreateReturnExpressionProbe(CSharpSyntaxFactory.ParseExpression("1")),
+            isBindingPath: true);
+        var doubleBinding = binder.BindReturnExpression(
+            CreateReturnExpressionProbe(CSharpSyntaxFactory.ParseExpression("1.0")),
+            isBindingPath: true);
+        var stringBinding = binder.BindReturnExpression(
+            CreateReturnExpressionProbe(CSharpSyntaxFactory.ParseExpression("\"text\"")),
+            isBindingPath: true);
+        var intType = intBinding.TypeSymbol;
+        var doubleType = doubleBinding.TypeSymbol;
+        var stringType = stringBinding.TypeSymbol;
+
+        Assert.NotNull(intType);
+        Assert.NotNull(doubleType);
+        Assert.NotNull(stringType);
+
+        var identity = binder.ClassifyConversion(intType, intType);
+        var implicitNumeric = binder.ClassifyConversion(intType, doubleType);
+        var explicitNumeric = binder.ClassifyConversion(doubleType, intType);
+        var none = binder.ClassifyConversion(stringType, intType);
+
+        Assert.Equal(AkburaConversionKind.Identity, identity.Kind);
+        Assert.True(identity.IsImplicit);
+        Assert.Equal(AkburaConversionKind.Implicit, implicitNumeric.Kind);
+        Assert.True(implicitNumeric.IsImplicit);
+        Assert.Equal(AkburaConversionKind.Explicit, explicitNumeric.Kind);
+        Assert.True(explicitNumeric.IsExplicit);
+        Assert.Equal(AkburaConversionKind.None, none.Kind);
+        Assert.False(none.Exists);
+    }
+
+    [Fact]
+    public void BoundConversionExpression_StoresConversionAndTargetType()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+        var intBinding = binder.BindReturnExpression(
+            CreateReturnExpressionProbe(CSharpSyntaxFactory.ParseExpression("1")),
+            isBindingPath: true);
+        var doubleBinding = binder.BindReturnExpression(
+            CreateReturnExpressionProbe(CSharpSyntaxFactory.ParseExpression("1.0")),
+            isBindingPath: true);
+        var intType = intBinding.TypeSymbol;
+        var doubleType = doubleBinding.TypeSymbol;
+
+        Assert.NotNull(intType);
+        Assert.NotNull(doubleType);
+
+        var operand = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.None),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var conversion = binder.ClassifyConversion(intType, doubleType);
+
+        var boundConversion = new BoundConversionExpression(
+            state,
+            binder,
+            operand,
+            conversion);
+
+        Assert.Same(operand, boundConversion.Operand);
+        Assert.Equal(AkburaConversionKind.Implicit, boundConversion.Conversion.Kind);
+        Assert.Equal("Double", boundConversion.Type?.Name);
+        Assert.False(boundConversion.HasErrors);
+    }
+
+    [Fact]
     public void BindingDiagnosticBag_DeduplicatesSemanticAndCSharpDiagnostics()
     {
         const string code = "state int count = 0;";

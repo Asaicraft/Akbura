@@ -1,5 +1,6 @@
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
+using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,6 +10,8 @@ using System.Collections.Immutable;
 using System.Linq;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using RoslynSemanticModel = Microsoft.CodeAnalysis.SemanticModel;
 
 namespace Akbura.Language.Binder;
@@ -100,6 +103,43 @@ internal sealed class CSharpProbeBinder : Binder
             : BindExpression(semanticModel, probeExpression, isBindingPath);
     }
 
+    public BoundExpression BindExpression(
+        AkburaSyntax syntax,
+        CSharp.ExpressionSyntax expression,
+        ITypeSymbol? targetType = null,
+        bool isBindingPath = true)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        if (expression == null)
+        {
+            throw new ArgumentNullException(nameof(expression));
+        }
+
+        var bindingResult = BindReturnExpression(
+            CreateReturnExpressionProbe(expression),
+            isBindingPath);
+        var boundExpression = new BoundCSharpExpression(
+            syntax,
+            this,
+            bindingResult);
+
+        if (targetType == null)
+        {
+            return boundExpression;
+        }
+
+        var conversion = ClassifyConversion(bindingResult.TypeSymbol, targetType);
+        return new BoundConversionExpression(
+            syntax,
+            this,
+            boundExpression,
+            conversion);
+    }
+
     public CSharpBindingResult BindExpressionStatement(
         CSharp.CompilationUnitSyntax compilationUnit,
         bool isBindingPath)
@@ -164,6 +204,20 @@ internal sealed class CSharpProbeBinder : Binder
     {
         var probeCompilation = CSharpCompilation.AddSyntaxTrees(syntaxTree);
         return probeCompilation.GetSemanticModel(syntaxTree);
+    }
+
+    private static CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(CSharp.ExpressionSyntax expression)
+    {
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(expression);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword)),
+                "__akbura_probe")
+            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
+        var type = CSharpSyntaxFactory.ClassDeclaration("__AkburaProbe")
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
+
+        return CSharpSyntaxFactory.CompilationUnit()
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));
     }
 
     private static CSharpBindingResult BindExpression(

@@ -555,6 +555,51 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void CSharpProbeBinder_BindExpressionReturnsBoundExpressionAndAppliesTargetConversion()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+        var doubleType = binder.CSharpCompilation.GetSpecialType(SpecialType.System_Double);
+
+        var bound = binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("1"),
+            doubleType);
+
+        var conversion = Assert.IsType<BoundConversionExpression>(bound);
+        var operand = Assert.IsType<BoundCSharpExpression>(conversion.Operand);
+        Assert.Equal("Int32", operand.Type?.Name);
+        Assert.Equal(AkburaConversionKind.Implicit, conversion.Conversion.Kind);
+        Assert.Equal("Double", conversion.Type?.Name);
+        Assert.False(conversion.HasErrors);
+    }
+
+    [Fact]
+    public void CSharpProbeBinder_BindExpressionMarksInvalidTargetConversionAsError()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+        var intType = binder.CSharpCompilation.GetSpecialType(SpecialType.System_Int32);
+
+        var bound = binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("\"text\""),
+            intType);
+
+        var conversion = Assert.IsType<BoundConversionExpression>(bound);
+        var operand = Assert.IsType<BoundCSharpExpression>(conversion.Operand);
+        Assert.Equal("String", operand.Type?.Name);
+        Assert.Equal(AkburaConversionKind.None, conversion.Conversion.Kind);
+        Assert.True(conversion.HasErrors);
+    }
+
+    [Fact]
     public void BindingDiagnosticBag_DeduplicatesSemanticAndCSharpDiagnostics()
     {
         const string code = "state int count = 0;";

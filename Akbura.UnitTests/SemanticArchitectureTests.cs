@@ -789,6 +789,45 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void CSharpProbeBinder_BindExpressionBuildsCallBoundNode()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+
+        var bound = binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("System.Math.Abs(1)"));
+
+        var call = Assert.IsType<BoundCallExpression>(bound);
+        Assert.Equal("Abs", call.TargetMethod?.Name);
+        Assert.Equal("Int32", call.Type?.Name);
+        Assert.NotNull(call.Receiver);
+        Assert.Single(call.Arguments);
+        Assert.Same(call.Receiver, call.Children[0]);
+        Assert.Same(call.Arguments[0], call.Children[1]);
+
+        var argument = Assert.IsType<BoundLiteralExpression>(call.Arguments[0]);
+        Assert.Equal(1, argument.ConstantValue);
+
+        var replacement = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var rewritten = Assert.IsType<BoundCallExpression>(
+            new ReplacingBoundTreeRewriter(argument, replacement).Visit(call));
+
+        Assert.NotSame(call, rewritten);
+        Assert.Same(replacement, rewritten.Arguments[0]);
+        Assert.Same(rewritten.Receiver, rewritten.Children[0]);
+        Assert.Same(rewritten.Arguments[0], rewritten.Children[1]);
+    }
+
+    [Fact]
     public void CSharpProbeBinder_BindExpressionMarksInvalidTargetConversionAsError()
     {
         const string code = "state int count = 0;";

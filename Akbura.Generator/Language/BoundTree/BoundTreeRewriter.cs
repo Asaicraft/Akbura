@@ -99,12 +99,12 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
 
     public override BoundNode? VisitCSharpExpression(BoundCSharpExpression node)
     {
-        return node;
+        return VisitExpression(node);
     }
 
     public override BoundNode? VisitLiteralExpression(BoundLiteralExpression node)
     {
-        return node;
+        return VisitExpression(node);
     }
 
     public override BoundNode? VisitBinaryExpression(BoundBinaryExpression node)
@@ -132,6 +132,26 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             node.OperatorKind,
             left,
             right,
+            node.Diagnostics);
+    }
+
+    public override BoundNode? VisitCallExpression(BoundCallExpression node)
+    {
+        var receiver = (BoundExpression?)Visit(node.Receiver);
+        var arguments = VisitExpressionList(node.Arguments);
+        if (ReferenceEquals(receiver, node.Receiver) &&
+            arguments == node.Arguments)
+        {
+            return node;
+        }
+
+        return new BoundCallExpression(
+            node.Syntax,
+            node.Binder,
+            node.BindingResult,
+            node.TargetMethod,
+            receiver,
+            arguments,
             node.Diagnostics);
     }
 
@@ -196,6 +216,45 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 }
 
                 builder = ArrayBuilder<BoundNode>.GetInstance(nodes.Length);
+                for (var previous = 0; previous < index; previous++)
+                {
+                    builder.Add(nodes[previous]);
+                }
+            }
+
+            if (newNode != null)
+            {
+                builder.Add(newNode);
+            }
+        }
+
+        return builder == null
+            ? nodes
+            : builder.ToImmutableAndFree();
+    }
+
+    protected virtual ImmutableArray<BoundExpression> VisitExpressionList(ImmutableArray<BoundExpression> nodes)
+    {
+        if (nodes.IsDefaultOrEmpty)
+        {
+            return nodes.IsDefault ? ImmutableArray<BoundExpression>.Empty : nodes;
+        }
+
+        ArrayBuilder<BoundExpression>? builder = null;
+
+        for (var index = 0; index < nodes.Length; index++)
+        {
+            var oldNode = nodes[index];
+            var newNode = (BoundExpression?)Visit(oldNode);
+
+            if (builder == null)
+            {
+                if (ReferenceEquals(newNode, oldNode))
+                {
+                    continue;
+                }
+
+                builder = ArrayBuilder<BoundExpression>.GetInstance(nodes.Length);
                 for (var previous = 0; previous < index; previous++)
                 {
                     builder.Add(nodes[previous]);

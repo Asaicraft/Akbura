@@ -249,11 +249,58 @@ internal sealed class CSharpProbeBinder : Binder
                     binaryExpression.Kind(),
                     BindExpressionTree(syntax, semanticModel, binaryExpression.Left, isBindingPath),
                     BindExpressionTree(syntax, semanticModel, binaryExpression.Right, isBindingPath)),
+            CSharp.InvocationExpressionSyntax invocationExpression =>
+                new BoundCallExpression(
+                    syntax,
+                    this,
+                    bindingResult,
+                    bindingResult.Symbol as IMethodSymbol,
+                    BindInvocationReceiver(syntax, semanticModel, invocationExpression, isBindingPath),
+                    BindInvocationArguments(syntax, semanticModel, invocationExpression, isBindingPath)),
             _ => new BoundCSharpExpression(
                 syntax,
                 this,
                 bindingResult),
         };
+    }
+
+    private BoundExpression? BindInvocationReceiver(
+        AkburaSyntax syntax,
+        RoslynSemanticModel semanticModel,
+        CSharp.InvocationExpressionSyntax invocationExpression,
+        bool isBindingPath)
+    {
+        return invocationExpression.Expression switch
+        {
+            CSharp.MemberAccessExpressionSyntax memberAccess =>
+                BindExpressionTree(syntax, semanticModel, memberAccess.Expression, isBindingPath),
+            _ => null,
+        };
+    }
+
+    private ImmutableArray<BoundExpression> BindInvocationArguments(
+        AkburaSyntax syntax,
+        RoslynSemanticModel semanticModel,
+        CSharp.InvocationExpressionSyntax invocationExpression,
+        bool isBindingPath)
+    {
+        var arguments = invocationExpression.ArgumentList.Arguments;
+        if (arguments.Count == 0)
+        {
+            return ImmutableArray<BoundExpression>.Empty;
+        }
+
+        var builder = ArrayBuilder<BoundExpression>.GetInstance(arguments.Count);
+        foreach (var argument in arguments)
+        {
+            builder.Add(BindExpressionTree(
+                syntax,
+                semanticModel,
+                argument.Expression,
+                isBindingPath));
+        }
+
+        return builder.ToImmutableAndFree();
     }
 
     private static object? GetConstantValue(

@@ -563,6 +563,36 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BoundTreeRewriter_VisitsSymbols()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(model.GetSymbolInfo(state).Symbol);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+        var call = Assert.IsType<BoundCallExpression>(binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("System.Math.Abs(1)")));
+        var localDeclaration = Assert.IsType<BoundLocalDeclarationStatement>(binder.BindStatement(
+            state,
+            CSharpSyntaxFactory.ParseStatement("int value = 1;")));
+        var block = new BoundBlock(
+            state,
+            binder,
+            ImmutableArray.Create<AkburaSymbol>(stateSymbol),
+            ImmutableArray.Create<BoundNode>(call, localDeclaration));
+        var rewriter = new RecordingSymbolBoundTreeRewriter();
+
+        var rewritten = rewriter.Visit(block);
+
+        Assert.Same(block, rewritten);
+        Assert.Equal(1, rewriter.StateSymbolCount);
+        Assert.Equal(1, rewriter.MethodSymbolCount);
+        Assert.Equal(1, rewriter.LocalSymbolCount);
+    }
+
+    [Fact]
     public void BindingSession_CachesBinderChainsBySyntaxAndUsage()
     {
         const string code = "state int count = 0;\n<TextBlock Text=\"Hello\" />";
@@ -1224,6 +1254,33 @@ public sealed class SemanticArchitectureTests
             return ReferenceEquals(node, _oldOperand)
                 ? _newOperand
                 : base.VisitExpression(node);
+        }
+    }
+
+    private sealed class RecordingSymbolBoundTreeRewriter : BoundTreeRewriter
+    {
+        public int StateSymbolCount { get; private set; }
+
+        public int MethodSymbolCount { get; private set; }
+
+        public int LocalSymbolCount { get; private set; }
+
+        protected override AkburaSymbol VisitStateSymbol(IStateSymbol symbol)
+        {
+            StateSymbolCount++;
+            return base.VisitStateSymbol(symbol);
+        }
+
+        protected override Microsoft.CodeAnalysis.ISymbol VisitMethodSymbol(IMethodSymbol symbol)
+        {
+            MethodSymbolCount++;
+            return base.VisitMethodSymbol(symbol);
+        }
+
+        protected override Microsoft.CodeAnalysis.ISymbol VisitLocalSymbol(ILocalSymbol symbol)
+        {
+            LocalSymbolCount++;
+            return base.VisitLocalSymbol(symbol);
         }
     }
 

@@ -8,8 +8,10 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+using System.Threading.Tasks;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaOperationKind = Akbura.Language.Operations.OperationKind;
+using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using AkburaSymbolVisitor = Akbura.Language.Symbols.SymbolVisitor;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -336,6 +338,54 @@ public sealed class SemanticArchitectureTests
         Assert.DoesNotContain(fields, field =>
             field.FieldType.FullName?.Contains(nameof(BoundNode), StringComparison.Ordinal) == true ||
             field.FieldType.FullName?.Contains(nameof(AkburaOperation), StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void BindingSession_CacheIsThreadSafeForParallelBinderRequests()
+    {
+        const string code = "state int count = 0;\n<TextBlock Text=\"Hello\" />";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binders = new Binder[64];
+
+        Parallel.For(0, binders.Length, index =>
+        {
+            binders[index] = model.GetBinder(state, BinderUsage.Expression);
+        });
+
+        var first = binders[0];
+        Assert.All(binders, binder => Assert.Same(first, binder));
+    }
+
+    [Fact]
+    public void ComponentBinder_DeclaredSymbolsAreLazyAndStable()
+    {
+        const string code =
+            "inject ILogger<Counter> logger;\n" +
+            "param int UserId = 1;\n" +
+            "state int count = 0;\n" +
+            "command int Refresh(int userId);";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var binder = Assert.IsType<ComponentBinder>(model.GetBinder(root));
+        var lazyField = typeof(ComponentBinder).GetField(
+            "_lazyDeclaredSymbols",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(lazyField);
+        var before = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
+        Assert.True(before.IsDefault);
+
+        var first = binder.GetDeclaredSymbolsForScope(root);
+        var after = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
+        var second = binder.GetDeclaredSymbolsForScope(root);
+
+        Assert.False(after.IsDefault);
+        Assert.Equal(4, first.Length);
+        Assert.Equal(first, second);
     }
 
     [Fact]

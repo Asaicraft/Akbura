@@ -7,6 +7,8 @@ namespace Akbura.Language.Binding;
 
 internal sealed class ComponentBinder : Binder
 {
+    private ImmutableArray<ISymbol> _lazyDeclaredSymbols;
+
     public ComponentBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
@@ -31,14 +33,7 @@ internal sealed class ComponentBinder : Binder
             return base.GetDeclaredSymbolsForScope(scopeDesignator);
         }
 
-        return CreateSymbolsForDeclarations(
-            Declaration.Children,
-            AkburaDeclarationKind.State,
-            AkburaDeclarationKind.Parameter,
-            AkburaDeclarationKind.InjectedService,
-            AkburaDeclarationKind.Command,
-            AkburaDeclarationKind.UseEffect,
-            AkburaDeclarationKind.UserHook);
+        return GetDeclaredSymbols();
     }
 
     protected override AkburaSymbolInfo LookupSymbolInSingleBinder(
@@ -57,5 +52,26 @@ internal sealed class ComponentBinder : Binder
         return symbol == null
             ? AkburaSymbolInfo.None(CandidateReason.NotFound)
             : AkburaSymbolInfo.Success(symbol);
+    }
+
+    private ImmutableArray<ISymbol> GetDeclaredSymbols()
+    {
+        var symbols = _lazyDeclaredSymbols;
+        if (!symbols.IsDefault)
+        {
+            return symbols;
+        }
+
+        symbols = CreateSymbolsForDeclarations(
+            Declaration!.Children,
+            AkburaDeclarationKind.State,
+            AkburaDeclarationKind.Parameter,
+            AkburaDeclarationKind.InjectedService,
+            AkburaDeclarationKind.Command,
+            AkburaDeclarationKind.UseEffect,
+            AkburaDeclarationKind.UserHook);
+
+        ImmutableInterlocked.InterlockedInitialize(ref _lazyDeclaredSymbols, symbols);
+        return _lazyDeclaredSymbols;
     }
 }

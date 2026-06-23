@@ -1,7 +1,7 @@
 using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 
 namespace Akbura.Language.Binding;
@@ -9,7 +9,7 @@ namespace Akbura.Language.Binding;
 internal sealed class BindingSession
 {
     private readonly AkburaSemanticModel _semanticModel;
-    private readonly Dictionary<BinderCacheKey, Binder> _binderCache = new();
+    private readonly ConcurrentDictionary<BinderCacheKey, Binder> _binderCache = new();
 
     public BindingSession(AkburaSemanticModel semanticModel)
     {
@@ -46,14 +46,8 @@ internal sealed class BindingSession
             scopeDesignator?.Green,
             nextScopeKey);
 
-        if (_binderCache.TryGetValue(key, out var cached))
-        {
-            return cached;
-        }
-
         var binder = CreateBinderChain(path, usage);
-        _binderCache.Add(key, binder);
-        return binder;
+        return _binderCache.GetOrAdd(key, binder);
     }
 
     public CSharpProbeBinder GetCSharpProbeBinder(

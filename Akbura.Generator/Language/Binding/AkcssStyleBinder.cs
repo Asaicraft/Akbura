@@ -7,6 +7,8 @@ namespace Akbura.Language.Binding;
 
 internal sealed class AkcssStyleBinder : Binder
 {
+    private ImmutableArray<ISymbol> _lazyDeclaredSymbols;
+
     public AkcssStyleBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
@@ -27,13 +29,12 @@ internal sealed class AkcssStyleBinder : Binder
     public override ImmutableArray<ISymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
     {
         if (!OwnsScope(scopeDesignator) ||
-            Declaration?.Kind != AkburaDeclarationKind.AkcssUtility ||
-            SemanticModel.GetSymbolInfo(Declaration.Syntax).Symbol is not ITailwindUtilitySymbol utility)
+            Declaration?.Kind != AkburaDeclarationKind.AkcssUtility)
         {
             return base.GetDeclaredSymbolsForScope(scopeDesignator);
         }
 
-        return ImmutableArray<ISymbol>.CastUp(utility.Parameters);
+        return GetDeclaredSymbols();
     }
 
     protected override AkburaSymbolInfo LookupSymbolInSingleBinder(
@@ -51,5 +52,26 @@ internal sealed class AkcssStyleBinder : Binder
         return symbol == null
             ? AkburaSymbolInfo.None(CandidateReason.NotFound)
             : AkburaSymbolInfo.Success(symbol);
+    }
+
+    private ImmutableArray<ISymbol> GetDeclaredSymbols()
+    {
+        var symbols = _lazyDeclaredSymbols;
+        if (!symbols.IsDefault)
+        {
+            return symbols;
+        }
+
+        if (SemanticModel.GetSymbolInfo(Declaration!.Syntax).Symbol is ITailwindUtilitySymbol utility)
+        {
+            symbols = ImmutableArray<ISymbol>.CastUp(utility.Parameters);
+        }
+        else
+        {
+            symbols = ImmutableArray<ISymbol>.Empty;
+        }
+
+        ImmutableInterlocked.InterlockedInitialize(ref _lazyDeclaredSymbols, symbols);
+        return _lazyDeclaredSymbols;
     }
 }

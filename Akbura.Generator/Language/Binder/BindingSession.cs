@@ -102,45 +102,10 @@ internal sealed class BindingSession
         AkburaSyntax syntax,
         out ImmutableArray<AkburaDeclaration> path)
     {
-        foreach (var root in _semanticModel.Compilation.DeclarationTable.Roots)
-        {
-            var builder = ArrayBuilder<AkburaDeclaration>.GetInstance();
-            if (TryFindDeclarationPath(root, syntax, builder))
-            {
-                path = builder.ToImmutableAndFree();
-                return true;
-            }
-
-            builder.Free();
-        }
-
-        path = default;
-        return false;
-    }
-
-    private static bool TryFindDeclarationPath(
-        AkburaDeclaration current,
-        AkburaSyntax syntax,
-        ArrayBuilder<AkburaDeclaration> path)
-    {
-        path.Add(current);
-
-        if (ReferenceEquals(current.Syntax, syntax) ||
-            ReferenceEquals(current.Syntax.Green, syntax.Green))
-        {
-            return true;
-        }
-
-        foreach (var child in current.Children)
-        {
-            if (TryFindDeclarationPath(child, syntax, path))
-            {
-                return true;
-            }
-        }
-
-        path.RemoveAt(path.Count - 1);
-        return false;
+        var finder = DeclarationPathFinder.GetInstance(syntax);
+        return finder.TryFind(
+            _semanticModel.Compilation.DeclarationTable.Roots,
+            out path);
     }
 
     private Binder CreateBinderChain(
@@ -251,5 +216,88 @@ internal sealed class BindingSession
         }
 
         return string.Empty;
+    }
+
+    private sealed class DeclarationPathFinder
+    {
+        private static readonly ObjectPool<DeclarationPathFinder> s_pool = CreatePool();
+
+        private readonly ObjectPool<DeclarationPathFinder> _pool;
+        private AkburaSyntax? _syntax;
+        private ArrayBuilder<AkburaDeclaration>? _path;
+
+        private DeclarationPathFinder(ObjectPool<DeclarationPathFinder> pool)
+        {
+            _pool = pool;
+        }
+
+        public static DeclarationPathFinder GetInstance(AkburaSyntax syntax)
+        {
+            var finder = s_pool.Allocate();
+            finder._syntax = syntax;
+            finder._path = ArrayBuilder<AkburaDeclaration>.GetInstance();
+            return finder;
+        }
+
+        public bool TryFind(
+            ImmutableArray<AkburaDeclaration> roots,
+            out ImmutableArray<AkburaDeclaration> path)
+        {
+            foreach (var root in roots)
+            {
+                _path!.Clear();
+                if (Visit(root))
+                {
+                    path = _path.ToImmutableAndFree();
+                    _path = null;
+                    Free();
+                    return true;
+                }
+            }
+
+            path = default;
+            Free();
+            return false;
+        }
+
+        private bool Visit(AkburaDeclaration current)
+        {
+            _path!.Add(current);
+
+            var syntax = _syntax!;
+            if (ReferenceEquals(current.Syntax, syntax) ||
+                ReferenceEquals(current.Syntax.Green, syntax.Green))
+            {
+                return true;
+            }
+
+            foreach (var child in current.Children)
+            {
+                if (Visit(child))
+                {
+                    return true;
+                }
+            }
+
+            _path.RemoveLast();
+            return false;
+        }
+
+        private void Free()
+        {
+            _syntax = null;
+            _path?.Free();
+            _path = null;
+            _pool.Free(this);
+        }
+
+        private static ObjectPool<DeclarationPathFinder> CreatePool()
+        {
+            ObjectPool<DeclarationPathFinder>? pool = null;
+            pool = new ObjectPool<DeclarationPathFinder>(
+                () => new DeclarationPathFinder(pool!),
+                size: 16);
+            return pool;
+        }
     }
 }

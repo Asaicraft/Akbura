@@ -18,4 +18,23 @@ internal abstract class BoundStatement : BoundNode
         : base(syntax, binder, symbolInfo, operation, diagnostics, children)
     {
     }
+
+    public override void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.VisitStatement(this);
+    }
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default
+    {
+        return visitor.VisitStatement(this);
+    }
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default
+    {
+        return visitor.VisitStatement(this, parameter);
+    }
 }

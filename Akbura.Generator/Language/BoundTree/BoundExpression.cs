@@ -21,4 +21,23 @@ internal class BoundExpression : BoundNode
     }
 
     public virtual ITypeSymbol? Type => null;
+
+    public override void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.VisitExpression(this);
+    }
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default
+    {
+        return visitor.VisitExpression(this);
+    }
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default
+    {
+        return visitor.VisitExpression(this, parameter);
+    }
 }

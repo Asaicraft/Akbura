@@ -18,4 +18,23 @@ internal sealed class BoundDeclaration : BoundNode
         : base(syntax, binder, symbolInfo, operation, diagnostics, children)
     {
     }
+
+    public override void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.VisitDeclaration(this);
+    }
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default
+    {
+        return visitor.VisitDeclaration(this);
+    }
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default
+    {
+        return visitor.VisitDeclaration(this, parameter);
+    }
 }

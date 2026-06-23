@@ -42,6 +42,23 @@ internal abstract class BoundNode
 
     public virtual bool IsError => false;
 
+    public virtual void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.DefaultVisit(this);
+    }
+
+    public virtual TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+    {
+        return visitor.DefaultVisit(this);
+    }
+
+    public virtual TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+    {
+        return visitor.DefaultVisit(this, parameter);
+    }
+
     public bool HasErrors
     {
         get

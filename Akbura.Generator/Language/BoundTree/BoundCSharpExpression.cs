@@ -31,4 +31,23 @@ internal sealed class BoundCSharpExpression : BoundExpression
     public override ITypeSymbol? Type => BindingResult.TypeSymbol;
 
     public override bool IsError => RoslynDiagnostics.Length != 0 || base.IsError;
+
+    public override void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.VisitCSharpExpression(this);
+    }
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default
+    {
+        return visitor.VisitCSharpExpression(this);
+    }
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default
+    {
+        return visitor.VisitCSharpExpression(this, parameter);
+    }
 }

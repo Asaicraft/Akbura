@@ -457,6 +457,110 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BoundTreeVisitor_DispatchesConcreteBoundNodes()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.GetBinder(state, BinderUsage.Expression);
+        var expression = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.None),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var conversion = new BoundConversionExpression(
+            state,
+            binder,
+            expression,
+            new AkburaConversion(AkburaConversionKind.Identity, null, null));
+        var block = new BoundBlock(
+            state,
+            binder,
+            ImmutableArray<AkburaSymbol>.Empty,
+            ImmutableArray.Create<BoundNode>(conversion));
+        var visitor = new RecordingBoundTreeVisitor();
+
+        visitor.Visit(block);
+        visitor.Visit(conversion);
+        visitor.Visit(expression);
+
+        Assert.Equal(
+            ["block", "conversion", "expression"],
+            visitor.Visited);
+    }
+
+    [Fact]
+    public void BoundTreeWalker_WalksChildrenWithStackGuard()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.GetBinder(state, BinderUsage.Expression);
+        var expression = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.None),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var conversion = new BoundConversionExpression(
+            state,
+            binder,
+            expression,
+            new AkburaConversion(AkburaConversionKind.Identity, null, null));
+        var block = new BoundBlock(
+            state,
+            binder,
+            ImmutableArray<AkburaSymbol>.Empty,
+            ImmutableArray.Create<BoundNode>(conversion));
+        var walker = new RecordingBoundTreeWalker();
+
+        walker.Visit(block);
+
+        Assert.Equal(
+            [nameof(BoundBlock), nameof(BoundConversionExpression), nameof(BoundExpression)],
+            walker.Visited);
+    }
+
+    [Fact]
+    public void BoundTreeRewriter_RewritesKnownChildrenAndPreservesNoOpIdentity()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.GetBinder(state, BinderUsage.Expression);
+        var oldOperand = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.None),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var newOperand = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var conversion = new BoundConversionExpression(
+            state,
+            binder,
+            oldOperand,
+            new AkburaConversion(AkburaConversionKind.Identity, null, null));
+
+        Assert.Same(conversion, new BoundTreeRewriter().Visit(conversion));
+
+        var rewritten = Assert.IsType<BoundConversionExpression>(
+            new ReplacingBoundTreeRewriter(oldOperand, newOperand).Visit(conversion));
+
+        Assert.NotSame(conversion, rewritten);
+        Assert.Same(newOperand, rewritten.Operand);
+        Assert.Equal(conversion.Conversion.Kind, rewritten.Conversion.Kind);
+    }
+
+    [Fact]
     public void BindingSession_CachesBinderChainsBySyntaxAndUsage()
     {
         const string code = "state int count = 0;\n<TextBlock Text=\"Hello\" />";
@@ -816,6 +920,58 @@ public sealed class SemanticArchitectureTests
 
         return CSharpSyntaxFactory.CompilationUnit()
             .WithMembers(CSharpSyntaxFactory.SingletonList<Microsoft.CodeAnalysis.CSharp.Syntax.MemberDeclarationSyntax>(probeClass));
+    }
+
+    private sealed class RecordingBoundTreeVisitor : BoundTreeVisitor
+    {
+        public List<string> Visited { get; } = [];
+
+        public override void VisitBlock(BoundBlock node)
+        {
+            Visited.Add("block");
+        }
+
+        public override void VisitConversionExpression(BoundConversionExpression node)
+        {
+            Visited.Add("conversion");
+        }
+
+        public override void VisitExpression(BoundExpression node)
+        {
+            Visited.Add("expression");
+        }
+    }
+
+    private sealed class RecordingBoundTreeWalker : BoundTreeWalker
+    {
+        public List<string> Visited { get; } = [];
+
+        public override void DefaultVisit(BoundNode node)
+        {
+            Visited.Add(node.GetType().Name);
+            base.DefaultVisit(node);
+        }
+    }
+
+    private sealed class ReplacingBoundTreeRewriter : BoundTreeRewriter
+    {
+        private readonly BoundExpression _oldOperand;
+        private readonly BoundExpression _newOperand;
+
+        public ReplacingBoundTreeRewriter(
+            BoundExpression oldOperand,
+            BoundExpression newOperand)
+        {
+            _oldOperand = oldOperand;
+            _newOperand = newOperand;
+        }
+
+        public override BoundNode? VisitExpression(BoundExpression node)
+        {
+            return ReferenceEquals(node, _oldOperand)
+                ? _newOperand
+                : base.VisitExpression(node);
+        }
     }
 
     private sealed class RecordingOperationWalker : OperationWalker

@@ -34,4 +34,23 @@ internal sealed class BoundConversionExpression : BoundExpression
     public override ITypeSymbol? Type => Conversion.TargetType ?? Operand.Type;
 
     public override bool IsError => !Conversion.Exists || base.IsError;
+
+    public override void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.VisitConversionExpression(this);
+    }
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default
+    {
+        return visitor.VisitConversionExpression(this);
+    }
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default
+    {
+        return visitor.VisitConversionExpression(this, parameter);
+    }
 }

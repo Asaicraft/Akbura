@@ -24,4 +24,23 @@ internal sealed class BoundErrorExpression : BoundExpression
     }
 
     public override bool IsError => true;
+
+    public override void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.VisitErrorExpression(this);
+    }
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default
+    {
+        return visitor.VisitErrorExpression(this);
+    }
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default
+    {
+        return visitor.VisitErrorExpression(this, parameter);
+    }
 }

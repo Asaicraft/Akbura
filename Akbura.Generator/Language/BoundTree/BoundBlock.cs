@@ -32,4 +32,23 @@ internal sealed class BoundBlock : BoundStatement
     public ImmutableArray<AkburaSymbol> DeclaredSymbols { get; }
 
     public ImmutableArray<BoundNode> Statements { get; }
+
+    public override void Accept(BoundTreeVisitor visitor)
+    {
+        visitor.VisitBlock(this);
+    }
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default
+    {
+        return visitor.VisitBlock(this);
+    }
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default
+    {
+        return visitor.VisitBlock(this, parameter);
+    }
 }

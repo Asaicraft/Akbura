@@ -1,26 +1,21 @@
 using BinderType = Akbura.Language.Binder.Binder;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
 
 namespace Akbura.Language.BoundTree;
 
-internal sealed class BoundBadStatement : BoundStatement
+internal abstract class BoundStatement : BoundNode
 {
-    public BoundBadStatement(
+    protected BoundStatement(
         AkburaSyntax syntax,
         BinderType binder,
+        AkburaSymbolInfo symbolInfo,
+        IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default)
-        : base(
-            syntax,
-            binder,
-            AkburaSymbolInfo.None(CandidateReason.NotFound),
-            operation: null,
-            diagnostics,
-            children)
+        : base(syntax, binder, symbolInfo, operation, diagnostics, children)
     {
     }
-
-    public override bool IsError => true;
 }

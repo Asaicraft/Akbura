@@ -7,7 +7,7 @@ using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 
 namespace Akbura.Language.BoundTree;
 
-internal sealed class BoundBlock : BoundNode
+internal sealed class BoundBlock : BoundStatement
 {
     public BoundBlock(
         AkburaSyntax syntax,

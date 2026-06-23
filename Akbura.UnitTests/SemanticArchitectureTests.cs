@@ -401,6 +401,7 @@ public sealed class SemanticArchitectureTests
         var unwrapped = markupBinder.WrapWithDeclaredSymbolsIfAny(markup, body);
 
         var block = Assert.IsType<BoundBlock>(wrapped);
+        Assert.IsAssignableFrom<BoundStatement>(block);
         Assert.Contains(block.DeclaredSymbols, symbol => symbol is IStateSymbol { Name: "count" });
         Assert.Same(body, Assert.Single(block.Statements));
         Assert.False(block.HasErrors);
@@ -431,6 +432,7 @@ public sealed class SemanticArchitectureTests
 
         Assert.True(errorExpression.IsError);
         Assert.True(errorExpression.HasErrors);
+        Assert.IsAssignableFrom<BoundStatement>(badStatement);
         Assert.True(badStatement.IsError);
         Assert.True(badStatement.HasErrors);
         Assert.Same(errorExpression, Assert.Single(badStatement.Children));

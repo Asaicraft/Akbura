@@ -46,6 +46,7 @@ internal sealed class AkburaConversions
         return new AkburaConversion(
             kind,
             sourceType,
-            targetType);
+            targetType,
+            conversion);
     }
 }

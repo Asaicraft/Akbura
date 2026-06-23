@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using CSharpConversion = Microsoft.CodeAnalysis.CSharp.Conversion;
 
 namespace Akbura.Language.BoundTree;
 
@@ -15,11 +16,13 @@ internal readonly struct AkburaConversion
     public AkburaConversion(
         AkburaConversionKind kind,
         ITypeSymbol? sourceType,
-        ITypeSymbol? targetType)
+        ITypeSymbol? targetType,
+        CSharpConversion csharpConversion = default)
     {
         Kind = kind;
         SourceType = sourceType;
         TargetType = targetType;
+        CSharpConversion = csharpConversion;
     }
 
     public AkburaConversionKind Kind { get; }
@@ -27,6 +30,8 @@ internal readonly struct AkburaConversion
     public ITypeSymbol? SourceType { get; }
 
     public ITypeSymbol? TargetType { get; }
+
+    public CSharpConversion CSharpConversion { get; }
 
     public bool Exists => Kind != AkburaConversionKind.None;
 

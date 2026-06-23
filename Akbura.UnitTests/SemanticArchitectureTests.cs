@@ -800,6 +800,48 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void AkburaConversions_PreserveRoslynConversionDetails()
+    {
+        const string code = "state int count = 0;";
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public enum Status
+            {
+                None,
+                Active
+            }
+            """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(csharpCode);
+        var csharpCompilation = CreateCSharpCompilation().AddSyntaxTrees(syntaxTree);
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = new AkburaCompilation(
+                csharpCompilation,
+                [tree],
+                rootNamespace: "Demo",
+                projectDirectory: Environment.CurrentDirectory)
+            .GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+        var intType = csharpCompilation.GetSpecialType(SpecialType.System_Int32);
+        var nullableIntType = csharpCompilation
+            .GetSpecialType(SpecialType.System_Nullable_T)
+            .Construct(intType);
+        var enumType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            csharpCompilation.GetTypeByMetadataName("Demo.Status"));
+
+        var nullableConversion = binder.Conversions.ClassifyConversion(intType, nullableIntType);
+        var enumConversion = binder.Conversions.ClassifyConversion(intType, enumType);
+
+        Assert.Equal(AkburaConversionKind.Implicit, nullableConversion.Kind);
+        Assert.True(nullableConversion.CSharpConversion.IsImplicit);
+        Assert.Same(nullableIntType, nullableConversion.TargetType);
+        Assert.Equal(AkburaConversionKind.Explicit, enumConversion.Kind);
+        Assert.True(enumConversion.CSharpConversion.IsExplicit);
+        Assert.Same(enumType, enumConversion.TargetType);
+    }
+
+    [Fact]
     public void BoundConversionExpression_StoresConversionAndTargetType()
     {
         const string code = "state int count = 0;";

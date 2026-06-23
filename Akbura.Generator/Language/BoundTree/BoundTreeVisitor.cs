@@ -17,6 +17,8 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitBadStatement(BoundBadStatement node) => VisitStatement(node);
 
+    public virtual void VisitLocalDeclarationStatement(BoundLocalDeclarationStatement node) => VisitStatement(node);
+
     public virtual void VisitDeclaration(BoundDeclaration node) => DefaultVisit(node);
 
     public virtual void VisitExpression(BoundExpression node) => DefaultVisit(node);
@@ -53,6 +55,9 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitBlock(BoundBlock node) => VisitStatement(node);
 
     public virtual TResult? VisitBadStatement(BoundBadStatement node) => VisitStatement(node);
+
+    public virtual TResult? VisitLocalDeclarationStatement(BoundLocalDeclarationStatement node) =>
+        VisitStatement(node);
 
     public virtual TResult? VisitDeclaration(BoundDeclaration node) => DefaultVisit(node);
 
@@ -92,6 +97,11 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         VisitStatement(node, parameter);
 
     public virtual TResult? VisitBadStatement(BoundBadStatement node, TParameter parameter) =>
+        VisitStatement(node, parameter);
+
+    public virtual TResult? VisitLocalDeclarationStatement(
+        BoundLocalDeclarationStatement node,
+        TParameter parameter) =>
         VisitStatement(node, parameter);
 
     public virtual TResult? VisitDeclaration(BoundDeclaration node, TParameter parameter) =>

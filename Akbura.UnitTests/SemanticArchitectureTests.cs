@@ -828,6 +828,49 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void CSharpProbeBinder_BindStatementBuildsLocalDeclarationBoundNode()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+
+        var bound = binder.BindStatement(
+            state,
+            CSharpSyntaxFactory.ParseStatement("int value = 1 + 2;"));
+
+        var localDeclaration = Assert.IsType<BoundLocalDeclarationStatement>(bound);
+        var local = Assert.Single(localDeclaration.Locals);
+        Assert.Equal("value", local.Name);
+        Assert.Equal("Int32", local.Type.Name);
+
+        var initializer = Assert.IsType<BoundBinaryExpression>(
+            Assert.Single(localDeclaration.Initializers));
+        Assert.Equal(CSharpSyntaxKind.AddExpression, initializer.OperatorKind);
+        Assert.Same(initializer, Assert.Single(localDeclaration.Children));
+
+        var left = Assert.IsType<BoundLiteralExpression>(initializer.Left);
+        var right = Assert.IsType<BoundLiteralExpression>(initializer.Right);
+        Assert.Equal(1, left.ConstantValue);
+        Assert.Equal(2, right.ConstantValue);
+
+        var replacement = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var rewritten = Assert.IsType<BoundLocalDeclarationStatement>(
+            new ReplacingBoundTreeRewriter(left, replacement).Visit(localDeclaration));
+        var rewrittenInitializer = Assert.IsType<BoundBinaryExpression>(
+            Assert.Single(rewritten.Initializers));
+
+        Assert.NotSame(localDeclaration, rewritten);
+        Assert.Same(replacement, rewrittenInitializer.Left);
+    }
+
+    [Fact]
     public void CSharpProbeBinder_BindExpressionMarksInvalidTargetConversionAsError()
     {
         const string code = "state int count = 0;";

@@ -63,6 +63,23 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             children);
     }
 
+    public override BoundNode? VisitLocalDeclarationStatement(BoundLocalDeclarationStatement node)
+    {
+        var initializers = VisitExpressionList(node.Initializers);
+        if (initializers == node.Initializers)
+        {
+            return node;
+        }
+
+        return new BoundLocalDeclarationStatement(
+            node.Syntax,
+            node.Binder,
+            node.BindingResult,
+            node.Locals,
+            initializers,
+            node.Diagnostics);
+    }
+
     public override BoundNode? VisitDeclaration(BoundDeclaration node)
     {
         var children = VisitList(node.Children);

@@ -161,6 +161,35 @@ internal sealed class CSharpProbeBinder : Binder
         return BindExpression(semanticModel, probeExpression, isBindingPath);
     }
 
+    public BoundStatement BindStatement(
+        AkburaSyntax syntax,
+        CSharp.StatementSyntax statement,
+        bool isBindingPath = false)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        if (statement == null)
+        {
+            throw new ArgumentNullException(nameof(statement));
+        }
+
+        var syntaxTree = CreateSyntaxTree(CreateStatementProbe(statement));
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var probeStatement = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.MethodDeclarationSyntax>()
+            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == "__akbura_statement_probe")
+            .Body!
+            .Statements
+            .Single();
+
+        return BindStatementTree(syntax, semanticModel, probeStatement, isBindingPath);
+    }
+
     public CSharpBindingResult BindMethodBlock(
         CSharp.CompilationUnitSyntax compilationUnit,
         string methodName)
@@ -223,6 +252,71 @@ internal sealed class CSharpProbeBinder : Binder
 
         return CSharpSyntaxFactory.CompilationUnit()
             .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));
+    }
+
+    private static CSharp.CompilationUnitSyntax CreateStatementProbe(CSharp.StatementSyntax statement)
+    {
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
+                "__akbura_statement_probe")
+            .WithBody(CSharpSyntaxFactory.Block(statement));
+        var type = CSharpSyntaxFactory.ClassDeclaration("__AkburaStatementProbe")
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
+
+        return CSharpSyntaxFactory.CompilationUnit()
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));
+    }
+
+    private BoundStatement BindStatementTree(
+        AkburaSyntax syntax,
+        RoslynSemanticModel semanticModel,
+        CSharp.StatementSyntax statement,
+        bool isBindingPath)
+    {
+        return statement switch
+        {
+            CSharp.LocalDeclarationStatementSyntax localDeclaration =>
+                BindLocalDeclarationStatement(syntax, semanticModel, localDeclaration, isBindingPath),
+            _ => new BoundBadStatement(
+                syntax,
+                this,
+                ImmutableArray<AkburaSemanticDiagnostic>.Empty),
+        };
+    }
+
+    private BoundLocalDeclarationStatement BindLocalDeclarationStatement(
+        AkburaSyntax syntax,
+        RoslynSemanticModel semanticModel,
+        CSharp.LocalDeclarationStatementSyntax statement,
+        bool isBindingPath)
+    {
+        var locals = ArrayBuilder<ILocalSymbol>.GetInstance(statement.Declaration.Variables.Count);
+        var initializers = ArrayBuilder<BoundExpression>.GetInstance(statement.Declaration.Variables.Count);
+
+        foreach (var variable in statement.Declaration.Variables)
+        {
+            if (semanticModel.GetDeclaredSymbol(variable) is ILocalSymbol local)
+            {
+                locals.Add(local);
+            }
+
+            if (variable.Initializer != null)
+            {
+                initializers.Add(BindExpressionTree(
+                    syntax,
+                    semanticModel,
+                    variable.Initializer.Value,
+                    isBindingPath));
+            }
+        }
+
+        var bindingResult = BindStatement(semanticModel, statement, locals.FirstOrDefault());
+        return new BoundLocalDeclarationStatement(
+            syntax,
+            this,
+            bindingResult,
+            locals.ToImmutableAndFree(),
+            initializers.ToImmutableAndFree());
     }
 
     private BoundExpression BindExpressionTree(
@@ -334,6 +428,25 @@ internal sealed class CSharpProbeBinder : Binder
             isBindingPath,
             symbolInfo.CandidateSymbols,
             ToAkburaCandidateReason(symbolInfo.CandidateReason),
+            operation == null ? default : new CSharpOperationDefinition(operation),
+            diagnostics);
+    }
+
+    private static CSharpBindingResult BindStatement(
+        RoslynSemanticModel semanticModel,
+        CSharp.StatementSyntax statement,
+        Microsoft.CodeAnalysis.ISymbol? symbol)
+    {
+        var operation = semanticModel.GetOperation(statement);
+        var diagnostics = GetProbeDiagnostics(semanticModel, statement);
+
+        return new CSharpBindingResult(
+            typeSymbol: null,
+            symbol,
+            receiverType: null,
+            isBindingPath: false,
+            candidateSymbols: ImmutableArray<Microsoft.CodeAnalysis.ISymbol>.Empty,
+            symbol == null ? AkburaCandidateReason.NotFound : AkburaCandidateReason.None,
             operation == null ? default : new CSharpOperationDefinition(operation),
             diagnostics);
     }

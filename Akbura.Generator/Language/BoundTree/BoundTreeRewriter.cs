@@ -151,7 +151,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
 
         if (left == null || right == null)
         {
-            return new BoundErrorExpression(
+            return new BoundBadExpression(
                 node.Syntax,
                 node.Binder,
                 node.Diagnostics);
@@ -199,7 +199,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
 
         if (operand == null)
         {
-            return new BoundErrorExpression(
+            return new BoundBadExpression(
                 node.Syntax,
                 node.Binder,
                 node.Diagnostics);
@@ -211,6 +211,21 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             operand,
             node.Conversion,
             node.Diagnostics);
+    }
+
+    public override BoundNode? VisitBadExpression(BoundBadExpression node)
+    {
+        var children = VisitList(node.Children);
+        if (children == node.Children)
+        {
+            return node;
+        }
+
+        return new BoundBadExpression(
+            node.Syntax,
+            node.Binder,
+            node.Diagnostics,
+            children);
     }
 
     public override BoundNode? VisitErrorExpression(BoundErrorExpression node)

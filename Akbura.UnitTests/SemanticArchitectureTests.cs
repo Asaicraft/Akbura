@@ -484,18 +484,27 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             ImmutableArray.Create(diagnostic));
-        var badStatement = new BoundBadStatement(
+        var badExpression = new BoundBadExpression(
             state,
             binder,
             ImmutableArray<AkburaSemanticDiagnostic>.Empty,
             ImmutableArray.Create<BoundNode>(errorExpression));
+        var badStatement = new BoundBadStatement(
+            state,
+            binder,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty,
+            ImmutableArray.Create<BoundNode>(badExpression));
 
         Assert.True(errorExpression.IsError);
         Assert.True(errorExpression.HasErrors);
+        Assert.True(badExpression.IsError);
+        Assert.True(badExpression.HasErrors);
+        Assert.IsAssignableFrom<BoundExpression>(badExpression);
+        Assert.Same(errorExpression, Assert.Single(badExpression.Children));
         Assert.IsAssignableFrom<BoundStatement>(badStatement);
         Assert.True(badStatement.IsError);
         Assert.True(badStatement.HasErrors);
-        Assert.Same(errorExpression, Assert.Single(badStatement.Children));
+        Assert.Same(badExpression, Assert.Single(badStatement.Children));
     }
 
     [Fact]
@@ -517,6 +526,10 @@ public sealed class SemanticArchitectureTests
             binder,
             expression,
             new AkburaConversion(AkburaConversionKind.Identity, null, null));
+        var badExpression = new BoundBadExpression(
+            state,
+            binder,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var block = new BoundBlock(
             state,
             binder,
@@ -526,10 +539,11 @@ public sealed class SemanticArchitectureTests
 
         visitor.Visit(block);
         visitor.Visit(conversion);
+        visitor.Visit(badExpression);
         visitor.Visit(expression);
 
         Assert.Equal(
-            ["block", "conversion", "expression"],
+            ["block", "conversion", "bad", "expression"],
             visitor.Visited);
     }
 
@@ -591,15 +605,25 @@ public sealed class SemanticArchitectureTests
             binder,
             oldOperand,
             new AkburaConversion(AkburaConversionKind.Identity, null, null));
+        var badExpression = new BoundBadExpression(
+            state,
+            binder,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty,
+            ImmutableArray.Create<BoundNode>(oldOperand));
 
         Assert.Same(conversion, new BoundTreeRewriter().Visit(conversion));
+        Assert.Same(badExpression, new BoundTreeRewriter().Visit(badExpression));
 
         var rewritten = Assert.IsType<BoundConversionExpression>(
             new ReplacingBoundTreeRewriter(oldOperand, newOperand).Visit(conversion));
+        var rewrittenBadExpression = Assert.IsType<BoundBadExpression>(
+            new ReplacingBoundTreeRewriter(oldOperand, newOperand).Visit(badExpression));
 
         Assert.NotSame(conversion, rewritten);
         Assert.Same(newOperand, rewritten.Operand);
         Assert.Equal(conversion.Conversion.Kind, rewritten.Conversion.Kind);
+        Assert.NotSame(badExpression, rewrittenBadExpression);
+        Assert.Same(newOperand, Assert.Single(rewrittenBadExpression.Children));
     }
 
     [Fact]
@@ -1313,6 +1337,11 @@ public sealed class SemanticArchitectureTests
         public override void VisitConversionExpression(BoundConversionExpression node)
         {
             Visited.Add("conversion");
+        }
+
+        public override void VisitBadExpression(BoundBadExpression node)
+        {
+            Visited.Add("bad");
         }
 
         public override void VisitExpression(BoundExpression node)

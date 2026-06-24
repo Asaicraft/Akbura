@@ -973,6 +973,54 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void CSharpProbeBinder_BindExpressionUsesComponentAndBlockScope()
+    {
+        const string code =
+            "state int total = 0;\n" +
+            "\n" +
+            "if(total > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    <TextBlock Text={count + total} />\n" +
+            "}";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(tree.GetRoot().Members[1]);
+        Assert.NotNull(ifStatement.Body);
+        var block = ifStatement.Body!;
+        var markup = Assert.IsType<MarkupRootSyntax>(block.Tokens[1]);
+
+        var bound = model.BindingSession.BindExpression(
+            markup,
+            CSharpSyntaxFactory.ParseExpression("count + total"),
+            usage: BinderUsage.Markup);
+
+        var binary = Assert.IsType<BoundBinaryExpression>(bound);
+        Assert.Equal("Int32", binary.Type?.Name);
+        Assert.False(binary.HasErrors);
+    }
+
+    [Fact]
+    public void CSharpProbeBinder_BindExpressionCreatesCommandFacadeFromScope()
+    {
+        const string code =
+            "command int CustomClick(int value);\n" +
+            "\n" +
+            "<TextBlock Tag={CustomClick.IsExecuting} />";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var markup = Assert.IsType<MarkupRootSyntax>(tree.GetRoot().Members[1]);
+
+        var bound = model.BindingSession.BindExpression(
+            markup,
+            CSharpSyntaxFactory.ParseExpression("CustomClick.IsExecuting"),
+            usage: BinderUsage.Markup);
+
+        Assert.Equal("IObservable", bound.Type?.Name);
+        Assert.False(bound.HasErrors);
+    }
+
+    [Fact]
     public void Binder_ConversionsAreLazyAndStable()
     {
         const string code = "state int count = 0;";

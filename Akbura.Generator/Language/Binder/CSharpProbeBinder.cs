@@ -16,7 +16,7 @@ using RoslynSemanticModel = Microsoft.CodeAnalysis.SemanticModel;
 
 namespace Akbura.Language.Binder;
 
-internal sealed class CSharpProbeBinder : Binder
+internal sealed partial class CSharpProbeBinder : Binder
 {
     public CSharpProbeBinder(
         AkburaSemanticModel semanticModel,
@@ -102,7 +102,7 @@ internal sealed class CSharpProbeBinder : Binder
             throw new ArgumentNullException(nameof(expression));
         }
 
-        var syntaxTree = CreateSyntaxTree(CreateReturnExpressionProbe(expression));
+        var syntaxTree = CreateSyntaxTree(CreateReturnExpressionProbe(syntax, expression));
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeExpression = syntaxTree
             .GetCompilationUnitRoot()
@@ -159,7 +159,7 @@ internal sealed class CSharpProbeBinder : Binder
             throw new ArgumentNullException(nameof(statement));
         }
 
-        var syntaxTree = CreateSyntaxTree(CreateStatementProbe(statement));
+        var syntaxTree = CreateSyntaxTree(CreateStatementProbe(syntax, statement));
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeStatement = syntaxTree
             .GetCompilationUnitRoot()
@@ -223,28 +223,34 @@ internal sealed class CSharpProbeBinder : Binder
         return probeCompilation.GetSemanticModel(syntaxTree);
     }
 
-    private static CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(CSharp.ExpressionSyntax expression)
+    private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
+        AkburaSyntax scope,
+        CSharp.ExpressionSyntax expression)
     {
+        var probeScope = CreateProbeScope(scope, expression);
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expression);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword)),
                 "__akbura_probe")
-            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
+            .WithBody(CreateProbeBlock(probeScope.LocalStatements, returnStatement));
         var type = CSharpSyntaxFactory.ClassDeclaration("__AkburaProbe")
-            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
+            .WithMembers(CSharpSyntaxFactory.List(AddProbeMethod(probeScope.MemberDeclarations, method)));
 
         return CSharpSyntaxFactory.CompilationUnit()
             .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));
     }
 
-    private static CSharp.CompilationUnitSyntax CreateStatementProbe(CSharp.StatementSyntax statement)
+    private CSharp.CompilationUnitSyntax CreateStatementProbe(
+        AkburaSyntax scope,
+        CSharp.StatementSyntax statement)
     {
+        var probeScope = CreateProbeScope(scope, statement);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
                 "__akbura_statement_probe")
-            .WithBody(CSharpSyntaxFactory.Block(statement));
+            .WithBody(CreateProbeBlock(probeScope.LocalStatements, statement));
         var type = CSharpSyntaxFactory.ClassDeclaration("__AkburaStatementProbe")
-            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
+            .WithMembers(CSharpSyntaxFactory.List(AddProbeMethod(probeScope.MemberDeclarations, method)));
 
         return CSharpSyntaxFactory.CompilationUnit()
             .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));

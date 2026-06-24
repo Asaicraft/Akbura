@@ -40,4 +40,6 @@ internal abstract class SymbolVisitor
     public virtual void VisitTailwindUtility(ITailwindUtilitySymbol symbol) => VisitAkcss(symbol);
 
     public virtual void VisitTailwindUtilityParameter(ITailwindUtilityParameterSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual void VisitCSharpSymbol(CSharpLocalSymbol symbol) => DefaultVisit(symbol);
 }

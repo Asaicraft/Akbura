@@ -61,4 +61,9 @@ internal abstract class SymbolVisitor<TParameter, TResult>
         ITailwindUtilityParameterSymbol symbol,
         TParameter parameter) =>
         DefaultVisit(symbol, parameter);
+
+    public virtual TResult VisitCSharpSymbol(
+        CSharpLocalSymbol symbol,
+        TParameter parameter) =>
+        DefaultVisit(symbol, parameter);
 }

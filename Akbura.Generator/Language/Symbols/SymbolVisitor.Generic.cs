@@ -43,4 +43,6 @@ internal abstract class SymbolVisitor<TResult>
     public virtual TResult VisitTailwindUtility(ITailwindUtilitySymbol symbol) => VisitAkcss(symbol);
 
     public virtual TResult VisitTailwindUtilityParameter(ITailwindUtilityParameterSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual TResult VisitCSharpSymbol(CSharpLocalSymbol symbol) => DefaultVisit(symbol);
 }

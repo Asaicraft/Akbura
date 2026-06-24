@@ -12,4 +12,5 @@ internal enum AkburaBinderFlags
     InAkcssStyle = 1 << 3,
     InAkcssUtility = 1 << 4,
     InCSharpProbe = 1 << 5,
+    InCSharpBlock = 1 << 6,
 }

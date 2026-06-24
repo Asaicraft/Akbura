@@ -394,6 +394,106 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BlockBinder_ResolvesLocalVariablesAndDelegatesOuterSymbols()
+    {
+        const string code =
+            "state int total = 0;\n" +
+            "\n" +
+            "if(total > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    Console.WriteLine(total + count);\n" +
+            "}";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(root.Members[1]);
+        Assert.NotNull(ifStatement.Body);
+        var block = ifStatement.Body!;
+        Assert.IsType<CSharpStatementSyntax>(block.Tokens[0]);
+        var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
+        var binder = Assert.IsType<BlockBinder>(model.GetBinder(writeLine, BinderUsage.Statement));
+        var diagnostics = new BindingDiagnosticBag();
+
+        Assert.Same(block, binder.ScopeDesignator);
+        Assert.True(binder.Flags.HasFlag(AkburaBinderFlags.InCSharpBlock));
+        Assert.True(binder.Flags.HasFlag(AkburaBinderFlags.InComponent));
+
+        var local = Assert.IsType<CSharpLocalSymbol>(binder.LookupSymbol(
+            "count",
+            BinderLookupOptions.None,
+            writeLine,
+            diagnostics).Symbol);
+        Assert.Equal("count", local.Name);
+        Assert.IsAssignableFrom<ILocalSymbol>(local.CSharpDefinition.Symbol);
+
+        var delegatedState = Assert.IsAssignableFrom<IStateSymbol>(binder.LookupSymbol(
+            "total",
+            BinderLookupOptions.None,
+            writeLine,
+            diagnostics).Symbol);
+        Assert.Equal("total", delegatedState.Name);
+    }
+
+    [Fact]
+    public void BlockBinder_LocalVariableShadowsComponentState()
+    {
+        const string code =
+            "state int count = 0;\n" +
+            "\n" +
+            "if(count > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    Console.WriteLine(count);\n" +
+            "}";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(tree.GetRoot().Members[1]);
+        Assert.NotNull(ifStatement.Body);
+        var block = ifStatement.Body!;
+        var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
+        var binder = Assert.IsType<BlockBinder>(model.GetBinder(writeLine, BinderUsage.Statement));
+
+        var symbol = binder.LookupSymbol(
+            "count",
+            BinderLookupOptions.None,
+            writeLine,
+            new BindingDiagnosticBag()).Symbol;
+
+        Assert.IsType<CSharpLocalSymbol>(symbol);
+    }
+
+    [Fact]
+    public void MarkupInsideCSharpBlock_DelegatesThroughBlockBinder()
+    {
+        const string code =
+            "state int total = 0;\n" +
+            "\n" +
+            "if(total > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    <TextBlock Text={count.ToString()} />\n" +
+            "}";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(tree.GetRoot().Members[1]);
+        Assert.NotNull(ifStatement.Body);
+        var block = ifStatement.Body!;
+        var markup = Assert.IsType<MarkupRootSyntax>(block.Tokens[1]);
+
+        var markupBinder = Assert.IsType<MarkupBinder>(model.GetBinder(markup, BinderUsage.Markup));
+        var blockBinder = Assert.IsType<BlockBinder>(markupBinder.NextRequired);
+        var symbol = markupBinder.LookupSymbol(
+            "count",
+            BinderLookupOptions.None,
+            markup,
+            new BindingDiagnosticBag()).Symbol;
+
+        Assert.Same(block, blockBinder.ScopeDesignator);
+        Assert.IsType<CSharpLocalSymbol>(symbol);
+    }
+
+    [Fact]
     public void BinderScopeOwnership_ReturnsDeclaredSymbolsForOwnedScopes()
     {
         const string code =
@@ -755,6 +855,32 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BinderFactoryVisitor_BuildsCSharpBlockBinderChain()
+    {
+        const string code =
+            "state int total = 0;\n" +
+            "if(total > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    Console.WriteLine(count);\n" +
+            "}";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(tree.GetRoot().Members[1]);
+        Assert.NotNull(ifStatement.Body);
+        var block = ifStatement.Body!;
+        var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
+
+        var binder = Assert.IsType<BlockBinder>(model.GetBinder(writeLine, BinderUsage.Statement));
+
+        Assert.Same(block, binder.ScopeDesignator);
+        Assert.True(binder.Flags.HasFlag(AkburaBinderFlags.InCSharpBlock));
+        Assert.IsType<ComponentBinder>(binder.NextRequired);
+        Assert.IsType<CompilationBinder>(binder.NextRequired.NextRequired);
+        Assert.Equal(1, model.BindingSession.CachedBinderCount);
+    }
+
+    [Fact]
     public void ComponentBinder_DeclaredSymbolsAreLazyAndStable()
     {
         const string code =
@@ -781,6 +907,42 @@ public sealed class SemanticArchitectureTests
 
         Assert.False(after.IsDefault);
         Assert.Equal(4, first.Length);
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void BlockBinder_DeclaredSymbolsAreLazyAndStable()
+    {
+        const string code =
+            "state int total = 0;\n" +
+            "if(total > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    int other = 2;\n" +
+            "    Console.WriteLine(count + other);\n" +
+            "}";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(tree.GetRoot().Members[1]);
+        Assert.NotNull(ifStatement.Body);
+        var block = ifStatement.Body!;
+        var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[2]);
+        var binder = Assert.IsType<BlockBinder>(model.GetBinder(writeLine, BinderUsage.Statement));
+        var lazyField = typeof(BlockBinder).GetField(
+            "_lazyDeclaredSymbols",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(lazyField);
+        var before = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
+        Assert.True(before.IsDefault);
+
+        var first = binder.GetDeclaredSymbolsForScope(block);
+        var after = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
+        var second = binder.GetDeclaredSymbolsForScope(block);
+
+        Assert.False(after.IsDefault);
+        Assert.Equal(["count", "other"], first.Select(symbol => symbol.Name));
         Assert.Equal(first, second);
     }
 

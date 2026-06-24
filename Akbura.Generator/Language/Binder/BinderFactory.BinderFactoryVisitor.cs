@@ -128,6 +128,16 @@ internal sealed partial class BinderFactory
             return CreateAkcssStyleBinder();
         }
 
+        public override Binder VisitCSharpBlockSyntax(CSharpBlockSyntax node)
+        {
+            var declaration = RequiredDeclaration(AkburaDeclarationKind.CSharpBlock);
+            return new BlockBinder(
+                Factory.SemanticModel,
+                Next,
+                declaration,
+                Next.Flags | GetUsageFlags(_usage));
+        }
+
         private MarkupBinder CreateMarkupBinder()
         {
             var declaration = RequiredDeclaration(
@@ -194,6 +204,7 @@ internal sealed partial class BinderFactory
                 {
                     AkburaDeclarationKind.Component => AkburaBinderFlags.InComponent,
                     AkburaDeclarationKind.MarkupRoot or AkburaDeclarationKind.MarkupElement => AkburaBinderFlags.InMarkup,
+                    AkburaDeclarationKind.CSharpBlock => AkburaBinderFlags.InCSharpBlock,
                     AkburaDeclarationKind.AkcssModule => AkburaBinderFlags.InAkcss,
                     AkburaDeclarationKind.AkcssStyle => AkburaBinderFlags.InAkcss | AkburaBinderFlags.InAkcssStyle,
                     AkburaDeclarationKind.AkcssUtility => AkburaBinderFlags.InAkcss | AkburaBinderFlags.InAkcssUtility,
@@ -224,6 +235,7 @@ internal sealed partial class BinderFactory
                     case AkburaDeclarationKind.Component:
                     case AkburaDeclarationKind.MarkupRoot:
                     case AkburaDeclarationKind.MarkupElement:
+                    case AkburaDeclarationKind.CSharpBlock:
                     case AkburaDeclarationKind.AkcssModule:
                     case AkburaDeclarationKind.AkcssStyle:
                     case AkburaDeclarationKind.AkcssUtility:
@@ -244,6 +256,7 @@ internal sealed partial class BinderFactory
                     case AkburaDeclarationKind.Component:
                     case AkburaDeclarationKind.MarkupRoot:
                     case AkburaDeclarationKind.MarkupElement:
+                    case AkburaDeclarationKind.CSharpBlock:
                     case AkburaDeclarationKind.AkcssModule:
                     case AkburaDeclarationKind.AkcssStyle:
                     case AkburaDeclarationKind.AkcssUtility:

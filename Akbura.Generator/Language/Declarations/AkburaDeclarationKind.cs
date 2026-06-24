@@ -13,6 +13,8 @@ internal enum AkburaDeclarationKind
     Command,
     UseEffect,
     UserHook,
+    CSharpStatement,
+    CSharpBlock,
     MarkupRoot,
     MarkupElement,
     AkcssModule,

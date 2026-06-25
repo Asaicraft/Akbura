@@ -37,21 +37,25 @@ internal sealed class AkcssStyleBinder : Binder
         return GetDeclaredSymbols();
     }
 
-    protected override AkburaSymbolInfo LookupSymbolInSingleBinder(
+    protected override void LookupSymbolsInSingleBinder(
+        LookupResult result,
         string name,
+        int arity,
         BinderLookupOptions options,
+        Binder originalBinder,
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
         if (Declaration?.Kind != AkburaDeclarationKind.AkcssUtility)
         {
-            return AkburaSymbolInfo.None(CandidateReason.NotFound);
+            return;
         }
 
         var symbol = FindDeclaredSymbol(GetDeclaredSymbolsForScope(Declaration.Syntax), name);
-        return symbol == null
-            ? AkburaSymbolInfo.None(CandidateReason.NotFound)
-            : AkburaSymbolInfo.Success(symbol);
+        if (symbol != null)
+        {
+            result.SetSymbol(symbol);
+        }
     }
 
     private ImmutableArray<ISymbol> GetDeclaredSymbols()

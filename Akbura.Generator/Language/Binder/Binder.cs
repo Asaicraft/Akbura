@@ -69,16 +69,54 @@ internal abstract class Binder
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
-        var result = LookupSymbolInSingleBinder(name, options, syntax, diagnostics);
-        if (result.Symbol != null ||
-            result.CandidateSymbols.Length > 0 ||
-            result.CandidateReason == AkburaCandidateReason.Ambiguous)
+        var result = LookupResult.GetInstance();
+        LookupSymbolsInternal(
+            result,
+            name,
+            arity: 0,
+            options,
+            originalBinder: this,
+            syntax,
+            diagnostics);
+
+        return result.ToSymbolInfoAndFree(AkburaCandidateReason.NotFound);
+    }
+
+    public void LookupSymbolsInternal(
+        LookupResult result,
+        string name,
+        int arity,
+        BinderLookupOptions options,
+        Binder originalBinder,
+        AkburaSyntax syntax,
+        BindingDiagnosticBag diagnostics)
+    {
+        if (result == null)
         {
-            return result;
+            throw new ArgumentNullException(nameof(result));
         }
 
-        return Next?.LookupSymbol(name, options, syntax, diagnostics) ??
-               AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+        if (originalBinder == null)
+        {
+            throw new ArgumentNullException(nameof(originalBinder));
+        }
+
+        for (var binder = this; binder != null; binder = binder.Next)
+        {
+            binder.LookupSymbolsInSingleBinder(
+                result,
+                name,
+                arity,
+                options,
+                originalBinder,
+                syntax,
+                diagnostics);
+
+            if (result.IsComplete)
+            {
+                return;
+            }
+        }
     }
 
     public virtual ImmutableArray<AkburaSymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
@@ -99,13 +137,15 @@ internal abstract class Binder
         Next?.AddCSharpDiagnostics(diagnostics);
     }
 
-    protected virtual AkburaSymbolInfo LookupSymbolInSingleBinder(
+    protected virtual void LookupSymbolsInSingleBinder(
+        LookupResult result,
         string name,
+        int arity,
         BinderLookupOptions options,
+        Binder originalBinder,
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
-        return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
     }
 
     protected bool OwnsScope(AkburaSyntax scopeDesignator)

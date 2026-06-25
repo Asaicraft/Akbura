@@ -36,22 +36,26 @@ internal sealed class ComponentBinder : Binder
         return GetDeclaredSymbols();
     }
 
-    protected override AkburaSymbolInfo LookupSymbolInSingleBinder(
+    protected override void LookupSymbolsInSingleBinder(
+        LookupResult result,
         string name,
+        int arity,
         BinderLookupOptions options,
+        Binder originalBinder,
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
         if (Declaration == null)
         {
-            return AkburaSymbolInfo.None(CandidateReason.NotFound);
+            return;
         }
 
         var symbols = GetDeclaredSymbolsForScope(Declaration.Syntax);
         var symbol = FindDeclaredSymbol(symbols, name);
-        return symbol == null
-            ? AkburaSymbolInfo.None(CandidateReason.NotFound)
-            : AkburaSymbolInfo.Success(symbol);
+        if (symbol != null)
+        {
+            result.SetSymbol(symbol);
+        }
     }
 
     private ImmutableArray<ISymbol> GetDeclaredSymbols()

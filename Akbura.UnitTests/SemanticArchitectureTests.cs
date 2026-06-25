@@ -542,6 +542,87 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BinderLookup_InternalLookupUsesLookupResult()
+    {
+        const string code =
+            "state int count = 0;\n" +
+            "<TextBlock Text={count.ToString()} />";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var markup = Assert.IsType<MarkupRootSyntax>(tree.GetRoot().Members[1]);
+        var binder = Assert.IsType<MarkupBinder>(model.GetBinder(markup, BinderUsage.Markup));
+        var result = LookupResult.GetInstance();
+
+        try
+        {
+            binder.LookupSymbolsInternal(
+                result,
+                "count",
+                arity: 0,
+                BinderLookupOptions.None,
+                originalBinder: binder,
+                markup,
+                new BindingDiagnosticBag());
+
+            Assert.True(result.IsGood);
+            var symbolInfo = result.ToSymbolInfo();
+            Assert.IsAssignableFrom<IStateSymbol>(symbolInfo.Symbol);
+        }
+        finally
+        {
+            result.Free();
+        }
+    }
+
+    [Fact]
+    public void BinderLookup_MissingSymbolLeavesLookupResultClearUntilChainEnds()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var binder = model.GetBinder(tree.GetRoot(), BinderUsage.Expression);
+        var result = LookupResult.GetInstance();
+
+        binder.LookupSymbolsInternal(
+            result,
+            "missing",
+            arity: 0,
+            BinderLookupOptions.None,
+            originalBinder: binder,
+            tree.GetRoot(),
+            new BindingDiagnosticBag());
+
+        var symbolInfo = result.ToSymbolInfoAndFree();
+        Assert.Null(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.NotFound, symbolInfo.CandidateReason);
+    }
+
+    [Fact]
+    public void LookupResult_PooledInstancesResetBeforeReuse()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(model.GetSymbolInfo(state).Symbol);
+        var result = LookupResult.GetInstance();
+        result.SetSymbol(stateSymbol);
+        result.Free();
+
+        var reused = LookupResult.GetInstance();
+        try
+        {
+            Assert.True(reused.IsClear);
+            Assert.Null(reused.Symbol);
+            Assert.Equal(AkburaCandidateReason.NotFound, reused.CandidateReason);
+        }
+        finally
+        {
+            reused.Free();
+        }
+    }
+
+    [Fact]
     public void BlockBinder_ResolvesLocalVariablesAndDelegatesOuterSymbols()
     {
         const string code =

@@ -38,15 +38,18 @@ internal sealed class BlockBinder : Binder
         return GetDeclaredSymbols();
     }
 
-    protected override AkburaSymbolInfo LookupSymbolInSingleBinder(
+    protected override void LookupSymbolsInSingleBinder(
+        LookupResult result,
         string name,
+        int arity,
         BinderLookupOptions options,
+        Binder originalBinder,
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
         if (Declaration == null)
         {
-            return AkburaSymbolInfo.None(CandidateReason.NotFound);
+            return;
         }
 
         var symbols = GetDeclaredSymbolsForScope(Declaration.Syntax);
@@ -58,10 +61,9 @@ internal sealed class BlockBinder : Binder
                 continue;
             }
 
-            return AkburaSymbolInfo.Success(symbol);
+            result.SetSymbol(symbol);
+            return;
         }
-
-        return AkburaSymbolInfo.None(CandidateReason.NotFound);
     }
 
     private ImmutableArray<ISymbol> GetDeclaredSymbols()

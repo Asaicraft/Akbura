@@ -32,6 +32,7 @@ internal sealed partial class AkburaSemanticModel
     private readonly Dictionary<AkburaSyntax, AkburaOperation?> _operationCache = new();
     private readonly Dictionary<AkburaSyntax, BoundNode> _boundNodeCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
+    private readonly Dictionary<AkburaSyntax, MemberSemanticModel> _memberSemanticModelCache = new();
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
 
@@ -58,12 +59,12 @@ internal sealed partial class AkburaSemanticModel
 
         return _bindingCache.GetSymbolInfo(syntax, () => syntax switch
         {
-            AkburaDocumentSyntax document => ResolveAkburaComponent(document),
-            StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
-            ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
-            InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
-            CommandDeclarationSyntax commandDeclaration => ResolveCommand(commandDeclaration),
-            UseEffectDeclarationSyntax useEffectDeclaration => ResolveUseEffect(useEffectDeclaration),
+            AkburaDocumentSyntax or
+                StateDeclarationSyntax or
+                ParamDeclarationSyntax or
+                InjectDeclarationSyntax or
+                CommandDeclarationSyntax or
+                UseEffectDeclarationSyntax => GetMemberSemanticModel(syntax).GetSymbolInfo(syntax),
             InlineAkcssBlockSyntax inlineAkcssBlock => ResolveInlineAkcssModule(inlineAkcssBlock),
             AkcssStyleRuleSyntax styleRule => ResolveAkcssStyle(styleRule),
             AkcssUtilityDeclarationSyntax utilityDeclaration => ResolveTailwindUtility(utilityDeclaration),
@@ -151,12 +152,45 @@ internal sealed partial class AkburaSemanticModel
         return _bindingSession.GetBinder(syntax, usage);
     }
 
+    internal MemberSemanticModel GetMemberSemanticModel(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        ValidateSyntaxTreeOwnership(syntax);
+
+        var scope = GetMemberSemanticModelScope(syntax);
+        if (_memberSemanticModelCache.TryGetValue(scope, out var memberModel))
+        {
+            return memberModel;
+        }
+
+        memberModel = new ComponentMemberSemanticModel(this, scope);
+        _memberSemanticModelCache.Add(scope, memberModel);
+        return memberModel;
+    }
+
     internal BindingSession BindingSession
     {
         get
         {
             return _bindingSession;
         }
+    }
+
+    private AkburaDocumentSyntax GetMemberSemanticModelScope(AkburaSyntax syntax)
+    {
+        for (var node = syntax; node != null; node = node.Parent)
+        {
+            if (node is AkburaDocumentSyntax document)
+            {
+                return document;
+            }
+        }
+
+        return SyntaxTree.GetRoot();
     }
 
     internal bool TryGetCachedSymbolInfoByGreen(
@@ -225,198 +259,6 @@ internal sealed partial class AkburaSemanticModel
 
         diagnostics = default;
         return false;
-    }
-
-    private AkburaSymbolInfo ResolveAkburaComponent(AkburaDocumentSyntax document)
-    {
-        var componentName = SyntaxTree.ComponentName;
-        if (string.IsNullOrWhiteSpace(componentName))
-        {
-            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
-        }
-
-        var namespaceName = GetAkburaNamespaceText(document, SyntaxTree);
-        var partialTypes = ResolveAkburaComponentPartialTypes(SyntaxTree);
-        var contentModel = partialTypes.Length > 0
-            ? CreateMarkupContentModel(partialTypes[0])
-            : default;
-
-        using var markupRootsBuilder = ImmutableArrayBuilder<MarkupRootSyntax>.Rent();
-        using var markupRootSymbolsBuilder = ImmutableArrayBuilder<IMarkupComponentSymbol>.Rent();
-        using var statesBuilder = ImmutableArrayBuilder<IStateSymbol>.Rent();
-        using var parametersBuilder = ImmutableArrayBuilder<IParamSymbol>.Rent();
-        using var injectedServicesBuilder = ImmutableArrayBuilder<IInjectSymbol>.Rent();
-        using var commandsBuilder = ImmutableArrayBuilder<ICommandSymbol>.Rent();
-        using var useEffectsBuilder = ImmutableArrayBuilder<IUseEffectSymbol>.Rent();
-        using var userHooksBuilder = ImmutableArrayBuilder<UserHookSyntax>.Rent();
-        using var inlineAkcssBuilder = ImmutableArrayBuilder<InlineAkcssBlockSyntax>.Rent();
-
-        foreach (var member in document.Members)
-        {
-            AddAkburaComponentMember(
-                member,
-                markupRootsBuilder,
-                statesBuilder,
-                parametersBuilder,
-                injectedServicesBuilder,
-                commandsBuilder,
-                useEffectsBuilder,
-                userHooksBuilder,
-                inlineAkcssBuilder);
-        }
-
-        var children = markupRootsBuilder.Count == 1
-            ? CreateMarkupChildren(markupRootsBuilder.WrittenSpan[0].Element, contentModel, out _)
-            : ImmutableArray<MarkupChildContent>.Empty;
-
-        foreach (var markupRoot in markupRootsBuilder.WrittenSpan)
-        {
-            if (GetSymbolInfo(markupRoot.Element).Symbol is IMarkupComponentSymbol markupComponentSymbol)
-            {
-                markupRootSymbolsBuilder.Add(markupComponentSymbol);
-            }
-        }
-
-        var componentSymbol = new AkburaComponentSymbol(
-            SyntaxTree,
-            document,
-            componentName,
-            namespaceName,
-            partialTypes,
-            contentModel,
-            children,
-            markupRootSymbolsBuilder.ToImmutable(),
-            statesBuilder.ToImmutable(),
-            parametersBuilder.ToImmutable(),
-            injectedServicesBuilder.ToImmutable(),
-            commandsBuilder.ToImmutable(),
-            useEffectsBuilder.ToImmutable(),
-            userHooksBuilder.ToImmutable(),
-            akcssModules: ImmutableArray<IAkcssModuleSymbol>.Empty);
-        var symbolInfo = AkburaSymbolInfo.Success(componentSymbol);
-        _symbolInfoCache[document] = symbolInfo;
-
-        componentSymbol.SetAkcssModules(CreateInlineAkcssModuleSymbols(
-            inlineAkcssBuilder.WrittenSpan,
-            componentSymbol));
-
-        SetSemanticDiagnostics(document, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
-        return symbolInfo;
-    }
-
-    private void AddAkburaComponentMember(
-        AkTopLevelMemberSyntax member,
-        ImmutableArrayBuilder<MarkupRootSyntax> markupRootsBuilder,
-        ImmutableArrayBuilder<IStateSymbol> statesBuilder,
-        ImmutableArrayBuilder<IParamSymbol> parametersBuilder,
-        ImmutableArrayBuilder<IInjectSymbol> injectedServicesBuilder,
-        ImmutableArrayBuilder<ICommandSymbol> commandsBuilder,
-        ImmutableArrayBuilder<IUseEffectSymbol> useEffectsBuilder,
-        ImmutableArrayBuilder<UserHookSyntax> userHooksBuilder,
-        ImmutableArrayBuilder<InlineAkcssBlockSyntax> inlineAkcssBuilder)
-    {
-        switch (member)
-        {
-            case MarkupRootSyntax markupRoot:
-                markupRootsBuilder.Add(markupRoot);
-                break;
-
-            case StateDeclarationSyntax stateDeclaration:
-                if (GetSymbolInfo(stateDeclaration).Symbol is IStateSymbol stateSymbol)
-                {
-                    statesBuilder.Add(stateSymbol);
-                }
-
-                break;
-
-            case ParamDeclarationSyntax paramDeclaration:
-                if (GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
-                {
-                    parametersBuilder.Add(paramSymbol);
-                }
-
-                break;
-
-            case InjectDeclarationSyntax injectDeclaration:
-                if (GetSymbolInfo(injectDeclaration).Symbol is IInjectSymbol injectSymbol)
-                {
-                    injectedServicesBuilder.Add(injectSymbol);
-                }
-
-                break;
-
-            case CommandDeclarationSyntax commandDeclaration:
-                if (GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
-                {
-                    commandsBuilder.Add(commandSymbol);
-                }
-
-                break;
-
-            case UseEffectDeclarationSyntax useEffectDeclaration:
-                if (GetSymbolInfo(useEffectDeclaration).Symbol is IUseEffectSymbol useEffectSymbol)
-                {
-                    useEffectsBuilder.Add(useEffectSymbol);
-                }
-
-                AddAkburaComponentBlockMarkup(useEffectDeclaration.Body, markupRootsBuilder);
-                foreach (var tail in useEffectDeclaration.Tails)
-                {
-                    AddAkburaComponentBlockMarkup(tail.Body, markupRootsBuilder);
-                }
-
-                break;
-
-            case UserHookSyntax userHook:
-                userHooksBuilder.Add(userHook);
-                AddAkburaComponentBlockMarkup(userHook.Body, markupRootsBuilder);
-                break;
-
-            case InlineAkcssBlockSyntax inlineAkcssBlock:
-                inlineAkcssBuilder.Add(inlineAkcssBlock);
-                break;
-
-            case CSharpStatementSyntax csharpStatement:
-                if (csharpStatement.Body != null)
-                {
-                    AddAkburaComponentBlockMarkup(csharpStatement.Body, markupRootsBuilder);
-                }
-
-                break;
-        }
-    }
-
-    private void AddAkburaComponentBlockMarkup(
-        CSharpBlockSyntax block,
-        ImmutableArrayBuilder<MarkupRootSyntax> markupRootsBuilder)
-    {
-        foreach (var member in block.Tokens)
-        {
-            switch (member)
-            {
-                case MarkupRootSyntax markupRoot:
-                    markupRootsBuilder.Add(markupRoot);
-                    break;
-
-                case CSharpStatementSyntax { Body: { } body }:
-                    AddAkburaComponentBlockMarkup(body, markupRootsBuilder);
-                    break;
-
-                case UseEffectDeclarationSyntax useEffectDeclaration:
-                    AddAkburaComponentBlockMarkup(useEffectDeclaration.Body, markupRootsBuilder);
-                    foreach (var tail in useEffectDeclaration.Tails)
-                    {
-                        AddAkburaComponentBlockMarkup(tail.Body, markupRootsBuilder);
-                    }
-
-                    break;
-
-                case UserHookSyntax userHook:
-                    AddAkburaComponentBlockMarkup(userHook.Body, markupRootsBuilder);
-                    break;
-            }
-        }
     }
 
     private AkburaSymbolInfo ResolveInlineAkcssModule(InlineAkcssBlockSyntax inlineAkcssBlock)
@@ -497,132 +339,6 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return builder.ToImmutable();
-    }
-
-    private ImmutableArray<INamedTypeSymbol> ResolveAkburaComponentPartialTypes(AkburaSyntaxTree syntaxTree)
-    {
-        var metadataName = GetAkburaComponentMetadataName(syntaxTree);
-        if (metadataName.Length == 0)
-        {
-            return ImmutableArray<INamedTypeSymbol>.Empty;
-        }
-
-        var type = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
-        return type == null
-            ? ImmutableArray<INamedTypeSymbol>.Empty
-            : ImmutableArray.Create(type);
-    }
-
-    private AkburaSymbolInfo ResolveState(StateDeclarationSyntax stateDeclaration)
-    {
-        var name = stateDeclaration.Name.Identifier.ValueText;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
-        }
-
-        var hasExplicitType = stateDeclaration.Type != null;
-        var initializerBinding = BindStateInitializerExpression(stateDeclaration);
-        var userHook = ResolveStateUserHook(stateDeclaration);
-        var initializerType = initializerBinding.TypeSymbol == null
-            ? userHook?.ReturnType ?? default
-            : new CSharpSymbolDefinition(initializerBinding.TypeSymbol);
-        var type = hasExplicitType
-            ? ResolveExplicitStateType(stateDeclaration)
-            : initializerType;
-        var bindingKind = GetStateBindingKind(stateDeclaration.Initializer);
-        var diagnostics = CreateStateBindingDiagnostics(
-            stateDeclaration,
-            bindingKind,
-            type,
-            initializerBinding);
-        SetSemanticDiagnostics(stateDeclaration, diagnostics);
-
-        return AkburaSymbolInfo.Success(new StateSymbol(
-            stateDeclaration,
-            type,
-            initializerType,
-            userHook,
-            hasExplicitType,
-            bindingKind));
-    }
-
-    private AkburaSymbolInfo ResolveParam(ParamDeclarationSyntax paramDeclaration)
-    {
-        var name = paramDeclaration.Name.Identifier.ValueText;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
-        }
-
-        var hasExplicitType = paramDeclaration.Type != null;
-        var defaultValueType = ResolveParamDefaultValueType(paramDeclaration);
-        var type = hasExplicitType
-            ? ResolveExplicitParamType(paramDeclaration)
-            : defaultValueType;
-        var bindingKind = GetParamBindingKind(paramDeclaration);
-
-        SetSemanticDiagnostics(paramDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
-        return AkburaSymbolInfo.Success(new ParamSymbol(
-            paramDeclaration,
-            type,
-            defaultValueType,
-            hasExplicitType,
-            bindingKind));
-    }
-
-    private AkburaSymbolInfo ResolveInject(InjectDeclarationSyntax injectDeclaration)
-    {
-        var name = injectDeclaration.Name.Identifier.ValueText;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
-        }
-
-        var type = ResolveInjectType(injectDeclaration);
-
-        SetSemanticDiagnostics(injectDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
-        return AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
-    }
-
-    private AkburaSymbolInfo ResolveCommand(CommandDeclarationSyntax commandDeclaration)
-    {
-        var name = commandDeclaration.Name.Identifier.ValueText;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
-        }
-
-        var returnType = ResolveCommandReturnType(commandDeclaration);
-        var parameters = CreateCommandParameters(commandDeclaration);
-        var isVoid = returnType.Symbol is ITypeSymbol { SpecialType: SpecialType.System_Void };
-        var isAsyncLike = true;
-        var resultType = GetCommandResultType(returnType, isVoid);
-        var hasResult = !resultType.IsDefault;
-
-        SetSemanticDiagnostics(commandDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
-        return AkburaSymbolInfo.Success(new CommandSymbol(
-            commandDeclaration,
-            returnType,
-            resultType,
-            parameters,
-            isVoid,
-            isAsyncLike,
-            hasResult));
-    }
-
-    private AkburaSymbolInfo ResolveUseEffect(UseEffectDeclarationSyntax useEffectDeclaration)
-    {
-        var dependencies = CreateUseEffectDependencies(useEffectDeclaration);
-
-        SetSemanticDiagnostics(useEffectDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
-        return AkburaSymbolInfo.Success(new UseEffectSymbol(
-            useEffectDeclaration,
-            dependencies));
     }
 
     private AkburaSymbolInfo ResolveAkcssStyle(
@@ -711,124 +427,6 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return symbol;
-    }
-
-    private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
-    {
-        var typeSyntax = stateDeclaration.Type;
-        if (typeSyntax == null)
-        {
-            return default;
-        }
-
-        CSharp.TypeSyntax csharpType;
-        try
-        {
-            csharpType = typeSyntax.ToCSharp();
-        }
-        catch (InvalidOperationException)
-        {
-            return default;
-        }
-
-        var binding = BindCSharpType(csharpType);
-        var typeSymbol = binding.TypeSymbol;
-        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-    }
-
-    private CSharpSymbolDefinition ResolveExplicitParamType(ParamDeclarationSyntax paramDeclaration)
-    {
-        var typeSyntax = paramDeclaration.Type;
-        if (typeSyntax == null)
-        {
-            return default;
-        }
-
-        CSharp.TypeSyntax csharpType;
-        try
-        {
-            csharpType = typeSyntax.ToCSharp();
-        }
-        catch (InvalidOperationException)
-        {
-            return default;
-        }
-
-        var binding = BindCSharpType(csharpType);
-        var typeSymbol = binding.TypeSymbol;
-        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-    }
-
-    private CSharpSymbolDefinition ResolveInjectType(InjectDeclarationSyntax injectDeclaration)
-    {
-        CSharp.TypeSyntax csharpType;
-        try
-        {
-            csharpType = injectDeclaration.Type.ToCSharp();
-        }
-        catch (InvalidOperationException)
-        {
-            return default;
-        }
-
-        var binding = BindCSharpType(csharpType);
-        var typeSymbol = binding.TypeSymbol;
-        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-    }
-
-    private CSharpSymbolDefinition ResolveCommandReturnType(CommandDeclarationSyntax commandDeclaration)
-    {
-        CSharp.TypeSyntax csharpType;
-        try
-        {
-            csharpType = commandDeclaration.ReturnType.ToCSharp();
-        }
-        catch (InvalidOperationException)
-        {
-            return default;
-        }
-
-        var binding = BindCSharpType(csharpType);
-        var typeSymbol = binding.TypeSymbol;
-        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-    }
-
-    private ImmutableArray<ICommandParameterSymbol> CreateCommandParameters(
-        CommandDeclarationSyntax commandDeclaration)
-    {
-        var csharpParameters = GetCSharpParameterList(commandDeclaration.Parameters);
-        if (csharpParameters == null)
-        {
-            return ImmutableArray<ICommandParameterSymbol>.Empty;
-        }
-
-        using var builder = ImmutableArrayBuilder<ICommandParameterSymbol>.Rent();
-        for (var index = 0; index < csharpParameters.Parameters.Count; index++)
-        {
-            var parameter = csharpParameters.Parameters[index];
-            var name = parameter.Identifier.ValueText;
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
-
-            var type = parameter.Type == null
-                ? default
-                : ResolveCSharpParameterType(parameter.Type);
-
-            builder.Add(new CommandParameterSymbol(
-                name,
-                index,
-                type));
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private CSharpSymbolDefinition ResolveCSharpParameterType(CSharp.TypeSyntax typeSyntax)
-    {
-        var binding = BindCSharpType(typeSyntax);
-        return binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol);
     }
 
     private ImmutableArray<ITailwindUtilityParameterSymbol> CreateTailwindUtilityParameters(
@@ -2473,73 +2071,6 @@ internal sealed partial class AkburaSemanticModel
             : null;
     }
 
-    private ImmutableArray<UseEffectDependency> CreateUseEffectDependencies(
-        UseEffectDeclarationSyntax useEffectDeclaration)
-    {
-        var argumentList = GetCSharpArgumentList(useEffectDeclaration.Arguments);
-        if (argumentList == null || argumentList.Arguments.Count == 0)
-        {
-            return ImmutableArray<UseEffectDependency>.Empty;
-        }
-
-        using var builder = ImmutableArrayBuilder<UseEffectDependency>.Rent(argumentList.Arguments.Count);
-        foreach (var argument in argumentList.Arguments)
-        {
-            var expression = argument.Expression;
-            var expressionText = expression.ToFullString().Trim();
-            if (string.IsNullOrWhiteSpace(expressionText))
-            {
-                continue;
-            }
-
-            var binding = BindMarkupAttributeExpression(expression);
-            var csharpDefinition = binding.Symbol == null
-                ? default
-                : new CSharpSymbolDefinition(binding.Symbol);
-
-            builder.Add(new UseEffectDependency(
-                expressionText,
-                ResolveUseEffectDependencyAkburaSymbol(expression),
-                csharpDefinition));
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private AkburaSymbol? ResolveUseEffectDependencyAkburaSymbol(CSharp.ExpressionSyntax expression)
-    {
-        return TryGetUseEffectDependencyRootName(expression, out var rootName)
-            ? ResolveTopLevelAkburaSymbol(rootName)
-            : null;
-    }
-
-    private AkburaSymbol? ResolveTopLevelAkburaSymbol(string name)
-    {
-        foreach (var member in SyntaxTree.GetRoot().Members)
-        {
-            switch (member)
-            {
-                case StateDeclarationSyntax stateDeclaration
-                    when stateDeclaration.Name.Identifier.ValueText == name:
-                    return GetSymbolInfo(stateDeclaration).Symbol;
-
-                case ParamDeclarationSyntax paramDeclaration
-                    when paramDeclaration.Name.Identifier.ValueText == name:
-                    return GetSymbolInfo(paramDeclaration).Symbol;
-
-                case InjectDeclarationSyntax injectDeclaration
-                    when injectDeclaration.Name.Identifier.ValueText == name:
-                    return GetSymbolInfo(injectDeclaration).Symbol;
-
-                case CommandDeclarationSyntax commandDeclaration
-                    when commandDeclaration.Name.Identifier.ValueText == name:
-                    return GetSymbolInfo(commandDeclaration).Symbol;
-            }
-        }
-
-        return null;
-    }
-
     private static bool TryGetUseEffectDependencyRootName(
         CSharp.ExpressionSyntax expression,
         out string rootName)
@@ -2578,70 +2109,6 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return expression;
-    }
-
-    private CSharpSymbolDefinition GetCommandResultType(
-        CSharpSymbolDefinition returnType,
-        bool isVoid)
-    {
-        if (returnType.Symbol is not ITypeSymbol returnTypeSymbol ||
-            isVoid)
-        {
-            return default;
-        }
-
-        return returnType;
-    }
-
-    private CSharpSymbolDefinition ResolveParamDefaultValueType(ParamDeclarationSyntax paramDeclaration)
-    {
-        var defaultValue = paramDeclaration.DefaultValue;
-        if (defaultValue == null)
-        {
-            return default;
-        }
-
-        CSharp.ExpressionSyntax csharpExpression;
-        try
-        {
-            csharpExpression = CSharpSyntaxFactory.ParseExpression(defaultValue.ToFullString());
-        }
-        catch (ArgumentException)
-        {
-            return default;
-        }
-
-        var binding = BindCSharpExpression(csharpExpression);
-        var typeSymbol = binding.TypeSymbol;
-        return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-    }
-
-    private CSharpBindingResult BindStateInitializerExpression(StateDeclarationSyntax stateDeclaration)
-    {
-        CSharp.ExpressionSyntax csharpExpression;
-        try
-        {
-            csharpExpression = CSharpSyntaxFactory.ParseExpression(stateDeclaration.Initializer.Expression.ToFullString());
-        }
-        catch (ArgumentException)
-        {
-            return CSharpBindingResult.Empty;
-        }
-
-        return BindCSharpExpression(
-            csharpExpression,
-            stateDeclaration,
-            isBindingPath: IsStateBindingPath(csharpExpression));
-    }
-
-    private IUserHookSymbol? ResolveStateUserHook(StateDeclarationSyntax stateDeclaration)
-    {
-        if (!TryGetStateUserHookInvocation(stateDeclaration, out var invocationName))
-        {
-            return null;
-        }
-
-        return ResolveUserHookInvocation(invocationName);
     }
 
     private IUserHookSymbol? ResolveUserHookInvocation(string invocationName)

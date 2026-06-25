@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -54,7 +55,7 @@ internal sealed partial class AkburaSemanticModel
         {
             valueKind = MarkupAttributeValueKind.Literal;
             literalValue = GetMarkupLiteralAttributeValueText(literalValueSyntax);
-            valueBinding = BindMarkupAttributeExpression(CSharpSyntaxFactory.LiteralExpression(
+            valueBinding = BindMarkupAttributeExpression(markupAttribute, CSharpSyntaxFactory.LiteralExpression(
                 Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralExpression,
                 CSharpSyntaxFactory.Literal(literalValue)));
             valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
@@ -71,7 +72,7 @@ internal sealed partial class AkburaSemanticModel
             {
                 dynamicExpression = expression;
                 valueKind = MarkupAttributeValueKind.DynamicExpression;
-                valueBinding = BindMarkupAttributeExpression(expression);
+                valueBinding = BindMarkupAttributeExpression(markupAttribute, expression);
                 valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
                 valueOperation = valueBinding.OperationDefinition;
             }
@@ -1407,6 +1408,52 @@ internal sealed partial class AkburaSemanticModel
             .BindReturnExpression(compilationUnit, isBindingPath: true);
     }
 
+    private CSharpBindingResult BindMarkupAttributeExpression(
+        AkburaSyntax scopeSyntax,
+        CSharp.ExpressionSyntax expressionSyntax)
+    {
+        var scope = GetMarkupBindingScope(scopeSyntax);
+        var bound = BindingSession
+            .GetCSharpProbeBinder(scope, BinderUsage.Markup)
+            .BindExpression(scope, expressionSyntax);
+
+        return GetCSharpBindingResult(bound);
+    }
+
+    private static CSharpBindingResult GetCSharpBindingResult(BoundExpression expression)
+    {
+        return expression switch
+        {
+            BoundCSharpExpression csharpExpression => csharpExpression.BindingResult,
+            BoundLiteralExpression literalExpression => literalExpression.BindingResult,
+            BoundBinaryExpression binaryExpression => binaryExpression.BindingResult,
+            BoundCallExpression callExpression => callExpression.BindingResult,
+            BoundConversionExpression conversionExpression => GetCSharpBindingResult(conversionExpression.Operand),
+            _ => CSharpBindingResult.Empty,
+        };
+    }
+
+    private AkburaSyntax GetMarkupBindingScope(AkburaSyntax syntax)
+    {
+        for (var node = syntax; node != null; node = node.Parent)
+        {
+            switch (node)
+            {
+                case MarkupRootSyntax markupRoot:
+                    return markupRoot;
+                case MarkupElementSyntax markupElement:
+                    if (markupElement.Parent is MarkupRootSyntax root)
+                    {
+                        return root;
+                    }
+
+                    return markupElement;
+            }
+        }
+
+        return SyntaxTree.GetRoot();
+    }
+
     private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateMarkupAttributeProbeFields()
     {
         using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
@@ -1662,7 +1709,7 @@ internal sealed partial class AkburaSemanticModel
 
         var binding = expression == null
             ? CSharpBindingResult.Empty
-            : BindMarkupAttributeExpression(expression);
+            : BindMarkupAttributeExpression(segment, expression);
 
         return new TailwindUtilityArgument(
             segment,
@@ -1689,7 +1736,7 @@ internal sealed partial class AkburaSemanticModel
             return (true, expressionPrefix.Expression.ToFullString(), default, default);
         }
 
-        var binding = BindMarkupAttributeExpression(expression);
+        var binding = BindMarkupAttributeExpression(attribute, expression);
         return (
             true,
             expressionPrefix.Expression.Expression.ToFullString(),

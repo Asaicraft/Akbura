@@ -2283,6 +2283,90 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupDynamicAttribute_BindsCSharpBlockScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int total = 1;
+
+            if(total > 0)
+            {
+                int local = 2;
+                <TextBlock Tag={local + total} />
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(syntaxTree.GetRoot().Members[2]);
+        Assert.NotNull(ifStatement.Body);
+        var markup = Assert.IsType<MarkupRootSyntax>(ifStatement.Body!.Tokens[1]);
+        var attribute = Assert.Single(markup.Element.StartTag!.Attributes);
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupAttributeValueKind.DynamicExpression, operation.ValueKind);
+        Assert.Equal("Tag", operation.Property?.Name);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
+        Assert.False(operation.ValueOperation.IsDefault);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_BindsCSharpBlockScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                @utilities {
+                    .w-(double value) { Width: value; }
+                }
+            }
+
+            state int total = 1;
+
+            if(total > 0)
+            {
+                int local = 2;
+                <Button w-{local + total} {total > local}:w-5 />
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(syntaxTree.GetRoot().Members[3]);
+        Assert.NotNull(ifStatement.Body);
+        var markup = Assert.IsType<MarkupRootSyntax>(ifStatement.Body!.Tokens[1]);
+        var attributes = markup.Element.StartTag!.Attributes;
+        var expressionAttribute = Assert.IsAssignableFrom<TailwindAttributeSyntax>(attributes[0]);
+        var conditionalAttribute = Assert.IsAssignableFrom<TailwindAttributeSyntax>(attributes[1]);
+
+        var expressionOperation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(expressionAttribute));
+        var conditionalOperation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(conditionalAttribute));
+
+        var argument = Assert.Single(expressionOperation.Arguments);
+        Assert.Equal("w", expressionOperation.UtilityName);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(argument.Type.Symbol).SpecialType);
+        Assert.False(argument.ValueOperation.IsDefault);
+        Assert.False(expressionOperation.HasErrors);
+
+        Assert.True(conditionalOperation.HasCondition);
+        Assert.Equal(SpecialType.System_Boolean, Assert.IsAssignableFrom<INamedTypeSymbol>(conditionalOperation.ConditionType.Symbol).SpecialType);
+        Assert.False(conditionalOperation.ConditionOperation.IsDefault);
+        Assert.False(conditionalOperation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(expressionAttribute).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(conditionalAttribute).IsEmpty);
+    }
+
+    [Fact]
     public void SemanticModel_MarkupInterpolatedStringAndEventExpression_BindComponentScope()
     {
         const string code =

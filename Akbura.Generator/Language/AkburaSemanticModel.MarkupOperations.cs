@@ -82,6 +82,7 @@ internal sealed partial class AkburaSemanticModel
         if (property?.Command is { } propertyCommand)
         {
             commandHandler = AnalyzeMarkupCommandHandler(
+                markupAttribute,
                 propertyCommand,
                 dynamicExpression,
                 valueType,
@@ -191,7 +192,7 @@ internal sealed partial class AkburaSemanticModel
             valueKind = MarkupAttributeValueKind.Literal;
         }
 
-        var handler = AnalyzeMarkupEventHandler(routedEvent, expression);
+        var handler = AnalyzeMarkupEventHandler(markupAttribute, routedEvent, expression);
         using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
         AddMarkupEventBindingDiagnostics(
             markupAttribute,
@@ -927,6 +928,7 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandHandler(
+        MarkupAttributeSyntax markupAttribute,
         ICommandSymbol command,
         CSharp.ExpressionSyntax? expression,
         CSharpSymbolDefinition handlerType,
@@ -940,16 +942,19 @@ internal sealed partial class AkburaSemanticModel
         return expression switch
         {
             CSharp.ParenthesizedLambdaExpressionSyntax lambda => AnalyzeMarkupCommandLambda(
+                markupAttribute,
                 command,
                 lambda.ParameterList.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray(),
                 lambda.AsyncKeyword.RawKind != 0,
                 lambda.Body),
             CSharp.SimpleLambdaExpressionSyntax lambda => AnalyzeMarkupCommandLambda(
+                markupAttribute,
                 command,
                 ImmutableArray.Create(lambda.Parameter.Identifier.ValueText),
                 lambda.AsyncKeyword.RawKind != 0,
                 lambda.Body),
             CSharp.AnonymousMethodExpressionSyntax anonymousMethod => AnalyzeMarkupCommandLambda(
+                markupAttribute,
                 command,
                 anonymousMethod.ParameterList?.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray() ??
                     ImmutableArray<string>.Empty,
@@ -969,6 +974,7 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private MarkupEventHandlerAnalysis AnalyzeMarkupEventHandler(
+        MarkupAttributeSyntax markupAttribute,
         IRoutedEventSymbol routedEvent,
         CSharp.ExpressionSyntax? expression)
     {
@@ -980,30 +986,35 @@ internal sealed partial class AkburaSemanticModel
         return expression switch
         {
             CSharp.ParenthesizedLambdaExpressionSyntax lambda => AnalyzeMarkupEventLambda(
+                markupAttribute,
                 routedEvent,
                 lambda.ParameterList.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray(),
                 lambda.AsyncKeyword.RawKind != 0,
                 lambda.Body),
             CSharp.SimpleLambdaExpressionSyntax lambda => AnalyzeMarkupEventLambda(
+                markupAttribute,
                 routedEvent,
                 ImmutableArray.Create(lambda.Parameter.Identifier.ValueText),
                 lambda.AsyncKeyword.RawKind != 0,
                 lambda.Body),
             CSharp.AnonymousMethodExpressionSyntax anonymousMethod => AnalyzeMarkupEventLambda(
+                markupAttribute,
                 routedEvent,
                 anonymousMethod.ParameterList?.Parameters.Select(static parameter => parameter.Identifier.ValueText).ToImmutableArray() ??
                     ImmutableArray<string>.Empty,
                 anonymousMethod.AsyncKeyword.RawKind != 0,
                 anonymousMethod.Body),
             CSharp.IdentifierNameSyntax or CSharp.MemberAccessExpressionSyntax =>
-                CreateDirectMarkupEventHandlerAnalysis(expression),
-            _ => CreateExpressionMarkupEventHandlerAnalysis(routedEvent, expression),
+                CreateDirectMarkupEventHandlerAnalysis(markupAttribute, expression),
+            _ => CreateExpressionMarkupEventHandlerAnalysis(markupAttribute, routedEvent, expression),
         };
     }
 
-    private MarkupEventHandlerAnalysis CreateDirectMarkupEventHandlerAnalysis(CSharp.ExpressionSyntax expression)
+    private MarkupEventHandlerAnalysis CreateDirectMarkupEventHandlerAnalysis(
+        MarkupAttributeSyntax markupAttribute,
+        CSharp.ExpressionSyntax expression)
     {
-        var binding = BindMarkupAttributeExpression(expression);
+        var binding = BindMarkupAttributeExpression(markupAttribute, expression);
         return new MarkupEventHandlerAnalysis(
             MarkupCommandHandlerKind.DirectReference,
             MarkupCommandArgumentMode.None,
@@ -1015,10 +1026,12 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private MarkupEventHandlerAnalysis CreateExpressionMarkupEventHandlerAnalysis(
+        MarkupAttributeSyntax markupAttribute,
         IRoutedEventSymbol routedEvent,
         CSharp.ExpressionSyntax expression)
     {
         var binding = BindMarkupEventHandlerStatementExpression(
+            markupAttribute,
             routedEvent,
             ImmutableArray<string>.Empty,
             expression,
@@ -1035,6 +1048,7 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private MarkupEventHandlerAnalysis AnalyzeMarkupEventLambda(
+        MarkupAttributeSyntax markupAttribute,
         IRoutedEventSymbol routedEvent,
         ImmutableArray<string> parameterNames,
         bool isAsync,
@@ -1044,11 +1058,13 @@ internal sealed partial class AkburaSemanticModel
         var binding = body switch
         {
             CSharp.ExpressionSyntax expression => BindMarkupEventHandlerStatementExpression(
+                markupAttribute,
                 routedEvent,
                 parameterNames,
                 expression,
                 isAsync || containsAwait),
             CSharp.BlockSyntax block => BindMarkupEventHandlerBlock(
+                markupAttribute,
                 routedEvent,
                 parameterNames,
                 block,
@@ -1069,6 +1085,7 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandLambda(
+        MarkupAttributeSyntax markupAttribute,
         ICommandSymbol command,
         ImmutableArray<string> parameterNames,
         bool isAsync,
@@ -1085,7 +1102,7 @@ internal sealed partial class AkburaSemanticModel
 
         if (body is CSharp.ExpressionSyntax expressionBody)
         {
-            var resultBinding = BindCommandHandlerResultExpression(command, parameterNames, expressionBody);
+            var resultBinding = BindCommandHandlerResultExpression(markupAttribute, command, parameterNames, expressionBody);
             operation = resultBinding.OperationDefinition;
             diagnostics = resultBinding.Diagnostics;
             if (TryGetAwaitedLocalCommandExecuteResultType(expressionBody, out var awaitedCommandResultType))
@@ -1105,7 +1122,7 @@ internal sealed partial class AkburaSemanticModel
             }
             else if (expressionBody is CSharp.InvocationExpressionSyntax)
             {
-                var statementBinding = BindCommandHandlerStatementExpression(command, parameterNames, expressionBody);
+                var statementBinding = BindCommandHandlerStatementExpression(markupAttribute, command, parameterNames, expressionBody);
                 operation = statementBinding.OperationDefinition;
                 diagnostics = statementBinding.Diagnostics;
                 if (statementBinding.Symbol is IMethodSymbol { ReturnsVoid: true })
@@ -1136,7 +1153,7 @@ internal sealed partial class AkburaSemanticModel
                 .FirstOrDefault(expression => expression != null);
             if (returnExpression != null)
             {
-                var resultBinding = BindCommandHandlerResultExpression(command, parameterNames, returnExpression);
+                var resultBinding = BindCommandHandlerResultExpression(markupAttribute, command, parameterNames, returnExpression);
                 operation = resultBinding.OperationDefinition;
                 diagnostics = resultBinding.Diagnostics;
                 resultMode = MarkupCommandResultMode.ReturnsResult;
@@ -1193,10 +1210,15 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private CSharpBindingResult BindCommandHandlerResultExpression(
+        MarkupAttributeSyntax markupAttribute,
         ICommandSymbol command,
         ImmutableArray<string> parameterNames,
         CSharp.ExpressionSyntax expressionSyntax)
     {
+        var probeScope = CreateMarkupHandlerProbeScope(
+            markupAttribute,
+            expressionSyntax,
+            parameterNames);
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 ContainsAwaitExpression(expressionSyntax)
@@ -1204,7 +1226,7 @@ internal sealed partial class AkburaSemanticModel
                     : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
                 "__AkburaCommandHandlerProbe")
             .WithParameterList(CreateCommandHandlerProbeParameterList(command, parameterNames))
-            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
+            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements, returnStatement));
 
         if (ContainsAwaitExpression(expressionSyntax))
         {
@@ -1213,10 +1235,7 @@ internal sealed partial class AkburaSemanticModel
         }
 
         using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-        foreach (var field in CreateMarkupAttributeProbeFields())
-        {
-            membersBuilder.Add(field);
-        }
+        AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
 
         membersBuilder.Add(method);
 
@@ -1225,27 +1244,29 @@ internal sealed partial class AkburaSemanticModel
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
-            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindReturnExpression(compilationUnit, isBindingPath: false);
     }
 
     private CSharpBindingResult BindCommandHandlerStatementExpression(
+        MarkupAttributeSyntax markupAttribute,
         ICommandSymbol command,
         ImmutableArray<string> parameterNames,
         CSharp.ExpressionSyntax expressionSyntax)
     {
+        var probeScope = CreateMarkupHandlerProbeScope(
+            markupAttribute,
+            expressionSyntax,
+            parameterNames);
         var statement = CSharpSyntaxFactory.ExpressionStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
                 "__AkburaCommandHandlerProbe")
             .WithParameterList(CreateCommandHandlerProbeParameterList(command, parameterNames))
-            .WithBody(CSharpSyntaxFactory.Block(statement));
+            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements, statement));
 
         using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-        foreach (var field in CreateMarkupAttributeProbeFields())
-        {
-            membersBuilder.Add(field);
-        }
+        AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
 
         membersBuilder.Add(method);
 
@@ -1254,22 +1275,27 @@ internal sealed partial class AkburaSemanticModel
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
-            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindExpressionStatement(compilationUnit, isBindingPath: false);
     }
 
     private CSharpBindingResult BindMarkupEventHandlerStatementExpression(
+        MarkupAttributeSyntax markupAttribute,
         IRoutedEventSymbol routedEvent,
         ImmutableArray<string> parameterNames,
         CSharp.ExpressionSyntax expressionSyntax,
         bool isAsync)
     {
+        var probeScope = CreateMarkupHandlerProbeScope(
+            markupAttribute,
+            expressionSyntax,
+            parameterNames);
         var statement = CSharpSyntaxFactory.ExpressionStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
                 "__AkburaEventHandlerProbe")
             .WithParameterList(CreateEventHandlerProbeParameterList(routedEvent, parameterNames))
-            .WithBody(CSharpSyntaxFactory.Block(statement));
+            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements, statement));
 
         if (isAsync)
         {
@@ -1278,10 +1304,7 @@ internal sealed partial class AkburaSemanticModel
         }
 
         using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-        foreach (var field in CreateMarkupAttributeProbeFields())
-        {
-            membersBuilder.Add(field);
-        }
+        AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
 
         membersBuilder.Add(method);
 
@@ -1290,21 +1313,26 @@ internal sealed partial class AkburaSemanticModel
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
-            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindExpressionStatement(compilationUnit, isBindingPath: false);
     }
 
     private CSharpBindingResult BindMarkupEventHandlerBlock(
+        MarkupAttributeSyntax markupAttribute,
         IRoutedEventSymbol routedEvent,
         ImmutableArray<string> parameterNames,
         CSharp.BlockSyntax block,
         bool isAsync)
     {
+        var probeScope = CreateMarkupHandlerProbeScope(
+            markupAttribute,
+            block,
+            parameterNames);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
                 "__AkburaEventHandlerProbe")
             .WithParameterList(CreateEventHandlerProbeParameterList(routedEvent, parameterNames))
-            .WithBody(block);
+            .WithBody(PrependMarkupHandlerProbeLocals(block, probeScope.LocalStatements));
 
         if (isAsync)
         {
@@ -1313,10 +1341,7 @@ internal sealed partial class AkburaSemanticModel
         }
 
         using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-        foreach (var field in CreateMarkupAttributeProbeFields())
-        {
-            membersBuilder.Add(field);
-        }
+        AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
 
         membersBuilder.Add(method);
 
@@ -1325,8 +1350,96 @@ internal sealed partial class AkburaSemanticModel
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
-            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindMethodBlock(compilationUnit, "__AkburaEventHandlerProbe");
+    }
+
+    private CSharpProbeScope CreateMarkupHandlerProbeScope(
+        MarkupAttributeSyntax markupAttribute,
+        SyntaxNode csharpNode,
+        ImmutableArray<string> parameterNames)
+    {
+        var scope = GetMarkupBindingScope(markupAttribute);
+        return BindingSession
+            .GetCSharpProbeBinder(scope, BinderUsage.Markup)
+            .CreateProbeScope(scope, csharpNode, parameterNames);
+    }
+
+    private void AddMarkupAttributeProbeMembers(
+        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder,
+        CSharpProbeScope probeScope)
+    {
+        var addedMemberKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in CreateMarkupAttributeProbeFields())
+        {
+            AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, field);
+        }
+
+        foreach (var member in probeScope.MemberDeclarations)
+        {
+            AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, member);
+        }
+    }
+
+    private static void AddMarkupAttributeProbeMember(
+        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder,
+        HashSet<string> addedMemberKeys,
+        CSharp.MemberDeclarationSyntax member)
+    {
+        var key = GetMarkupAttributeProbeMemberKey(member);
+        if (key == null ||
+            addedMemberKeys.Add(key))
+        {
+            membersBuilder.Add(member);
+        }
+    }
+
+    private static string? GetMarkupAttributeProbeMemberKey(CSharp.MemberDeclarationSyntax member)
+    {
+        return member switch
+        {
+            CSharp.ClassDeclarationSyntax classDeclaration => "class:" + classDeclaration.Identifier.ValueText,
+            CSharp.StructDeclarationSyntax structDeclaration => "struct:" + structDeclaration.Identifier.ValueText,
+            CSharp.MethodDeclarationSyntax methodDeclaration => "method:" + methodDeclaration.Identifier.ValueText,
+            CSharp.FieldDeclarationSyntax fieldDeclaration when fieldDeclaration.Declaration.Variables.Count == 1 =>
+                "field:" + fieldDeclaration.Declaration.Variables[0].Identifier.ValueText,
+            _ => null,
+        };
+    }
+
+    private static CSharp.BlockSyntax CreateMarkupHandlerProbeBlock(
+        ImmutableArray<CSharp.StatementSyntax> localStatements,
+        CSharp.StatementSyntax statement)
+    {
+        if (localStatements.IsDefaultOrEmpty)
+        {
+            return CSharpSyntaxFactory.Block(statement);
+        }
+
+        using var statements = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent(localStatements.Length + 1);
+        statements.AddRange(localStatements.AsSpan());
+        statements.Add(statement);
+        return CSharpSyntaxFactory.Block(CSharpSyntaxFactory.List(statements.ToImmutable()));
+    }
+
+    private static CSharp.BlockSyntax PrependMarkupHandlerProbeLocals(
+        CSharp.BlockSyntax block,
+        ImmutableArray<CSharp.StatementSyntax> localStatements)
+    {
+        if (localStatements.IsDefaultOrEmpty)
+        {
+            return block;
+        }
+
+        using var statements = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent(
+            localStatements.Length + block.Statements.Count);
+        statements.AddRange(localStatements.AsSpan());
+        foreach (var statement in block.Statements)
+        {
+            statements.Add(statement);
+        }
+
+        return block.WithStatements(CSharpSyntaxFactory.List(statements.ToImmutable()));
     }
 
     private static CSharp.ParameterListSyntax CreateCommandHandlerProbeParameterList(

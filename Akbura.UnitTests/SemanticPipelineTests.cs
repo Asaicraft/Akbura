@@ -2530,6 +2530,40 @@ public class SemanticPipelineTests
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
 
+    [Fact]
+    public void SemanticModel_MarkupRoutedEventAttribute_BindsCSharpBlockLocalScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            if(count >= 0)
+            {
+                var delta = 2;
+                <Button Click={(sender, args) => { count += delta; }} />
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var conditional = Assert.IsType<CSharpStatementSyntax>(syntaxTree.GetRoot().Members[2]);
+        var markupRoot = Assert.IsType<MarkupRootSyntax>(
+            Assert.Single(conditional.Body!.Tokens.OfType<MarkupRootSyntax>()));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(markupRoot.Element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
+        Assert.Equal(2, operation.HandlerParameterCount);
+        Assert.False(operation.HandlerOperation.IsDefault);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
     [Theory]
     [InlineData("bind:Click={count++}")]
     [InlineData("out:Click={count++}")]
@@ -3086,6 +3120,50 @@ public class SemanticPipelineTests
         Assert.Same(attribute.Value, operation.ValueSyntax);
         Assert.False(operation.HasErrors);
         Assert.Same(operation, semanticModel.GetOperation(attribute));
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupCommandAttribute_BindsCSharpBlockLocalScope()
+    {
+        const string aCode =
+            """
+            namespace SomeNs;
+
+            command int Click(int a);
+            """;
+        const string bCode =
+            """
+            using SomeNs;
+
+            state int count = 0;
+
+            if(count >= 0)
+            {
+                var delta = 2;
+                <A Click={x => x + delta}/>
+            }
+            """;
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var conditional = Assert.IsType<CSharpStatementSyntax>(bSyntaxTree.GetRoot().Members[2]);
+        var markupRoot = Assert.IsType<MarkupRootSyntax>(
+            Assert.Single(conditional.Body!.Tokens.OfType<MarkupRootSyntax>()));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(markupRoot.Element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
+        Assert.Equal(MarkupCommandArgumentMode.ReceivesCommandArgument, operation.ArgumentMode);
+        Assert.Equal(MarkupCommandResultMode.ReturnsResult, operation.ResultMode);
+        Assert.Equal("Int32", operation.HandlerResultType.Name);
+        Assert.False(operation.HandlerOperation.IsDefault);
+        Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
 

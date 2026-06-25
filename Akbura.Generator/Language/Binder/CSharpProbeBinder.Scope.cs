@@ -17,20 +17,21 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class CSharpProbeBinder
 {
-    private ProbeScope CreateProbeScope(
+    internal CSharpProbeScope CreateProbeScope(
         AkburaSyntax scope,
-        SyntaxNode csharpNode)
+        SyntaxNode csharpNode,
+        ImmutableArray<string> excludedNames = default)
     {
         if (scope == null ||
             csharpNode == null)
         {
-            return ProbeScope.Empty;
+            return CSharpProbeScope.Empty;
         }
 
-        var names = CollectIdentifierNames(csharpNode);
+        var names = CollectIdentifierNames(csharpNode, excludedNames);
         if (names.IsDefaultOrEmpty)
         {
-            return ProbeScope.Empty;
+            return CSharpProbeScope.Empty;
         }
 
         using var memberDeclarations = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
@@ -56,15 +57,30 @@ internal sealed partial class CSharpProbeBinder
                 localStatements);
         }
 
-        return new ProbeScope(
+        return new CSharpProbeScope(
             memberDeclarations.ToImmutable(),
             localStatements.ToImmutable());
     }
 
-    private static ImmutableArray<string> CollectIdentifierNames(SyntaxNode node)
+    private static ImmutableArray<string> CollectIdentifierNames(
+        SyntaxNode node,
+        ImmutableArray<string> excludedNames)
     {
         using var builder = ImmutableArrayBuilder<string>.Rent();
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        if (!excludedNames.IsDefaultOrEmpty)
+        {
+            foreach (var excludedName in excludedNames)
+            {
+                if (!string.IsNullOrWhiteSpace(excludedName))
+                {
+                    seen.Add(excludedName);
+                }
+            }
+        }
+
+        AddDeclaredIdentifierNames(node, seen);
+
         foreach (var identifier in node.DescendantNodesAndSelf().OfType<CSharp.IdentifierNameSyntax>())
         {
             var name = identifier.Identifier.ValueText;
@@ -76,6 +92,41 @@ internal sealed partial class CSharpProbeBinder
         }
 
         return builder.ToImmutable();
+    }
+
+    private static void AddDeclaredIdentifierNames(
+        SyntaxNode node,
+        HashSet<string> names)
+    {
+        foreach (var parameter in node.DescendantNodesAndSelf().OfType<CSharp.ParameterSyntax>())
+        {
+            AddDeclaredIdentifierName(names, parameter.Identifier.ValueText);
+        }
+
+        foreach (var variable in node.DescendantNodesAndSelf().OfType<CSharp.VariableDeclaratorSyntax>())
+        {
+            AddDeclaredIdentifierName(names, variable.Identifier.ValueText);
+        }
+
+        foreach (var foreachStatement in node.DescendantNodesAndSelf().OfType<CSharp.ForEachStatementSyntax>())
+        {
+            AddDeclaredIdentifierName(names, foreachStatement.Identifier.ValueText);
+        }
+
+        foreach (var designation in node.DescendantNodesAndSelf().OfType<CSharp.SingleVariableDesignationSyntax>())
+        {
+            AddDeclaredIdentifierName(names, designation.Identifier.ValueText);
+        }
+    }
+
+    private static void AddDeclaredIdentifierName(
+        HashSet<string> names,
+        string name)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            names.Add(name);
+        }
     }
 
     private static ImmutableArray<CSharp.MemberDeclarationSyntax> AddProbeMethod(
@@ -280,26 +331,27 @@ internal sealed partial class CSharpProbeBinder
         return builder.ToString();
     }
 
-    private readonly struct ProbeScope
+}
+
+internal readonly struct CSharpProbeScope
+{
+    public static readonly CSharpProbeScope Empty = new(
+        ImmutableArray<CSharp.MemberDeclarationSyntax>.Empty,
+        ImmutableArray<CSharp.StatementSyntax>.Empty);
+
+    public CSharpProbeScope(
+        ImmutableArray<CSharp.MemberDeclarationSyntax> memberDeclarations,
+        ImmutableArray<CSharp.StatementSyntax> localStatements)
     {
-        public static readonly ProbeScope Empty = new(
-            ImmutableArray<CSharp.MemberDeclarationSyntax>.Empty,
-            ImmutableArray<CSharp.StatementSyntax>.Empty);
-
-        public ProbeScope(
-            ImmutableArray<CSharp.MemberDeclarationSyntax> memberDeclarations,
-            ImmutableArray<CSharp.StatementSyntax> localStatements)
-        {
-            MemberDeclarations = memberDeclarations.IsDefault
-                ? ImmutableArray<CSharp.MemberDeclarationSyntax>.Empty
-                : memberDeclarations;
-            LocalStatements = localStatements.IsDefault
-                ? ImmutableArray<CSharp.StatementSyntax>.Empty
-                : localStatements;
-        }
-
-        public ImmutableArray<CSharp.MemberDeclarationSyntax> MemberDeclarations { get; }
-
-        public ImmutableArray<CSharp.StatementSyntax> LocalStatements { get; }
+        MemberDeclarations = memberDeclarations.IsDefault
+            ? ImmutableArray<CSharp.MemberDeclarationSyntax>.Empty
+            : memberDeclarations;
+        LocalStatements = localStatements.IsDefault
+            ? ImmutableArray<CSharp.StatementSyntax>.Empty
+            : localStatements;
     }
+
+    public ImmutableArray<CSharp.MemberDeclarationSyntax> MemberDeclarations { get; }
+
+    public ImmutableArray<CSharp.StatementSyntax> LocalStatements { get; }
 }

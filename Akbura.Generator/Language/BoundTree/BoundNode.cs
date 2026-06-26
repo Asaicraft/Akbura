@@ -2,13 +2,18 @@ using BinderType = Akbura.Language.Binder.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Akbura.Language.BoundTree;
 
 internal abstract class BoundNode
 {
+    private readonly BoundKind _kind;
+
     protected BoundNode(
+        BoundKind kind,
         AkburaSyntax syntax,
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
@@ -16,7 +21,11 @@ internal abstract class BoundNode
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default)
     {
-        Syntax = syntax;
+        Debug.Assert(kind != BoundKind.None);
+        Debug.Assert(syntax != null);
+
+        _kind = kind;
+        Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         Binder = binder;
         SymbolInfo = symbolInfo;
         Operation = operation;
@@ -39,6 +48,8 @@ internal abstract class BoundNode
     public ImmutableArray<AkburaSemanticDiagnostic> Diagnostics { get; }
 
     public ImmutableArray<BoundNode> Children { get; }
+
+    public BoundKind Kind => _kind;
 
     public virtual bool IsError => false;
 

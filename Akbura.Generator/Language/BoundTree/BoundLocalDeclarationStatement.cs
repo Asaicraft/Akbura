@@ -18,6 +18,7 @@ internal sealed class BoundLocalDeclarationStatement : BoundStatement
         ImmutableArray<BoundExpression> initializers,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
         : base(
+            BoundKind.LocalDeclarationStatement,
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
@@ -43,6 +44,25 @@ internal sealed class BoundLocalDeclarationStatement : BoundStatement
     public ImmutableArray<Diagnostic> RoslynDiagnostics => BindingResult.Diagnostics;
 
     public override bool IsError => RoslynDiagnostics.Length != 0 || base.IsError;
+
+    public BoundLocalDeclarationStatement Update(
+        ImmutableArray<ILocalSymbol> locals,
+        ImmutableArray<BoundExpression> initializers)
+    {
+        if (locals == Locals &&
+            initializers == Initializers)
+        {
+            return this;
+        }
+
+        return new BoundLocalDeclarationStatement(
+            Syntax,
+            Binder,
+            BindingResult,
+            locals,
+            initializers,
+            Diagnostics);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

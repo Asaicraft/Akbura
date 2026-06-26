@@ -12,7 +12,18 @@ internal class BoundBadExpression : BoundExpression
         BinderType binder,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default)
+        : this(BoundKind.BadExpression, syntax, binder, diagnostics, children)
+    {
+    }
+
+    protected BoundBadExpression(
+        BoundKind kind,
+        AkburaSyntax syntax,
+        BinderType binder,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
+        ImmutableArray<BoundNode> children = default)
         : base(
+            kind,
             syntax,
             binder,
             AkburaSymbolInfo.None(CandidateReason.NotFound),
@@ -23,6 +34,20 @@ internal class BoundBadExpression : BoundExpression
     }
 
     public override bool IsError => true;
+
+    public virtual BoundBadExpression Update(ImmutableArray<BoundNode> children)
+    {
+        if (children == Children)
+        {
+            return this;
+        }
+
+        return new BoundBadExpression(
+            Syntax,
+            Binder,
+            Diagnostics,
+            children);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

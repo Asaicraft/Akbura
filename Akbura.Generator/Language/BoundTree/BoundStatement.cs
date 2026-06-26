@@ -9,13 +9,14 @@ namespace Akbura.Language.BoundTree;
 internal abstract class BoundStatement : BoundNode
 {
     protected BoundStatement(
+        BoundKind kind,
         AkburaSyntax syntax,
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
         IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default)
-        : base(syntax, binder, symbolInfo, operation, diagnostics, children)
+        : base(kind, syntax, binder, symbolInfo, operation, diagnostics, children)
     {
     }
 

@@ -15,6 +15,7 @@ internal sealed class BoundCSharpExpression : BoundExpression
         CSharpBindingResult bindingResult,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
         : base(
+            BoundKind.CSharpExpression,
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
@@ -31,6 +32,20 @@ internal sealed class BoundCSharpExpression : BoundExpression
     public override ITypeSymbol? Type => BindingResult.TypeSymbol;
 
     public override bool IsError => RoslynDiagnostics.Length != 0 || base.IsError;
+
+    public BoundCSharpExpression Update(CSharpBindingResult bindingResult)
+    {
+        if (bindingResult.Equals(BindingResult))
+        {
+            return this;
+        }
+
+        return new BoundCSharpExpression(
+            Syntax,
+            Binder,
+            bindingResult,
+            Diagnostics);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

@@ -13,6 +13,7 @@ internal sealed class BoundBadStatement : BoundStatement
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default)
         : base(
+            BoundKind.BadStatement,
             syntax,
             binder,
             AkburaSymbolInfo.None(CandidateReason.NotFound),
@@ -23,6 +24,20 @@ internal sealed class BoundBadStatement : BoundStatement
     }
 
     public override bool IsError => true;
+
+    public BoundBadStatement Update(ImmutableArray<BoundNode> children)
+    {
+        if (children == Children)
+        {
+            return this;
+        }
+
+        return new BoundBadStatement(
+            Syntax,
+            Binder,
+            Diagnostics,
+            children);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

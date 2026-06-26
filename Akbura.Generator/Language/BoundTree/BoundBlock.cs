@@ -16,6 +16,7 @@ internal sealed class BoundBlock : BoundStatement
         ImmutableArray<BoundNode> statements,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
         : base(
+            BoundKind.Block,
             syntax,
             binder,
             AkburaSymbolInfo.None(CandidateReason.None),
@@ -32,6 +33,24 @@ internal sealed class BoundBlock : BoundStatement
     public ImmutableArray<AkburaSymbol> DeclaredSymbols { get; }
 
     public ImmutableArray<BoundNode> Statements { get; }
+
+    public BoundBlock Update(
+        ImmutableArray<AkburaSymbol> declaredSymbols,
+        ImmutableArray<BoundNode> statements)
+    {
+        if (declaredSymbols == DeclaredSymbols &&
+            statements == Statements)
+        {
+            return this;
+        }
+
+        return new BoundBlock(
+            Syntax,
+            Binder,
+            declaredSymbols,
+            statements,
+            Diagnostics);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

@@ -43,90 +43,34 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
     {
         var declaredSymbols = VisitAkburaSymbolList(node.DeclaredSymbols);
         var statements = VisitList(node.Statements);
-        if (declaredSymbols == node.DeclaredSymbols &&
-            statements == node.Statements)
-        {
-            return node;
-        }
-
-        return new BoundBlock(
-            node.Syntax,
-            node.Binder,
-            declaredSymbols,
-            statements,
-            node.Diagnostics);
+        return node.Update(declaredSymbols, statements);
     }
 
     public override BoundNode? VisitBadStatement(BoundBadStatement node)
     {
         var children = VisitList(node.Children);
-        if (children == node.Children)
-        {
-            return node;
-        }
-
-        return new BoundBadStatement(
-            node.Syntax,
-            node.Binder,
-            node.Diagnostics,
-            children);
+        return node.Update(children);
     }
 
     public override BoundNode? VisitLocalDeclarationStatement(BoundLocalDeclarationStatement node)
     {
         var locals = VisitCSharpSymbolList(node.Locals);
         var initializers = VisitExpressionList(node.Initializers);
-        if (locals == node.Locals &&
-            initializers == node.Initializers)
-        {
-            return node;
-        }
-
-        return new BoundLocalDeclarationStatement(
-            node.Syntax,
-            node.Binder,
-            node.BindingResult,
-            locals,
-            initializers,
-            node.Diagnostics);
+        return node.Update(locals, initializers);
     }
 
     public override BoundNode? VisitDeclaration(BoundDeclaration node)
     {
         var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
         var children = VisitList(node.Children);
-        if (symbolInfo.Equals(node.SymbolInfo) &&
-            children == node.Children)
-        {
-            return node;
-        }
-
-        return new BoundDeclaration(
-            node.Syntax,
-            node.Binder,
-            symbolInfo,
-            node.Operation,
-            node.Diagnostics,
-            children);
+        return node.Update(symbolInfo, node.Operation, children);
     }
 
     public override BoundNode? VisitExpression(BoundExpression node)
     {
         var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
         var children = VisitList(node.Children);
-        if (symbolInfo.Equals(node.SymbolInfo) &&
-            children == node.Children)
-        {
-            return node;
-        }
-
-        return new BoundExpression(
-            node.Syntax,
-            node.Binder,
-            symbolInfo,
-            node.Operation,
-            node.Diagnostics,
-            children);
+        return node.Update(symbolInfo, node.Operation, children);
     }
 
     public override BoundNode? VisitCSharpExpression(BoundCSharpExpression node)
@@ -157,14 +101,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 node.Diagnostics);
         }
 
-        return new BoundBinaryExpression(
-            node.Syntax,
-            node.Binder,
-            node.BindingResult,
-            node.OperatorKind,
-            left,
-            right,
-            node.Diagnostics);
+        return node.Update(node.BindingResult, node.OperatorKind, left, right);
     }
 
     public override BoundNode? VisitCallExpression(BoundCallExpression node)
@@ -179,14 +116,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             return node;
         }
 
-        return new BoundCallExpression(
-            node.Syntax,
-            node.Binder,
-            node.BindingResult,
-            targetMethod,
-            receiver,
-            arguments,
-            node.Diagnostics);
+        return node.Update(node.BindingResult, targetMethod, receiver, arguments);
     }
 
     public override BoundNode? VisitConversionExpression(BoundConversionExpression node)
@@ -205,42 +135,19 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 node.Diagnostics);
         }
 
-        return new BoundConversionExpression(
-            node.Syntax,
-            node.Binder,
-            operand,
-            node.Conversion,
-            node.Diagnostics);
+        return node.Update(operand, node.Conversion);
     }
 
     public override BoundNode? VisitBadExpression(BoundBadExpression node)
     {
         var children = VisitList(node.Children);
-        if (children == node.Children)
-        {
-            return node;
-        }
-
-        return new BoundBadExpression(
-            node.Syntax,
-            node.Binder,
-            node.Diagnostics,
-            children);
+        return node.Update(children);
     }
 
     public override BoundNode? VisitErrorExpression(BoundErrorExpression node)
     {
         var children = VisitList(node.Children);
-        if (children == node.Children)
-        {
-            return node;
-        }
-
-        return new BoundErrorExpression(
-            node.Syntax,
-            node.Binder,
-            node.Diagnostics,
-            children);
+        return node.Update(children);
     }
 
     [return: NotNullIfNotNull(nameof(symbol))]

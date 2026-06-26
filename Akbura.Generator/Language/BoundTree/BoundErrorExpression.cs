@@ -12,11 +12,26 @@ internal sealed class BoundErrorExpression : BoundBadExpression
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default)
         : base(
+            BoundKind.ErrorExpression,
             syntax,
             binder,
             diagnostics,
             children)
     {
+    }
+
+    public override BoundBadExpression Update(ImmutableArray<BoundNode> children)
+    {
+        if (children == Children)
+        {
+            return this;
+        }
+
+        return new BoundErrorExpression(
+            Syntax,
+            Binder,
+            Diagnostics,
+            children);
     }
 
     public override void Accept(BoundTreeVisitor visitor)

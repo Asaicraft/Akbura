@@ -19,6 +19,7 @@ internal sealed class BoundCallExpression : BoundExpression
         ImmutableArray<BoundExpression> arguments,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
         : base(
+            BoundKind.CallExpression,
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
@@ -47,6 +48,30 @@ internal sealed class BoundCallExpression : BoundExpression
     public override ITypeSymbol? Type => BindingResult.TypeSymbol;
 
     public override bool IsError => RoslynDiagnostics.Length != 0 || base.IsError;
+
+    public BoundExpression Update(
+        CSharpBindingResult bindingResult,
+        IMethodSymbol? targetMethod,
+        BoundExpression? receiver,
+        ImmutableArray<BoundExpression> arguments)
+    {
+        if (bindingResult.Equals(BindingResult) &&
+            SymbolEqualityComparer.Default.Equals(targetMethod, TargetMethod) &&
+            ReferenceEquals(receiver, Receiver) &&
+            arguments == Arguments)
+        {
+            return this;
+        }
+
+        return new BoundCallExpression(
+            Syntax,
+            Binder,
+            bindingResult,
+            targetMethod,
+            receiver,
+            arguments,
+            Diagnostics);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

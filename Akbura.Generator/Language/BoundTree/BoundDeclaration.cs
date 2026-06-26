@@ -15,8 +15,29 @@ internal sealed class BoundDeclaration : BoundNode
         IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default)
-        : base(syntax, binder, symbolInfo, operation, diagnostics, children)
+        : base(BoundKind.Declaration, syntax, binder, symbolInfo, operation, diagnostics, children)
     {
+    }
+
+    public BoundDeclaration Update(
+        AkburaSymbolInfo symbolInfo,
+        IOperation? operation,
+        ImmutableArray<BoundNode> children)
+    {
+        if (symbolInfo.Equals(SymbolInfo) &&
+            ReferenceEquals(operation, Operation) &&
+            children == Children)
+        {
+            return this;
+        }
+
+        return new BoundDeclaration(
+            Syntax,
+            Binder,
+            symbolInfo,
+            operation,
+            Diagnostics,
+            children);
     }
 
     public override void Accept(BoundTreeVisitor visitor)

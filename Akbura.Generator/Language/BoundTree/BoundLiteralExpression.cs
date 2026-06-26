@@ -16,6 +16,7 @@ internal sealed class BoundLiteralExpression : BoundExpression
         object? constantValue,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
         : base(
+            BoundKind.LiteralExpression,
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
@@ -35,6 +36,24 @@ internal sealed class BoundLiteralExpression : BoundExpression
     public override ITypeSymbol? Type => BindingResult.TypeSymbol;
 
     public override bool IsError => RoslynDiagnostics.Length != 0 || base.IsError;
+
+    public BoundLiteralExpression Update(
+        CSharpBindingResult bindingResult,
+        object? constantValue)
+    {
+        if (bindingResult.Equals(BindingResult) &&
+            Equals(constantValue, ConstantValue))
+        {
+            return this;
+        }
+
+        return new BoundLiteralExpression(
+            Syntax,
+            Binder,
+            bindingResult,
+            constantValue,
+            Diagnostics);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

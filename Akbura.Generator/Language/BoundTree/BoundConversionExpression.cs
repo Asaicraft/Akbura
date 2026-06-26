@@ -16,6 +16,7 @@ internal sealed class BoundConversionExpression : BoundExpression
         AkburaConversion conversion,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
         : base(
+            BoundKind.ConversionExpression,
             syntax,
             binder,
             operand.SymbolInfo,
@@ -34,6 +35,24 @@ internal sealed class BoundConversionExpression : BoundExpression
     public override ITypeSymbol? Type => Conversion.TargetType ?? Operand.Type;
 
     public override bool IsError => !Conversion.Exists || base.IsError;
+
+    public BoundExpression Update(
+        BoundExpression operand,
+        AkburaConversion conversion)
+    {
+        if (ReferenceEquals(operand, Operand) &&
+            conversion.Equals(Conversion))
+        {
+            return this;
+        }
+
+        return new BoundConversionExpression(
+            Syntax,
+            Binder,
+            operand,
+            conversion,
+            Diagnostics);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

@@ -877,6 +877,79 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BoundNodes_ExposeBoundKind()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.BindingSession.GetCSharpProbeBinder(state, BinderUsage.Expression);
+        var expression = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.None),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var csharpExpression = new BoundCSharpExpression(
+            state,
+            binder,
+            CSharpBindingResult.Empty);
+        var conversion = new BoundConversionExpression(
+            state,
+            binder,
+            expression,
+            new AkburaConversion(AkburaConversionKind.Identity, null, null));
+        var literal = Assert.IsType<BoundLiteralExpression>(binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("1")));
+        var binary = Assert.IsType<BoundBinaryExpression>(binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("1 + 2")));
+        var call = Assert.IsType<BoundCallExpression>(binder.BindExpression(
+            state,
+            CSharpSyntaxFactory.ParseExpression("System.Math.Abs(1)")));
+        var badExpression = new BoundBadExpression(
+            state,
+            binder,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var errorExpression = new BoundErrorExpression(
+            state,
+            binder,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var localDeclaration = Assert.IsType<BoundLocalDeclarationStatement>(binder.BindStatement(
+            state,
+            CSharpSyntaxFactory.ParseStatement("int value = 1;")));
+        var declaration = new BoundDeclaration(
+            state,
+            binder,
+            model.GetSymbolInfo(state),
+            operation: null,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var block = new BoundBlock(
+            state,
+            binder,
+            ImmutableArray<AkburaSymbol>.Empty,
+            ImmutableArray.Create<BoundNode>(expression));
+        var badStatement = new BoundBadStatement(
+            state,
+            binder,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+        Assert.Equal(BoundKind.Expression, expression.Kind);
+        Assert.Equal(BoundKind.CSharpExpression, csharpExpression.Kind);
+        Assert.Equal(BoundKind.ConversionExpression, conversion.Kind);
+        Assert.Equal(BoundKind.LiteralExpression, literal.Kind);
+        Assert.Equal(BoundKind.BinaryExpression, binary.Kind);
+        Assert.Equal(BoundKind.CallExpression, call.Kind);
+        Assert.Equal(BoundKind.BadExpression, badExpression.Kind);
+        Assert.Equal(BoundKind.ErrorExpression, errorExpression.Kind);
+        Assert.Equal(BoundKind.LocalDeclarationStatement, localDeclaration.Kind);
+        Assert.Equal(BoundKind.Declaration, declaration.Kind);
+        Assert.Equal(BoundKind.Block, block.Kind);
+        Assert.Equal(BoundKind.BadStatement, badStatement.Kind);
+    }
+
+    [Fact]
     public void BoundTreeWalker_WalksChildrenWithStackGuard()
     {
         const string code = "state int count = 0;";
@@ -953,6 +1026,52 @@ public sealed class SemanticArchitectureTests
         Assert.Equal(conversion.Conversion.Kind, rewritten.Conversion.Kind);
         Assert.NotSame(badExpression, rewrittenBadExpression);
         Assert.Same(newOperand, Assert.Single(rewrittenBadExpression.Children));
+    }
+
+    [Fact]
+    public void BoundNodeUpdate_PreservesNoOpIdentityAndCreatesChangedNode()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var binder = model.GetBinder(state, BinderUsage.Expression);
+        var oldOperand = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.None),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var newOperand = new BoundExpression(
+            state,
+            binder,
+            AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
+            operation: null,
+            diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var conversion = new BoundConversionExpression(
+            state,
+            binder,
+            oldOperand,
+            new AkburaConversion(AkburaConversionKind.Identity, null, null));
+        var block = new BoundBlock(
+            state,
+            binder,
+            ImmutableArray<AkburaSymbol>.Empty,
+            ImmutableArray.Create<BoundNode>(conversion));
+
+        Assert.Same(conversion, conversion.Update(conversion.Operand, conversion.Conversion));
+        Assert.Same(block, block.Update(block.DeclaredSymbols, block.Statements));
+
+        var changedConversion = Assert.IsType<BoundConversionExpression>(
+            conversion.Update(newOperand, conversion.Conversion));
+        var changedBlock = block.Update(
+            block.DeclaredSymbols,
+            ImmutableArray.Create<BoundNode>(changedConversion));
+
+        Assert.NotSame(conversion, changedConversion);
+        Assert.Same(newOperand, changedConversion.Operand);
+        Assert.NotSame(block, changedBlock);
+        Assert.Same(changedConversion, Assert.Single(changedBlock.Statements));
     }
 
     [Fact]

@@ -19,6 +19,7 @@ internal sealed class BoundBinaryExpression : BoundExpression
         BoundExpression right,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
         : base(
+            BoundKind.BinaryExpression,
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
@@ -45,6 +46,30 @@ internal sealed class BoundBinaryExpression : BoundExpression
     public override ITypeSymbol? Type => BindingResult.TypeSymbol;
 
     public override bool IsError => RoslynDiagnostics.Length != 0 || base.IsError;
+
+    public BoundExpression Update(
+        CSharpBindingResult bindingResult,
+        CSharpSyntaxKind operatorKind,
+        BoundExpression left,
+        BoundExpression right)
+    {
+        if (bindingResult.Equals(BindingResult) &&
+            operatorKind == OperatorKind &&
+            ReferenceEquals(left, Left) &&
+            ReferenceEquals(right, Right))
+        {
+            return this;
+        }
+
+        return new BoundBinaryExpression(
+            Syntax,
+            Binder,
+            bindingResult,
+            operatorKind,
+            left,
+            right,
+            Diagnostics);
+    }
 
     public override void Accept(BoundTreeVisitor visitor)
     {

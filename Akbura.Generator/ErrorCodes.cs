@@ -25,6 +25,11 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_AkcssInvalidThickness = nameof(AKBURA_SEMANTIC_AkcssInvalidThickness);
     public const string AKBURA_SEMANTIC_AkcssExpressionError = nameof(AKBURA_SEMANTIC_AkcssExpressionError);
     public const string AKBURA_SEMANTIC_AkcssPropertyNotFound = nameof(AKBURA_SEMANTIC_AkcssPropertyNotFound);
+    public const string AKBURA_SEMANTIC_CSharpExpressionError = nameof(AKBURA_SEMANTIC_CSharpExpressionError);
+    public const string AKBURA_SEMANTIC_DuplicateComponentMember = nameof(AKBURA_SEMANTIC_DuplicateComponentMember);
+    public const string AKBURA_SEMANTIC_DuplicateCommandParameter = nameof(AKBURA_SEMANTIC_DuplicateCommandParameter);
+    public const string AKBURA_SEMANTIC_DuplicateAkcssSymbol = nameof(AKBURA_SEMANTIC_DuplicateAkcssSymbol);
+    public const string AKBURA_SEMANTIC_InaccessibleMember = nameof(AKBURA_SEMANTIC_InaccessibleMember);
     public const string AKBURA_SEMANTIC_MarkupPropertyNotFound = nameof(AKBURA_SEMANTIC_MarkupPropertyNotFound);
     public const string AKBURA_SEMANTIC_MarkupExpressionError = nameof(AKBURA_SEMANTIC_MarkupExpressionError);
     public const string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert = nameof(AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert);

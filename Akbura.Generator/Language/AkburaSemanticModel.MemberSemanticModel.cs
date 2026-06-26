@@ -6,6 +6,7 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
@@ -139,7 +140,9 @@ internal sealed partial class AkburaSemanticModel
                 inlineAkcssBuilder.WrittenSpan,
                 componentSymbol));
 
-            SemanticModel.SetSemanticDiagnostics(document, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            SemanticModel.SetSemanticDiagnostics(
+                document,
+                CreateUserHookDuplicateComponentMemberDiagnostics(document));
 
             return symbolInfo;
         }
@@ -307,11 +310,22 @@ internal sealed partial class AkburaSemanticModel
                 ? ResolveExplicitStateType(stateDeclaration)
                 : initializerType;
             var bindingKind = GetStateBindingKind(stateDeclaration.Initializer);
-            var diagnostics = SemanticModel.CreateStateBindingDiagnostics(
-                stateDeclaration,
-                bindingKind,
-                type,
-                initializerBinding);
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            diagnosticsBuilder.AddRange(SemanticModel.CreateStateBindingDiagnostics(
+                    stateDeclaration,
+                    bindingKind,
+                    type,
+                    initializerBinding));
+            AddDuplicateComponentMemberDiagnostics(stateDeclaration, name, diagnosticsBuilder);
+            if (userHook == null)
+            {
+                AddCSharpBindingDiagnostics(
+                    stateDeclaration,
+                    stateDeclaration.Initializer.Expression.ToFullString().Trim(),
+                    initializerBinding,
+                    diagnosticsBuilder);
+            }
+            var diagnostics = diagnosticsBuilder.ToImmutable();
             SemanticModel.SetSemanticDiagnostics(stateDeclaration, diagnostics);
 
             return AkburaSymbolInfo.Success(new StateSymbol(
@@ -332,13 +346,27 @@ internal sealed partial class AkburaSemanticModel
             }
 
             var hasExplicitType = paramDeclaration.Type != null;
-            var defaultValueType = ResolveParamDefaultValueType(paramDeclaration);
+            var defaultValueBinding = BindParamDefaultValueExpression(paramDeclaration);
+            var defaultValueType = defaultValueBinding.TypeSymbol == null
+                ? default
+                : new CSharpSymbolDefinition(defaultValueBinding.TypeSymbol);
             var type = hasExplicitType
                 ? ResolveExplicitParamType(paramDeclaration)
                 : defaultValueType;
             var bindingKind = GetParamBindingKind(paramDeclaration);
 
-            SemanticModel.SetSemanticDiagnostics(paramDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            AddDuplicateComponentMemberDiagnostics(paramDeclaration, name, diagnosticsBuilder);
+            if (paramDeclaration.DefaultValue != null)
+            {
+                AddCSharpBindingDiagnostics(
+                    paramDeclaration,
+                    paramDeclaration.DefaultValue.ToFullString().Trim(),
+                    defaultValueBinding,
+                    diagnosticsBuilder);
+            }
+
+            SemanticModel.SetSemanticDiagnostics(paramDeclaration, diagnosticsBuilder.ToImmutable());
 
             return AkburaSymbolInfo.Success(new ParamSymbol(
                 paramDeclaration,
@@ -358,7 +386,9 @@ internal sealed partial class AkburaSemanticModel
 
             var type = ResolveInjectType(injectDeclaration);
 
-            SemanticModel.SetSemanticDiagnostics(injectDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            AddDuplicateComponentMemberDiagnostics(injectDeclaration, name, diagnosticsBuilder);
+            SemanticModel.SetSemanticDiagnostics(injectDeclaration, diagnosticsBuilder.ToImmutable());
 
             return AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
         }
@@ -378,7 +408,10 @@ internal sealed partial class AkburaSemanticModel
             var resultType = GetCommandResultType(returnType, isVoid);
             var hasResult = !resultType.IsDefault;
 
-            SemanticModel.SetSemanticDiagnostics(commandDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            AddDuplicateComponentMemberDiagnostics(commandDeclaration, name, diagnosticsBuilder);
+            AddDuplicateCommandParameterDiagnostics(commandDeclaration, diagnosticsBuilder);
+            SemanticModel.SetSemanticDiagnostics(commandDeclaration, diagnosticsBuilder.ToImmutable());
 
             return AkburaSymbolInfo.Success(new CommandSymbol(
                 commandDeclaration,
@@ -392,9 +425,10 @@ internal sealed partial class AkburaSemanticModel
 
         private AkburaSymbolInfo ResolveUseEffect(UseEffectDeclarationSyntax useEffectDeclaration)
         {
-            var dependencies = CreateUseEffectDependencies(useEffectDeclaration);
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            var dependencies = CreateUseEffectDependencies(useEffectDeclaration, diagnosticsBuilder);
 
-            SemanticModel.SetSemanticDiagnostics(useEffectDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            SemanticModel.SetSemanticDiagnostics(useEffectDeclaration, diagnosticsBuilder.ToImmutable());
 
             return AkburaSymbolInfo.Success(new UseEffectSymbol(
                 useEffectDeclaration,
@@ -532,12 +566,12 @@ internal sealed partial class AkburaSemanticModel
             return returnType;
         }
 
-        private CSharpSymbolDefinition ResolveParamDefaultValueType(ParamDeclarationSyntax paramDeclaration)
+        private CSharpBindingResult BindParamDefaultValueExpression(ParamDeclarationSyntax paramDeclaration)
         {
             var defaultValue = paramDeclaration.DefaultValue;
             if (defaultValue == null)
             {
-                return default;
+                return CSharpBindingResult.Empty;
             }
 
             CSharp.ExpressionSyntax csharpExpression;
@@ -547,12 +581,10 @@ internal sealed partial class AkburaSemanticModel
             }
             catch (ArgumentException)
             {
-                return default;
+                return CSharpBindingResult.Empty;
             }
 
-            var binding = SemanticModel.BindCSharpExpression(csharpExpression);
-            var typeSymbol = binding.TypeSymbol;
-            return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+            return SemanticModel.BindCSharpExpression(csharpExpression);
         }
 
         private CSharpBindingResult BindStateInitializerExpression(StateDeclarationSyntax stateDeclaration)
@@ -584,7 +616,8 @@ internal sealed partial class AkburaSemanticModel
         }
 
         private ImmutableArray<UseEffectDependency> CreateUseEffectDependencies(
-            UseEffectDeclarationSyntax useEffectDeclaration)
+            UseEffectDeclarationSyntax useEffectDeclaration,
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
         {
             var argumentList = GetCSharpArgumentList(useEffectDeclaration.Arguments);
             if (argumentList == null || argumentList.Arguments.Count == 0)
@@ -603,6 +636,11 @@ internal sealed partial class AkburaSemanticModel
                 }
 
                 var binding = SemanticModel.BindMarkupAttributeExpression(expression);
+                AddCSharpBindingDiagnostics(
+                    useEffectDeclaration,
+                    expressionText,
+                    binding,
+                    diagnosticsBuilder);
                 var csharpDefinition = binding.Symbol == null
                     ? default
                     : new CSharpSymbolDefinition(binding.Symbol);
@@ -668,6 +706,127 @@ internal sealed partial class AkburaSemanticModel
             }
 
             return null;
+        }
+
+        private void AddDuplicateComponentMemberDiagnostics(
+            AkTopLevelMemberSyntax member,
+            string name,
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            foreach (var candidate in Scope.Members)
+            {
+                if (candidate.Position >= member.Position)
+                {
+                    return;
+                }
+
+                if (TryGetComponentMemberName(candidate, out var candidateName, out var candidateKind) &&
+                    string.Equals(candidateName, name, StringComparison.Ordinal))
+                {
+                    diagnosticsBuilder.Add(CreateDuplicateComponentMemberDiagnostic(
+                        member,
+                        name,
+                        candidateKind));
+                    return;
+                }
+            }
+        }
+
+        private ImmutableArray<AkburaSemanticDiagnostic> CreateUserHookDuplicateComponentMemberDiagnostics(
+            AkburaDocumentSyntax document)
+        {
+            using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            foreach (var member in document.Members)
+            {
+                if (member.Kind != AkburaSyntaxKind.UserHook ||
+                    !TryGetComponentMemberName(member, out var name, out _))
+                {
+                    continue;
+                }
+
+                AddDuplicateComponentMemberDiagnostics(member, name, builder);
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static bool TryGetComponentMemberName(
+            AkTopLevelMemberSyntax member,
+            out string name,
+            out string kind)
+        {
+            switch (member.Kind)
+            {
+                case AkburaSyntaxKind.StateDeclarationSyntax:
+                    name = Unsafe.As<StateDeclarationSyntax>(member).Name.Identifier.ValueText;
+                    kind = "state";
+                    return !string.IsNullOrWhiteSpace(name);
+                case AkburaSyntaxKind.ParamDeclarationSyntax:
+                    name = Unsafe.As<ParamDeclarationSyntax>(member).Name.Identifier.ValueText;
+                    kind = "param";
+                    return !string.IsNullOrWhiteSpace(name);
+                case AkburaSyntaxKind.InjectDeclarationSyntax:
+                    name = Unsafe.As<InjectDeclarationSyntax>(member).Name.Identifier.ValueText;
+                    kind = "inject";
+                    return !string.IsNullOrWhiteSpace(name);
+                case AkburaSyntaxKind.CommandDeclarationSyntax:
+                    name = Unsafe.As<CommandDeclarationSyntax>(member).Name.Identifier.ValueText;
+                    kind = "command";
+                    return !string.IsNullOrWhiteSpace(name);
+                case AkburaSyntaxKind.UserHook:
+                    name = Unsafe.As<UserHookSyntax>(member).Name.Identifier.ValueText;
+                    kind = "userHook";
+                    return !string.IsNullOrWhiteSpace(name);
+                default:
+                    name = string.Empty;
+                    kind = string.Empty;
+                    return false;
+            }
+        }
+
+        private static AkburaSemanticDiagnostic CreateDuplicateComponentMemberDiagnostic(
+            AkTopLevelMemberSyntax member,
+            string name,
+            string previousKind)
+        {
+            return new AkburaSemanticDiagnostic(
+                member,
+                ErrorCodes.AKBURA_SEMANTIC_DuplicateComponentMember,
+                [name, previousKind]);
+        }
+
+        private void AddDuplicateCommandParameterDiagnostics(
+            CommandDeclarationSyntax commandDeclaration,
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        {
+            var csharpParameters = GetCSharpParameterList(commandDeclaration.Parameters);
+            if (csharpParameters == null || csharpParameters.Parameters.Count < 2)
+            {
+                return;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var parameter in csharpParameters.Parameters)
+            {
+                var name = parameter.Identifier.ValueText;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                if (!seen.Add(name))
+                {
+                    diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
+                        commandDeclaration,
+                        ErrorCodes.AKBURA_SEMANTIC_DuplicateCommandParameter,
+                        [name]));
+                }
+            }
         }
     }
 }

@@ -177,6 +177,21 @@
   <data name="AKBURA_SEMANTIC_AkcssPropertyNotFound" xml:space="preserve">
     <value>AKCSS property '{0}' was not found on style target '{1}'.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_CSharpExpressionError" xml:space="preserve">
+    <value>C# expression '{0}' is not valid: {1}</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_DuplicateComponentMember" xml:space="preserve">
+    <value>Component member '{0}' is already declared as '{1}'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_DuplicateCommandParameter" xml:space="preserve">
+    <value>Command parameter '{0}' is already declared.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_DuplicateAkcssSymbol" xml:space="preserve">
+    <value>AKCSS symbol '{0}' is already declared in this module.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_InaccessibleMember" xml:space="preserve">
+    <value>Member '{0}' exists on '{1}' but is not publicly accessible.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_MarkupPropertyNotFound" xml:space="preserve">
     <value>Property '{0}' was not found on component '{1}'.</value>
   </data>

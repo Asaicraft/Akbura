@@ -90,6 +90,11 @@ internal sealed partial class AkburaSemanticModel
         return _bindingCache.GetDiagnostics(syntax, () =>
         {
             _ = GetSymbolInfo(syntax);
+            if (syntax.Kind == AkburaSyntaxKind.AkburaDocumentSyntax)
+            {
+                return CreateComponentSemanticDiagnostics(Unsafe.As<AkburaDocumentSyntax>(syntax));
+            }
+
             if (syntax.Kind is AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
@@ -113,6 +118,33 @@ internal sealed partial class AkburaSemanticModel
                 ? diagnostics
                 : [];
         });
+    }
+
+    private ImmutableArray<AkburaSemanticDiagnostic> CreateComponentSemanticDiagnostics(
+        AkburaDocumentSyntax document)
+    {
+        var bag = new BindingDiagnosticBag();
+        if (_semanticDiagnosticsCache.TryGetValue(document, out var documentDiagnostics))
+        {
+            bag.AddRange(documentDiagnostics);
+        }
+
+        foreach (var member in document.Members)
+        {
+            switch (member.Kind)
+            {
+                case AkburaSyntaxKind.StateDeclarationSyntax:
+                case AkburaSyntaxKind.ParamDeclarationSyntax:
+                case AkburaSyntaxKind.InjectDeclarationSyntax:
+                case AkburaSyntaxKind.CommandDeclarationSyntax:
+                case AkburaSyntaxKind.UseEffectDeclarationSyntax:
+                case AkburaSyntaxKind.InlineAkcssBlockSyntax:
+                    bag.AddRange(GetSemanticDiagnostics(member));
+                    break;
+            }
+        }
+
+        return bag.ToSemanticDiagnostics();
     }
 
     public AkburaOperation? GetOperation(AkburaSyntax syntax)
@@ -290,7 +322,9 @@ internal sealed partial class AkburaSemanticModel
         var symbol = CreateInlineAkcssModuleSymbol(inlineAkcssBlock, containingComponent);
         var symbolInfo = AkburaSymbolInfo.Success(symbol);
         _symbolInfoCache[inlineAkcssBlock] = symbolInfo;
-        SetSemanticDiagnostics(inlineAkcssBlock, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        SetSemanticDiagnostics(
+            inlineAkcssBlock,
+            CreateDuplicateAkcssSymbolDiagnostics(inlineAkcssBlock.Members));
         return symbolInfo;
     }
 
@@ -308,6 +342,9 @@ internal sealed partial class AkburaSemanticModel
         {
             var module = CreateInlineAkcssModuleSymbol(inlineAkcssBlock, containingComponent);
             _symbolInfoCache[inlineAkcssBlock] = AkburaSymbolInfo.Success(module);
+            SetSemanticDiagnostics(
+                inlineAkcssBlock,
+                CreateDuplicateAkcssSymbolDiagnostics(inlineAkcssBlock.Members));
             builder.Add(module);
         }
 
@@ -360,6 +397,179 @@ internal sealed partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
+    private ImmutableArray<AkburaSemanticDiagnostic> CreateDuplicateAkcssSymbolDiagnostics(
+        Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> members)
+    {
+        using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var member in members)
+        {
+            foreach (var symbolSyntax in EnumerateAkcssSymbolSyntaxes(member))
+            {
+                AddDuplicateAkcssSymbolDiagnostics(symbolSyntax, seen, builder);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<AkburaSemanticDiagnostic> CreateDuplicateAkcssSymbolDiagnostics(
+        AkburaSyntax symbolSyntax)
+    {
+        if (!TryGetAkcssSymbolKey(symbolSyntax, out var symbolKey, out var displayName))
+        {
+            return ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+        }
+
+        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var candidate in EnumerateContainingAkcssSymbolSyntaxes(symbolSyntax))
+        {
+            if (candidate.Position >= symbolSyntax.Position)
+            {
+                break;
+            }
+
+            if (TryGetAkcssSymbolKey(candidate, out var candidateKey, out var candidateDisplayName))
+            {
+                if (!seen.ContainsKey(candidateKey))
+                {
+                    seen.Add(candidateKey, candidateDisplayName);
+                }
+            }
+        }
+
+        return seen.ContainsKey(symbolKey)
+            ? ImmutableArray.Create(CreateDuplicateAkcssSymbolDiagnostic(symbolSyntax, displayName))
+            : ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+    }
+
+    private void AddDuplicateAkcssSymbolDiagnostics(
+        AkburaSyntax syntax,
+        Dictionary<string, string> seen,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (!TryGetAkcssSymbolKey(syntax, out var key, out var displayName))
+        {
+            return;
+        }
+
+        if (seen.ContainsKey(key))
+        {
+            diagnosticsBuilder.Add(CreateDuplicateAkcssSymbolDiagnostic(syntax, displayName));
+            return;
+        }
+
+        seen.Add(key, displayName);
+    }
+
+    private IEnumerable<AkburaSyntax> EnumerateContainingAkcssSymbolSyntaxes(AkburaSyntax syntax)
+    {
+        for (var node = syntax.Parent; node != null; node = node.Parent)
+        {
+            switch (node.Kind)
+            {
+                case AkburaSyntaxKind.InlineAkcssBlockSyntax:
+                    foreach (var member in Unsafe.As<InlineAkcssBlockSyntax>(node).Members)
+                    {
+                        foreach (var symbolSyntax in EnumerateAkcssSymbolSyntaxes(member))
+                        {
+                            yield return symbolSyntax;
+                        }
+                    }
+
+                    yield break;
+
+                case AkburaSyntaxKind.AkcssDocumentSyntax:
+                    foreach (var member in Unsafe.As<AkcssDocumentSyntax>(node).Members)
+                    {
+                        foreach (var symbolSyntax in EnumerateAkcssSymbolSyntaxes(member))
+                        {
+                            yield return symbolSyntax;
+                        }
+                    }
+
+                    yield break;
+            }
+        }
+    }
+
+    private static IEnumerable<AkburaSyntax> EnumerateAkcssSymbolSyntaxes(AkcssTopLevelMemberSyntax member)
+    {
+        switch (member.Kind)
+        {
+            case AkburaSyntaxKind.AkcssStyleRuleSyntax:
+                yield return Unsafe.As<AkcssStyleRuleSyntax>(member);
+                break;
+
+            case AkburaSyntaxKind.AkcssUtilitiesSectionSyntax:
+                foreach (var utility in Unsafe.As<AkcssUtilitiesSectionSyntax>(member).Utilities)
+                {
+                    yield return utility;
+                }
+
+                break;
+        }
+    }
+
+    private static bool TryGetAkcssSymbolKey(
+        AkburaSyntax syntax,
+        out string key,
+        out string displayName)
+    {
+        switch (syntax.Kind)
+        {
+            case AkburaSyntaxKind.AkcssStyleRuleSyntax:
+            {
+                var selector = Unsafe.As<AkcssStyleRuleSyntax>(syntax).Selector.ToFullString().Trim();
+                if (selector.Length == 0)
+                {
+                    key = string.Empty;
+                    displayName = string.Empty;
+                    return false;
+                }
+
+                key = "style:" + selector;
+                displayName = selector;
+                return true;
+            }
+
+            case AkburaSyntaxKind.AkcssUtilityDeclarationSyntax:
+            {
+                var utility = Unsafe.As<AkcssUtilityDeclarationSyntax>(syntax);
+                var name = utility.Selector.Name.Identifier.ValueText;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    key = string.Empty;
+                    displayName = string.Empty;
+                    return false;
+                }
+
+                var targetType = utility.Selector.TargetType?.ToFullString().Trim() ?? string.Empty;
+                var arity = utility.Selector.Parameters.Count;
+                key = "utility:" + targetType + ":" + name + "/" + arity;
+                displayName = targetType.Length == 0
+                    ? name + "/" + arity
+                    : targetType + "." + name + "/" + arity;
+                return true;
+            }
+
+            default:
+                key = string.Empty;
+                displayName = string.Empty;
+                return false;
+        }
+    }
+
+    private static AkburaSemanticDiagnostic CreateDuplicateAkcssSymbolDiagnostic(
+        AkburaSyntax syntax,
+        string displayName)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_DuplicateAkcssSymbol,
+            [displayName]);
+    }
+
     private AkburaSymbolInfo ResolveAkcssStyle(
         AkcssStyleRuleSyntax styleRule)
     {
@@ -372,17 +582,18 @@ internal sealed partial class AkburaSemanticModel
 
         if (!TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var targetType))
         {
-            SetSemanticDiagnostics(
-                styleRule,
-                ImmutableArray.Create(CreateAkcssSelectorTargetNotFoundDiagnostic(
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            diagnosticsBuilder.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     styleRule,
-                    styleRule.Selector.TargetType?.ToFullString().Trim() ?? string.Empty)));
+                    styleRule.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
+            diagnosticsBuilder.AddRange(CreateDuplicateAkcssSymbolDiagnostics(styleRule));
+            SetSemanticDiagnostics(styleRule, diagnosticsBuilder.ToImmutable());
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
         }
 
         var symbol = CreateAkcssStyleSymbol(styleRule, targetType, includeOperations: true);
 
-        SetSemanticDiagnosticsIfAbsent(styleRule, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        SetSemanticDiagnosticsIfAbsent(styleRule, CreateDuplicateAkcssSymbolDiagnostics(styleRule));
 
         return AkburaSymbolInfo.Success(symbol);
     }
@@ -398,17 +609,18 @@ internal sealed partial class AkburaSemanticModel
 
         if (!TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var targetType))
         {
-            SetSemanticDiagnostics(
-                utilityDeclaration,
-                ImmutableArray.Create(CreateAkcssSelectorTargetNotFoundDiagnostic(
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            diagnosticsBuilder.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     utilityDeclaration,
-                    utilityDeclaration.Selector.TargetType?.ToFullString().Trim() ?? string.Empty)));
+                    utilityDeclaration.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
+            diagnosticsBuilder.AddRange(CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
+            SetSemanticDiagnostics(utilityDeclaration, diagnosticsBuilder.ToImmutable());
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
         }
 
         var symbol = CreateTailwindUtilitySymbolForAkcss(utilityDeclaration, targetType, includeOperations: true);
 
-        SetSemanticDiagnostics(utilityDeclaration, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        SetSemanticDiagnostics(utilityDeclaration, CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
 
         return AkburaSymbolInfo.Success(symbol);
     }
@@ -804,7 +1016,14 @@ internal sealed partial class AkburaSemanticModel
             : new CSharpSymbolDefinition(binding.TypeSymbol);
         var operations = CreateAkcssOperations(ifDirective.Members, containingSymbol);
 
-        SetSemanticDiagnostics(ifDirective, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        AddAkcssExpressionDiagnostics(
+            ifDirective,
+            ifDirective.Condition.ToFullString().Trim(),
+            binding,
+            diagnosticsBuilder);
+        var diagnostics = diagnosticsBuilder.ToImmutable();
+        SetSemanticDiagnostics(ifDirective, diagnostics);
 
         return new AkcssIfOperation(
             ifDirective,
@@ -812,7 +1031,9 @@ internal sealed partial class AkburaSemanticModel
             conditionType,
             binding.OperationDefinition,
             operations,
-            hasErrors: expression == null || operations.Any(static operation => operation.HasErrors));
+            hasErrors: expression == null ||
+                diagnostics.Length > 0 ||
+                operations.Any(static operation => operation.HasErrors));
     }
 
     private AkcssApplyOperation CreateAkcssApplyOperation(
@@ -1073,6 +1294,19 @@ internal sealed partial class AkburaSemanticModel
         CSharpBindingResult binding,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
+        AddAkcssExpressionDiagnostics(
+            assignment,
+            assignment.Expression.ToFullString().Trim(),
+            binding,
+            diagnosticsBuilder);
+    }
+
+    private void AddAkcssExpressionDiagnostics(
+        AkburaSyntax syntax,
+        string expressionText,
+        CSharpBindingResult binding,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
         if (binding.Diagnostics.IsDefaultOrEmpty)
         {
             return;
@@ -1083,7 +1317,8 @@ internal sealed partial class AkburaSemanticModel
             if (diagnostic.Severity == DiagnosticSeverity.Error)
             {
                 diagnosticsBuilder.Add(CreateAkcssExpressionErrorDiagnostic(
-                    assignment,
+                    syntax,
+                    expressionText,
                     diagnostic));
             }
         }
@@ -1290,10 +1525,12 @@ internal sealed partial class AkburaSemanticModel
 
         if (clrProperty == null && avaloniaProperty == null)
         {
-            diagnosticsBuilder.Add(CreateAkcssPropertyNotFoundDiagnostic(
-                assignment,
-                propertyName,
-                ownerType));
+            diagnosticsBuilder.Add(HasInaccessiblePropertyMember(ownerType, propertyName)
+                ? CreateInaccessibleMemberDiagnostic(assignment, propertyName, ownerType)
+                : CreateAkcssPropertyNotFoundDiagnostic(
+                    assignment,
+                    propertyName,
+                    ownerType));
             return null;
         }
 
@@ -1936,13 +2173,14 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private AkburaSemanticDiagnostic CreateAkcssExpressionErrorDiagnostic(
-        AkcssAssignmentSyntax syntax,
+        AkburaSyntax syntax,
+        string expressionText,
         Diagnostic diagnostic)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_AkcssExpressionError,
-            [syntax.Expression.ToFullString().Trim(), diagnostic.GetMessage()]);
+            [expressionText, diagnostic.GetMessage()]);
     }
 
     private AkburaSemanticDiagnostic CreateAkcssApplyItemNotFoundDiagnostic(
@@ -2959,10 +3197,13 @@ internal sealed partial class AkburaSemanticModel
         {
             SetSemanticDiagnostics(
                 markupAttribute,
-                ImmutableArray.Create(CreateMarkupPropertyNotFoundDiagnostic(
-                    markupAttribute,
-                    propertyName,
-                    componentSymbol)));
+                ImmutableArray.Create(componentType != null &&
+                    HasInaccessibleMarkupMember(componentType, propertyName)
+                        ? CreateInaccessibleMemberDiagnostic(markupAttribute, propertyName, componentType)
+                        : CreateMarkupPropertyNotFoundDiagnostic(
+                            markupAttribute,
+                            propertyName,
+                            componentSymbol)));
 
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
         }
@@ -3074,6 +3315,145 @@ internal sealed partial class AkburaSemanticModel
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyNotFound,
             [propertyName, componentName]);
+    }
+
+    private bool HasInaccessibleMarkupMember(
+        INamedTypeSymbol componentType,
+        string memberName)
+    {
+        return HasInaccessiblePropertyMember(componentType, memberName) ||
+            HasInaccessibleClrEvent(componentType, memberName) ||
+            HasInaccessibleAvaloniaRoutedEventField(componentType, memberName);
+    }
+
+    private bool HasInaccessiblePropertyMember(
+        INamedTypeSymbol componentType,
+        string propertyName)
+    {
+        return HasInaccessibleClrProperty(componentType, propertyName) ||
+            HasInaccessibleAvaloniaPropertyField(componentType, propertyName);
+    }
+
+    private bool HasInaccessibleClrProperty(
+        INamedTypeSymbol componentType,
+        string propertyName)
+    {
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var property in current.GetMembers(propertyName).OfType<RoslynPropertySymbol>())
+            {
+                if (!property.IsStatic &&
+                    property.DeclaredAccessibility != Accessibility.Public)
+                {
+                    return true;
+                }
+            }
+        }
+
+        foreach (var @interface in componentType.AllInterfaces)
+        {
+            foreach (var property in @interface.GetMembers(propertyName).OfType<RoslynPropertySymbol>())
+            {
+                if (!property.IsStatic &&
+                    property.DeclaredAccessibility != Accessibility.Public)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasInaccessibleAvaloniaPropertyField(
+        INamedTypeSymbol componentType,
+        string propertyName)
+    {
+        return HasInaccessibleAvaloniaPropertyFieldName(componentType, propertyName + "Property") ||
+            HasInaccessibleAvaloniaPropertyFieldName(componentType, propertyName);
+    }
+
+    private bool HasInaccessibleAvaloniaPropertyFieldName(
+        INamedTypeSymbol componentType,
+        string fieldName)
+    {
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var field in current.GetMembers(fieldName).OfType<RoslynFieldSymbol>())
+            {
+                if (field.IsStatic &&
+                    field.DeclaredAccessibility != Accessibility.Public &&
+                    IsAvaloniaPropertyType(field.Type))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasInaccessibleClrEvent(
+        INamedTypeSymbol componentType,
+        string eventName)
+    {
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var @event in current.GetMembers(eventName).OfType<RoslynEventSymbol>())
+            {
+                if (!@event.IsStatic &&
+                    @event.DeclaredAccessibility != Accessibility.Public)
+                {
+                    return true;
+                }
+            }
+        }
+
+        foreach (var @interface in componentType.AllInterfaces)
+        {
+            foreach (var @event in @interface.GetMembers(eventName).OfType<RoslynEventSymbol>())
+            {
+                if (!@event.IsStatic &&
+                    @event.DeclaredAccessibility != Accessibility.Public)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasInaccessibleAvaloniaRoutedEventField(
+        INamedTypeSymbol componentType,
+        string eventName)
+    {
+        var routedEventName = eventName + "Event";
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            foreach (var field in current.GetMembers(routedEventName).OfType<RoslynFieldSymbol>())
+            {
+                if (field.IsStatic &&
+                    field.DeclaredAccessibility != Accessibility.Public &&
+                    IsAvaloniaRoutedEventType(field.Type))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static AkburaSemanticDiagnostic CreateInaccessibleMemberDiagnostic(
+        AkburaSyntax syntax,
+        string memberName,
+        INamedTypeSymbol ownerType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_InaccessibleMember,
+            [memberName, ownerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
     }
 
     private static RoslynPropertySymbol? FindPublicClrProperty(
@@ -4112,4 +4492,37 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
+    private static void AddCSharpBindingDiagnostics(
+        AkburaSyntax syntax,
+        string expressionText,
+        CSharpBindingResult binding,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (binding.Diagnostics.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in binding.Diagnostics)
+        {
+            if (diagnostic.Severity == DiagnosticSeverity.Error)
+            {
+                diagnosticsBuilder.Add(CreateCSharpExpressionErrorDiagnostic(
+                    syntax,
+                    expressionText,
+                    diagnostic));
+            }
+        }
+    }
+
+    private static AkburaSemanticDiagnostic CreateCSharpExpressionErrorDiagnostic(
+        AkburaSyntax syntax,
+        string expressionText,
+        Diagnostic diagnostic)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError,
+            [expressionText, diagnostic.GetMessage()]);
+    }
 }

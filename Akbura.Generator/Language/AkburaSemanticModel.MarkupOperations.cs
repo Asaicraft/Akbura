@@ -244,13 +244,16 @@ internal sealed partial class AkburaSemanticModel
         var componentName = containingComponent?.Name ?? "<unknown>";
         var utilityName = GetTailwindUtilityName(attribute);
         var arguments = CreateTailwindUtilityArguments(attribute);
+        var validatedArguments = arguments;
         var condition = CreateTailwindCondition(attribute);
         var utility = ResolveTailwindUtilityForAttribute(
             attribute,
             utilityName,
             arguments,
             containingComponent,
-            diagnosticsBuilder);
+            diagnosticsBuilder,
+            out validatedArguments);
+        AddTailwindExpressionDiagnostics(attribute, validatedArguments, diagnosticsBuilder);
 
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(attribute, diagnostics);
@@ -260,7 +263,7 @@ internal sealed partial class AkburaSemanticModel
             containingComponent,
             utilityName,
             utility,
-            arguments,
+            validatedArguments,
             condition.HasCondition,
             condition.Text,
             condition.Type,
@@ -273,8 +276,10 @@ internal sealed partial class AkburaSemanticModel
         string utilityName,
         ImmutableArray<TailwindUtilityArgument> arguments,
         IMarkupComponentSymbol? containingComponent,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        out ImmutableArray<TailwindUtilityArgument> validatedArguments)
     {
+        validatedArguments = arguments;
         var localCandidates = FindTailwindUtilityCandidates(
             GetLocalAkcssUtilityDeclarations(diagnosticsBuilder),
             utilityName,
@@ -295,7 +300,8 @@ internal sealed partial class AkburaSemanticModel
                 attribute,
                 localCandidates[0],
                 arguments,
-                diagnosticsBuilder);
+                diagnosticsBuilder,
+                out validatedArguments);
         }
 
         foreach (var importLayer in GetImportedAkcssUtilityDeclarationLayers(diagnosticsBuilder))
@@ -320,7 +326,8 @@ internal sealed partial class AkburaSemanticModel
                     attribute,
                     importCandidates[0],
                     arguments,
-                    diagnosticsBuilder);
+                    diagnosticsBuilder,
+                    out validatedArguments);
             }
         }
 
@@ -360,8 +367,10 @@ internal sealed partial class AkburaSemanticModel
         TailwindAttributeSyntax attribute,
         ITailwindUtilitySymbol utility,
         ImmutableArray<TailwindUtilityArgument> arguments,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        out ImmutableArray<TailwindUtilityArgument> validatedArguments)
     {
+        validatedArguments = arguments;
         if (utility.Parameters.Length != arguments.Length)
         {
             diagnosticsBuilder.Add(CreateTailwindUtilityArgumentMismatchDiagnostic(
@@ -371,14 +380,31 @@ internal sealed partial class AkburaSemanticModel
             return null;
         }
 
+        using var validatedBuilder = ImmutableArrayBuilder<TailwindUtilityArgument>.Rent(arguments.Length);
         for (var i = 0; i < arguments.Length; i++)
         {
-            var argumentType = arguments[i].Type.Symbol as ITypeSymbol;
+            var argument = arguments[i];
+            var argumentType = argument.Type.Symbol as ITypeSymbol;
             var parameterType = utility.Parameters[i].Type.Symbol as ITypeSymbol;
+            if (parameterType == null)
+            {
+                validatedBuilder.Add(argument);
+                continue;
+            }
+
+            if (TryCreateEnumTailwindUtilityArgument(
+                argument,
+                parameterType,
+                out var enumArgument))
+            {
+                validatedBuilder.Add(enumArgument);
+                continue;
+            }
+
             if (argumentType == null ||
-                parameterType == null ||
                 Compilation.CSharpCompilation.ClassifyConversion(argumentType, parameterType).IsImplicit)
             {
+                validatedBuilder.Add(argument);
                 continue;
             }
 
@@ -389,7 +415,87 @@ internal sealed partial class AkburaSemanticModel
             return null;
         }
 
+        validatedArguments = validatedBuilder.ToImmutable();
         return utility;
+    }
+
+    private bool TryCreateEnumTailwindUtilityArgument(
+        TailwindUtilityArgument argument,
+        ITypeSymbol parameterType,
+        out TailwindUtilityArgument enumArgument)
+    {
+        enumArgument = default;
+        if (parameterType is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType ||
+            !TryGetTailwindEnumArgumentMemberName(argument.Syntax, enumType, out var memberName))
+        {
+            return false;
+        }
+
+        var enumMember = enumType
+            .GetMembers(memberName)
+            .OfType<IFieldSymbol>()
+            .FirstOrDefault(static field => field.HasConstantValue);
+        if (enumMember == null)
+        {
+            return false;
+        }
+
+        var expressionText =
+            enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+            "." +
+            memberName;
+        CSharp.ExpressionSyntax expression;
+        try
+        {
+            expression = CSharpSyntaxFactory.ParseExpression(expressionText);
+        }
+        catch (ArgumentException)
+        {
+            expression = null!;
+        }
+
+        var binding = expression == null
+            ? CSharpBindingResult.Empty
+            : BindMarkupAttributeExpression(argument.Syntax, expression);
+
+        enumArgument = new TailwindUtilityArgument(
+            argument.Syntax,
+            argument.Text,
+            new CSharpSymbolDefinition(enumType),
+            binding.OperationDefinition,
+            enumMember.ConstantValue);
+        return true;
+    }
+
+    private static bool TryGetTailwindEnumArgumentMemberName(
+        TailwindSegmentSyntax syntax,
+        INamedTypeSymbol enumType,
+        out string memberName)
+    {
+        switch (syntax.Kind)
+        {
+            case AkburaSyntaxKind.TailwindIdentifierSegmentSyntax:
+                memberName = Unsafe.As<TailwindIdentifierSegmentSyntax>(syntax).Name.Identifier.ValueText;
+                return !string.IsNullOrWhiteSpace(memberName);
+
+            case AkburaSyntaxKind.TailwindExpressionSegmentSyntax:
+                var expressionSegment = Unsafe.As<TailwindExpressionSegmentSyntax>(syntax);
+                try
+                {
+                    var expression = CSharpSyntaxFactory.ParseExpression(
+                        expressionSegment.Expression.Expression.ToFullString());
+                    return TryGetExpectedTypeMemberName(expression, enumType, out memberName);
+                }
+                catch (ArgumentException)
+                {
+                    memberName = string.Empty;
+                    return false;
+                }
+
+            default:
+                memberName = string.Empty;
+                return false;
+        }
     }
 
     private ITailwindUtilitySymbol CreateTailwindUtilitySymbol(
@@ -1832,6 +1938,56 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return builder.ToImmutable();
+    }
+
+    private void AddTailwindExpressionDiagnostics(
+        TailwindAttributeSyntax attribute,
+        ImmutableArray<TailwindUtilityArgument> arguments,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
+        {
+            return;
+        }
+
+        var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
+        foreach (var argument in arguments)
+        {
+            if (argument.Syntax.Kind != AkburaSyntaxKind.TailwindExpressionSegmentSyntax ||
+                IsConvertedEnumTailwindUtilityArgument(argument))
+            {
+                continue;
+            }
+
+            var expressionSegment = Unsafe.As<TailwindExpressionSegmentSyntax>(argument.Syntax);
+            var expression = ParseInlineExpression(expressionSegment.Expression);
+            if (expression != null)
+            {
+                AddMarkupExpressionDiagnostics(
+                    attribute,
+                    BindMarkupAttributeExpression(argument.Syntax, expression),
+                    diagnosticsBuilder);
+            }
+        }
+
+        if (fullAttribute.Prefix?.Kind == AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        {
+            var expressionPrefix = Unsafe.As<ExpressionConditionalPrefixSyntax>(fullAttribute.Prefix);
+            var expression = ParseInlineExpression(expressionPrefix.Expression);
+            if (expression != null)
+            {
+                AddMarkupExpressionDiagnostics(
+                    attribute,
+                    BindMarkupAttributeExpression(attribute, expression),
+                    diagnosticsBuilder);
+            }
+        }
+    }
+
+    private static bool IsConvertedEnumTailwindUtilityArgument(TailwindUtilityArgument argument)
+    {
+        return argument.Type.Symbol is INamedTypeSymbol { TypeKind: TypeKind.Enum } &&
+            argument.ConstantValue != null;
     }
 
     private TailwindUtilityArgument CreateTailwindUtilityArgument(TailwindSegmentSyntax segment)

@@ -608,6 +608,40 @@ Utility arguments come from numeric segments and expression segments:
 <Border px-{viewModel.Spacing}/>
 ```
 
+Enum arguments can be passed either as a plain utility segment or as a C# expression segment. If a utility parameter type is an enum, Akbura can bind a matching identifier segment to that enum member.
+
+`Styles.akcss`:
+
+```akcss
+@utilities {
+    .mypad-(MyEnum myEnum) {
+        @if(myEnum == MyEnum.horizontal) {
+            Padding: (horizontal: 10);
+        }
+
+        @if(myEnum == MyEnum.vertical) {
+            Padding: (vertical: 10);
+        }
+    }
+}
+```
+
+`MyEnum.cs`:
+
+```csharp
+enum MyEnum
+{
+    horizontal,
+    vertical,
+}
+```
+
+Use it in markup:
+
+```akbura
+<TextBlock mypad-horizontal mypad-{MyEnum.vertical}/>
+```
+
 Conditional prefixes are supported:
 
 ```akbura

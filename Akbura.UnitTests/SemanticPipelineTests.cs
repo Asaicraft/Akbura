@@ -1737,6 +1737,135 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssIfInvalidCSharpExpression_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            @akcss {
+                .myText {
+                    @if(missingFlag) {
+                        Width: 10;
+                    }
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(Assert.Single(rule.Members));
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssIfOperation>(Assert.Single(symbol.Operations));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(ifDirective));
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssExpressionError, diagnostic.Code);
+        Assert.Contains("missingFlag", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssUtilityInvalidCSharpExpression_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            @akcss {
+                @utilities {
+                    .w-(double value) {
+                        Width: missing + value;
+                    }
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var utility = GetOnlyAkcssUtility(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(semanticModel.GetSymbolInfo(utility).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(symbol.Operations));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssExpressionError, diagnostic.Code);
+        Assert.Contains("missing", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_DuplicateAkcssSymbols_ProduceDiagnostics()
+    {
+        const string code =
+            """
+            @akcss {
+                .card {
+                    Width: 1;
+                }
+
+                .card {
+                    Width: 2;
+                }
+
+                @utilities {
+                    .w-(double value) {
+                        Width: value;
+                    }
+
+                    .w-(double value) {
+                        Width: value;
+                    }
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(Assert.Single(syntaxTree.GetRoot().Members));
+        var rules = inlineAkcss.Members.OfType<AkcssStyleRuleSyntax>().ToArray();
+        var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(
+            inlineAkcss.Members.Single(member => member is AkcssUtilitiesSectionSyntax)).Utilities;
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_DuplicateAkcssSymbol,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(rules[1])).Code);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_DuplicateAkcssSymbol,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(utilities[1])).Code);
+        Assert.Equal(2, semanticModel.GetSemanticDiagnostics(inlineAkcss).Count(static diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_DuplicateAkcssSymbol));
+    }
+
+    [Fact]
+    public void SemanticModel_InaccessibleAkcssProperty_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            @akcss {
+                (global::Demo.SecretControl).card {
+                    Secret: "x";
+                }
+            }
+            """;
+        const string csharpCode =
+            """
+            namespace Demo
+            {
+                public sealed class SecretControl : Avalonia.Controls.Control
+                {
+                    private string Secret { get; set; } = "";
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(Assert.Single(rule.Members));
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            semanticModel.GetOperation(assignment));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(assignment));
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_InaccessibleMember, diagnostic.Code);
+        Assert.Contains("Secret", diagnostic.Message);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssThicknessTuples_CreateConvertedValues()
     {
         const string code =
@@ -2117,6 +2246,90 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ComponentCSharpExpressions_ProduceDiagnostics()
+    {
+        const string code =
+            """
+            state int count = missing + 1;
+            param int UserId = missing;
+
+            useEffect(missing.Name) {
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[0]);
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[1]);
+        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[2]);
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(state)).Code);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(param)).Code);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError,
+            Assert.Single(semanticModel.GetSemanticDiagnostics(useEffect)).Code);
+
+        var rootDiagnostics = semanticModel.GetSemanticDiagnostics(root);
+        Assert.Equal(3, rootDiagnostics.Count(static diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError));
+    }
+
+    [Fact]
+    public void SemanticModel_DuplicateComponentMembers_ProduceDiagnostics()
+    {
+        const string code =
+            """
+            using System;
+
+            state int count = 0;
+            param int count = 1;
+            inject IServiceProvider count;
+            command void count();
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        _ = semanticModel.GetSymbolInfo(root);
+
+        var duplicateDiagnostics = semanticModel.GetSemanticDiagnostics(root)
+            .Where(static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_DuplicateComponentMember)
+            .ToArray();
+
+        Assert.Equal(3, duplicateDiagnostics.Length);
+        Assert.All(duplicateDiagnostics, diagnostic => Assert.Contains("count", diagnostic.Message));
+    }
+
+    [Fact]
+    public void SemanticModel_SameComponentMemberNamesInDifferentComponents_AreAllowed()
+    {
+        const string code = "state int count = 0;";
+        var firstTree = AkburaSyntaxTree.ParseText(code, "First.akbura");
+        var secondTree = AkburaSyntaxTree.ParseText(code, "Second.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [firstTree, secondTree]);
+
+        Assert.True(compilation.GetSemanticModel(firstTree).GetSemanticDiagnostics(firstTree.GetRoot()).IsEmpty);
+        Assert.True(compilation.GetSemanticModel(secondTree).GetSemanticDiagnostics(secondTree.GetRoot()).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_DuplicateCommandParameters_ProduceDiagnostic()
+    {
+        const string code = "command void Save(int id, string id);";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var command = Assert.IsType<CommandDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(command));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_DuplicateCommandParameter, diagnostic.Code);
+        Assert.Contains("id", diagnostic.Message);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesAvaloniaMarkupPropertySymbol()
     {
         const string code =
@@ -2368,6 +2581,118 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_BindsEnumIdentifierSegments()
+    {
+        const string code =
+            """
+            using Demo;
+            using Avalonia.Controls;
+
+            @akcss {
+                @utilities {
+                    .mypad-(MyEnum myEnum) {
+                        @if(myEnum == MyEnum.horizontal) {
+                            Padding: (horizontal: 10);
+                        }
+
+                        @if(myEnum == MyEnum.vertical) {
+                            Padding: (vertical: 10);
+                        }
+                    }
+                }
+            }
+
+            <TextBlock mypad-horizontal mypad-{MyEnum.vertical}/>
+            """;
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public enum MyEnum
+            {
+                horizontal,
+                vertical,
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var utility = GetOnlyAkcssUtility(syntaxTree);
+        var utilitySymbol = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            semanticModel.GetSymbolInfo(utility).Symbol);
+        var attributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal("MyEnum", Assert.Single(utilitySymbol.Parameters).Type.Name);
+        Assert.Equal(2, utilitySymbol.Operations.Length);
+        Assert.All(utilitySymbol.Operations, operation =>
+        {
+            var ifOperation = Assert.IsAssignableFrom<IAkcssIfOperation>(operation);
+            Assert.False(ifOperation.HasErrors);
+            Assert.True(semanticModel.GetSemanticDiagnostics(ifOperation.Syntax).IsEmpty);
+        });
+
+        Assert.Equal(2, attributes.Length);
+        var plainOperation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attributes[0]));
+        var expressionOperation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attributes[1]));
+        var plainArgument = Assert.Single(plainOperation.Arguments);
+        var expressionArgument = Assert.Single(expressionOperation.Arguments);
+
+        Assert.Equal("MyEnum", plainArgument.Type.Name);
+        Assert.Equal(0, plainArgument.ConstantValue);
+        Assert.Equal("MyEnum", expressionArgument.Type.Name);
+        Assert.False(expressionArgument.ValueOperation.IsDefault);
+        Assert.False(plainOperation.HasErrors);
+        Assert.False(expressionOperation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attributes[0]).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attributes[1]).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_InvalidEnumSegment_ProducesArgumentMismatch()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                @utilities {
+                    .mypad-(MyEnum myEnum) {
+                        Padding: (horizontal: 10);
+                    }
+                }
+            }
+
+            <TextBlock mypad-unknown/>
+            """;
+        const string csharpCode =
+            """
+            public enum MyEnum
+            {
+                horizontal,
+                vertical,
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.Single(syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<TailwindFullAttributeSyntax>());
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch, diagnostic.Code);
+    }
+
+    [Fact]
     public void SemanticModel_MarkupInterpolatedStringAndEventExpression_BindComponentScope()
     {
         const string code =
@@ -2430,6 +2755,105 @@ public class SemanticPipelineTests
         Assert.True(operation.HasErrors);
         Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError, diagnostic.Code);
         Assert.Contains("missing", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupEventInvalidCSharpExpression_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <Button Click={() => missing.Method()} />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(attribute),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+
+        Assert.True(operation.HasErrors);
+        Assert.Contains("missing", diagnostic.Message);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindInvalidExpressionSegments_ProduceDiagnostics()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                @utilities {
+                    .w-(double value) { Width: value; }
+                    .hidden { IsVisible: false; }
+                }
+            }
+
+            <Button w-{missingValue} {missingCondition}:hidden />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var attributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<TailwindAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(2, attributes.Length);
+        foreach (var attribute in attributes)
+        {
+            var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                semanticModel.GetOperation(attribute));
+            var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+            Assert.True(operation.HasErrors);
+            Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError, diagnostic.Code);
+        }
+    }
+
+    [Fact]
+    public void SemanticModel_InaccessibleMarkupPropertyOrEvent_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            using Demo;
+
+            <SecretControl Secret="x" Hidden={() => {}} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo
+            {
+                public sealed class SecretControl : Avalonia.Controls.Control
+                {
+                    private string Secret { get; set; } = "";
+                    internal event System.EventHandler? Hidden;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var attributes = GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes
+            .Cast<MarkupPlainAttributeSyntax>()
+            .ToArray();
+
+        foreach (var attribute in attributes)
+        {
+            var symbolInfo = semanticModel.GetSymbolInfo(attribute);
+            var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+            Assert.Null(symbolInfo.Symbol);
+            Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_InaccessibleMember, diagnostic.Code);
+            Assert.Contains(attribute.Name.Identifier.ValueText, diagnostic.Message);
+        }
     }
 
     [Fact]

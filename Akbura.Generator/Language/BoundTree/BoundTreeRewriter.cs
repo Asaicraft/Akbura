@@ -167,7 +167,11 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             case AkburaSymbolKind.State:
                 return VisitStateSymbol((IStateSymbol)symbol);
             case AkburaSymbolKind.Parameter:
-                return VisitParameterLikeSymbol(symbol);
+                return VisitParameterSymbol((IParamSymbol)symbol);
+            case AkburaSymbolKind.CommandParameter:
+                return VisitCommandParameterSymbol((ICommandParameterSymbol)symbol);
+            case AkburaSymbolKind.TailwindUtilityParameter:
+                return VisitTailwindUtilityParameterSymbol((ITailwindUtilityParameterSymbol)symbol);
             case AkburaSymbolKind.InjectedService:
                 return VisitInjectSymbol((IInjectSymbol)symbol);
             case AkburaSymbolKind.Command:
@@ -231,21 +235,6 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
     }
 
     protected virtual AkburaSymbol DefaultVisitSymbol(AkburaSymbol symbol) => symbol;
-
-    protected virtual AkburaSymbol VisitParameterLikeSymbol(AkburaSymbol symbol)
-    {
-        if (symbol is ICommandParameterSymbol commandParameter)
-        {
-            return VisitCommandParameterSymbol(commandParameter);
-        }
-
-        if (symbol is ITailwindUtilityParameterSymbol utilityParameter)
-        {
-            return VisitTailwindUtilityParameterSymbol(utilityParameter);
-        }
-
-        return VisitParameterSymbol((IParamSymbol)symbol);
-    }
 
     protected virtual AkburaSymbol VisitAkburaComponentSymbol(IAkburaComponentSymbol symbol) =>
         VisitMarkupComponentSymbol(symbol);

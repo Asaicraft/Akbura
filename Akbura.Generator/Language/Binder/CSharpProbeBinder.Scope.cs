@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
@@ -172,27 +173,61 @@ internal sealed partial class CSharpProbeBinder
         ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> memberDeclarations,
         ImmutableArrayBuilder<CSharp.StatementSyntax> localStatements)
     {
-        switch (symbol)
+        if (symbol == null)
         {
-            case IStateSymbol state:
+            return;
+        }
+
+        switch (symbol.Kind)
+        {
+            case AkburaSymbolKind.State:
+            {
+                var state = (IStateSymbol)symbol;
                 AddProbeLocal(localStatements, state.Name, state.Type);
                 break;
+            }
 
-            case IParamSymbol parameter:
+            case AkburaSymbolKind.Parameter:
+            {
+                var parameter = (IParamSymbol)symbol;
                 AddProbeLocal(localStatements, parameter.Name, parameter.Type);
                 break;
+            }
 
-            case IInjectSymbol inject:
+            case AkburaSymbolKind.CommandParameter:
+            {
+                var parameter = (ICommandParameterSymbol)symbol;
+                AddProbeLocal(localStatements, parameter.Name, parameter.Type);
+                break;
+            }
+
+            case AkburaSymbolKind.TailwindUtilityParameter:
+            {
+                var parameter = (ITailwindUtilityParameterSymbol)symbol;
+                AddProbeLocal(localStatements, parameter.Name, parameter.Type);
+                break;
+            }
+
+            case AkburaSymbolKind.InjectedService:
+            {
+                var inject = (IInjectSymbol)symbol;
                 AddProbeLocal(localStatements, inject.Name, inject.Type);
                 break;
+            }
 
-            case CSharpLocalSymbol local:
+            case AkburaSymbolKind.CSharpSymbol:
+            {
+                var local = (CSharpLocalSymbol)symbol;
                 AddProbeLocal(localStatements, local.Name, new CSharpSymbolDefinition(local.Local.Type));
                 break;
+            }
 
-            case ICommandSymbol command:
+            case AkburaSymbolKind.Command:
+            {
+                var command = (ICommandSymbol)symbol;
                 AddCommandProbeMembers(memberDeclarations, command);
                 break;
+            }
         }
     }
 

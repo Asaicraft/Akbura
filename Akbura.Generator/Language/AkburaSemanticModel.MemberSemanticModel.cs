@@ -7,7 +7,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -49,14 +51,14 @@ internal sealed partial class AkburaSemanticModel
                 return cached;
             }
 
-            var symbolInfo = syntax switch
+            var symbolInfo = syntax.Kind switch
             {
-                AkburaDocumentSyntax document => ResolveAkburaComponent(document),
-                StateDeclarationSyntax stateDeclaration => ResolveState(stateDeclaration),
-                ParamDeclarationSyntax paramDeclaration => ResolveParam(paramDeclaration),
-                InjectDeclarationSyntax injectDeclaration => ResolveInject(injectDeclaration),
-                CommandDeclarationSyntax commandDeclaration => ResolveCommand(commandDeclaration),
-                UseEffectDeclarationSyntax useEffectDeclaration => ResolveUseEffect(useEffectDeclaration),
+                AkburaSyntaxKind.AkburaDocumentSyntax => ResolveAkburaComponent(Unsafe.As<AkburaDocumentSyntax>(syntax)),
+                AkburaSyntaxKind.StateDeclarationSyntax => ResolveState(Unsafe.As<StateDeclarationSyntax>(syntax)),
+                AkburaSyntaxKind.ParamDeclarationSyntax => ResolveParam(Unsafe.As<ParamDeclarationSyntax>(syntax)),
+                AkburaSyntaxKind.InjectDeclarationSyntax => ResolveInject(Unsafe.As<InjectDeclarationSyntax>(syntax)),
+                AkburaSyntaxKind.CommandDeclarationSyntax => ResolveCommand(Unsafe.As<CommandDeclarationSyntax>(syntax)),
+                AkburaSyntaxKind.UseEffectDeclarationSyntax => ResolveUseEffect(Unsafe.As<UseEffectDeclarationSyntax>(syntax)),
                 _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
             };
 
@@ -153,13 +155,15 @@ internal sealed partial class AkburaSemanticModel
             ImmutableArrayBuilder<UserHookSyntax> userHooksBuilder,
             ImmutableArrayBuilder<InlineAkcssBlockSyntax> inlineAkcssBuilder)
         {
-            switch (member)
+            switch (member.Kind)
             {
-                case MarkupRootSyntax markupRoot:
+                case AkburaSyntaxKind.MarkupRootSyntax:
+                    var markupRoot = Unsafe.As<MarkupRootSyntax>(member);
                     markupRootsBuilder.Add(markupRoot);
                     break;
 
-                case StateDeclarationSyntax stateDeclaration:
+                case AkburaSyntaxKind.StateDeclarationSyntax:
+                    var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
                     if (SemanticModel.GetSymbolInfo(stateDeclaration).Symbol is IStateSymbol stateSymbol)
                     {
                         statesBuilder.Add(stateSymbol);
@@ -167,7 +171,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case ParamDeclarationSyntax paramDeclaration:
+                case AkburaSyntaxKind.ParamDeclarationSyntax:
+                    var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
                     if (SemanticModel.GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
                     {
                         parametersBuilder.Add(paramSymbol);
@@ -175,7 +180,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case InjectDeclarationSyntax injectDeclaration:
+                case AkburaSyntaxKind.InjectDeclarationSyntax:
+                    var injectDeclaration = Unsafe.As<InjectDeclarationSyntax>(member);
                     if (SemanticModel.GetSymbolInfo(injectDeclaration).Symbol is IInjectSymbol injectSymbol)
                     {
                         injectedServicesBuilder.Add(injectSymbol);
@@ -183,7 +189,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case CommandDeclarationSyntax commandDeclaration:
+                case AkburaSyntaxKind.CommandDeclarationSyntax:
+                    var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
                     if (SemanticModel.GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
                     {
                         commandsBuilder.Add(commandSymbol);
@@ -191,7 +198,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case UseEffectDeclarationSyntax useEffectDeclaration:
+                case AkburaSyntaxKind.UseEffectDeclarationSyntax:
+                    var useEffectDeclaration = Unsafe.As<UseEffectDeclarationSyntax>(member);
                     if (SemanticModel.GetSymbolInfo(useEffectDeclaration).Symbol is IUseEffectSymbol useEffectSymbol)
                     {
                         useEffectsBuilder.Add(useEffectSymbol);
@@ -205,16 +213,19 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case UserHookSyntax userHook:
+                case AkburaSyntaxKind.UserHook:
+                    var userHook = Unsafe.As<UserHookSyntax>(member);
                     userHooksBuilder.Add(userHook);
                     AddAkburaComponentBlockMarkup(userHook.Body, markupRootsBuilder);
                     break;
 
-                case InlineAkcssBlockSyntax inlineAkcssBlock:
+                case AkburaSyntaxKind.InlineAkcssBlockSyntax:
+                    var inlineAkcssBlock = Unsafe.As<InlineAkcssBlockSyntax>(member);
                     inlineAkcssBuilder.Add(inlineAkcssBlock);
                     break;
 
-                case CSharpStatementSyntax csharpStatement:
+                case AkburaSyntaxKind.CSharpStatementSyntax:
+                    var csharpStatement = Unsafe.As<CSharpStatementSyntax>(member);
                     if (csharpStatement.Body != null)
                     {
                         AddAkburaComponentBlockMarkup(csharpStatement.Body, markupRootsBuilder);
@@ -230,17 +241,24 @@ internal sealed partial class AkburaSemanticModel
         {
             foreach (var member in block.Tokens)
             {
-                switch (member)
+                switch (member.Kind)
                 {
-                    case MarkupRootSyntax markupRoot:
+                    case AkburaSyntaxKind.MarkupRootSyntax:
+                        var markupRoot = Unsafe.As<MarkupRootSyntax>(member);
                         markupRootsBuilder.Add(markupRoot);
                         break;
 
-                    case CSharpStatementSyntax { Body: { } body }:
-                        AddAkburaComponentBlockMarkup(body, markupRootsBuilder);
+                    case AkburaSyntaxKind.CSharpStatementSyntax:
+                        var csharpStatement = Unsafe.As<CSharpStatementSyntax>(member);
+                        if (csharpStatement.Body != null)
+                        {
+                            AddAkburaComponentBlockMarkup(csharpStatement.Body, markupRootsBuilder);
+                        }
+
                         break;
 
-                    case UseEffectDeclarationSyntax useEffectDeclaration:
+                    case AkburaSyntaxKind.UseEffectDeclarationSyntax:
+                        var useEffectDeclaration = Unsafe.As<UseEffectDeclarationSyntax>(member);
                         AddAkburaComponentBlockMarkup(useEffectDeclaration.Body, markupRootsBuilder);
                         foreach (var tail in useEffectDeclaration.Tails)
                         {
@@ -249,7 +267,8 @@ internal sealed partial class AkburaSemanticModel
 
                         break;
 
-                    case UserHookSyntax userHook:
+                    case AkburaSyntaxKind.UserHook:
+                        var userHook = Unsafe.As<UserHookSyntax>(member);
                         AddAkburaComponentBlockMarkup(userHook.Body, markupRootsBuilder);
                         break;
                 }
@@ -608,23 +627,43 @@ internal sealed partial class AkburaSemanticModel
         {
             foreach (var member in Scope.Members)
             {
-                switch (member)
+                switch (member.Kind)
                 {
-                    case StateDeclarationSyntax stateDeclaration
-                        when stateDeclaration.Name.Identifier.ValueText == name:
-                        return SemanticModel.GetSymbolInfo(stateDeclaration).Symbol;
+                    case AkburaSyntaxKind.StateDeclarationSyntax:
+                        var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
+                        if (stateDeclaration.Name.Identifier.ValueText == name)
+                        {
+                            return SemanticModel.GetSymbolInfo(stateDeclaration).Symbol;
+                        }
 
-                    case ParamDeclarationSyntax paramDeclaration
-                        when paramDeclaration.Name.Identifier.ValueText == name:
-                        return SemanticModel.GetSymbolInfo(paramDeclaration).Symbol;
+                        break;
 
-                    case InjectDeclarationSyntax injectDeclaration
-                        when injectDeclaration.Name.Identifier.ValueText == name:
-                        return SemanticModel.GetSymbolInfo(injectDeclaration).Symbol;
+                    case AkburaSyntaxKind.ParamDeclarationSyntax:
+                        var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
+                        if (paramDeclaration.Name.Identifier.ValueText == name)
+                        {
+                            return SemanticModel.GetSymbolInfo(paramDeclaration).Symbol;
+                        }
 
-                    case CommandDeclarationSyntax commandDeclaration
-                        when commandDeclaration.Name.Identifier.ValueText == name:
-                        return SemanticModel.GetSymbolInfo(commandDeclaration).Symbol;
+                        break;
+
+                    case AkburaSyntaxKind.InjectDeclarationSyntax:
+                        var injectDeclaration = Unsafe.As<InjectDeclarationSyntax>(member);
+                        if (injectDeclaration.Name.Identifier.ValueText == name)
+                        {
+                            return SemanticModel.GetSymbolInfo(injectDeclaration).Symbol;
+                        }
+
+                        break;
+
+                    case AkburaSyntaxKind.CommandDeclarationSyntax:
+                        var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
+                        if (commandDeclaration.Name.Identifier.ValueText == name)
+                        {
+                            return SemanticModel.GetSymbolInfo(commandDeclaration).Symbol;
+                        }
+
+                        break;
                 }
             }
 

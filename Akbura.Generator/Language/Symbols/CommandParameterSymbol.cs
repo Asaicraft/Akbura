@@ -28,7 +28,7 @@ internal sealed class CommandParameterSymbol : Symbol, ICommandParameterSymbol
         CSharpParameter = csharpParameter;
     }
 
-    public override SymbolKind Kind => SymbolKind.Parameter;
+    public override SymbolKind Kind => SymbolKind.CommandParameter;
 
     public override SymbolLanguage Language => SymbolLanguage.Akbura;
 

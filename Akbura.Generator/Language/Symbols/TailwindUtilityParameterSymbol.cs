@@ -32,7 +32,7 @@ internal sealed class TailwindUtilityParameterSymbol : Symbol, ITailwindUtilityP
         CSharpParameter = csharpParameter;
     }
 
-    public override SymbolKind Kind => SymbolKind.Parameter;
+    public override SymbolKind Kind => SymbolKind.TailwindUtilityParameter;
 
     public override SymbolLanguage Language => SymbolLanguage.Akcss;
 

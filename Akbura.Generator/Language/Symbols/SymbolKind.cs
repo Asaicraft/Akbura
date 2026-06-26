@@ -12,6 +12,8 @@ internal enum SymbolKind
     Event,
     State,
     Parameter,
+    CommandParameter,
+    TailwindUtilityParameter,
     InjectedService,
     Command,
     Function,

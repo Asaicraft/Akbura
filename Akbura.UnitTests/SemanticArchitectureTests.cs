@@ -15,6 +15,7 @@ using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaOperationKind = Akbura.Language.Operations.OperationKind;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
+using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
 using AkburaSymbolVisitor = Akbura.Language.Symbols.SymbolVisitor;
 using BinderType = Akbura.Language.Binder.Binder;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -539,6 +540,7 @@ public sealed class SemanticArchitectureTests
             diagnostics).Symbol;
 
         Assert.IsAssignableFrom<ITailwindUtilityParameterSymbol>(shadowingSymbol);
+        Assert.Equal(AkburaSymbolKind.TailwindUtilityParameter, shadowingSymbol!.Kind);
     }
 
     [Fact]
@@ -762,6 +764,7 @@ public sealed class SemanticArchitectureTests
         var parameterSymbols = utilityBinder.GetDeclaredSymbolsForScope(utility);
         Assert.Single(parameterSymbols);
         Assert.IsAssignableFrom<ITailwindUtilityParameterSymbol>(parameterSymbols[0]);
+        Assert.Equal(AkburaSymbolKind.TailwindUtilityParameter, parameterSymbols[0].Kind);
 
         var markupBinder = Assert.IsType<MarkupBinder>(model.GetBinder(markup, BinderUsage.Markup));
         Assert.Empty(markupBinder.GetDeclaredSymbolsForScope(markup));

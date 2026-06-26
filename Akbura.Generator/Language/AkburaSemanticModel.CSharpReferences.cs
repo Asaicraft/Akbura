@@ -8,6 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
@@ -198,9 +200,10 @@ internal sealed partial class AkburaSemanticModel
                 break;
             }
 
-            switch (member)
+            switch (member.Kind)
             {
-                case StateDeclarationSyntax stateDeclaration:
+                case AkburaSyntaxKind.StateDeclarationSyntax:
+                    var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
                     AddCSharpProbeLocal(
                         builder,
                         akburaSymbolsByName,
@@ -209,7 +212,8 @@ internal sealed partial class AkburaSemanticModel
                         GetSymbolInfo(stateDeclaration).Symbol);
                     break;
 
-                case ParamDeclarationSyntax paramDeclaration:
+                case AkburaSyntaxKind.ParamDeclarationSyntax:
+                    var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
                     AddCSharpProbeLocal(
                         builder,
                         akburaSymbolsByName,
@@ -218,7 +222,8 @@ internal sealed partial class AkburaSemanticModel
                         GetSymbolInfo(paramDeclaration).Symbol);
                     break;
 
-                case InjectDeclarationSyntax injectDeclaration:
+                case AkburaSyntaxKind.InjectDeclarationSyntax:
+                    var injectDeclaration = Unsafe.As<InjectDeclarationSyntax>(member);
                     AddCSharpProbeLocal(
                         builder,
                         akburaSymbolsByName,
@@ -227,7 +232,8 @@ internal sealed partial class AkburaSemanticModel
                         GetSymbolInfo(injectDeclaration).Symbol);
                     break;
 
-                case CommandDeclarationSyntax commandDeclaration:
+                case AkburaSyntaxKind.CommandDeclarationSyntax:
+                    var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
                     AddCSharpCommandProbeMembers(
                         classMembersBuilder,
                         akburaSymbolsByName,

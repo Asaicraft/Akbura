@@ -869,6 +869,7 @@ public class SemanticPipelineTests
 
         var parameter = Assert.Single(symbol.Parameters);
         Assert.Equal(0, parameter.Ordinal);
+        Assert.Equal(AkburaSymbolKind.CommandParameter, parameter.Kind);
         Assert.Equal("a", parameter.Name);
         Assert.Equal("Int32", parameter.Type.Name);
         Assert.Equal("Int32 a", parameter.ToDisplayString());

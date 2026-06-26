@@ -47,6 +47,11 @@ internal sealed partial class AkburaSemanticModel
             statementsBuilder.Add(local);
         }
 
+        foreach (var previousStatement in CreateCSharpBlockProbeStatementsBefore(statementSyntax))
+        {
+            statementsBuilder.Add(previousStatement);
+        }
+
         statementsBuilder.Add(statement);
 
         var method = CSharpSyntaxFactory.MethodDeclaration(
@@ -184,6 +189,40 @@ internal sealed partial class AkburaSemanticModel
         {
             return null;
         }
+    }
+
+    private static ImmutableArray<CSharp.StatementSyntax> CreateCSharpBlockProbeStatementsBefore(
+        CSharpStatementSyntax statementSyntax)
+    {
+        if (statementSyntax.Parent?.Kind != AkburaSyntaxKind.CSharpBlockSyntax)
+        {
+            return ImmutableArray<CSharp.StatementSyntax>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
+        var block = Unsafe.As<CSharpBlockSyntax>(statementSyntax.Parent);
+        foreach (var member in block.Tokens)
+        {
+            if (ReferenceEquals(member, statementSyntax) ||
+                ReferenceEquals(member.Green, statementSyntax.Green) ||
+                member.Position >= statementSyntax.Position)
+            {
+                break;
+            }
+
+            if (member.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
+            {
+                continue;
+            }
+
+            var previousStatement = ParseCSharpStatement(Unsafe.As<CSharpStatementSyntax>(member));
+            if (previousStatement != null)
+            {
+                builder.Add(previousStatement);
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     private ImmutableArray<CSharp.StatementSyntax> CreateCSharpProbeMembersBefore(

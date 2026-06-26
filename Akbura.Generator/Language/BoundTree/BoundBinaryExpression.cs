@@ -25,7 +25,8 @@ internal sealed class BoundBinaryExpression : BoundExpression
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
             operation: null,
             diagnostics,
-            ImmutableArray.Create<BoundNode>(left, right))
+            ImmutableArray.Create<BoundNode>(left, right),
+            hasErrors: bindingResult.Diagnostics.Length != 0)
     {
         BindingResult = bindingResult;
         OperatorKind = operatorKind;

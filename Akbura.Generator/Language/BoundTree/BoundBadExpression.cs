@@ -29,7 +29,8 @@ internal class BoundBadExpression : BoundExpression
             AkburaSymbolInfo.None(CandidateReason.NotFound),
             operation: null,
             diagnostics,
-            children)
+            children,
+            hasErrors: true)
     {
     }
 

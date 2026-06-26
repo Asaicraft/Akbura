@@ -15,7 +15,8 @@ internal class BoundExpression : BoundNode
         AkburaSymbolInfo symbolInfo,
         AkburaOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
-        ImmutableArray<BoundNode> children = default)
+        ImmutableArray<BoundNode> children = default,
+        bool hasErrors = false)
         : this(
             BoundKind.Expression,
             syntax,
@@ -23,7 +24,8 @@ internal class BoundExpression : BoundNode
             symbolInfo,
             operation,
             diagnostics,
-            children)
+            children,
+            hasErrors)
     {
     }
 
@@ -34,8 +36,9 @@ internal class BoundExpression : BoundNode
         AkburaSymbolInfo symbolInfo,
         AkburaOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
-        ImmutableArray<BoundNode> children = default)
-        : base(kind, syntax, binder, symbolInfo, operation, diagnostics, children)
+        ImmutableArray<BoundNode> children = default,
+        bool hasErrors = false)
+        : base(kind, syntax, binder, symbolInfo, operation, diagnostics, children, hasErrors)
     {
     }
 

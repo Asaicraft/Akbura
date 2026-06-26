@@ -11,6 +11,13 @@ namespace Akbura.Language.BoundTree;
 internal abstract class BoundNode
 {
     private readonly BoundKind _kind;
+    private BoundNodeAttributes _attributes;
+
+    [Flags]
+    private enum BoundNodeAttributes : byte
+    {
+        HasErrors = 1 << 0
+    }
 
     protected BoundNode(
         BoundKind kind,
@@ -19,7 +26,8 @@ internal abstract class BoundNode
         AkburaSymbolInfo symbolInfo,
         IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
-        ImmutableArray<BoundNode> children = default)
+        ImmutableArray<BoundNode> children = default,
+        bool hasErrors = false)
     {
         Debug.Assert(kind != BoundKind.None);
         Debug.Assert(syntax != null);
@@ -35,6 +43,11 @@ internal abstract class BoundNode
         Children = children.IsDefault
             ? ImmutableArray<BoundNode>.Empty
             : children;
+
+        if (hasErrors || ComputeHasErrorsFromDiagnosticsAndChildren())
+        {
+            _attributes |= BoundNodeAttributes.HasErrors;
+        }
     }
 
     public AkburaSyntax Syntax { get; }
@@ -70,24 +83,28 @@ internal abstract class BoundNode
         return visitor.DefaultVisit(this, parameter);
     }
 
-    public bool HasErrors
+    public bool HasErrors => HasAttribute(BoundNodeAttributes.HasErrors);
+
+    private bool HasAttribute(BoundNodeAttributes attribute)
     {
-        get
+        return (_attributes & attribute) != 0;
+    }
+
+    private bool ComputeHasErrorsFromDiagnosticsAndChildren()
+    {
+        if (Diagnostics.Length != 0)
         {
-            if (IsError || Diagnostics.Length != 0)
+            return true;
+        }
+
+        for (var i = 0; i < Children.Length; i++)
+        {
+            if (Children[i].HasErrors)
             {
                 return true;
             }
-
-            foreach (var child in Children)
-            {
-                if (child.HasErrors)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
+
+        return false;
     }
 }

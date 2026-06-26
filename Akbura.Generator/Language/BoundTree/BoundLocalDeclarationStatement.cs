@@ -24,7 +24,8 @@ internal sealed class BoundLocalDeclarationStatement : BoundStatement
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
             operation: null,
             diagnostics,
-            BuildChildren(initializers))
+            BuildChildren(initializers),
+            hasErrors: bindingResult.Diagnostics.Length != 0)
     {
         BindingResult = bindingResult;
         Locals = locals.IsDefault

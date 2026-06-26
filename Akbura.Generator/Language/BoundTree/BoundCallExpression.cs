@@ -25,7 +25,8 @@ internal sealed class BoundCallExpression : BoundExpression
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
             operation: null,
             diagnostics,
-            BuildChildren(receiver, arguments))
+            BuildChildren(receiver, arguments),
+            hasErrors: bindingResult.Diagnostics.Length != 0)
     {
         BindingResult = bindingResult;
         TargetMethod = targetMethod;

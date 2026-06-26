@@ -19,7 +19,8 @@ internal sealed class BoundBadStatement : BoundStatement
             AkburaSymbolInfo.None(CandidateReason.NotFound),
             operation: null,
             diagnostics,
-            children)
+            children,
+            hasErrors: true)
     {
     }
 

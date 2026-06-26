@@ -22,7 +22,8 @@ internal sealed class BoundConversionExpression : BoundExpression
             operand.SymbolInfo,
             operand.Operation,
             diagnostics,
-            ImmutableArray.Create<BoundNode>(operand))
+            ImmutableArray.Create<BoundNode>(operand),
+            hasErrors: !conversion.Exists)
     {
         Operand = operand;
         Conversion = conversion;

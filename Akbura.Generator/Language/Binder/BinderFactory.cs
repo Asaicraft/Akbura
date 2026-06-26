@@ -41,6 +41,16 @@ internal sealed partial class BinderFactory
         return _bindingSession.GetBinder(syntax, usage);
     }
 
+    public Binder GetBinder(AkburaSyntax syntax, int position)
+    {
+        return GetBinder(syntax, position, BinderUsage.Default);
+    }
+
+    public Binder GetBinder(AkburaSyntax syntax, int position, BinderUsage usage)
+    {
+        return _bindingSession.GetBinder(syntax, position, usage);
+    }
+
     internal Binder CreateBinder(
         ImmutableArray<AkburaDeclaration> path,
         BinderUsage usage)

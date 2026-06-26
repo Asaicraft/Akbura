@@ -164,6 +164,11 @@ internal sealed partial class AkburaSemanticModel
         return _bindingSession.GetBinder(syntax, usage);
     }
 
+    internal BinderType GetBinder(AkburaSyntax syntax, int position, BinderUsage usage)
+    {
+        return _bindingSession.GetBinder(syntax, position, usage);
+    }
+
     internal MemberSemanticModel GetMemberSemanticModel(AkburaSyntax syntax)
     {
         if (syntax == null)

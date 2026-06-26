@@ -49,6 +49,46 @@ internal sealed class BindingSession
             _ => _binderFactory.CreateBinder(path, usage));
     }
 
+    public Binder GetBinder(
+        AkburaSyntax syntax,
+        int position,
+        BinderUsage usage = BinderUsage.Default)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        if (syntax.FullWidth == 0 && position == syntax.Position)
+        {
+            return GetBinder(syntax, usage);
+        }
+
+        if (!syntax.FullSpan.Contains(position) &&
+            position != syntax.EndPosition)
+        {
+            throw new ArgumentOutOfRangeException(nameof(position));
+        }
+
+        var normalizedPosition = position == syntax.EndPosition
+            ? position - 1
+            : position;
+        if (!TryFindDeclarationPath(syntax, normalizedPosition, out var path) ||
+            path.Length == 0)
+        {
+            return RootBinder;
+        }
+
+        var cacheSyntax = path[path.Length - 1].Syntax;
+        var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
+            cacheSyntax,
+            path,
+            usage);
+        return _binderCache.GetOrAdd(
+            key,
+            _ => _binderFactory.CreateBinder(path, usage));
+    }
+
     public CSharpProbeBinder GetCSharpProbeBinder(
         AkburaSyntax syntax,
         BinderUsage usage = BinderUsage.Expression)
@@ -103,12 +143,25 @@ internal sealed class BindingSession
             out path);
     }
 
+    private bool TryFindDeclarationPath(
+        AkburaSyntax syntax,
+        int position,
+        out ImmutableArray<AkburaDeclaration> path)
+    {
+        var finder = DeclarationPathFinder.GetInstance(syntax, position);
+        return finder.TryFind(
+            _semanticModel.Compilation.DeclarationTable.Roots,
+            out path);
+    }
+
     private sealed class DeclarationPathFinder
     {
         private static readonly ObjectPool<DeclarationPathFinder> s_pool = CreatePool();
 
         private readonly ObjectPool<DeclarationPathFinder> _pool;
         private AkburaSyntax? _syntax;
+        private int _position;
+        private bool _findByPosition;
         private ArrayBuilder<AkburaDeclaration>? _path;
 
         private DeclarationPathFinder(ObjectPool<DeclarationPathFinder> pool)
@@ -120,6 +173,20 @@ internal sealed class BindingSession
         {
             var finder = s_pool.Allocate();
             finder._syntax = syntax;
+            finder._position = 0;
+            finder._findByPosition = false;
+            finder._path = ArrayBuilder<AkburaDeclaration>.GetInstance();
+            return finder;
+        }
+
+        public static DeclarationPathFinder GetInstance(
+            AkburaSyntax syntax,
+            int position)
+        {
+            var finder = s_pool.Allocate();
+            finder._syntax = syntax;
+            finder._position = position;
+            finder._findByPosition = true;
             finder._path = ArrayBuilder<AkburaDeclaration>.GetInstance();
             return finder;
         }
@@ -149,6 +216,11 @@ internal sealed class BindingSession
         {
             _path!.Add(current);
 
+            if (_findByPosition)
+            {
+                return VisitByPosition(current);
+            }
+
             var syntax = _syntax!;
             if (ReferenceEquals(current.Syntax, syntax) ||
                 ReferenceEquals(current.Syntax.Green, syntax.Green))
@@ -168,12 +240,41 @@ internal sealed class BindingSession
             return false;
         }
 
+        private bool VisitByPosition(AkburaDeclaration current)
+        {
+            var syntax = _syntax!;
+            if (!ReferenceEquals(current.Syntax.Root.Green, syntax.Root.Green) ||
+                !ContainsPosition(current.Syntax, _position))
+            {
+                _path!.RemoveLast();
+                return false;
+            }
+
+            foreach (var child in current.Children)
+            {
+                if (Visit(child))
+                {
+                    return true;
+                }
+            }
+
+            return true;
+        }
+
         private void Free()
         {
             _syntax = null;
+            _position = 0;
+            _findByPosition = false;
             _path?.Free();
             _path = null;
             _pool.Free(this);
+        }
+
+        private static bool ContainsPosition(AkburaSyntax syntax, int position)
+        {
+            return syntax.FullSpan.Contains(position) ||
+                   (syntax.FullWidth == 0 && position == syntax.Position);
         }
 
         private static ObjectPool<DeclarationPathFinder> CreatePool()

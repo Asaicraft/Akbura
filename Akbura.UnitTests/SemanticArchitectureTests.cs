@@ -1206,6 +1206,38 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BinderFactory_GetBinderByPosition_BuildsNestedMarkupBinderChain()
+    {
+        const string code = "<StackPanel><Button /></StackPanel>";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var markupRoot = Assert.IsType<MarkupRootSyntax>(root.Members[0]);
+        var childContent = Assert.IsType<MarkupElementContentSyntax>(markupRoot.Element.Body[0]);
+        var childElement = childContent.Element;
+        var factory = new BinderFactory(model);
+
+        var childBinder = Assert.IsType<MarkupBinder>(factory.GetBinder(
+            root,
+            childElement.Position,
+            BinderUsage.Markup));
+        var cachedBinder = factory.GetBinder(
+            root,
+            childElement.Position,
+            BinderUsage.Markup);
+
+        Assert.Same(childBinder, cachedBinder);
+        Assert.Same(childElement, childBinder.ScopeDesignator);
+        Assert.True(childBinder.Flags.HasFlag(AkburaBinderFlags.InMarkup));
+
+        var parentMarkupBinder = Assert.IsType<MarkupBinder>(childBinder.NextRequired);
+        Assert.Same(markupRoot, parentMarkupBinder.ScopeDesignator);
+        Assert.IsType<ComponentBinder>(parentMarkupBinder.NextRequired);
+        Assert.IsType<CompilationBinder>(parentMarkupBinder.NextRequired.NextRequired);
+        Assert.Equal(1, model.BindingSession.CachedBinderCount);
+    }
+
+    [Fact]
     public void BinderFactoryVisitor_BuildsCSharpBlockBinderChain()
     {
         const string code =
@@ -1229,6 +1261,55 @@ public sealed class SemanticArchitectureTests
         Assert.IsType<ComponentBinder>(binder.NextRequired);
         Assert.IsType<CompilationBinder>(binder.NextRequired.NextRequired);
         Assert.Equal(1, model.BindingSession.CachedBinderCount);
+    }
+
+    [Fact]
+    public void BinderFactory_GetBinderByPosition_BuildsCSharpBlockBinderChain()
+    {
+        const string code =
+            "state int total = 0;\n" +
+            "if(total > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    Console.WriteLine(count);\n" +
+            "}";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(root.Members[1]);
+        Assert.NotNull(ifStatement.Body);
+        var block = ifStatement.Body!;
+        var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
+
+        var binder = Assert.IsType<BlockBinder>(model.GetBinder(
+            root,
+            writeLine.Position,
+            BinderUsage.Statement));
+        var cachedBinder = model.GetBinder(
+            root,
+            writeLine.Position,
+            BinderUsage.Statement);
+
+        Assert.Same(binder, cachedBinder);
+        Assert.Same(block, binder.ScopeDesignator);
+        Assert.True(binder.Flags.HasFlag(AkburaBinderFlags.InCSharpBlock));
+        Assert.IsType<ComponentBinder>(binder.NextRequired);
+        Assert.IsType<CompilationBinder>(binder.NextRequired.NextRequired);
+        Assert.Equal(1, model.BindingSession.CachedBinderCount);
+    }
+
+    [Fact]
+    public void BinderFactory_GetBinderByPosition_RejectsPositionOutsideSyntax()
+    {
+        const string code = "<Button />";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => model.GetBinder(
+            root,
+            root.EndPosition + 1,
+            BinderUsage.Markup));
     }
 
     [Fact]
@@ -1550,6 +1631,117 @@ public sealed class SemanticArchitectureTests
         Assert.Equal(AkburaConversionKind.Explicit, enumConversion.Kind);
         Assert.True(enumConversion.CSharpConversion.IsExplicit);
         Assert.Same(enumType, enumConversion.TargetType);
+    }
+
+    [Fact]
+    public void AkburaConversions_ExposeRoslynStyleFlags()
+    {
+        const string code = "state int count = 0;";
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public enum Status
+            {
+                None,
+                Active
+            }
+            """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(csharpCode);
+        var csharpCompilation = CreateCSharpCompilation().AddSyntaxTrees(syntaxTree);
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = new AkburaCompilation(
+                csharpCompilation,
+                [tree],
+                rootNamespace: "Demo",
+                projectDirectory: Environment.CurrentDirectory)
+            .GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+        var intType = csharpCompilation.GetSpecialType(SpecialType.System_Int32);
+        var doubleType = csharpCompilation.GetSpecialType(SpecialType.System_Double);
+        var nullableIntType = csharpCompilation
+            .GetSpecialType(SpecialType.System_Nullable_T)
+            .Construct(intType);
+        var enumType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            csharpCompilation.GetTypeByMetadataName("Demo.Status"));
+
+        var numericConversion = binder.Conversions.ClassifyConversion(intType, doubleType);
+        var sameNumericConversion = binder.Conversions.ClassifyConversion(intType, doubleType);
+        var nullableConversion = binder.Conversions.ClassifyConversion(intType, nullableIntType);
+        var enumConversion = binder.Conversions.ClassifyConversion(intType, enumType);
+
+        Assert.Equal(numericConversion, sameNumericConversion);
+        Assert.True(numericConversion.Exists);
+        Assert.True(numericConversion.IsImplicit);
+        Assert.True(numericConversion.IsNumeric);
+        Assert.False(numericConversion.IsUserDefined);
+        Assert.Null(numericConversion.MethodSymbol);
+
+        Assert.True(nullableConversion.IsNullable);
+        Assert.True(nullableConversion.IsImplicit);
+
+        Assert.True(enumConversion.IsEnumeration);
+        Assert.True(enumConversion.IsExplicit);
+    }
+
+    [Fact]
+    public void AkburaConversions_PreserveUserDefinedConversionMethod()
+    {
+        const string code = "state int count = 0;";
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public readonly struct Meters
+            {
+                public Meters(double value)
+                {
+                    Value = value;
+                }
+
+                public double Value { get; }
+
+                public static implicit operator Meters(double value)
+                {
+                    return new Meters(value);
+                }
+
+                public static explicit operator double(Meters value)
+                {
+                    return value.Value;
+                }
+            }
+            """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(csharpCode);
+        var csharpCompilation = CreateCSharpCompilation().AddSyntaxTrees(syntaxTree);
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = new AkburaCompilation(
+                csharpCompilation,
+                [tree],
+                rootNamespace: "Demo",
+                projectDirectory: Environment.CurrentDirectory)
+            .GetSemanticModel(tree);
+        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
+        var doubleType = csharpCompilation.GetSpecialType(SpecialType.System_Double);
+        var metersType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            csharpCompilation.GetTypeByMetadataName("Demo.Meters"));
+
+        var implicitConversion = binder.Conversions.ClassifyConversion(doubleType, metersType);
+        var explicitConversion = binder.Conversions.ClassifyConversion(metersType, doubleType);
+
+        Assert.Equal(AkburaConversionKind.Implicit, implicitConversion.Kind);
+        Assert.True(implicitConversion.IsUserDefined);
+        Assert.True(implicitConversion.IsImplicit);
+        Assert.NotNull(implicitConversion.MethodSymbol);
+        Assert.Equal("op_Implicit", implicitConversion.MethodSymbol.MetadataName);
+        Assert.Same(implicitConversion.MethodSymbol, implicitConversion.CSharpConversion.MethodSymbol);
+
+        Assert.Equal(AkburaConversionKind.Explicit, explicitConversion.Kind);
+        Assert.True(explicitConversion.IsUserDefined);
+        Assert.True(explicitConversion.IsExplicit);
+        Assert.NotNull(explicitConversion.MethodSymbol);
+        Assert.Equal("op_Explicit", explicitConversion.MethodSymbol.MetadataName);
+        Assert.Same(explicitConversion.MethodSymbol, explicitConversion.CSharpConversion.MethodSymbol);
     }
 
     [Fact]

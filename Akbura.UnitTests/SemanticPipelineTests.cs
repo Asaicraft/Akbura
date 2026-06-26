@@ -844,6 +844,134 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupEventHandlerReferences_MapBackToAkburaSymbols()
+    {
+        const string code =
+            """
+            using System.Threading.Tasks;
+            using Avalonia.Controls;
+            using Demo;
+
+            inject ILogger<Counter> logger;
+            state int count = 0;
+
+            <Button Click={async (sender, args) => {
+                logger.LogInformation("Clicked {0}", count);
+                sender?.ToString();
+                args.ToString();
+                count++;
+                await Task.Yield();
+            }} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public interface ILogger<T>
+            {
+                void LogInformation(string message, params object[] args);
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var root = syntaxTree.GetRoot();
+        var inject = Assert.IsType<InjectDeclarationSyntax>(root.Members[3]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[4]);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+        var value = Assert.IsType<MarkupDynamicAttributeValueSyntax>(attribute.Value);
+
+        var references = semanticModel.GetCSharpSymbolReferences(value.Expression);
+
+        var loggerReference = Assert.Single(references, reference => reference.Name == "logger");
+        var loggerSymbol = Assert.IsAssignableFrom<IInjectSymbol>(loggerReference.AkburaSymbol);
+        Assert.Same(semanticModel.GetSymbolInfo(inject).Symbol, loggerSymbol);
+
+        var countReferences = references.Where(reference => reference.Name == "count").ToArray();
+        Assert.Equal(2, countReferences.Length);
+        var countSymbol = Assert.IsAssignableFrom<IStateSymbol>(countReferences[0].AkburaSymbol);
+        Assert.Same(semanticModel.GetSymbolInfo(state).Symbol, countSymbol);
+        Assert.All(countReferences, reference => Assert.Same(countSymbol, reference.AkburaSymbol));
+
+        var senderReference = Assert.Single(references, reference => reference.Name == "sender");
+        Assert.IsAssignableFrom<IParameterSymbol>(senderReference.CSharpDefinition.Symbol);
+        Assert.Null(senderReference.AkburaSymbol);
+
+        var argsReference = Assert.Single(references, reference => reference.Name == "args");
+        var argsParameter = Assert.IsAssignableFrom<IParameterSymbol>(argsReference.CSharpDefinition.Symbol);
+        Assert.Equal("RoutedEventArgs", argsParameter.Type.Name);
+        Assert.Null(argsReference.AkburaSymbol);
+
+        Assert.Contains(references, reference =>
+            reference.Name == "LogInformation" &&
+            reference.CSharpDefinition.Symbol is IMethodSymbol &&
+            reference.AkburaSymbol == null);
+        Assert.Contains(references, reference =>
+            reference.Name == "Yield" &&
+            reference.CSharpDefinition.Symbol is IMethodSymbol);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupCommandHandlerReferences_MapCommandFacadeMembersBackToCommandSymbol()
+    {
+        const string aCode =
+            """
+            namespace SomeNs;
+
+            command int Click(int a);
+            """;
+        const string bCode =
+            """
+            using SomeNs;
+
+            command int CustomClick(int a);
+            state int clicked = 0;
+
+            <A Click={async x => await CustomClick.Execute(clicked + x)}/>
+            """;
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var root = bSyntaxTree.GetRoot();
+        var command = Assert.IsType<CommandDeclarationSyntax>(root.Members[1]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+        var value = Assert.IsType<MarkupDynamicAttributeValueSyntax>(attribute.Value);
+
+        var references = semanticModel.GetCSharpSymbolReferences(attribute);
+
+        var commandSymbol = Assert.IsAssignableFrom<ICommandSymbol>(
+            semanticModel.GetSymbolInfo(command).Symbol);
+        var commandReceiver = Assert.Single(references, reference => reference.Name == "CustomClick");
+        Assert.Same(commandSymbol, commandReceiver.AkburaSymbol);
+        Assert.IsAssignableFrom<IFieldSymbol>(commandReceiver.CSharpDefinition.Symbol);
+
+        var execute = Assert.Single(references, reference => reference.Name == "Execute");
+        Assert.Same(commandSymbol, execute.AkburaSymbol);
+        var executeMethod = Assert.IsAssignableFrom<IMethodSymbol>(execute.CSharpDefinition.Symbol);
+        Assert.Equal("ValueTask", executeMethod.ReturnType.Name);
+
+        var clicked = Assert.Single(references, reference => reference.Name == "clicked");
+        var clickedSymbol = Assert.IsAssignableFrom<IStateSymbol>(clicked.AkburaSymbol);
+        Assert.Same(semanticModel.GetSymbolInfo(state).Symbol, clickedSymbol);
+
+        var parameter = Assert.Single(references, reference => reference.Name == "x");
+        var parameterSymbol = Assert.IsAssignableFrom<IParameterSymbol>(parameter.CSharpDefinition.Symbol);
+        Assert.Equal("Int32", parameterSymbol.Type.Name);
+        Assert.Null(parameter.AkburaSymbol);
+
+        Assert.Equal(
+            references.Select(reference => reference.Name).OrderBy(static name => name),
+            semanticModel.GetCSharpSymbolReferences(value.Expression)
+                .Select(reference => reference.Name)
+                .OrderBy(static name => name));
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesCommandSymbol()
     {
         const string code = "command int Click(int a);";

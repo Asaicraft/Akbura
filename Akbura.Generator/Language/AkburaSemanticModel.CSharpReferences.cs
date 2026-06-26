@@ -19,6 +19,9 @@ namespace Akbura.Language;
 
 internal sealed partial class AkburaSemanticModel
 {
+    private const string CSharpReferenceProbeMethodName = "__AkburaSemanticProbe";
+    private const string MarkupInlineReferenceProbeMethodName = "__AkburaMarkupInlineReferenceProbe";
+
     public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(CSharpStatementSyntax statementSyntax)
     {
         if (statementSyntax == null)
@@ -66,57 +69,423 @@ internal sealed partial class AkburaSemanticModel
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
-        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
-        var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
-        var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
+        var semanticModel = CreateReferenceProbeSemanticModel(compilationUnit, out var syntaxTree);
         var probeStatement = syntaxTree
             .GetCompilationUnitRoot()
             .DescendantNodes()
             .OfType<CSharp.MethodDeclarationSyntax>()
-            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == "__AkburaSemanticProbe")
+            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == CSharpReferenceProbeMethodName)
             .Body!
             .Statements
             .Last();
 
-        using var references = ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
-        var seenReferences = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var identifier in probeStatement.DescendantNodesAndSelf().OfType<CSharp.IdentifierNameSyntax>())
+        return CollectCSharpSymbolReferences(
+            semanticModel,
+            [probeStatement],
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+    }
+
+    public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(MarkupAttributeSyntax markupAttribute)
+    {
+        if (markupAttribute == null)
         {
-            AddCSharpSymbolReference(
-                references,
-                seenReferences,
-                identifier,
-                semanticModel.GetSymbolInfo(identifier).Symbol,
-                akburaSymbolsByName,
-                akburaSymbolsByCommandTypeName);
+            throw new ArgumentNullException(nameof(markupAttribute));
         }
 
-        foreach (var memberAccess in probeStatement.DescendantNodesAndSelf().OfType<CSharp.MemberAccessExpressionSyntax>())
-        {
-            if (memberAccess.Name is CSharp.IdentifierNameSyntax name)
-            {
-                var symbol = GetBestSymbolInfo(semanticModel, memberAccess);
-                if (symbol == null &&
-                    memberAccess.Parent is CSharp.InvocationExpressionSyntax invocation &&
-                    invocation.Expression == memberAccess)
-                {
-                    symbol = GetBestSymbolInfo(semanticModel, invocation);
-                }
+        ValidateSyntaxTreeOwnership(markupAttribute);
 
+        if (GetMarkupAttributeValue(markupAttribute)?.Kind != AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
+        {
+            return ImmutableArray<CSharpSymbolReference>.Empty;
+        }
+
+        var dynamicValue = Unsafe.As<MarkupDynamicAttributeValueSyntax>(GetMarkupAttributeValue(markupAttribute)!);
+        return GetCSharpSymbolReferences(dynamicValue.Expression);
+    }
+
+    public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(InlineExpressionSyntax inlineExpressionSyntax)
+    {
+        if (inlineExpressionSyntax == null)
+        {
+            throw new ArgumentNullException(nameof(inlineExpressionSyntax));
+        }
+
+        ValidateSyntaxTreeOwnership(inlineExpressionSyntax);
+
+        var expression = ParseInlineExpression(inlineExpressionSyntax);
+        if (expression == null)
+        {
+            return ImmutableArray<CSharpSymbolReference>.Empty;
+        }
+
+        return TryGetContainingMarkupAttribute(inlineExpressionSyntax, out var markupAttribute)
+            ? GetMarkupInlineExpressionCSharpSymbolReferences(markupAttribute, expression)
+            : GetMarkupExpressionCSharpSymbolReferences(inlineExpressionSyntax, expression);
+    }
+
+    private ImmutableArray<CSharpSymbolReference> GetMarkupInlineExpressionCSharpSymbolReferences(
+        MarkupAttributeSyntax markupAttribute,
+        CSharp.ExpressionSyntax expression)
+    {
+        var attributeSymbol = GetSymbolInfo(markupAttribute).Symbol;
+        var isHandler = attributeSymbol is IRoutedEventSymbol ||
+            attributeSymbol is Symbols.IPropertySymbol { Command: not null };
+        ImmutableArray<string> parameterNames;
+        bool isAsync;
+        SyntaxNode referenceNode;
+        if (isHandler)
+        {
+            referenceNode = GetMarkupHandlerReferenceNode(expression, out parameterNames, out isAsync);
+        }
+        else
+        {
+            referenceNode = expression;
+            parameterNames = ImmutableArray<string>.Empty;
+            isAsync = ContainsAwaitExpression(expression);
+        }
+
+        var probeScope = CreateMarkupHandlerProbeScope(
+            markupAttribute,
+            referenceNode,
+            parameterNames);
+
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
+
+        var method = CreateMarkupInlineReferenceProbeMethod(
+            markupAttribute,
+            attributeSymbol,
+            referenceNode,
+            probeScope.LocalStatements,
+            parameterNames,
+            isAsync);
+        membersBuilder.Add(method);
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var semanticModel = CreateReferenceProbeSemanticModel(compilationUnit, out var syntaxTree);
+        var probeMethod = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.MethodDeclarationSyntax>()
+            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == MarkupInlineReferenceProbeMethodName);
+        var targetNodes = GetMarkupInlineReferenceTargetNodes(
+            probeMethod,
+            referenceNode,
+            probeScope.LocalStatements.Length);
+        var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
+        var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
+        AddCSharpProbeRootSymbolMappings(akburaSymbolsByName, akburaSymbolsByCommandTypeName);
+
+        return CollectCSharpSymbolReferences(
+            semanticModel,
+            targetNodes,
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+    }
+
+    private ImmutableArray<CSharpSymbolReference> GetMarkupExpressionCSharpSymbolReferences(
+        AkburaSyntax scopeSyntax,
+        CSharp.ExpressionSyntax expression)
+    {
+        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        foreach (var field in CreateMarkupAttributeProbeFields())
+        {
+            membersBuilder.Add(field);
+        }
+
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                ContainsAwaitExpression(expression)
+                    ? CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.Task<object>")
+                    : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                MarkupInlineReferenceProbeMethodName)
+            .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.ReturnStatement(expression)));
+        if (ContainsAwaitExpression(expression))
+        {
+            method = method.WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsyncKeyword)));
+        }
+
+        membersBuilder.Add(method);
+
+        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var semanticModel = CreateReferenceProbeSemanticModel(compilationUnit, out var syntaxTree);
+        var targetExpression = syntaxTree
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<CSharp.MethodDeclarationSyntax>()
+            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == MarkupInlineReferenceProbeMethodName)
+            .Body!
+            .Statements
+            .OfType<CSharp.ReturnStatementSyntax>()
+            .Single()
+            .Expression;
+        if (targetExpression == null)
+        {
+            return ImmutableArray<CSharpSymbolReference>.Empty;
+        }
+
+        var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
+        var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
+        AddCSharpProbeRootSymbolMappings(akburaSymbolsByName, akburaSymbolsByCommandTypeName);
+
+        return CollectCSharpSymbolReferences(
+            semanticModel,
+            [targetExpression],
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+    }
+
+    private Microsoft.CodeAnalysis.SemanticModel CreateReferenceProbeSemanticModel(
+        CSharp.CompilationUnitSyntax compilationUnit,
+        out SyntaxTree syntaxTree)
+    {
+        var parseOptions = Compilation.CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+        syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        return probeCompilation.GetSemanticModel(syntaxTree);
+    }
+
+    private ImmutableArray<CSharpSymbolReference> CollectCSharpSymbolReferences(
+        Microsoft.CodeAnalysis.SemanticModel semanticModel,
+        IEnumerable<SyntaxNode> targetNodes,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
+    {
+        using var references = ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
+        var seenReferences = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var targetNode in targetNodes)
+        {
+            foreach (var identifier in targetNode.DescendantNodesAndSelf().OfType<CSharp.IdentifierNameSyntax>())
+            {
                 AddCSharpSymbolReference(
                     references,
                     seenReferences,
-                    name,
-                    symbol,
+                    identifier,
+                    semanticModel.GetSymbolInfo(identifier).Symbol,
                     akburaSymbolsByName,
                     akburaSymbolsByCommandTypeName);
+            }
+
+            foreach (var memberAccess in targetNode.DescendantNodesAndSelf().OfType<CSharp.MemberAccessExpressionSyntax>())
+            {
+                if (memberAccess.Name is CSharp.IdentifierNameSyntax name)
+                {
+                    var symbol = GetBestSymbolInfo(semanticModel, memberAccess);
+                    if (symbol == null &&
+                        memberAccess.Parent is CSharp.InvocationExpressionSyntax invocation &&
+                        invocation.Expression == memberAccess)
+                    {
+                        symbol = GetBestSymbolInfo(semanticModel, invocation);
+                    }
+
+                    AddCSharpSymbolReference(
+                        references,
+                        seenReferences,
+                        name,
+                        symbol,
+                        akburaSymbolsByName,
+                        akburaSymbolsByCommandTypeName);
+                }
             }
         }
 
         return references.ToImmutable();
+    }
+
+    private CSharp.MethodDeclarationSyntax CreateMarkupInlineReferenceProbeMethod(
+        MarkupAttributeSyntax markupAttribute,
+        AkburaSymbol? attributeSymbol,
+        SyntaxNode referenceNode,
+        ImmutableArray<CSharp.StatementSyntax> localStatements,
+        ImmutableArray<string> parameterNames,
+        bool isAsync)
+    {
+        var returnType = isAsync
+            ? CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.Task<object>")
+            : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword));
+        var method = CSharpSyntaxFactory.MethodDeclaration(returnType, MarkupInlineReferenceProbeMethodName)
+            .WithParameterList(CreateMarkupInlineReferenceProbeParameterList(
+                markupAttribute,
+                attributeSymbol,
+                parameterNames));
+
+        if (referenceNode is CSharp.BlockSyntax block)
+        {
+            method = method.WithBody(PrependMarkupHandlerProbeLocals(block, localStatements));
+        }
+        else
+        {
+            method = method.WithBody(CreateMarkupHandlerProbeBlock(
+                localStatements,
+                CSharpSyntaxFactory.ReturnStatement((CSharp.ExpressionSyntax)referenceNode)));
+        }
+
+        return isAsync
+            ? method.WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsyncKeyword)))
+            : method;
+    }
+
+    private CSharp.ParameterListSyntax CreateMarkupInlineReferenceProbeParameterList(
+        MarkupAttributeSyntax markupAttribute,
+        AkburaSymbol? attributeSymbol,
+        ImmutableArray<string> parameterNames)
+    {
+        if (attributeSymbol is IRoutedEventSymbol routedEvent)
+        {
+            return CreateEventHandlerProbeParameterList(routedEvent, parameterNames);
+        }
+
+        if (attributeSymbol is Symbols.IPropertySymbol { Command: { } command })
+        {
+            return CreateCommandHandlerProbeParameterList(command, parameterNames);
+        }
+
+        return CSharpSyntaxFactory.ParameterList();
+    }
+
+    private static SyntaxNode GetMarkupHandlerReferenceNode(
+        CSharp.ExpressionSyntax expression,
+        out ImmutableArray<string> parameterNames,
+        out bool isAsync)
+    {
+        switch (expression)
+        {
+            case CSharp.ParenthesizedLambdaExpressionSyntax lambda:
+                parameterNames = lambda.ParameterList.Parameters
+                    .Select(static parameter => parameter.Identifier.ValueText)
+                    .ToImmutableArray();
+                isAsync = lambda.AsyncKeyword.RawKind != 0 || ContainsAwaitExpression(lambda.Body);
+                return lambda.Body;
+
+            case CSharp.SimpleLambdaExpressionSyntax lambda:
+                parameterNames = ImmutableArray.Create(lambda.Parameter.Identifier.ValueText);
+                isAsync = lambda.AsyncKeyword.RawKind != 0 || ContainsAwaitExpression(lambda.Body);
+                return lambda.Body;
+
+            case CSharp.AnonymousMethodExpressionSyntax anonymousMethod:
+                parameterNames = anonymousMethod.ParameterList?.Parameters
+                    .Select(static parameter => parameter.Identifier.ValueText)
+                    .ToImmutableArray() ?? ImmutableArray<string>.Empty;
+                isAsync = anonymousMethod.AsyncKeyword.RawKind != 0 || ContainsAwaitExpression(anonymousMethod.Body);
+                return anonymousMethod.Body;
+
+            default:
+                parameterNames = ImmutableArray<string>.Empty;
+                isAsync = ContainsAwaitExpression(expression);
+                return expression;
+        }
+    }
+
+    private static ImmutableArray<SyntaxNode> GetMarkupInlineReferenceTargetNodes(
+        CSharp.MethodDeclarationSyntax probeMethod,
+        SyntaxNode referenceNode,
+        int generatedLocalCount)
+    {
+        if (probeMethod.Body == null)
+        {
+            return ImmutableArray<SyntaxNode>.Empty;
+        }
+
+        if (referenceNode is CSharp.BlockSyntax)
+        {
+            return probeMethod.Body.Statements
+                .Skip(generatedLocalCount)
+                .Cast<SyntaxNode>()
+                .ToImmutableArray();
+        }
+
+        var expression = probeMethod.Body
+            .Statements
+            .OfType<CSharp.ReturnStatementSyntax>()
+            .LastOrDefault()
+            ?.Expression;
+
+        return expression == null
+            ? ImmutableArray<SyntaxNode>.Empty
+            : ImmutableArray.Create<SyntaxNode>(expression);
+    }
+
+    private static bool TryGetContainingMarkupAttribute(
+        AkburaSyntax syntax,
+        out MarkupAttributeSyntax markupAttribute)
+    {
+        for (var node = syntax.Parent; node != null; node = node.Parent)
+        {
+            switch (node.Kind)
+            {
+                case AkburaSyntaxKind.MarkupPlainAttributeSyntax:
+                case AkburaSyntaxKind.MarkupPrefixedAttributeSyntax:
+                case AkburaSyntaxKind.TailwindFlagAttributeSyntax:
+                case AkburaSyntaxKind.TailwindFullAttributeSyntax:
+                    markupAttribute = Unsafe.As<MarkupAttributeSyntax>(node);
+                    return true;
+            }
+        }
+
+        markupAttribute = null!;
+        return false;
+    }
+
+    private void AddCSharpProbeRootSymbolMappings(
+        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
+    {
+        foreach (var member in SyntaxTree.GetRoot().Members)
+        {
+            switch (member.Kind)
+            {
+                case AkburaSyntaxKind.StateDeclarationSyntax:
+                    AddCSharpProbeRootSymbolMapping(
+                        akburaSymbolsByName,
+                        Unsafe.As<StateDeclarationSyntax>(member).Name.Identifier.ValueText,
+                        GetSymbolInfo(member).Symbol);
+                    break;
+
+                case AkburaSyntaxKind.ParamDeclarationSyntax:
+                    AddCSharpProbeRootSymbolMapping(
+                        akburaSymbolsByName,
+                        Unsafe.As<ParamDeclarationSyntax>(member).Name.Identifier.ValueText,
+                        GetSymbolInfo(member).Symbol);
+                    break;
+
+                case AkburaSyntaxKind.InjectDeclarationSyntax:
+                    AddCSharpProbeRootSymbolMapping(
+                        akburaSymbolsByName,
+                        Unsafe.As<InjectDeclarationSyntax>(member).Name.Identifier.ValueText,
+                        GetSymbolInfo(member).Symbol);
+                    break;
+
+                case AkburaSyntaxKind.CommandDeclarationSyntax:
+                    var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
+                    if (GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol command)
+                    {
+                        akburaSymbolsByName[command.Name] = command;
+                        akburaSymbolsByCommandTypeName["__AkburaCommand_" + ToCSharpIdentifier(command.Name)] = command;
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static void AddCSharpProbeRootSymbolMapping(
+        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
+        string name,
+        AkburaSymbol? symbol)
+    {
+        if (!string.IsNullOrWhiteSpace(name) &&
+            symbol != null)
+        {
+            akburaSymbolsByName[name] = symbol;
+        }
     }
 
     private static RoslynSymbol? GetBestSymbolInfo(

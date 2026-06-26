@@ -12,6 +12,8 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
@@ -22,10 +24,12 @@ internal sealed partial class AkburaSemanticModel
 {
     private AkburaOperation? ResolveMarkupAttributeOperation(MarkupAttributeSyntax markupAttribute)
     {
-        return markupAttribute switch
+        return markupAttribute.Kind switch
         {
-            TailwindAttributeSyntax tailwindAttribute => ResolveTailwindUtilityAttributeOperation(tailwindAttribute),
-            MarkupPlainAttributeSyntax or MarkupPrefixedAttributeSyntax => ResolveMarkupPropertyOrEventOperation(markupAttribute),
+            AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+            AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveTailwindUtilityAttributeOperation(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => ResolveMarkupPropertyOrEventOperation(markupAttribute),
             _ => null,
         };
     }
@@ -51,8 +55,9 @@ internal sealed partial class AkburaSemanticModel
         var dynamicExpression = default(CSharp.ExpressionSyntax);
         var valueBinding = CSharpBindingResult.Empty;
 
-        if (valueSyntax is MarkupLiteralAttributeValueSyntax literalValueSyntax)
+        if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupLiteralAttributeValueSyntax)
         {
+            var literalValueSyntax = Unsafe.As<MarkupLiteralAttributeValueSyntax>(valueSyntax);
             valueKind = MarkupAttributeValueKind.Literal;
             literalValue = GetMarkupLiteralAttributeValueText(literalValueSyntax);
             valueBinding = BindMarkupAttributeExpression(markupAttribute, CSharpSyntaxFactory.LiteralExpression(
@@ -61,8 +66,9 @@ internal sealed partial class AkburaSemanticModel
             valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
             valueOperation = valueBinding.OperationDefinition;
         }
-        else if (valueSyntax is MarkupDynamicAttributeValueSyntax dynamicValueSyntax)
+        else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
         {
+            var dynamicValueSyntax = Unsafe.As<MarkupDynamicAttributeValueSyntax>(valueSyntax);
             var expression = ParseInlineExpression(dynamicValueSyntax.Expression);
             if (expression == null)
             {
@@ -180,14 +186,15 @@ internal sealed partial class AkburaSemanticModel
         var valueKind = MarkupAttributeValueKind.None;
         var expression = default(CSharp.ExpressionSyntax);
 
-        if (valueSyntax is MarkupDynamicAttributeValueSyntax dynamicValueSyntax)
+        if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
         {
+            var dynamicValueSyntax = Unsafe.As<MarkupDynamicAttributeValueSyntax>(valueSyntax);
             expression = ParseInlineExpression(dynamicValueSyntax.Expression);
             valueKind = expression == null
                 ? MarkupAttributeValueKind.Error
                 : MarkupAttributeValueKind.DynamicExpression;
         }
-        else if (valueSyntax is MarkupLiteralAttributeValueSyntax)
+        else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupLiteralAttributeValueSyntax)
         {
             valueKind = MarkupAttributeValueKind.Literal;
         }
@@ -515,8 +522,12 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<string>.Rent();
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            if (member is UsingDirectiveSyntax usingDirective &&
-                TryGetAkcssImportName(usingDirective, out var importName))
+            if (member.Kind != AkburaSyntaxKind.UsingDirectiveSyntax)
+            {
+                continue;
+            }
+
+            if (TryGetAkcssImportName(Unsafe.As<UsingDirectiveSyntax>(member), out var importName))
             {
                 builder.Add(importName);
             }
@@ -569,18 +580,18 @@ internal sealed partial class AkburaSemanticModel
 
     private static MarkupAttributeValueSyntax? GetMarkupAttributeValue(MarkupAttributeSyntax markupAttribute)
     {
-        return markupAttribute switch
+        return markupAttribute.Kind switch
         {
-            MarkupPlainAttributeSyntax plainAttribute => plainAttribute.Value,
-            MarkupPrefixedAttributeSyntax prefixedAttribute => prefixedAttribute.Value,
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax => Unsafe.As<MarkupPlainAttributeSyntax>(markupAttribute).Value,
+            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => Unsafe.As<MarkupPrefixedAttributeSyntax>(markupAttribute).Value,
             _ => null,
         };
     }
 
     private static MarkupAttributeBindingKind GetMarkupAttributeBindingKind(MarkupAttributeSyntax markupAttribute)
     {
-        return markupAttribute is MarkupPrefixedAttributeSyntax prefixedAttribute
-            ? prefixedAttribute.Prefix.Kind switch
+        return markupAttribute.Kind == AkburaSyntaxKind.MarkupPrefixedAttributeSyntax
+            ? Unsafe.As<MarkupPrefixedAttributeSyntax>(markupAttribute).Prefix.Kind switch
             {
                 Akbura.Language.Syntax.SyntaxKind.BindToken => MarkupAttributeBindingKind.Bind,
                 Akbura.Language.Syntax.SyntaxKind.OutToken => MarkupAttributeBindingKind.Out,
@@ -863,9 +874,9 @@ internal sealed partial class AkburaSemanticModel
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
         {
-            if (node is MarkupStartTagSyntax startTag)
+            if (node.Kind == AkburaSyntaxKind.MarkupStartTagSyntax)
             {
-                return startTag;
+                return Unsafe.As<MarkupStartTagSyntax>(node);
             }
         }
 
@@ -1194,8 +1205,13 @@ internal sealed partial class AkburaSemanticModel
         var commandName = receiver.Identifier.ValueText;
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            if (member is not CommandDeclarationSyntax commandDeclaration ||
-                commandDeclaration.Name.Identifier.ValueText != commandName ||
+            if (member.Kind != AkburaSyntaxKind.CommandDeclarationSyntax)
+            {
+                continue;
+            }
+
+            var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
+            if (commandDeclaration.Name.Identifier.ValueText != commandName ||
                 GetSymbolInfo(commandDeclaration).Symbol is not ICommandSymbol command ||
                 command.ResultType.IsDefault)
             {
@@ -1535,13 +1551,13 @@ internal sealed partial class AkburaSemanticModel
 
     private static CSharpBindingResult GetCSharpBindingResult(BoundExpression expression)
     {
-        return expression switch
+        return expression.Kind switch
         {
-            BoundCSharpExpression csharpExpression => csharpExpression.BindingResult,
-            BoundLiteralExpression literalExpression => literalExpression.BindingResult,
-            BoundBinaryExpression binaryExpression => binaryExpression.BindingResult,
-            BoundCallExpression callExpression => callExpression.BindingResult,
-            BoundConversionExpression conversionExpression => GetCSharpBindingResult(conversionExpression.Operand),
+            BoundKind.CSharpExpression => Unsafe.As<BoundCSharpExpression>(expression).BindingResult,
+            BoundKind.LiteralExpression => Unsafe.As<BoundLiteralExpression>(expression).BindingResult,
+            BoundKind.BinaryExpression => Unsafe.As<BoundBinaryExpression>(expression).BindingResult,
+            BoundKind.CallExpression => Unsafe.As<BoundCallExpression>(expression).BindingResult,
+            BoundKind.ConversionExpression => GetCSharpBindingResult(Unsafe.As<BoundConversionExpression>(expression).Operand),
             _ => CSharpBindingResult.Empty,
         };
     }
@@ -1550,14 +1566,15 @@ internal sealed partial class AkburaSemanticModel
     {
         for (var node = syntax; node != null; node = node.Parent)
         {
-            switch (node)
+            switch (node.Kind)
             {
-                case MarkupRootSyntax markupRoot:
-                    return markupRoot;
-                case MarkupElementSyntax markupElement:
-                    if (markupElement.Parent is MarkupRootSyntax root)
+                case AkburaSyntaxKind.MarkupRootSyntax:
+                    return Unsafe.As<MarkupRootSyntax>(node);
+                case AkburaSyntaxKind.MarkupElementSyntax:
+                    var markupElement = Unsafe.As<MarkupElementSyntax>(node);
+                    if (markupElement.Parent?.Kind == AkburaSyntaxKind.MarkupRootSyntax)
                     {
-                        return root;
+                        return Unsafe.As<MarkupRootSyntax>(markupElement.Parent);
                     }
 
                     return markupElement;
@@ -1572,9 +1589,10 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            switch (member)
+            switch (member.Kind)
             {
-                case StateDeclarationSyntax stateDeclaration:
+                case AkburaSyntaxKind.StateDeclarationSyntax:
+                    var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
                     if (TryCreateStateProbeField(stateDeclaration, out var stateField))
                     {
                         builder.Add(stateField);
@@ -1582,7 +1600,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case ParamDeclarationSyntax paramDeclaration:
+                case AkburaSyntaxKind.ParamDeclarationSyntax:
+                    var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
                     if (TryCreateParamProbeField(paramDeclaration, out var paramField))
                     {
                         builder.Add(paramField);
@@ -1590,7 +1609,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case InjectDeclarationSyntax injectDeclaration:
+                case AkburaSyntaxKind.InjectDeclarationSyntax:
+                    var injectDeclaration = Unsafe.As<InjectDeclarationSyntax>(member);
                     if (TryCreateInjectProbeField(injectDeclaration, out var injectField))
                     {
                         builder.Add(injectField);
@@ -1598,7 +1618,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case CommandDeclarationSyntax commandDeclaration:
+                case AkburaSyntaxKind.CommandDeclarationSyntax:
+                    var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
                     foreach (var commandMember in CreateCommandProbeMembers(commandDeclaration))
                     {
                         builder.Add(commandMember);
@@ -1783,18 +1804,23 @@ internal sealed partial class AkburaSemanticModel
 
     private static string GetTailwindUtilityName(TailwindAttributeSyntax attribute)
     {
-        return attribute switch
+        return attribute.Kind switch
         {
-            TailwindFlagAttributeSyntax flag => flag.Name.Identifier.ValueText,
-            TailwindFullAttributeSyntax full => full.Name.Identifier.ValueText,
+            AkburaSyntaxKind.TailwindFlagAttributeSyntax => Unsafe.As<TailwindFlagAttributeSyntax>(attribute).Name.Identifier.ValueText,
+            AkburaSyntaxKind.TailwindFullAttributeSyntax => Unsafe.As<TailwindFullAttributeSyntax>(attribute).Name.Identifier.ValueText,
             _ => string.Empty,
         };
     }
 
     private ImmutableArray<TailwindUtilityArgument> CreateTailwindUtilityArguments(TailwindAttributeSyntax attribute)
     {
-        if (attribute is not TailwindFullAttributeSyntax fullAttribute ||
-            fullAttribute.Segments.Count == 0)
+        if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
+        {
+            return ImmutableArray<TailwindUtilityArgument>.Empty;
+        }
+
+        var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
+        if (fullAttribute.Segments.Count == 0)
         {
             return ImmutableArray<TailwindUtilityArgument>.Empty;
         }
@@ -1810,13 +1836,15 @@ internal sealed partial class AkburaSemanticModel
 
     private TailwindUtilityArgument CreateTailwindUtilityArgument(TailwindSegmentSyntax segment)
     {
-        CSharp.ExpressionSyntax? expression = segment switch
+        CSharp.ExpressionSyntax? expression = segment.Kind switch
         {
-            TailwindNumericSegmentSyntax numeric => CSharpSyntaxFactory.ParseExpression(numeric.Number.ToFullString()),
-            TailwindIdentifierSegmentSyntax identifier => CSharpSyntaxFactory.LiteralExpression(
+            AkburaSyntaxKind.TailwindNumericSegmentSyntax => CSharpSyntaxFactory.ParseExpression(
+                Unsafe.As<TailwindNumericSegmentSyntax>(segment).Number.ToFullString()),
+            AkburaSyntaxKind.TailwindIdentifierSegmentSyntax => CSharpSyntaxFactory.LiteralExpression(
                 Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralExpression,
-                CSharpSyntaxFactory.Literal(identifier.Name.Identifier.ValueText)),
-            TailwindExpressionSegmentSyntax expressionSegment => ParseInlineExpression(expressionSegment.Expression),
+                CSharpSyntaxFactory.Literal(Unsafe.As<TailwindIdentifierSegmentSyntax>(segment).Name.Identifier.ValueText)),
+            AkburaSyntaxKind.TailwindExpressionSegmentSyntax => ParseInlineExpression(
+                Unsafe.As<TailwindExpressionSegmentSyntax>(segment).Expression),
             _ => null,
         };
 
@@ -1837,12 +1865,18 @@ internal sealed partial class AkburaSemanticModel
     private (bool HasCondition, string? Text, CSharpSymbolDefinition Type, CSharpOperationDefinition Operation)
         CreateTailwindCondition(TailwindAttributeSyntax attribute)
     {
-        if (attribute is not TailwindFullAttributeSyntax fullAttribute ||
-            fullAttribute.Prefix is not ExpressionConditionalPrefixSyntax expressionPrefix)
+        if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
         {
             return (false, null, default, default);
         }
 
+        var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
+        if (fullAttribute.Prefix?.Kind != AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        {
+            return (false, null, default, default);
+        }
+
+        var expressionPrefix = Unsafe.As<ExpressionConditionalPrefixSyntax>(fullAttribute.Prefix);
         var expression = ParseInlineExpression(expressionPrefix.Expression);
         if (expression == null)
         {

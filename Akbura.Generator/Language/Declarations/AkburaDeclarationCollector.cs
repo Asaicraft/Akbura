@@ -2,6 +2,8 @@ using Akbura.Pools;
 using Akbura.Language.Syntax;
 using System.Diagnostics;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Declarations;
 
@@ -286,9 +288,9 @@ internal sealed class AkburaDeclarationCollector : SyntaxVisitor
         var builder = ImmutableArray.CreateBuilder<AkburaDeclaration>();
         foreach (var content in element.Body)
         {
-            if (content is MarkupElementContentSyntax elementContent)
+            if (content.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)
             {
-                builder.Add(CreateMarkupElementDeclaration(elementContent.Element));
+                builder.Add(CreateMarkupElementDeclaration(Unsafe.As<MarkupElementContentSyntax>(content).Element));
             }
         }
 

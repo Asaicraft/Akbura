@@ -4,6 +4,8 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -91,11 +93,12 @@ internal sealed class BlockBinder : Binder
         foreach (var child in Declaration.Children)
         {
             if (child.Kind != AkburaDeclarationKind.CSharpStatement ||
-                child.Syntax is not CSharpStatementSyntax statement)
+                child.Syntax.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
             {
                 continue;
             }
 
+            var statement = Unsafe.As<CSharpStatementSyntax>(child.Syntax);
             AddLocalSymbols(builder, statement);
         }
 

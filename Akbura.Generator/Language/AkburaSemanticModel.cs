@@ -12,7 +12,9 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -57,19 +59,22 @@ internal sealed partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(syntax);
 
-        return _bindingCache.GetSymbolInfo(syntax, () => syntax switch
+        return _bindingCache.GetSymbolInfo(syntax, () => syntax.Kind switch
         {
-            AkburaDocumentSyntax or
-                StateDeclarationSyntax or
-                ParamDeclarationSyntax or
-                InjectDeclarationSyntax or
-                CommandDeclarationSyntax or
-                UseEffectDeclarationSyntax => GetMemberSemanticModel(syntax).GetSymbolInfo(syntax),
-            InlineAkcssBlockSyntax inlineAkcssBlock => ResolveInlineAkcssModule(inlineAkcssBlock),
-            AkcssStyleRuleSyntax styleRule => ResolveAkcssStyle(styleRule),
-            AkcssUtilityDeclarationSyntax utilityDeclaration => ResolveTailwindUtility(utilityDeclaration),
-            MarkupElementSyntax markupElement => ResolveMarkupComponent(markupElement),
-            MarkupAttributeSyntax markupAttribute => ResolveMarkupProperty(markupAttribute),
+            AkburaSyntaxKind.AkburaDocumentSyntax or
+                AkburaSyntaxKind.StateDeclarationSyntax or
+                AkburaSyntaxKind.ParamDeclarationSyntax or
+                AkburaSyntaxKind.InjectDeclarationSyntax or
+                AkburaSyntaxKind.CommandDeclarationSyntax or
+                AkburaSyntaxKind.UseEffectDeclarationSyntax => GetMemberSemanticModel(syntax).GetSymbolInfo(syntax),
+            AkburaSyntaxKind.InlineAkcssBlockSyntax => ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssStyleRuleSyntax => ResolveAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssUtilityDeclarationSyntax => ResolveTailwindUtility(Unsafe.As<AkcssUtilityDeclarationSyntax>(syntax)),
+            AkburaSyntaxKind.MarkupElementSyntax => ResolveMarkupComponent(Unsafe.As<MarkupElementSyntax>(syntax)),
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveMarkupProperty(Unsafe.As<MarkupAttributeSyntax>(syntax)),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         });
     }
@@ -85,16 +90,20 @@ internal sealed partial class AkburaSemanticModel
         return _bindingCache.GetDiagnostics(syntax, () =>
         {
             _ = GetSymbolInfo(syntax);
-            if (syntax is MarkupAttributeSyntax or
-                AkcssAssignmentSyntax or
-                AkcssIfDirectiveSyntax or
-                AkcssApplyDirectiveSyntax or
-                AkcssInterceptDirectiveSyntax)
+            if (syntax.Kind is AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax or
+                AkburaSyntaxKind.AkcssAssignmentSyntax or
+                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
+                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
+                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
             {
                 _ = GetOperation(syntax);
             }
-            else if (syntax is CSharpStatementSyntax csharpStatement)
+            else if (syntax.Kind == AkburaSyntaxKind.CSharpStatementSyntax)
             {
+                var csharpStatement = Unsafe.As<CSharpStatementSyntax>(syntax);
                 SetSemanticDiagnosticsIfAbsent(
                     csharpStatement,
                     CreateCSharpStatementUserHookDiagnostics(csharpStatement));
@@ -102,7 +111,7 @@ internal sealed partial class AkburaSemanticModel
 
             return _semanticDiagnosticsCache.TryGetValue(syntax, out var diagnostics)
                 ? diagnostics
-                : ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+                : [];
         });
     }
 
@@ -115,13 +124,16 @@ internal sealed partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(syntax);
 
-        return _bindingCache.GetOperation(syntax, () => syntax switch
+        return _bindingCache.GetOperation(syntax, () => syntax.Kind switch
         {
-            AkcssAssignmentSyntax assignment => ResolveAkcssPropertySetterOperation(assignment),
-            AkcssIfDirectiveSyntax ifDirective => ResolveAkcssIfOperation(ifDirective),
-            AkcssApplyDirectiveSyntax applyDirective => ResolveAkcssApplyOperation(applyDirective),
-            AkcssInterceptDirectiveSyntax interceptDirective => ResolveAkcssInterceptOperation(interceptDirective),
-            MarkupAttributeSyntax markupAttribute => ResolveMarkupAttributeOperation(markupAttribute),
+            AkburaSyntaxKind.AkcssAssignmentSyntax => ResolveAkcssPropertySetterOperation(Unsafe.As<AkcssAssignmentSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssIfDirectiveSyntax => ResolveAkcssIfOperation(Unsafe.As<AkcssIfDirectiveSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssApplyDirectiveSyntax => ResolveAkcssApplyOperation(Unsafe.As<AkcssApplyDirectiveSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => ResolveAkcssInterceptOperation(Unsafe.As<AkcssInterceptDirectiveSyntax>(syntax)),
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveMarkupAttributeOperation(Unsafe.As<MarkupAttributeSyntax>(syntax)),
             _ => null,
         });
     }
@@ -184,9 +196,9 @@ internal sealed partial class AkburaSemanticModel
     {
         for (var node = syntax; node != null; node = node.Parent)
         {
-            if (node is AkburaDocumentSyntax document)
+            if (node.Kind == AkburaSyntaxKind.AkburaDocumentSyntax)
             {
-                return document;
+                return Unsafe.As<AkburaDocumentSyntax>(node);
             }
         }
 
@@ -315,9 +327,10 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
         foreach (var member in members)
         {
-            switch (member)
+            switch (member.Kind)
             {
-                case AkcssStyleRuleSyntax styleRule:
+                case AkburaSyntaxKind.AkcssStyleRuleSyntax:
+                    var styleRule = Unsafe.As<AkcssStyleRuleSyntax>(member);
                     if (GetSymbolInfo(styleRule).Symbol is IAkcssSymbol styleSymbol)
                     {
                         builder.Add(styleSymbol);
@@ -325,7 +338,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case AkcssUtilitiesSectionSyntax utilitiesSection:
+                case AkburaSyntaxKind.AkcssUtilitiesSectionSyntax:
+                    var utilitiesSection = Unsafe.As<AkcssUtilitiesSectionSyntax>(member);
                     foreach (var utilityDeclaration in utilitiesSection.Utilities)
                     {
                         if (GetSymbolInfo(utilityDeclaration).Symbol is IAkcssSymbol utilitySymbol)
@@ -533,11 +547,12 @@ internal sealed partial class AkburaSemanticModel
         using var interceptOperationsBuilder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
         foreach (var member in members)
         {
-            if (member is not AkcssInterceptDirectiveSyntax interceptDirective)
+            if (member.Kind != AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
             {
                 continue;
             }
 
+            var interceptDirective = Unsafe.As<AkcssInterceptDirectiveSyntax>(member);
             var interceptOperation = CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
             _operationCache[interceptDirective] = interceptOperation;
             interceptOperationsBuilder.Add(interceptOperation);
@@ -552,7 +567,7 @@ internal sealed partial class AkburaSemanticModel
         {
             foreach (var member in members)
             {
-                if (member is not AkcssInterceptDirectiveSyntax)
+                if (member.Kind != AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
                 {
                     SetAkcssInterceptIgnoredDiagnostics(member, containingSymbol);
                 }
@@ -564,34 +579,38 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
         foreach (var member in members)
         {
-            switch (member)
+            switch (member.Kind)
             {
-                case AkcssAssignmentSyntax assignment:
+                case AkburaSyntaxKind.AkcssAssignmentSyntax:
                 {
+                    var assignment = Unsafe.As<AkcssAssignmentSyntax>(member);
                     var operation = CreateAkcssPropertySetterOperation(assignment, containingSymbol);
                     _operationCache[assignment] = operation;
                     builder.Add(operation);
                     break;
                 }
 
-                case AkcssIfDirectiveSyntax ifDirective:
+                case AkburaSyntaxKind.AkcssIfDirectiveSyntax:
                 {
+                    var ifDirective = Unsafe.As<AkcssIfDirectiveSyntax>(member);
                     var ifOperation = CreateAkcssIfOperation(ifDirective, containingSymbol);
                     _operationCache[ifDirective] = ifOperation;
                     builder.Add(ifOperation);
                     break;
                 }
 
-                case AkcssApplyDirectiveSyntax applyDirective:
+                case AkburaSyntaxKind.AkcssApplyDirectiveSyntax:
                 {
+                    var applyDirective = Unsafe.As<AkcssApplyDirectiveSyntax>(member);
                     var applyOperation = CreateAkcssApplyOperation(applyDirective, containingSymbol);
                     _operationCache[applyDirective] = applyOperation;
                     builder.Add(applyOperation);
                     break;
                 }
 
-                case AkcssInterceptDirectiveSyntax interceptDirective:
+                case AkburaSyntaxKind.AkcssInterceptDirectiveSyntax:
                 {
+                    var interceptDirective = Unsafe.As<AkcssInterceptDirectiveSyntax>(member);
                     var interceptOperation = (IAkcssInterceptOperation?)_operationCache[interceptDirective] ??
                         CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
                     _operationCache[interceptDirective] = interceptOperation;
@@ -715,16 +734,14 @@ internal sealed partial class AkburaSemanticModel
     {
         for (var node = syntax.Parent; node != null; node = node.Parent)
         {
-            if (node is AkcssStyleRuleSyntax styleRule)
+            switch (node.Kind)
             {
-                symbol = GetSymbolInfo(styleRule).Symbol as IAkcssSymbol;
-                return symbol != null;
-            }
-
-            if (node is AkcssUtilityDeclarationSyntax utilityDeclaration)
-            {
-                symbol = GetSymbolInfo(utilityDeclaration).Symbol as IAkcssSymbol;
-                return symbol != null;
+                case AkburaSyntaxKind.AkcssStyleRuleSyntax:
+                    symbol = GetSymbolInfo(Unsafe.As<AkcssStyleRuleSyntax>(node)).Symbol as IAkcssSymbol;
+                    return symbol != null;
+                case AkburaSyntaxKind.AkcssUtilityDeclarationSyntax:
+                    symbol = GetSymbolInfo(Unsafe.As<AkcssUtilityDeclarationSyntax>(node)).Symbol as IAkcssSymbol;
+                    return symbol != null;
             }
         }
 
@@ -1210,9 +1227,10 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
         foreach (var member in members)
         {
-            switch (member)
+            switch (member.Kind)
             {
-                case AkcssStyleRuleSyntax styleRule:
+                case AkburaSyntaxKind.AkcssStyleRuleSyntax:
+                    var styleRule = Unsafe.As<AkcssStyleRuleSyntax>(member);
                     if (TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var styleTargetType))
                     {
                         builder.Add(CreateAkcssStyleSymbol(styleRule, styleTargetType, includeOperations: false));
@@ -1220,7 +1238,8 @@ internal sealed partial class AkburaSemanticModel
 
                     break;
 
-                case AkcssUtilitiesSectionSyntax utilitiesSection:
+                case AkburaSyntaxKind.AkcssUtilitiesSectionSyntax:
+                    var utilitiesSection = Unsafe.As<AkcssUtilitiesSectionSyntax>(member);
                     foreach (var utilityDeclaration in utilitiesSection.Utilities)
                     {
                         if (TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var utilityTargetType))
@@ -2324,11 +2343,12 @@ internal sealed partial class AkburaSemanticModel
 
     private static StateBindingKind GetStateBindingKind(StateInitializerSyntax initializer)
     {
-        if (initializer is not BindableStateInitializerSyntax bindableInitializer)
+        if (initializer.Kind != AkburaSyntaxKind.BindableStateInitializer)
         {
             return StateBindingKind.None;
         }
 
+        var bindableInitializer = Unsafe.As<BindableStateInitializerSyntax>(initializer);
         return bindableInitializer.BindingKeyword.Kind switch
         {
             Akbura.Language.Syntax.SyntaxKind.InToken => StateBindingKind.In,
@@ -2727,8 +2747,13 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<string>.Rent();
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            if (member is not UsingDirectiveSyntax usingDirective ||
-                usingDirective.Alias != null ||
+            if (member.Kind != AkburaSyntaxKind.UsingDirectiveSyntax)
+            {
+                continue;
+            }
+
+            var usingDirective = Unsafe.As<UsingDirectiveSyntax>(member);
+            if (usingDirective.Alias != null ||
                 usingDirective.StaticKeyword.RawKind != 0 ||
                 IsAkcssUsingDirective(usingDirective))
             {
@@ -2752,8 +2777,13 @@ internal sealed partial class AkburaSemanticModel
 
         foreach (var member in syntaxTree.GetRoot().Members)
         {
-            if (member is ParamDeclarationSyntax paramDeclaration &&
-                semanticModel.GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
+            if (member.Kind != AkburaSyntaxKind.ParamDeclarationSyntax)
+            {
+                continue;
+            }
+
+            var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
+            if (semanticModel.GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
             {
                 builder.Add(paramSymbol);
             }
@@ -2769,8 +2799,13 @@ internal sealed partial class AkburaSemanticModel
 
         foreach (var member in syntaxTree.GetRoot().Members)
         {
-            if (member is CommandDeclarationSyntax commandDeclaration &&
-                semanticModel.GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
+            if (member.Kind != AkburaSyntaxKind.CommandDeclarationSyntax)
+            {
+                continue;
+            }
+
+            var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
+            if (semanticModel.GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
             {
                 builder.Add(commandSymbol);
             }
@@ -2797,9 +2832,9 @@ internal sealed partial class AkburaSemanticModel
     {
         foreach (var member in root.Members)
         {
-            if (member is NamespaceDeclarationSyntax namespaceDeclaration)
+            if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
             {
-                return namespaceDeclaration.Name.ToFullString().Trim();
+                return Unsafe.As<NamespaceDeclarationSyntax>(member).Name.ToFullString().Trim();
             }
         }
 
@@ -2958,10 +2993,10 @@ internal sealed partial class AkburaSemanticModel
 
     private static string GetMarkupPropertyName(MarkupAttributeSyntax markupAttribute)
     {
-        return markupAttribute switch
+        return markupAttribute.Kind switch
         {
-            MarkupPlainAttributeSyntax plainAttribute => plainAttribute.Name.Identifier.ValueText,
-            MarkupPrefixedAttributeSyntax prefixedAttribute => prefixedAttribute.Name.Identifier.ValueText,
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax => Unsafe.As<MarkupPlainAttributeSyntax>(markupAttribute).Name.Identifier.ValueText,
+            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => Unsafe.As<MarkupPrefixedAttributeSyntax>(markupAttribute).Name.Identifier.ValueText,
             _ => string.Empty,
         };
     }
@@ -2970,9 +3005,9 @@ internal sealed partial class AkburaSemanticModel
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
         {
-            if (node is MarkupElementSyntax markupElement)
+            if (node.Kind == AkburaSyntaxKind.MarkupElementSyntax)
             {
-                return markupElement;
+                return Unsafe.As<MarkupElementSyntax>(node);
             }
         }
 
@@ -3713,8 +3748,13 @@ internal sealed partial class AkburaSemanticModel
                 break;
             }
 
-            if (member is StateDeclarationSyntax stateDeclaration &&
-                TryCreateStateProbeField(stateDeclaration, out var field))
+            if (member.Kind != AkburaSyntaxKind.StateDeclarationSyntax)
+            {
+                continue;
+            }
+
+            var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
+            if (TryCreateStateProbeField(stateDeclaration, out var field))
             {
                 builder.Add(field);
             }
@@ -3781,8 +3821,9 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            if (member is UsingDirectiveSyntax usingDirective)
+            if (member.Kind == AkburaSyntaxKind.UsingDirectiveSyntax)
             {
+                var usingDirective = Unsafe.As<UsingDirectiveSyntax>(member);
                 if (IsAkcssUsingDirective(usingDirective))
                 {
                     continue;
@@ -3845,9 +3886,9 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<AkcssUsingDirectiveSyntax>.Rent();
         foreach (var member in members)
         {
-            if (member is AkcssUsingDirectiveSyntax usingDirective)
+            if (member.Kind == AkburaSyntaxKind.AkcssUsingDirectiveSyntax)
             {
-                builder.Add(usingDirective);
+                builder.Add(Unsafe.As<AkcssUsingDirectiveSyntax>(member));
             }
         }
 
@@ -3858,12 +3899,12 @@ internal sealed partial class AkburaSemanticModel
     {
         for (var node = syntax; node != null; node = node.Parent)
         {
-            switch (node)
+            switch (node.Kind)
             {
-                case InlineAkcssBlockSyntax inlineAkcssBlock:
-                    return inlineAkcssBlock.Members;
-                case AkcssDocumentSyntax document:
-                    return document.Members;
+                case AkburaSyntaxKind.InlineAkcssBlockSyntax:
+                    return Unsafe.As<InlineAkcssBlockSyntax>(node).Members;
+                case AkburaSyntaxKind.AkcssDocumentSyntax:
+                    return Unsafe.As<AkcssDocumentSyntax>(node).Members;
             }
         }
 
@@ -3930,9 +3971,9 @@ internal sealed partial class AkburaSemanticModel
     {
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            if (member is NamespaceDeclarationSyntax namespaceDeclaration)
+            if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
             {
-                return namespaceDeclaration.ToCSharp();
+                return Unsafe.As<NamespaceDeclarationSyntax>(member).ToCSharp();
             }
         }
 

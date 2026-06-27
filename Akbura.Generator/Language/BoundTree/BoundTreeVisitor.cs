@@ -21,6 +21,42 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitDeclaration(BoundDeclaration node) => DefaultVisit(node);
 
+    public virtual void VisitComponentDeclaration(BoundComponentDeclaration node) => VisitDeclaration(node);
+
+    public virtual void VisitStateDeclaration(BoundStateDeclaration node) => VisitDeclaration(node);
+
+    public virtual void VisitParamDeclaration(BoundParamDeclaration node) => VisitDeclaration(node);
+
+    public virtual void VisitInjectDeclaration(BoundInjectDeclaration node) => VisitDeclaration(node);
+
+    public virtual void VisitCommandDeclaration(BoundCommandDeclaration node) => VisitDeclaration(node);
+
+    public virtual void VisitUseEffectDeclaration(BoundUseEffectDeclaration node) => VisitDeclaration(node);
+
+    public virtual void VisitMarkupComponent(BoundMarkupComponent node) => DefaultVisit(node);
+
+    public virtual void VisitAkcssModule(BoundAkcssModule node) => DefaultVisit(node);
+
+    public virtual void VisitAkcssStyle(BoundAkcssStyle node) => DefaultVisit(node);
+
+    public virtual void VisitAkcssUtility(BoundAkcssUtility node) => DefaultVisit(node);
+
+    public virtual void VisitMarkupPropertySetter(BoundMarkupPropertySetter node) => DefaultVisit(node);
+
+    public virtual void VisitMarkupCommandBinding(BoundMarkupCommandBinding node) => DefaultVisit(node);
+
+    public virtual void VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node) => DefaultVisit(node);
+
+    public virtual void VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node) => DefaultVisit(node);
+
+    public virtual void VisitAkcssPropertySetter(BoundAkcssPropertySetter node) => DefaultVisit(node);
+
+    public virtual void VisitAkcssIf(BoundAkcssIf node) => DefaultVisit(node);
+
+    public virtual void VisitAkcssApply(BoundAkcssApply node) => DefaultVisit(node);
+
+    public virtual void VisitAkcssIntercept(BoundAkcssIntercept node) => DefaultVisit(node);
+
     public virtual void VisitExpression(BoundExpression node) => DefaultVisit(node);
 
     public virtual void VisitCSharpExpression(BoundCSharpExpression node) => VisitExpression(node);
@@ -62,6 +98,42 @@ internal abstract class BoundTreeVisitor<TResult>
         VisitStatement(node);
 
     public virtual TResult? VisitDeclaration(BoundDeclaration node) => DefaultVisit(node);
+
+    public virtual TResult? VisitComponentDeclaration(BoundComponentDeclaration node) => VisitDeclaration(node);
+
+    public virtual TResult? VisitStateDeclaration(BoundStateDeclaration node) => VisitDeclaration(node);
+
+    public virtual TResult? VisitParamDeclaration(BoundParamDeclaration node) => VisitDeclaration(node);
+
+    public virtual TResult? VisitInjectDeclaration(BoundInjectDeclaration node) => VisitDeclaration(node);
+
+    public virtual TResult? VisitCommandDeclaration(BoundCommandDeclaration node) => VisitDeclaration(node);
+
+    public virtual TResult? VisitUseEffectDeclaration(BoundUseEffectDeclaration node) => VisitDeclaration(node);
+
+    public virtual TResult? VisitMarkupComponent(BoundMarkupComponent node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssModule(BoundAkcssModule node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssStyle(BoundAkcssStyle node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssUtility(BoundAkcssUtility node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupPropertySetter(BoundMarkupPropertySetter node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupCommandBinding(BoundMarkupCommandBinding node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node) => DefaultVisit(node);
+
+    public virtual TResult? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssPropertySetter(BoundAkcssPropertySetter node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssIf(BoundAkcssIf node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssApply(BoundAkcssApply node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssIntercept(BoundAkcssIntercept node) => DefaultVisit(node);
 
     public virtual TResult? VisitExpression(BoundExpression node) => DefaultVisit(node);
 
@@ -109,6 +181,60 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         VisitStatement(node, parameter);
 
     public virtual TResult? VisitDeclaration(BoundDeclaration node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitComponentDeclaration(BoundComponentDeclaration node, TParameter parameter) =>
+        VisitDeclaration(node, parameter);
+
+    public virtual TResult? VisitStateDeclaration(BoundStateDeclaration node, TParameter parameter) =>
+        VisitDeclaration(node, parameter);
+
+    public virtual TResult? VisitParamDeclaration(BoundParamDeclaration node, TParameter parameter) =>
+        VisitDeclaration(node, parameter);
+
+    public virtual TResult? VisitInjectDeclaration(BoundInjectDeclaration node, TParameter parameter) =>
+        VisitDeclaration(node, parameter);
+
+    public virtual TResult? VisitCommandDeclaration(BoundCommandDeclaration node, TParameter parameter) =>
+        VisitDeclaration(node, parameter);
+
+    public virtual TResult? VisitUseEffectDeclaration(BoundUseEffectDeclaration node, TParameter parameter) =>
+        VisitDeclaration(node, parameter);
+
+    public virtual TResult? VisitMarkupComponent(BoundMarkupComponent node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssModule(BoundAkcssModule node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssStyle(BoundAkcssStyle node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssUtility(BoundAkcssUtility node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupPropertySetter(BoundMarkupPropertySetter node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupCommandBinding(BoundMarkupCommandBinding node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssPropertySetter(BoundAkcssPropertySetter node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssIf(BoundAkcssIf node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssApply(BoundAkcssApply node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssIntercept(BoundAkcssIntercept node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitExpression(BoundExpression node, TParameter parameter) =>

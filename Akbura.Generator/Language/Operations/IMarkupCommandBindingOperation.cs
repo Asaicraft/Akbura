@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
@@ -39,4 +40,6 @@ internal interface IMarkupCommandBindingOperation : IMarkupAttributeOperation
     CSharpSymbolDefinition HandlerResultType { get; }
 
     CSharpOperationDefinition HandlerOperation { get; }
+
+    ICSharpOperation? HandlerOperationTree { get; }
 }

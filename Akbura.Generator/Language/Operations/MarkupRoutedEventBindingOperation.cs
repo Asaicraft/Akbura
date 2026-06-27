@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -21,7 +22,8 @@ internal sealed class MarkupRoutedEventBindingOperation : IMarkupRoutedEventBind
         bool isAsync,
         bool containsAwait,
         CSharpOperationDefinition handlerOperation,
-        bool hasErrors)
+        bool hasErrors,
+        ICSharpOperation? handlerOperationTree = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
@@ -36,6 +38,11 @@ internal sealed class MarkupRoutedEventBindingOperation : IMarkupRoutedEventBind
         ContainsAwait = containsAwait;
         HandlerOperation = handlerOperation;
         HasErrors = hasErrors;
+        HandlerOperationTree = handlerOperationTree;
+        AdoptCSharpOperationTree(HandlerOperationTree);
+        Children = HandlerOperationTree == null
+            ? ImmutableArray<IOperation>.Empty
+            : ImmutableArray.Create<IOperation>(HandlerOperationTree);
     }
 
     public OperationKind Kind => OperationKind.MarkupEventBinding;
@@ -48,7 +55,7 @@ internal sealed class MarkupRoutedEventBindingOperation : IMarkupRoutedEventBind
 
     public IOperation? Parent => null;
 
-    public ImmutableArray<IOperation> Children => ImmutableArray<IOperation>.Empty;
+    public ImmutableArray<IOperation> Children { get; }
 
     public ISymbol? TargetSymbol => Event;
 
@@ -88,6 +95,8 @@ internal sealed class MarkupRoutedEventBindingOperation : IMarkupRoutedEventBind
 
     public CSharpOperationDefinition HandlerOperation { get; }
 
+    public ICSharpOperation? HandlerOperationTree { get; }
+
     public void Accept(OperationVisitor visitor)
     {
         visitor.VisitMarkupRoutedEventBinding(this);
@@ -124,5 +133,13 @@ internal sealed class MarkupRoutedEventBindingOperation : IMarkupRoutedEventBind
     public override string ToString()
     {
         return ToDisplayString();
+    }
+
+    private void AdoptCSharpOperationTree(ICSharpOperation? operation)
+    {
+        if (operation is CSharpOperation csharpOperation)
+        {
+            csharpOperation.SetParent(this);
+        }
     }
 }

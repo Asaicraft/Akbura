@@ -19,7 +19,6 @@ internal sealed class BoundCSharpExpression : BoundExpression
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
-            operation: null,
             diagnostics,
             hasErrors: bindingResult.Diagnostics.Length != 0)
     {

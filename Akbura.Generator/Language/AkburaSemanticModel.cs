@@ -37,6 +37,7 @@ internal sealed partial class AkburaSemanticModel
     private readonly Dictionary<AkburaSyntax, MemberSemanticModel> _memberSemanticModelCache = new();
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
+    private readonly AkburaOperationFactory _operationFactory;
 
     public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
@@ -44,6 +45,7 @@ internal sealed partial class AkburaSemanticModel
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
         _bindingCache = new SemanticBindingCache(this, _symbolInfoCache, _operationCache, _boundNodeCache, _semanticDiagnosticsCache);
         _bindingSession = new BindingSession(this);
+        _operationFactory = new AkburaOperationFactory(this);
     }
 
     public AkburaCompilation Compilation { get; }
@@ -156,18 +158,15 @@ internal sealed partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(syntax);
 
-        return _bindingCache.GetOperation(syntax, () => syntax.Kind switch
-        {
-            AkburaSyntaxKind.AkcssAssignmentSyntax => ResolveAkcssPropertySetterOperation(Unsafe.As<AkcssAssignmentSyntax>(syntax)),
-            AkburaSyntaxKind.AkcssIfDirectiveSyntax => ResolveAkcssIfOperation(Unsafe.As<AkcssIfDirectiveSyntax>(syntax)),
-            AkburaSyntaxKind.AkcssApplyDirectiveSyntax => ResolveAkcssApplyOperation(Unsafe.As<AkcssApplyDirectiveSyntax>(syntax)),
-            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => ResolveAkcssInterceptOperation(Unsafe.As<AkcssInterceptDirectiveSyntax>(syntax)),
-            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
-                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
-                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
-                AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveMarkupAttributeOperation(Unsafe.As<MarkupAttributeSyntax>(syntax)),
-            _ => null,
-        });
+        return _bindingCache.GetOperation(
+            syntax,
+            () =>
+            {
+                var boundNode = _bindingSession.BindOperationSyntax(syntax);
+                return _operationCache.TryGetValue(syntax, out var cachedOperation)
+                    ? cachedOperation
+                    : _operationFactory.CreateOperation(boundNode);
+            });
     }
 
     internal BoundNode GetBoundNode(AkburaSyntax syntax, Func<BoundNode> bind)
@@ -770,8 +769,15 @@ internal sealed partial class AkburaSemanticModel
             }
 
             var interceptDirective = Unsafe.As<AkcssInterceptDirectiveSyntax>(member);
-            var interceptOperation = CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
-            _operationCache[interceptDirective] = interceptOperation;
+            if (!_operationCache.TryGetValue(interceptDirective, out var cachedInterceptOperation) ||
+                cachedInterceptOperation is not IAkcssInterceptOperation interceptOperation)
+            {
+                var interceptBoundNode = CreateBoundAkcssIntercept(interceptDirective, containingSymbol);
+                _boundNodeCache[interceptDirective] = interceptBoundNode;
+                interceptOperation = (IAkcssInterceptOperation)_operationFactory.CreateOperation(interceptBoundNode)!;
+                _operationCache[interceptDirective] = interceptOperation;
+            }
+
             interceptOperationsBuilder.Add(interceptOperation);
             if (!interceptOperation.InterceptType.IsDefault)
             {
@@ -801,8 +807,15 @@ internal sealed partial class AkburaSemanticModel
                 case AkburaSyntaxKind.AkcssAssignmentSyntax:
                 {
                     var assignment = Unsafe.As<AkcssAssignmentSyntax>(member);
-                    var operation = CreateAkcssPropertySetterOperation(assignment, containingSymbol);
-                    _operationCache[assignment] = operation;
+                    if (!_operationCache.TryGetValue(assignment, out var cachedOperation) ||
+                        cachedOperation is not IAkcssOperation operation)
+                    {
+                        var boundNode = CreateBoundAkcssPropertySetter(assignment, containingSymbol);
+                        _boundNodeCache[assignment] = boundNode;
+                        operation = (IAkcssOperation)_operationFactory.CreateOperation(boundNode)!;
+                        _operationCache[assignment] = operation;
+                    }
+
                     builder.Add(operation);
                     break;
                 }
@@ -810,8 +823,15 @@ internal sealed partial class AkburaSemanticModel
                 case AkburaSyntaxKind.AkcssIfDirectiveSyntax:
                 {
                     var ifDirective = Unsafe.As<AkcssIfDirectiveSyntax>(member);
-                    var ifOperation = CreateAkcssIfOperation(ifDirective, containingSymbol);
-                    _operationCache[ifDirective] = ifOperation;
+                    if (!_operationCache.TryGetValue(ifDirective, out var cachedOperation) ||
+                        cachedOperation is not IAkcssOperation ifOperation)
+                    {
+                        var boundNode = CreateBoundAkcssIf(ifDirective, containingSymbol);
+                        _boundNodeCache[ifDirective] = boundNode;
+                        ifOperation = (IAkcssOperation)_operationFactory.CreateOperation(boundNode)!;
+                        _operationCache[ifDirective] = ifOperation;
+                    }
+
                     builder.Add(ifOperation);
                     break;
                 }
@@ -819,8 +839,15 @@ internal sealed partial class AkburaSemanticModel
                 case AkburaSyntaxKind.AkcssApplyDirectiveSyntax:
                 {
                     var applyDirective = Unsafe.As<AkcssApplyDirectiveSyntax>(member);
-                    var applyOperation = CreateAkcssApplyOperation(applyDirective, containingSymbol);
-                    _operationCache[applyDirective] = applyOperation;
+                    if (!_operationCache.TryGetValue(applyDirective, out var cachedOperation) ||
+                        cachedOperation is not IAkcssOperation applyOperation)
+                    {
+                        var boundNode = CreateBoundAkcssApply(applyDirective, containingSymbol);
+                        _boundNodeCache[applyDirective] = boundNode;
+                        applyOperation = (IAkcssOperation)_operationFactory.CreateOperation(boundNode)!;
+                        _operationCache[applyDirective] = applyOperation;
+                    }
+
                     builder.Add(applyOperation);
                     break;
                 }
@@ -828,8 +855,14 @@ internal sealed partial class AkburaSemanticModel
                 case AkburaSyntaxKind.AkcssInterceptDirectiveSyntax:
                 {
                     var interceptDirective = Unsafe.As<AkcssInterceptDirectiveSyntax>(member);
-                    var interceptOperation = (IAkcssInterceptOperation?)_operationCache[interceptDirective] ??
-                        CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
+                    var interceptOperation = (IAkcssInterceptOperation?)_operationCache[interceptDirective];
+                    if (interceptOperation == null)
+                    {
+                        var boundNode = CreateBoundAkcssIntercept(interceptDirective, containingSymbol);
+                        _boundNodeCache[interceptDirective] = boundNode;
+                        interceptOperation = (IAkcssInterceptOperation)_operationFactory.CreateOperation(boundNode)!;
+                    }
+
                     _operationCache[interceptDirective] = interceptOperation;
                     builder.Add(interceptOperation);
                     break;
@@ -840,87 +873,145 @@ internal sealed partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private AkburaOperation? ResolveAkcssPropertySetterOperation(AkcssAssignmentSyntax assignment)
+    private ImmutableArray<BoundAkcssOperation> CreateAkcssBoundOperations(
+        Akbura.Language.Syntax.SyntaxList<AkcssBodyMemberSyntax> members,
+        IAkcssSymbol containingSymbol)
+    {
+        using var builder = ImmutableArrayBuilder<BoundAkcssOperation>.Rent();
+        foreach (var member in members)
+        {
+            BoundNode? boundNode = member.Kind switch
+            {
+                AkburaSyntaxKind.AkcssAssignmentSyntax =>
+                    CreateBoundAkcssPropertySetter(
+                        Unsafe.As<AkcssAssignmentSyntax>(member),
+                        containingSymbol),
+                AkburaSyntaxKind.AkcssIfDirectiveSyntax =>
+                    CreateBoundAkcssIf(
+                        Unsafe.As<AkcssIfDirectiveSyntax>(member),
+                        containingSymbol),
+                AkburaSyntaxKind.AkcssApplyDirectiveSyntax =>
+                    CreateBoundAkcssApply(
+                        Unsafe.As<AkcssApplyDirectiveSyntax>(member),
+                        containingSymbol),
+                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax =>
+                    CreateBoundAkcssIntercept(
+                        Unsafe.As<AkcssInterceptDirectiveSyntax>(member),
+                        containingSymbol),
+                _ => null,
+            };
+
+            if (boundNode is BoundAkcssOperation operation)
+            {
+                builder.Add(operation);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    internal BoundNode BindAkcssPropertySetterOperation(AkcssAssignmentSyntax assignment)
     {
         var containingSymbol = GetContainingAkcssSymbol(assignment);
         if (containingSymbol == null)
         {
             SetSemanticDiagnostics(assignment, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-            return null;
+            return new BoundDeclaration(
+                assignment,
+                GetBinder(assignment, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.NotFound));
         }
 
-        if (_operationCache.TryGetValue(assignment, out var cachedOperation))
+        if (_boundNodeCache.TryGetValue(assignment, out var cachedBoundNode))
         {
-            return cachedOperation;
+            return cachedBoundNode;
         }
 
         if (TrySuppressAkcssOperationDueToIntercept(assignment, containingSymbol))
         {
-            return null;
+            return new BoundDeclaration(
+                assignment,
+                GetBinder(assignment, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.None));
         }
 
-        return CreateAkcssPropertySetterOperation(assignment, containingSymbol);
+        return CreateBoundAkcssPropertySetter(assignment, containingSymbol);
     }
 
-    private AkburaOperation? ResolveAkcssIfOperation(AkcssIfDirectiveSyntax ifDirective)
+    internal BoundNode BindAkcssIfOperation(AkcssIfDirectiveSyntax ifDirective)
     {
         var containingSymbol = GetContainingAkcssSymbol(ifDirective);
         if (containingSymbol == null)
         {
             SetSemanticDiagnostics(ifDirective, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-            return null;
+            return new BoundDeclaration(
+                ifDirective,
+                GetBinder(ifDirective, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.NotFound));
         }
 
-        if (_operationCache.TryGetValue(ifDirective, out var cachedOperation))
+        if (_boundNodeCache.TryGetValue(ifDirective, out var cachedBoundNode))
         {
-            return cachedOperation;
+            return cachedBoundNode;
         }
 
         if (TrySuppressAkcssOperationDueToIntercept(ifDirective, containingSymbol))
         {
-            return null;
+            return new BoundDeclaration(
+                ifDirective,
+                GetBinder(ifDirective, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.None));
         }
 
-        return CreateAkcssIfOperation(ifDirective, containingSymbol);
+        return CreateBoundAkcssIf(ifDirective, containingSymbol);
     }
 
-    private AkburaOperation? ResolveAkcssApplyOperation(AkcssApplyDirectiveSyntax applyDirective)
+    internal BoundNode BindAkcssApplyOperation(AkcssApplyDirectiveSyntax applyDirective)
     {
         var containingSymbol = GetContainingAkcssSymbol(applyDirective);
         if (containingSymbol == null)
         {
             SetSemanticDiagnostics(applyDirective, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-            return null;
+            return new BoundDeclaration(
+                applyDirective,
+                GetBinder(applyDirective, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.NotFound));
         }
 
-        if (_operationCache.TryGetValue(applyDirective, out var cachedOperation))
+        if (_boundNodeCache.TryGetValue(applyDirective, out var cachedBoundNode))
         {
-            return cachedOperation;
+            return cachedBoundNode;
         }
 
         if (TrySuppressAkcssOperationDueToIntercept(applyDirective, containingSymbol))
         {
-            return null;
+            return new BoundDeclaration(
+                applyDirective,
+                GetBinder(applyDirective, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.None));
         }
 
-        return CreateAkcssApplyOperation(applyDirective, containingSymbol);
+        return CreateBoundAkcssApply(applyDirective, containingSymbol);
     }
 
-    private AkburaOperation? ResolveAkcssInterceptOperation(AkcssInterceptDirectiveSyntax interceptDirective)
+    internal BoundNode BindAkcssInterceptOperation(AkcssInterceptDirectiveSyntax interceptDirective)
     {
         var containingSymbol = GetContainingAkcssSymbol(interceptDirective);
         if (containingSymbol == null)
         {
             SetSemanticDiagnostics(interceptDirective, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-            return null;
+            return new BoundDeclaration(
+                interceptDirective,
+                GetBinder(interceptDirective, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.NotFound));
         }
 
-        if (_operationCache.TryGetValue(interceptDirective, out var cachedOperation))
+        if (_boundNodeCache.TryGetValue(interceptDirective, out var cachedBoundNode))
         {
-            return cachedOperation;
+            return cachedBoundNode;
         }
 
-        return CreateAkcssInterceptOperation(interceptDirective, containingSymbol);
+        return CreateBoundAkcssIntercept(interceptDirective, containingSymbol);
     }
 
     private IAkcssSymbol? GetContainingAkcssSymbol(AkburaSyntax syntax)
@@ -1003,7 +1094,7 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
-    private AkcssIfOperation CreateAkcssIfOperation(
+    private BoundAkcssIf CreateBoundAkcssIf(
         AkcssIfDirectiveSyntax ifDirective,
         IAkcssSymbol containingSymbol)
     {
@@ -1014,7 +1105,7 @@ internal sealed partial class AkburaSemanticModel
         var conditionType = binding.TypeSymbol == null
             ? default
             : new CSharpSymbolDefinition(binding.TypeSymbol);
-        var operations = CreateAkcssOperations(ifDirective.Members, containingSymbol);
+        var operations = CreateAkcssBoundOperations(ifDirective.Members, containingSymbol);
 
         using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
         AddAkcssExpressionDiagnostics(
@@ -1025,18 +1116,20 @@ internal sealed partial class AkburaSemanticModel
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(ifDirective, diagnostics);
 
-        return new AkcssIfOperation(
+        return new BoundAkcssIf(
             ifDirective,
+            GetBinder(ifDirective, BinderUsage.Akcss),
             containingSymbol,
             conditionType,
             binding.OperationDefinition,
             operations,
+            diagnostics,
             hasErrors: expression == null ||
                 diagnostics.Length > 0 ||
                 operations.Any(static operation => operation.HasErrors));
     }
 
-    private AkcssApplyOperation CreateAkcssApplyOperation(
+    private BoundAkcssApply CreateBoundAkcssApply(
         AkcssApplyDirectiveSyntax applyDirective,
         IAkcssSymbol containingSymbol)
     {
@@ -1057,15 +1150,17 @@ internal sealed partial class AkburaSemanticModel
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(applyDirective, diagnostics);
 
-        return new AkcssApplyOperation(
+        return new BoundAkcssApply(
             applyDirective,
+            GetBinder(applyDirective, BinderUsage.Akcss),
             containingSymbol,
             itemsBuilder.ToImmutable(),
             symbolsBuilder.ToImmutable(),
+            diagnostics,
             hasErrors: diagnostics.Length > 0);
     }
 
-    private AkcssInterceptOperation CreateAkcssInterceptOperation(
+    private BoundAkcssIntercept CreateBoundAkcssIntercept(
         AkcssInterceptDirectiveSyntax interceptDirective,
         IAkcssSymbol containingSymbol)
     {
@@ -1104,14 +1199,16 @@ internal sealed partial class AkburaSemanticModel
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(interceptDirective, diagnostics);
 
-        return new AkcssInterceptOperation(
+        return new BoundAkcssIntercept(
             interceptDirective,
+            GetBinder(interceptDirective, BinderUsage.Akcss),
             containingSymbol,
             interceptType,
+            diagnostics,
             hasErrors: diagnostics.Length > 0);
     }
 
-    private AkcssPropertySetterOperation CreateAkcssPropertySetterOperation(
+    private BoundAkcssPropertySetter CreateBoundAkcssPropertySetter(
         AkcssAssignmentSyntax assignment,
         IAkcssSymbol containingSymbol)
     {
@@ -1264,8 +1361,9 @@ internal sealed partial class AkburaSemanticModel
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(assignment, diagnostics);
 
-        return new AkcssPropertySetterOperation(
+        return new BoundAkcssPropertySetter(
             assignment,
+            GetBinder(assignment, BinderUsage.Akcss),
             containingSymbol,
             property,
             valueType,
@@ -1273,6 +1371,7 @@ internal sealed partial class AkburaSemanticModel
             valueKind,
             requiresBrushConversion,
             convertedValue,
+            diagnostics,
             property == null || valueKind == AkcssPropertyValueKind.Error || diagnostics.Length > 0);
     }
 

@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -17,7 +18,8 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
         AkcssPropertyValueKind valueKind,
         bool requiresBrushConversion,
         object? convertedValue,
-        bool hasErrors)
+        bool hasErrors,
+        ICSharpOperation? valueOperationTree = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingAkcssSymbol = containingAkcssSymbol ?? throw new ArgumentNullException(nameof(containingAkcssSymbol));
@@ -28,6 +30,11 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
         RequiresBrushConversion = requiresBrushConversion;
         ConvertedValue = convertedValue;
         HasErrors = hasErrors;
+        ValueOperationTree = valueOperationTree;
+        AdoptCSharpOperationTree(ValueOperationTree);
+        Children = ValueOperationTree == null
+            ? ImmutableArray<IOperation>.Empty
+            : ImmutableArray.Create<IOperation>(ValueOperationTree);
     }
 
     public OperationKind Kind => OperationKind.AkcssAssignment;
@@ -40,7 +47,7 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
 
     public IOperation? Parent => null;
 
-    public ImmutableArray<IOperation> Children => ImmutableArray<IOperation>.Empty;
+    public ImmutableArray<IOperation> Children { get; }
 
     public ISymbol? TargetSymbol => Property;
 
@@ -61,6 +68,8 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
     public CSharpSymbolDefinition ValueType { get; }
 
     public CSharpOperationDefinition ValueOperation { get; }
+
+    public ICSharpOperation? ValueOperationTree { get; }
 
     public AkcssPropertyValueKind ValueKind { get; }
 
@@ -106,5 +115,13 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
     public override string ToString()
     {
         return ToDisplayString();
+    }
+
+    private void AdoptCSharpOperationTree(ICSharpOperation? operation)
+    {
+        if (operation is CSharpOperation csharpOperation)
+        {
+            csharpOperation.SetParent(this);
+        }
     }
 }

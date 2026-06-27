@@ -476,6 +476,32 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
+    internal Func<RoslynSymbol, AkburaSymbol?> CreateCSharpOperationSymbolMapper(
+        IAkcssSymbol? containingAkcssSymbol = null)
+    {
+        var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
+        var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
+        AddCSharpProbeRootSymbolMappings(
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+
+        if (containingAkcssSymbol is ITailwindUtilitySymbol utility)
+        {
+            foreach (var parameter in utility.Parameters)
+            {
+                if (!string.IsNullOrWhiteSpace(parameter.Name))
+                {
+                    akburaSymbolsByName[parameter.Name] = parameter;
+                }
+            }
+        }
+
+        return symbol => TryGetReferencedAkburaSymbol(
+            symbol,
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+    }
+
     private static void AddCSharpProbeRootSymbolMapping(
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
         string name,
@@ -742,6 +768,12 @@ internal sealed partial class AkburaSemanticModel
 
         if (csharpSymbol is IFieldSymbol field &&
             akburaSymbolsByName.TryGetValue(field.Name, out symbol))
+        {
+            return symbol;
+        }
+
+        if (csharpSymbol is IParameterSymbol parameter &&
+            akburaSymbolsByName.TryGetValue(parameter.Name, out symbol))
         {
             return symbol;
         }

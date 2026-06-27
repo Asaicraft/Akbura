@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

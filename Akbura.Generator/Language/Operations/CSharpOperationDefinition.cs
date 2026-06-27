@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using RoslynIOperation = Microsoft.CodeAnalysis.IOperation;
 using RoslynOperationKind = Microsoft.CodeAnalysis.OperationKind;
 
-namespace Akbura.Language.Operations;
+namespace Akbura.Language.Binder;
 
 internal readonly struct CSharpOperationDefinition
 {

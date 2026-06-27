@@ -1,5 +1,4 @@
 using BinderType = Akbura.Language.Binder.Binder;
-using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -20,7 +19,6 @@ internal sealed class BoundConversionExpression : BoundExpression
             syntax,
             binder,
             operand.SymbolInfo,
-            operand.Operation,
             diagnostics,
             ImmutableArray.Create<BoundNode>(operand),
             hasErrors: !conversion.Exists)

@@ -1,31 +1,38 @@
 using BinderType = Akbura.Language.Binder.Binder;
-using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
 
 namespace Akbura.Language.BoundTree;
 
-internal sealed class BoundDeclaration : BoundNode
+internal class BoundDeclaration : BoundNode
 {
     public BoundDeclaration(
         AkburaSyntax syntax,
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
-        IOperation? operation,
-        ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
         ImmutableArray<BoundNode> children = default)
-        : base(BoundKind.Declaration, syntax, binder, symbolInfo, operation, diagnostics, children)
+        : this(BoundKind.Declaration, syntax, binder, symbolInfo, diagnostics, children)
+    {
+    }
+
+    protected BoundDeclaration(
+        BoundKind kind,
+        AkburaSyntax syntax,
+        BinderType binder,
+        AkburaSymbolInfo symbolInfo,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
+        ImmutableArray<BoundNode> children = default)
+        : base(kind, syntax, binder, symbolInfo, diagnostics, children)
     {
     }
 
     public BoundDeclaration Update(
         AkburaSymbolInfo symbolInfo,
-        IOperation? operation,
         ImmutableArray<BoundNode> children)
     {
         if (symbolInfo.Equals(SymbolInfo) &&
-            ReferenceEquals(operation, Operation) &&
             children == Children)
         {
             return this;
@@ -35,7 +42,6 @@ internal sealed class BoundDeclaration : BoundNode
             Syntax,
             Binder,
             symbolInfo,
-            operation,
             Diagnostics,
             children);
     }

@@ -14,6 +14,11 @@ internal abstract class OperationVisitor<TParameter, TResult>
             : operation.Accept(this, parameter);
     }
 
+    public virtual TResult? VisitCSharpOperation(
+        ICSharpOperation operation,
+        TParameter parameter) =>
+        DefaultVisit(operation, parameter);
+
     public virtual TResult? VisitAkcssPropertySetter(
         IAkcssPropertySetterOperation operation,
         TParameter parameter) =>

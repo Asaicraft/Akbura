@@ -1,5 +1,7 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System;
 using System.Collections.Immutable;
 using System.Linq;
@@ -17,7 +19,8 @@ internal sealed class AkcssIfOperation : IAkcssIfOperation
         CSharpSymbolDefinition conditionType,
         CSharpOperationDefinition conditionOperation,
         ImmutableArray<IAkcssOperation> operations,
-        bool hasErrors)
+        bool hasErrors,
+        ICSharpOperation? conditionOperationTree = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingAkcssSymbol = containingAkcssSymbol ?? throw new ArgumentNullException(nameof(containingAkcssSymbol));
@@ -27,10 +30,22 @@ internal sealed class AkcssIfOperation : IAkcssIfOperation
             ? ImmutableArray<IAkcssOperation>.Empty
             : operations;
         HasErrors = hasErrors;
+        ConditionOperationTree = conditionOperationTree;
+        AdoptCSharpOperationTree(ConditionOperationTree);
 
-        _children = Operations
-            .Cast<IOperation>()
-            .ToImmutableArray();
+        var builder = ArrayBuilder<IOperation>.GetInstance(
+            (ConditionOperationTree == null ? 0 : 1) + Operations.Length);
+        if (ConditionOperationTree != null)
+        {
+            builder.Add(ConditionOperationTree);
+        }
+
+        foreach (var operation in Operations)
+        {
+            builder.Add(operation);
+        }
+
+        _children = builder.ToImmutableAndFree();
     }
 
     public OperationKind Kind => OperationKind.AkcssIf;
@@ -64,6 +79,8 @@ internal sealed class AkcssIfOperation : IAkcssIfOperation
     public CSharpSymbolDefinition ConditionType { get; }
 
     public CSharpOperationDefinition ConditionOperation { get; }
+
+    public ICSharpOperation? ConditionOperationTree { get; }
 
     public ImmutableArray<IAkcssOperation> Operations { get; }
 
@@ -103,5 +120,13 @@ internal sealed class AkcssIfOperation : IAkcssIfOperation
     public override string ToString()
     {
         return ToDisplayString();
+    }
+
+    private void AdoptCSharpOperationTree(ICSharpOperation? operation)
+    {
+        if (operation is CSharpOperation csharpOperation)
+        {
+            csharpOperation.SetParent(this);
+        }
     }
 }

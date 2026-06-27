@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 
@@ -10,13 +11,15 @@ internal readonly struct TailwindUtilityArgument
         string text,
         CSharpSymbolDefinition type,
         CSharpOperationDefinition valueOperation,
-        object? constantValue)
+        object? constantValue,
+        ICSharpOperation? valueOperationTree = null)
     {
         Syntax = syntax;
         Text = text;
         Type = type;
         ValueOperation = valueOperation;
         ConstantValue = constantValue;
+        ValueOperationTree = valueOperationTree;
     }
 
     public TailwindSegmentSyntax Syntax { get; }
@@ -27,5 +30,18 @@ internal readonly struct TailwindUtilityArgument
 
     public CSharpOperationDefinition ValueOperation { get; }
 
+    public ICSharpOperation? ValueOperationTree { get; }
+
     public object? ConstantValue { get; }
+
+    public TailwindUtilityArgument WithValueOperationTree(ICSharpOperation? valueOperationTree)
+    {
+        return new TailwindUtilityArgument(
+            Syntax,
+            Text,
+            Type,
+            ValueOperation,
+            ConstantValue,
+            valueOperationTree);
+    }
 }

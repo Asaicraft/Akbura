@@ -16,32 +16,34 @@ using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using AkburaOperation = Akbura.Language.Operations.IOperation;
 
 namespace Akbura.Language;
 
 internal sealed partial class AkburaSemanticModel
 {
-    private AkburaOperation? ResolveMarkupAttributeOperation(MarkupAttributeSyntax markupAttribute)
+    internal BoundNode BindMarkupAttributeOperation(MarkupAttributeSyntax markupAttribute)
     {
         return markupAttribute.Kind switch
         {
             AkburaSyntaxKind.TailwindFlagAttributeSyntax or
-            AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveTailwindUtilityAttributeOperation(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
+            AkburaSyntaxKind.TailwindFullAttributeSyntax => BindTailwindUtilityAttributeOperation(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
-            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => ResolveMarkupPropertyOrEventOperation(markupAttribute),
-            _ => null,
+            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => BindMarkupPropertyOrEventOperation(markupAttribute),
+            _ => new BoundDeclaration(
+                markupAttribute,
+                GetBinder(markupAttribute, BinderUsage.Expression),
+                AkburaSymbolInfo.None(Symbols.CandidateReason.UnsupportedSyntax)),
         };
     }
 
-    private AkburaOperation? ResolveMarkupPropertyOrEventOperation(MarkupAttributeSyntax markupAttribute)
+    private BoundNode BindMarkupPropertyOrEventOperation(MarkupAttributeSyntax markupAttribute)
     {
         return GetSymbolInfo(markupAttribute).Symbol is IRoutedEventSymbol routedEvent
-            ? ResolveMarkupRoutedEventBindingOperation(markupAttribute, routedEvent)
-            : ResolveMarkupPropertySetterOperation(markupAttribute);
+            ? BindMarkupRoutedEventBindingOperation(markupAttribute, routedEvent)
+            : BindMarkupPropertySetterOperation(markupAttribute);
     }
 
-    private AkburaOperation? ResolveMarkupPropertySetterOperation(MarkupAttributeSyntax markupAttribute)
+    private BoundNode BindMarkupPropertySetterOperation(MarkupAttributeSyntax markupAttribute)
     {
         var propertyInfo = GetSymbolInfo(markupAttribute);
         var property = propertyInfo.Symbol as Symbols.IPropertySymbol;
@@ -143,8 +145,9 @@ internal sealed partial class AkburaSemanticModel
 
         if (property?.Command is { } command)
         {
-            return new MarkupCommandBindingOperation(
+            return new BoundMarkupCommandBinding(
                 markupAttribute,
+                GetBinder(markupAttribute, BinderUsage.Expression),
                 containingComponent,
                 property,
                 command,
@@ -160,11 +163,13 @@ internal sealed partial class AkburaSemanticModel
                 commandHandler.Type,
                 commandHandler.ResultType,
                 commandHandler.Operation,
+                diagnostics,
                 valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
         }
 
-        return new MarkupPropertySetterOperation(
+        return new BoundMarkupPropertySetter(
             markupAttribute,
+            GetBinder(markupAttribute, BinderUsage.Expression),
             containingComponent,
             property,
             valueType,
@@ -173,10 +178,11 @@ internal sealed partial class AkburaSemanticModel
             valueKind,
             valueSyntax,
             literalValue,
+            diagnostics,
             property == null || valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
     }
 
-    private AkburaOperation ResolveMarkupRoutedEventBindingOperation(
+    private BoundNode BindMarkupRoutedEventBindingOperation(
         MarkupAttributeSyntax markupAttribute,
         IRoutedEventSymbol routedEvent)
     {
@@ -218,8 +224,9 @@ internal sealed partial class AkburaSemanticModel
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(markupAttribute, diagnostics);
 
-        return new MarkupRoutedEventBindingOperation(
+        return new BoundMarkupRoutedEventBinding(
             markupAttribute,
+            GetBinder(markupAttribute, BinderUsage.Expression),
             containingComponent,
             routedEvent,
             bindingKind,
@@ -231,12 +238,13 @@ internal sealed partial class AkburaSemanticModel
             handler.IsAsync,
             handler.ContainsAwait,
             handler.Operation,
+            diagnostics,
             valueKind != MarkupAttributeValueKind.DynamicExpression ||
                 handler.Kind == MarkupCommandHandlerKind.Error ||
                 diagnostics.Length > 0);
     }
 
-    private AkburaOperation ResolveTailwindUtilityAttributeOperation(TailwindAttributeSyntax attribute)
+    private BoundNode BindTailwindUtilityAttributeOperation(TailwindAttributeSyntax attribute)
     {
         using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
 
@@ -258,8 +266,9 @@ internal sealed partial class AkburaSemanticModel
         var diagnostics = diagnosticsBuilder.ToImmutable();
         SetSemanticDiagnostics(attribute, diagnostics);
 
-        return new TailwindUtilityAttributeOperation(
+        return new BoundTailwindUtilityAttribute(
             attribute,
+            GetBinder(attribute, BinderUsage.Expression),
             containingComponent,
             utilityName,
             utility,
@@ -268,16 +277,17 @@ internal sealed partial class AkburaSemanticModel
             condition.Text,
             condition.Type,
             condition.Operation,
+            diagnostics,
             hasErrors: utility == null || diagnostics.Length > 0 || componentName.Length == 0);
     }
 
     private ITailwindUtilitySymbol? ResolveTailwindUtilityForAttribute(
         TailwindAttributeSyntax attribute,
         string utilityName,
-        ImmutableArray<TailwindUtilityArgument> arguments,
+        ImmutableArray<BoundTailwindUtilityArgument> arguments,
         IMarkupComponentSymbol? containingComponent,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        out ImmutableArray<TailwindUtilityArgument> validatedArguments)
+        out ImmutableArray<BoundTailwindUtilityArgument> validatedArguments)
     {
         validatedArguments = arguments;
         var localCandidates = FindTailwindUtilityCandidates(
@@ -366,9 +376,9 @@ internal sealed partial class AkburaSemanticModel
     private ITailwindUtilitySymbol? ValidateTailwindUtilityArguments(
         TailwindAttributeSyntax attribute,
         ITailwindUtilitySymbol utility,
-        ImmutableArray<TailwindUtilityArgument> arguments,
+        ImmutableArray<BoundTailwindUtilityArgument> arguments,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        out ImmutableArray<TailwindUtilityArgument> validatedArguments)
+        out ImmutableArray<BoundTailwindUtilityArgument> validatedArguments)
     {
         validatedArguments = arguments;
         if (utility.Parameters.Length != arguments.Length)
@@ -380,7 +390,7 @@ internal sealed partial class AkburaSemanticModel
             return null;
         }
 
-        using var validatedBuilder = ImmutableArrayBuilder<TailwindUtilityArgument>.Rent(arguments.Length);
+        using var validatedBuilder = ImmutableArrayBuilder<BoundTailwindUtilityArgument>.Rent(arguments.Length);
         for (var i = 0; i < arguments.Length; i++)
         {
             var argument = arguments[i];
@@ -420,9 +430,9 @@ internal sealed partial class AkburaSemanticModel
     }
 
     private bool TryCreateEnumTailwindUtilityArgument(
-        TailwindUtilityArgument argument,
+        BoundTailwindUtilityArgument argument,
         ITypeSymbol parameterType,
-        out TailwindUtilityArgument enumArgument)
+        out BoundTailwindUtilityArgument enumArgument)
     {
         enumArgument = default;
         if (parameterType is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType ||
@@ -458,7 +468,7 @@ internal sealed partial class AkburaSemanticModel
             ? CSharpBindingResult.Empty
             : BindMarkupAttributeExpression(argument.Syntax, expression);
 
-        enumArgument = new TailwindUtilityArgument(
+        enumArgument = new BoundTailwindUtilityArgument(
             argument.Syntax,
             argument.Text,
             new CSharpSymbolDefinition(enumType),
@@ -1918,20 +1928,20 @@ internal sealed partial class AkburaSemanticModel
         };
     }
 
-    private ImmutableArray<TailwindUtilityArgument> CreateTailwindUtilityArguments(TailwindAttributeSyntax attribute)
+    private ImmutableArray<BoundTailwindUtilityArgument> CreateTailwindUtilityArguments(TailwindAttributeSyntax attribute)
     {
         if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
         {
-            return ImmutableArray<TailwindUtilityArgument>.Empty;
+            return ImmutableArray<BoundTailwindUtilityArgument>.Empty;
         }
 
         var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
         if (fullAttribute.Segments.Count == 0)
         {
-            return ImmutableArray<TailwindUtilityArgument>.Empty;
+            return ImmutableArray<BoundTailwindUtilityArgument>.Empty;
         }
 
-        using var builder = ImmutableArrayBuilder<TailwindUtilityArgument>.Rent();
+        using var builder = ImmutableArrayBuilder<BoundTailwindUtilityArgument>.Rent();
         foreach (var segment in fullAttribute.Segments)
         {
             builder.Add(CreateTailwindUtilityArgument(segment));
@@ -1942,7 +1952,7 @@ internal sealed partial class AkburaSemanticModel
 
     private void AddTailwindExpressionDiagnostics(
         TailwindAttributeSyntax attribute,
-        ImmutableArray<TailwindUtilityArgument> arguments,
+        ImmutableArray<BoundTailwindUtilityArgument> arguments,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
@@ -1984,13 +1994,13 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
-    private static bool IsConvertedEnumTailwindUtilityArgument(TailwindUtilityArgument argument)
+    private static bool IsConvertedEnumTailwindUtilityArgument(BoundTailwindUtilityArgument argument)
     {
         return argument.Type.Symbol is INamedTypeSymbol { TypeKind: TypeKind.Enum } &&
             argument.ConstantValue != null;
     }
 
-    private TailwindUtilityArgument CreateTailwindUtilityArgument(TailwindSegmentSyntax segment)
+    private BoundTailwindUtilityArgument CreateTailwindUtilityArgument(TailwindSegmentSyntax segment)
     {
         CSharp.ExpressionSyntax? expression = segment.Kind switch
         {
@@ -2008,7 +2018,7 @@ internal sealed partial class AkburaSemanticModel
             ? CSharpBindingResult.Empty
             : BindMarkupAttributeExpression(segment, expression);
 
-        return new TailwindUtilityArgument(
+        return new BoundTailwindUtilityArgument(
             segment,
             segment.ToFullString().Trim(),
             binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol),

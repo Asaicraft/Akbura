@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -18,7 +19,8 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
         string? literalValue,
-        bool hasErrors)
+        bool hasErrors,
+        ICSharpOperation? valueOperationTree = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
@@ -30,6 +32,11 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         ValueSyntax = valueSyntax;
         LiteralValue = literalValue;
         HasErrors = hasErrors;
+        ValueOperationTree = valueOperationTree;
+        AdoptCSharpOperationTree(ValueOperationTree);
+        Children = ValueOperationTree == null
+            ? ImmutableArray<IOperation>.Empty
+            : ImmutableArray.Create<IOperation>(ValueOperationTree);
     }
 
     public OperationKind Kind => OperationKind.MarkupAttribute;
@@ -42,7 +49,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
 
     public IOperation? Parent => null;
 
-    public ImmutableArray<IOperation> Children => ImmutableArray<IOperation>.Empty;
+    public ImmutableArray<IOperation> Children { get; }
 
     public ISymbol? TargetSymbol => Property;
 
@@ -63,6 +70,8 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
     public CSharpSymbolDefinition ValueType { get; }
 
     public CSharpOperationDefinition ValueOperation { get; }
+
+    public ICSharpOperation? ValueOperationTree { get; }
 
     public MarkupAttributeBindingKind BindingKind { get; }
 
@@ -110,5 +119,13 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
     public override string ToString()
     {
         return ToDisplayString();
+    }
+
+    private void AdoptCSharpOperationTree(ICSharpOperation? operation)
+    {
+        if (operation is CSharpOperation csharpOperation)
+        {
+            csharpOperation.SetParent(this);
+        }
     }
 }

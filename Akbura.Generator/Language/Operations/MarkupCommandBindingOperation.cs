@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -25,7 +26,8 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
         CSharpSymbolDefinition handlerType,
         CSharpSymbolDefinition handlerResultType,
         CSharpOperationDefinition handlerOperation,
-        bool hasErrors)
+        bool hasErrors,
+        ICSharpOperation? handlerOperationTree = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
@@ -44,6 +46,11 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
         HandlerResultType = handlerResultType;
         HandlerOperation = handlerOperation;
         HasErrors = hasErrors;
+        HandlerOperationTree = handlerOperationTree;
+        AdoptCSharpOperationTree(HandlerOperationTree);
+        Children = HandlerOperationTree == null
+            ? ImmutableArray<IOperation>.Empty
+            : ImmutableArray.Create<IOperation>(HandlerOperationTree);
     }
 
     public OperationKind Kind => OperationKind.MarkupCommandBinding;
@@ -56,7 +63,7 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
 
     public IOperation? Parent => null;
 
-    public ImmutableArray<IOperation> Children => ImmutableArray<IOperation>.Empty;
+    public ImmutableArray<IOperation> Children { get; }
 
     public ISymbol? TargetSymbol => Command;
 
@@ -106,6 +113,8 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
 
     public CSharpOperationDefinition HandlerOperation { get; }
 
+    public ICSharpOperation? HandlerOperationTree { get; }
+
     public void Accept(OperationVisitor visitor)
     {
         visitor.VisitMarkupCommandBinding(this);
@@ -142,5 +151,13 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
     public override string ToString()
     {
         return ToDisplayString();
+    }
+
+    private void AdoptCSharpOperationTree(ICSharpOperation? operation)
+    {
+        if (operation is CSharpOperation csharpOperation)
+        {
+            csharpOperation.SetParent(this);
+        }
     }
 }

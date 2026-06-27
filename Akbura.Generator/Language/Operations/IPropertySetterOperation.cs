@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 
 namespace Akbura.Language.Operations;
@@ -9,4 +10,6 @@ internal interface IPropertySetterOperation : IOperation
     CSharpSymbolDefinition ValueType { get; }
 
     CSharpOperationDefinition ValueOperation { get; }
+
+    ICSharpOperation? ValueOperationTree { get; }
 }

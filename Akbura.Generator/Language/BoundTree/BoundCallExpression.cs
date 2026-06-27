@@ -23,7 +23,6 @@ internal sealed class BoundCallExpression : BoundExpression
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
-            operation: null,
             diagnostics,
             BuildChildren(receiver, arguments),
             hasErrors: bindingResult.Diagnostics.Length != 0)

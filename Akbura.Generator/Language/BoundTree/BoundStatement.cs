@@ -1,5 +1,4 @@
 using BinderType = Akbura.Language.Binder.Binder;
-using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
@@ -13,11 +12,10 @@ internal abstract class BoundStatement : BoundNode
         AkburaSyntax syntax,
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
-        IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default,
         bool hasErrors = false)
-        : base(kind, syntax, binder, symbolInfo, operation, diagnostics, children, hasErrors)
+        : base(kind, syntax, binder, symbolInfo, diagnostics, children, hasErrors)
     {
     }
 

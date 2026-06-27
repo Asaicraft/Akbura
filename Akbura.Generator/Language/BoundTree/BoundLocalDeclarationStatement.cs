@@ -22,7 +22,6 @@ internal sealed class BoundLocalDeclarationStatement : BoundStatement
             syntax,
             binder,
             AkburaSymbolInfo.None(bindingResult.CandidateReason),
-            operation: null,
             diagnostics,
             BuildChildren(initializers),
             hasErrors: bindingResult.Diagnostics.Length != 0)

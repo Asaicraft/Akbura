@@ -1,5 +1,4 @@
 using BinderType = Akbura.Language.Binder.Binder;
-using AkburaOperation = Akbura.Language.Operations.IOperation;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -13,7 +12,6 @@ internal class BoundExpression : BoundNode
         AkburaSyntax syntax,
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
-        AkburaOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default,
         bool hasErrors = false)
@@ -22,7 +20,6 @@ internal class BoundExpression : BoundNode
             syntax,
             binder,
             symbolInfo,
-            operation,
             diagnostics,
             children,
             hasErrors)
@@ -34,11 +31,10 @@ internal class BoundExpression : BoundNode
         AkburaSyntax syntax,
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
-        AkburaOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default,
         bool hasErrors = false)
-        : base(kind, syntax, binder, symbolInfo, operation, diagnostics, children, hasErrors)
+        : base(kind, syntax, binder, symbolInfo, diagnostics, children, hasErrors)
     {
     }
 
@@ -46,11 +42,9 @@ internal class BoundExpression : BoundNode
 
     public BoundExpression Update(
         AkburaSymbolInfo symbolInfo,
-        AkburaOperation? operation,
         ImmutableArray<BoundNode> children)
     {
         if (symbolInfo.Equals(SymbolInfo) &&
-            ReferenceEquals(operation, Operation) &&
             children == Children)
         {
             return this;
@@ -60,7 +54,6 @@ internal class BoundExpression : BoundNode
             Syntax,
             Binder,
             symbolInfo,
-            operation,
             Diagnostics,
             children);
     }

@@ -1,4 +1,4 @@
-namespace Akbura.Language.Operations;
+namespace Akbura.Language.Binder;
 
 internal enum MarkupCommandHandlerKind
 {

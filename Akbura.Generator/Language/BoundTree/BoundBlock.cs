@@ -1,5 +1,4 @@
 using BinderType = Akbura.Language.Binder.Binder;
-using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
@@ -20,7 +19,6 @@ internal sealed class BoundBlock : BoundStatement
             syntax,
             binder,
             AkburaSymbolInfo.None(CandidateReason.None),
-            operation: null,
             diagnostics,
             statements)
     {

@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 
@@ -28,4 +29,6 @@ internal interface IMarkupRoutedEventBindingOperation : IMarkupAttributeOperatio
     CSharpSymbolDefinition EventArgsType { get; }
 
     CSharpOperationDefinition HandlerOperation { get; }
+
+    ICSharpOperation? HandlerOperationTree { get; }
 }

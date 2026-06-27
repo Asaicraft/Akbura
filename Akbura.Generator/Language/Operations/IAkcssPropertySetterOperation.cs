@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
 
 namespace Akbura.Language.Operations;

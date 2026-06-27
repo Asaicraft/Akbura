@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using System.Collections.Immutable;
 
@@ -18,4 +19,6 @@ internal interface ITailwindUtilityAttributeOperation : IMarkupAttributeOperatio
     CSharpSymbolDefinition ConditionType { get; }
 
     CSharpOperationDefinition ConditionOperation { get; }
+
+    ICSharpOperation? ConditionOperationTree { get; }
 }

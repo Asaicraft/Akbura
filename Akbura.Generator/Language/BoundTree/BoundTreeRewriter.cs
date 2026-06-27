@@ -63,14 +63,47 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
     {
         var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
         var children = VisitList(node.Children);
-        return node.Update(symbolInfo, node.Operation, children);
+        return node.Update(symbolInfo, children);
     }
+
+    public override BoundNode? VisitMarkupPropertySetter(BoundMarkupPropertySetter node) => node;
+
+    public override BoundNode? VisitMarkupCommandBinding(BoundMarkupCommandBinding node) => node;
+
+    public override BoundNode? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node) => node;
+
+    public override BoundNode? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node) => node;
+
+    public override BoundNode? VisitAkcssPropertySetter(BoundAkcssPropertySetter node) => node;
+
+    public override BoundNode? VisitAkcssIf(BoundAkcssIf node)
+    {
+        var operations = VisitAkcssOperationList(node.Operations);
+        if (operations == node.Operations)
+        {
+            return node;
+        }
+
+        return new BoundAkcssIf(
+            node.Syntax,
+            node.Binder,
+            node.ContainingAkcssSymbol,
+            node.ConditionType,
+            node.ConditionOperation,
+            operations,
+            node.Diagnostics,
+            node.HasErrors);
+    }
+
+    public override BoundNode? VisitAkcssApply(BoundAkcssApply node) => node;
+
+    public override BoundNode? VisitAkcssIntercept(BoundAkcssIntercept node) => node;
 
     public override BoundNode? VisitExpression(BoundExpression node)
     {
         var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
         var children = VisitList(node.Children);
-        return node.Update(symbolInfo, node.Operation, children);
+        return node.Update(symbolInfo, children);
     }
 
     public override BoundNode? VisitCSharpExpression(BoundCSharpExpression node)
@@ -382,6 +415,46 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 }
 
                 builder = ArrayBuilder<BoundExpression>.GetInstance(nodes.Length);
+                for (var previous = 0; previous < index; previous++)
+                {
+                    builder.Add(nodes[previous]);
+                }
+            }
+
+            if (newNode != null)
+            {
+                builder.Add(newNode);
+            }
+        }
+
+        return builder == null
+            ? nodes
+            : builder.ToImmutableAndFree();
+    }
+
+    protected virtual ImmutableArray<BoundAkcssOperation> VisitAkcssOperationList(
+        ImmutableArray<BoundAkcssOperation> nodes)
+    {
+        if (nodes.IsDefaultOrEmpty)
+        {
+            return nodes.IsDefault ? ImmutableArray<BoundAkcssOperation>.Empty : nodes;
+        }
+
+        ArrayBuilder<BoundAkcssOperation>? builder = null;
+
+        for (var index = 0; index < nodes.Length; index++)
+        {
+            var oldNode = nodes[index];
+            var newNode = Visit(oldNode) as BoundAkcssOperation;
+
+            if (builder == null)
+            {
+                if (ReferenceEquals(newNode, oldNode))
+                {
+                    continue;
+                }
+
+                builder = ArrayBuilder<BoundAkcssOperation>.GetInstance(nodes.Length);
                 for (var previous = 0; previous < index; previous++)
                 {
                     builder.Add(nodes[previous]);

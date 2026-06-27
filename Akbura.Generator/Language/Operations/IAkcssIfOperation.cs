@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
@@ -11,6 +12,8 @@ internal interface IAkcssIfOperation : IAkcssOperation
     CSharpSymbolDefinition ConditionType { get; }
 
     CSharpOperationDefinition ConditionOperation { get; }
+
+    ICSharpOperation? ConditionOperationTree { get; }
 
     ImmutableArray<IAkcssOperation> Operations { get; }
 }

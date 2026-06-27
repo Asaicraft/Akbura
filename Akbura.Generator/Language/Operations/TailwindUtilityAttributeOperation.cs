@@ -1,5 +1,7 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -18,7 +20,8 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         string? conditionText,
         CSharpSymbolDefinition conditionType,
         CSharpOperationDefinition conditionOperation,
-        bool hasErrors)
+        bool hasErrors,
+        ICSharpOperation? conditionOperationTree = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
@@ -32,6 +35,10 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         ConditionType = conditionType;
         ConditionOperation = conditionOperation;
         HasErrors = hasErrors;
+        ConditionOperationTree = conditionOperationTree;
+        AdoptCSharpOperationTree(ConditionOperationTree);
+        AdoptArgumentOperationTrees(Arguments);
+        Children = CreateChildren(ConditionOperationTree, Arguments);
     }
 
     public OperationKind Kind => OperationKind.TailwindUtility;
@@ -44,7 +51,7 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
 
     public IOperation? Parent => null;
 
-    public ImmutableArray<IOperation> Children => ImmutableArray<IOperation>.Empty;
+    public ImmutableArray<IOperation> Children { get; }
 
     public ISymbol? TargetSymbol => Utility;
 
@@ -73,6 +80,43 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
     public CSharpSymbolDefinition ConditionType { get; }
 
     public CSharpOperationDefinition ConditionOperation { get; }
+
+    public ICSharpOperation? ConditionOperationTree { get; }
+
+    private static ImmutableArray<IOperation> CreateChildren(
+        ICSharpOperation? conditionOperationTree,
+        ImmutableArray<TailwindUtilityArgument> arguments)
+    {
+        var count = conditionOperationTree == null ? 0 : 1;
+        foreach (var argument in arguments)
+        {
+            if (argument.ValueOperationTree != null)
+            {
+                count++;
+            }
+        }
+
+        if (count == 0)
+        {
+            return ImmutableArray<IOperation>.Empty;
+        }
+
+        var builder = ArrayBuilder<IOperation>.GetInstance(count);
+        if (conditionOperationTree != null)
+        {
+            builder.Add(conditionOperationTree);
+        }
+
+        foreach (var argument in arguments)
+        {
+            if (argument.ValueOperationTree != null)
+            {
+                builder.Add(argument.ValueOperationTree);
+            }
+        }
+
+        return builder.ToImmutableAndFree();
+    }
 
     public void Accept(OperationVisitor visitor)
     {
@@ -112,5 +156,21 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
     public override string ToString()
     {
         return ToDisplayString();
+    }
+
+    private void AdoptArgumentOperationTrees(ImmutableArray<TailwindUtilityArgument> arguments)
+    {
+        foreach (var argument in arguments)
+        {
+            AdoptCSharpOperationTree(argument.ValueOperationTree);
+        }
+    }
+
+    private void AdoptCSharpOperationTree(ICSharpOperation? operation)
+    {
+        if (operation is CSharpOperation csharpOperation)
+        {
+            csharpOperation.SetParent(this);
+        }
     }
 }

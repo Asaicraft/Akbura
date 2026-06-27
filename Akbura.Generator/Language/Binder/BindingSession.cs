@@ -1,12 +1,16 @@
 using Akbura.Language.BoundTree;
 using Akbura.Language.Declarations;
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
+using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
 
@@ -95,6 +99,37 @@ internal sealed class BindingSession
     {
         var next = GetBinder(syntax, usage);
         return new CSharpProbeBinder(_semanticModel, next);
+    }
+
+    public BoundNode BindOperationSyntax(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        return _semanticModel.GetBoundNode(
+            syntax,
+            () => syntax.Kind switch
+            {
+                AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                    AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                    AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                    AkburaSyntaxKind.TailwindFullAttributeSyntax =>
+                    _semanticModel.BindMarkupAttributeOperation(Unsafe.As<MarkupAttributeSyntax>(syntax)),
+                AkburaSyntaxKind.AkcssAssignmentSyntax =>
+                    _semanticModel.BindAkcssPropertySetterOperation(Unsafe.As<AkcssAssignmentSyntax>(syntax)),
+                AkburaSyntaxKind.AkcssIfDirectiveSyntax =>
+                    _semanticModel.BindAkcssIfOperation(Unsafe.As<AkcssIfDirectiveSyntax>(syntax)),
+                AkburaSyntaxKind.AkcssApplyDirectiveSyntax =>
+                    _semanticModel.BindAkcssApplyOperation(Unsafe.As<AkcssApplyDirectiveSyntax>(syntax)),
+                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax =>
+                    _semanticModel.BindAkcssInterceptOperation(Unsafe.As<AkcssInterceptDirectiveSyntax>(syntax)),
+                _ => new BoundDeclaration(
+                    syntax,
+                    GetBinder(syntax, BinderUsage.Expression),
+                    AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax)),
+            });
     }
 
     public BoundExpression BindExpression(

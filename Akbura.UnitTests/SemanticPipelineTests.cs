@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -2096,6 +2097,11 @@ public class SemanticPipelineTests
         Assert.Equal(AkcssAmxInvocationKind.DynamicResource, amx.Kind);
         Assert.Equal("Double", amx.TypeArgument.Name);
         Assert.Equal("\"--spacing\"", Assert.Single(amx.Arguments).ToString());
+        AssertCSharpRootChild(operation, operation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is ITailwindUtilityParameterSymbol { Name: "value" });
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is IMethodSymbol { Name: "DynamicResource" });
         Assert.False(operation.HasErrors);
     }
 
@@ -2124,7 +2130,10 @@ public class SemanticPipelineTests
             Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(ifOperation.Operations)).ValueKind);
         Assert.Equal("Boolean", ifOperation.ConditionType.Name);
         Assert.False(ifOperation.ConditionOperation.IsDefault);
-        Assert.Single(ifOperation.Children);
+        AssertCSharpRootChild(ifOperation, ifOperation.ConditionOperationTree);
+        Assert.Equal(2, ifOperation.Children.Length);
+        Assert.Same(ifOperation.ConditionOperationTree, ifOperation.Children[0]);
+        Assert.Same(Assert.Single(ifOperation.Operations), ifOperation.Children[1]);
         Assert.False(ifOperation.HasErrors);
         Assert.Equal("@if(true)", ifOperation.ToDisplayString());
     }
@@ -2155,6 +2164,9 @@ public class SemanticPipelineTests
         Assert.Same(ifDirective, ifOperation.Syntax);
         Assert.Equal("Boolean", ifOperation.ConditionType.Name);
         Assert.False(ifOperation.ConditionOperation.IsDefault);
+        AssertCSharpRootChild(ifOperation, ifOperation.ConditionOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(ifOperation), operation =>
+            operation.TargetSymbol is ITailwindUtilityParameterSymbol { Name: "value" });
         var setter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(ifOperation.Operations));
         Assert.Equal("Width", setter.Property?.Name);
         Assert.Equal("Double", setter.ValueType.Name);
@@ -2621,6 +2633,40 @@ public class SemanticPipelineTests
         Assert.Equal("IsVisible", operation.Property?.Name);
         Assert.Equal(SpecialType.System_Boolean, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
         Assert.False(operation.ValueOperation.IsDefault);
+        AssertCSharpRootChild(operation, operation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "isOpen" });
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupDynamicAttribute_CreatesCSharpOperationTreeForInterpolatedString()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <TextBlock Text={$"Count: {count}"} />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupAttributeValueKind.DynamicExpression, operation.ValueKind);
+        Assert.Equal("String", operation.ValueType.Name);
+        AssertCSharpRootChild(operation, operation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.RoslynKind == Microsoft.CodeAnalysis.OperationKind.InterpolatedString);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "count" });
+        Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
 
@@ -2654,6 +2700,11 @@ public class SemanticPipelineTests
         Assert.Equal("Tag", operation.Property?.Name);
         Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
         Assert.False(operation.ValueOperation.IsDefault);
+        AssertCSharpRootChild(operation, operation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "total" });
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is ILocalSymbol { Name: "local" });
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
@@ -2698,11 +2749,21 @@ public class SemanticPipelineTests
         Assert.Equal("w", expressionOperation.UtilityName);
         Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(argument.Type.Symbol).SpecialType);
         Assert.False(argument.ValueOperation.IsDefault);
+        AssertCSharpRootChild(expressionOperation, argument.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(expressionOperation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "total" });
+        Assert.Contains(EnumerateCSharpOperations(expressionOperation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is ILocalSymbol { Name: "local" });
         Assert.False(expressionOperation.HasErrors);
 
         Assert.True(conditionalOperation.HasCondition);
         Assert.Equal(SpecialType.System_Boolean, Assert.IsAssignableFrom<INamedTypeSymbol>(conditionalOperation.ConditionType.Symbol).SpecialType);
         Assert.False(conditionalOperation.ConditionOperation.IsDefault);
+        AssertCSharpRootChild(conditionalOperation, conditionalOperation.ConditionOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(conditionalOperation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "total" });
+        Assert.Contains(EnumerateCSharpOperations(conditionalOperation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is ILocalSymbol { Name: "local" });
         Assert.False(conditionalOperation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(expressionAttribute).IsEmpty);
         Assert.True(semanticModel.GetSemanticDiagnostics(conditionalAttribute).IsEmpty);
@@ -3042,6 +3103,9 @@ public class SemanticPipelineTests
         Assert.False(operation.IsAsync);
         Assert.False(operation.ContainsAwait);
         Assert.False(operation.HandlerOperation.IsDefault);
+        AssertCSharpRootChild(operation, operation.HandlerOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "count" });
         Assert.Equal("RoutedEventArgs", operation.EventArgsType.Name);
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
@@ -3077,6 +3141,9 @@ public class SemanticPipelineTests
         Assert.Equal(expectedParameterCount, operation.HandlerParameterCount);
         Assert.Equal(expectedAsync, operation.IsAsync);
         Assert.False(operation.HandlerOperation.IsDefault);
+        AssertCSharpRootChild(operation, operation.HandlerOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "count" });
         Assert.Equal("EventHandler", operation.HandlerType.Name);
         Assert.Equal("RoutedEventArgs", operation.EventArgsType.Name);
         Assert.False(operation.HasErrors);
@@ -3113,6 +3180,11 @@ public class SemanticPipelineTests
         Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
         Assert.Equal(2, operation.HandlerParameterCount);
         Assert.False(operation.HandlerOperation.IsDefault);
+        AssertCSharpRootChild(operation, operation.HandlerOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "count" });
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is ILocalSymbol { Name: "delta" });
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
@@ -3670,6 +3742,9 @@ public class SemanticPipelineTests
         Assert.False(operation.IsAsync);
         Assert.False(operation.ContainsAwait);
         Assert.Equal("Int32", operation.HandlerResultType.Name);
+        AssertCSharpRootChild(operation, operation.HandlerOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is IParameterSymbol { Name: "x" });
         Assert.Same(attribute.Value, operation.ValueSyntax);
         Assert.False(operation.HasErrors);
         Assert.Same(operation, semanticModel.GetOperation(attribute));
@@ -3716,6 +3791,11 @@ public class SemanticPipelineTests
         Assert.Equal(MarkupCommandResultMode.ReturnsResult, operation.ResultMode);
         Assert.Equal("Int32", operation.HandlerResultType.Name);
         Assert.False(operation.HandlerOperation.IsDefault);
+        AssertCSharpRootChild(operation, operation.HandlerOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is ILocalSymbol { Name: "delta" });
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.CSharpTargetDefinition.Symbol is IParameterSymbol { Name: "x" });
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
@@ -3836,6 +3916,11 @@ public class SemanticPipelineTests
         Assert.True(operation.IsAsync);
         Assert.True(operation.ContainsAwait);
         Assert.Equal("Int32", operation.HandlerResultType.Name);
+        AssertCSharpRootChild(operation, operation.HandlerOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is ICommandSymbol { Name: "CustomClick" });
+        Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
+            csharpOperation.TargetSymbol is IStateSymbol { Name: "clicked" });
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
@@ -3941,6 +4026,35 @@ public class SemanticPipelineTests
         Assert.Equal(name, property.Name);
         Assert.Equal("global::Avalonia.Media.Colors",
             property.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+    }
+
+    private static void AssertCSharpRootChild(
+        Akbura.Language.Operations.IOperation owner,
+        ICSharpOperation? csharpOperation)
+    {
+        Assert.NotNull(csharpOperation);
+        Assert.Same(owner, csharpOperation!.Parent);
+        Assert.Contains(csharpOperation, owner.Children);
+    }
+
+    private static IEnumerable<ICSharpOperation> EnumerateCSharpOperations(
+        Akbura.Language.Operations.IOperation operation)
+    {
+        return EnumerateOperations(operation).OfType<ICSharpOperation>();
+    }
+
+    private static IEnumerable<Akbura.Language.Operations.IOperation> EnumerateOperations(
+        Akbura.Language.Operations.IOperation operation)
+    {
+        yield return operation;
+
+        foreach (var child in operation.Children)
+        {
+            foreach (var descendant in EnumerateOperations(child))
+            {
+                yield return descendant;
+            }
+        }
     }
 
     private static AkburaSemanticModel CreateSemanticModel(AkburaSyntaxTree syntaxTree)

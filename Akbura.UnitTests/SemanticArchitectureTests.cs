@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+using System.IO;
 using System.Threading.Tasks;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaOperationKind = Akbura.Language.Operations.OperationKind;
@@ -449,7 +450,65 @@ public sealed class SemanticArchitectureTests
         walker.Visit(operation);
 
         Assert.Contains(AkburaOperationKind.AkcssIf, walker.Kinds);
+        Assert.Contains(AkburaOperationKind.CSharpExpression, walker.Kinds);
         Assert.Contains(AkburaOperationKind.AkcssAssignment, walker.Kinds);
+    }
+
+    [Fact]
+    public void BoundTree_DoesNotExposeAkburaOperations()
+    {
+        var operationType = typeof(AkburaOperation);
+        var boundTypes = typeof(BoundNode)
+            .Assembly
+            .GetTypes()
+            .Where(type => type.Namespace == typeof(BoundNode).Namespace)
+            .ToArray();
+
+        Assert.DoesNotContain(typeof(BoundNode).GetProperties(), property =>
+            property.Name == "Operation");
+
+        foreach (var type in boundTypes)
+        {
+            Assert.DoesNotContain(type.GetFields(
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic),
+                field => operationType.IsAssignableFrom(field.FieldType));
+            Assert.DoesNotContain(type.GetProperties(
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic),
+                property => operationType.IsAssignableFrom(property.PropertyType));
+            Assert.DoesNotContain(type.GetConstructors(
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic)
+                .SelectMany(constructor => constructor.GetParameters()),
+                parameter => operationType.IsAssignableFrom(parameter.ParameterType));
+        }
+    }
+
+    [Fact]
+    public void CSharpProbeBinder_DoesNotExposeAkburaCSharpOperationTree()
+    {
+        var csharpOperationType = typeof(ICSharpOperation);
+        var binderType = typeof(CSharpProbeBinder);
+        var source = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Binder",
+            "CSharpProbeBinder.cs");
+
+        Assert.DoesNotContain(binderType.GetMethods(
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Static |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic),
+            method =>
+                csharpOperationType.IsAssignableFrom(method.ReturnType) ||
+                method.GetParameters().Any(parameter =>
+                    csharpOperationType.IsAssignableFrom(parameter.ParameterType)));
+        Assert.DoesNotContain(nameof(CSharpOperationTreeBuilder), source);
     }
 
     [Fact]
@@ -786,7 +845,6 @@ public sealed class SemanticArchitectureTests
             root,
             componentBinder,
             AkburaSymbolInfo.None(AkburaCandidateReason.None),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
 
         var wrapped = componentBinder.WrapWithDeclaredSymbolsIfAny(root, body);
@@ -851,7 +909,6 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.None),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var conversion = new BoundConversionExpression(
             state,
@@ -891,7 +948,6 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.None),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var csharpExpression = new BoundCSharpExpression(
             state,
@@ -926,7 +982,6 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             model.GetSymbolInfo(state),
-            operation: null,
             ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var block = new BoundBlock(
             state,
@@ -937,6 +992,23 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        const string markupCode =
+            "using Avalonia.Controls;\n" +
+            "<TextBlock Text=\"Hello\" />";
+        var markupTree = AkburaSyntaxTree.ParseText(markupCode, "Markup.akbura");
+        var markupModel = CreateCompilation(markupTree).GetSemanticModel(markupTree);
+        var markupRoot = Assert.IsType<MarkupRootSyntax>(markupTree.GetRoot().Members[1]);
+        var markupAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            markupRoot.Element.StartTag!.Attributes[0]);
+        var markupSetter = markupModel.BindingSession.BindOperationSyntax(markupAttribute);
+
+        const string akcssCode = "@akcss { Button.card { Background: White; } }";
+        var akcssTree = AkburaSyntaxTree.ParseText(akcssCode, "Akcss.akbura");
+        var akcssModel = CreateCompilation(akcssTree).GetSemanticModel(akcssTree);
+        var akcssBlock = Assert.IsType<InlineAkcssBlockSyntax>(akcssTree.GetRoot().Members[0]);
+        var akcssRule = Assert.IsType<AkcssStyleRuleSyntax>(akcssBlock.Members[0]);
+        var akcssAssignment = Assert.IsType<AkcssAssignmentSyntax>(akcssRule.Members[0]);
+        var akcssSetter = akcssModel.BindingSession.BindOperationSyntax(akcssAssignment);
 
         Assert.Equal(BoundKind.Expression, expression.Kind);
         Assert.Equal(BoundKind.CSharpExpression, csharpExpression.Kind);
@@ -948,6 +1020,8 @@ public sealed class SemanticArchitectureTests
         Assert.Equal(BoundKind.ErrorExpression, errorExpression.Kind);
         Assert.Equal(BoundKind.LocalDeclarationStatement, localDeclaration.Kind);
         Assert.Equal(BoundKind.Declaration, declaration.Kind);
+        Assert.Equal(BoundKind.MarkupPropertySetter, markupSetter.Kind);
+        Assert.Equal(BoundKind.AkcssPropertySetter, akcssSetter.Kind);
         Assert.Equal(BoundKind.Block, block.Kind);
         Assert.Equal(BoundKind.BadStatement, badStatement.Kind);
     }
@@ -964,7 +1038,6 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.None),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var conversion = new BoundConversionExpression(
             state,
@@ -997,13 +1070,11 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.None),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var newOperand = new BoundExpression(
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var conversion = new BoundConversionExpression(
             state,
@@ -1043,13 +1114,11 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.None),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var newOperand = new BoundExpression(
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var conversion = new BoundConversionExpression(
             state,
@@ -1768,7 +1837,6 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.None),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var conversion = binder.ClassifyConversion(intType, doubleType);
 
@@ -1861,7 +1929,6 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var rewritten = Assert.IsType<BoundCallExpression>(
             new ReplacingBoundTreeRewriter(argument, replacement).Visit(call));
@@ -1904,7 +1971,6 @@ public sealed class SemanticArchitectureTests
             state,
             binder,
             AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
-            operation: null,
             diagnostics: ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var rewritten = Assert.IsType<BoundLocalDeclarationStatement>(
             new ReplacingBoundTreeRewriter(left, replacement).Visit(localDeclaration));
@@ -2060,6 +2126,19 @@ public sealed class SemanticArchitectureTests
             "SemanticArchitectureTests",
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static string ReadRepositoryFile(params string[] pathParts)
+    {
+        var parts = new string[pathParts.Length + 5];
+        parts[0] = AppContext.BaseDirectory;
+        parts[1] = "..";
+        parts[2] = "..";
+        parts[3] = "..";
+        parts[4] = "..";
+        Array.Copy(pathParts, 0, parts, 5, pathParts.Length);
+
+        return File.ReadAllText(Path.GetFullPath(Path.Combine(parts)));
     }
 
     private static Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax CreateReturnExpressionProbe(

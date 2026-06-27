@@ -1,5 +1,4 @@
 using BinderType = Akbura.Language.Binder.Binder;
-using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -24,7 +23,6 @@ internal abstract class BoundNode
         AkburaSyntax syntax,
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
-        IOperation? operation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         ImmutableArray<BoundNode> children = default,
         bool hasErrors = false)
@@ -36,7 +34,6 @@ internal abstract class BoundNode
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         Binder = binder;
         SymbolInfo = symbolInfo;
-        Operation = operation;
         Diagnostics = diagnostics.IsDefault
             ? ImmutableArray<AkburaSemanticDiagnostic>.Empty
             : diagnostics;
@@ -55,8 +52,6 @@ internal abstract class BoundNode
     public BinderType Binder { get; }
 
     public AkburaSymbolInfo SymbolInfo { get; }
-
-    public IOperation? Operation { get; }
 
     public ImmutableArray<AkburaSemanticDiagnostic> Diagnostics { get; }
 

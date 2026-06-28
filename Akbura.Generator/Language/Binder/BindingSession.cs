@@ -5,7 +5,6 @@ using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
@@ -15,7 +14,6 @@ namespace Akbura.Language.Binder;
 internal sealed class BindingSession
 {
     private readonly AkburaSemanticModel _semanticModel;
-    private readonly ConcurrentDictionary<BinderCacheKey, Binder> _binderCache = new();
     private readonly BinderFactory _binderFactory;
 
     public BindingSession(AkburaSemanticModel semanticModel)
@@ -27,7 +25,7 @@ internal sealed class BindingSession
 
     public CompilationBinder RootBinder { get; }
 
-    public int CachedBinderCount => _binderCache.Count;
+    public int CachedBinderCount => _binderFactory.CachedBinderCount;
 
     public Binder GetBinder(AkburaSyntax syntax, BinderUsage usage = BinderUsage.Default)
     {
@@ -45,9 +43,10 @@ internal sealed class BindingSession
         var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
             syntax,
             usage);
-        return _binderCache.GetOrAdd(
+        return _binderFactory.GetOrCreateBinder(
             key,
-            _ => _binderFactory.CreateBinder(path, usage));
+            path,
+            usage);
     }
 
     public Binder GetBinder(
@@ -84,9 +83,10 @@ internal sealed class BindingSession
         var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
             cacheSyntax,
             usage);
-        return _binderCache.GetOrAdd(
+        return _binderFactory.GetOrCreateBinder(
             key,
-            _ => _binderFactory.CreateBinder(path, usage));
+            path,
+            usage);
     }
 
     public CSharpProbeBinder GetCSharpProbeBinder(

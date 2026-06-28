@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Declarations;
@@ -1446,7 +1447,7 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
-    public void BindingSession_CacheIsThreadSafeForParallelBinderRequests()
+    public void BindingSession_ConcurrentCacheIsBestEffortForParallelBinderRequests()
     {
         const string code = "state int count = 0;\n<TextBlock Text=\"Hello\" />";
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
@@ -1459,8 +1460,10 @@ public sealed class SemanticArchitectureTests
             binders[index] = model.GetBinder(state, BinderUsage.Expression);
         });
 
-        var first = binders[0];
-        Assert.All(binders, binder => Assert.Same(first, binder));
+        Assert.All(binders, binder => Assert.IsType<ComponentBinder>(binder));
+
+        var cached = model.GetBinder(state, BinderUsage.Expression);
+        Assert.Same(cached, model.GetBinder(state, BinderUsage.Expression));
     }
 
     [Fact]
@@ -1493,6 +1496,20 @@ public sealed class SemanticArchitectureTests
         Assert.Same(
             typeof(ObjectPool<BinderFactory.BinderFactoryVisitor>),
             poolField.FieldType);
+    }
+
+    [Fact]
+    public void BinderFactory_UsesFixedSizeConcurrentCache()
+    {
+        var cacheField = typeof(BinderFactory).GetField(
+            "_binderCache",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(cacheField);
+        Assert.Same(
+            typeof(ConcurrentCache<BinderCacheKey, BinderType>),
+            cacheField.FieldType);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -12,6 +13,7 @@ internal sealed partial class BinderFactory
         () => new BinderFactoryVisitor(),
         size: 64);
 
+    private readonly ConcurrentCache<BinderCacheKey, Binder> _binderCache;
     private readonly AkburaSemanticModel _semanticModel;
     private readonly BindingSession _bindingSession;
     private readonly ObjectPool<BinderFactoryVisitor> _binderFactoryVisitorPool;
@@ -29,6 +31,7 @@ internal sealed partial class BinderFactory
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         _bindingSession = bindingSession ?? throw new ArgumentNullException(nameof(bindingSession));
         _binderFactoryVisitorPool = binderFactoryVisitorPool ?? s_binderFactoryVisitorPool;
+        _binderCache = new ConcurrentCache<BinderCacheKey, Binder>(50);
     }
 
     public Binder GetBinder(AkburaSyntax syntax)
@@ -51,7 +54,29 @@ internal sealed partial class BinderFactory
         return _bindingSession.GetBinder(syntax, position, usage);
     }
 
-    internal Binder CreateBinder(
+    internal Binder GetOrCreateBinder(
+        BinderCacheKey key,
+        ImmutableArray<AkburaDeclaration> path,
+        BinderUsage usage)
+    {
+        if (_binderCache.TryGetValue(key, out var binder))
+        {
+            return binder;
+        }
+
+        binder = CreateBinder(path, usage);
+        if (!_binderCache.TryAdd(key, binder) &&
+            _binderCache.TryGetValue(key, out var cachedBinder))
+        {
+            return cachedBinder;
+        }
+
+        return binder;
+    }
+
+    internal int CachedBinderCount => _binderCache.Count;
+
+    private Binder CreateBinder(
         ImmutableArray<AkburaDeclaration> path,
         BinderUsage usage)
     {

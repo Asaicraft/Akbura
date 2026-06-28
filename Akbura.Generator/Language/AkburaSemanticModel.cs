@@ -1,5 +1,6 @@
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
+using Akbura.Language.Declarations;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -42,6 +43,7 @@ internal sealed partial class AkburaSemanticModel
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
     private readonly AkburaOperationFactory _operationFactory;
+    private readonly AkburaDeclarationSymbolTable _declarationSymbols;
 
     public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
@@ -59,6 +61,7 @@ internal sealed partial class AkburaSemanticModel
             _semanticDiagnosticsReuseKeys);
         _bindingSession = new BindingSession(this);
         _operationFactory = new AkburaOperationFactory(this);
+        _declarationSymbols = new AkburaDeclarationSymbolTable(this);
     }
 
     public AkburaCompilation Compilation { get; }
@@ -81,10 +84,10 @@ internal sealed partial class AkburaSemanticModel
                 AkburaSyntaxKind.ParamDeclarationSyntax or
                 AkburaSyntaxKind.InjectDeclarationSyntax or
                 AkburaSyntaxKind.CommandDeclarationSyntax or
-                AkburaSyntaxKind.UseEffectDeclarationSyntax => GetMemberSemanticModel(syntax).GetSymbolInfo(syntax),
-            AkburaSyntaxKind.InlineAkcssBlockSyntax => ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(syntax)),
-            AkburaSyntaxKind.AkcssStyleRuleSyntax => ResolveAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(syntax)),
-            AkburaSyntaxKind.AkcssUtilityDeclarationSyntax => ResolveTailwindUtility(Unsafe.As<AkcssUtilityDeclarationSyntax>(syntax)),
+                AkburaSyntaxKind.UseEffectDeclarationSyntax or
+                AkburaSyntaxKind.InlineAkcssBlockSyntax or
+                AkburaSyntaxKind.AkcssStyleRuleSyntax or
+                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax => GetDeclarationSymbolInfo(syntax),
             AkburaSyntaxKind.MarkupElementSyntax => ResolveMarkupComponent(Unsafe.As<MarkupElementSyntax>(syntax)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
@@ -267,6 +270,36 @@ internal sealed partial class AkburaSemanticModel
         {
             return _bindingSession;
         }
+    }
+
+    internal AkburaDeclarationSymbolTable DeclarationSymbols => _declarationSymbols;
+
+    internal AkburaSymbolInfo CreateDeclarationSymbolInfo(AkburaDeclaration declaration)
+    {
+        return declaration.Kind switch
+        {
+            AkburaDeclarationKind.Component or
+                AkburaDeclarationKind.State or
+                AkburaDeclarationKind.Parameter or
+                AkburaDeclarationKind.InjectedService or
+                AkburaDeclarationKind.Command or
+                AkburaDeclarationKind.UseEffect =>
+                GetMemberSemanticModel(declaration.Syntax).GetSymbolInfo(declaration.Syntax),
+            AkburaDeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax =>
+                ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(declaration.Syntax)),
+            AkburaDeclarationKind.AkcssStyle =>
+                ResolveAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(declaration.Syntax)),
+            AkburaDeclarationKind.AkcssUtility =>
+                ResolveTailwindUtility(Unsafe.As<AkcssUtilityDeclarationSyntax>(declaration.Syntax)),
+            _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
+        };
+    }
+
+    private AkburaSymbolInfo GetDeclarationSymbolInfo(AkburaSyntax syntax)
+    {
+        return Compilation.DeclarationTable.TryGetDeclaration(syntax, out var declaration)
+            ? _declarationSymbols.GetSymbolInfo(declaration)
+            : GetMemberSemanticModel(syntax).GetSymbolInfo(syntax);
     }
 
     private AkburaDocumentSyntax GetMemberSemanticModelScope(AkburaSyntax syntax)

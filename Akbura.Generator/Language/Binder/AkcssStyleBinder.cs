@@ -101,14 +101,7 @@ internal sealed class AkcssStyleBinder : Binder
             return symbols;
         }
 
-        if (SemanticModel.GetSymbolInfo(Declaration!.Syntax).Symbol is ITailwindUtilitySymbol utility)
-        {
-            symbols = ImmutableArray<ISymbol>.CastUp(utility.Parameters);
-        }
-        else
-        {
-            symbols = ImmutableArray<ISymbol>.Empty;
-        }
+        symbols = SemanticModel.DeclarationSymbols.GetTailwindUtilityParameters(Declaration!);
 
         ImmutableInterlocked.InterlockedInitialize(ref _lazyDeclaredSymbols, symbols);
         return _lazyDeclaredSymbols;

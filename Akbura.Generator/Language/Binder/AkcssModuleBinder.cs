@@ -76,8 +76,8 @@ internal sealed class AkcssModuleBinder : Binder
             return symbols;
         }
 
-        symbols = CreateSymbolsForDeclarations(
-            Declaration!.Children,
+        symbols = SemanticModel.DeclarationSymbols.GetDeclaredSymbols(
+            Declaration!,
             AkburaDeclarationKind.AkcssStyle,
             AkburaDeclarationKind.AkcssUtility);
 

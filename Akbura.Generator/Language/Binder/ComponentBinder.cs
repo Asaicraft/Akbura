@@ -83,8 +83,8 @@ internal sealed class ComponentBinder : Binder
             return symbols;
         }
 
-        symbols = CreateSymbolsForDeclarations(
-            Declaration!.Children,
+        symbols = SemanticModel.DeclarationSymbols.GetDeclaredSymbols(
+            Declaration!,
             AkburaDeclarationKind.State,
             AkburaDeclarationKind.Parameter,
             AkburaDeclarationKind.InjectedService,

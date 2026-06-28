@@ -2,11 +2,9 @@ using Akbura.Language.Declarations;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
-using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
-using System.Linq;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 
@@ -172,46 +170,6 @@ internal abstract class Binder
         return ScopeDesignator != null &&
                (ReferenceEquals(ScopeDesignator, scopeDesignator) ||
                 ReferenceEquals(ScopeDesignator.Green, scopeDesignator.Green));
-    }
-
-    protected ImmutableArray<AkburaSymbol> CreateSymbolsForDeclarations(
-        ImmutableArray<AkburaDeclaration> declarations,
-        params AkburaDeclarationKind[] allowedKinds)
-    {
-        if (declarations.IsDefaultOrEmpty)
-        {
-            return ImmutableArray<AkburaSymbol>.Empty;
-        }
-
-        var builder = ArrayBuilder<AkburaSymbol>.GetInstance();
-        foreach (var declaration in declarations)
-        {
-            if (allowedKinds.Length != 0 &&
-                !allowedKinds.Contains(declaration.Kind))
-            {
-                continue;
-            }
-
-            if (TryCreateDeclaredSymbol(declaration, out var symbol))
-            {
-                builder.Add(symbol);
-            }
-        }
-
-        return builder.ToImmutableAndFree();
-    }
-
-    protected bool TryCreateDeclaredSymbol(AkburaDeclaration declaration, out AkburaSymbol symbol)
-    {
-        var symbolInfo = SemanticModel.GetSymbolInfo(declaration.Syntax);
-        if (symbolInfo.Symbol != null)
-        {
-            symbol = symbolInfo.Symbol;
-            return true;
-        }
-
-        symbol = null!;
-        return false;
     }
 
     protected static AkburaSymbol? FindDeclaredSymbol(

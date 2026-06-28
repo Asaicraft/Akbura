@@ -974,6 +974,45 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void DeclarationSymbolTable_OwnsComponentDeclaredSymbols()
+    {
+        const string code =
+            "inject int service;\n" +
+            "param int UserId = 1;\n" +
+            "state int count = 0;\n" +
+            "command int Refresh(int id);\n" +
+            "useEffect(count) { }";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var compilation = CreateCompilation(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var declaration = Assert.Single(compilation.DeclarationTable.Components);
+
+        var declaredSymbols = model.DeclarationSymbols.GetDeclaredSymbols(
+            declaration,
+            AkburaDeclarationKind.State,
+            AkburaDeclarationKind.Parameter,
+            AkburaDeclarationKind.InjectedService,
+            AkburaDeclarationKind.Command,
+            AkburaDeclarationKind.UseEffect);
+        var binder = Assert.IsType<ComponentBinder>(model.GetBinder(root));
+
+        Assert.Contains(declaredSymbols, symbol => symbol is IInjectSymbol { Name: "service" });
+        Assert.Contains(declaredSymbols, symbol => symbol is IParamSymbol { Name: "UserId" });
+        Assert.Contains(declaredSymbols, symbol => symbol is IStateSymbol { Name: "count" });
+        Assert.Contains(declaredSymbols, symbol => symbol is ICommandSymbol { Name: "Refresh" });
+        Assert.Contains(declaredSymbols, symbol => symbol is IUseEffectSymbol);
+        var binderSymbols = binder.GetDeclaredSymbolsForScope(root);
+        Assert.Equal(
+            declaredSymbols.Select(symbol => (symbol.Kind, symbol.Name)),
+            binderSymbols.Select(symbol => (symbol.Kind, symbol.Name)));
+        Assert.Null(typeof(BinderType).GetMethod(
+            "CreateSymbolsForDeclarations",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic));
+    }
+
+    [Fact]
     public void BoundWrapping_WithDeclaredSymbolsCreatesBoundBlock()
     {
         const string code =

@@ -1,7 +1,10 @@
 using Akbura.Language.Declarations;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
 
@@ -35,6 +38,22 @@ internal sealed class AkcssStyleBinder : Binder
         }
 
         return GetDeclaredSymbols();
+    }
+
+    public override BoundNode BindOperationSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.AkcssAssignmentSyntax =>
+                SemanticModel.CreateBoundAkcssPropertySetter(Unsafe.As<AkcssAssignmentSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssIfDirectiveSyntax =>
+                SemanticModel.CreateBoundAkcssIf(Unsafe.As<AkcssIfDirectiveSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssApplyDirectiveSyntax =>
+                SemanticModel.CreateBoundAkcssApply(Unsafe.As<AkcssApplyDirectiveSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax =>
+                SemanticModel.CreateBoundAkcssIntercept(Unsafe.As<AkcssInterceptDirectiveSyntax>(syntax)),
+            _ => base.BindOperationSyntax(syntax),
+        };
     }
 
     protected override void LookupSymbolsInSingleBinder(

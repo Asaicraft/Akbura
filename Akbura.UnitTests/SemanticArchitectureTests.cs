@@ -512,6 +512,32 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void BindingSession_DelegatesOperationBindingToBinderChain()
+    {
+        var source = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Binder",
+            "BindingSession.cs");
+        var semanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "AkburaSemanticModel.cs");
+        var markupSemanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "AkburaSemanticModel.MarkupOperations.cs");
+
+        Assert.Contains("GetOperationBinder(syntax).BindOperationSyntax(syntax)", source);
+        Assert.DoesNotContain("CreateBoundMarkupAttribute", source);
+        Assert.DoesNotContain("CreateBoundAkcss", source);
+        Assert.DoesNotContain("BindMarkupAttributeOperation", semanticModelSource + markupSemanticModelSource);
+        Assert.DoesNotContain("BindAkcssPropertySetterOperation", semanticModelSource + markupSemanticModelSource);
+        Assert.DoesNotContain("ResolveMarkupAttributeOperation", semanticModelSource + markupSemanticModelSource);
+        Assert.DoesNotContain("ResolveAkcssPropertySetterOperation", semanticModelSource + markupSemanticModelSource);
+    }
+
+    [Fact]
     public void SymbolVisitor_DispatchesConcreteAkburaSymbols()
     {
         const string code =

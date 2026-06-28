@@ -1,4 +1,5 @@
 using Akbura.Language.Declarations;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -61,6 +62,15 @@ internal abstract class Binder
     {
         return Next?.LookupSymbol(syntax) ??
                AkburaSymbolInfo.None(Symbols.CandidateReason.UnsupportedSyntax);
+    }
+
+    public virtual BoundNode BindOperationSyntax(AkburaSyntax syntax)
+    {
+        return Next?.BindOperationSyntax(syntax) ??
+               new BoundDeclaration(
+                   syntax,
+                   this,
+                   AkburaSymbolInfo.None(Symbols.CandidateReason.UnsupportedSyntax));
     }
 
     public virtual AkburaSymbolInfo LookupSymbol(

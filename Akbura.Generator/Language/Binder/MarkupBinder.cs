@@ -1,6 +1,9 @@
 using Akbura.Language.Declarations;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
 
@@ -31,5 +34,18 @@ internal sealed class MarkupBinder : Binder
                 _ => null,
             };
         }
+    }
+
+    public override BoundNode BindOperationSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax =>
+                SemanticModel.CreateBoundMarkupAttribute(Unsafe.As<MarkupAttributeSyntax>(syntax)),
+            _ => base.BindOperationSyntax(syntax),
+        };
     }
 }

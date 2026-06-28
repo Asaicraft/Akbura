@@ -21,14 +21,16 @@ namespace Akbura.Language;
 
 internal sealed partial class AkburaSemanticModel
 {
-    internal BoundNode BindMarkupAttributeOperation(MarkupAttributeSyntax markupAttribute)
+    internal BoundNode CreateBoundMarkupAttribute(MarkupAttributeSyntax markupAttribute)
     {
         return markupAttribute.Kind switch
         {
             AkburaSyntaxKind.TailwindFlagAttributeSyntax or
-            AkburaSyntaxKind.TailwindFullAttributeSyntax => BindTailwindUtilityAttributeOperation(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
+                AkburaSyntaxKind.TailwindFullAttributeSyntax =>
+                CreateBoundTailwindUtilityAttribute(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
-            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => BindMarkupPropertyOrEventOperation(markupAttribute),
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax =>
+                CreateBoundMarkupPropertyOrEvent(markupAttribute),
             _ => new BoundDeclaration(
                 markupAttribute,
                 GetBinder(markupAttribute, BinderUsage.Expression),
@@ -36,14 +38,14 @@ internal sealed partial class AkburaSemanticModel
         };
     }
 
-    private BoundNode BindMarkupPropertyOrEventOperation(MarkupAttributeSyntax markupAttribute)
+    private BoundNode CreateBoundMarkupPropertyOrEvent(MarkupAttributeSyntax markupAttribute)
     {
         return GetSymbolInfo(markupAttribute).Symbol is IRoutedEventSymbol routedEvent
-            ? BindMarkupRoutedEventBindingOperation(markupAttribute, routedEvent)
-            : BindMarkupPropertySetterOperation(markupAttribute);
+            ? CreateBoundMarkupRoutedEventBinding(markupAttribute, routedEvent)
+            : CreateBoundMarkupPropertySetter(markupAttribute);
     }
 
-    private BoundNode BindMarkupPropertySetterOperation(MarkupAttributeSyntax markupAttribute)
+    private BoundNode CreateBoundMarkupPropertySetter(MarkupAttributeSyntax markupAttribute)
     {
         var propertyInfo = GetSymbolInfo(markupAttribute);
         var property = propertyInfo.Symbol as Symbols.IPropertySymbol;
@@ -182,7 +184,7 @@ internal sealed partial class AkburaSemanticModel
             property == null || valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
     }
 
-    private BoundNode BindMarkupRoutedEventBindingOperation(
+    private BoundNode CreateBoundMarkupRoutedEventBinding(
         MarkupAttributeSyntax markupAttribute,
         IRoutedEventSymbol routedEvent)
     {
@@ -244,7 +246,7 @@ internal sealed partial class AkburaSemanticModel
                 diagnostics.Length > 0);
     }
 
-    private BoundNode BindTailwindUtilityAttributeOperation(TailwindAttributeSyntax attribute)
+    private BoundNode CreateBoundTailwindUtilityAttribute(TailwindAttributeSyntax attribute)
     {
         using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
 

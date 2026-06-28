@@ -44,7 +44,6 @@ internal sealed class BindingSession
 
         var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
             syntax,
-            path,
             usage);
         return _binderCache.GetOrAdd(
             key,
@@ -84,7 +83,6 @@ internal sealed class BindingSession
         var cacheSyntax = path[path.Length - 1].Syntax;
         var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
             cacheSyntax,
-            path,
             usage);
         return _binderCache.GetOrAdd(
             key,
@@ -108,7 +106,8 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => GetOperationBinder(syntax).BindOperationSyntax(syntax));
+            () => GetOperationBinder(syntax).BindOperationSyntax(syntax),
+            GetOperationCacheKey(syntax));
     }
 
     public BoundNode BindSemanticSyntax(AkburaSyntax syntax)
@@ -120,51 +119,50 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
+            () => GetSemanticBinder(syntax).BindSemanticSyntax(syntax),
+            GetSemanticCacheKey(syntax));
+    }
+
+    internal SemanticReuseKey GetOperationCacheKey(AkburaSyntax syntax)
+    {
+        return CreatePositionCacheKey(syntax, GetOperationUsage(syntax.Kind));
+    }
+
+    internal SemanticReuseKey GetSemanticCacheKey(AkburaSyntax syntax)
+    {
+        return CreatePositionCacheKey(syntax, GetSemanticUsage(syntax.Kind));
+    }
+
+    internal SemanticReuseKey GetExpressionCacheKey(
+        AkburaSyntax syntax,
+        BinderUsage usage = BinderUsage.Expression)
+    {
+        return CreatePositionCacheKey(syntax, usage);
+    }
+
+    internal SemanticReuseKey GetDiagnosticsCacheKey(AkburaSyntax syntax)
+    {
+        return syntax.Kind is
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+            AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+            AkburaSyntaxKind.TailwindFullAttributeSyntax or
+            AkburaSyntaxKind.AkcssAssignmentSyntax or
+            AkburaSyntaxKind.AkcssIfDirectiveSyntax or
+            AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
+            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax
+                ? GetOperationCacheKey(syntax)
+                : GetSemanticCacheKey(syntax);
     }
 
     private Binder GetOperationBinder(AkburaSyntax syntax)
     {
-        var usage = syntax.Kind switch
-        {
-            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
-                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
-                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
-                AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
-            AkburaSyntaxKind.AkcssAssignmentSyntax or
-                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
-                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
-                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => BinderUsage.Akcss,
-            _ => BinderUsage.Expression,
-        };
-
-        return GetBinder(syntax.Root, syntax.Position, usage);
+        return GetBinder(syntax.Root, syntax.Position, GetOperationUsage(syntax.Kind));
     }
 
     private Binder GetSemanticBinder(AkburaSyntax syntax)
     {
-        var usage = syntax.Kind switch
-        {
-            AkburaSyntaxKind.MarkupRootSyntax or
-                AkburaSyntaxKind.MarkupElementSyntax or
-                AkburaSyntaxKind.MarkupElementContentSyntax or
-                AkburaSyntaxKind.MarkupInlineExpressionSyntax or
-                AkburaSyntaxKind.MarkupTextLiteralSyntax or
-                AkburaSyntaxKind.MarkupPlainAttributeSyntax or
-                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
-                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
-                AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
-            AkburaSyntaxKind.InlineAkcssBlockSyntax or
-                AkburaSyntaxKind.AkcssStyleRuleSyntax or
-                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax or
-                AkburaSyntaxKind.AkcssAssignmentSyntax or
-                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
-                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
-                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => BinderUsage.Akcss,
-            _ => BinderUsage.Expression,
-        };
-
-        return GetBinder(syntax.Root, syntax.Position, usage);
+        return GetBinder(syntax.Root, syntax.Position, GetSemanticUsage(syntax.Kind));
     }
 
     public BoundExpression BindExpression(
@@ -200,7 +198,88 @@ internal sealed class BindingSession
                 syntax,
                 expression,
                 targetType: null,
-                isBindingPath));
+                isBindingPath),
+            GetExpressionCacheKey(syntax, usage));
+    }
+
+    private SemanticReuseKey CreatePositionCacheKey(
+        AkburaSyntax syntax,
+        BinderUsage usage)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        if (TryFindDeclarationPath(syntax, out var exactPath) &&
+            exactPath.Length > 0)
+        {
+            return BinderFactory.BinderFactoryVisitor.CreateSemanticReuseKey(
+                syntax,
+                exactPath,
+                usage);
+        }
+
+        var root = syntax.Root;
+        var position = syntax.Position;
+        if (position == root.EndPosition && position > root.Position)
+        {
+            position--;
+        }
+
+        if (!TryFindDeclarationPath(root, position, out var path) ||
+            path.Length == 0)
+        {
+            return BinderFactory.BinderFactoryVisitor.CreateSemanticReuseKey(
+                syntax,
+                ImmutableArray<AkburaDeclaration>.Empty,
+                usage);
+        }
+
+        return BinderFactory.BinderFactoryVisitor.CreateSemanticReuseKey(
+            syntax,
+            path,
+            usage);
+    }
+
+    private static BinderUsage GetOperationUsage(AkburaSyntaxKind kind)
+    {
+        return kind switch
+        {
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
+            AkburaSyntaxKind.AkcssAssignmentSyntax or
+                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
+                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
+                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => BinderUsage.Akcss,
+            _ => BinderUsage.Expression,
+        };
+    }
+
+    private static BinderUsage GetSemanticUsage(AkburaSyntaxKind kind)
+    {
+        return kind switch
+        {
+            AkburaSyntaxKind.MarkupRootSyntax or
+                AkburaSyntaxKind.MarkupElementSyntax or
+                AkburaSyntaxKind.MarkupElementContentSyntax or
+                AkburaSyntaxKind.MarkupInlineExpressionSyntax or
+                AkburaSyntaxKind.MarkupTextLiteralSyntax or
+                AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
+            AkburaSyntaxKind.InlineAkcssBlockSyntax or
+                AkburaSyntaxKind.AkcssStyleRuleSyntax or
+                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax or
+                AkburaSyntaxKind.AkcssAssignmentSyntax or
+                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
+                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
+                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => BinderUsage.Akcss,
+            _ => BinderUsage.Expression,
+        };
     }
 
     private bool TryFindDeclarationPath(

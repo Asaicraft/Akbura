@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Syntax;
 using Akbura.Language.Symbols;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
@@ -73,6 +74,16 @@ public class SemanticIncrementalBenchmarks
             checksum += symbol.Name.Length;
         }
 
+        foreach (var member in root.Members)
+        {
+            if (member is MarkupRootSyntax markupRoot &&
+                     markupRoot.Element.StartTag?.Attributes.Count > 0)
+            {
+                var operation = model.GetOperation(markupRoot.Element.StartTag.Attributes[0]);
+                checksum += operation == null ? 0 : (int)operation.Kind;
+            }
+        }
+
         return checksum;
     }
 
@@ -103,6 +114,7 @@ public class SemanticIncrementalBenchmarks
         builder.AppendLine("using System;");
         builder.AppendLine("namespace Demo;");
         builder.AppendLine();
+        builder.AppendLine("param int Value = 0;");
 
         for (var i = 0; i < stateCount; i++)
         {
@@ -116,6 +128,8 @@ public class SemanticIncrementalBenchmarks
         builder.Append("state int changedCounter = ");
         builder.Append(changedValue);
         builder.AppendLine(";");
+        builder.AppendLine();
+        builder.AppendLine("<Counter Value={item0} />");
         return builder.ToString();
     }
 }

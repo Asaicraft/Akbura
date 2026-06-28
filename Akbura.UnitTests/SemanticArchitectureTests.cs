@@ -201,6 +201,123 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void SemanticBindingCache_ChangedComponentScopeDoesNotReuseUnchangedDeclaration()
+    {
+        const string oldCode =
+            "using Demo.A;\n" +
+            "\n" +
+            "state Widget value = new Widget();";
+        const string newCode =
+            "using Demo.B;\n" +
+            "\n" +
+            "state Widget value = new Widget();";
+        const string csharpCode =
+            """
+            namespace Demo.A
+            {
+                public sealed class Widget { }
+            }
+
+            namespace Demo.B
+            {
+                public sealed class Widget { }
+            }
+            """;
+        var changeStart = oldCode.IndexOf("Demo.A", StringComparison.Ordinal) + "Demo.".Length;
+        var change = new TextChangeRange(new TextSpan(changeStart, 1), newLength: 1);
+        var oldTree = AkburaSyntaxTree.ParseText(oldCode, "Counter.akbura");
+        var csharpCompilation = CreateCSharpCompilation()
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(csharpCode));
+        var oldCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [oldTree],
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            rootNamespace: "Demo",
+            projectDirectory: Environment.CurrentDirectory);
+        var oldModel = oldCompilation.GetSemanticModel(oldTree);
+        var oldState = Assert.IsType<StateDeclarationSyntax>(oldTree.GetRoot().Members[1]);
+        var oldStateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            oldModel.GetSymbolInfo(oldState).Symbol);
+        var oldBoundNode = oldModel.BindingSession.BindSemanticSyntax(oldState);
+
+        var newTree = oldTree.WithChangedText(SourceText.From(newCode), [change]);
+        var newCompilation = oldCompilation.WithSyntaxTrees([newTree]);
+        var newModel = newCompilation.GetSemanticModel(newTree);
+        var newState = Assert.IsType<StateDeclarationSyntax>(newTree.GetRoot().Members[1]);
+        var newStateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            newModel.GetSymbolInfo(newState).Symbol);
+        var newBoundNode = newModel.BindingSession.BindSemanticSyntax(newState);
+
+        Assert.Same(oldState.Green, newState.Green);
+        Assert.Equal("global::Demo.A.Widget", oldStateSymbol.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal("global::Demo.B.Widget", newStateSymbol.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.NotSame(oldStateSymbol, newStateSymbol);
+        Assert.NotSame(oldBoundNode, newBoundNode);
+    }
+
+    [Fact]
+    public void SemanticBindingCache_ChangedComponentScopeDoesNotReuseUnchangedMarkupOperation()
+    {
+        const string oldCode =
+            "using Avalonia.Controls;\n" +
+            "using Demo.A;\n" +
+            "\n" +
+            "<TextBlock Text={Widget.Value.ToString()} />";
+        const string newCode =
+            "using Avalonia.Controls;\n" +
+            "using Demo.B;\n" +
+            "\n" +
+            "<TextBlock Text={Widget.Value.ToString()} />";
+        const string csharpCode =
+            """
+            namespace Demo.A
+            {
+                public static class Widget
+                {
+                    public static int Value => 1;
+                }
+            }
+
+            namespace Demo.B
+            {
+                public static class Widget
+                {
+                    public static int Value => 2;
+                }
+            }
+            """;
+        var changeStart = oldCode.IndexOf("Demo.A", StringComparison.Ordinal) + "Demo.".Length;
+        var change = new TextChangeRange(new TextSpan(changeStart, 1), newLength: 1);
+        var oldTree = AkburaSyntaxTree.ParseText(oldCode, "Counter.akbura");
+        var csharpCompilation = CreateCSharpCompilation()
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(csharpCode));
+        var oldCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [oldTree],
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            rootNamespace: "Demo",
+            projectDirectory: Environment.CurrentDirectory);
+        var oldModel = oldCompilation.GetSemanticModel(oldTree);
+        var oldMarkup = Assert.IsType<MarkupRootSyntax>(oldTree.GetRoot().Members[2]);
+        var oldAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            oldMarkup.Element.StartTag!.Attributes[0]);
+        var oldOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            oldModel.GetOperation(oldAttribute));
+
+        var newTree = oldTree.WithChangedText(SourceText.From(newCode), [change]);
+        var newCompilation = oldCompilation.WithSyntaxTrees([newTree]);
+        var newModel = newCompilation.GetSemanticModel(newTree);
+        var newMarkup = Assert.IsType<MarkupRootSyntax>(newTree.GetRoot().Members[2]);
+        var newAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            newMarkup.Element.StartTag!.Attributes[0]);
+        var newOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            newModel.GetOperation(newAttribute));
+
+        Assert.Same(oldAttribute.Green, newAttribute.Green);
+        Assert.NotSame(oldOperation, newOperation);
+    }
+
+    [Fact]
     public void MemberSemanticModel_CachesByComponentScope()
     {
         const string code =

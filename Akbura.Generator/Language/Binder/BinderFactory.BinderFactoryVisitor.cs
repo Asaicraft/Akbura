@@ -3,6 +3,8 @@ using Akbura.Language.Syntax;
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Akbura.Language.Binder;
 
@@ -54,6 +56,18 @@ internal sealed partial class BinderFactory
 
         internal static BinderCacheKey CreateBinderCacheKey(
             AkburaSyntax syntax,
+            BinderUsage usage)
+        {
+            if (syntax == null)
+            {
+                throw new ArgumentNullException(nameof(syntax));
+            }
+
+            return new BinderCacheKey(syntax.Green, usage);
+        }
+
+        internal static SemanticReuseKey CreateSemanticReuseKey(
+            AkburaSyntax syntax,
             ImmutableArray<AkburaDeclaration> path,
             BinderUsage usage)
         {
@@ -64,23 +78,21 @@ internal sealed partial class BinderFactory
 
             if (path.IsDefaultOrEmpty)
             {
-                return new BinderCacheKey(
+                return new SemanticReuseKey(
                     syntax.Green,
                     usage,
                     AkburaBinderFlags.None,
                     AkburaDeclarationKind.None,
-                    scopeDesignator: null,
-                    nextScopeKey: string.Empty);
+                    scopeKey: string.Empty);
             }
 
             var declaration = path[path.Length - 1];
-            return new BinderCacheKey(
+            return new SemanticReuseKey(
                 syntax.Green,
                 usage,
                 GetPathFlags(path),
                 declaration.Kind,
-                GetScopeDesignator(path)?.Green,
-                GetNextScopeKey(path));
+                GetStableScopeChainKey(path));
         }
 
         public override Binder DefaultVisit(AkburaSyntax akburaSyntax)
@@ -225,46 +237,70 @@ internal sealed partial class BinderFactory
             };
         }
 
-        private static AkburaSyntax? GetScopeDesignator(ImmutableArray<AkburaDeclaration> path)
+        private static bool IsScopeDeclaration(AkburaDeclarationKind kind)
         {
-            for (var index = path.Length - 1; index >= 0; index--)
-            {
-                var declaration = path[index];
-                switch (declaration.Kind)
-                {
-                    case AkburaDeclarationKind.Component:
-                    case AkburaDeclarationKind.MarkupRoot:
-                    case AkburaDeclarationKind.MarkupElement:
-                    case AkburaDeclarationKind.CSharpBlock:
-                    case AkburaDeclarationKind.AkcssModule:
-                    case AkburaDeclarationKind.AkcssStyle:
-                    case AkburaDeclarationKind.AkcssUtility:
-                        return declaration.Syntax;
-                }
-            }
-
-            return null;
+            return kind is
+                AkburaDeclarationKind.Component or
+                AkburaDeclarationKind.MarkupRoot or
+                AkburaDeclarationKind.MarkupElement or
+                AkburaDeclarationKind.CSharpBlock or
+                AkburaDeclarationKind.AkcssModule or
+                AkburaDeclarationKind.AkcssStyle or
+                AkburaDeclarationKind.AkcssUtility;
         }
 
-        private static string GetNextScopeKey(ImmutableArray<AkburaDeclaration> path)
+        private static string GetStableScopeChainKey(ImmutableArray<AkburaDeclaration> path)
         {
-            for (var index = path.Length - 2; index >= 0; index--)
+            var builder = new StringBuilder();
+            foreach (var declaration in path)
             {
-                var declaration = path[index];
-                switch (declaration.Kind)
+                if (IsScopeDeclaration(declaration.Kind))
                 {
-                    case AkburaDeclarationKind.Component:
-                    case AkburaDeclarationKind.MarkupRoot:
-                    case AkburaDeclarationKind.MarkupElement:
-                    case AkburaDeclarationKind.CSharpBlock:
-                    case AkburaDeclarationKind.AkcssModule:
-                    case AkburaDeclarationKind.AkcssStyle:
-                    case AkburaDeclarationKind.AkcssUtility:
-                        return $"{declaration.Kind}:{declaration.Name}:{declaration.Syntax.FullSpan}";
+                    builder.Append(GetStableScopeKey(declaration));
+                    builder.Append('|');
                 }
             }
 
-            return string.Empty;
+            return builder.ToString();
+        }
+
+        private static string GetStableScopeKey(AkburaDeclaration declaration)
+        {
+            return declaration.Kind switch
+            {
+                AkburaDeclarationKind.Component =>
+                    $"{declaration.Kind}:{declaration.Name}:{GetChildSyntaxSignature(declaration, AkburaDeclarationKind.Namespace, AkburaDeclarationKind.Using)}",
+                AkburaDeclarationKind.AkcssModule =>
+                    $"{declaration.Kind}:{declaration.Name}:{GetChildSyntaxSignature(declaration, AkburaDeclarationKind.AkcssUsing)}",
+                AkburaDeclarationKind.MarkupRoot or
+                    AkburaDeclarationKind.MarkupElement or
+                    AkburaDeclarationKind.AkcssStyle or
+                    AkburaDeclarationKind.AkcssUtility =>
+                    $"{declaration.Kind}:{declaration.Name}",
+                _ =>
+                    $"{declaration.Kind}:{declaration.Name}:{RuntimeHelpers.GetHashCode(declaration.Syntax.Green)}",
+            };
+        }
+
+        private static string GetChildSyntaxSignature(
+            AkburaDeclaration declaration,
+            params AkburaDeclarationKind[] kinds)
+        {
+            var builder = new StringBuilder();
+            foreach (var child in declaration.Children)
+            {
+                foreach (var kind in kinds)
+                {
+                    if (child.Kind == kind)
+                    {
+                        builder.Append(child.Syntax.ToFullString());
+                        builder.Append('|');
+                        break;
+                    }
+                }
+            }
+
+            return builder.ToString();
         }
     }
 }

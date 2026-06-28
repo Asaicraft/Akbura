@@ -100,12 +100,14 @@ internal sealed partial class AkburaSemanticModel
                     CacheBoundNode(Unsafe.As<InjectDeclarationSyntax>(syntax), new BoundInjectDeclaration(
                         Unsafe.As<InjectDeclarationSyntax>(syntax),
                         SemanticModel.GetBinder(syntax, BinderUsage.Expression),
-                        symbolInfo)),
+                        symbolInfo,
+                        SemanticModel.GetCachedSemanticDiagnostics(syntax))),
                 AkburaSyntaxKind.CommandDeclarationSyntax =>
                     CacheBoundNode(Unsafe.As<CommandDeclarationSyntax>(syntax), new BoundCommandDeclaration(
                         Unsafe.As<CommandDeclarationSyntax>(syntax),
                         SemanticModel.GetBinder(syntax, BinderUsage.Expression),
-                        symbolInfo)),
+                        symbolInfo,
+                        SemanticModel.GetCachedSemanticDiagnostics(syntax))),
                 AkburaSyntaxKind.UseEffectDeclarationSyntax =>
                     CreateAndCacheBoundUseEffectDeclaration(Unsafe.As<UseEffectDeclarationSyntax>(syntax), symbolInfo),
                 _ => new BoundDeclaration(
@@ -464,7 +466,8 @@ internal sealed partial class AkburaSemanticModel
             SemanticModel._boundNodeCache[injectDeclaration] = new BoundInjectDeclaration(
                 injectDeclaration,
                 SemanticModel.GetBinder(injectDeclaration, BinderUsage.Expression),
-                symbolInfo);
+                symbolInfo,
+                diagnostics);
             return symbolInfo;
         }
 
@@ -500,7 +503,8 @@ internal sealed partial class AkburaSemanticModel
             SemanticModel._boundNodeCache[commandDeclaration] = new BoundCommandDeclaration(
                 commandDeclaration,
                 SemanticModel.GetBinder(commandDeclaration, BinderUsage.Expression),
-                symbolInfo);
+                symbolInfo,
+                diagnostics);
             return symbolInfo;
         }
 

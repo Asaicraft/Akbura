@@ -136,6 +136,16 @@ internal sealed partial class AkburaSemanticModel
                     diagnosticsBuilder);
             }
 
+            if (property.Command is { } commandSymbol)
+            {
+                AddMarkupCommandHandlerSignatureDiagnostics(
+                    markupAttribute,
+                    commandSymbol,
+                    dynamicExpression,
+                    commandHandler,
+                    diagnosticsBuilder);
+            }
+
             AddMarkupExpressionDiagnostics(
                 markupAttribute,
                 commandHandler.Diagnostics,
@@ -1031,12 +1041,39 @@ internal sealed partial class AkburaSemanticModel
     {
         AddMarkupExpressionDiagnostics(
             markupAttribute,
-            binding.Diagnostics,
+            GetMarkupExpressionDiagnosticText(markupAttribute),
+            binding,
             diagnosticsBuilder);
     }
 
     private void AddMarkupExpressionDiagnostics(
         MarkupAttributeSyntax markupAttribute,
+        ImmutableArray<Diagnostic> diagnostics,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        AddMarkupExpressionDiagnostics(
+            markupAttribute,
+            GetMarkupExpressionDiagnosticText(markupAttribute),
+            diagnostics,
+            diagnosticsBuilder);
+    }
+
+    private void AddMarkupExpressionDiagnostics(
+        AkburaSyntax syntax,
+        string expressionText,
+        CSharpBindingResult binding,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        AddMarkupExpressionDiagnostics(
+            syntax,
+            expressionText,
+            binding.Diagnostics,
+            diagnosticsBuilder);
+    }
+
+    private void AddMarkupExpressionDiagnostics(
+        AkburaSyntax syntax,
+        string expressionText,
         ImmutableArray<Diagnostic> diagnostics,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
@@ -1050,10 +1087,140 @@ internal sealed partial class AkburaSemanticModel
             if (diagnostic.Severity == DiagnosticSeverity.Error)
             {
                 diagnosticsBuilder.Add(CreateMarkupExpressionErrorDiagnostic(
-                    markupAttribute,
+                    syntax,
+                    expressionText,
                     diagnostic));
             }
         }
+    }
+
+    private void AddMarkupCommandHandlerSignatureDiagnostics(
+        MarkupAttributeSyntax markupAttribute,
+        ICommandSymbol command,
+        CSharp.ExpressionSyntax? expression,
+        MarkupCommandHandlerAnalysis handler,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (handler.Kind != MarkupCommandHandlerKind.Lambda ||
+            expression == null)
+        {
+            return;
+        }
+
+        if (handler.ParameterCount != 0 &&
+            handler.ParameterCount != command.Parameters.Length)
+        {
+            diagnosticsBuilder.Add(CreateMarkupCommandHandlerSignatureMismatchDiagnostic(
+                markupAttribute,
+                command,
+                FormatCommandHandlerParameterExpectation(command),
+                handler.ParameterCount + " parameter(s)"));
+            return;
+        }
+
+        if (handler.ParameterCount != 0 &&
+            TryGetLambdaParameterTypes(expression, out var actualParameterTypes) &&
+            !HasCompatibleCommandHandlerParameters(command, actualParameterTypes))
+        {
+            diagnosticsBuilder.Add(CreateMarkupCommandHandlerSignatureMismatchDiagnostic(
+                markupAttribute,
+                command,
+                FormatCommandHandlerParameterTypes(command),
+                FormatEventHandlerSignature(actualParameterTypes)));
+            return;
+        }
+
+        if (handler.ResultMode != MarkupCommandResultMode.ReturnsResult)
+        {
+            return;
+        }
+
+        if (!command.HasResult)
+        {
+            diagnosticsBuilder.Add(CreateMarkupCommandHandlerSignatureMismatchDiagnostic(
+                markupAttribute,
+                command,
+                "no result",
+                FormatCommandHandlerResultType(handler.ResultType)));
+            return;
+        }
+
+        if (handler.ResultType.Symbol is not ITypeSymbol sourceType ||
+            command.ResultType.Symbol is not ITypeSymbol targetType ||
+            IsSameType(sourceType, targetType) ||
+            Compilation.CSharpCompilation.ClassifyConversion(sourceType, targetType).IsImplicit)
+        {
+            return;
+        }
+
+        diagnosticsBuilder.Add(CreateMarkupCommandHandlerSignatureMismatchDiagnostic(
+            markupAttribute,
+            command,
+            targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            sourceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+    }
+
+    private bool HasCompatibleCommandHandlerParameters(
+        ICommandSymbol command,
+        ImmutableArray<CSharp.TypeSyntax?> actualParameterTypes)
+    {
+        if (actualParameterTypes.Length != command.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < actualParameterTypes.Length; index++)
+        {
+            var actualParameterType = actualParameterTypes[index];
+            if (actualParameterType == null)
+            {
+                continue;
+            }
+
+            if (command.Parameters[index].Type.Symbol is not ITypeSymbol expectedType)
+            {
+                return false;
+            }
+
+            var binding = BindCSharpType(actualParameterType);
+            if (binding.TypeSymbol == null ||
+                !IsSameType(expectedType, binding.TypeSymbol))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string FormatCommandHandlerParameterExpectation(ICommandSymbol command)
+    {
+        return command.Parameters.Length == 0
+            ? "0 parameter(s)"
+            : "0 or " + command.Parameters.Length + " parameter(s)";
+    }
+
+    private static string FormatCommandHandlerParameterTypes(ICommandSymbol command)
+    {
+        if (command.Parameters.Length == 0)
+        {
+            return "()";
+        }
+
+        return "(" +
+            string.Join(
+                ", ",
+                command.Parameters.Select(static parameter => parameter.Type.IsDefault
+                    ? "object"
+                    : parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))) +
+            ")";
+    }
+
+    private static string FormatCommandHandlerResultType(CSharpSymbolDefinition resultType)
+    {
+        return resultType.IsDefault
+            ? "<unknown>"
+            : resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
 
     private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandHandler(
@@ -2096,14 +2263,41 @@ internal sealed partial class AkburaSemanticModel
         MarkupAttributeSyntax syntax,
         Diagnostic diagnostic)
     {
+        return CreateMarkupExpressionErrorDiagnostic(
+            syntax,
+            GetMarkupExpressionDiagnosticText(syntax),
+            diagnostic);
+    }
+
+    private static string GetMarkupExpressionDiagnosticText(MarkupAttributeSyntax syntax)
+    {
         var valueSyntax = GetMarkupAttributeValue(syntax);
-        var expressionText = valueSyntax == null
+        return valueSyntax == null
             ? syntax.ToFullString().Trim()
             : valueSyntax.ToFullString().Trim();
+    }
+
+    private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(
+        AkburaSyntax syntax,
+        string expressionText,
+        Diagnostic diagnostic)
+    {
         return new AkburaSemanticDiagnostic(
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError,
             [expressionText, diagnostic.GetMessage()]);
+    }
+
+    private static AkburaSemanticDiagnostic CreateMarkupCommandHandlerSignatureMismatchDiagnostic(
+        MarkupAttributeSyntax markupAttribute,
+        ICommandSymbol command,
+        string expected,
+        string actual)
+    {
+        return new AkburaSemanticDiagnostic(
+            markupAttribute,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch,
+            [command.Name, expected, actual]);
     }
 
     private AkburaSemanticDiagnostic CreateAkcssImportNotFoundDiagnostic(string importName)

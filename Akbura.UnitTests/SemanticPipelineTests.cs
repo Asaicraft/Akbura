@@ -1866,6 +1866,31 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssValueCannotConvert_ProducesDiagnostic()
+    {
+        const string code =
+            """
+            @akcss {
+                .myText {
+                    Padding: FontWeight.Bold;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(Assert.Single(rule.Members));
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(assignment));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssValueCannotConvert, diagnostic.Code);
+        Assert.Contains("Padding", diagnostic.Message);
+        Assert.Contains("FontWeight", diagnostic.Message);
+        Assert.Contains("Thickness", diagnostic.Message);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssIfInvalidCSharpExpression_ProducesDiagnostic()
     {
         const string code =
@@ -2972,6 +2997,41 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_DocumentDiagnostics_AggregateNestedMarkupAndAkcssDiagnostics()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                .bad {
+                    Padding: FontWeight.Bold;
+                }
+            }
+
+            <StackPanel>
+                <TextBlock Text={missingAttribute}/>
+                <TextBlock>{missingContent}</TextBlock>
+            </StackPanel>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+
+        var diagnostics = semanticModel.GetSemanticDiagnostics(syntaxTree.GetRoot());
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError &&
+            diagnostic.Message.Contains("missingAttribute"));
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError &&
+            diagnostic.Message.Contains("missingContent"));
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_AkcssValueCannotConvert &&
+            diagnostic.Message.Contains("Padding"));
+    }
+
+    [Fact]
     public void SemanticModel_TailwindInvalidExpressionSegments_ProduceDiagnostics()
     {
         const string code =
@@ -3859,6 +3919,40 @@ public class SemanticPipelineTests
         {
             Assert.Equal(expectedResultTypeName, operation.HandlerResultType.Name);
         }
+    }
+
+    [Theory]
+    [InlineData("(x, y) => x")]
+    [InlineData("(string x) => x")]
+    [InlineData("x => \"bad\"")]
+    public void SemanticModel_MarkupCommandAttribute_RejectsInvalidHandlerSignature(string handler)
+    {
+        const string aCode =
+            """
+            namespace SomeNs;
+
+            command int Click(int a);
+            """;
+        var bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "<A Click={" + handler + "}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(attribute),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch);
+
+        Assert.True(operation.HasErrors);
+        Assert.Contains("Click", diagnostic.Message);
     }
 
     [Fact]

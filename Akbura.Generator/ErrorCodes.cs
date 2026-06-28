@@ -37,12 +37,14 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_MarkupDuplicatePropertySetter = nameof(AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);
     public const string AKBURA_SEMANTIC_MarkupEventBindingNotAllowed = nameof(AKBURA_SEMANTIC_MarkupEventBindingNotAllowed);
     public const string AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch = nameof(AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch);
+    public const string AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch = nameof(AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch);
     public const string AKBURA_SEMANTIC_TailwindUtilityNotFound = nameof(AKBURA_SEMANTIC_TailwindUtilityNotFound);
     public const string AKBURA_SEMANTIC_TailwindUtilityAmbiguous = nameof(AKBURA_SEMANTIC_TailwindUtilityAmbiguous);
     public const string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch = nameof(AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch);
     public const string AKBURA_SEMANTIC_AkcssImportNotFound = nameof(AKBURA_SEMANTIC_AkcssImportNotFound);
     public const string AKBURA_SEMANTIC_AkcssApplyItemNotFound = nameof(AKBURA_SEMANTIC_AkcssApplyItemNotFound);
     public const string AKBURA_SEMANTIC_AkcssApplyItemAmbiguous = nameof(AKBURA_SEMANTIC_AkcssApplyItemAmbiguous);
+    public const string AKBURA_SEMANTIC_AkcssValueCannotConvert = nameof(AKBURA_SEMANTIC_AkcssValueCannotConvert);
     public const string AKBURA_SEMANTIC_AkcssInterceptTypeNotFound = nameof(AKBURA_SEMANTIC_AkcssInterceptTypeNotFound);
     public const string AKBURA_SEMANTIC_AkcssInterceptTypeInvalid = nameof(AKBURA_SEMANTIC_AkcssInterceptTypeInvalid);
     public const string AKBURA_SEMANTIC_AkcssInterceptIgnoresMember = nameof(AKBURA_SEMANTIC_AkcssInterceptIgnoresMember);

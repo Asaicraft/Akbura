@@ -218,8 +218,12 @@ internal sealed class BoundParamDefaultValue : BoundNode
 
 internal sealed class BoundInjectDeclaration : BoundNamedDeclaration
 {
-    public BoundInjectDeclaration(InjectDeclarationSyntax syntax, BinderType binder, AkburaSymbolInfo symbolInfo)
-        : base(BoundKind.InjectDeclaration, syntax, binder, symbolInfo)
+    public BoundInjectDeclaration(
+        InjectDeclarationSyntax syntax,
+        BinderType binder,
+        AkburaSymbolInfo symbolInfo,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
+        : base(BoundKind.InjectDeclaration, syntax, binder, symbolInfo, diagnostics)
     {
     }
 
@@ -238,8 +242,12 @@ internal sealed class BoundInjectDeclaration : BoundNamedDeclaration
 
 internal sealed class BoundCommandDeclaration : BoundNamedDeclaration
 {
-    public BoundCommandDeclaration(CommandDeclarationSyntax syntax, BinderType binder, AkburaSymbolInfo symbolInfo)
-        : base(BoundKind.CommandDeclaration, syntax, binder, symbolInfo)
+    public BoundCommandDeclaration(
+        CommandDeclarationSyntax syntax,
+        BinderType binder,
+        AkburaSymbolInfo symbolInfo,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
+        : base(BoundKind.CommandDeclaration, syntax, binder, symbolInfo, diagnostics)
     {
     }
 

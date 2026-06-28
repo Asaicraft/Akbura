@@ -97,6 +97,19 @@ internal sealed partial class AkburaSemanticModel
         });
     }
 
+    public AkburaSymbol? GetDeclaredSymbol(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        ValidateSyntaxTreeOwnership(syntax);
+        return Compilation.DeclarationTable.TryGetDeclaration(syntax, out var declaration)
+            ? _declarationSymbols.GetSymbolInfo(declaration).Symbol
+            : null;
+    }
+
     public ImmutableArray<AkburaSemanticDiagnostic> GetSemanticDiagnostics(AkburaSyntax syntax)
     {
         if (syntax == null)

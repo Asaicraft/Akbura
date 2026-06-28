@@ -1013,6 +1013,47 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void SemanticModel_GetDeclaredSymbol_UsesDeclarationSymbolTable()
+    {
+        const string code =
+            "inject int service;\n" +
+            "param int UserId = 1;\n" +
+            "state int count = 0;\n" +
+            "command int Refresh(int id);\n" +
+            "useEffect(count) { }\n" +
+            "@akcss {\n" +
+            "    .card { Background: White; }\n" +
+            "    @utilities { .w-(double value) { Width: value; } }\n" +
+            "}\n" +
+            "<TextBlock Text=\"Hello\" />";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var inject = Assert.IsType<InjectDeclarationSyntax>(root.Members[0]);
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[1]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
+        var command = Assert.IsType<CommandDeclarationSyntax>(root.Members[3]);
+        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[4]);
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[5]);
+        var style = Assert.IsType<AkcssStyleRuleSyntax>(inlineAkcss.Members[0]);
+        var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(inlineAkcss.Members[1]);
+        var utility = Assert.Single(utilities.Utilities);
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[6]);
+
+        Assert.IsAssignableFrom<IAkburaComponentSymbol>(model.GetDeclaredSymbol(root));
+        Assert.IsAssignableFrom<IInjectSymbol>(model.GetDeclaredSymbol(inject));
+        Assert.IsAssignableFrom<IParamSymbol>(model.GetDeclaredSymbol(param));
+        Assert.IsAssignableFrom<IStateSymbol>(model.GetDeclaredSymbol(state));
+        Assert.IsAssignableFrom<ICommandSymbol>(model.GetDeclaredSymbol(command));
+        Assert.IsAssignableFrom<IUseEffectSymbol>(model.GetDeclaredSymbol(useEffect));
+        Assert.IsAssignableFrom<IAkcssModuleSymbol>(model.GetDeclaredSymbol(inlineAkcss));
+        Assert.IsAssignableFrom<IAkcssSymbol>(model.GetDeclaredSymbol(style));
+        Assert.IsAssignableFrom<ITailwindUtilitySymbol>(model.GetDeclaredSymbol(utility));
+        Assert.Same(model.GetSymbolInfo(state).Symbol, model.GetDeclaredSymbol(state));
+        Assert.Null(model.GetDeclaredSymbol(markup.Element));
+    }
+
+    [Fact]
     public void BoundWrapping_WithDeclaredSymbolsCreatesBoundBlock()
     {
         const string code =

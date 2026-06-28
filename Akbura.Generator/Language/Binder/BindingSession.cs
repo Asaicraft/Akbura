@@ -111,6 +111,18 @@ internal sealed class BindingSession
             () => GetOperationBinder(syntax).BindOperationSyntax(syntax));
     }
 
+    public BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        return _semanticModel.GetBoundNode(
+            syntax,
+            () => GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
+    }
+
     private Binder GetOperationBinder(AkburaSyntax syntax)
     {
         var usage = syntax.Kind switch
@@ -120,6 +132,32 @@ internal sealed class BindingSession
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
             AkburaSyntaxKind.AkcssAssignmentSyntax or
+                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
+                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
+                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => BinderUsage.Akcss,
+            _ => BinderUsage.Expression,
+        };
+
+        return GetBinder(syntax.Root, syntax.Position, usage);
+    }
+
+    private Binder GetSemanticBinder(AkburaSyntax syntax)
+    {
+        var usage = syntax.Kind switch
+        {
+            AkburaSyntaxKind.MarkupRootSyntax or
+                AkburaSyntaxKind.MarkupElementSyntax or
+                AkburaSyntaxKind.MarkupElementContentSyntax or
+                AkburaSyntaxKind.MarkupInlineExpressionSyntax or
+                AkburaSyntaxKind.MarkupTextLiteralSyntax or
+                AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
+            AkburaSyntaxKind.InlineAkcssBlockSyntax or
+                AkburaSyntaxKind.AkcssStyleRuleSyntax or
+                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax or
+                AkburaSyntaxKind.AkcssAssignmentSyntax or
                 AkburaSyntaxKind.AkcssIfDirectiveSyntax or
                 AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
                 AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => BinderUsage.Akcss,

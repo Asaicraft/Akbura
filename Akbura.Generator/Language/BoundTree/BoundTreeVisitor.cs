@@ -33,7 +33,19 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitUseEffectDeclaration(BoundUseEffectDeclaration node) => VisitDeclaration(node);
 
+    public virtual void VisitStateInitializer(BoundStateInitializer node) => DefaultVisit(node);
+
+    public virtual void VisitParamDefaultValue(BoundParamDefaultValue node) => DefaultVisit(node);
+
+    public virtual void VisitUseEffectDependency(BoundUseEffectDependency node) => DefaultVisit(node);
+
+    public virtual void VisitUseEffectBody(BoundUseEffectBody node) => DefaultVisit(node);
+
+    public virtual void VisitMarkupRoot(BoundMarkupRoot node) => DefaultVisit(node);
+
     public virtual void VisitMarkupComponent(BoundMarkupComponent node) => DefaultVisit(node);
+
+    public virtual void VisitMarkupContent(BoundMarkupContent node) => DefaultVisit(node);
 
     public virtual void VisitAkcssModule(BoundAkcssModule node) => DefaultVisit(node);
 
@@ -111,7 +123,19 @@ internal abstract class BoundTreeVisitor<TResult>
 
     public virtual TResult? VisitUseEffectDeclaration(BoundUseEffectDeclaration node) => VisitDeclaration(node);
 
+    public virtual TResult? VisitStateInitializer(BoundStateInitializer node) => DefaultVisit(node);
+
+    public virtual TResult? VisitParamDefaultValue(BoundParamDefaultValue node) => DefaultVisit(node);
+
+    public virtual TResult? VisitUseEffectDependency(BoundUseEffectDependency node) => DefaultVisit(node);
+
+    public virtual TResult? VisitUseEffectBody(BoundUseEffectBody node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupRoot(BoundMarkupRoot node) => DefaultVisit(node);
+
     public virtual TResult? VisitMarkupComponent(BoundMarkupComponent node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupContent(BoundMarkupContent node) => DefaultVisit(node);
 
     public virtual TResult? VisitAkcssModule(BoundAkcssModule node) => DefaultVisit(node);
 
@@ -201,7 +225,25 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
     public virtual TResult? VisitUseEffectDeclaration(BoundUseEffectDeclaration node, TParameter parameter) =>
         VisitDeclaration(node, parameter);
 
+    public virtual TResult? VisitStateInitializer(BoundStateInitializer node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitParamDefaultValue(BoundParamDefaultValue node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitUseEffectDependency(BoundUseEffectDependency node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitUseEffectBody(BoundUseEffectBody node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupRoot(BoundMarkupRoot node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
     public virtual TResult? VisitMarkupComponent(BoundMarkupComponent node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupContent(BoundMarkupContent node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitAkcssModule(BoundAkcssModule node, TParameter parameter) =>

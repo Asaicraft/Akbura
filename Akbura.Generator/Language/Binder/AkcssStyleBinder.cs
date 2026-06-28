@@ -56,6 +56,22 @@ internal sealed class AkcssStyleBinder : Binder
         };
     }
 
+    public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.AkcssStyleRuleSyntax or
+                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax =>
+                SemanticModel.CreateBoundAkcssSyntax(syntax),
+            AkburaSyntaxKind.AkcssAssignmentSyntax or
+                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
+                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
+                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax =>
+                BindOperationSyntax(syntax),
+            _ => base.BindSemanticSyntax(syntax),
+        };
+    }
+
     protected override void LookupSymbolsInSingleBinder(
         LookupResult result,
         string name,

@@ -66,6 +66,113 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node.Update(symbolInfo, children);
     }
 
+    public override BoundNode? VisitStateInitializer(BoundStateInitializer node)
+    {
+        return node;
+    }
+
+    public override BoundNode? VisitParamDefaultValue(BoundParamDefaultValue node)
+    {
+        return node;
+    }
+
+    public override BoundNode? VisitUseEffectDependency(BoundUseEffectDependency node)
+    {
+        return node;
+    }
+
+    public override BoundNode? VisitUseEffectBody(BoundUseEffectBody node)
+    {
+        var children = VisitList(node.Children);
+        return node.Update(children);
+    }
+
+    public override BoundNode? VisitMarkupRoot(BoundMarkupRoot node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var children = VisitList(node.Children);
+        return node.Update(symbolInfo, children);
+    }
+
+    public override BoundNode? VisitMarkupComponent(BoundMarkupComponent node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var children = VisitList(node.Children);
+        if (symbolInfo.Equals(node.SymbolInfo) &&
+            children == node.Children)
+        {
+            return node;
+        }
+
+        return new BoundMarkupComponent(
+            node.Syntax,
+            node.Binder,
+            symbolInfo,
+            node.Diagnostics,
+            children);
+    }
+
+    public override BoundNode? VisitMarkupContent(BoundMarkupContent node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var children = VisitList(node.Children);
+        return node.Update(symbolInfo, children);
+    }
+
+    public override BoundNode? VisitAkcssModule(BoundAkcssModule node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var children = VisitList(node.Children);
+        if (symbolInfo.Equals(node.SymbolInfo) &&
+            children == node.Children)
+        {
+            return node;
+        }
+
+        return new BoundAkcssModule(
+            node.Syntax,
+            node.Binder,
+            symbolInfo,
+            node.Diagnostics,
+            children);
+    }
+
+    public override BoundNode? VisitAkcssStyle(BoundAkcssStyle node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var children = VisitList(node.Children);
+        if (symbolInfo.Equals(node.SymbolInfo) &&
+            children == node.Children)
+        {
+            return node;
+        }
+
+        return new BoundAkcssStyle(
+            node.Syntax,
+            node.Binder,
+            symbolInfo,
+            node.Diagnostics,
+            children);
+    }
+
+    public override BoundNode? VisitAkcssUtility(BoundAkcssUtility node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var children = VisitList(node.Children);
+        if (symbolInfo.Equals(node.SymbolInfo) &&
+            children == node.Children)
+        {
+            return node;
+        }
+
+        return new BoundAkcssUtility(
+            node.Syntax,
+            node.Binder,
+            symbolInfo,
+            node.Diagnostics,
+            children);
+    }
+
     public override BoundNode? VisitMarkupPropertySetter(BoundMarkupPropertySetter node) => node;
 
     public override BoundNode? VisitMarkupCommandBinding(BoundMarkupCommandBinding node) => node;

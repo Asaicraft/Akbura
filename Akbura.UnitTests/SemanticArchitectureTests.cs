@@ -1026,6 +1026,8 @@ public sealed class SemanticArchitectureTests
         var markupRoot = Assert.IsType<MarkupRootSyntax>(markupTree.GetRoot().Members[1]);
         var markupAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
             markupRoot.Element.StartTag!.Attributes[0]);
+        var boundMarkupRoot = markupModel.BindingSession.BindSemanticSyntax(markupRoot);
+        var boundMarkupComponent = markupModel.BindingSession.BindSemanticSyntax(markupRoot.Element);
         var markupSetter = markupModel.BindingSession.BindOperationSyntax(markupAttribute);
 
         const string akcssCode = "@akcss { Button.card { Background: White; } }";
@@ -1034,6 +1036,8 @@ public sealed class SemanticArchitectureTests
         var akcssBlock = Assert.IsType<InlineAkcssBlockSyntax>(akcssTree.GetRoot().Members[0]);
         var akcssRule = Assert.IsType<AkcssStyleRuleSyntax>(akcssBlock.Members[0]);
         var akcssAssignment = Assert.IsType<AkcssAssignmentSyntax>(akcssRule.Members[0]);
+        var boundAkcssModule = akcssModel.BindingSession.BindSemanticSyntax(akcssBlock);
+        var boundAkcssStyle = akcssModel.BindingSession.BindSemanticSyntax(akcssRule);
         var akcssSetter = akcssModel.BindingSession.BindOperationSyntax(akcssAssignment);
 
         Assert.Equal(BoundKind.Expression, expression.Kind);
@@ -1046,10 +1050,108 @@ public sealed class SemanticArchitectureTests
         Assert.Equal(BoundKind.ErrorExpression, errorExpression.Kind);
         Assert.Equal(BoundKind.LocalDeclarationStatement, localDeclaration.Kind);
         Assert.Equal(BoundKind.Declaration, declaration.Kind);
+        Assert.Equal(BoundKind.MarkupRoot, boundMarkupRoot.Kind);
+        Assert.Equal(BoundKind.MarkupComponent, boundMarkupComponent.Kind);
         Assert.Equal(BoundKind.MarkupPropertySetter, markupSetter.Kind);
+        Assert.Equal(BoundKind.AkcssModule, boundAkcssModule.Kind);
+        Assert.Equal(BoundKind.AkcssStyle, boundAkcssStyle.Kind);
         Assert.Equal(BoundKind.AkcssPropertySetter, akcssSetter.Kind);
         Assert.Equal(BoundKind.Block, block.Kind);
         Assert.Equal(BoundKind.BadStatement, badStatement.Kind);
+    }
+
+    [Fact]
+    public void BindingSession_BindsSemanticSyntaxCoverageTree()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+            param string Title = "Dashboard";
+
+            useEffect(count) {
+                <TextBlock Text={Title}/>
+            }
+
+            @akcss {
+                Button.card {
+                    Background: White;
+                    @if(true) {
+                        Opacity: 1;
+                    }
+                    @apply card;
+                }
+
+                @utilities {
+                    .w-(double value) {
+                        Width: value;
+                    }
+                }
+            }
+
+            <StackPanel>
+                <TextBlock Text="Hello"/>
+            </StackPanel>
+            """;
+
+        var tree = AkburaSyntaxTree.ParseText(code, "Dashboard.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+
+        var component = Assert.IsType<BoundComponentDeclaration>(
+            model.BindingSession.BindSemanticSyntax(root));
+        Assert.Contains(component.Children, child => child.Kind == BoundKind.StateDeclaration);
+        Assert.Contains(component.Children, child => child.Kind == BoundKind.ParamDeclaration);
+        Assert.Contains(component.Children, child => child.Kind == BoundKind.UseEffectDeclaration);
+        Assert.Contains(component.Children, child => child.Kind == BoundKind.AkcssModule);
+        Assert.Contains(component.Children, child => child.Kind == BoundKind.MarkupRoot);
+
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[1]);
+        var boundState = Assert.IsType<BoundStateDeclaration>(
+            model.BindingSession.BindSemanticSyntax(state));
+        Assert.Single(boundState.Children);
+        Assert.IsType<BoundStateInitializer>(boundState.Children[0]);
+
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[2]);
+        var boundParam = Assert.IsType<BoundParamDeclaration>(
+            model.BindingSession.BindSemanticSyntax(param));
+        Assert.Single(boundParam.Children);
+        Assert.IsType<BoundParamDefaultValue>(boundParam.Children[0]);
+
+        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[3]);
+        var boundUseEffect = Assert.IsType<BoundUseEffectDeclaration>(
+            model.BindingSession.BindSemanticSyntax(useEffect));
+        Assert.Contains(boundUseEffect.Children, child => child.Kind == BoundKind.UseEffectDependency);
+        var body = Assert.IsType<BoundUseEffectBody>(
+            Assert.Single(boundUseEffect.Children, child => child.Kind == BoundKind.UseEffectBody));
+        Assert.Contains(body.Children, child => child.Kind == BoundKind.MarkupRoot);
+
+        var akcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[4]);
+        var boundModule = Assert.IsType<BoundAkcssModule>(
+            model.BindingSession.BindSemanticSyntax(akcss));
+        Assert.Contains(boundModule.Children, child => child.Kind == BoundKind.AkcssStyle);
+        Assert.Contains(boundModule.Children, child => child.Kind == BoundKind.AkcssUtility);
+
+        var style = Assert.IsType<BoundAkcssStyle>(
+            Assert.Single(boundModule.Children, child => child.Kind == BoundKind.AkcssStyle));
+        Assert.Contains(style.Children, child => child.Kind == BoundKind.AkcssPropertySetter);
+        Assert.Contains(style.Children, child => child.Kind == BoundKind.AkcssIf);
+        Assert.Contains(style.Children, child => child.Kind == BoundKind.AkcssApply);
+
+        var utility = Assert.IsType<BoundAkcssUtility>(
+            Assert.Single(boundModule.Children, child => child.Kind == BoundKind.AkcssUtility));
+        Assert.Contains(utility.Children, child => child.Kind == BoundKind.AkcssPropertySetter);
+
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[5]);
+        var boundMarkupRoot = Assert.IsType<BoundMarkupRoot>(
+            model.BindingSession.BindSemanticSyntax(markup));
+        var boundMarkupComponent = Assert.IsType<BoundMarkupComponent>(
+            Assert.Single(boundMarkupRoot.Children));
+        Assert.Contains(boundMarkupComponent.Children, child => child.Kind == BoundKind.MarkupContent);
+        var nestedContent = Assert.IsType<BoundMarkupContent>(
+            Assert.Single(boundMarkupComponent.Children, child => child.Kind == BoundKind.MarkupContent));
+        Assert.Contains(nestedContent.Children, child => child.Kind == BoundKind.MarkupComponent);
     }
 
     [Fact]

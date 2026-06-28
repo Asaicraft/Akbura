@@ -48,4 +48,23 @@ internal sealed class MarkupBinder : Binder
             _ => base.BindOperationSyntax(syntax),
         };
     }
+
+    public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.MarkupRootSyntax or
+                AkburaSyntaxKind.MarkupElementSyntax or
+                AkburaSyntaxKind.MarkupElementContentSyntax or
+                AkburaSyntaxKind.MarkupInlineExpressionSyntax or
+                AkburaSyntaxKind.MarkupTextLiteralSyntax =>
+                SemanticModel.CreateBoundMarkupSyntax(syntax),
+            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+                AkburaSyntaxKind.TailwindFullAttributeSyntax =>
+                BindOperationSyntax(syntax),
+            _ => base.BindSemanticSyntax(syntax),
+        };
+    }
 }

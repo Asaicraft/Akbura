@@ -73,6 +73,15 @@ internal abstract class Binder
                    AkburaSymbolInfo.None(Symbols.CandidateReason.UnsupportedSyntax));
     }
 
+    public virtual BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+    {
+        return Next?.BindSemanticSyntax(syntax) ??
+               new BoundDeclaration(
+                   syntax,
+                   this,
+                   AkburaSymbolInfo.None(Symbols.CandidateReason.UnsupportedSyntax));
+    }
+
     public virtual AkburaSymbolInfo LookupSymbol(
         string name,
         BinderLookupOptions options,

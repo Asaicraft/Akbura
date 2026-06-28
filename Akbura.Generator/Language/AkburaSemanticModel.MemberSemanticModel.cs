@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
@@ -34,6 +35,8 @@ internal sealed partial class AkburaSemanticModel
         public AkburaDocumentSyntax Scope { get; }
 
         public abstract AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax);
+
+        public abstract BoundNode BindSemanticSyntax(AkburaSyntax syntax);
     }
 
     internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
@@ -65,6 +68,51 @@ internal sealed partial class AkburaSemanticModel
 
             SemanticModel._symbolInfoCache[syntax] = symbolInfo;
             return symbolInfo;
+        }
+
+        public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+        {
+            if (SemanticModel._boundNodeCache.TryGetValue(syntax, out var cached))
+            {
+                return cached;
+            }
+
+            var symbolInfo = GetSymbolInfo(syntax);
+            if (SemanticModel._boundNodeCache.TryGetValue(syntax, out cached))
+            {
+                return cached;
+            }
+
+            return syntax.Kind switch
+            {
+                AkburaSyntaxKind.AkburaDocumentSyntax =>
+                    CacheBoundNode(Unsafe.As<AkburaDocumentSyntax>(syntax), new BoundComponentDeclaration(
+                        Unsafe.As<AkburaDocumentSyntax>(syntax),
+                        SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                        symbolInfo,
+                        SemanticModel.GetCachedSemanticDiagnostics(syntax),
+                        CreateBoundChildrenForComponent(Unsafe.As<AkburaDocumentSyntax>(syntax)))),
+                AkburaSyntaxKind.StateDeclarationSyntax =>
+                    CreateAndCacheBoundStateDeclaration(Unsafe.As<StateDeclarationSyntax>(syntax), symbolInfo),
+                AkburaSyntaxKind.ParamDeclarationSyntax =>
+                    CreateAndCacheBoundParamDeclaration(Unsafe.As<ParamDeclarationSyntax>(syntax), symbolInfo),
+                AkburaSyntaxKind.InjectDeclarationSyntax =>
+                    CacheBoundNode(Unsafe.As<InjectDeclarationSyntax>(syntax), new BoundInjectDeclaration(
+                        Unsafe.As<InjectDeclarationSyntax>(syntax),
+                        SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                        symbolInfo)),
+                AkburaSyntaxKind.CommandDeclarationSyntax =>
+                    CacheBoundNode(Unsafe.As<CommandDeclarationSyntax>(syntax), new BoundCommandDeclaration(
+                        Unsafe.As<CommandDeclarationSyntax>(syntax),
+                        SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                        symbolInfo)),
+                AkburaSyntaxKind.UseEffectDeclarationSyntax =>
+                    CreateAndCacheBoundUseEffectDeclaration(Unsafe.As<UseEffectDeclarationSyntax>(syntax), symbolInfo),
+                _ => new BoundDeclaration(
+                    syntax,
+                    SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                    AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax)),
+            };
         }
 
         private AkburaSymbolInfo ResolveAkburaComponent(AkburaDocumentSyntax document)
@@ -143,6 +191,12 @@ internal sealed partial class AkburaSemanticModel
             SemanticModel.SetSemanticDiagnostics(
                 document,
                 CreateUserHookDuplicateComponentMemberDiagnostics(document));
+            SemanticModel._boundNodeCache[document] = new BoundComponentDeclaration(
+                document,
+                SemanticModel.GetBinder(document, BinderUsage.Expression),
+                symbolInfo,
+                SemanticModel.GetCachedSemanticDiagnostics(document),
+                CreateBoundChildrenForComponent(document));
 
             return symbolInfo;
         }
@@ -328,13 +382,21 @@ internal sealed partial class AkburaSemanticModel
             var diagnostics = diagnosticsBuilder.ToImmutable();
             SemanticModel.SetSemanticDiagnostics(stateDeclaration, diagnostics);
 
-            return AkburaSymbolInfo.Success(new StateSymbol(
+            var symbolInfo = AkburaSymbolInfo.Success(new StateSymbol(
                 stateDeclaration,
                 type,
                 initializerType,
                 userHook,
                 hasExplicitType,
                 bindingKind));
+            CacheBoundStateDeclaration(
+                stateDeclaration,
+                symbolInfo,
+                initializerBinding,
+                bindingKind,
+                userHook,
+                diagnostics);
+            return symbolInfo;
         }
 
         private AkburaSymbolInfo ResolveParam(ParamDeclarationSyntax paramDeclaration)
@@ -366,14 +428,21 @@ internal sealed partial class AkburaSemanticModel
                     diagnosticsBuilder);
             }
 
-            SemanticModel.SetSemanticDiagnostics(paramDeclaration, diagnosticsBuilder.ToImmutable());
+            var diagnostics = diagnosticsBuilder.ToImmutable();
+            SemanticModel.SetSemanticDiagnostics(paramDeclaration, diagnostics);
 
-            return AkburaSymbolInfo.Success(new ParamSymbol(
+            var symbolInfo = AkburaSymbolInfo.Success(new ParamSymbol(
                 paramDeclaration,
                 type,
                 defaultValueType,
                 hasExplicitType,
                 bindingKind));
+            CacheBoundParamDeclaration(
+                paramDeclaration,
+                symbolInfo,
+                defaultValueBinding,
+                diagnostics);
+            return symbolInfo;
         }
 
         private AkburaSymbolInfo ResolveInject(InjectDeclarationSyntax injectDeclaration)
@@ -388,9 +457,15 @@ internal sealed partial class AkburaSemanticModel
 
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
             AddDuplicateComponentMemberDiagnostics(injectDeclaration, name, diagnosticsBuilder);
-            SemanticModel.SetSemanticDiagnostics(injectDeclaration, diagnosticsBuilder.ToImmutable());
+            var diagnostics = diagnosticsBuilder.ToImmutable();
+            SemanticModel.SetSemanticDiagnostics(injectDeclaration, diagnostics);
 
-            return AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
+            var symbolInfo = AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
+            SemanticModel._boundNodeCache[injectDeclaration] = new BoundInjectDeclaration(
+                injectDeclaration,
+                SemanticModel.GetBinder(injectDeclaration, BinderUsage.Expression),
+                symbolInfo);
+            return symbolInfo;
         }
 
         private AkburaSymbolInfo ResolveCommand(CommandDeclarationSyntax commandDeclaration)
@@ -411,9 +486,10 @@ internal sealed partial class AkburaSemanticModel
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
             AddDuplicateComponentMemberDiagnostics(commandDeclaration, name, diagnosticsBuilder);
             AddDuplicateCommandParameterDiagnostics(commandDeclaration, diagnosticsBuilder);
-            SemanticModel.SetSemanticDiagnostics(commandDeclaration, diagnosticsBuilder.ToImmutable());
+            var diagnostics = diagnosticsBuilder.ToImmutable();
+            SemanticModel.SetSemanticDiagnostics(commandDeclaration, diagnostics);
 
-            return AkburaSymbolInfo.Success(new CommandSymbol(
+            var symbolInfo = AkburaSymbolInfo.Success(new CommandSymbol(
                 commandDeclaration,
                 returnType,
                 resultType,
@@ -421,18 +497,220 @@ internal sealed partial class AkburaSemanticModel
                 isVoid,
                 isAsyncLike,
                 hasResult));
+            SemanticModel._boundNodeCache[commandDeclaration] = new BoundCommandDeclaration(
+                commandDeclaration,
+                SemanticModel.GetBinder(commandDeclaration, BinderUsage.Expression),
+                symbolInfo);
+            return symbolInfo;
+        }
+
+        private ImmutableArray<BoundNode> CreateBoundChildrenForComponent(AkburaDocumentSyntax document)
+        {
+            using var builder = ImmutableArrayBuilder<BoundNode>.Rent();
+            foreach (var member in document.Members)
+            {
+                switch (member.Kind)
+                {
+                    case AkburaSyntaxKind.StateDeclarationSyntax:
+                    case AkburaSyntaxKind.ParamDeclarationSyntax:
+                    case AkburaSyntaxKind.InjectDeclarationSyntax:
+                    case AkburaSyntaxKind.CommandDeclarationSyntax:
+                    case AkburaSyntaxKind.UseEffectDeclarationSyntax:
+                    case AkburaSyntaxKind.MarkupRootSyntax:
+                    case AkburaSyntaxKind.InlineAkcssBlockSyntax:
+                        builder.Add(SemanticModel.BindingSession.BindSemanticSyntax(member));
+                        break;
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private BoundNode CreateAndCacheBoundStateDeclaration(
+            StateDeclarationSyntax stateDeclaration,
+            AkburaSymbolInfo symbolInfo)
+        {
+            var initializerBinding = BindStateInitializerExpression(stateDeclaration);
+            var bindingKind = GetStateBindingKind(stateDeclaration.Initializer);
+            var userHook = ResolveStateUserHook(stateDeclaration);
+            return CacheBoundStateDeclaration(
+                stateDeclaration,
+                symbolInfo,
+                initializerBinding,
+                bindingKind,
+                userHook,
+                SemanticModel.GetCachedSemanticDiagnostics(stateDeclaration));
+        }
+
+        private BoundNode CacheBoundStateDeclaration(
+            StateDeclarationSyntax stateDeclaration,
+            AkburaSymbolInfo symbolInfo,
+            CSharpBindingResult initializerBinding,
+            StateBindingKind bindingKind,
+            IUserHookSymbol? userHook,
+            ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+        {
+            var binder = SemanticModel.GetBinder(stateDeclaration, BinderUsage.Expression);
+            var initializer = new BoundStateInitializer(
+                stateDeclaration.Initializer,
+                binder,
+                initializerBinding,
+                bindingKind,
+                userHook,
+                diagnostics);
+            SemanticModel._boundNodeCache[stateDeclaration.Initializer] = initializer;
+
+            var declaration = new BoundStateDeclaration(
+                stateDeclaration,
+                binder,
+                symbolInfo,
+                diagnostics,
+                ImmutableArray.Create<BoundNode>(initializer));
+            SemanticModel._boundNodeCache[stateDeclaration] = declaration;
+            return declaration;
+        }
+
+        private BoundNode CreateAndCacheBoundParamDeclaration(
+            ParamDeclarationSyntax paramDeclaration,
+            AkburaSymbolInfo symbolInfo)
+        {
+            var defaultValueBinding = BindParamDefaultValueExpression(paramDeclaration);
+            return CacheBoundParamDeclaration(
+                paramDeclaration,
+                symbolInfo,
+                defaultValueBinding,
+                SemanticModel.GetCachedSemanticDiagnostics(paramDeclaration));
+        }
+
+        private BoundNode CacheBoundParamDeclaration(
+            ParamDeclarationSyntax paramDeclaration,
+            AkburaSymbolInfo symbolInfo,
+            CSharpBindingResult defaultValueBinding,
+            ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+        {
+            var binder = SemanticModel.GetBinder(paramDeclaration, BinderUsage.Expression);
+            ImmutableArray<BoundNode> children;
+            if (paramDeclaration.DefaultValue == null)
+            {
+                children = ImmutableArray<BoundNode>.Empty;
+            }
+            else
+            {
+                var defaultValue = new BoundParamDefaultValue(
+                    paramDeclaration.DefaultValue,
+                    binder,
+                    defaultValueBinding,
+                    diagnostics);
+                SemanticModel._boundNodeCache[paramDeclaration.DefaultValue] = defaultValue;
+                children = ImmutableArray.Create<BoundNode>(defaultValue);
+            }
+
+            var declaration = new BoundParamDeclaration(
+                paramDeclaration,
+                binder,
+                symbolInfo,
+                diagnostics,
+                children);
+            SemanticModel._boundNodeCache[paramDeclaration] = declaration;
+            return declaration;
+        }
+
+        private BoundNode CreateAndCacheBoundUseEffectDeclaration(
+            UseEffectDeclarationSyntax useEffectDeclaration,
+            AkburaSymbolInfo symbolInfo)
+        {
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            _ = CreateUseEffectDependencies(
+                useEffectDeclaration,
+                diagnosticsBuilder,
+                out var dependencyNodes);
+
+            return CacheBoundUseEffectDeclaration(
+                useEffectDeclaration,
+                symbolInfo,
+                dependencyNodes,
+                SemanticModel.GetCachedSemanticDiagnostics(useEffectDeclaration));
+        }
+
+        private BoundNode CacheBoundUseEffectDeclaration(
+            UseEffectDeclarationSyntax useEffectDeclaration,
+            AkburaSymbolInfo symbolInfo,
+            ImmutableArray<BoundNode> dependencyNodes,
+            ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+        {
+            var binder = SemanticModel.GetBinder(useEffectDeclaration, BinderUsage.Expression);
+            using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
+            childrenBuilder.AddRange(dependencyNodes);
+            childrenBuilder.Add(CreateBoundUseEffectBody(useEffectDeclaration.Body));
+            foreach (var tail in useEffectDeclaration.Tails)
+            {
+                childrenBuilder.Add(CreateBoundUseEffectBody(tail.Body));
+            }
+
+            var declaration = new BoundUseEffectDeclaration(
+                useEffectDeclaration,
+                binder,
+                symbolInfo,
+                diagnostics,
+                childrenBuilder.ToImmutable());
+            SemanticModel._boundNodeCache[useEffectDeclaration] = declaration;
+            return declaration;
+        }
+
+        private BoundUseEffectBody CreateBoundUseEffectBody(CSharpBlockSyntax body)
+        {
+            var binder = SemanticModel.GetBinder(body, BinderUsage.Expression);
+            using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
+            foreach (var token in body.Tokens)
+            {
+                if (token.Kind == AkburaSyntaxKind.MarkupRootSyntax)
+                {
+                    childrenBuilder.Add(SemanticModel.BindingSession.BindSemanticSyntax(token));
+                }
+            }
+
+            var boundBody = new BoundUseEffectBody(
+                body,
+                binder,
+                children: childrenBuilder.ToImmutable());
+            SemanticModel._boundNodeCache[body] = boundBody;
+            return boundBody;
+        }
+
+        private TBoundNode CacheBoundNode<TBoundNode>(
+            AkburaSyntax syntax,
+            TBoundNode boundNode)
+            where TBoundNode : BoundNode
+        {
+            SemanticModel._boundNodeCache[syntax] = boundNode;
+            return boundNode;
         }
 
         private AkburaSymbolInfo ResolveUseEffect(UseEffectDeclarationSyntax useEffectDeclaration)
         {
+            var placeholderInfo = AkburaSymbolInfo.Success(new UseEffectSymbol(
+                useEffectDeclaration,
+                ImmutableArray<UseEffectDependency>.Empty));
+            SemanticModel._symbolInfoCache[useEffectDeclaration] = placeholderInfo;
+
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            var dependencies = CreateUseEffectDependencies(useEffectDeclaration, diagnosticsBuilder);
+            var dependencies = CreateUseEffectDependencies(
+                useEffectDeclaration,
+                diagnosticsBuilder,
+                out var dependencyNodes);
 
-            SemanticModel.SetSemanticDiagnostics(useEffectDeclaration, diagnosticsBuilder.ToImmutable());
+            var diagnostics = diagnosticsBuilder.ToImmutable();
+            SemanticModel.SetSemanticDiagnostics(useEffectDeclaration, diagnostics);
 
-            return AkburaSymbolInfo.Success(new UseEffectSymbol(
+            var symbolInfo = AkburaSymbolInfo.Success(new UseEffectSymbol(
                 useEffectDeclaration,
                 dependencies));
+            CacheBoundUseEffectDeclaration(
+                useEffectDeclaration,
+                symbolInfo,
+                dependencyNodes,
+                diagnostics);
+            return symbolInfo;
         }
 
         private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
@@ -617,15 +895,19 @@ internal sealed partial class AkburaSemanticModel
 
         private ImmutableArray<UseEffectDependency> CreateUseEffectDependencies(
             UseEffectDeclarationSyntax useEffectDeclaration,
-            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+            out ImmutableArray<BoundNode> dependencyNodes)
         {
             var argumentList = GetCSharpArgumentList(useEffectDeclaration.Arguments);
             if (argumentList == null || argumentList.Arguments.Count == 0)
             {
+                dependencyNodes = ImmutableArray<BoundNode>.Empty;
                 return ImmutableArray<UseEffectDependency>.Empty;
             }
 
             using var builder = ImmutableArrayBuilder<UseEffectDependency>.Rent(argumentList.Arguments.Count);
+            using var boundBuilder = ImmutableArrayBuilder<BoundNode>.Rent(argumentList.Arguments.Count);
+            var binder = SemanticModel.GetBinder(useEffectDeclaration.Arguments, BinderUsage.Expression);
             foreach (var argument in argumentList.Arguments)
             {
                 var expression = argument.Expression;
@@ -645,12 +927,19 @@ internal sealed partial class AkburaSemanticModel
                     ? default
                     : new CSharpSymbolDefinition(binding.Symbol);
 
-                builder.Add(new UseEffectDependency(
+                var dependency = new UseEffectDependency(
                     expressionText,
                     ResolveUseEffectDependencyAkburaSymbol(expression),
-                    csharpDefinition));
+                    csharpDefinition);
+                builder.Add(dependency);
+                boundBuilder.Add(new BoundUseEffectDependency(
+                    useEffectDeclaration.Arguments,
+                    binder,
+                    dependency,
+                    binding));
             }
 
+            dependencyNodes = boundBuilder.ToImmutable();
             return builder.ToImmutable();
         }
 

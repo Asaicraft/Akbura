@@ -1,7 +1,9 @@
 using Akbura.Language.Declarations;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
 
@@ -32,6 +34,17 @@ internal sealed class AkcssModuleBinder : Binder
         }
 
         return GetDeclaredSymbols();
+    }
+
+    public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.InlineAkcssBlockSyntax or
+                AkburaSyntaxKind.AkcssDocumentSyntax =>
+                SemanticModel.CreateBoundAkcssSyntax(syntax),
+            _ => base.BindSemanticSyntax(syntax),
+        };
     }
 
     protected override void LookupSymbolsInSingleBinder(

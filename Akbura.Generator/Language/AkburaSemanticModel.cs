@@ -185,6 +185,13 @@ internal sealed partial class AkburaSemanticModel
         return _bindingCache.GetBoundNode(syntax, bind);
     }
 
+    internal ImmutableArray<AkburaSemanticDiagnostic> GetCachedSemanticDiagnostics(AkburaSyntax syntax)
+    {
+        return _semanticDiagnosticsCache.TryGetValue(syntax, out var diagnostics)
+            ? diagnostics
+            : ImmutableArray<AkburaSemanticDiagnostic>.Empty;
+    }
+
     internal BinderType GetBinder(AkburaSyntax syntax)
     {
         return _bindingSession.GetBinder(syntax);
@@ -569,6 +576,105 @@ internal sealed partial class AkburaSemanticModel
             [displayName]);
     }
 
+    internal BoundNode CreateBoundAkcssSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.InlineAkcssBlockSyntax =>
+                CreateBoundInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssStyleRuleSyntax =>
+                CreateBoundAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssUtilityDeclarationSyntax =>
+                CreateBoundAkcssUtility(Unsafe.As<AkcssUtilityDeclarationSyntax>(syntax)),
+            _ => new BoundDeclaration(
+                syntax,
+                GetBinder(syntax, BinderUsage.Akcss),
+                AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax)),
+        };
+    }
+
+    private BoundAkcssModule CreateBoundInlineAkcssModule(InlineAkcssBlockSyntax inlineAkcssBlock)
+    {
+        var symbolInfo = GetSymbolInfo(inlineAkcssBlock);
+        using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
+        foreach (var member in inlineAkcssBlock.Members)
+        {
+            switch (member.Kind)
+            {
+                case AkburaSyntaxKind.AkcssStyleRuleSyntax:
+                    childrenBuilder.Add(BindingSession.BindSemanticSyntax(member));
+                    break;
+
+                case AkburaSyntaxKind.AkcssUtilitiesSectionSyntax:
+                    foreach (var utility in Unsafe.As<AkcssUtilitiesSectionSyntax>(member).Utilities)
+                    {
+                        childrenBuilder.Add(BindingSession.BindSemanticSyntax(utility));
+                    }
+
+                    break;
+            }
+        }
+
+        var boundModule = new BoundAkcssModule(
+            inlineAkcssBlock,
+            GetBinder(inlineAkcssBlock, BinderUsage.Akcss),
+            symbolInfo,
+            GetCachedSemanticDiagnostics(inlineAkcssBlock),
+            childrenBuilder.ToImmutable());
+        _boundNodeCache[inlineAkcssBlock] = boundModule;
+        return boundModule;
+    }
+
+    private BoundAkcssStyle CreateBoundAkcssStyle(AkcssStyleRuleSyntax styleRule)
+    {
+        var symbolInfo = GetSymbolInfo(styleRule);
+        var symbol = symbolInfo.Symbol as IAkcssSymbol;
+        var children = symbol == null
+            ? ImmutableArray<BoundNode>.Empty
+            : CastBoundNodes(CreateAkcssBoundOperations(styleRule.Members, symbol));
+        var boundStyle = new BoundAkcssStyle(
+            styleRule,
+            GetBinder(styleRule, BinderUsage.Akcss),
+            symbolInfo,
+            GetCachedSemanticDiagnostics(styleRule),
+            children);
+        _boundNodeCache[styleRule] = boundStyle;
+        return boundStyle;
+    }
+
+    private BoundAkcssUtility CreateBoundAkcssUtility(AkcssUtilityDeclarationSyntax utilityDeclaration)
+    {
+        var symbolInfo = GetSymbolInfo(utilityDeclaration);
+        var symbol = symbolInfo.Symbol as IAkcssSymbol;
+        var children = symbol == null
+            ? ImmutableArray<BoundNode>.Empty
+            : CastBoundNodes(CreateAkcssBoundOperations(utilityDeclaration.Members, symbol));
+        var boundUtility = new BoundAkcssUtility(
+            utilityDeclaration,
+            GetBinder(utilityDeclaration, BinderUsage.Akcss),
+            symbolInfo,
+            GetCachedSemanticDiagnostics(utilityDeclaration),
+            children);
+        _boundNodeCache[utilityDeclaration] = boundUtility;
+        return boundUtility;
+    }
+
+    private static ImmutableArray<BoundNode> CastBoundNodes(ImmutableArray<BoundAkcssOperation> operations)
+    {
+        if (operations.IsDefaultOrEmpty)
+        {
+            return ImmutableArray<BoundNode>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<BoundNode>.Rent(operations.Length);
+        foreach (var operation in operations)
+        {
+            builder.Add(operation);
+        }
+
+        return builder.ToImmutable();
+    }
+
     private AkburaSymbolInfo ResolveAkcssStyle(
         AkcssStyleRuleSyntax styleRule)
     {
@@ -880,6 +986,13 @@ internal sealed partial class AkburaSemanticModel
         using var builder = ImmutableArrayBuilder<BoundAkcssOperation>.Rent();
         foreach (var member in members)
         {
+            if (_boundNodeCache.TryGetValue(member, out var cachedBoundNode) &&
+                cachedBoundNode is BoundAkcssOperation cachedOperation)
+            {
+                builder.Add(cachedOperation);
+                continue;
+            }
+
             BoundNode? boundNode = member.Kind switch
             {
                 AkburaSyntaxKind.AkcssAssignmentSyntax =>
@@ -903,6 +1016,7 @@ internal sealed partial class AkburaSemanticModel
 
             if (boundNode is BoundAkcssOperation operation)
             {
+                _boundNodeCache[member] = operation;
                 builder.Add(operation);
             }
         }
@@ -2916,6 +3030,90 @@ internal sealed partial class AkburaSemanticModel
             ErrorCodes.AKBURA_SEMANTIC_UserHookMustBeTopLevel,
             [invocationName],
             AkburaDiagnosticSeverity.Error);
+    }
+
+    internal BoundNode CreateBoundMarkupSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.MarkupRootSyntax =>
+                CreateBoundMarkupRoot(Unsafe.As<MarkupRootSyntax>(syntax)),
+            AkburaSyntaxKind.MarkupElementSyntax =>
+                CreateBoundMarkupComponent(Unsafe.As<MarkupElementSyntax>(syntax)),
+            AkburaSyntaxKind.MarkupElementContentSyntax or
+                AkburaSyntaxKind.MarkupInlineExpressionSyntax or
+                AkburaSyntaxKind.MarkupTextLiteralSyntax =>
+                CreateBoundMarkupContent(Unsafe.As<MarkupContentSyntax>(syntax)),
+            _ => new BoundDeclaration(
+                syntax,
+                GetBinder(syntax, BinderUsage.Markup),
+                AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax)),
+        };
+    }
+
+    private BoundMarkupRoot CreateBoundMarkupRoot(MarkupRootSyntax markupRoot)
+    {
+        var element = BindingSession.BindSemanticSyntax(markupRoot.Element);
+        var symbolInfo = element.SymbolInfo;
+        var boundRoot = new BoundMarkupRoot(
+            markupRoot,
+            GetBinder(markupRoot, BinderUsage.Markup),
+            symbolInfo,
+            GetCachedSemanticDiagnostics(markupRoot),
+            ImmutableArray.Create(element));
+        _boundNodeCache[markupRoot] = boundRoot;
+        return boundRoot;
+    }
+
+    private BoundMarkupComponent CreateBoundMarkupComponent(MarkupElementSyntax markupElement)
+    {
+        var symbolInfo = GetSymbolInfo(markupElement);
+        using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
+
+        if (markupElement.StartTag != null)
+        {
+            foreach (var attribute in markupElement.StartTag.Attributes)
+            {
+                childrenBuilder.Add(BindingSession.BindOperationSyntax(attribute));
+            }
+        }
+
+        foreach (var content in markupElement.Body)
+        {
+            childrenBuilder.Add(BindingSession.BindSemanticSyntax(content));
+        }
+
+        var boundComponent = new BoundMarkupComponent(
+            markupElement,
+            GetBinder(markupElement, BinderUsage.Markup),
+            symbolInfo,
+            GetCachedSemanticDiagnostics(markupElement),
+            childrenBuilder.ToImmutable());
+        _boundNodeCache[markupElement] = boundComponent;
+        return boundComponent;
+    }
+
+    private BoundMarkupContent CreateBoundMarkupContent(MarkupContentSyntax content)
+    {
+        using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
+        AkburaSymbolInfo symbolInfo = AkburaSymbolInfo.None(AkburaCandidateReason.None);
+
+        if (content.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)
+        {
+            var elementContent = Unsafe.As<MarkupElementContentSyntax>(content);
+            var element = BindingSession.BindSemanticSyntax(elementContent.Element);
+            symbolInfo = element.SymbolInfo;
+            childrenBuilder.Add(element);
+        }
+
+        var boundContent = new BoundMarkupContent(
+            content,
+            GetBinder(content, BinderUsage.Markup),
+            symbolInfo,
+            GetCachedSemanticDiagnostics(content),
+            childrenBuilder.ToImmutable());
+        _boundNodeCache[content] = boundContent;
+        return boundContent;
     }
 
     private AkburaSymbolInfo ResolveMarkupComponent(MarkupElementSyntax markupElement)

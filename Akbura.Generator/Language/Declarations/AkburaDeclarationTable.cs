@@ -1,3 +1,4 @@
+using Akbura.Language.Syntax;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -129,4 +130,5 @@ internal sealed class AkburaDeclarationTable
 
         return false;
     }
+
 }

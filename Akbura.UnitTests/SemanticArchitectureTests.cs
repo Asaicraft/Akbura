@@ -147,7 +147,7 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
-    public void SemanticBindingCache_NoChangeCompilationReusesCachedSymbol()
+    public void SemanticBindingCache_NoChangeCompilationReturnsSameSnapshotCachedSymbol()
     {
         const string code = "state int count = 0;";
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
@@ -163,11 +163,13 @@ public sealed class SemanticArchitectureTests
         var newSymbol = Assert.IsAssignableFrom<IStateSymbol>(newModel.GetSymbolInfo(newState).Symbol);
 
         Assert.Same(tree, newTree);
+        Assert.Same(compilation, newCompilation);
+        Assert.Same(model, newModel);
         Assert.Same(oldSymbol, newSymbol);
     }
 
     [Fact]
-    public void SemanticBindingCache_StateInitializerEdit_ReusesUnchangedTopLevelSymbols()
+    public void SemanticBindingCache_StateInitializerEdit_RebindsUnchangedTopLevelSymbolsInNewSnapshot()
     {
         const string oldCode =
             "state int first = 0;\n" +
@@ -195,10 +197,17 @@ public sealed class SemanticArchitectureTests
         var newFirst = Assert.IsType<StateDeclarationSyntax>(newTree.GetRoot().Members[0]);
         var newChanged = Assert.IsType<StateDeclarationSyntax>(newTree.GetRoot().Members[1]);
         var newLast = Assert.IsType<StateDeclarationSyntax>(newTree.GetRoot().Members[2]);
+        var newFirstSymbol = newModel.GetSymbolInfo(newFirst).Symbol;
+        var newChangedSymbol = newModel.GetSymbolInfo(newChanged).Symbol;
+        var newLastSymbol = newModel.GetSymbolInfo(newLast).Symbol;
 
-        Assert.Same(oldFirstSymbol, newModel.GetSymbolInfo(newFirst).Symbol);
-        Assert.NotSame(oldChangedSymbol, newModel.GetSymbolInfo(newChanged).Symbol);
-        Assert.Same(oldLastSymbol, newModel.GetSymbolInfo(newLast).Symbol);
+        Assert.Same(oldFirst.Green, newFirst.Green);
+        Assert.Same(oldLast.Green, newLast.Green);
+        Assert.NotSame(oldFirstSymbol, newFirstSymbol);
+        Assert.NotSame(oldChangedSymbol, newChangedSymbol);
+        Assert.NotSame(oldLastSymbol, newLastSymbol);
+        Assert.Same(newFirstSymbol, newModel.GetSymbolInfo(newFirst).Symbol);
+        Assert.Same(newLastSymbol, newModel.GetSymbolInfo(newLast).Symbol);
     }
 
     [Fact]
@@ -319,6 +328,118 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void SemanticBindingCache_StateInitializerEdit_RebindsMarkupBoundOperationAndCachesWithinSnapshot()
+    {
+        const string oldCode =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<TextBlock Text={missing + 1} />";
+        const string newCode =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "state int count = 1;\n" +
+            "\n" +
+            "<TextBlock Text={missing + 1} />";
+        var changeStart = oldCode.IndexOf("count = 0", StringComparison.Ordinal) + "count = ".Length;
+        var change = new TextChangeRange(new TextSpan(changeStart, 1), newLength: 1);
+        var oldTree = AkburaSyntaxTree.ParseText(oldCode, "Counter.akbura");
+        var oldCompilation = CreateCompilation(oldTree);
+        var oldModel = oldCompilation.GetSemanticModel(oldTree);
+        var oldMarkup = Assert.IsType<MarkupRootSyntax>(oldTree.GetRoot().Members[2]);
+        var oldAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            oldMarkup.Element.StartTag!.Attributes[0]);
+        var oldBoundNode = oldModel.BindingSession.BindOperationSyntax(oldAttribute);
+        var oldOperation = oldModel.GetOperation(oldAttribute);
+        var oldDiagnostics = oldModel.GetSemanticDiagnostics(oldAttribute);
+
+        var newTree = oldTree.WithChangedText(SourceText.From(newCode), [change]);
+        var newCompilation = oldCompilation.WithSyntaxTrees([newTree]);
+        var newModel = newCompilation.GetSemanticModel(newTree);
+        var newMarkup = Assert.IsType<MarkupRootSyntax>(newTree.GetRoot().Members[2]);
+        var newAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            newMarkup.Element.StartTag!.Attributes[0]);
+        var newBoundNode = newModel.BindingSession.BindOperationSyntax(newAttribute);
+        var newOperation = newModel.GetOperation(newAttribute);
+        var newDiagnostics = newModel.GetSemanticDiagnostics(newAttribute);
+
+        Assert.Same(oldAttribute.Green, newAttribute.Green);
+        Assert.NotSame(oldBoundNode, newBoundNode);
+        Assert.NotSame(oldOperation, newOperation);
+        Assert.Same(newBoundNode, newModel.BindingSession.BindOperationSyntax(newAttribute));
+        Assert.Same(newOperation, newModel.GetOperation(newAttribute));
+        Assert.Equal(oldDiagnostics.Select(diagnostic => diagnostic.Code), newDiagnostics.Select(diagnostic => diagnostic.Code));
+        Assert.Contains(
+            newDiagnostics,
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticBindingCache_ChangedExternalComponentDeclarationDoesNotReuseMarkupOperation()
+    {
+        const string dashboardCode =
+            """
+            using Demo.Components;
+
+            param string Title = "Hello";
+
+            <TaskCard Title={Title} />
+            """;
+        const string oldTaskCardCode =
+            """
+            namespace Demo.Components;
+
+            param string Title = "";
+            """;
+        const string newTaskCardCode =
+            """
+            namespace Demo.Components;
+
+            param int Title = 0;
+            """;
+        var dashboardTree = AkburaSyntaxTree.ParseText(
+            dashboardCode,
+            "Pages/Dashboard.akbura");
+        var oldTaskCardTree = AkburaSyntaxTree.ParseText(
+            oldTaskCardCode,
+            "Components/TaskCard.akbura");
+        var csharpCompilation = CreateCSharpCompilation();
+        var oldCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [dashboardTree, oldTaskCardTree],
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            rootNamespace: "Demo",
+            projectDirectory: Environment.CurrentDirectory);
+        var oldModel = oldCompilation.GetSemanticModel(dashboardTree);
+        var oldMarkup = Assert.IsType<MarkupRootSyntax>(dashboardTree.GetRoot().Members[2]);
+        var oldAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            oldMarkup.Element.StartTag!.Attributes[0]);
+        var oldOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            oldModel.GetOperation(oldAttribute));
+
+        var newTaskCardTree = oldTaskCardTree.WithChangedText(SourceText.From(newTaskCardCode), [
+            new TextChangeRange(
+                new TextSpan(
+                    oldTaskCardCode.IndexOf("string", StringComparison.Ordinal),
+                    "string".Length),
+                "int".Length)
+        ]);
+        var newCompilation = oldCompilation.WithSyntaxTrees([dashboardTree, newTaskCardTree]);
+        var newModel = newCompilation.GetSemanticModel(dashboardTree);
+        var newMarkup = Assert.IsType<MarkupRootSyntax>(dashboardTree.GetRoot().Members[2]);
+        var newAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            newMarkup.Element.StartTag!.Attributes[0]);
+        var newOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            newModel.GetOperation(newAttribute));
+
+        Assert.Same(oldAttribute.Green, newAttribute.Green);
+        Assert.Equal("String", oldOperation.Property?.Parameter?.Type.Name);
+        Assert.Equal("Int32", newOperation.Property?.Parameter?.Type.Name);
+        Assert.NotSame(oldOperation, newOperation);
+    }
+
+    [Fact]
     public void MemberSemanticModel_CachesByComponentScope()
     {
         const string code =
@@ -431,7 +552,7 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
-    public void MemberSemanticModel_MarkupOnlyEditReusesDeclarationSymbols()
+    public void MemberSemanticModel_MarkupOnlyEditRebindsDeclarationSymbolsInNewSnapshot()
     {
         const string oldCode =
             "using Avalonia.Controls;\n" +
@@ -460,9 +581,15 @@ public sealed class SemanticArchitectureTests
         var newRoot = newTree.GetRoot();
         var newState = Assert.IsType<StateDeclarationSyntax>(newRoot.Members[1]);
         var newParam = Assert.IsType<ParamDeclarationSyntax>(newRoot.Members[2]);
+        var newStateSymbol = newModel.GetSymbolInfo(newState).Symbol;
+        var newParamSymbol = newModel.GetSymbolInfo(newParam).Symbol;
 
-        Assert.Same(oldStateSymbol, newModel.GetSymbolInfo(newState).Symbol);
-        Assert.Same(oldParamSymbol, newModel.GetSymbolInfo(newParam).Symbol);
+        Assert.Same(oldState.Green, newState.Green);
+        Assert.Same(oldParam.Green, newParam.Green);
+        Assert.NotSame(oldStateSymbol, newStateSymbol);
+        Assert.NotSame(oldParamSymbol, newParamSymbol);
+        Assert.Same(newStateSymbol, newModel.GetSymbolInfo(newState).Symbol);
+        Assert.Same(newParamSymbol, newModel.GetSymbolInfo(newParam).Symbol);
         Assert.Equal(newCode.Length, newRoot.FullWidth);
     }
 
@@ -488,7 +615,7 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
-    public void SemanticBindingCache_UnchangedGreenNodeReusesPreviousBoundNode()
+    public void SemanticBindingCache_UnchangedGreenNodeRebindsBoundNodeInNewSnapshot()
     {
         const string oldCode =
             "state int first = 0;\n" +
@@ -513,8 +640,13 @@ public sealed class SemanticArchitectureTests
         var newBoundNode = newModel.BindingSession.BindExpression(
             newFirst,
             CSharpSyntaxFactory.ParseExpression("2"));
+        var cachedNewBoundNode = newModel.BindingSession.BindExpression(
+            newFirst,
+            CSharpSyntaxFactory.ParseExpression("3"));
 
-        Assert.Same(oldBoundNode, newBoundNode);
+        Assert.Same(oldFirst.Green, newFirst.Green);
+        Assert.NotSame(oldBoundNode, newBoundNode);
+        Assert.Same(newBoundNode, cachedNewBoundNode);
     }
 
     [Fact]
@@ -630,6 +762,24 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void OperationFactory_DoesNotReferenceSemanticModelFacade()
+    {
+        var source = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Operations",
+            "AkburaOperationFactory.cs");
+
+        Assert.DoesNotContain(nameof(AkburaSemanticModel), source);
+        Assert.DoesNotContain("_semanticModel", source);
+        Assert.DoesNotContain(".GetSymbolInfo(", source);
+        Assert.DoesNotContain(".GetOperation(", source);
+        Assert.DoesNotContain(".GetSemanticDiagnostics(", source);
+        Assert.DoesNotContain(nameof(BindingSession), source);
+        Assert.Contains("CSharpOperationTreeBuilder.Create", source);
+    }
+
+    [Fact]
     public void BindingSession_DelegatesOperationBindingToBinderChain()
     {
         var source = ReadRepositoryFile(
@@ -653,6 +803,106 @@ public sealed class SemanticArchitectureTests
         Assert.DoesNotContain("BindAkcssPropertySetterOperation", semanticModelSource + markupSemanticModelSource);
         Assert.DoesNotContain("ResolveMarkupAttributeOperation", semanticModelSource + markupSemanticModelSource);
         Assert.DoesNotContain("ResolveAkcssPropertySetterOperation", semanticModelSource + markupSemanticModelSource);
+    }
+
+    [Fact]
+    public void OperationFactory_CreatesOperationsFromBoundOperationNodes()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                Button.surface {
+                    Width: 10;
+                }
+
+                Button.card {
+                    @apply surface;
+                    @if(true) {
+                        Height: 20;
+                    }
+                }
+
+                @utilities {
+                    .w-(double value) {
+                        Width: value;
+                    }
+                }
+            }
+
+            <TextBlock Text="Hello" w-30 />
+            """;
+        var tree = AkburaSyntaxTree.ParseText(code, "Dashboard.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var akcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[1]);
+        var surface = Assert.IsType<AkcssStyleRuleSyntax>(akcss.Members[0]);
+        var card = Assert.IsType<AkcssStyleRuleSyntax>(akcss.Members[1]);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(surface.Members[0]);
+        var apply = Assert.IsType<AkcssApplyDirectiveSyntax>(card.Members[0]);
+        var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(card.Members[1]);
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[2]);
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            markup.Element.StartTag!.Attributes[0]);
+        var tailwindAttribute = Assert.IsType<TailwindFullAttributeSyntax>(
+            markup.Element.StartTag!.Attributes[1]);
+
+        Assert.IsType<BoundMarkupPropertySetter>(
+            model.BindingSession.BindOperationSyntax(textAttribute));
+        Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            model.GetOperation(textAttribute));
+
+        Assert.IsType<BoundTailwindUtilityAttribute>(
+            model.BindingSession.BindOperationSyntax(tailwindAttribute));
+        Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            model.GetOperation(tailwindAttribute));
+
+        Assert.IsType<BoundAkcssPropertySetter>(
+            model.BindingSession.BindOperationSyntax(assignment));
+        Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            model.GetOperation(assignment));
+
+        Assert.IsType<BoundAkcssApply>(
+            model.BindingSession.BindOperationSyntax(apply));
+        Assert.IsAssignableFrom<IAkcssApplyOperation>(
+            model.GetOperation(apply));
+
+        Assert.IsType<BoundAkcssIf>(
+            model.BindingSession.BindOperationSyntax(ifDirective));
+        Assert.IsAssignableFrom<IAkcssIfOperation>(
+            model.GetOperation(ifDirective));
+    }
+
+    [Fact]
+    public void MarkupBinder_BindsPropertyAndEventAttributesToBoundNodes()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "state int count = 0;\n" +
+            "<StackPanel><TextBlock Text={count.ToString()} /><Button Click={() => count++} /></StackPanel>";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[2]);
+        var textBlockContent = Assert.IsType<MarkupElementContentSyntax>(markup.Element.Body[0]);
+        var buttonContent = Assert.IsType<MarkupElementContentSyntax>(markup.Element.Body[1]);
+        var textBlock = textBlockContent.Element;
+        var button = buttonContent.Element;
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            textBlock.StartTag!.Attributes[0]);
+        var clickAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            button.StartTag!.Attributes[0]);
+
+        var propertyBoundNode = Assert.IsType<BoundMarkupPropertySetter>(
+            model.BindingSession.BindOperationSyntax(textAttribute));
+        var eventBoundNode = Assert.IsType<BoundMarkupRoutedEventBinding>(
+            model.BindingSession.BindOperationSyntax(clickAttribute));
+
+        Assert.IsType<MarkupBinder>(propertyBoundNode.Binder);
+        Assert.IsType<MarkupBinder>(eventBoundNode.Binder);
+        Assert.Equal("Text", propertyBoundNode.Property?.Name);
+        Assert.Equal("Click", eventBoundNode.RoutedEvent.Name);
     }
 
     [Fact]
@@ -1051,6 +1301,103 @@ public sealed class SemanticArchitectureTests
         Assert.IsAssignableFrom<ITailwindUtilitySymbol>(model.GetDeclaredSymbol(utility));
         Assert.Same(model.GetSymbolInfo(state).Symbol, model.GetDeclaredSymbol(state));
         Assert.Null(model.GetDeclaredSymbol(markup.Element));
+    }
+
+    [Fact]
+    public void SemanticModel_GetDeclaredSymbol_UsesDeclarationSymbolTableForExternalAkcss()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "using Demo.Styles.Shared.akcss;\n" +
+            "\n" +
+            "<TextBlock class=\"surface\" w-30 />";
+        const string akcss =
+            "@using Avalonia.Controls;\n" +
+            ".surface { Background: White; }\n" +
+            "@utilities { .w-(double value) { Width: value; } }";
+        var tree = AkburaSyntaxTree.ParseText(code, "Pages/Dashboard.akbura");
+        var akcssTree = AkcssSyntaxTree.ParseText(
+            akcss,
+            "Styles/Shared.akcss",
+            "Demo.Styles.Shared.akcss");
+        var compilation = CreateCompilation(tree, [akcssTree]);
+        var model = compilation.GetSemanticModel(tree);
+        var document = akcssTree.GetRoot();
+        var style = Assert.IsType<AkcssStyleRuleSyntax>(document.Members[1]);
+        var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(document.Members[2]);
+        var utility = Assert.Single(utilities.Utilities);
+
+        var module = Assert.IsAssignableFrom<IAkcssModuleSymbol>(model.GetDeclaredSymbol(document));
+        var declaredSymbols = model.DeclarationSymbols.GetDeclaredSymbols(
+            Assert.Single(compilation.DeclarationTable.AkcssModules),
+            AkburaDeclarationKind.AkcssStyle,
+            AkburaDeclarationKind.AkcssUtility);
+
+        Assert.False(module.IsInlined);
+        Assert.Null(module.ContainingSymbol);
+        Assert.Equal("Demo.Styles.Shared.akcss", module.Path);
+        Assert.Same(document, module.DeclaringSyntax);
+        Assert.Contains(module.AkcssSymbols, symbol => symbol is IAkcssSymbol { Name: "surface" });
+        Assert.Contains(module.AkcssSymbols, symbol => symbol is ITailwindUtilitySymbol { Name: "w" });
+        Assert.Contains(declaredSymbols, symbol => symbol is IAkcssSymbol { Name: "surface" });
+        Assert.Contains(declaredSymbols, symbol => symbol is ITailwindUtilitySymbol { Name: "w" });
+        Assert.Same(module, model.GetDeclaredSymbol(document));
+        Assert.IsAssignableFrom<IAkcssSymbol>(model.GetDeclaredSymbol(style));
+        Assert.IsAssignableFrom<ITailwindUtilitySymbol>(model.GetDeclaredSymbol(utility));
+    }
+
+    [Fact]
+    public void SemanticModel_GetDeclaredSymbol_UsesDeclarationSymbolTableForOtherComponentTree()
+    {
+        const string dashboardCode =
+            "using Demo.Components;\n" +
+            "\n" +
+            "<TaskCard Title=\"Hello\" />";
+        const string taskCardCode =
+            "namespace Demo.Components;\n" +
+            "\n" +
+            "param string Title = \"\";\n" +
+            "state int count = 0;";
+        var dashboardTree = AkburaSyntaxTree.ParseText(
+            dashboardCode,
+            "Pages/DashboardPage.akbura");
+        var taskCardTree = AkburaSyntaxTree.ParseText(
+            taskCardCode,
+            "Components/TaskCard.akbura");
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [dashboardTree, taskCardTree],
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            rootNamespace: "Demo",
+            projectDirectory: Environment.CurrentDirectory);
+        var model = compilation.GetSemanticModel(dashboardTree);
+        var taskCardRoot = taskCardTree.GetRoot();
+        var param = Assert.IsType<ParamDeclarationSyntax>(taskCardRoot.Members[1]);
+        var state = Assert.IsType<StateDeclarationSyntax>(taskCardRoot.Members[2]);
+
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            model.GetDeclaredSymbol(taskCardRoot));
+
+        Assert.Equal("TaskCard", component.Name);
+        Assert.Equal("Demo.Components", component.NamespaceName);
+        Assert.Contains(component.Parameters, parameter => parameter.Name == "Title");
+        Assert.Contains(component.States, stateSymbol => stateSymbol.Name == "count");
+        Assert.IsAssignableFrom<IParamSymbol>(model.GetDeclaredSymbol(param));
+        Assert.IsAssignableFrom<IStateSymbol>(model.GetDeclaredSymbol(state));
+    }
+
+    [Fact]
+    public void SemanticModel_GetDeclaredSymbol_RejectsForeignExternalAkcssSyntax()
+    {
+        const string code = "<TextBlock />";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var foreignRoot = AkcssSyntaxTree.ParseText(
+            ".other { Width: 1; }",
+            "Other.akcss",
+            "Other.akcss").GetRoot();
+
+        Assert.Throws<ArgumentException>(() => model.GetDeclaredSymbol(foreignRoot));
     }
 
     [Fact]
@@ -2219,6 +2566,126 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void MarkupPropertySetter_BindsDynamicValueWithExpectedType()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <TextBlock Width={1} />
+            """;
+
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var markup = Assert.IsType<MarkupRootSyntax>(tree.GetRoot().Members[1]);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(markup.Element.StartTag!.Attributes));
+
+        var bound = Assert.IsType<BoundMarkupPropertySetter>(
+            model.BindingSession.BindOperationSyntax(attribute));
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            model.GetOperation(attribute));
+
+        Assert.Equal("Width", bound.Property?.Name);
+        Assert.Equal("Double", bound.ValueType.Name);
+        Assert.Equal("Double", operation.ValueType.Name);
+        Assert.True(model.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void StateAndParamInitializers_BindWithExplicitExpectedType()
+    {
+        const string code =
+            """
+            param double Size = 1;
+            state double width = 1;
+            """;
+
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[0]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[1]);
+
+        var paramSymbol = Assert.IsAssignableFrom<IParamSymbol>(
+            model.GetSymbolInfo(param).Symbol);
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            model.GetSymbolInfo(state).Symbol);
+        var boundParam = Assert.IsType<BoundParamDeclaration>(
+            model.BindingSession.BindSemanticSyntax(param));
+        var boundState = Assert.IsType<BoundStateDeclaration>(
+            model.BindingSession.BindSemanticSyntax(state));
+        var defaultValue = Assert.IsType<BoundParamDefaultValue>(
+            Assert.Single(boundParam.Children));
+        var initializer = Assert.IsType<BoundStateInitializer>(
+            Assert.Single(boundState.Children));
+
+        Assert.Equal("Double", paramSymbol.Type.Name);
+        Assert.Equal("Double", paramSymbol.DefaultValueType.Name);
+        Assert.Equal("Double", stateSymbol.Type.Name);
+        Assert.Equal("Double", stateSymbol.InitializerType.Name);
+        Assert.Equal(AkburaConversionKind.Implicit, defaultValue.BindingResult.Conversion.Kind);
+        Assert.Equal(AkburaConversionKind.Implicit, initializer.BindingResult.Conversion.Kind);
+        Assert.True(model.GetSemanticDiagnostics(param).IsEmpty);
+        Assert.True(model.GetSemanticDiagnostics(state).IsEmpty);
+    }
+
+    [Fact]
+    public void StateAndParamInitializers_ReportInvalidExpectedTypeConversion()
+    {
+        const string code =
+            """
+            param int Count = "bad";
+            state int width = "bad";
+            """;
+
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[0]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[1]);
+
+        _ = model.GetSymbolInfo(param);
+        _ = model.GetSymbolInfo(state);
+
+        Assert.Contains(
+            model.GetSemanticDiagnostics(param),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError);
+        Assert.Contains(
+            model.GetSemanticDiagnostics(state),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError);
+    }
+
+    [Fact]
+    public void AkcssPropertySetter_BindsCSharpValueWithExpectedType()
+    {
+        const string code =
+            """
+            @akcss {
+                .panel {
+                    Width: 1;
+                }
+            }
+            """;
+
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var akcss = Assert.IsType<InlineAkcssBlockSyntax>(tree.GetRoot().Members[0]);
+        var rule = Assert.IsType<AkcssStyleRuleSyntax>(Assert.Single(akcss.Members));
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(Assert.Single(rule.Members));
+
+        var bound = Assert.IsType<BoundAkcssPropertySetter>(
+            model.BindingSession.BindOperationSyntax(assignment));
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            model.GetOperation(assignment));
+
+        Assert.Equal("Width", bound.Property?.Name);
+        Assert.Equal("Double", bound.ValueType.Name);
+        Assert.Equal("Double", operation.ValueType.Name);
+        Assert.True(model.GetSemanticDiagnostics(assignment).IsEmpty);
+    }
+
+    [Fact]
     public void CSharpProbeBinder_BindExpressionBuildsLiteralAndBinaryBoundNodes()
     {
         const string code = "state int count = 0;";
@@ -2394,7 +2861,7 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
-    public void SemanticBindingCache_AkcssAssignmentEdit_ReusesUnchangedStyleOperations()
+    public void SemanticBindingCache_AkcssAssignmentEdit_RebindsUnchangedStyleOperationsInNewSnapshot()
     {
         const string oldCode =
             "@akcss {\n" +
@@ -2437,9 +2904,14 @@ public sealed class SemanticArchitectureTests
         var newChangedRule = Assert.IsType<AkcssStyleRuleSyntax>(newBlock.Members[1]);
         var newBackground = Assert.IsType<AkcssAssignmentSyntax>(newUnchangedRule.Members[0]);
         var newPadding = Assert.IsType<AkcssAssignmentSyntax>(newChangedRule.Members[0]);
+        var newBackgroundOperation = newModel.GetOperation(newBackground);
+        var newPaddingOperation = newModel.GetOperation(newPadding);
 
-        Assert.Same(oldBackgroundOperation, newModel.GetOperation(newBackground));
-        Assert.NotSame(oldPaddingOperation, newModel.GetOperation(newPadding));
+        Assert.Same(oldBackground.Green, newBackground.Green);
+        Assert.NotSame(oldBackgroundOperation, newBackgroundOperation);
+        Assert.NotSame(oldPaddingOperation, newPaddingOperation);
+        Assert.Same(newBackgroundOperation, newModel.GetOperation(newBackground));
+        Assert.Same(newPaddingOperation, newModel.GetOperation(newPadding));
     }
 
     private static AkburaCompilation CreateCompilation(

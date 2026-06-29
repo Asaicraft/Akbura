@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -196,6 +197,407 @@ public sealed class RealisticSemanticProjectTests
         AssertTailwindOperation(semanticModel, GetAttribute(stackPanel, "w"), "w", "30", hasCondition: false);
         AssertTailwindOperation(semanticModel, GetAttribute(stackPanel, "opacity"), "opacity", "1", hasCondition: false);
         AssertTailwindOperation(semanticModel, GetAttribute(stackPanel, "hidden"), "hidden", expectedArgument: null, hasCondition: true);
+    }
+
+    [Fact]
+    public void RealisticProject_BoundTreeAudit_CoversSemanticBearingSyntax()
+    {
+        var project = CreateProject();
+        var dashboardModel = project.Compilation.GetSemanticModel(project.DashboardTree);
+        var taskCardModel = project.Compilation.GetSemanticModel(project.TaskCardTree);
+        var statusBadgeModel = project.Compilation.GetSemanticModel(project.StatusBadgeTree);
+
+        AssertComponentBoundCoverage(dashboardModel, project.DashboardTree.GetRoot());
+        AssertComponentBoundCoverage(taskCardModel, project.TaskCardTree.GetRoot());
+        AssertComponentBoundCoverage(statusBadgeModel, project.StatusBadgeTree.GetRoot());
+        AssertAkcssDocumentBoundCoverage(dashboardModel, project.DashboardAkcssTree.GetRoot());
+        AssertAkcssDocumentBoundCoverage(dashboardModel, project.SharedAkcssTree.GetRoot());
+    }
+
+    private static void AssertComponentBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        AkburaDocumentSyntax root)
+    {
+        var component = AssertBoundSemantic<BoundComponentDeclaration>(
+            semanticModel,
+            root,
+            BoundKind.ComponentDeclaration);
+        Assert.DoesNotContain(component.Children, child => child.Kind == BoundKind.Declaration);
+
+        foreach (var member in root.Members)
+        {
+            switch (member)
+            {
+                case InjectDeclarationSyntax inject:
+                    AssertBoundSemantic<BoundInjectDeclaration>(
+                        semanticModel,
+                        inject,
+                        BoundKind.InjectDeclaration);
+                    break;
+
+                case ParamDeclarationSyntax param:
+                    AssertParamBoundCoverage(semanticModel, param);
+                    break;
+
+                case StateDeclarationSyntax state:
+                    AssertStateBoundCoverage(semanticModel, state);
+                    break;
+
+                case CommandDeclarationSyntax command:
+                    AssertBoundSemantic<BoundCommandDeclaration>(
+                        semanticModel,
+                        command,
+                        BoundKind.CommandDeclaration);
+                    break;
+
+                case UseEffectDeclarationSyntax useEffect:
+                    AssertUseEffectBoundCoverage(semanticModel, useEffect);
+                    break;
+
+                case InlineAkcssBlockSyntax inlineAkcss:
+                    AssertAkcssModuleBoundCoverage(semanticModel, inlineAkcss);
+                    break;
+
+                case MarkupRootSyntax markup:
+                    AssertMarkupRootBoundCoverage(semanticModel, markup);
+                    break;
+
+                case CSharpStatementSyntax statement:
+                    foreach (var markup in EnumerateMarkupRoots(statement.Body))
+                    {
+                        AssertMarkupRootBoundCoverage(semanticModel, markup);
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static void AssertStateBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        StateDeclarationSyntax state)
+    {
+        var boundState = AssertBoundSemantic<BoundStateDeclaration>(
+            semanticModel,
+            state,
+            BoundKind.StateDeclaration);
+        var initializer = Assert.IsType<BoundStateInitializer>(Assert.Single(boundState.Children));
+
+        Assert.Same(state.Initializer, initializer.Syntax);
+        Assert.Same(initializer, semanticModel.BindingSession.BindSemanticSyntax(state.Initializer));
+    }
+
+    private static void AssertParamBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        ParamDeclarationSyntax param)
+    {
+        var boundParam = AssertBoundSemantic<BoundParamDeclaration>(
+            semanticModel,
+            param,
+            BoundKind.ParamDeclaration);
+        if (param.DefaultValue == null)
+        {
+            Assert.Empty(boundParam.Children);
+            return;
+        }
+
+        var defaultValue = Assert.IsType<BoundParamDefaultValue>(Assert.Single(boundParam.Children));
+        Assert.Same(param.DefaultValue, defaultValue.Syntax);
+        Assert.Same(defaultValue, semanticModel.BindingSession.BindSemanticSyntax(param.DefaultValue));
+    }
+
+    private static void AssertUseEffectBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        UseEffectDeclarationSyntax useEffect)
+    {
+        var boundUseEffect = AssertBoundSemantic<BoundUseEffectDeclaration>(
+            semanticModel,
+            useEffect,
+            BoundKind.UseEffectDeclaration);
+        Assert.Contains(boundUseEffect.Children, child => child.Kind == BoundKind.UseEffectDependency);
+
+        var bodies = boundUseEffect.Children
+            .Where(static child => child.Kind == BoundKind.UseEffectBody)
+            .Cast<BoundUseEffectBody>()
+            .ToArray();
+        Assert.Equal(1 + useEffect.Tails.Count, bodies.Length);
+        Assert.Same(bodies[0], semanticModel.BindingSession.BindSemanticSyntax(useEffect.Body));
+        AssertUseEffectBodyMarkupCoverage(semanticModel, bodies[0]);
+
+        for (var index = 0; index < useEffect.Tails.Count; index++)
+        {
+            var tailBody = useEffect.Tails[index].Body;
+            var boundBody = bodies[index + 1];
+            Assert.Same(boundBody, semanticModel.BindingSession.BindSemanticSyntax(tailBody));
+            AssertUseEffectBodyMarkupCoverage(semanticModel, boundBody);
+        }
+    }
+
+    private static void AssertUseEffectBodyMarkupCoverage(
+        AkburaSemanticModel semanticModel,
+        BoundUseEffectBody body)
+    {
+        foreach (var child in body.Children)
+        {
+            if (child.Kind == BoundKind.MarkupRoot)
+            {
+                AssertMarkupRootBoundCoverage(semanticModel, (MarkupRootSyntax)child.Syntax);
+            }
+        }
+    }
+
+    private static void AssertMarkupRootBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        MarkupRootSyntax markupRoot)
+    {
+        var boundRoot = AssertBoundSemantic<BoundMarkupRoot>(
+            semanticModel,
+            markupRoot,
+            BoundKind.MarkupRoot);
+        Assert.Single(boundRoot.Children);
+        AssertMarkupElementBoundCoverage(semanticModel, markupRoot.Element);
+    }
+
+    private static void AssertMarkupElementBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        MarkupElementSyntax element)
+    {
+        var boundElement = AssertBoundSemantic<BoundMarkupComponent>(
+            semanticModel,
+            element,
+            BoundKind.MarkupComponent);
+        Assert.DoesNotContain(boundElement.Children, child => child.Kind == BoundKind.Declaration);
+
+        if (element.StartTag != null)
+        {
+            foreach (var attribute in element.StartTag.Attributes)
+            {
+                AssertMarkupAttributeBoundCoverage(semanticModel, attribute);
+            }
+        }
+
+        foreach (var content in element.Body)
+        {
+            var boundContent = AssertBoundSemantic<BoundMarkupContent>(
+                semanticModel,
+                content,
+                BoundKind.MarkupContent);
+            if (content is MarkupElementContentSyntax elementContent)
+            {
+                Assert.Contains(boundContent.Children, child => child.Kind == BoundKind.MarkupComponent);
+                AssertMarkupElementBoundCoverage(semanticModel, elementContent.Element);
+            }
+        }
+    }
+
+    private static void AssertMarkupAttributeBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        MarkupAttributeSyntax attribute)
+    {
+        if (attribute is TailwindAttributeSyntax)
+        {
+            AssertBoundOperation<BoundTailwindUtilityAttribute>(
+                semanticModel,
+                attribute,
+                BoundKind.TailwindUtilityAttribute);
+            return;
+        }
+
+        var symbol = semanticModel.GetSymbolInfo(attribute).Symbol;
+        if (symbol is IRoutedEventSymbol)
+        {
+            AssertBoundOperation<BoundMarkupRoutedEventBinding>(
+                semanticModel,
+                attribute,
+                BoundKind.MarkupRoutedEventBinding);
+            return;
+        }
+
+        if (symbol is AkburaPropertySymbol { Command: not null })
+        {
+            AssertBoundOperation<BoundMarkupCommandBinding>(
+                semanticModel,
+                attribute,
+                BoundKind.MarkupCommandBinding);
+            return;
+        }
+
+        AssertBoundOperation<BoundMarkupPropertySetter>(
+            semanticModel,
+            attribute,
+            BoundKind.MarkupPropertySetter);
+    }
+
+    private static void AssertAkcssDocumentBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        AkcssDocumentSyntax document)
+    {
+        AssertAkcssModuleBoundCoverage(
+            semanticModel,
+            document,
+            document.Members);
+    }
+
+    private static void AssertAkcssModuleBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        InlineAkcssBlockSyntax inlineAkcss)
+    {
+        AssertAkcssModuleBoundCoverage(
+            semanticModel,
+            inlineAkcss,
+            inlineAkcss.Members);
+    }
+
+    private static void AssertAkcssModuleBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        AkburaSyntax moduleSyntax,
+        Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> members)
+    {
+        var boundModule = AssertBoundSemantic<BoundAkcssModule>(
+            semanticModel,
+            moduleSyntax,
+            BoundKind.AkcssModule);
+        Assert.DoesNotContain(boundModule.Children, child => child.Kind == BoundKind.Declaration);
+
+        foreach (var member in members)
+        {
+            switch (member)
+            {
+                case AkcssStyleRuleSyntax style:
+                    AssertAkcssStyleBoundCoverage(semanticModel, style);
+                    break;
+
+                case AkcssUtilitiesSectionSyntax utilities:
+                    foreach (var utility in utilities.Utilities)
+                    {
+                        AssertAkcssUtilityBoundCoverage(semanticModel, utility);
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static void AssertAkcssStyleBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        AkcssStyleRuleSyntax style)
+    {
+        var boundStyle = AssertBoundSemantic<BoundAkcssStyle>(
+            semanticModel,
+            style,
+            BoundKind.AkcssStyle);
+        AssertAkcssBodyMembersBoundCoverage(semanticModel, style.Members, boundStyle.Children);
+    }
+
+    private static void AssertAkcssUtilityBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        AkcssUtilityDeclarationSyntax utility)
+    {
+        var boundUtility = AssertBoundSemantic<BoundAkcssUtility>(
+            semanticModel,
+            utility,
+            BoundKind.AkcssUtility);
+        AssertAkcssBodyMembersBoundCoverage(semanticModel, utility.Members, boundUtility.Children);
+    }
+
+    private static void AssertAkcssBodyMembersBoundCoverage(
+        AkburaSemanticModel semanticModel,
+        Akbura.Language.Syntax.SyntaxList<AkcssBodyMemberSyntax> members,
+        ImmutableArray<BoundNode> boundChildren)
+    {
+        foreach (var member in members)
+        {
+            switch (member)
+            {
+                case AkcssAssignmentSyntax assignment:
+                    AssertBoundOperation<BoundAkcssPropertySetter>(
+                        semanticModel,
+                        assignment,
+                        BoundKind.AkcssPropertySetter);
+                    Assert.Contains(boundChildren, child => ReferenceEquals(child.Syntax, assignment));
+                    break;
+
+                case AkcssIfDirectiveSyntax ifDirective:
+                    var boundIf = AssertBoundOperation<BoundAkcssIf>(
+                        semanticModel,
+                        ifDirective,
+                        BoundKind.AkcssIf);
+                    Assert.Contains(boundChildren, child => ReferenceEquals(child.Syntax, ifDirective));
+                    AssertAkcssBodyMembersBoundCoverage(
+                        semanticModel,
+                        ifDirective.Members,
+                        ImmutableArray<BoundNode>.CastUp(boundIf.Operations));
+                    break;
+
+                case AkcssApplyDirectiveSyntax apply:
+                    AssertBoundOperation<BoundAkcssApply>(
+                        semanticModel,
+                        apply,
+                        BoundKind.AkcssApply);
+                    Assert.Contains(boundChildren, child => ReferenceEquals(child.Syntax, apply));
+                    break;
+
+                case AkcssInterceptDirectiveSyntax intercept:
+                    AssertBoundOperation<BoundAkcssIntercept>(
+                        semanticModel,
+                        intercept,
+                        BoundKind.AkcssIntercept);
+                    Assert.Contains(boundChildren, child => ReferenceEquals(child.Syntax, intercept));
+                    break;
+            }
+        }
+    }
+
+    private static IEnumerable<MarkupRootSyntax> EnumerateMarkupRoots(CSharpBlockSyntax? block)
+    {
+        if (block == null)
+        {
+            yield break;
+        }
+
+        foreach (var token in block.Tokens)
+        {
+            switch (token)
+            {
+                case MarkupRootSyntax markup:
+                    yield return markup;
+                    break;
+
+                case CSharpStatementSyntax statement:
+                    foreach (var nested in EnumerateMarkupRoots(statement.Body))
+                    {
+                        yield return nested;
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static TBound AssertBoundSemantic<TBound>(
+        AkburaSemanticModel semanticModel,
+        AkburaSyntax syntax,
+        BoundKind expectedKind)
+        where TBound : BoundNode
+    {
+        var boundNode = Assert.IsType<TBound>(
+            semanticModel.BindingSession.BindSemanticSyntax(syntax));
+        Assert.Equal(expectedKind, boundNode.Kind);
+        Assert.Same(syntax, boundNode.Syntax);
+        return boundNode;
+    }
+
+    private static TBound AssertBoundOperation<TBound>(
+        AkburaSemanticModel semanticModel,
+        AkburaSyntax syntax,
+        BoundKind expectedKind)
+        where TBound : BoundNode
+    {
+        var boundNode = Assert.IsType<TBound>(
+            semanticModel.BindingSession.BindOperationSyntax(syntax));
+        Assert.Equal(expectedKind, boundNode.Kind);
+        Assert.Same(syntax, boundNode.Syntax);
+        return boundNode;
     }
 
     private static void AssertRootParameters(IAkburaComponentSymbol component)

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace Akbura.Language;
 
@@ -79,6 +80,14 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
     {
+        syntaxTrees = syntaxTrees.IsDefault
+            ? ImmutableArray<AkburaSyntaxTree>.Empty
+            : syntaxTrees;
+        if (SyntaxTrees.SequenceEqual(syntaxTrees))
+        {
+            return this;
+        }
+
         return new AkburaCompilation(
             CSharpCompilation,
             syntaxTrees,
@@ -95,6 +104,14 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithAkcssSyntaxTrees(ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
     {
+        akcssSyntaxTrees = akcssSyntaxTrees.IsDefault
+            ? ImmutableArray<AkcssSyntaxTree>.Empty
+            : akcssSyntaxTrees;
+        if (AkcssSyntaxTrees.SequenceEqual(akcssSyntaxTrees))
+        {
+            return this;
+        }
+
         return new AkburaCompilation(
             CSharpCompilation,
             SyntaxTrees,
@@ -106,6 +123,11 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithCSharpCompilation(CSharpCompilation csharpCompilation)
     {
+        if (ReferenceEquals(CSharpCompilation, csharpCompilation))
+        {
+            return this;
+        }
+
         return new AkburaCompilation(
             csharpCompilation,
             SyntaxTrees,
@@ -137,20 +159,4 @@ internal sealed class AkburaCompilation
         return semanticModel;
     }
 
-    internal bool TryGetCachedSemanticModel(
-        string filePath,
-        out AkburaSemanticModel semanticModel)
-    {
-        foreach (var cached in _semanticModels)
-        {
-            if (cached.Key.FilePath == filePath)
-            {
-                semanticModel = cached.Value;
-                return true;
-            }
-        }
-
-        semanticModel = null!;
-        return false;
-    }
 }

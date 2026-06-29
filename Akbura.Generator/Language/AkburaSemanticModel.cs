@@ -35,10 +35,6 @@ internal sealed partial class AkburaSemanticModel
     private readonly Dictionary<AkburaSyntax, AkburaOperation?> _operationCache = new();
     private readonly Dictionary<AkburaSyntax, BoundNode> _boundNodeCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _semanticDiagnosticsCache = new();
-    private readonly Dictionary<AkburaSyntax, SemanticReuseKey> _symbolInfoReuseKeys = new();
-    private readonly Dictionary<AkburaSyntax, SemanticReuseKey> _operationReuseKeys = new();
-    private readonly Dictionary<AkburaSyntax, SemanticReuseKey> _boundNodeReuseKeys = new();
-    private readonly Dictionary<AkburaSyntax, SemanticReuseKey> _semanticDiagnosticsReuseKeys = new();
     private readonly Dictionary<AkburaSyntax, MemberSemanticModel> _memberSemanticModelCache = new();
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
@@ -50,17 +46,12 @@ internal sealed partial class AkburaSemanticModel
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
         _bindingCache = new SemanticBindingCache(
-            this,
             _symbolInfoCache,
             _operationCache,
             _boundNodeCache,
-            _semanticDiagnosticsCache,
-            _symbolInfoReuseKeys,
-            _operationReuseKeys,
-            _boundNodeReuseKeys,
-            _semanticDiagnosticsReuseKeys);
+            _semanticDiagnosticsCache);
         _bindingSession = new BindingSession(this);
-        _operationFactory = new AkburaOperationFactory(this);
+        _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
         _declarationSymbols = new AkburaDeclarationSymbolTable(this);
     }
 
@@ -104,10 +95,13 @@ internal sealed partial class AkburaSemanticModel
             throw new ArgumentNullException(nameof(syntax));
         }
 
+        if (Compilation.DeclarationTable.TryGetDeclaration(syntax, out var declaration))
+        {
+            return _declarationSymbols.GetSymbolInfo(declaration).Symbol;
+        }
+
         ValidateSyntaxTreeOwnership(syntax);
-        return Compilation.DeclarationTable.TryGetDeclaration(syntax, out var declaration)
-            ? _declarationSymbols.GetSymbolInfo(declaration).Symbol
-            : null;
+        return null;
     }
 
     public ImmutableArray<AkburaSemanticDiagnostic> GetSemanticDiagnostics(AkburaSyntax syntax)
@@ -218,8 +212,7 @@ internal sealed partial class AkburaSemanticModel
 
     internal BoundNode GetBoundNode(
         AkburaSyntax syntax,
-        Func<BoundNode> bind,
-        SemanticReuseKey reuseKey)
+        Func<BoundNode> bind)
     {
         if (syntax == null)
         {
@@ -231,8 +224,8 @@ internal sealed partial class AkburaSemanticModel
             throw new ArgumentNullException(nameof(bind));
         }
 
-        ValidateSyntaxTreeOwnership(syntax);
-        return _bindingCache.GetBoundNode(syntax, bind, reuseKey);
+        ValidateBoundSyntaxOwnership(syntax);
+        return _bindingCache.GetBoundNode(syntax, bind);
     }
 
     internal ImmutableArray<AkburaSemanticDiagnostic> GetCachedSemanticDiagnostics(AkburaSyntax syntax)
@@ -289,6 +282,16 @@ internal sealed partial class AkburaSemanticModel
 
     internal AkburaSymbolInfo CreateDeclarationSymbolInfo(AkburaDeclaration declaration)
     {
+        if (declaration.SyntaxTree != null &&
+            !ReferenceEquals(declaration.Syntax.Root, SyntaxTree.GetRoot()))
+        {
+            var containingModel = Compilation.GetSemanticModel(declaration.SyntaxTree);
+            var symbol = containingModel.GetDeclaredSymbol(declaration.Syntax);
+            return symbol == null
+                ? AkburaSymbolInfo.None(AkburaCandidateReason.NotFound)
+                : AkburaSymbolInfo.Success(symbol);
+        }
+
         return declaration.Kind switch
         {
             AkburaDeclarationKind.Component or
@@ -300,6 +303,8 @@ internal sealed partial class AkburaSemanticModel
                 GetMemberSemanticModel(declaration.Syntax).GetSymbolInfo(declaration.Syntax),
             AkburaDeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax =>
                 ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(declaration.Syntax)),
+            AkburaDeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.AkcssDocumentSyntax =>
+                ResolveExternalAkcssModule(declaration),
             AkburaDeclarationKind.AkcssStyle =>
                 ResolveAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(declaration.Syntax)),
             AkburaDeclarationKind.AkcssUtility =>
@@ -326,86 +331,6 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return SyntaxTree.GetRoot();
-    }
-
-    internal bool TryGetCachedSymbolInfoByGreen(
-        GreenNode green,
-        SemanticReuseKey reuseKey,
-        out AkburaSymbolInfo symbolInfo)
-    {
-        foreach (var cached in _symbolInfoCache)
-        {
-            if (ReferenceEquals(cached.Key.Green, green) &&
-                _symbolInfoReuseKeys.TryGetValue(cached.Key, out var cachedReuseKey) &&
-                cachedReuseKey.Equals(reuseKey))
-            {
-                symbolInfo = cached.Value;
-                return true;
-            }
-        }
-
-        symbolInfo = default;
-        return false;
-    }
-
-    internal bool TryGetCachedOperationByGreen(
-        GreenNode green,
-        SemanticReuseKey reuseKey,
-        out AkburaOperation? operation)
-    {
-        foreach (var cached in _operationCache)
-        {
-            if (ReferenceEquals(cached.Key.Green, green) &&
-                _operationReuseKeys.TryGetValue(cached.Key, out var cachedReuseKey) &&
-                cachedReuseKey.Equals(reuseKey))
-            {
-                operation = cached.Value;
-                return true;
-            }
-        }
-
-        operation = null;
-        return false;
-    }
-
-    internal bool TryGetCachedBoundNodeByGreen(
-        GreenNode green,
-        SemanticReuseKey reuseKey,
-        out BoundNode boundNode)
-    {
-        foreach (var cached in _boundNodeCache)
-        {
-            if (ReferenceEquals(cached.Key.Green, green) &&
-                _boundNodeReuseKeys.TryGetValue(cached.Key, out var cachedReuseKey) &&
-                cachedReuseKey.Equals(reuseKey))
-            {
-                boundNode = cached.Value;
-                return true;
-            }
-        }
-
-        boundNode = null!;
-        return false;
-    }
-
-    internal bool TryGetCachedDiagnosticsByGreen(
-        GreenNode green,
-        SemanticReuseKey reuseKey,
-        out ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
-    {
-        foreach (var cached in _semanticDiagnosticsCache)
-        {
-            if (ReferenceEquals(cached.Key.Green, green) &&
-                _semanticDiagnosticsReuseKeys.TryGetValue(cached.Key, out var cachedReuseKey) &&
-                cachedReuseKey.Equals(reuseKey))
-            {
-                diagnostics = cached.Value;
-                return true;
-            }
-        }
-
-        diagnostics = default;
-        return false;
     }
 
     private AkburaSymbolInfo ResolveInlineAkcssModule(InlineAkcssBlockSyntax inlineAkcssBlock)
@@ -461,6 +386,43 @@ internal sealed partial class AkburaSemanticModel
             path: null);
     }
 
+    private AkburaSymbolInfo ResolveExternalAkcssModule(AkburaDeclaration declaration)
+    {
+        var document = Unsafe.As<AkcssDocumentSyntax>(declaration.Syntax);
+        if (_symbolInfoCache.TryGetValue(document, out var cachedInfo))
+        {
+            return cachedInfo;
+        }
+
+        var symbol = new AkcssModuleSymbol(
+            document,
+            isInlined: false,
+            containingSymbol: null,
+            CreateAkcssSymbols(document.Members),
+            GetExternalAkcssPath(declaration));
+        var symbolInfo = AkburaSymbolInfo.Success(symbol);
+        _symbolInfoCache[document] = symbolInfo;
+        SetSemanticDiagnostics(
+            document,
+            CreateDuplicateAkcssSymbolDiagnostics(document.Members));
+        return symbolInfo;
+    }
+
+    private static string? GetExternalAkcssPath(AkburaDeclaration declaration)
+    {
+        var syntaxTree = declaration.AkcssSyntaxTree;
+        if (syntaxTree == null)
+        {
+            return string.IsNullOrWhiteSpace(declaration.Name)
+                ? null
+                : declaration.Name;
+        }
+
+        return !string.IsNullOrWhiteSpace(syntaxTree.LogicalName)
+            ? syntaxTree.LogicalName
+            : syntaxTree.FilePath;
+    }
+
     private ImmutableArray<IAkcssSymbol> CreateAkcssSymbols(
         Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> members)
     {
@@ -471,7 +433,7 @@ internal sealed partial class AkburaSemanticModel
             {
                 case AkburaSyntaxKind.AkcssStyleRuleSyntax:
                     var styleRule = Unsafe.As<AkcssStyleRuleSyntax>(member);
-                    if (GetSymbolInfo(styleRule).Symbol is IAkcssSymbol styleSymbol)
+                    if (GetDeclarationSymbolInfo(styleRule).Symbol is IAkcssSymbol styleSymbol)
                     {
                         builder.Add(styleSymbol);
                     }
@@ -482,7 +444,7 @@ internal sealed partial class AkburaSemanticModel
                     var utilitiesSection = Unsafe.As<AkcssUtilitiesSectionSyntax>(member);
                     foreach (var utilityDeclaration in utilitiesSection.Utilities)
                     {
-                        if (GetSymbolInfo(utilityDeclaration).Symbol is IAkcssSymbol utilitySymbol)
+                        if (GetDeclarationSymbolInfo(utilityDeclaration).Symbol is IAkcssSymbol utilitySymbol)
                         {
                             builder.Add(utilitySymbol);
                         }
@@ -674,6 +636,8 @@ internal sealed partial class AkburaSemanticModel
         {
             AkburaSyntaxKind.InlineAkcssBlockSyntax =>
                 CreateBoundInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssDocumentSyntax =>
+                CreateBoundExternalAkcssModule(Unsafe.As<AkcssDocumentSyntax>(syntax)),
             AkburaSyntaxKind.AkcssStyleRuleSyntax =>
                 CreateBoundAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(syntax)),
             AkburaSyntaxKind.AkcssUtilityDeclarationSyntax =>
@@ -687,9 +651,33 @@ internal sealed partial class AkburaSemanticModel
 
     private BoundAkcssModule CreateBoundInlineAkcssModule(InlineAkcssBlockSyntax inlineAkcssBlock)
     {
-        var symbolInfo = GetSymbolInfo(inlineAkcssBlock);
+        var symbolInfo = GetDeclarationSymbolInfo(inlineAkcssBlock);
+        var boundModule = CreateBoundAkcssModule(
+            inlineAkcssBlock,
+            inlineAkcssBlock.Members,
+            symbolInfo);
+        _boundNodeCache[inlineAkcssBlock] = boundModule;
+        return boundModule;
+    }
+
+    private BoundAkcssModule CreateBoundExternalAkcssModule(AkcssDocumentSyntax document)
+    {
+        var symbolInfo = GetDeclarationSymbolInfo(document);
+        var boundModule = CreateBoundAkcssModule(
+            document,
+            document.Members,
+            symbolInfo);
+        _boundNodeCache[document] = boundModule;
+        return boundModule;
+    }
+
+    private BoundAkcssModule CreateBoundAkcssModule(
+        AkburaSyntax syntax,
+        Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> members,
+        AkburaSymbolInfo symbolInfo)
+    {
         using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
-        foreach (var member in inlineAkcssBlock.Members)
+        foreach (var member in members)
         {
             switch (member.Kind)
             {
@@ -708,18 +696,17 @@ internal sealed partial class AkburaSemanticModel
         }
 
         var boundModule = new BoundAkcssModule(
-            inlineAkcssBlock,
-            GetBinder(inlineAkcssBlock, BinderUsage.Akcss),
+            syntax,
+            GetBinder(syntax, BinderUsage.Akcss),
             symbolInfo,
-            GetCachedSemanticDiagnostics(inlineAkcssBlock),
+            GetCachedSemanticDiagnostics(syntax),
             childrenBuilder.ToImmutable());
-        _boundNodeCache[inlineAkcssBlock] = boundModule;
         return boundModule;
     }
 
     private BoundAkcssStyle CreateBoundAkcssStyle(AkcssStyleRuleSyntax styleRule)
     {
-        var symbolInfo = GetSymbolInfo(styleRule);
+        var symbolInfo = GetDeclarationSymbolInfo(styleRule);
         var symbol = symbolInfo.Symbol as IAkcssSymbol;
         var children = symbol == null
             ? ImmutableArray<BoundNode>.Empty
@@ -736,7 +723,7 @@ internal sealed partial class AkburaSemanticModel
 
     private BoundAkcssUtility CreateBoundAkcssUtility(AkcssUtilityDeclarationSyntax utilityDeclaration)
     {
-        var symbolInfo = GetSymbolInfo(utilityDeclaration);
+        var symbolInfo = GetDeclarationSymbolInfo(utilityDeclaration);
         var symbol = symbolInfo.Symbol as IAkcssSymbol;
         var children = symbol == null
             ? ImmutableArray<BoundNode>.Empty
@@ -779,12 +766,12 @@ internal sealed partial class AkburaSemanticModel
 
         if (!TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var targetType))
         {
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            diagnosticsBuilder.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
+            var diagnosticsBag = new BindingDiagnosticBag();
+            diagnosticsBag.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     styleRule,
                     styleRule.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
-            diagnosticsBuilder.AddRange(CreateDuplicateAkcssSymbolDiagnostics(styleRule));
-            SetSemanticDiagnostics(styleRule, diagnosticsBuilder.ToImmutable());
+            diagnosticsBag.AddRange(CreateDuplicateAkcssSymbolDiagnostics(styleRule));
+            SetSemanticDiagnostics(styleRule, diagnosticsBag);
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
         }
 
@@ -806,18 +793,20 @@ internal sealed partial class AkburaSemanticModel
 
         if (!TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var targetType))
         {
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            diagnosticsBuilder.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
+            var diagnosticsBag = new BindingDiagnosticBag();
+            diagnosticsBag.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     utilityDeclaration,
                     utilityDeclaration.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
-            diagnosticsBuilder.AddRange(CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
-            SetSemanticDiagnostics(utilityDeclaration, diagnosticsBuilder.ToImmutable());
+            diagnosticsBag.AddRange(CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
+            SetSemanticDiagnostics(utilityDeclaration, diagnosticsBag);
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
         }
 
         var symbol = CreateTailwindUtilitySymbolForAkcss(utilityDeclaration, targetType, includeOperations: true);
 
-        SetSemanticDiagnostics(utilityDeclaration, CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
+        var diagnostics = new BindingDiagnosticBag();
+        diagnostics.AddRange(CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
+        SetSemanticDiagnostics(utilityDeclaration, diagnostics);
 
         return AkburaSymbolInfo.Success(symbol);
     }
@@ -1313,14 +1302,17 @@ internal sealed partial class AkburaSemanticModel
             : new CSharpSymbolDefinition(binding.TypeSymbol);
         var operations = CreateAkcssBoundOperations(ifDirective.Members, containingSymbol);
 
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-        AddAkcssExpressionDiagnostics(
-            ifDirective,
-            ifDirective.Condition.ToFullString().Trim(),
-            binding,
-            diagnosticsBuilder);
-        var diagnostics = diagnosticsBuilder.ToImmutable();
-        SetSemanticDiagnostics(ifDirective, diagnostics);
+        var diagnosticsBag = new BindingDiagnosticBag();
+        {
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            AddAkcssExpressionDiagnostics(
+                ifDirective,
+                ifDirective.Condition.ToFullString().Trim(),
+                binding,
+                diagnosticsBuilder);
+            diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
+        }
+        var diagnostics = SetSemanticDiagnostics(ifDirective, diagnosticsBag);
 
         return new BoundAkcssIf(
             ifDirective,
@@ -1339,22 +1331,27 @@ internal sealed partial class AkburaSemanticModel
         AkcssApplyDirectiveSyntax applyDirective,
         IAkcssSymbol containingSymbol)
     {
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        var diagnosticsBag = new BindingDiagnosticBag();
         using var itemsBuilder = ImmutableArrayBuilder<string>.Rent();
         using var symbolsBuilder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
 
         foreach (var item in GetAkcssApplyItems(applyDirective))
         {
             itemsBuilder.Add(item);
-            var resolved = ResolveAkcssApplyItem(applyDirective, item, containingSymbol, diagnosticsBuilder);
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            var resolved = ResolveAkcssApplyItem(
+                    applyDirective,
+                    item,
+                    containingSymbol,
+                    diagnosticsBuilder);
+            diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             if (resolved != null)
             {
                 symbolsBuilder.Add(resolved);
             }
         }
 
-        var diagnostics = diagnosticsBuilder.ToImmutable();
-        SetSemanticDiagnostics(applyDirective, diagnostics);
+        var diagnostics = SetSemanticDiagnostics(applyDirective, diagnosticsBag);
 
         return new BoundAkcssApply(
             applyDirective,
@@ -1370,7 +1367,7 @@ internal sealed partial class AkburaSemanticModel
         AkcssInterceptDirectiveSyntax interceptDirective,
         IAkcssSymbol containingSymbol)
     {
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        var diagnosticsBag = new BindingDiagnosticBag();
         var interceptType = default(CSharpSymbolDefinition);
 
         CSharp.TypeSyntax typeSyntax;
@@ -1386,13 +1383,13 @@ internal sealed partial class AkburaSemanticModel
         var binding = BindCSharpType(typeSyntax, GetAkcssCSharpUsingDirectives(containingSymbol));
         if (binding.TypeSymbol is not INamedTypeSymbol namedType)
         {
-            diagnosticsBuilder.Add(CreateAkcssInterceptTypeNotFoundDiagnostic(
+            diagnosticsBag.Add(CreateAkcssInterceptTypeNotFoundDiagnostic(
                 interceptDirective,
                 interceptDirective.Type.ToFullString().Trim()));
         }
         else if (!IsAkcssInterceptRuntimeType(namedType, containingSymbol, out var expectedBaseType))
         {
-            diagnosticsBuilder.Add(CreateAkcssInterceptTypeInvalidDiagnostic(
+            diagnosticsBag.Add(CreateAkcssInterceptTypeInvalidDiagnostic(
                 interceptDirective,
                 namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 expectedBaseType));
@@ -1402,8 +1399,7 @@ internal sealed partial class AkburaSemanticModel
             interceptType = new CSharpSymbolDefinition(namedType);
         }
 
-        var diagnostics = diagnosticsBuilder.ToImmutable();
-        SetSemanticDiagnostics(interceptDirective, diagnostics);
+        var diagnostics = SetSemanticDiagnostics(interceptDirective, diagnosticsBag);
 
         return new BoundAkcssIntercept(
             interceptDirective,
@@ -1418,9 +1414,12 @@ internal sealed partial class AkburaSemanticModel
         AkcssAssignmentSyntax assignment,
         IAkcssSymbol containingSymbol)
     {
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        var diagnosticsBag = new BindingDiagnosticBag();
 
-        var property = ResolveAkcssProperty(assignment, containingSymbol, diagnosticsBuilder);
+        var property = ResolveAkcssPropertyWithDiagnostics(
+            assignment,
+            containingSymbol,
+            diagnosticsBag);
         var expression = ParseAkcssAssignmentExpression(assignment);
         var binding = expression == null
             ? CSharpBindingResult.Empty
@@ -1434,6 +1433,7 @@ internal sealed partial class AkburaSemanticModel
         var requiresBrushConversion = false;
         object? convertedValue = null;
         var activeBinding = binding;
+        var hasExpectedTypeBinding = false;
 
         if (property?.Type.Symbol is ITypeSymbol expectedType && expression != null)
         {
@@ -1455,7 +1455,7 @@ internal sealed partial class AkburaSemanticModel
                     else
                     {
                         valueKind = AkcssPropertyValueKind.Error;
-                        diagnosticsBuilder.Add(CreateAkcssInvalidColorDiagnostic(
+                        diagnosticsBag.Add(CreateAkcssInvalidColorDiagnostic(
                             assignment,
                             colorName,
                             property.Name));
@@ -1487,7 +1487,7 @@ internal sealed partial class AkburaSemanticModel
                     else
                     {
                         valueKind = AkcssPropertyValueKind.Error;
-                        diagnosticsBuilder.Add(CreateAkcssInvalidColorDiagnostic(
+                        diagnosticsBag.Add(CreateAkcssInvalidColorDiagnostic(
                             assignment,
                             colorText,
                             property.Name));
@@ -1513,6 +1513,7 @@ internal sealed partial class AkburaSemanticModel
                     : new CSharpSymbolDefinition(expectedTypeMemberBinding.Symbol);
                 valueOperation = expectedTypeMemberBinding.OperationDefinition;
                 activeBinding = expectedTypeMemberBinding;
+                hasExpectedTypeBinding = true;
                 valueType = expectedTypeMemberBinding.TypeSymbol == null
                     ? valueType
                     : new CSharpSymbolDefinition(expectedTypeMemberBinding.TypeSymbol);
@@ -1522,6 +1523,7 @@ internal sealed partial class AkburaSemanticModel
             {
                 valueType = new CSharpSymbolDefinition(expectedType);
                 activeBinding = CSharpBindingResult.Empty;
+                hasExpectedTypeBinding = true;
             }
 
             var isThicknessPropertyType = IsAvaloniaThicknessType(expectedType);
@@ -1542,7 +1544,7 @@ internal sealed partial class AkburaSemanticModel
             else if (isThicknessPropertyType && isThicknessTuple)
             {
                 valueKind = AkcssPropertyValueKind.Error;
-                diagnosticsBuilder.Add(CreateAkcssInvalidThicknessDiagnostic(
+                diagnosticsBag.Add(CreateAkcssInvalidThicknessDiagnostic(
                     assignment,
                     assignment.Expression.ToFullString().Trim(),
                     property.Name));
@@ -1554,25 +1556,40 @@ internal sealed partial class AkburaSemanticModel
                 valueKind = AkcssPropertyValueKind.AmxInvocation;
                 convertedValue = amxInvocation;
             }
+
+            if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
+                !hasExpectedTypeBinding &&
+                !requiresBrushConversion)
+            {
+                activeBinding = BindAkcssExpression(
+                    expression,
+                    containingSymbol,
+                    expectedType);
+                valueOperation = activeBinding.OperationDefinition;
+                valueType = activeBinding.TypeSymbol == null
+                    ? valueType
+                    : new CSharpSymbolDefinition(activeBinding.TypeSymbol);
+            }
         }
 
         if (valueKind != AkcssPropertyValueKind.Error)
         {
+            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
             AddAkcssExpressionDiagnostics(
-                assignment,
-                activeBinding,
-                diagnosticsBuilder);
+                    assignment,
+                    activeBinding,
+                    diagnosticsBuilder);
             AddAkcssValueConversionDiagnostics(
-                assignment,
-                property,
-                valueKind,
-                requiresBrushConversion,
-                activeBinding,
-                diagnosticsBuilder);
+                    assignment,
+                    property,
+                    valueKind,
+                    requiresBrushConversion,
+                    activeBinding,
+                    diagnosticsBuilder);
+            diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
         }
 
-        var diagnostics = diagnosticsBuilder.ToImmutable();
-        SetSemanticDiagnostics(assignment, diagnostics);
+        var diagnostics = SetSemanticDiagnostics(assignment, diagnosticsBag);
 
         return new BoundAkcssPropertySetter(
             assignment,
@@ -1645,10 +1662,34 @@ internal sealed partial class AkburaSemanticModel
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (property?.Type.Symbol is not ITypeSymbol targetType ||
-            binding.TypeSymbol is not ITypeSymbol sourceType ||
             requiresBrushConversion ||
             binding.Diagnostics.Any(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error) ||
             valueKind is AkcssPropertyValueKind.ColorLiteral or AkcssPropertyValueKind.ThicknessTuple ||
+            IsImplicitExpectedConversion(binding))
+        {
+            return;
+        }
+
+        if (binding.Conversion.TargetType != null)
+        {
+            if (binding.Conversion.SourceType is ITypeSymbol conversionSourceType)
+            {
+                if (IsSameType(conversionSourceType, targetType))
+                {
+                    return;
+                }
+
+                diagnosticsBuilder.Add(CreateAkcssValueCannotConvertDiagnostic(
+                    assignment,
+                    property.Name,
+                    conversionSourceType,
+                    targetType));
+            }
+
+            return;
+        }
+
+        if (binding.TypeSymbol is not ITypeSymbol sourceType ||
             IsSameType(sourceType, targetType) ||
             Compilation.CSharpCompilation.ClassifyConversion(sourceType, targetType).IsImplicit)
         {
@@ -1660,6 +1701,12 @@ internal sealed partial class AkburaSemanticModel
             property.Name,
             sourceType,
             targetType));
+    }
+
+    private static bool IsImplicitExpectedConversion(CSharpBindingResult binding)
+    {
+        return binding.Conversion.TargetType != null &&
+               binding.Conversion.IsImplicit;
     }
 
     private IAkcssSymbol? ResolveAkcssApplyItem(
@@ -1834,6 +1881,21 @@ internal sealed partial class AkburaSemanticModel
         }
 
         return builder.ToImmutable();
+    }
+
+    private AkburaPropertySymbol? ResolveAkcssPropertyWithDiagnostics(
+        AkcssAssignmentSyntax assignment,
+        IAkcssSymbol containingSymbol,
+        BindingDiagnosticBag diagnostics)
+    {
+        AkburaPropertySymbol? property = null;
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        property = ResolveAkcssProperty(
+                assignment,
+                containingSymbol,
+                diagnosticsBuilder);
+        diagnostics.AddRange(diagnosticsBuilder.ToImmutable());
+        return property;
     }
 
     private AkburaPropertySymbol? ResolveAkcssProperty(
@@ -4501,7 +4563,8 @@ internal sealed partial class AkburaSemanticModel
     private CSharpBindingResult BindCSharpExpression(
         CSharp.ExpressionSyntax expressionSyntax,
         StateDeclarationSyntax? scopeStateDeclaration = null,
-        bool isBindingPath = true)
+        bool isBindingPath = true,
+        ITypeSymbol? targetType = null)
     {
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
@@ -4525,14 +4588,17 @@ internal sealed partial class AkburaSemanticModel
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
 
-        return BindingSession
-            .GetCSharpProbeBinder((AkburaSyntax?)scopeStateDeclaration ?? SyntaxTree.GetRoot(), BinderUsage.Expression)
-            .BindReturnExpression(compilationUnit, isBindingPath);
+        var binder = BindingSession.GetCSharpProbeBinder(
+            (AkburaSyntax?)scopeStateDeclaration ?? SyntaxTree.GetRoot(),
+            BinderUsage.Expression);
+        var binding = binder.BindReturnExpression(compilationUnit, isBindingPath);
+        return ApplyExpectedTypeConversion(binding, binder, targetType);
     }
 
     private CSharpBindingResult BindAkcssExpression(
         CSharp.ExpressionSyntax expressionSyntax,
-        IAkcssSymbol containingSymbol)
+        IAkcssSymbol containingSymbol,
+        ITypeSymbol? targetType = null)
     {
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
@@ -4548,9 +4614,21 @@ internal sealed partial class AkburaSemanticModel
             probeClass,
             GetAkcssCSharpUsingDirectives(containingSymbol));
 
-        return BindingSession
-            .GetCSharpProbeBinder(containingSymbol.DeclarationSyntax, BinderUsage.Akcss)
-            .BindReturnExpression(compilationUnit, isBindingPath: true);
+        var binder = BindingSession.GetCSharpProbeBinder(
+            containingSymbol.DeclarationSyntax,
+            BinderUsage.Akcss);
+        var binding = binder.BindReturnExpression(compilationUnit, isBindingPath: true);
+        return ApplyExpectedTypeConversion(binding, binder, targetType);
+    }
+
+    private static CSharpBindingResult ApplyExpectedTypeConversion(
+        CSharpBindingResult binding,
+        CSharpProbeBinder binder,
+        ITypeSymbol? targetType)
+    {
+        return targetType == null
+            ? binding
+            : binding.WithConversion(binder.ClassifyConversion(binding.TypeSymbol, targetType));
     }
 
     private CSharp.ParameterListSyntax CreateAkcssExpressionParameterList(IAkcssSymbol containingSymbol)
@@ -4929,13 +5007,38 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
-    private void SetSemanticDiagnostics(
+    private void ValidateBoundSyntaxOwnership(AkburaSyntax syntax)
+    {
+        if (ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()) ||
+            Compilation.DeclarationTable.TryGetDeclaration(syntax.Root, out _))
+        {
+            return;
+        }
+
+        throw new ArgumentException("Syntax node is not part of this semantic model syntax tree or compilation declarations.", nameof(syntax));
+    }
+
+    internal void SetSemanticDiagnostics(
         AkburaSyntax syntax,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
     {
         _semanticDiagnosticsCache[syntax] = diagnostics.IsDefault
             ? ImmutableArray<AkburaSemanticDiagnostic>.Empty
             : diagnostics;
+    }
+
+    internal ImmutableArray<AkburaSemanticDiagnostic> SetSemanticDiagnostics(
+        AkburaSyntax syntax,
+        BindingDiagnosticBag diagnostics)
+    {
+        if (diagnostics == null)
+        {
+            throw new ArgumentNullException(nameof(diagnostics));
+        }
+
+        var semanticDiagnostics = diagnostics.ToSemanticDiagnostics();
+        SetSemanticDiagnostics(syntax, semanticDiagnostics);
+        return semanticDiagnostics;
     }
 
     private void SetSemanticDiagnosticsIfAbsent(
@@ -4954,21 +5057,53 @@ internal sealed partial class AkburaSemanticModel
         CSharpBindingResult binding,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
-        if (binding.Diagnostics.IsDefaultOrEmpty)
+        if (!binding.Diagnostics.IsDefaultOrEmpty)
+        {
+            foreach (var diagnostic in binding.Diagnostics)
+            {
+                if (diagnostic.Severity == DiagnosticSeverity.Error)
+                {
+                    diagnosticsBuilder.Add(CreateCSharpExpressionErrorDiagnostic(
+                        syntax,
+                        expressionText,
+                        diagnostic));
+                }
+            }
+        }
+
+        AddCSharpConversionDiagnostics(
+            syntax,
+            expressionText,
+            binding,
+            diagnosticsBuilder);
+    }
+
+    private static void AddCSharpConversionDiagnostics(
+        AkburaSyntax syntax,
+        string expressionText,
+        CSharpBindingResult binding,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        var conversion = binding.Conversion;
+        if (conversion.TargetType == null ||
+            conversion.IsImplicit ||
+            conversion.SourceType == null ||
+            IsSameType(conversion.SourceType, conversion.TargetType))
         {
             return;
         }
 
-        foreach (var diagnostic in binding.Diagnostics)
-        {
-            if (diagnostic.Severity == DiagnosticSeverity.Error)
-            {
-                diagnosticsBuilder.Add(CreateCSharpExpressionErrorDiagnostic(
-                    syntax,
-                    expressionText,
-                    diagnostic));
-            }
-        }
+        diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError,
+            [
+                expressionText,
+                "Cannot implicitly convert type '" +
+                conversion.SourceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                "' to '" +
+                conversion.TargetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                "'."
+            ]));
     }
 
     private static AkburaSemanticDiagnostic CreateCSharpExpressionErrorDiagnostic(

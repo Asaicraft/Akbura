@@ -106,8 +106,7 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => GetOperationBinder(syntax).BindOperationSyntax(syntax),
-            GetOperationCacheKey(syntax));
+            () => GetOperationBinder(syntax).BindOperationSyntax(syntax));
     }
 
     public BoundNode BindSemanticSyntax(AkburaSyntax syntax)
@@ -119,40 +118,7 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => GetSemanticBinder(syntax).BindSemanticSyntax(syntax),
-            GetSemanticCacheKey(syntax));
-    }
-
-    internal SemanticReuseKey GetOperationCacheKey(AkburaSyntax syntax)
-    {
-        return CreatePositionCacheKey(syntax, GetOperationUsage(syntax.Kind));
-    }
-
-    internal SemanticReuseKey GetSemanticCacheKey(AkburaSyntax syntax)
-    {
-        return CreatePositionCacheKey(syntax, GetSemanticUsage(syntax.Kind));
-    }
-
-    internal SemanticReuseKey GetExpressionCacheKey(
-        AkburaSyntax syntax,
-        BinderUsage usage = BinderUsage.Expression)
-    {
-        return CreatePositionCacheKey(syntax, usage);
-    }
-
-    internal SemanticReuseKey GetDiagnosticsCacheKey(AkburaSyntax syntax)
-    {
-        return syntax.Kind is
-            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
-            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
-            AkburaSyntaxKind.TailwindFlagAttributeSyntax or
-            AkburaSyntaxKind.TailwindFullAttributeSyntax or
-            AkburaSyntaxKind.AkcssAssignmentSyntax or
-            AkburaSyntaxKind.AkcssIfDirectiveSyntax or
-            AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
-            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax
-                ? GetOperationCacheKey(syntax)
-                : GetSemanticCacheKey(syntax);
+            () => GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
     }
 
     private Binder GetOperationBinder(AkburaSyntax syntax)
@@ -198,48 +164,7 @@ internal sealed class BindingSession
                 syntax,
                 expression,
                 targetType: null,
-                isBindingPath),
-            GetExpressionCacheKey(syntax, usage));
-    }
-
-    private SemanticReuseKey CreatePositionCacheKey(
-        AkburaSyntax syntax,
-        BinderUsage usage)
-    {
-        if (syntax == null)
-        {
-            throw new ArgumentNullException(nameof(syntax));
-        }
-
-        if (TryFindDeclarationPath(syntax, out var exactPath) &&
-            exactPath.Length > 0)
-        {
-            return BinderFactory.BinderFactoryVisitor.CreateSemanticReuseKey(
-                syntax,
-                exactPath,
-                usage);
-        }
-
-        var root = syntax.Root;
-        var position = syntax.Position;
-        if (position == root.EndPosition && position > root.Position)
-        {
-            position--;
-        }
-
-        if (!TryFindDeclarationPath(root, position, out var path) ||
-            path.Length == 0)
-        {
-            return BinderFactory.BinderFactoryVisitor.CreateSemanticReuseKey(
-                syntax,
-                ImmutableArray<AkburaDeclaration>.Empty,
-                usage);
-        }
-
-        return BinderFactory.BinderFactoryVisitor.CreateSemanticReuseKey(
-            syntax,
-            path,
-            usage);
+                isBindingPath));
     }
 
     private static BinderUsage GetOperationUsage(AkburaSyntaxKind kind)

@@ -357,32 +357,43 @@ internal sealed partial class AkburaSemanticModel
             }
 
             var hasExplicitType = stateDeclaration.Type != null;
-            var initializerBinding = BindStateInitializerExpression(stateDeclaration);
+            var explicitType = hasExplicitType
+                ? ResolveExplicitStateType(stateDeclaration)
+                : default;
+            var bindingKind = GetStateBindingKind(stateDeclaration.Initializer);
+            var initializerBinding = BindStateInitializerExpression(
+                stateDeclaration,
+                bindingKind == StateBindingKind.None
+                    ? explicitType.Symbol as ITypeSymbol
+                    : null);
             var userHook = ResolveStateUserHook(stateDeclaration);
             var initializerType = initializerBinding.TypeSymbol == null
                 ? userHook?.ReturnType ?? default
                 : new CSharpSymbolDefinition(initializerBinding.TypeSymbol);
             var type = hasExplicitType
-                ? ResolveExplicitStateType(stateDeclaration)
+                ? explicitType
                 : initializerType;
-            var bindingKind = GetStateBindingKind(stateDeclaration.Initializer);
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            diagnosticsBuilder.AddRange(SemanticModel.CreateStateBindingDiagnostics(
+            var diagnosticsBag = new BindingDiagnosticBag();
+            diagnosticsBag.AddRange(SemanticModel.CreateStateBindingDiagnostics(
                     stateDeclaration,
                     bindingKind,
                     type,
                     initializerBinding));
-            AddDuplicateComponentMemberDiagnostics(stateDeclaration, name, diagnosticsBuilder);
-            if (userHook == null)
             {
-                AddCSharpBindingDiagnostics(
-                    stateDeclaration,
-                    stateDeclaration.Initializer.Expression.ToFullString().Trim(),
-                    initializerBinding,
-                    diagnosticsBuilder);
+                using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                AddDuplicateComponentMemberDiagnostics(stateDeclaration, name, diagnosticsBuilder);
+                if (userHook == null)
+                {
+                    AddCSharpBindingDiagnostics(
+                        stateDeclaration,
+                        stateDeclaration.Initializer.Expression.ToFullString().Trim(),
+                        initializerBinding,
+                        diagnosticsBuilder);
+                }
+
+                diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
-            var diagnostics = diagnosticsBuilder.ToImmutable();
-            SemanticModel.SetSemanticDiagnostics(stateDeclaration, diagnostics);
+            var diagnostics = SemanticModel.SetSemanticDiagnostics(stateDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new StateSymbol(
                 stateDeclaration,
@@ -410,28 +421,37 @@ internal sealed partial class AkburaSemanticModel
             }
 
             var hasExplicitType = paramDeclaration.Type != null;
-            var defaultValueBinding = BindParamDefaultValueExpression(paramDeclaration);
+            var explicitType = hasExplicitType
+                ? ResolveExplicitParamType(paramDeclaration)
+                : default;
+            var defaultValueBinding = BindParamDefaultValueExpression(
+                paramDeclaration,
+                explicitType.Symbol as ITypeSymbol);
             var defaultValueType = defaultValueBinding.TypeSymbol == null
                 ? default
                 : new CSharpSymbolDefinition(defaultValueBinding.TypeSymbol);
             var type = hasExplicitType
-                ? ResolveExplicitParamType(paramDeclaration)
+                ? explicitType
                 : defaultValueType;
             var bindingKind = GetParamBindingKind(paramDeclaration);
 
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            AddDuplicateComponentMemberDiagnostics(paramDeclaration, name, diagnosticsBuilder);
-            if (paramDeclaration.DefaultValue != null)
+            var diagnosticsBag = new BindingDiagnosticBag();
             {
-                AddCSharpBindingDiagnostics(
-                    paramDeclaration,
-                    paramDeclaration.DefaultValue.ToFullString().Trim(),
-                    defaultValueBinding,
-                    diagnosticsBuilder);
+                using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                AddDuplicateComponentMemberDiagnostics(paramDeclaration, name, diagnosticsBuilder);
+                if (paramDeclaration.DefaultValue != null)
+                {
+                    AddCSharpBindingDiagnostics(
+                        paramDeclaration,
+                        paramDeclaration.DefaultValue.ToFullString().Trim(),
+                        defaultValueBinding,
+                        diagnosticsBuilder);
+                }
+
+                diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
 
-            var diagnostics = diagnosticsBuilder.ToImmutable();
-            SemanticModel.SetSemanticDiagnostics(paramDeclaration, diagnostics);
+            var diagnostics = SemanticModel.SetSemanticDiagnostics(paramDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new ParamSymbol(
                 paramDeclaration,
@@ -457,10 +477,13 @@ internal sealed partial class AkburaSemanticModel
 
             var type = ResolveInjectType(injectDeclaration);
 
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            AddDuplicateComponentMemberDiagnostics(injectDeclaration, name, diagnosticsBuilder);
-            var diagnostics = diagnosticsBuilder.ToImmutable();
-            SemanticModel.SetSemanticDiagnostics(injectDeclaration, diagnostics);
+            var diagnosticsBag = new BindingDiagnosticBag();
+            {
+                using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                AddDuplicateComponentMemberDiagnostics(injectDeclaration, name, diagnosticsBuilder);
+                diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
+            }
+            var diagnostics = SemanticModel.SetSemanticDiagnostics(injectDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
             SemanticModel._boundNodeCache[injectDeclaration] = new BoundInjectDeclaration(
@@ -486,11 +509,14 @@ internal sealed partial class AkburaSemanticModel
             var resultType = GetCommandResultType(returnType, isVoid);
             var hasResult = !resultType.IsDefault;
 
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            AddDuplicateComponentMemberDiagnostics(commandDeclaration, name, diagnosticsBuilder);
-            AddDuplicateCommandParameterDiagnostics(commandDeclaration, diagnosticsBuilder);
-            var diagnostics = diagnosticsBuilder.ToImmutable();
-            SemanticModel.SetSemanticDiagnostics(commandDeclaration, diagnostics);
+            var diagnosticsBag = new BindingDiagnosticBag();
+            {
+                using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                AddDuplicateComponentMemberDiagnostics(commandDeclaration, name, diagnosticsBuilder);
+                AddDuplicateCommandParameterDiagnostics(commandDeclaration, diagnosticsBuilder);
+                diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
+            }
+            var diagnostics = SemanticModel.SetSemanticDiagnostics(commandDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new CommandSymbol(
                 commandDeclaration,
@@ -534,8 +560,12 @@ internal sealed partial class AkburaSemanticModel
             StateDeclarationSyntax stateDeclaration,
             AkburaSymbolInfo symbolInfo)
         {
-            var initializerBinding = BindStateInitializerExpression(stateDeclaration);
             var bindingKind = GetStateBindingKind(stateDeclaration.Initializer);
+            var targetType = symbolInfo.Symbol is IStateSymbol { HasExplicitType: true } stateSymbol
+                && bindingKind == StateBindingKind.None
+                ? stateSymbol.Type.Symbol as ITypeSymbol
+                : null;
+            var initializerBinding = BindStateInitializerExpression(stateDeclaration, targetType);
             var userHook = ResolveStateUserHook(stateDeclaration);
             return CacheBoundStateDeclaration(
                 stateDeclaration,
@@ -578,7 +608,10 @@ internal sealed partial class AkburaSemanticModel
             ParamDeclarationSyntax paramDeclaration,
             AkburaSymbolInfo symbolInfo)
         {
-            var defaultValueBinding = BindParamDefaultValueExpression(paramDeclaration);
+            var targetType = symbolInfo.Symbol is IParamSymbol { HasExplicitType: true } paramSymbol
+                ? paramSymbol.Type.Symbol as ITypeSymbol
+                : null;
+            var defaultValueBinding = BindParamDefaultValueExpression(paramDeclaration, targetType);
             return CacheBoundParamDeclaration(
                 paramDeclaration,
                 symbolInfo,
@@ -623,10 +656,10 @@ internal sealed partial class AkburaSemanticModel
             UseEffectDeclarationSyntax useEffectDeclaration,
             AkburaSymbolInfo symbolInfo)
         {
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            var diagnosticsBag = new BindingDiagnosticBag();
             _ = CreateUseEffectDependencies(
                 useEffectDeclaration,
-                diagnosticsBuilder,
+                diagnosticsBag,
                 out var dependencyNodes);
 
             return CacheBoundUseEffectDeclaration(
@@ -697,14 +730,13 @@ internal sealed partial class AkburaSemanticModel
                 ImmutableArray<UseEffectDependency>.Empty));
             SemanticModel._symbolInfoCache[useEffectDeclaration] = placeholderInfo;
 
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            var diagnosticsBag = new BindingDiagnosticBag();
             var dependencies = CreateUseEffectDependencies(
                 useEffectDeclaration,
-                diagnosticsBuilder,
+                diagnosticsBag,
                 out var dependencyNodes);
 
-            var diagnostics = diagnosticsBuilder.ToImmutable();
-            SemanticModel.SetSemanticDiagnostics(useEffectDeclaration, diagnostics);
+            var diagnostics = SemanticModel.SetSemanticDiagnostics(useEffectDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new UseEffectSymbol(
                 useEffectDeclaration,
@@ -848,7 +880,9 @@ internal sealed partial class AkburaSemanticModel
             return returnType;
         }
 
-        private CSharpBindingResult BindParamDefaultValueExpression(ParamDeclarationSyntax paramDeclaration)
+        private CSharpBindingResult BindParamDefaultValueExpression(
+            ParamDeclarationSyntax paramDeclaration,
+            ITypeSymbol? targetType = null)
         {
             var defaultValue = paramDeclaration.DefaultValue;
             if (defaultValue == null)
@@ -866,10 +900,14 @@ internal sealed partial class AkburaSemanticModel
                 return CSharpBindingResult.Empty;
             }
 
-            return SemanticModel.BindCSharpExpression(csharpExpression);
+            return SemanticModel.BindCSharpExpression(
+                csharpExpression,
+                targetType: targetType);
         }
 
-        private CSharpBindingResult BindStateInitializerExpression(StateDeclarationSyntax stateDeclaration)
+        private CSharpBindingResult BindStateInitializerExpression(
+            StateDeclarationSyntax stateDeclaration,
+            ITypeSymbol? targetType = null)
         {
             CSharp.ExpressionSyntax csharpExpression;
             try
@@ -884,7 +922,8 @@ internal sealed partial class AkburaSemanticModel
             return SemanticModel.BindCSharpExpression(
                 csharpExpression,
                 stateDeclaration,
-                isBindingPath: IsStateBindingPath(csharpExpression));
+                isBindingPath: IsStateBindingPath(csharpExpression),
+                targetType: targetType);
         }
 
         private IUserHookSymbol? ResolveStateUserHook(StateDeclarationSyntax stateDeclaration)
@@ -899,7 +938,7 @@ internal sealed partial class AkburaSemanticModel
 
         private ImmutableArray<UseEffectDependency> CreateUseEffectDependencies(
             UseEffectDeclarationSyntax useEffectDeclaration,
-            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+            BindingDiagnosticBag diagnostics,
             out ImmutableArray<BoundNode> dependencyNodes)
         {
             var argumentList = GetCSharpArgumentList(useEffectDeclaration.Arguments);
@@ -922,11 +961,15 @@ internal sealed partial class AkburaSemanticModel
                 }
 
                 var binding = SemanticModel.BindMarkupAttributeExpression(expression);
-                AddCSharpBindingDiagnostics(
-                    useEffectDeclaration,
-                    expressionText,
-                    binding,
-                    diagnosticsBuilder);
+                using (var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent())
+                {
+                    AddCSharpBindingDiagnostics(
+                            useEffectDeclaration,
+                            expressionText,
+                            binding,
+                            diagnosticsBuilder);
+                    diagnostics.AddRange(diagnosticsBuilder.ToImmutable());
+                }
                 var csharpDefinition = binding.Symbol == null
                     ? default
                     : new CSharpSymbolDefinition(binding.Symbol);

@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
+using Akbura.Language.BoundTree;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
@@ -25,7 +26,8 @@ internal readonly struct CSharpBindingResult
         ImmutableArray<RoslynSymbol> candidateSymbols,
         AkburaCandidateReason candidateReason,
         CSharpOperationDefinition operationDefinition,
-        ImmutableArray<Diagnostic> diagnostics = default)
+        ImmutableArray<Diagnostic> diagnostics = default,
+        AkburaConversion conversion = default)
     {
         TypeSymbol = typeSymbol;
         Symbol = symbol;
@@ -39,6 +41,7 @@ internal readonly struct CSharpBindingResult
         Diagnostics = diagnostics.IsDefault
             ? ImmutableArray<Diagnostic>.Empty
             : diagnostics;
+        Conversion = conversion;
     }
 
     public ITypeSymbol? TypeSymbol { get; }
@@ -56,4 +59,20 @@ internal readonly struct CSharpBindingResult
     public CSharpOperationDefinition OperationDefinition { get; }
 
     public ImmutableArray<Diagnostic> Diagnostics { get; }
+
+    public AkburaConversion Conversion { get; }
+
+    public CSharpBindingResult WithConversion(AkburaConversion conversion)
+    {
+        return new CSharpBindingResult(
+            conversion.TargetType ?? TypeSymbol,
+            Symbol,
+            ReceiverType,
+            IsBindingPath,
+            CandidateSymbols,
+            CandidateReason,
+            OperationDefinition,
+            Diagnostics,
+            conversion);
+    }
 }

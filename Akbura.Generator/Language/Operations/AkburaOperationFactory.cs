@@ -10,11 +10,13 @@ namespace Akbura.Language.Operations;
 
 internal sealed class AkburaOperationFactory
 {
-    private readonly AkburaSemanticModel _semanticModel;
+    private readonly Func<IAkcssSymbol?, Func<RoslynSymbol, ISymbol?>> _createCSharpOperationSymbolMapper;
 
-    public AkburaOperationFactory(AkburaSemanticModel semanticModel)
+    public AkburaOperationFactory(
+        Func<IAkcssSymbol?, Func<RoslynSymbol, ISymbol?>> createCSharpOperationSymbolMapper)
     {
-        _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _createCSharpOperationSymbolMapper = createCSharpOperationSymbolMapper ??
+            throw new ArgumentNullException(nameof(createCSharpOperationSymbolMapper));
     }
 
     public IOperation? CreateOperation(BoundNode boundNode)
@@ -55,7 +57,7 @@ internal sealed class AkburaOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ValueOperation,
-                _semanticModel.CreateCSharpOperationSymbolMapper()));
+                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
     }
 
     private MarkupCommandBindingOperation CreateMarkupCommandBindingOperation(
@@ -82,7 +84,7 @@ internal sealed class AkburaOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.HandlerOperation,
-                _semanticModel.CreateCSharpOperationSymbolMapper()));
+                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
     }
 
     private MarkupRoutedEventBindingOperation CreateMarkupRoutedEventBindingOperation(
@@ -105,13 +107,13 @@ internal sealed class AkburaOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.HandlerOperation,
-                _semanticModel.CreateCSharpOperationSymbolMapper()));
+                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
     }
 
     private TailwindUtilityAttributeOperation CreateTailwindUtilityAttributeOperation(
         BoundTailwindUtilityAttribute boundNode)
     {
-        var mapper = _semanticModel.CreateCSharpOperationSymbolMapper();
+        var mapper = CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null);
         return new TailwindUtilityAttributeOperation(
             boundNode.Syntax,
             boundNode.ContainingComponent,
@@ -145,7 +147,7 @@ internal sealed class AkburaOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ValueOperation,
-                _semanticModel.CreateCSharpOperationSymbolMapper(boundNode.ContainingAkcssSymbol)));
+                CreateCSharpOperationSymbolMapper(boundNode.ContainingAkcssSymbol)));
     }
 
     private AkcssIfOperation CreateAkcssIfOperation(BoundAkcssIf boundNode)
@@ -169,7 +171,7 @@ internal sealed class AkburaOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ConditionOperation,
-                _semanticModel.CreateCSharpOperationSymbolMapper(boundNode.ContainingAkcssSymbol)));
+                CreateCSharpOperationSymbolMapper(boundNode.ContainingAkcssSymbol)));
     }
 
     private static AkcssApplyOperation CreateAkcssApplyOperation(BoundAkcssApply boundNode)
@@ -216,6 +218,12 @@ internal sealed class AkburaOperationFactory
         }
 
         return builder.ToImmutableAndFree();
+    }
+
+    private Func<RoslynSymbol, ISymbol?> CreateCSharpOperationSymbolMapper(
+        IAkcssSymbol? containingAkcssSymbol)
+    {
+        return _createCSharpOperationSymbolMapper(containingAkcssSymbol);
     }
 
     private static ICSharpOperation? CreateCSharpOperationTree(

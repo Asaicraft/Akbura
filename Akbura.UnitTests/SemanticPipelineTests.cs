@@ -335,6 +335,62 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_TextBlockMixedContent_UsesTextProperty()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <TextBlock>Count is {count}</TextBlock>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var contentOperation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(element));
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(element).IsEmpty);
+        Assert.Equal("Text", symbol.ContentModel.ContentProperty.Name);
+        Assert.Equal("Text", contentOperation.Property?.Name);
+        Assert.True(contentOperation.IsSynthesizedString);
+        Assert.Equal(SpecialType.System_String,
+            Assert.IsAssignableFrom<INamedTypeSymbol>(contentOperation.ValueType.Symbol).SpecialType);
+        Assert.False(contentOperation.HasErrors);
+        AssertCSharpRootChild(contentOperation, contentOperation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(contentOperation),
+            operation => operation.TargetSymbol is IStateSymbol { Name: "count" });
+    }
+
+    [Fact]
+    public void SemanticModel_TextBlockRunChild_UsesInlinesContentModel()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Controls.Documents;
+
+            <TextBlock>
+                <Run Text="Hello"/>
+            </TextBlock>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(element).IsEmpty);
+        Assert.Equal("Inlines", symbol.ContentModel.ContentProperty.Name);
+        Assert.Null(semanticModel.GetOperation(element));
+    }
+
+    [Fact]
     public void SemanticModel_BorderMixedContent_RejectsStringContentOperation()
     {
         const string code =

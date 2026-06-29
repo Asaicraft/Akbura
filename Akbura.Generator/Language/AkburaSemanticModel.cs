@@ -3537,7 +3537,7 @@ internal sealed partial class AkburaSemanticModel
         if (binding.TypeSymbol is INamedTypeSymbol namedType &&
             namedType.TypeKind != TypeKind.Error)
         {
-            var contentModel = CreateMarkupContentModel(namedType);
+            var contentModel = CreateMarkupContentModel(namedType, markupElement);
             var children = CreateMarkupChildren(markupElement, contentModel, out var diagnostics);
             SetSemanticDiagnostics(markupElement, diagnostics);
 
@@ -4419,8 +4419,15 @@ internal sealed partial class AkburaSemanticModel
         return false;
     }
 
-    private MarkupContentModel CreateMarkupContentModel(INamedTypeSymbol componentType)
+    private MarkupContentModel CreateMarkupContentModel(
+        INamedTypeSymbol componentType,
+        MarkupElementSyntax? markupElement = null)
     {
+        if (TryCreateTextBlockTextContentModel(componentType, markupElement, out var textBlockContentModel))
+        {
+            return textBlockContentModel;
+        }
+
         if (TryGetAvaloniaControlType(out var controlType) &&
             IsAssignableTo(componentType, controlType))
         {
@@ -4459,6 +4466,60 @@ internal sealed partial class AkburaSemanticModel
         return default;
     }
 
+    private bool TryCreateTextBlockTextContentModel(
+        INamedTypeSymbol componentType,
+        MarkupElementSyntax? markupElement,
+        out MarkupContentModel contentModel)
+    {
+        contentModel = default;
+        if (markupElement == null ||
+            HasElementContent(markupElement) ||
+            !HasValueContent(markupElement) ||
+            !IsAvaloniaTextBlockType(componentType))
+        {
+            return false;
+        }
+
+        var textProperty = FindPublicClrProperty(componentType, "Text");
+        if (textProperty == null)
+        {
+            return false;
+        }
+
+        contentModel = new MarkupContentModel(
+            new CSharpSymbolDefinition(textProperty),
+            new CSharpSymbolDefinition(textProperty.Type),
+            isCollection: false,
+            allowsText: AllowsTextContent(textProperty.Type));
+        return true;
+    }
+
+    private bool IsAvaloniaTextBlockType(INamedTypeSymbol componentType)
+    {
+        var textBlockType = Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Controls.TextBlock");
+        return textBlockType != null &&
+            IsAssignableTo(componentType, textBlockType);
+    }
+
+    private static bool HasValueContent(MarkupElementSyntax markupElement)
+    {
+        foreach (var content in markupElement.Body)
+        {
+            if (content.Kind == AkburaSyntaxKind.MarkupInlineExpressionSyntax)
+            {
+                return true;
+            }
+
+            if (content.Kind == AkburaSyntaxKind.MarkupTextLiteralSyntax &&
+                !string.IsNullOrWhiteSpace(content.ToFullString()))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private ImmutableArray<MarkupChildContent> CreateMarkupChildren(
         MarkupElementSyntax markupElement,
         MarkupContentModel contentModel,
@@ -4486,19 +4547,27 @@ internal sealed partial class AkburaSemanticModel
 
         foreach (var childSyntax in markupElement.Body)
         {
-            switch (childSyntax)
+            switch (childSyntax.Kind)
             {
-                case MarkupElementContentSyntax elementContent:
-                    AddElementChild(elementContent, contentModel, childrenBuilder, diagnosticsBuilder);
+                case AkburaSyntaxKind.MarkupElementContentSyntax:
+                    AddElementChild(
+                        Unsafe.As<MarkupElementContentSyntax>(childSyntax),
+                        contentModel,
+                        childrenBuilder,
+                        diagnosticsBuilder);
                     break;
 
-                case MarkupTextLiteralSyntax textLiteral:
-                    AddTextChild(textLiteral, contentModel, childrenBuilder, diagnosticsBuilder);
+                case AkburaSyntaxKind.MarkupTextLiteralSyntax:
+                    AddTextChild(
+                        Unsafe.As<MarkupTextLiteralSyntax>(childSyntax),
+                        contentModel,
+                        childrenBuilder,
+                        diagnosticsBuilder);
                     break;
 
-                case MarkupInlineExpressionSyntax inlineExpression:
+                case AkburaSyntaxKind.MarkupInlineExpressionSyntax:
                     AddExpressionChild(
-                        inlineExpression,
+                        Unsafe.As<MarkupInlineExpressionSyntax>(childSyntax),
                         contentModel,
                         validateInlineExpressionContent,
                         childrenBuilder,

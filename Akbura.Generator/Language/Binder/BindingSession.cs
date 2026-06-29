@@ -171,7 +171,8 @@ internal sealed class BindingSession
     {
         return kind switch
         {
-            AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+            AkburaSyntaxKind.MarkupElementSyntax or
+                AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,

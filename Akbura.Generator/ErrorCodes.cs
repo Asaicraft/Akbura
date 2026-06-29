@@ -38,6 +38,7 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_MarkupEventBindingNotAllowed = nameof(AKBURA_SEMANTIC_MarkupEventBindingNotAllowed);
     public const string AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch = nameof(AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch);
     public const string AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch = nameof(AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch);
+    public const string AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed = nameof(AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed);
     public const string AKBURA_SEMANTIC_TailwindUtilityNotFound = nameof(AKBURA_SEMANTIC_TailwindUtilityNotFound);
     public const string AKBURA_SEMANTIC_TailwindUtilityAmbiguous = nameof(AKBURA_SEMANTIC_TailwindUtilityAmbiguous);
     public const string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch = nameof(AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch);

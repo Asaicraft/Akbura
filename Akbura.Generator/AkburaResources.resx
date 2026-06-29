@@ -216,6 +216,9 @@
   <data name="AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch" xml:space="preserve">
     <value>Markup command '{0}' expects handler '{1}', but received '{2}'.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed" xml:space="preserve">
+    <value>Markup command '{0}' does not support '{1}' binding. Use a normal command handler expression.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_TailwindUtilityNotFound" xml:space="preserve">
     <value>Tailwind utility '{0}' was not found for component '{1}'.</value>
   </data>

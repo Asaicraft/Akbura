@@ -14,7 +14,7 @@ using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Language.Binder;
 
-internal sealed class MarkupBinder : Binder
+internal sealed partial class MarkupBinder : Binder
 {
     public MarkupBinder(
         AkburaSemanticModel semanticModel,
@@ -47,6 +47,8 @@ internal sealed class MarkupBinder : Binder
     {
         return syntax.Kind switch
         {
+            AkburaSyntaxKind.MarkupElementSyntax =>
+                SemanticModel.CreateBoundMarkupSyntax(syntax),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
@@ -81,7 +83,7 @@ internal sealed class MarkupBinder : Binder
         {
             AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax =>
-                SemanticModel.CreateBoundTailwindUtilityAttribute(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
+                CreateBoundTailwindUtilityAttribute(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax =>
                 BindMarkupPropertyOrEvent(markupAttribute),

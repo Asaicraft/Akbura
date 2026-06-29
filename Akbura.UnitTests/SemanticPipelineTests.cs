@@ -295,6 +295,108 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ButtonMixedContent_CreatesContentOperation()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <Button Click={count++}>Count is {count}</Button>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var clickAttribute = element.StartTag!.Attributes.Single();
+
+        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var contentOperation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(element));
+        var clickOperation = Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+            semanticModel.GetOperation(clickAttribute));
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(element).IsEmpty);
+        Assert.Equal("Content", symbol.ContentModel.ContentProperty.Name);
+        Assert.Equal("Content", contentOperation.Property?.Name);
+        Assert.True(contentOperation.IsSynthesizedString);
+        Assert.Equal(SpecialType.System_String,
+            Assert.IsAssignableFrom<INamedTypeSymbol>(contentOperation.ValueType.Symbol).SpecialType);
+        Assert.Equal(2, contentOperation.Content.Length);
+        Assert.Equal(MarkupChildKind.Text, contentOperation.Content[0].Kind);
+        Assert.Equal(MarkupChildKind.Expression, contentOperation.Content[1].Kind);
+        Assert.False(contentOperation.HasErrors);
+        Assert.Same(contentOperation.Property, contentOperation.TargetSymbol);
+        AssertCSharpRootChild(contentOperation, contentOperation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(contentOperation),
+            operation => operation.TargetSymbol is IStateSymbol { Name: "count" });
+        Assert.Equal("Click", clickOperation.Event.Name);
+    }
+
+    [Fact]
+    public void SemanticModel_BorderMixedContent_RejectsStringContentOperation()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <Border>Count is {count}</Border>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var operation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(element));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(element));
+
+        Assert.Equal("Child", operation.Property?.Name);
+        Assert.True(operation.IsSynthesizedString);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_InvalidMarkupChild, diagnostic.Code);
+        Assert.Contains("string", diagnostic.Message);
+        Assert.Contains("Avalonia.Controls.Control", diagnostic.Message);
+        AssertCSharpRootChild(operation, operation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation),
+            csharpOperation => csharpOperation.TargetSymbol is IStateSymbol { Name: "count" });
+    }
+
+    [Fact]
+    public void SemanticModel_BorderExpressionContent_ChecksExpressionType()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <Border>{count}</Border>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        var operation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(element));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(element));
+
+        Assert.Equal("Child", operation.Property?.Name);
+        Assert.False(operation.IsSynthesizedString);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_InvalidMarkupChild, diagnostic.Code);
+        Assert.Contains("int", diagnostic.Message);
+        Assert.Contains("Avalonia.Controls.Control", diagnostic.Message);
+        AssertCSharpRootChild(operation, operation.ValueOperationTree);
+        Assert.Contains(EnumerateCSharpOperations(operation),
+            csharpOperation => csharpOperation.TargetSymbol is IStateSymbol { Name: "count" });
+    }
+
+    [Fact]
     public void SemanticModel_BorderContent_RejectsTextChild()
     {
         const string code =
@@ -3106,6 +3208,36 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupAttributeInvalidConversions_ProduceDiagnostics()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <Button Width={"wide"} IsVisible={1} />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var attributes = GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes
+            .Cast<MarkupPlainAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(2, attributes.Length);
+        foreach (var attribute in attributes)
+        {
+            var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+                semanticModel.GetOperation(attribute));
+            var diagnostics = semanticModel.GetSemanticDiagnostics(attribute);
+
+            Assert.True(operation.HasErrors);
+            Assert.Contains(diagnostics, diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert &&
+                diagnostic.Message.Contains(attribute.Name.Identifier.ValueText));
+        }
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesAvaloniaRoutedEventSymbol()
     {
         const string code =
@@ -3952,6 +4084,40 @@ public class SemanticPipelineTests
             diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch);
 
         Assert.True(operation.HasErrors);
+        Assert.Contains("Click", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("bind:Click={x => x * 2}")]
+    [InlineData("out:Click={x => x * 2}")]
+    public void SemanticModel_MarkupCommandAttribute_RejectsDirectionalBinding(string attributeText)
+    {
+        const string aCode =
+            """
+            namespace SomeNs;
+
+            command int Click(int a);
+            """;
+        var bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "<A " + attributeText + "/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsAssignableFrom<MarkupAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(attribute),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed);
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal("Click", operation.Command.Name);
         Assert.Contains("Click", diagnostic.Message);
     }
 

@@ -28,6 +28,8 @@ internal sealed class AkburaOperationFactory
 
         return boundNode.Kind switch
         {
+            BoundKind.MarkupComponent => CreateMarkupContentOperation((BoundMarkupComponent)boundNode),
+            BoundKind.MarkupContentSetter => CreateMarkupContentOperation((BoundMarkupContentSetter)boundNode),
             BoundKind.MarkupPropertySetter => CreateMarkupPropertySetterOperation((BoundMarkupPropertySetter)boundNode),
             BoundKind.MarkupCommandBinding => CreateMarkupCommandBindingOperation((BoundMarkupCommandBinding)boundNode),
             BoundKind.MarkupRoutedEventBinding => CreateMarkupRoutedEventBindingOperation((BoundMarkupRoutedEventBinding)boundNode),
@@ -38,6 +40,40 @@ internal sealed class AkburaOperationFactory
             BoundKind.AkcssIntercept => CreateAkcssInterceptOperation((BoundAkcssIntercept)boundNode),
             _ => null,
         };
+    }
+
+    private MarkupContentOperation? CreateMarkupContentOperation(
+        BoundMarkupComponent boundNode)
+    {
+        foreach (var child in boundNode.Children)
+        {
+            if (child.Kind == BoundKind.MarkupContentSetter)
+            {
+                return CreateMarkupContentOperation((BoundMarkupContentSetter)child);
+            }
+        }
+
+        return null;
+    }
+
+    private MarkupContentOperation CreateMarkupContentOperation(
+        BoundMarkupContentSetter boundNode)
+    {
+        return new MarkupContentOperation(
+            boundNode.Syntax,
+            boundNode.ContainingComponent,
+            boundNode.Property,
+            boundNode.ContentModel,
+            boundNode.Content,
+            boundNode.ValueType,
+            boundNode.ValueOperation,
+            boundNode.LiteralValue,
+            boundNode.IsSynthesizedString,
+            boundNode.HasErrors,
+            CreateCSharpOperationTree(
+                boundNode.Syntax,
+                boundNode.ValueOperation,
+                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
     }
 
     private MarkupPropertySetterOperation CreateMarkupPropertySetterOperation(

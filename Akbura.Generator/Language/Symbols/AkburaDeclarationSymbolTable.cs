@@ -1,4 +1,5 @@
 using Akbura.Language.Declarations;
+using Akbura.Language.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -10,7 +11,7 @@ namespace Akbura.Language.Symbols;
 internal sealed class AkburaDeclarationSymbolTable
 {
     private readonly AkburaSemanticModel _semanticModel;
-    private readonly Dictionary<AkburaDeclaration, AkburaSymbolInfo> _symbolInfos = new();
+    private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfos = new();
     private readonly Dictionary<DeclaredSymbolsKey, ImmutableArray<AkburaSymbol>> _declaredSymbols = new();
 
     public AkburaDeclarationSymbolTable(AkburaSemanticModel semanticModel)
@@ -20,13 +21,14 @@ internal sealed class AkburaDeclarationSymbolTable
 
     public AkburaSymbolInfo GetSymbolInfo(AkburaDeclaration declaration)
     {
-        if (_symbolInfos.TryGetValue(declaration, out var symbolInfo))
+        var syntax = declaration.Syntax;
+        if (_symbolInfos.TryGetValue(syntax, out var symbolInfo))
         {
             return symbolInfo;
         }
 
         symbolInfo = _semanticModel.CreateDeclarationSymbolInfo(declaration);
-        _symbolInfos[declaration] = symbolInfo;
+        _symbolInfos[syntax] = symbolInfo;
         return symbolInfo;
     }
 
@@ -34,7 +36,7 @@ internal sealed class AkburaDeclarationSymbolTable
         AkburaDeclaration declaration,
         params AkburaDeclarationKind[] allowedKinds)
     {
-        var key = new DeclaredSymbolsKey(declaration, GetKindMask(allowedKinds));
+        var key = new DeclaredSymbolsKey(declaration.Syntax, GetKindMask(allowedKinds));
         if (_declaredSymbols.TryGetValue(key, out var symbols))
         {
             return symbols;
@@ -137,19 +139,19 @@ internal sealed class AkburaDeclarationSymbolTable
 
     private readonly struct DeclaredSymbolsKey : IEquatable<DeclaredSymbolsKey>
     {
-        public DeclaredSymbolsKey(AkburaDeclaration declaration, ulong kindMask)
+        public DeclaredSymbolsKey(AkburaSyntax syntax, ulong kindMask)
         {
-            Declaration = declaration;
+            Syntax = syntax;
             KindMask = kindMask;
         }
 
-        public AkburaDeclaration Declaration { get; }
+        public AkburaSyntax Syntax { get; }
 
         public ulong KindMask { get; }
 
         public bool Equals(DeclaredSymbolsKey other)
         {
-            return ReferenceEquals(Declaration, other.Declaration) &&
+            return ReferenceEquals(Syntax, other.Syntax) &&
                    KindMask == other.KindMask;
         }
 
@@ -162,7 +164,7 @@ internal sealed class AkburaDeclarationSymbolTable
         {
             unchecked
             {
-                return (RuntimeHelpers.GetHashCode(Declaration) * 397) ^
+                return (RuntimeHelpers.GetHashCode(Syntax) * 397) ^
                        KindMask.GetHashCode();
             }
         }

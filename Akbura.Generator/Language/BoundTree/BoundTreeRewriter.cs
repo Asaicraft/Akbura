@@ -119,6 +119,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node.Update(symbolInfo, children);
     }
 
+    public override BoundNode? VisitMarkupContentSetter(BoundMarkupContentSetter node) => node;
+
     public override BoundNode? VisitAkcssModule(BoundAkcssModule node)
     {
         var symbolInfo = VisitSymbolInfo(node.SymbolInfo);

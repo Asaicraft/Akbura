@@ -21,6 +21,8 @@ internal abstract class OperationVisitor
 
     public virtual void VisitAkcssIntercept(IAkcssInterceptOperation operation) => DefaultVisit(operation);
 
+    public virtual void VisitMarkupContent(IMarkupContentOperation operation) => DefaultVisit(operation);
+
     public virtual void VisitMarkupPropertySetter(IMarkupPropertySetterOperation operation) => DefaultVisit(operation);
 
     public virtual void VisitMarkupCommandBinding(IMarkupCommandBindingOperation operation) => DefaultVisit(operation);

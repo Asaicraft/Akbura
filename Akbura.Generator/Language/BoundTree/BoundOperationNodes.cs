@@ -55,6 +55,72 @@ internal abstract class BoundMarkupAttribute : BoundNode
     public IMarkupComponentSymbol? ContainingComponent { get; }
 }
 
+internal sealed class BoundMarkupContentSetter : BoundNode
+{
+    public BoundMarkupContentSetter(
+        MarkupElementSyntax syntax,
+        BinderType binder,
+        IMarkupComponentSymbol? containingComponent,
+        IPropertySymbol? property,
+        MarkupContentModel contentModel,
+        ImmutableArray<MarkupChildContent> content,
+        CSharpSymbolDefinition valueType,
+        CSharpOperationDefinition valueOperation,
+        string? literalValue,
+        bool isSynthesizedString,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
+        bool hasErrors = false)
+        : base(
+            BoundKind.MarkupContentSetter,
+            syntax,
+            binder,
+            property == null ? AkburaSymbolInfo.None(CandidateReason.NotFound) : AkburaSymbolInfo.Success(property),
+            diagnostics,
+            hasErrors: hasErrors)
+    {
+        ContainingComponent = containingComponent;
+        Property = property;
+        ContentModel = contentModel;
+        Content = content.IsDefault
+            ? ImmutableArray<MarkupChildContent>.Empty
+            : content;
+        ValueType = valueType;
+        ValueOperation = valueOperation;
+        LiteralValue = literalValue;
+        IsSynthesizedString = isSynthesizedString;
+    }
+
+    public new MarkupElementSyntax Syntax => (MarkupElementSyntax)base.Syntax;
+
+    public IMarkupComponentSymbol? ContainingComponent { get; }
+
+    public IPropertySymbol? Property { get; }
+
+    public MarkupContentModel ContentModel { get; }
+
+    public ImmutableArray<MarkupChildContent> Content { get; }
+
+    public CSharpSymbolDefinition ValueType { get; }
+
+    public CSharpOperationDefinition ValueOperation { get; }
+
+    public string? LiteralValue { get; }
+
+    public bool IsSynthesizedString { get; }
+
+    public override void Accept(BoundTreeVisitor visitor) => visitor.VisitMarkupContentSetter(this);
+
+    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
+        where TResult : default =>
+        visitor.VisitMarkupContentSetter(this);
+
+    public override TResult? Accept<TParameter, TResult>(
+        BoundTreeVisitor<TParameter, TResult> visitor,
+        TParameter parameter)
+        where TResult : default =>
+        visitor.VisitMarkupContentSetter(this, parameter);
+}
+
 internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
 {
     public BoundMarkupPropertySetter(

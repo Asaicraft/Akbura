@@ -1,9 +1,12 @@
 using Akbura.Language.Declarations;
 using Akbura.Language.BoundTree;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
@@ -45,13 +48,13 @@ internal sealed class AkcssStyleBinder : Binder
         return syntax.Kind switch
         {
             AkburaSyntaxKind.AkcssAssignmentSyntax =>
-                SemanticModel.CreateBoundAkcssPropertySetter(Unsafe.As<AkcssAssignmentSyntax>(syntax)),
+                BindAkcssPropertySetter(Unsafe.As<AkcssAssignmentSyntax>(syntax)),
             AkburaSyntaxKind.AkcssIfDirectiveSyntax =>
-                SemanticModel.CreateBoundAkcssIf(Unsafe.As<AkcssIfDirectiveSyntax>(syntax)),
+                BindAkcssIf(Unsafe.As<AkcssIfDirectiveSyntax>(syntax)),
             AkburaSyntaxKind.AkcssApplyDirectiveSyntax =>
-                SemanticModel.CreateBoundAkcssApply(Unsafe.As<AkcssApplyDirectiveSyntax>(syntax)),
+                BindAkcssApply(Unsafe.As<AkcssApplyDirectiveSyntax>(syntax)),
             AkburaSyntaxKind.AkcssInterceptDirectiveSyntax =>
-                SemanticModel.CreateBoundAkcssIntercept(Unsafe.As<AkcssInterceptDirectiveSyntax>(syntax)),
+                BindAkcssIntercept(Unsafe.As<AkcssInterceptDirectiveSyntax>(syntax)),
             _ => base.BindOperationSyntax(syntax),
         };
     }
@@ -70,6 +73,95 @@ internal sealed class AkcssStyleBinder : Binder
                 BindOperationSyntax(syntax),
             _ => base.BindSemanticSyntax(syntax),
         };
+    }
+
+    private BoundNode BindAkcssPropertySetter(AkcssAssignmentSyntax assignment)
+    {
+        return BindAkcssOperation(
+            assignment,
+            static (semanticModel, syntax, containingSymbol) =>
+                semanticModel.CreateBoundAkcssPropertySetterCore(
+                    Unsafe.As<AkcssAssignmentSyntax>(syntax),
+                    containingSymbol));
+    }
+
+    private BoundNode BindAkcssIf(AkcssIfDirectiveSyntax ifDirective)
+    {
+        return BindAkcssOperation(
+            ifDirective,
+            static (semanticModel, syntax, containingSymbol) =>
+                semanticModel.CreateBoundAkcssIfCore(
+                    Unsafe.As<AkcssIfDirectiveSyntax>(syntax),
+                    containingSymbol));
+    }
+
+    private BoundNode BindAkcssApply(AkcssApplyDirectiveSyntax applyDirective)
+    {
+        return BindAkcssOperation(
+            applyDirective,
+            static (semanticModel, syntax, containingSymbol) =>
+                semanticModel.CreateBoundAkcssApplyCore(
+                    Unsafe.As<AkcssApplyDirectiveSyntax>(syntax),
+                    containingSymbol));
+    }
+
+    private BoundNode BindAkcssIntercept(AkcssInterceptDirectiveSyntax interceptDirective)
+    {
+        if (!TryGetContainingAkcssSymbol(interceptDirective, out var containingSymbol))
+        {
+            return CreateMissingContainingAkcssSymbolBoundNode(interceptDirective);
+        }
+
+        if (SemanticModel.TryGetCachedBoundNode(interceptDirective, out var cachedBoundNode))
+        {
+            return cachedBoundNode;
+        }
+
+        return SemanticModel.CreateBoundAkcssInterceptCore(interceptDirective, containingSymbol);
+    }
+
+    private BoundNode BindAkcssOperation(
+        AkcssBodyMemberSyntax member,
+        Func<AkburaSemanticModel, AkburaSyntax, IAkcssSymbol, BoundNode> bindCore)
+    {
+        if (!TryGetContainingAkcssSymbol(member, out var containingSymbol))
+        {
+            return CreateMissingContainingAkcssSymbolBoundNode(member);
+        }
+
+        if (SemanticModel.TryGetCachedBoundNode(member, out var cachedBoundNode))
+        {
+            return cachedBoundNode;
+        }
+
+        if (SemanticModel.TrySuppressAkcssOperationDueToIntercept(member, containingSymbol))
+        {
+            return new BoundDeclaration(
+                member,
+                this,
+                AkburaSymbolInfo.None(AkburaCandidateReason.None));
+        }
+
+        return bindCore(SemanticModel, member, containingSymbol);
+    }
+
+    private bool TryGetContainingAkcssSymbol(
+        AkburaSyntax syntax,
+        out IAkcssSymbol containingSymbol)
+    {
+        containingSymbol = SemanticModel.GetContainingAkcssSymbol(syntax)!;
+        return containingSymbol != null;
+    }
+
+    private BoundDeclaration CreateMissingContainingAkcssSymbolBoundNode(AkburaSyntax syntax)
+    {
+        SemanticModel.SetSemanticDiagnostics(
+            syntax,
+            ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        return new BoundDeclaration(
+            syntax,
+            this,
+            AkburaSymbolInfo.None(AkburaCandidateReason.NotFound));
     }
 
     protected override void LookupSymbolsInSingleBinder(

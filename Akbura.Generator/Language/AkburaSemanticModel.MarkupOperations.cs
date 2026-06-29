@@ -21,452 +21,6 @@ namespace Akbura.Language;
 
 internal sealed partial class AkburaSemanticModel
 {
-    internal BoundNode CreateBoundTailwindUtilityAttribute(TailwindAttributeSyntax attribute)
-    {
-        var diagnosticsBag = new BindingDiagnosticBag();
-
-        var containingComponent = GetContainingMarkupComponentSymbol(attribute);
-        var componentName = containingComponent?.Name ?? "<unknown>";
-        var utilityName = GetTailwindUtilityName(attribute);
-        var arguments = CreateTailwindUtilityArguments(attribute);
-        var validatedArguments = arguments;
-        var condition = CreateTailwindCondition(attribute);
-        ITailwindUtilitySymbol? utility = null;
-        {
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            utility = ResolveTailwindUtilityForAttribute(
-                attribute,
-                utilityName,
-                arguments,
-                containingComponent,
-                diagnosticsBuilder,
-                out validatedArguments);
-            AddTailwindExpressionDiagnostics(attribute, validatedArguments, diagnosticsBuilder);
-            diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
-        }
-
-        var diagnostics = SetSemanticDiagnostics(attribute, diagnosticsBag);
-
-        return new BoundTailwindUtilityAttribute(
-            attribute,
-            GetBinder(attribute, BinderUsage.Expression),
-            containingComponent,
-            utilityName,
-            utility,
-            validatedArguments,
-            condition.HasCondition,
-            condition.Text,
-            condition.Type,
-            condition.Operation,
-            diagnostics,
-            hasErrors: utility == null || diagnostics.Length > 0 || componentName.Length == 0);
-    }
-
-    private ITailwindUtilitySymbol? ResolveTailwindUtilityForAttribute(
-        TailwindAttributeSyntax attribute,
-        string utilityName,
-        ImmutableArray<BoundTailwindUtilityArgument> arguments,
-        IMarkupComponentSymbol? containingComponent,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        out ImmutableArray<BoundTailwindUtilityArgument> validatedArguments)
-    {
-        validatedArguments = arguments;
-        var localCandidates = FindTailwindUtilityCandidates(
-            GetLocalAkcssUtilityDeclarations(diagnosticsBuilder),
-            utilityName,
-            arguments.Length,
-            containingComponent);
-        if (localCandidates.Length > 1)
-        {
-            diagnosticsBuilder.Add(CreateTailwindUtilityAmbiguousDiagnostic(
-                attribute,
-                utilityName,
-                containingComponent));
-            return null;
-        }
-
-        if (localCandidates.Length == 1)
-        {
-            return ValidateTailwindUtilityArguments(
-                attribute,
-                localCandidates[0],
-                arguments,
-                diagnosticsBuilder,
-                out validatedArguments);
-        }
-
-        foreach (var importLayer in GetImportedAkcssUtilityDeclarationLayers(diagnosticsBuilder))
-        {
-            var importCandidates = FindTailwindUtilityCandidates(
-                importLayer,
-                utilityName,
-                arguments.Length,
-                containingComponent);
-            if (importCandidates.Length > 1)
-            {
-                diagnosticsBuilder.Add(CreateTailwindUtilityAmbiguousDiagnostic(
-                    attribute,
-                    utilityName,
-                    containingComponent));
-                return null;
-            }
-
-            if (importCandidates.Length == 1)
-            {
-                return ValidateTailwindUtilityArguments(
-                    attribute,
-                    importCandidates[0],
-                    arguments,
-                    diagnosticsBuilder,
-                    out validatedArguments);
-            }
-        }
-
-        diagnosticsBuilder.Add(CreateTailwindUtilityNotFoundDiagnostic(
-            attribute,
-            utilityName,
-            containingComponent));
-        return null;
-    }
-
-    private ImmutableArray<ITailwindUtilitySymbol> FindTailwindUtilityCandidates(
-        ImmutableArray<AkcssUtilityDeclarationSyntax> declarations,
-        string utilityName,
-        int argumentCount,
-        IMarkupComponentSymbol? containingComponent)
-    {
-        using var builder = ImmutableArrayBuilder<ITailwindUtilitySymbol>.Rent();
-        foreach (var declaration in declarations)
-        {
-            if (declaration.Selector.Name.Identifier.ValueText != utilityName ||
-                declaration.Selector.Parameters.Count != argumentCount)
-            {
-                continue;
-            }
-
-            var symbol = CreateTailwindUtilitySymbol(declaration);
-            if (IsTailwindUtilityTargetCompatible(symbol, containingComponent))
-            {
-                builder.Add(symbol);
-            }
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private ITailwindUtilitySymbol? ValidateTailwindUtilityArguments(
-        TailwindAttributeSyntax attribute,
-        ITailwindUtilitySymbol utility,
-        ImmutableArray<BoundTailwindUtilityArgument> arguments,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        out ImmutableArray<BoundTailwindUtilityArgument> validatedArguments)
-    {
-        validatedArguments = arguments;
-        if (utility.Parameters.Length != arguments.Length)
-        {
-            diagnosticsBuilder.Add(CreateTailwindUtilityArgumentMismatchDiagnostic(
-                attribute,
-                utility,
-                arguments.Length));
-            return null;
-        }
-
-        using var validatedBuilder = ImmutableArrayBuilder<BoundTailwindUtilityArgument>.Rent(arguments.Length);
-        for (var i = 0; i < arguments.Length; i++)
-        {
-            var argument = arguments[i];
-            var argumentType = argument.Type.Symbol as ITypeSymbol;
-            var parameterType = utility.Parameters[i].Type.Symbol as ITypeSymbol;
-            if (parameterType == null)
-            {
-                validatedBuilder.Add(argument);
-                continue;
-            }
-
-            if (TryCreateEnumTailwindUtilityArgument(
-                argument,
-                parameterType,
-                out var enumArgument))
-            {
-                validatedBuilder.Add(enumArgument);
-                continue;
-            }
-
-            if (argumentType == null ||
-                Compilation.CSharpCompilation.ClassifyConversion(argumentType, parameterType).IsImplicit)
-            {
-                validatedBuilder.Add(argument);
-                continue;
-            }
-
-            diagnosticsBuilder.Add(CreateTailwindUtilityArgumentMismatchDiagnostic(
-                attribute,
-                utility,
-                arguments.Length));
-            return null;
-        }
-
-        validatedArguments = validatedBuilder.ToImmutable();
-        return utility;
-    }
-
-    private bool TryCreateEnumTailwindUtilityArgument(
-        BoundTailwindUtilityArgument argument,
-        ITypeSymbol parameterType,
-        out BoundTailwindUtilityArgument enumArgument)
-    {
-        enumArgument = default;
-        if (parameterType is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType ||
-            !TryGetTailwindEnumArgumentMemberName(argument.Syntax, enumType, out var memberName))
-        {
-            return false;
-        }
-
-        var enumMember = enumType
-            .GetMembers(memberName)
-            .OfType<IFieldSymbol>()
-            .FirstOrDefault(static field => field.HasConstantValue);
-        if (enumMember == null)
-        {
-            return false;
-        }
-
-        var expressionText =
-            enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
-            "." +
-            memberName;
-        CSharp.ExpressionSyntax expression;
-        try
-        {
-            expression = CSharpSyntaxFactory.ParseExpression(expressionText);
-        }
-        catch (ArgumentException)
-        {
-            expression = null!;
-        }
-
-        var binding = expression == null
-            ? CSharpBindingResult.Empty
-            : BindMarkupAttributeExpression(argument.Syntax, expression);
-
-        enumArgument = new BoundTailwindUtilityArgument(
-            argument.Syntax,
-            argument.Text,
-            new CSharpSymbolDefinition(enumType),
-            binding.OperationDefinition,
-            enumMember.ConstantValue);
-        return true;
-    }
-
-    private static bool TryGetTailwindEnumArgumentMemberName(
-        TailwindSegmentSyntax syntax,
-        INamedTypeSymbol enumType,
-        out string memberName)
-    {
-        switch (syntax.Kind)
-        {
-            case AkburaSyntaxKind.TailwindIdentifierSegmentSyntax:
-                memberName = Unsafe.As<TailwindIdentifierSegmentSyntax>(syntax).Name.Identifier.ValueText;
-                return !string.IsNullOrWhiteSpace(memberName);
-
-            case AkburaSyntaxKind.TailwindExpressionSegmentSyntax:
-                var expressionSegment = Unsafe.As<TailwindExpressionSegmentSyntax>(syntax);
-                try
-                {
-                    var expression = CSharpSyntaxFactory.ParseExpression(
-                        expressionSegment.Expression.Expression.ToFullString());
-                    return TryGetExpectedTypeMemberName(expression, enumType, out memberName);
-                }
-                catch (ArgumentException)
-                {
-                    memberName = string.Empty;
-                    return false;
-                }
-
-            default:
-                memberName = string.Empty;
-                return false;
-        }
-    }
-
-    private ITailwindUtilitySymbol CreateTailwindUtilitySymbol(
-        AkcssUtilityDeclarationSyntax utilityDeclaration)
-    {
-        if (!TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var targetType))
-        {
-            targetType = default;
-        }
-
-        var symbol = new TailwindUtilitySymbol(
-            utilityDeclaration,
-            targetType,
-            CreateTailwindUtilityParameters(utilityDeclaration),
-            ImmutableArray<IAkcssOperation>.Empty);
-        symbol.SetOperations(CreateAkcssOperations(utilityDeclaration.Members, symbol));
-        return symbol;
-    }
-
-    private bool IsTailwindUtilityTargetCompatible(
-        ITailwindUtilitySymbol utility,
-        IMarkupComponentSymbol? containingComponent)
-    {
-        if (!utility.HasTargetType)
-        {
-            return true;
-        }
-
-        return containingComponent?.ComponentType != null &&
-            utility.TargetType.Symbol is ITypeSymbol targetType &&
-            IsAssignableTo(containingComponent.ComponentType, targetType);
-    }
-
-    private ImmutableArray<AkcssUtilityDeclarationSyntax> GetLocalAkcssUtilityDeclarations(
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
-    {
-        using var builder = ImmutableArrayBuilder<AkcssUtilityDeclarationSyntax>.Rent();
-        AddInlineAkcssUtilityDeclarations(builder);
-
-        var companion = GetCompanionAkcssSyntaxTree();
-        if (companion != null)
-        {
-            AddAkcssDocumentUtilityDeclarations(companion.GetRoot(), builder);
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private ImmutableArray<ImmutableArray<AkcssUtilityDeclarationSyntax>> GetImportedAkcssUtilityDeclarationLayers(
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
-    {
-        using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<AkcssUtilityDeclarationSyntax>>.Rent();
-        foreach (var importName in GetAkcssImportNames())
-        {
-            var matches = Compilation.AkcssSyntaxTrees
-                .Where(tree => string.Equals(tree.LogicalName, importName, StringComparison.Ordinal))
-                .ToImmutableArray();
-            if (matches.Length == 0)
-            {
-                diagnosticsBuilder.Add(CreateAkcssImportNotFoundDiagnostic(importName));
-                continue;
-            }
-
-            using var layerBuilder = ImmutableArrayBuilder<AkcssUtilityDeclarationSyntax>.Rent();
-            foreach (var tree in matches)
-            {
-                AddAkcssDocumentUtilityDeclarations(tree.GetRoot(), layerBuilder);
-            }
-
-            layersBuilder.Add(layerBuilder.ToImmutable());
-        }
-
-        return layersBuilder.ToImmutable();
-    }
-
-    private void AddInlineAkcssUtilityDeclarations(
-        ImmutableArrayBuilder<AkcssUtilityDeclarationSyntax> builder)
-    {
-        foreach (var block in SyntaxTree.GetRoot().Members.OfType<InlineAkcssBlockSyntax>())
-        {
-            foreach (var section in block.Members.OfType<AkcssUtilitiesSectionSyntax>())
-            {
-                foreach (var utility in section.Utilities)
-                {
-                    builder.Add(utility);
-                }
-            }
-        }
-    }
-
-    private static void AddAkcssDocumentUtilityDeclarations(
-        AkcssDocumentSyntax document,
-        ImmutableArrayBuilder<AkcssUtilityDeclarationSyntax> builder)
-    {
-        foreach (var section in document.Members.OfType<AkcssUtilitiesSectionSyntax>())
-        {
-            foreach (var utility in section.Utilities)
-            {
-                builder.Add(utility);
-            }
-        }
-    }
-
-    private AkcssSyntaxTree? GetCompanionAkcssSyntaxTree()
-    {
-        if (string.IsNullOrWhiteSpace(SyntaxTree.FilePath) ||
-            string.IsNullOrWhiteSpace(SyntaxTree.ComponentName))
-        {
-            return null;
-        }
-
-        var directory = Path.GetDirectoryName(SyntaxTree.FilePath);
-        var expectedPath = string.IsNullOrWhiteSpace(directory)
-            ? SyntaxTree.ComponentName + ".akcss"
-            : Path.Combine(directory, SyntaxTree.ComponentName + ".akcss");
-
-        foreach (var tree in Compilation.AkcssSyntaxTrees)
-        {
-            if (PathsEqual(tree.FilePath, expectedPath))
-            {
-                return tree;
-            }
-        }
-
-        return null;
-    }
-
-    private ImmutableArray<string> GetAkcssImportNames()
-    {
-        using var builder = ImmutableArrayBuilder<string>.Rent();
-        foreach (var member in SyntaxTree.GetRoot().Members)
-        {
-            if (member.Kind != AkburaSyntaxKind.UsingDirectiveSyntax)
-            {
-                continue;
-            }
-
-            if (TryGetAkcssImportName(Unsafe.As<UsingDirectiveSyntax>(member), out var importName))
-            {
-                builder.Add(importName);
-            }
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private static bool IsAkcssUsingDirective(UsingDirectiveSyntax usingDirective)
-    {
-        return TryGetAkcssImportName(usingDirective, out _);
-    }
-
-    private static bool TryGetAkcssImportName(
-        UsingDirectiveSyntax usingDirective,
-        out string importName)
-    {
-        importName = string.Empty;
-        if (usingDirective.Alias != null ||
-            usingDirective.StaticKeyword.RawKind != 0)
-        {
-            return false;
-        }
-
-        var name = usingDirective.Name.ToFullString().Trim();
-        if (!name.EndsWith(".akcss", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        importName = name;
-        return true;
-    }
-
-    private static bool PathsEqual(string left, string right)
-    {
-        return string.Equals(
-            Path.GetFullPath(left),
-            Path.GetFullPath(right),
-            StringComparison.OrdinalIgnoreCase);
-    }
-
     internal IMarkupComponentSymbol? GetContainingMarkupComponentSymbol(MarkupAttributeSyntax markupAttribute)
     {
         var markupElement = GetContainingMarkupElement(markupAttribute);
@@ -528,6 +82,19 @@ internal sealed partial class AkburaSemanticModel
         MarkupAttributeBindingKind bindingKind,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
+        if (property.Command != null)
+        {
+            if (bindingKind != MarkupAttributeBindingKind.None)
+            {
+                diagnosticsBuilder.Add(CreateMarkupCommandBindingNotAllowedDiagnostic(
+                    markupAttribute,
+                    property.Command,
+                    bindingKind));
+            }
+
+            return;
+        }
+
         if (property.Parameter == null)
         {
             return;
@@ -562,6 +129,17 @@ internal sealed partial class AkburaSemanticModel
             markupAttribute,
             ErrorCodes.AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed,
             [GetMarkupAttributeBindingText(bindingKind), property.Name, GetParamBindingText(property.Parameter!.BindingKind)]);
+    }
+
+    private static AkburaSemanticDiagnostic CreateMarkupCommandBindingNotAllowedDiagnostic(
+        MarkupAttributeSyntax markupAttribute,
+        ICommandSymbol command,
+        MarkupAttributeBindingKind bindingKind)
+    {
+        return new AkburaSemanticDiagnostic(
+            markupAttribute,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed,
+            [command.Name, GetMarkupAttributeBindingText(bindingKind)]);
     }
 
     private static string GetMarkupAttributeBindingText(MarkupAttributeBindingKind bindingKind)
@@ -1909,7 +1487,7 @@ internal sealed partial class AkburaSemanticModel
                 CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword)));
     }
 
-    private static string GetTailwindUtilityName(TailwindAttributeSyntax attribute)
+    internal static string GetTailwindUtilityName(TailwindAttributeSyntax attribute)
     {
         return attribute.Kind switch
         {
@@ -1919,7 +1497,7 @@ internal sealed partial class AkburaSemanticModel
         };
     }
 
-    private ImmutableArray<BoundTailwindUtilityArgument> CreateTailwindUtilityArguments(TailwindAttributeSyntax attribute)
+    internal ImmutableArray<BoundTailwindUtilityArgument> CreateTailwindUtilityArguments(TailwindAttributeSyntax attribute)
     {
         if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
         {
@@ -1941,7 +1519,7 @@ internal sealed partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private void AddTailwindExpressionDiagnostics(
+    internal void AddTailwindExpressionDiagnostics(
         TailwindAttributeSyntax attribute,
         ImmutableArray<BoundTailwindUtilityArgument> arguments,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
@@ -2019,7 +1597,7 @@ internal sealed partial class AkburaSemanticModel
                 : null);
     }
 
-    private (bool HasCondition, string? Text, CSharpSymbolDefinition Type, CSharpOperationDefinition Operation)
+    internal (bool HasCondition, string? Text, CSharpSymbolDefinition Type, CSharpOperationDefinition Operation)
         CreateTailwindCondition(TailwindAttributeSyntax attribute)
     {
         if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
@@ -2048,7 +1626,7 @@ internal sealed partial class AkburaSemanticModel
             binding.OperationDefinition);
     }
 
-    private AkburaSemanticDiagnostic CreateTailwindUtilityNotFoundDiagnostic(
+    internal AkburaSemanticDiagnostic CreateTailwindUtilityNotFoundDiagnostic(
         TailwindAttributeSyntax syntax,
         string utilityName,
         IMarkupComponentSymbol? componentSymbol)
@@ -2059,7 +1637,7 @@ internal sealed partial class AkburaSemanticModel
             [utilityName, componentSymbol?.Name ?? "<unknown>"]);
     }
 
-    private AkburaSemanticDiagnostic CreateTailwindUtilityAmbiguousDiagnostic(
+    internal AkburaSemanticDiagnostic CreateTailwindUtilityAmbiguousDiagnostic(
         TailwindAttributeSyntax syntax,
         string utilityName,
         IMarkupComponentSymbol? componentSymbol)
@@ -2070,7 +1648,7 @@ internal sealed partial class AkburaSemanticModel
             [utilityName, componentSymbol?.Name ?? "<unknown>"]);
     }
 
-    private AkburaSemanticDiagnostic CreateTailwindUtilityArgumentMismatchDiagnostic(
+    internal AkburaSemanticDiagnostic CreateTailwindUtilityArgumentMismatchDiagnostic(
         TailwindAttributeSyntax syntax,
         ITailwindUtilitySymbol utility,
         int actualCount)
@@ -2122,7 +1700,7 @@ internal sealed partial class AkburaSemanticModel
             [command.Name, expected, actual]);
     }
 
-    private AkburaSemanticDiagnostic CreateAkcssImportNotFoundDiagnostic(string importName)
+    internal AkburaSemanticDiagnostic CreateAkcssImportNotFoundDiagnostic(string importName)
     {
         return new AkburaSemanticDiagnostic(
             SyntaxTree.GetRoot(),

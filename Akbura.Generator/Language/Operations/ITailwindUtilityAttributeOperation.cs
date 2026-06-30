@@ -10,6 +10,8 @@ internal interface ITailwindUtilityAttributeOperation : IMarkupAttributeOperatio
 
     ITailwindUtilitySymbol? Utility { get; }
 
+    ImmutableArray<ITailwindUtilitySymbol> Utilities { get; }
+
     ImmutableArray<TailwindUtilityArgument> Arguments { get; }
 
     bool HasCondition { get; }

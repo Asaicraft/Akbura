@@ -30,10 +30,10 @@ internal sealed partial class MarkupBinder
         var arguments = SemanticModel.CreateTailwindUtilityArguments(attribute);
         var validatedArguments = arguments;
         var condition = SemanticModel.CreateTailwindCondition(attribute);
-        ITailwindUtilitySymbol? utility = null;
+        var utilities = ImmutableArray<ITailwindUtilitySymbol>.Empty;
         {
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            utility = ResolveTailwindUtilityForAttribute(
+            utilities = ResolveTailwindUtilitiesForAttribute(
                 attribute,
                 utilityName,
                 arguments,
@@ -51,17 +51,18 @@ internal sealed partial class MarkupBinder
             this,
             containingComponent,
             utilityName,
-            utility,
+            utilities.Length == 0 ? null : utilities[0],
+            utilities,
             validatedArguments,
             condition.HasCondition,
             condition.Text,
             condition.Type,
             condition.Operation,
             diagnostics,
-            hasErrors: utility == null || diagnostics.Length > 0 || componentName.Length == 0);
+            hasErrors: utilities.Length == 0 || diagnostics.Length > 0 || componentName.Length == 0);
     }
 
-    private ITailwindUtilitySymbol? ResolveTailwindUtilityForAttribute(
+    private ImmutableArray<ITailwindUtilitySymbol> ResolveTailwindUtilitiesForAttribute(
         TailwindAttributeSyntax attribute,
         string utilityName,
         ImmutableArray<BoundTailwindUtilityArgument> arguments,
@@ -75,23 +76,17 @@ internal sealed partial class MarkupBinder
             utilityName,
             arguments.Length,
             containingComponent);
-        if (localCandidates.Length > 1)
-        {
-            diagnosticsBuilder.Add(SemanticModel.CreateTailwindUtilityAmbiguousDiagnostic(
+        if (TryResolveTailwindUtilityLayer(
                 attribute,
                 utilityName,
-                containingComponent));
-            return null;
-        }
-
-        if (localCandidates.Length == 1)
-        {
-            return ValidateTailwindUtilityArguments(
-                attribute,
-                localCandidates[0],
+                localCandidates,
                 arguments,
+                containingComponent,
                 diagnosticsBuilder,
-                out validatedArguments);
+                out validatedArguments,
+                out var localUtilities))
+        {
+            return localUtilities;
         }
 
         foreach (var importLayer in GetImportedAkcssUtilityDeclarationLayers(diagnosticsBuilder))
@@ -101,23 +96,17 @@ internal sealed partial class MarkupBinder
                 utilityName,
                 arguments.Length,
                 containingComponent);
-            if (importCandidates.Length > 1)
-            {
-                diagnosticsBuilder.Add(SemanticModel.CreateTailwindUtilityAmbiguousDiagnostic(
+            if (TryResolveTailwindUtilityLayer(
                     attribute,
                     utilityName,
-                    containingComponent));
-                return null;
-            }
-
-            if (importCandidates.Length == 1)
-            {
-                return ValidateTailwindUtilityArguments(
-                    attribute,
-                    importCandidates[0],
+                    importCandidates,
                     arguments,
+                    containingComponent,
                     diagnosticsBuilder,
-                    out validatedArguments);
+                    out validatedArguments,
+                    out var importedUtilities))
+            {
+                return importedUtilities;
             }
         }
 
@@ -125,7 +114,62 @@ internal sealed partial class MarkupBinder
             attribute,
             utilityName,
             containingComponent));
-        return null;
+        return ImmutableArray<ITailwindUtilitySymbol>.Empty;
+    }
+
+    private bool TryResolveTailwindUtilityLayer(
+        TailwindAttributeSyntax attribute,
+        string utilityName,
+        ImmutableArray<ITailwindUtilitySymbol> candidates,
+        ImmutableArray<BoundTailwindUtilityArgument> arguments,
+        IMarkupComponentSymbol? containingComponent,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        out ImmutableArray<BoundTailwindUtilityArgument> validatedArguments,
+        out ImmutableArray<ITailwindUtilitySymbol> utilities)
+    {
+        validatedArguments = arguments;
+        utilities = ImmutableArray<ITailwindUtilitySymbol>.Empty;
+        if (candidates.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        if (HasDuplicateAkcssSelector(candidates))
+        {
+            diagnosticsBuilder.Add(SemanticModel.CreateTailwindUtilityAmbiguousDiagnostic(
+                attribute,
+                utilityName,
+                containingComponent));
+            return true;
+        }
+
+        using var builder = ImmutableArrayBuilder<ITailwindUtilitySymbol>.Rent(candidates.Length);
+        var hasValidatedArguments = false;
+        foreach (var candidate in candidates)
+        {
+            var utility = ValidateTailwindUtilityArguments(
+                attribute,
+                candidate,
+                arguments,
+                diagnosticsBuilder,
+                out var candidateArguments);
+            if (utility == null)
+            {
+                utilities = ImmutableArray<ITailwindUtilitySymbol>.Empty;
+                return true;
+            }
+
+            if (!hasValidatedArguments)
+            {
+                validatedArguments = candidateArguments;
+                hasValidatedArguments = true;
+            }
+
+            builder.Add(utility);
+        }
+
+        utilities = builder.ToImmutable();
+        return true;
     }
 
     private ImmutableArray<ITailwindUtilitySymbol> FindTailwindUtilityCandidates(
@@ -144,7 +188,7 @@ internal sealed partial class MarkupBinder
             }
 
             var symbol = CreateTailwindUtilitySymbol(declaration);
-            if (IsTailwindUtilityTargetCompatible(symbol, containingComponent))
+            if (IsAkcssTargetCompatible(symbol, containingComponent))
             {
                 builder.Add(symbol);
             }
@@ -305,18 +349,159 @@ internal sealed partial class MarkupBinder
         return symbol;
     }
 
-    private bool IsTailwindUtilityTargetCompatible(
-        ITailwindUtilitySymbol utility,
+    private bool IsAkcssTargetCompatible(
+        IAkcssSymbol symbol,
         IMarkupComponentSymbol? containingComponent)
     {
-        if (!utility.HasTargetType)
+        if (!symbol.HasTargetType)
         {
             return true;
         }
 
         return containingComponent?.ComponentType != null &&
-            utility.TargetType.Symbol is ITypeSymbol targetType &&
+            symbol.TargetType.Symbol is ITypeSymbol targetType &&
             AkburaSemanticModel.IsAssignableTo(containingComponent.ComponentType, targetType);
+    }
+
+    private ImmutableArray<IAkcssSymbol> ResolveAkcssClassSymbolsForAttribute(
+        MarkupAttributeSyntax attribute,
+        string literalValue,
+        IMarkupComponentSymbol? containingComponent,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (!IsClassAttribute(attribute))
+        {
+            return ImmutableArray<IAkcssSymbol>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
+        foreach (var className in literalValue.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            foreach (var symbol in ResolveAkcssClassNameSymbols(
+                         attribute,
+                         className,
+                         containingComponent,
+                         diagnosticsBuilder))
+            {
+                builder.Add(symbol);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<IAkcssSymbol> ResolveAkcssClassNameSymbols(
+        MarkupAttributeSyntax attribute,
+        string className,
+        IMarkupComponentSymbol? containingComponent,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        var localCandidates = FindAkcssStyleCandidates(
+            GetLocalAkcssStyleDeclarations(),
+            className,
+            containingComponent);
+        if (localCandidates.Length > 0)
+        {
+            return HasDuplicateAkcssSelector(localCandidates)
+                ? ImmutableArray<IAkcssSymbol>.Empty
+                : localCandidates;
+        }
+
+        foreach (var importLayer in GetImportedAkcssStyleDeclarationLayers(diagnosticsBuilder))
+        {
+            var candidates = FindAkcssStyleCandidates(
+                importLayer,
+                className,
+                containingComponent);
+            if (candidates.Length > 0)
+            {
+                return HasDuplicateAkcssSelector(candidates)
+                    ? ImmutableArray<IAkcssSymbol>.Empty
+                    : candidates;
+            }
+        }
+
+        return ImmutableArray<IAkcssSymbol>.Empty;
+    }
+
+    private ImmutableArray<IAkcssSymbol> FindAkcssStyleCandidates(
+        ImmutableArray<AkcssStyleRuleSyntax> declarations,
+        string className,
+        IMarkupComponentSymbol? containingComponent)
+    {
+        using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
+        foreach (var declaration in declarations)
+        {
+            if (declaration.Selector.Name?.Identifier.ValueText != className)
+            {
+                continue;
+            }
+
+            var symbol = CreateAkcssStyleSymbol(declaration);
+            if (IsAkcssTargetCompatible(symbol, containingComponent))
+            {
+                builder.Add(symbol);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private IAkcssSymbol CreateAkcssStyleSymbol(
+        AkcssStyleRuleSyntax styleRule)
+    {
+        if (!SemanticModel.TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var targetType))
+        {
+            targetType = default;
+        }
+
+        var symbol = new AkcssStyleSymbol(
+            styleRule,
+            targetType,
+            ImmutableArray<IAkcssOperation>.Empty);
+        symbol.SetOperations(SemanticModel.CreateAkcssOperations(styleRule.Members, symbol));
+        return symbol;
+    }
+
+    private static bool IsClassAttribute(MarkupAttributeSyntax attribute)
+    {
+        return attribute.Kind == AkburaSyntaxKind.MarkupPlainAttributeSyntax &&
+            Unsafe.As<MarkupPlainAttributeSyntax>(attribute).Name.Identifier.ValueText == "class";
+    }
+
+    private static bool HasDuplicateAkcssSelector<TSymbol>(ImmutableArray<TSymbol> symbols)
+        where TSymbol : IAkcssSymbol
+    {
+        for (var leftIndex = 0; leftIndex < symbols.Length; leftIndex++)
+        {
+            for (var rightIndex = leftIndex + 1; rightIndex < symbols.Length; rightIndex++)
+            {
+                if (SameAkcssSelector(symbols[leftIndex], symbols[rightIndex]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool SameAkcssSelector(
+        IAkcssSymbol left,
+        IAkcssSymbol right)
+    {
+        if (left.HasTargetType != right.HasTargetType ||
+            left.Name != right.Name)
+        {
+            return false;
+        }
+
+        if (!left.HasTargetType)
+        {
+            return true;
+        }
+
+        return SymbolEqualityComparer.Default.Equals(left.TargetType.Symbol, right.TargetType.Symbol);
     }
 
     private ImmutableArray<AkcssUtilityDeclarationSyntax> GetLocalAkcssUtilityDeclarations(
@@ -329,6 +514,20 @@ internal sealed partial class MarkupBinder
         if (companion != null)
         {
             AddAkcssDocumentUtilityDeclarations(companion.GetRoot(), builder);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<AkcssStyleRuleSyntax> GetLocalAkcssStyleDeclarations()
+    {
+        using var builder = ImmutableArrayBuilder<AkcssStyleRuleSyntax>.Rent();
+        AddInlineAkcssStyleDeclarations(builder);
+
+        var companion = GetCompanionAkcssSyntaxTree();
+        if (companion != null)
+        {
+            AddAkcssDocumentStyleDeclarations(companion.GetRoot(), builder);
         }
 
         return builder.ToImmutable();
@@ -359,6 +558,55 @@ internal sealed partial class MarkupBinder
         }
 
         return layersBuilder.ToImmutable();
+    }
+
+    private ImmutableArray<ImmutableArray<AkcssStyleRuleSyntax>> GetImportedAkcssStyleDeclarationLayers(
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<AkcssStyleRuleSyntax>>.Rent();
+        foreach (var importName in GetAkcssImportNames())
+        {
+            var matches = Compilation.AkcssSyntaxTrees
+                .Where(tree => string.Equals(tree.LogicalName, importName, StringComparison.Ordinal))
+                .ToImmutableArray();
+            if (matches.Length == 0)
+            {
+                diagnosticsBuilder.Add(SemanticModel.CreateAkcssImportNotFoundDiagnostic(importName));
+                continue;
+            }
+
+            using var layerBuilder = ImmutableArrayBuilder<AkcssStyleRuleSyntax>.Rent();
+            foreach (var tree in matches)
+            {
+                AddAkcssDocumentStyleDeclarations(tree.GetRoot(), layerBuilder);
+            }
+
+            layersBuilder.Add(layerBuilder.ToImmutable());
+        }
+
+        return layersBuilder.ToImmutable();
+    }
+
+    private void AddInlineAkcssStyleDeclarations(
+        ImmutableArrayBuilder<AkcssStyleRuleSyntax> builder)
+    {
+        foreach (var block in SemanticModel.SyntaxTree.GetRoot().Members.OfType<InlineAkcssBlockSyntax>())
+        {
+            foreach (var rule in block.Members.OfType<AkcssStyleRuleSyntax>())
+            {
+                builder.Add(rule);
+            }
+        }
+    }
+
+    private static void AddAkcssDocumentStyleDeclarations(
+        AkcssDocumentSyntax document,
+        ImmutableArrayBuilder<AkcssStyleRuleSyntax> builder)
+    {
+        foreach (var rule in document.Members.OfType<AkcssStyleRuleSyntax>())
+        {
+            builder.Add(rule);
+        }
     }
 
     private void AddInlineAkcssUtilityDeclarations(

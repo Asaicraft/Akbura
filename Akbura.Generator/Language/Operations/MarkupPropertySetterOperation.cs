@@ -13,6 +13,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         MarkupAttributeSyntax syntax,
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol? property,
+        ImmutableArray<IAkcssSymbol> appliedAkcssSymbols,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
         MarkupAttributeBindingKind bindingKind,
@@ -25,6 +26,9 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
         Property = property;
+        AppliedAkcssSymbols = appliedAkcssSymbols.IsDefault
+            ? ImmutableArray<IAkcssSymbol>.Empty
+            : appliedAkcssSymbols;
         ValueType = valueType;
         ValueOperation = valueOperation;
         BindingKind = bindingKind;
@@ -66,6 +70,8 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
     public IMarkupComponentSymbol? ContainingComponent { get; }
 
     public IPropertySymbol? Property { get; }
+
+    public ImmutableArray<IAkcssSymbol> AppliedAkcssSymbols { get; }
 
     public CSharpSymbolDefinition ValueType { get; }
 

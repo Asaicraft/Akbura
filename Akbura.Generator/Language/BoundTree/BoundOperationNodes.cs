@@ -128,6 +128,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         BinderType binder,
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol? property,
+        ImmutableArray<IAkcssSymbol> appliedAkcssSymbols,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
         MarkupAttributeBindingKind bindingKind,
@@ -146,6 +147,9 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             hasErrors: hasErrors)
     {
         Property = property;
+        AppliedAkcssSymbols = appliedAkcssSymbols.IsDefault
+            ? ImmutableArray<IAkcssSymbol>.Empty
+            : appliedAkcssSymbols;
         ValueType = valueType;
         ValueOperation = valueOperation;
         BindingKind = bindingKind;
@@ -155,6 +159,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
     }
 
     public IPropertySymbol? Property { get; }
+
+    public ImmutableArray<IAkcssSymbol> AppliedAkcssSymbols { get; }
 
     public CSharpSymbolDefinition ValueType { get; }
 
@@ -171,6 +177,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
     public BoundMarkupPropertySetter Update(
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol? property,
+        ImmutableArray<IAkcssSymbol> appliedAkcssSymbols,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
         MarkupAttributeBindingKind bindingKind,
@@ -180,6 +187,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
     {
         if (ReferenceEquals(containingComponent, ContainingComponent) &&
             ReferenceEquals(property, Property) &&
+            appliedAkcssSymbols == AppliedAkcssSymbols &&
             valueType.Equals(ValueType) &&
             valueOperation.Equals(ValueOperation) &&
             bindingKind == BindingKind &&
@@ -195,6 +203,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             Binder,
             containingComponent,
             property,
+            appliedAkcssSymbols,
             valueType,
             valueOperation,
             bindingKind,
@@ -386,6 +395,7 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         IMarkupComponentSymbol? containingComponent,
         string utilityName,
         ITailwindUtilitySymbol? utility,
+        ImmutableArray<ITailwindUtilitySymbol> utilities,
         ImmutableArray<BoundTailwindUtilityArgument> arguments,
         bool hasCondition,
         string? conditionText,
@@ -404,6 +414,9 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
     {
         UtilityName = utilityName;
         Utility = utility;
+        Utilities = utilities.IsDefault
+            ? ImmutableArray<ITailwindUtilitySymbol>.Empty
+            : utilities;
         Arguments = arguments.IsDefault
             ? ImmutableArray<BoundTailwindUtilityArgument>.Empty
             : arguments;
@@ -418,6 +431,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
     public string UtilityName { get; }
 
     public ITailwindUtilitySymbol? Utility { get; }
+
+    public ImmutableArray<ITailwindUtilitySymbol> Utilities { get; }
 
     public ImmutableArray<BoundTailwindUtilityArgument> Arguments { get; }
 

@@ -3857,6 +3857,7 @@ internal sealed partial class AkburaSemanticModel
         }
 
         var componentType = componentSymbol.ComponentType;
+        var memberName = GetMarkupMemberLookupName(propertyName);
         var parameter = FindComponentParameter(componentSymbol, propertyName);
         var command = FindComponentCommand(componentSymbol, propertyName);
         RoslynPropertySymbol? clrProperty = null;
@@ -3866,10 +3867,10 @@ internal sealed partial class AkburaSemanticModel
 
         if (componentType != null)
         {
-            clrProperty = FindPublicClrProperty(componentType, propertyName);
-            avaloniaProperty = FindAvaloniaPropertyField(componentType, propertyName);
-            clrEvent = FindPublicClrEvent(componentType, propertyName);
-            avaloniaRoutedEvent = FindAvaloniaRoutedEventField(componentType, propertyName);
+            clrProperty = FindPublicClrProperty(componentType, memberName);
+            avaloniaProperty = FindAvaloniaPropertyField(componentType, memberName);
+            clrEvent = FindPublicClrEvent(componentType, memberName);
+            avaloniaRoutedEvent = FindAvaloniaRoutedEventField(componentType, memberName);
         }
 
         if (parameter == null &&
@@ -3882,7 +3883,7 @@ internal sealed partial class AkburaSemanticModel
             SetSemanticDiagnostics(
                 markupAttribute,
                 ImmutableArray.Create(componentType != null &&
-                    HasInaccessibleMarkupMember(componentType, propertyName)
+                    HasInaccessibleMarkupMember(componentType, memberName)
                         ? CreateInaccessibleMemberDiagnostic(markupAttribute, propertyName, componentType)
                         : CreateMarkupPropertyNotFoundDiagnostic(
                             markupAttribute,
@@ -3912,13 +3913,20 @@ internal sealed partial class AkburaSemanticModel
         SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
 
         return AkburaSymbolInfo.Success(new PropertySymbol(
-            propertyName,
+            memberName,
             GetMarkupPropertyType(parameter, command, clrProperty, avaloniaProperty),
             avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
             clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
             parameter,
             command,
             containingSymbol: componentSymbol));
+    }
+
+    private static string GetMarkupMemberLookupName(string propertyName)
+    {
+        return string.Equals(propertyName, "class", StringComparison.Ordinal)
+            ? "Classes"
+            : propertyName;
     }
 
     private static string GetMarkupPropertyName(MarkupAttributeSyntax markupAttribute)

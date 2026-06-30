@@ -115,6 +115,7 @@ internal sealed partial class MarkupBinder : Binder
         var dynamicExpression = default(CSharp.ExpressionSyntax);
         var valueBinding = CSharpBindingResult.Empty;
         var targetType = GetExpectedValueType(property);
+        var appliedAkcssSymbols = ImmutableArray<IAkcssSymbol>.Empty;
 
         if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupLiteralAttributeValueSyntax)
         {
@@ -176,6 +177,15 @@ internal sealed partial class MarkupBinder : Binder
                     property,
                     bindingKind,
                     diagnosticsBuilder);
+                if (literalValue != null)
+                {
+                    appliedAkcssSymbols = ResolveAkcssClassSymbolsForAttribute(
+                        markupAttribute,
+                        literalValue,
+                        containingComponent,
+                        diagnosticsBuilder);
+                }
+
                 if (valueSyntax != null && valueKind == MarkupAttributeValueKind.DynamicExpression)
                 {
                     if (property.Command == null)
@@ -242,6 +252,7 @@ internal sealed partial class MarkupBinder : Binder
             this,
             containingComponent,
             property,
+            appliedAkcssSymbols,
             valueType,
             valueOperation,
             bindingKind,

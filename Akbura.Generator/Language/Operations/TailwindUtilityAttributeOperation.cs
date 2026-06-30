@@ -15,6 +15,7 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         IMarkupComponentSymbol? containingComponent,
         string utilityName,
         ITailwindUtilitySymbol? utility,
+        ImmutableArray<ITailwindUtilitySymbol> utilities,
         ImmutableArray<TailwindUtilityArgument> arguments,
         bool hasCondition,
         string? conditionText,
@@ -28,7 +29,10 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         UtilityName = string.IsNullOrWhiteSpace(utilityName)
             ? throw new ArgumentException("Tailwind utility name cannot be empty.", nameof(utilityName))
             : utilityName;
-        Utility = utility;
+        Utilities = utilities.IsDefault
+            ? ImmutableArray<ITailwindUtilitySymbol>.Empty
+            : utilities;
+        Utility = utility ?? (Utilities.Length == 0 ? null : Utilities[0]);
         Arguments = arguments.IsDefault ? ImmutableArray<TailwindUtilityArgument>.Empty : arguments;
         HasCondition = hasCondition;
         ConditionText = conditionText;
@@ -70,6 +74,8 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
     public string UtilityName { get; }
 
     public ITailwindUtilitySymbol? Utility { get; }
+
+    public ImmutableArray<ITailwindUtilitySymbol> Utilities { get; }
 
     public ImmutableArray<TailwindUtilityArgument> Arguments { get; }
 

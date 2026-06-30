@@ -3587,6 +3587,123 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssClassAndUtilityAttributes_ResolveAllCompatibleSources()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Style.akcss;
+
+            <StackPanel utility>
+                <Border class="awesomeBg" utility />
+                <Button class="awesomeBg" utility/>
+            </StackPanel>
+            """;
+        const string akcss =
+            """
+            .awesomeBg {
+                Background: White;
+            }
+
+            Button.awesomeBg {
+                Background: Red;
+                Padding: 10;
+            }
+
+            @utilities {
+                .utility {
+                    Width: 100;
+                    Height: 100;
+                }
+
+                Border.utility {
+                    Width: 150;
+                    Margin: 20;
+                }
+
+                Button.utility {
+                    CornerRadius: 10;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "MyComponent.akbura");
+        var akcssTree = AkcssSyntaxTree.ParseText(akcss, "Style.akcss", "Style.akcss");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(), [akcssTree]);
+        var stackPanel = GetOnlyMarkupElement(syntaxTree);
+        var children = stackPanel.Body
+            .OfType<MarkupElementContentSyntax>()
+            .Select(static content => content.Element)
+            .ToArray();
+        var border = Assert.Single(children, static element => element.StartTag!.Name.ToFullString().Trim() == "Border");
+        var button = Assert.Single(children, static element => element.StartTag!.Name.ToFullString().Trim() == "Button");
+
+        var stackUtility = AssertTailwindOperation(stackPanel, "utility");
+        var borderClass = AssertClassOperation(border);
+        var borderUtility = AssertTailwindOperation(border, "utility");
+        var buttonClass = AssertClassOperation(button);
+        var buttonUtility = AssertTailwindOperation(button, "utility");
+
+        Assert.Single(stackUtility.Utilities);
+        Assert.Contains(stackUtility.Utilities, static utility => !utility.HasTargetType);
+
+        Assert.Single(borderClass.AppliedAkcssSymbols);
+        Assert.Contains(borderClass.AppliedAkcssSymbols, static symbol => !symbol.HasTargetType);
+        Assert.Equal(2, borderUtility.Utilities.Length);
+        Assert.Contains(borderUtility.Utilities, static utility => !utility.HasTargetType);
+        Assert.Contains(borderUtility.Utilities, static utility => utility.TargetType.Name == "Border");
+
+        Assert.Equal(2, buttonClass.AppliedAkcssSymbols.Length);
+        Assert.Contains(buttonClass.AppliedAkcssSymbols, static symbol => !symbol.HasTargetType);
+        Assert.Contains(buttonClass.AppliedAkcssSymbols, static symbol => symbol.TargetType.Name == "Button");
+        Assert.Equal(2, buttonUtility.Utilities.Length);
+        Assert.Contains(buttonUtility.Utilities, static utility => !utility.HasTargetType);
+        Assert.Contains(buttonUtility.Utilities, static utility => utility.TargetType.Name == "Button");
+
+        Assert.True(semanticModel.GetSemanticDiagnostics(stackPanel.StartTag!.Attributes[0]).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(border.StartTag!.Attributes[0]).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(border.StartTag!.Attributes[1]).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(button.StartTag!.Attributes[0]).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(button.StartTag!.Attributes[1]).IsEmpty);
+
+        ITailwindUtilityAttributeOperation AssertTailwindOperation(
+            MarkupElementSyntax element,
+            string name)
+        {
+            var attribute = element.StartTag!.Attributes.Single(attribute => AttributeName(attribute) == name);
+            var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                semanticModel.GetOperation(attribute));
+            Assert.NotNull(operation.Utility);
+            Assert.False(operation.HasErrors);
+            return operation;
+        }
+
+        IMarkupPropertySetterOperation AssertClassOperation(MarkupElementSyntax element)
+        {
+            var attribute = element.StartTag!.Attributes.Single(attribute => AttributeName(attribute) == "class");
+            var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+                semanticModel.GetOperation(attribute));
+            Assert.Equal("Classes", operation.Property?.Name);
+            Assert.False(operation.HasErrors);
+            return operation;
+        }
+
+        static string AttributeName(MarkupAttributeSyntax attribute)
+        {
+            return attribute.Kind switch
+            {
+                Akbura.Language.Syntax.SyntaxKind.MarkupPlainAttributeSyntax =>
+                    ((MarkupPlainAttributeSyntax)attribute).Name.Identifier.ValueText,
+                Akbura.Language.Syntax.SyntaxKind.TailwindFlagAttributeSyntax =>
+                    ((TailwindFlagAttributeSyntax)attribute).Name.Identifier.ValueText,
+                Akbura.Language.Syntax.SyntaxKind.TailwindFullAttributeSyntax =>
+                    ((TailwindFullAttributeSyntax)attribute).Name.Identifier.ValueText,
+                _ => string.Empty,
+            };
+        }
+    }
+
+    [Fact]
     public void SemanticModel_TailwindUtilityAttribute_LocalAkcssWinsOverImportedAkcss()
     {
         const string code =

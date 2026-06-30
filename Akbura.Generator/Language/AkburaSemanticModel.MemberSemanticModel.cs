@@ -50,7 +50,7 @@ internal sealed partial class AkburaSemanticModel
 
         public override AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax)
         {
-            if (SemanticModel._symbolInfoCache.TryGetValue(syntax, out var cached))
+            if (SemanticModel._bindingCache.TryGetSymbolInfo(syntax, out var cached))
             {
                 return cached;
             }
@@ -66,19 +66,19 @@ internal sealed partial class AkburaSemanticModel
                 _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
             };
 
-            SemanticModel._symbolInfoCache[syntax] = symbolInfo;
+            SemanticModel.SetCachedSymbolInfo(syntax, symbolInfo);
             return symbolInfo;
         }
 
         public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
         {
-            if (SemanticModel._boundNodeCache.TryGetValue(syntax, out var cached))
+            if (SemanticModel._bindingCache.TryGetBoundNode(syntax, out var cached))
             {
                 return cached;
             }
 
             var symbolInfo = GetSymbolInfo(syntax);
-            if (SemanticModel._boundNodeCache.TryGetValue(syntax, out cached))
+            if (SemanticModel._bindingCache.TryGetBoundNode(syntax, out cached))
             {
                 return cached;
             }
@@ -184,7 +184,7 @@ internal sealed partial class AkburaSemanticModel
                 userHooksBuilder.ToImmutable(),
                 akcssModules: ImmutableArray<IAkcssModuleSymbol>.Empty);
             var symbolInfo = AkburaSymbolInfo.Success(componentSymbol);
-            SemanticModel._symbolInfoCache[document] = symbolInfo;
+            SemanticModel.SetCachedSymbolInfo(document, symbolInfo);
 
             componentSymbol.SetAkcssModules(SemanticModel.CreateInlineAkcssModuleSymbols(
                 inlineAkcssBuilder.WrittenSpan,
@@ -193,12 +193,12 @@ internal sealed partial class AkburaSemanticModel
             SemanticModel.SetSemanticDiagnostics(
                 document,
                 CreateUserHookDuplicateComponentMemberDiagnostics(document));
-            SemanticModel._boundNodeCache[document] = new BoundComponentDeclaration(
+            SemanticModel.SetCachedBoundNode(document, new BoundComponentDeclaration(
                 document,
                 SemanticModel.GetBinder(document, BinderUsage.Expression),
                 symbolInfo,
                 SemanticModel.GetCachedSemanticDiagnostics(document),
-                CreateBoundChildrenForComponent(document));
+                CreateBoundChildrenForComponent(document)));
 
             return symbolInfo;
         }
@@ -486,11 +486,11 @@ internal sealed partial class AkburaSemanticModel
             var diagnostics = SemanticModel.SetSemanticDiagnostics(injectDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
-            SemanticModel._boundNodeCache[injectDeclaration] = new BoundInjectDeclaration(
+            SemanticModel.SetCachedBoundNode(injectDeclaration, new BoundInjectDeclaration(
                 injectDeclaration,
                 SemanticModel.GetBinder(injectDeclaration, BinderUsage.Expression),
                 symbolInfo,
-                diagnostics);
+                diagnostics));
             return symbolInfo;
         }
 
@@ -526,11 +526,11 @@ internal sealed partial class AkburaSemanticModel
                 isVoid,
                 isAsyncLike,
                 hasResult));
-            SemanticModel._boundNodeCache[commandDeclaration] = new BoundCommandDeclaration(
+            SemanticModel.SetCachedBoundNode(commandDeclaration, new BoundCommandDeclaration(
                 commandDeclaration,
                 SemanticModel.GetBinder(commandDeclaration, BinderUsage.Expression),
                 symbolInfo,
-                diagnostics);
+                diagnostics));
             return symbolInfo;
         }
 
@@ -592,7 +592,7 @@ internal sealed partial class AkburaSemanticModel
                 bindingKind,
                 userHook,
                 diagnostics);
-            SemanticModel._boundNodeCache[stateDeclaration.Initializer] = initializer;
+            SemanticModel.SetCachedBoundNode(stateDeclaration.Initializer, initializer);
 
             var declaration = new BoundStateDeclaration(
                 stateDeclaration,
@@ -600,7 +600,7 @@ internal sealed partial class AkburaSemanticModel
                 symbolInfo,
                 diagnostics,
                 ImmutableArray.Create<BoundNode>(initializer));
-            SemanticModel._boundNodeCache[stateDeclaration] = declaration;
+            SemanticModel.SetCachedBoundNode(stateDeclaration, declaration);
             return declaration;
         }
 
@@ -638,7 +638,7 @@ internal sealed partial class AkburaSemanticModel
                     binder,
                     defaultValueBinding,
                     diagnostics);
-                SemanticModel._boundNodeCache[paramDeclaration.DefaultValue] = defaultValue;
+                SemanticModel.SetCachedBoundNode(paramDeclaration.DefaultValue, defaultValue);
                 children = ImmutableArray.Create<BoundNode>(defaultValue);
             }
 
@@ -648,7 +648,7 @@ internal sealed partial class AkburaSemanticModel
                 symbolInfo,
                 diagnostics,
                 children);
-            SemanticModel._boundNodeCache[paramDeclaration] = declaration;
+            SemanticModel.SetCachedBoundNode(paramDeclaration, declaration);
             return declaration;
         }
 
@@ -690,7 +690,7 @@ internal sealed partial class AkburaSemanticModel
                 symbolInfo,
                 diagnostics,
                 childrenBuilder.ToImmutable());
-            SemanticModel._boundNodeCache[useEffectDeclaration] = declaration;
+            SemanticModel.SetCachedBoundNode(useEffectDeclaration, declaration);
             return declaration;
         }
 
@@ -710,7 +710,7 @@ internal sealed partial class AkburaSemanticModel
                 body,
                 binder,
                 children: childrenBuilder.ToImmutable());
-            SemanticModel._boundNodeCache[body] = boundBody;
+            SemanticModel.SetCachedBoundNode(body, boundBody);
             return boundBody;
         }
 
@@ -719,8 +719,7 @@ internal sealed partial class AkburaSemanticModel
             TBoundNode boundNode)
             where TBoundNode : BoundNode
         {
-            SemanticModel._boundNodeCache[syntax] = boundNode;
-            return boundNode;
+            return SemanticModel.SetCachedBoundNode(syntax, boundNode);
         }
 
         private AkburaSymbolInfo ResolveUseEffect(UseEffectDeclarationSyntax useEffectDeclaration)
@@ -728,7 +727,7 @@ internal sealed partial class AkburaSemanticModel
             var placeholderInfo = AkburaSymbolInfo.Success(new UseEffectSymbol(
                 useEffectDeclaration,
                 ImmutableArray<UseEffectDependency>.Empty));
-            SemanticModel._symbolInfoCache[useEffectDeclaration] = placeholderInfo;
+            SemanticModel.SetCachedSymbolInfo(useEffectDeclaration, placeholderInfo);
 
             var diagnosticsBag = new BindingDiagnosticBag();
             var dependencies = CreateUseEffectDependencies(

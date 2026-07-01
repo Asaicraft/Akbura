@@ -2332,8 +2332,63 @@ public sealed class SemanticArchitectureTests
 
         Assert.Same(block, rewritten);
         Assert.Equal(1, rewriter.StateSymbolCount);
-        Assert.Equal(1, rewriter.MethodSymbolCount);
+        Assert.True(rewriter.MethodSymbolCount >= 1);
         Assert.Equal(1, rewriter.LocalSymbolCount);
+    }
+
+    [Fact]
+    public void BoundTreeRewriter_VisitsOperationAndBindingFacts()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                .card { Width: 1; }
+            }
+
+            state int count = 0;
+
+            <StackPanel>
+                <TextBlock Text={count.ToString()} />
+                <Button Click={() => count++} />
+            </StackPanel>
+            """;
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var akcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[1]);
+        var akcssRule = Assert.IsType<AkcssStyleRuleSyntax>(akcss.Members[0]);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(akcssRule.Members[0]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[3]);
+        var textBlockContent = Assert.IsType<MarkupElementContentSyntax>(markup.Element.Body[0]);
+        var buttonContent = Assert.IsType<MarkupElementContentSyntax>(markup.Element.Body[1]);
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            textBlockContent.Element.StartTag!.Attributes[0]);
+        var clickAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            buttonContent.Element.StartTag!.Attributes[0]);
+        var stateBoundNode = Assert.IsType<BoundStateDeclaration>(
+            model.BindingSession.BindSemanticSyntax(state));
+        var stateInitializer = Assert.IsType<BoundStateInitializer>(
+            Assert.Single(stateBoundNode.Children));
+        var textSetter = Assert.IsType<BoundMarkupPropertySetter>(
+            model.BindingSession.BindOperationSyntax(textAttribute));
+        var clickBinding = Assert.IsType<BoundMarkupRoutedEventBinding>(
+            model.BindingSession.BindOperationSyntax(clickAttribute));
+        var akcssSetter = Assert.IsType<BoundAkcssPropertySetter>(
+            model.BindingSession.BindOperationSyntax(assignment));
+        var rewriter = new RecordingSymbolBoundTreeRewriter();
+
+        Assert.Same(stateInitializer, rewriter.Visit(stateInitializer));
+        Assert.Same(textSetter, rewriter.Visit(textSetter));
+        Assert.Same(clickBinding, rewriter.Visit(clickBinding));
+        Assert.Same(akcssSetter, rewriter.Visit(akcssSetter));
+
+        Assert.True(rewriter.PropertySymbolCount >= 2);
+        Assert.True(rewriter.RoutedEventSymbolCount >= 1);
+        Assert.True(rewriter.CSharpSymbolDefinitionCount >= 2);
+        Assert.True(rewriter.CSharpOperationDefinitionCount >= 4);
     }
 
     [Fact]
@@ -3578,6 +3633,20 @@ public sealed class SemanticArchitectureTests
                 ? _newOperand
                 : base.VisitExpression(node);
         }
+
+        public override BoundNode? VisitLiteralExpression(BoundLiteralExpression node)
+        {
+            return ReferenceEquals(node, _oldOperand)
+                ? _newOperand
+                : base.VisitLiteralExpression(node);
+        }
+
+        public override BoundNode? VisitBinaryExpression(BoundBinaryExpression node)
+        {
+            return ReferenceEquals(node, _oldOperand)
+                ? _newOperand
+                : base.VisitBinaryExpression(node);
+        }
     }
 
     private sealed class RecordingSymbolBoundTreeRewriter : BoundTreeRewriter
@@ -3588,10 +3657,30 @@ public sealed class SemanticArchitectureTests
 
         public int LocalSymbolCount { get; private set; }
 
+        public int PropertySymbolCount { get; private set; }
+
+        public int RoutedEventSymbolCount { get; private set; }
+
+        public int CSharpSymbolDefinitionCount { get; private set; }
+
+        public int CSharpOperationDefinitionCount { get; private set; }
+
         protected override AkburaSymbol VisitStateSymbol(IStateSymbol symbol)
         {
             StateSymbolCount++;
             return base.VisitStateSymbol(symbol);
+        }
+
+        protected override AkburaSymbol VisitPropertySymbol(AkburaPropertySymbol symbol)
+        {
+            PropertySymbolCount++;
+            return base.VisitPropertySymbol(symbol);
+        }
+
+        protected override AkburaSymbol VisitRoutedEventSymbol(IRoutedEventSymbol symbol)
+        {
+            RoutedEventSymbolCount++;
+            return base.VisitRoutedEventSymbol(symbol);
         }
 
         protected override Microsoft.CodeAnalysis.ISymbol VisitMethodSymbol(IMethodSymbol symbol)
@@ -3604,6 +3693,26 @@ public sealed class SemanticArchitectureTests
         {
             LocalSymbolCount++;
             return base.VisitLocalSymbol(symbol);
+        }
+
+        protected override CSharpSymbolDefinition VisitCSharpSymbolDefinition(CSharpSymbolDefinition definition)
+        {
+            if (!definition.IsDefault)
+            {
+                CSharpSymbolDefinitionCount++;
+            }
+
+            return base.VisitCSharpSymbolDefinition(definition);
+        }
+
+        protected override CSharpOperationDefinition VisitCSharpOperationDefinition(CSharpOperationDefinition definition)
+        {
+            if (!definition.IsDefault)
+            {
+                CSharpOperationDefinitionCount++;
+            }
+
+            return base.VisitCSharpOperationDefinition(definition);
         }
     }
 

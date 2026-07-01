@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
@@ -68,17 +69,22 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
 
     public override BoundNode? VisitStateInitializer(BoundStateInitializer node)
     {
-        return node;
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
+        var userHook = (IUserHookSymbol?)VisitSymbol(node.UserHook);
+        return node.Update(bindingResult, node.BindingKind, userHook);
     }
 
     public override BoundNode? VisitParamDefaultValue(BoundParamDefaultValue node)
     {
-        return node;
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
+        return node.Update(bindingResult);
     }
 
     public override BoundNode? VisitUseEffectDependency(BoundUseEffectDependency node)
     {
-        return node;
+        var dependency = VisitUseEffectDependencyValue(node.Dependency);
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
+        return node.Update(dependency, bindingResult);
     }
 
     public override BoundNode? VisitUseEffectBody(BoundUseEffectBody node)
@@ -119,7 +125,24 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node.Update(symbolInfo, children);
     }
 
-    public override BoundNode? VisitMarkupContentSetter(BoundMarkupContentSetter node) => node;
+    public override BoundNode? VisitMarkupContentSetter(BoundMarkupContentSetter node)
+    {
+        var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+        var property = (Akbura.Language.Symbols.IPropertySymbol?)VisitSymbol(node.Property);
+        var content = VisitMarkupChildContentList(node.Content);
+        var valueType = VisitCSharpSymbolDefinition(node.ValueType);
+        var valueOperation = VisitCSharpOperationDefinition(node.ValueOperation);
+
+        return node.Update(
+            containingComponent,
+            property,
+            node.ContentModel,
+            content,
+            valueType,
+            valueOperation,
+            node.LiteralValue,
+            node.IsSynthesizedString);
+    }
 
     public override BoundNode? VisitAkcssModule(BoundAkcssModule node)
     {
@@ -175,38 +198,138 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             children);
     }
 
-    public override BoundNode? VisitMarkupPropertySetter(BoundMarkupPropertySetter node) => node;
+    public override BoundNode? VisitMarkupPropertySetter(BoundMarkupPropertySetter node)
+    {
+        var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+        var property = (Akbura.Language.Symbols.IPropertySymbol?)VisitSymbol(node.Property);
+        var appliedAkcssSymbols = VisitAkburaSymbolList(node.AppliedAkcssSymbols);
+        var valueType = VisitCSharpSymbolDefinition(node.ValueType);
+        var valueOperation = VisitCSharpOperationDefinition(node.ValueOperation);
 
-    public override BoundNode? VisitMarkupCommandBinding(BoundMarkupCommandBinding node) => node;
+        return node.Update(
+            containingComponent,
+            property,
+            appliedAkcssSymbols,
+            valueType,
+            valueOperation,
+            node.BindingKind,
+            node.ValueKind,
+            node.ValueSyntax,
+            node.LiteralValue);
+    }
 
-    public override BoundNode? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node) => node;
+    public override BoundNode? VisitMarkupCommandBinding(BoundMarkupCommandBinding node)
+    {
+        var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+        var property = (Akbura.Language.Symbols.IPropertySymbol)VisitSymbol(node.Property)!;
+        var command = (ICommandSymbol)VisitSymbol(node.Command)!;
+        var handlerType = VisitCSharpSymbolDefinition(node.HandlerType);
+        var handlerResultType = VisitCSharpSymbolDefinition(node.HandlerResultType);
+        var handlerOperation = VisitCSharpOperationDefinition(node.HandlerOperation);
 
-    public override BoundNode? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node) => node;
+        return node.Update(
+            containingComponent,
+            property,
+            command,
+            node.BindingKind,
+            node.ValueKind,
+            node.ValueSyntax,
+            node.HandlerKind,
+            node.ArgumentMode,
+            node.ResultMode,
+            node.HandlerParameterCount,
+            node.IsAsync,
+            node.ContainsAwait,
+            handlerType,
+            handlerResultType,
+            handlerOperation);
+    }
 
-    public override BoundNode? VisitAkcssPropertySetter(BoundAkcssPropertySetter node) => node;
+    public override BoundNode? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node)
+    {
+        var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+        var routedEvent = (IRoutedEventSymbol)VisitSymbol(node.RoutedEvent)!;
+        var handlerOperation = VisitCSharpOperationDefinition(node.HandlerOperation);
+
+        return node.Update(
+            containingComponent,
+            routedEvent,
+            node.BindingKind,
+            node.ValueKind,
+            node.ValueSyntax,
+            node.HandlerKind,
+            node.ArgumentMode,
+            node.HandlerParameterCount,
+            node.IsAsync,
+            node.ContainsAwait,
+            handlerOperation);
+    }
+
+    public override BoundNode? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node)
+    {
+        var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+        var utility = (ITailwindUtilitySymbol?)VisitSymbol(node.Utility);
+        var utilities = VisitAkburaSymbolList(node.Utilities);
+        var arguments = VisitTailwindUtilityArgumentList(node.Arguments);
+        var conditionType = VisitCSharpSymbolDefinition(node.ConditionType);
+        var conditionOperation = VisitCSharpOperationDefinition(node.ConditionOperation);
+
+        return node.Update(
+            containingComponent,
+            node.UtilityName,
+            utility,
+            utilities,
+            arguments,
+            node.HasCondition,
+            node.ConditionText,
+            conditionType,
+            conditionOperation);
+    }
+
+    public override BoundNode? VisitAkcssPropertySetter(BoundAkcssPropertySetter node)
+    {
+        var containingAkcssSymbol = (IAkcssSymbol)VisitSymbol(node.ContainingAkcssSymbol)!;
+        var property = (Akbura.Language.Symbols.IPropertySymbol?)VisitSymbol(node.Property);
+        var valueType = VisitCSharpSymbolDefinition(node.ValueType);
+        var valueOperation = VisitCSharpOperationDefinition(node.ValueOperation);
+
+        return node.Update(
+            containingAkcssSymbol,
+            property,
+            valueType,
+            valueOperation,
+            node.ValueKind,
+            node.RequiresBrushConversion,
+            node.ConvertedValue);
+    }
 
     public override BoundNode? VisitAkcssIf(BoundAkcssIf node)
     {
+        var containingAkcssSymbol = (IAkcssSymbol)VisitSymbol(node.ContainingAkcssSymbol)!;
+        var conditionType = VisitCSharpSymbolDefinition(node.ConditionType);
+        var conditionOperation = VisitCSharpOperationDefinition(node.ConditionOperation);
         var operations = VisitAkcssOperationList(node.Operations);
-        if (operations == node.Operations)
-        {
-            return node;
-        }
 
-        return new BoundAkcssIf(
-            node.Syntax,
-            node.Binder,
-            node.ContainingAkcssSymbol,
-            node.ConditionType,
-            node.ConditionOperation,
-            operations,
-            node.Diagnostics,
-            node.HasErrors);
+        return node.Update(
+            containingAkcssSymbol,
+            conditionType,
+            conditionOperation,
+            operations);
     }
 
-    public override BoundNode? VisitAkcssApply(BoundAkcssApply node) => node;
+    public override BoundNode? VisitAkcssApply(BoundAkcssApply node)
+    {
+        var containingAkcssSymbol = (IAkcssSymbol)VisitSymbol(node.ContainingAkcssSymbol)!;
+        var appliedSymbols = VisitAkburaSymbolList(node.AppliedSymbols);
+        return node.Update(containingAkcssSymbol, node.Items, appliedSymbols);
+    }
 
-    public override BoundNode? VisitAkcssIntercept(BoundAkcssIntercept node) => node;
+    public override BoundNode? VisitAkcssIntercept(BoundAkcssIntercept node)
+    {
+        var containingAkcssSymbol = (IAkcssSymbol)VisitSymbol(node.ContainingAkcssSymbol)!;
+        var interceptType = VisitCSharpSymbolDefinition(node.InterceptType);
+        return node.Update(containingAkcssSymbol, interceptType);
+    }
 
     public override BoundNode? VisitExpression(BoundExpression node)
     {
@@ -217,19 +340,23 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
 
     public override BoundNode? VisitCSharpExpression(BoundCSharpExpression node)
     {
-        return VisitExpression(node);
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
+        return node.Update(bindingResult);
     }
 
     public override BoundNode? VisitLiteralExpression(BoundLiteralExpression node)
     {
-        return VisitExpression(node);
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
+        return node.Update(bindingResult, node.ConstantValue);
     }
 
     public override BoundNode? VisitBinaryExpression(BoundBinaryExpression node)
     {
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
         var left = (BoundExpression?)Visit(node.Left);
         var right = (BoundExpression?)Visit(node.Right);
-        if (ReferenceEquals(left, node.Left) &&
+        if (bindingResult.Equals(node.BindingResult) &&
+            ReferenceEquals(left, node.Left) &&
             ReferenceEquals(right, node.Right))
         {
             return node;
@@ -243,28 +370,32 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 node.Diagnostics);
         }
 
-        return node.Update(node.BindingResult, node.OperatorKind, left, right);
+        return node.Update(bindingResult, node.OperatorKind, left, right);
     }
 
     public override BoundNode? VisitCallExpression(BoundCallExpression node)
     {
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
         var targetMethod = (IMethodSymbol?)VisitSymbol(node.TargetMethod);
         var receiver = (BoundExpression?)Visit(node.Receiver);
         var arguments = VisitExpressionList(node.Arguments);
-        if (SymbolEqualityComparer.Default.Equals(targetMethod, node.TargetMethod) &&
+        if (bindingResult.Equals(node.BindingResult) &&
+            SymbolEqualityComparer.Default.Equals(targetMethod, node.TargetMethod) &&
             ReferenceEquals(receiver, node.Receiver) &&
             arguments == node.Arguments)
         {
             return node;
         }
 
-        return node.Update(node.BindingResult, targetMethod, receiver, arguments);
+        return node.Update(bindingResult, targetMethod, receiver, arguments);
     }
 
     public override BoundNode? VisitConversionExpression(BoundConversionExpression node)
     {
         var operand = (BoundExpression?)Visit(node.Operand);
-        if (ReferenceEquals(operand, node.Operand))
+        var conversion = VisitConversion(node.Conversion);
+        if (ReferenceEquals(operand, node.Operand) &&
+            conversion.Equals(node.Conversion))
         {
             return node;
         }
@@ -277,7 +408,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 node.Diagnostics);
         }
 
-        return node.Update(operand, node.Conversion);
+        return node.Update(operand, conversion);
     }
 
     public override BoundNode? VisitBadExpression(BoundBadExpression node)
@@ -463,6 +594,130 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             : AkburaSymbolInfo.Candidates(candidateSymbols, symbolInfo.CandidateReason);
     }
 
+    protected virtual CSharpBindingResult VisitCSharpBindingResult(CSharpBindingResult bindingResult)
+    {
+        var typeSymbol = (ITypeSymbol?)VisitSymbol(bindingResult.TypeSymbol);
+        var symbol = VisitSymbol(bindingResult.Symbol);
+        var receiverType = (ITypeSymbol?)VisitSymbol(bindingResult.ReceiverType);
+        var candidateSymbols = VisitCSharpSymbolList(bindingResult.CandidateSymbols);
+        var operationDefinition = VisitCSharpOperationDefinition(bindingResult.OperationDefinition);
+        var conversion = VisitConversion(bindingResult.Conversion);
+
+        if (SymbolEqualityComparer.Default.Equals(typeSymbol, bindingResult.TypeSymbol) &&
+            SymbolEqualityComparer.Default.Equals(symbol, bindingResult.Symbol) &&
+            SymbolEqualityComparer.Default.Equals(receiverType, bindingResult.ReceiverType) &&
+            candidateSymbols == bindingResult.CandidateSymbols &&
+            operationDefinition.Equals(bindingResult.OperationDefinition) &&
+            conversion.Equals(bindingResult.Conversion))
+        {
+            return bindingResult;
+        }
+
+        return new CSharpBindingResult(
+            typeSymbol,
+            symbol,
+            receiverType,
+            bindingResult.IsBindingPath,
+            candidateSymbols,
+            bindingResult.CandidateReason,
+            operationDefinition,
+            bindingResult.Diagnostics,
+            conversion);
+    }
+
+    protected virtual CSharpSymbolDefinition VisitCSharpSymbolDefinition(CSharpSymbolDefinition definition)
+    {
+        var symbol = VisitSymbol(definition.Symbol);
+        if (SymbolEqualityComparer.Default.Equals(symbol, definition.Symbol))
+        {
+            return definition;
+        }
+
+        return symbol == null
+            ? default
+            : new CSharpSymbolDefinition(symbol);
+    }
+
+    protected virtual CSharpOperationDefinition VisitCSharpOperationDefinition(CSharpOperationDefinition definition)
+    {
+        return definition;
+    }
+
+    protected virtual AkburaConversion VisitConversion(AkburaConversion conversion)
+    {
+        var sourceType = (ITypeSymbol?)VisitSymbol(conversion.SourceType);
+        var targetType = (ITypeSymbol?)VisitSymbol(conversion.TargetType);
+        _ = VisitSymbol(conversion.MethodSymbol);
+
+        if (SymbolEqualityComparer.Default.Equals(sourceType, conversion.SourceType) &&
+            SymbolEqualityComparer.Default.Equals(targetType, conversion.TargetType))
+        {
+            return conversion;
+        }
+
+        return new AkburaConversion(
+            conversion.Kind,
+            sourceType,
+            targetType,
+            conversion.CSharpConversion);
+    }
+
+    protected virtual UseEffectDependency VisitUseEffectDependencyValue(UseEffectDependency dependency)
+    {
+        var akburaSymbol = VisitSymbol(dependency.AkburaSymbol);
+        var csharpDefinition = VisitCSharpSymbolDefinition(dependency.CSharpDefinition);
+
+        if (ReferenceEquals(akburaSymbol, dependency.AkburaSymbol) &&
+            csharpDefinition.Equals(dependency.CSharpDefinition))
+        {
+            return dependency;
+        }
+
+        return new UseEffectDependency(
+            dependency.ExpressionText,
+            akburaSymbol,
+            csharpDefinition);
+    }
+
+    protected virtual MarkupChildContent VisitMarkupChildContent(MarkupChildContent content)
+    {
+        var type = VisitCSharpSymbolDefinition(content.Type);
+        var componentSymbol = (IMarkupComponentSymbol?)VisitSymbol(content.ComponentSymbol);
+
+        if (type.Equals(content.Type) &&
+            ReferenceEquals(componentSymbol, content.ComponentSymbol))
+        {
+            return content;
+        }
+
+        return new MarkupChildContent(
+            content.Syntax,
+            content.Kind,
+            type,
+            componentSymbol,
+            content.Text);
+    }
+
+    protected virtual BoundTailwindUtilityArgument VisitTailwindUtilityArgument(
+        BoundTailwindUtilityArgument argument)
+    {
+        var type = VisitCSharpSymbolDefinition(argument.Type);
+        var valueOperation = VisitCSharpOperationDefinition(argument.ValueOperation);
+
+        if (type.Equals(argument.Type) &&
+            valueOperation.Equals(argument.ValueOperation))
+        {
+            return argument;
+        }
+
+        return new BoundTailwindUtilityArgument(
+            argument.Syntax,
+            argument.Text,
+            type,
+            valueOperation,
+            argument.ConstantValue);
+    }
+
     protected virtual ImmutableArray<BoundNode> VisitList(ImmutableArray<BoundNode> nodes)
     {
         if (nodes.IsDefaultOrEmpty)
@@ -581,6 +836,80 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             : builder.ToImmutableAndFree();
     }
 
+    protected virtual ImmutableArray<MarkupChildContent> VisitMarkupChildContentList(
+        ImmutableArray<MarkupChildContent> content)
+    {
+        if (content.IsDefaultOrEmpty)
+        {
+            return content.IsDefault ? ImmutableArray<MarkupChildContent>.Empty : content;
+        }
+
+        ArrayBuilder<MarkupChildContent>? builder = null;
+
+        for (var index = 0; index < content.Length; index++)
+        {
+            var oldContent = content[index];
+            var newContent = VisitMarkupChildContent(oldContent);
+
+            if (builder == null)
+            {
+                if (newContent.Equals(oldContent))
+                {
+                    continue;
+                }
+
+                builder = ArrayBuilder<MarkupChildContent>.GetInstance(content.Length);
+                for (var previous = 0; previous < index; previous++)
+                {
+                    builder.Add(content[previous]);
+                }
+            }
+
+            builder.Add(newContent);
+        }
+
+        return builder == null
+            ? content
+            : builder.ToImmutableAndFree();
+    }
+
+    protected virtual ImmutableArray<BoundTailwindUtilityArgument> VisitTailwindUtilityArgumentList(
+        ImmutableArray<BoundTailwindUtilityArgument> arguments)
+    {
+        if (arguments.IsDefaultOrEmpty)
+        {
+            return arguments.IsDefault ? ImmutableArray<BoundTailwindUtilityArgument>.Empty : arguments;
+        }
+
+        ArrayBuilder<BoundTailwindUtilityArgument>? builder = null;
+
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            var oldArgument = arguments[index];
+            var newArgument = VisitTailwindUtilityArgument(oldArgument);
+
+            if (builder == null)
+            {
+                if (newArgument.Equals(oldArgument))
+                {
+                    continue;
+                }
+
+                builder = ArrayBuilder<BoundTailwindUtilityArgument>.GetInstance(arguments.Length);
+                for (var previous = 0; previous < index; previous++)
+                {
+                    builder.Add(arguments[previous]);
+                }
+            }
+
+            builder.Add(newArgument);
+        }
+
+        return builder == null
+            ? arguments
+            : builder.ToImmutableAndFree();
+    }
+
     protected virtual ImmutableArray<AkburaSymbol> VisitAkburaSymbolList(
         ImmutableArray<AkburaSymbol> symbols)
     {
@@ -604,6 +933,47 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 }
 
                 builder = ArrayBuilder<AkburaSymbol>.GetInstance(symbols.Length);
+                for (var previous = 0; previous < index; previous++)
+                {
+                    builder.Add(symbols[previous]);
+                }
+            }
+
+            if (newSymbol != null)
+            {
+                builder.Add(newSymbol);
+            }
+        }
+
+        return builder == null
+            ? symbols
+            : builder.ToImmutableAndFree();
+    }
+
+    protected virtual ImmutableArray<TSymbol> VisitAkburaSymbolList<TSymbol>(
+        ImmutableArray<TSymbol> symbols)
+        where TSymbol : class, AkburaSymbol
+    {
+        if (symbols.IsDefaultOrEmpty)
+        {
+            return symbols.IsDefault ? ImmutableArray<TSymbol>.Empty : symbols;
+        }
+
+        ArrayBuilder<TSymbol>? builder = null;
+
+        for (var index = 0; index < symbols.Length; index++)
+        {
+            var oldSymbol = symbols[index];
+            var newSymbol = VisitSymbol(oldSymbol) as TSymbol;
+
+            if (builder == null)
+            {
+                if (ReferenceEquals(newSymbol, oldSymbol))
+                {
+                    continue;
+                }
+
+                builder = ArrayBuilder<TSymbol>.GetInstance(symbols.Length);
                 for (var previous = 0; previous < index; previous++)
                 {
                     builder.Add(symbols[previous]);

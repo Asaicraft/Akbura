@@ -108,6 +108,43 @@ internal sealed class BoundMarkupContentSetter : BoundNode
 
     public bool IsSynthesizedString { get; }
 
+    public BoundMarkupContentSetter Update(
+        IMarkupComponentSymbol? containingComponent,
+        IPropertySymbol? property,
+        MarkupContentModel contentModel,
+        ImmutableArray<MarkupChildContent> content,
+        CSharpSymbolDefinition valueType,
+        CSharpOperationDefinition valueOperation,
+        string? literalValue,
+        bool isSynthesizedString)
+    {
+        if (ReferenceEquals(containingComponent, ContainingComponent) &&
+            ReferenceEquals(property, Property) &&
+            contentModel.Equals(ContentModel) &&
+            content == Content &&
+            valueType.Equals(ValueType) &&
+            valueOperation.Equals(ValueOperation) &&
+            literalValue == LiteralValue &&
+            isSynthesizedString == IsSynthesizedString)
+        {
+            return this;
+        }
+
+        return new BoundMarkupContentSetter(
+            Syntax,
+            Binder,
+            containingComponent,
+            property,
+            contentModel,
+            content,
+            valueType,
+            valueOperation,
+            literalValue,
+            isSynthesizedString,
+            Diagnostics,
+            HasErrors);
+    }
+
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitMarkupContentSetter(this);
 
     public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
@@ -302,6 +339,64 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
 
     public CSharpOperationDefinition HandlerOperation { get; }
 
+    public BoundMarkupCommandBinding Update(
+        IMarkupComponentSymbol? containingComponent,
+        IPropertySymbol property,
+        ICommandSymbol command,
+        MarkupAttributeBindingKind bindingKind,
+        MarkupAttributeValueKind valueKind,
+        MarkupAttributeValueSyntax? valueSyntax,
+        MarkupCommandHandlerKind handlerKind,
+        MarkupCommandArgumentMode argumentMode,
+        MarkupCommandResultMode resultMode,
+        int handlerParameterCount,
+        bool isAsync,
+        bool containsAwait,
+        CSharpSymbolDefinition handlerType,
+        CSharpSymbolDefinition handlerResultType,
+        CSharpOperationDefinition handlerOperation)
+    {
+        if (ReferenceEquals(containingComponent, ContainingComponent) &&
+            ReferenceEquals(property, Property) &&
+            ReferenceEquals(command, Command) &&
+            bindingKind == BindingKind &&
+            valueKind == ValueKind &&
+            ReferenceEquals(valueSyntax, ValueSyntax) &&
+            handlerKind == HandlerKind &&
+            argumentMode == ArgumentMode &&
+            resultMode == ResultMode &&
+            handlerParameterCount == HandlerParameterCount &&
+            isAsync == IsAsync &&
+            containsAwait == ContainsAwait &&
+            handlerType.Equals(HandlerType) &&
+            handlerResultType.Equals(HandlerResultType) &&
+            handlerOperation.Equals(HandlerOperation))
+        {
+            return this;
+        }
+
+        return new BoundMarkupCommandBinding(
+            Syntax,
+            Binder,
+            containingComponent,
+            property,
+            command,
+            bindingKind,
+            valueKind,
+            valueSyntax,
+            handlerKind,
+            argumentMode,
+            resultMode,
+            handlerParameterCount,
+            isAsync,
+            containsAwait,
+            handlerType,
+            handlerResultType,
+            handlerOperation,
+            Diagnostics,
+            HasErrors);
+    }
+
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitMarkupCommandBinding(this);
 
     public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
@@ -374,6 +469,52 @@ internal sealed class BoundMarkupRoutedEventBinding : BoundMarkupAttribute
 
     public CSharpOperationDefinition HandlerOperation { get; }
 
+    public BoundMarkupRoutedEventBinding Update(
+        IMarkupComponentSymbol? containingComponent,
+        IRoutedEventSymbol routedEvent,
+        MarkupAttributeBindingKind bindingKind,
+        MarkupAttributeValueKind valueKind,
+        MarkupAttributeValueSyntax? valueSyntax,
+        MarkupCommandHandlerKind handlerKind,
+        MarkupCommandArgumentMode argumentMode,
+        int handlerParameterCount,
+        bool isAsync,
+        bool containsAwait,
+        CSharpOperationDefinition handlerOperation)
+    {
+        if (ReferenceEquals(containingComponent, ContainingComponent) &&
+            ReferenceEquals(routedEvent, RoutedEvent) &&
+            bindingKind == BindingKind &&
+            valueKind == ValueKind &&
+            ReferenceEquals(valueSyntax, ValueSyntax) &&
+            handlerKind == HandlerKind &&
+            argumentMode == ArgumentMode &&
+            handlerParameterCount == HandlerParameterCount &&
+            isAsync == IsAsync &&
+            containsAwait == ContainsAwait &&
+            handlerOperation.Equals(HandlerOperation))
+        {
+            return this;
+        }
+
+        return new BoundMarkupRoutedEventBinding(
+            Syntax,
+            Binder,
+            containingComponent,
+            routedEvent,
+            bindingKind,
+            valueKind,
+            valueSyntax,
+            handlerKind,
+            argumentMode,
+            handlerParameterCount,
+            isAsync,
+            containsAwait,
+            handlerOperation,
+            Diagnostics,
+            HasErrors);
+    }
+
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitMarkupRoutedEventBinding(this);
 
     public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
@@ -443,6 +584,46 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
     public CSharpSymbolDefinition ConditionType { get; }
 
     public CSharpOperationDefinition ConditionOperation { get; }
+
+    public BoundTailwindUtilityAttribute Update(
+        IMarkupComponentSymbol? containingComponent,
+        string utilityName,
+        ITailwindUtilitySymbol? utility,
+        ImmutableArray<ITailwindUtilitySymbol> utilities,
+        ImmutableArray<BoundTailwindUtilityArgument> arguments,
+        bool hasCondition,
+        string? conditionText,
+        CSharpSymbolDefinition conditionType,
+        CSharpOperationDefinition conditionOperation)
+    {
+        if (ReferenceEquals(containingComponent, ContainingComponent) &&
+            utilityName == UtilityName &&
+            ReferenceEquals(utility, Utility) &&
+            utilities == Utilities &&
+            arguments == Arguments &&
+            hasCondition == HasCondition &&
+            conditionText == ConditionText &&
+            conditionType.Equals(ConditionType) &&
+            conditionOperation.Equals(ConditionOperation))
+        {
+            return this;
+        }
+
+        return new BoundTailwindUtilityAttribute(
+            Syntax,
+            Binder,
+            containingComponent,
+            utilityName,
+            utility,
+            utilities,
+            arguments,
+            hasCondition,
+            conditionText,
+            conditionType,
+            conditionOperation,
+            Diagnostics,
+            HasErrors);
+    }
 
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitTailwindUtilityAttribute(this);
 
@@ -521,6 +702,40 @@ internal sealed class BoundAkcssPropertySetter : BoundAkcssOperation
 
     public object? ConvertedValue { get; }
 
+    public BoundAkcssPropertySetter Update(
+        IAkcssSymbol containingAkcssSymbol,
+        IPropertySymbol? property,
+        CSharpSymbolDefinition valueType,
+        CSharpOperationDefinition valueOperation,
+        AkcssPropertyValueKind valueKind,
+        bool requiresBrushConversion,
+        object? convertedValue)
+    {
+        if (ReferenceEquals(containingAkcssSymbol, ContainingAkcssSymbol) &&
+            ReferenceEquals(property, Property) &&
+            valueType.Equals(ValueType) &&
+            valueOperation.Equals(ValueOperation) &&
+            valueKind == ValueKind &&
+            requiresBrushConversion == RequiresBrushConversion &&
+            Equals(convertedValue, ConvertedValue))
+        {
+            return this;
+        }
+
+        return new BoundAkcssPropertySetter(
+            Syntax,
+            Binder,
+            containingAkcssSymbol,
+            property,
+            valueType,
+            valueOperation,
+            valueKind,
+            requiresBrushConversion,
+            convertedValue,
+            Diagnostics,
+            HasErrors);
+    }
+
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitAkcssPropertySetter(this);
 
     public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
@@ -568,6 +783,31 @@ internal sealed class BoundAkcssIf : BoundAkcssOperation
 
     public ImmutableArray<BoundAkcssOperation> Operations { get; }
 
+    public BoundAkcssIf Update(
+        IAkcssSymbol containingAkcssSymbol,
+        CSharpSymbolDefinition conditionType,
+        CSharpOperationDefinition conditionOperation,
+        ImmutableArray<BoundAkcssOperation> operations)
+    {
+        if (ReferenceEquals(containingAkcssSymbol, ContainingAkcssSymbol) &&
+            conditionType.Equals(ConditionType) &&
+            conditionOperation.Equals(ConditionOperation) &&
+            operations == Operations)
+        {
+            return this;
+        }
+
+        return new BoundAkcssIf(
+            Syntax,
+            Binder,
+            containingAkcssSymbol,
+            conditionType,
+            conditionOperation,
+            operations,
+            Diagnostics,
+            HasErrors);
+    }
+
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitAkcssIf(this);
 
     public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
@@ -610,6 +850,28 @@ internal sealed class BoundAkcssApply : BoundAkcssOperation
 
     public ImmutableArray<IAkcssSymbol> AppliedSymbols { get; }
 
+    public BoundAkcssApply Update(
+        IAkcssSymbol containingAkcssSymbol,
+        ImmutableArray<string> items,
+        ImmutableArray<IAkcssSymbol> appliedSymbols)
+    {
+        if (ReferenceEquals(containingAkcssSymbol, ContainingAkcssSymbol) &&
+            items == Items &&
+            appliedSymbols == AppliedSymbols)
+        {
+            return this;
+        }
+
+        return new BoundAkcssApply(
+            Syntax,
+            Binder,
+            containingAkcssSymbol,
+            items,
+            appliedSymbols,
+            Diagnostics,
+            HasErrors);
+    }
+
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitAkcssApply(this);
 
     public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
@@ -647,6 +909,25 @@ internal sealed class BoundAkcssIntercept : BoundAkcssOperation
     public new AkcssInterceptDirectiveSyntax Syntax => (AkcssInterceptDirectiveSyntax)base.Syntax;
 
     public CSharpSymbolDefinition InterceptType { get; }
+
+    public BoundAkcssIntercept Update(
+        IAkcssSymbol containingAkcssSymbol,
+        CSharpSymbolDefinition interceptType)
+    {
+        if (ReferenceEquals(containingAkcssSymbol, ContainingAkcssSymbol) &&
+            interceptType.Equals(InterceptType))
+        {
+            return this;
+        }
+
+        return new BoundAkcssIntercept(
+            Syntax,
+            Binder,
+            containingAkcssSymbol,
+            interceptType,
+            Diagnostics,
+            HasErrors);
+    }
 
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitAkcssIntercept(this);
 

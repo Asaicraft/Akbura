@@ -44,10 +44,10 @@ internal sealed class AkburaDeclarationTable
         AkburaDeclarationTable? previous)
     {
         syntaxTrees = syntaxTrees.IsDefault
-            ? ImmutableArray<AkburaSyntaxTree>.Empty
+            ? []
             : syntaxTrees;
         akcssSyntaxTrees = akcssSyntaxTrees.IsDefault
-            ? ImmutableArray<AkcssSyntaxTree>.Empty
+            ? []
             : akcssSyntaxTrees;
 
         var components = syntaxTrees

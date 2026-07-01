@@ -37,13 +37,13 @@ internal sealed class BindingSession
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        if (!TryFindRootDeclaration(syntax, out var rootDeclaration))
+        if (!TryFindDeclarationPath(syntax, out var path) ||
+            path.Length == 0)
         {
             return RootBinder;
         }
 
-        return GetExecutableCodeBinder(rootDeclaration, usage)
-            .GetBinder(syntax);
+        return GetBinderFromPath(path, usage);
     }
 
     public Binder GetBinder(
@@ -70,13 +70,13 @@ internal sealed class BindingSession
         var normalizedPosition = position == syntax.EndPosition
             ? position - 1
             : position;
-        if (!TryFindRootDeclaration(syntax, normalizedPosition, out var rootDeclaration))
+        if (!TryFindDeclarationPath(syntax, normalizedPosition, out var path) ||
+            path.Length == 0)
         {
             return RootBinder;
         }
 
-        return GetExecutableCodeBinder(rootDeclaration, usage)
-            .GetBinder(syntax, normalizedPosition);
+        return GetBinderFromPath(path, usage);
     }
 
     public CSharpProbeBinder GetCSharpProbeBinder(
@@ -217,43 +217,60 @@ internal sealed class BindingSession
             usage);
     }
 
-    internal bool TryFindDeclarationPath(
-        AkburaDeclaration root,
+    private Binder GetBinderFromPath(
+        ImmutableArray<AkburaDeclaration> path,
+        BinderUsage usage)
+    {
+        if (TryGetExecutableRootPath(path, out var executableRootPath))
+        {
+            var targetSyntax = path[path.Length - 1].Syntax;
+            return GetExecutableCodeBinder(executableRootPath, usage)
+                .GetBinder(targetSyntax);
+        }
+
+        return GetOrCreateBinder(path, usage);
+    }
+
+    private bool TryFindDeclarationPath(
         AkburaSyntax syntax,
         out ImmutableArray<AkburaDeclaration> path)
     {
         var finder = DeclarationPathFinder.GetInstance(syntax);
         return finder.TryFind(
-            ImmutableArray.Create(root),
+            _semanticModel.Compilation.DeclarationTable.Roots,
             out path);
     }
 
-    internal bool TryFindDeclarationPath(
-        AkburaDeclaration root,
+    private bool TryFindDeclarationPath(
         AkburaSyntax syntax,
         int position,
         out ImmutableArray<AkburaDeclaration> path)
     {
         var finder = DeclarationPathFinder.GetInstance(syntax, position);
         return finder.TryFind(
-            ImmutableArray.Create(root),
+            _semanticModel.Compilation.DeclarationTable.Roots,
             out path);
     }
 
     private ExecutableCodeBinder GetExecutableCodeBinder(
-        AkburaDeclaration rootDeclaration,
+        ImmutableArray<AkburaDeclaration> executableRootPath,
         BinderUsage usage)
     {
+        var rootDeclaration = executableRootPath[executableRootPath.Length - 1];
         var key = new BinderCacheKey(rootDeclaration.Syntax.Green, usage);
         if (_executableBinderCache.TryGetValue(key, out var executableBinder))
         {
             return executableBinder;
         }
 
+        var nextPath = SlicePath(executableRootPath, executableRootPath.Length - 1);
+        var next = nextPath.IsDefaultOrEmpty
+            ? RootBinder
+            : GetOrCreateBinder(nextPath, usage);
         executableBinder = new ExecutableCodeBinder(
             this,
-            rootDeclaration,
-            RootBinder,
+            executableRootPath,
+            next,
             usage);
         if (!_executableBinderCache.TryAdd(key, executableBinder) &&
             _executableBinderCache.TryGetValue(key, out var cachedExecutableBinder))
@@ -264,40 +281,46 @@ internal sealed class BindingSession
         return executableBinder;
     }
 
-    private bool TryFindRootDeclaration(
-        AkburaSyntax syntax,
-        out AkburaDeclaration rootDeclaration)
+    private static bool TryGetExecutableRootPath(
+        ImmutableArray<AkburaDeclaration> path,
+        out ImmutableArray<AkburaDeclaration> executableRootPath)
     {
-        foreach (var root in _semanticModel.Compilation.DeclarationTable.Roots)
+        for (var index = 0; index < path.Length; index++)
         {
-            if (ReferenceEquals(root.Syntax.Root.Green, syntax.Root.Green))
+            if (IsExecutableRoot(path[index]))
             {
-                rootDeclaration = root;
+                executableRootPath = SlicePath(path, index + 1);
                 return true;
             }
         }
 
-        rootDeclaration = null!;
+        executableRootPath = default;
         return false;
     }
 
-    private bool TryFindRootDeclaration(
-        AkburaSyntax syntax,
-        int position,
-        out AkburaDeclaration rootDeclaration)
+    private static bool IsExecutableRoot(AkburaDeclaration declaration)
     {
-        foreach (var root in _semanticModel.Compilation.DeclarationTable.Roots)
+        return declaration.Kind is
+            AkburaDeclarationKind.CSharpStatement or
+            AkburaDeclarationKind.CSharpBlock;
+    }
+
+    private static ImmutableArray<AkburaDeclaration> SlicePath(
+        ImmutableArray<AkburaDeclaration> path,
+        int length)
+    {
+        if (length == 0)
         {
-            if (ReferenceEquals(root.Syntax.Root.Green, syntax.Root.Green) &&
-                ContainsPosition(root.Syntax, position))
-            {
-                rootDeclaration = root;
-                return true;
-            }
+            return ImmutableArray<AkburaDeclaration>.Empty;
         }
 
-        rootDeclaration = null!;
-        return false;
+        var builder = ImmutableArray.CreateBuilder<AkburaDeclaration>(length);
+        for (var index = 0; index < length; index++)
+        {
+            builder.Add(path[index]);
+        }
+
+        return builder.ToImmutable();
     }
 
     private sealed class DeclarationPathFinder

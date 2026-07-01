@@ -4,6 +4,7 @@ using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -15,24 +16,31 @@ namespace Akbura.Language.Binder;
 internal sealed class ExecutableCodeBinder : Binder
 {
     private readonly BindingSession _bindingSession;
+    private readonly ImmutableArray<AkburaDeclaration> _rootPath;
     private readonly AkburaDeclaration _rootDeclaration;
     private readonly BinderUsage _usage;
     private SmallDictionary<AkburaSyntax, Binder>? _lazyBinderMap;
 
     public ExecutableCodeBinder(
         BindingSession bindingSession,
-        AkburaDeclaration rootDeclaration,
+        ImmutableArray<AkburaDeclaration> rootPath,
         Binder next,
         BinderUsage usage)
         : base(
             next?.SemanticModel ?? throw new ArgumentNullException(nameof(next)),
             next,
-            rootDeclaration,
-            rootDeclaration?.Syntax,
+            GetRootDeclaration(rootPath),
+            GetRootDeclaration(rootPath).Syntax,
             next.Flags)
     {
         _bindingSession = bindingSession ?? throw new ArgumentNullException(nameof(bindingSession));
-        _rootDeclaration = rootDeclaration ?? throw new ArgumentNullException(nameof(rootDeclaration));
+        if (rootPath.IsDefaultOrEmpty)
+        {
+            throw new ArgumentException("Executable root path cannot be empty.", nameof(rootPath));
+        }
+
+        _rootPath = rootPath;
+        _rootDeclaration = rootPath[rootPath.Length - 1];
         _usage = usage;
     }
 
@@ -49,31 +57,6 @@ internal sealed class ExecutableCodeBinder : Binder
             : NextRequired;
     }
 
-    public Binder GetBinder(
-        AkburaSyntax syntax,
-        int position)
-    {
-        if (syntax == null)
-        {
-            throw new ArgumentNullException(nameof(syntax));
-        }
-
-        if (!_bindingSession.TryFindDeclarationPath(
-                _rootDeclaration,
-                syntax,
-                position,
-                out var path))
-        {
-            return NextRequired;
-        }
-
-        var scopeSyntax = path[path.Length - 1].Syntax;
-        var map = BinderMap;
-        return map.TryGetValue(scopeSyntax, out var binder)
-            ? binder
-            : NextRequired;
-    }
-
     private void ComputeBinderMap()
     {
         var map = new SmallDictionary<AkburaSyntax, Binder>(
@@ -81,6 +64,11 @@ internal sealed class ExecutableCodeBinder : Binder
         var path = ArrayBuilder<AkburaDeclaration>.GetInstance();
         try
         {
+            for (var index = 0; index < _rootPath.Length - 1; index++)
+            {
+                path.Add(_rootPath[index]);
+            }
+
             AddDeclarationBinders(map, path, _rootDeclaration);
         }
         finally
@@ -120,6 +108,13 @@ internal sealed class ExecutableCodeBinder : Binder
 
             return _lazyBinderMap!;
         }
+    }
+
+    private static AkburaDeclaration GetRootDeclaration(ImmutableArray<AkburaDeclaration> rootPath)
+    {
+        return !rootPath.IsDefaultOrEmpty
+            ? rootPath[rootPath.Length - 1]
+            : throw new ArgumentException("Executable root path cannot be empty.", nameof(rootPath));
     }
 
     private sealed class AkburaSyntaxGreenComparer : IEqualityComparer<AkburaSyntax>

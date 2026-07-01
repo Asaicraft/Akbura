@@ -10,7 +10,7 @@ namespace Akbura.Language.BoundTree;
 internal abstract class BoundNode
 {
     private readonly BoundKind _kind;
-    private BoundNodeAttributes _attributes;
+    private readonly BoundNodeAttributes _attributes;
 
     [Flags]
     private enum BoundNodeAttributes : byte

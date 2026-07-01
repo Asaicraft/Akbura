@@ -47,7 +47,7 @@ internal sealed partial class SyntaxAndDeclarationManager
     public SyntaxAndDeclarationManager WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
     {
         syntaxTrees = syntaxTrees.IsDefault
-            ? ImmutableArray<AkburaSyntaxTree>.Empty
+            ? []
             : syntaxTrees;
         return _syntaxTrees.SequenceEqual(syntaxTrees)
             ? this
@@ -57,7 +57,7 @@ internal sealed partial class SyntaxAndDeclarationManager
     public SyntaxAndDeclarationManager WithAkcssSyntaxTrees(ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
     {
         akcssSyntaxTrees = akcssSyntaxTrees.IsDefault
-            ? ImmutableArray<AkcssSyntaxTree>.Empty
+            ? []
             : akcssSyntaxTrees;
         return _akcssSyntaxTrees.SequenceEqual(akcssSyntaxTrees)
             ? this

@@ -242,6 +242,28 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void AkburaCompilation_LazilyCachesSemanticModelsConcurrently()
+    {
+        var tree = AkburaSyntaxTree.ParseText("state int count = 0;", "Counter.akbura");
+        var compilation = CreateCompilation(tree);
+        var cacheField = typeof(AkburaCompilation).GetField(
+            "_semanticModels",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var models = new AkburaSemanticModel[32];
+
+        Parallel.For(0, models.Length, index =>
+        {
+            models[index] = compilation.GetSemanticModel(tree);
+        });
+
+        Assert.NotNull(cacheField);
+        Assert.Same(
+            typeof(System.Collections.Concurrent.ConcurrentDictionary<AkburaSyntaxTree, AkburaSemanticModel>),
+            cacheField.FieldType);
+        Assert.All(models, model => Assert.Same(models[0], model));
+    }
+
+    [Fact]
     public void SmallDictionary_AddUpdateLookupAndEnumerate()
     {
         var dictionary = new SmallDictionary<string, int>();
@@ -2429,26 +2451,37 @@ public sealed class SemanticArchitectureTests
     [Fact]
     public void ExecutableCodeBinder_ReturnsCachedNestedBinderFromMap()
     {
-        const string code = "<StackPanel><Button /></StackPanel>";
+        const string code =
+            "state int total = 0;\n" +
+            "if(total > 0)\n" +
+            "{\n" +
+            "    int count = 1;\n" +
+            "    Console.WriteLine(count);\n" +
+            "}";
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var model = CreateCompilation(tree).GetSemanticModel(tree);
         var rootDeclaration = Assert.Single(model.Compilation.DeclarationTable.Components);
         var root = tree.GetRoot();
-        var markupRoot = Assert.IsType<MarkupRootSyntax>(root.Members[0]);
-        var childContent = Assert.IsType<MarkupElementContentSyntax>(markupRoot.Element.Body[0]);
-        var childElement = childContent.Element;
+        var ifStatement = Assert.IsType<CSharpStatementSyntax>(root.Members[1]);
+        var block = ifStatement.Body!;
+        var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
+        var statementDeclaration = Assert.Single(
+            rootDeclaration.Children,
+            declaration => ReferenceEquals(declaration.Syntax.Green, ifStatement.Green));
+        var executableRootPath = ImmutableArray.Create(rootDeclaration, statementDeclaration);
+        var next = model.GetBinder(root);
         var executableBinder = new ExecutableCodeBinder(
             model.BindingSession,
-            rootDeclaration,
-            model.BindingSession.RootBinder,
-            BinderUsage.Markup);
+            executableRootPath,
+            next,
+            BinderUsage.Statement);
 
-        var first = executableBinder.GetBinder(childElement);
-        var second = executableBinder.GetBinder(childElement);
+        var first = executableBinder.GetBinder(writeLine);
+        var second = executableBinder.GetBinder(writeLine);
 
-        var markupBinder = Assert.IsType<MarkupBinder>(first);
+        var blockBinder = Assert.IsType<BlockBinder>(first);
         Assert.Same(first, second);
-        Assert.Same(childElement, markupBinder.ScopeDesignator);
+        Assert.Same(block, blockBinder.ScopeDesignator);
 
         var mapField = typeof(ExecutableCodeBinder).GetField(
             "_lazyBinderMap",

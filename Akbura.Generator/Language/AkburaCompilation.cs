@@ -1,6 +1,7 @@
 using Akbura.Language.Declarations;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace Akbura.Language;
 
 internal sealed class AkburaCompilation
 {
-    private readonly Dictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
+    private readonly ConcurrentDictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
     private readonly SyntaxAndDeclarationManager _syntaxAndDeclarations;
 
     public AkburaCompilation(
@@ -17,7 +18,7 @@ internal sealed class AkburaCompilation
         IEnumerable<AkburaSyntaxTree> syntaxTrees,
         string rootNamespace = "",
         string projectDirectory = "")
-        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), ImmutableArray<AkcssSyntaxTree>.Empty, rootNamespace, projectDirectory)
+        : this(csharpCompilation, [.. syntaxTrees], ImmutableArray<AkcssSyntaxTree>.Empty, rootNamespace, projectDirectory)
     {
     }
 
@@ -27,7 +28,7 @@ internal sealed class AkburaCompilation
         IEnumerable<AkcssSyntaxTree> akcssSyntaxTrees,
         string rootNamespace = "",
         string projectDirectory = "")
-        : this(csharpCompilation, syntaxTrees.ToImmutableArray(), akcssSyntaxTrees.ToImmutableArray(), rootNamespace, projectDirectory)
+        : this(csharpCompilation, [.. syntaxTrees], [.. akcssSyntaxTrees], rootNamespace, projectDirectory)
     {
     }
 
@@ -36,7 +37,7 @@ internal sealed class AkburaCompilation
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
         string rootNamespace = "",
         string projectDirectory = "")
-        : this(csharpCompilation, syntaxTrees, ImmutableArray<AkcssSyntaxTree>.Empty, rootNamespace, projectDirectory)
+        : this(csharpCompilation, syntaxTrees, [], rootNamespace, projectDirectory)
     {
     }
 
@@ -91,7 +92,7 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
-        return WithSyntaxTrees(syntaxTrees.ToImmutableArray());
+        return WithSyntaxTrees([.. syntaxTrees]);
     }
 
     public AkburaCompilation WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
@@ -192,14 +193,9 @@ internal sealed class AkburaCompilation
             throw new ArgumentException("Syntax tree is not part of this compilation.", nameof(syntaxTree));
         }
 
-        if (_semanticModels.TryGetValue(syntaxTree, out var semanticModel))
-        {
-            return semanticModel;
-        }
-
-        semanticModel = new AkburaSemanticModel(this, syntaxTree);
-        _semanticModels.Add(syntaxTree, semanticModel);
-        return semanticModel;
+        return _semanticModels.GetOrAdd(
+            syntaxTree,
+            tree => new AkburaSemanticModel(this, tree));
     }
 
     private AkburaCompilation WithSyntaxAndDeclarations(

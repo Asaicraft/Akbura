@@ -1,4 +1,6 @@
+using Akbura.Pools;
 using Akbura.Language.Syntax;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -6,6 +8,9 @@ namespace Akbura.Language.Declarations;
 
 internal sealed class AkburaDeclarationTable
 {
+    private static readonly ObjectPool<Stack<AkburaDeclaration>> s_declarationStack =
+        new(() => new Stack<AkburaDeclaration>(), 16);
+
     private AkburaDeclarationTable(
         ImmutableArray<AkburaDeclaration> components,
         ImmutableArray<AkburaDeclaration> akcssModules)
@@ -27,15 +32,31 @@ internal sealed class AkburaDeclarationTable
 
     public static AkburaDeclarationTable Create(AkburaCompilation compilation)
     {
-        var previous = compilation.PreviousCompilation?.DeclarationTable;
+        return Create(
+            compilation.SyntaxTrees,
+            compilation.AkcssSyntaxTrees,
+            compilation.PreviousCompilation?.DeclarationTable);
+    }
 
-        var components = compilation.SyntaxTrees
+    public static AkburaDeclarationTable Create(
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
+        AkburaDeclarationTable? previous)
+    {
+        syntaxTrees = syntaxTrees.IsDefault
+            ? ImmutableArray<AkburaSyntaxTree>.Empty
+            : syntaxTrees;
+        akcssSyntaxTrees = akcssSyntaxTrees.IsDefault
+            ? ImmutableArray<AkcssSyntaxTree>.Empty
+            : akcssSyntaxTrees;
+
+        var components = syntaxTrees
             .Select(tree => TryReuseComponent(previous, tree, out var declaration)
                 ? declaration
                 : AkburaDeclarationCollector.Collect(tree))
             .ToImmutableArray();
 
-        var akcssModules = compilation.AkcssSyntaxTrees
+        var akcssModules = akcssSyntaxTrees
             .Select(tree => TryReuseAkcssModule(previous, tree, out var declaration)
                 ? declaration
                 : AkburaDeclarationCollector.Collect(tree))
@@ -46,40 +67,38 @@ internal sealed class AkburaDeclarationTable
 
     public bool TryGetDeclaration(Akbura.Language.Syntax.AkburaSyntax syntax, out AkburaDeclaration declaration)
     {
-        foreach (var root in Roots)
+        var stack = s_declarationStack.Allocate();
+        try
         {
-            if (TryGetDeclaration(root, syntax, out declaration))
+            for (var index = Roots.Length - 1; index >= 0; index--)
             {
-                return true;
+                stack.Push(Roots[index]);
             }
-        }
 
-        declaration = null!;
-        return false;
-    }
-
-    private static bool TryGetDeclaration(
-        AkburaDeclaration current,
-        Akbura.Language.Syntax.AkburaSyntax syntax,
-        out AkburaDeclaration declaration)
-    {
-        if (ReferenceEquals(current.Syntax, syntax) ||
-            ReferenceEquals(current.Syntax.Green, syntax.Green))
-        {
-            declaration = current;
-            return true;
-        }
-
-        foreach (var child in current.Children)
-        {
-            if (TryGetDeclaration(child, syntax, out declaration))
+            while (stack.Count > 0)
             {
-                return true;
-            }
-        }
+                var current = stack.Pop();
+                if (ReferenceEquals(current.Syntax, syntax) ||
+                    ReferenceEquals(current.Syntax.Green, syntax.Green))
+                {
+                    declaration = current;
+                    return true;
+                }
 
-        declaration = null!;
-        return false;
+                for (var index = current.Children.Length - 1; index >= 0; index--)
+                {
+                    stack.Push(current.Children[index]);
+                }
+            }
+
+            declaration = null!;
+            return false;
+        }
+        finally
+        {
+            stack.Clear();
+            s_declarationStack.Free(stack);
+        }
     }
 
     private static bool TryReuseComponent(

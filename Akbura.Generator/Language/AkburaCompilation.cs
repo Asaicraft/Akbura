@@ -10,7 +10,7 @@ namespace Akbura.Language;
 internal sealed class AkburaCompilation
 {
     private readonly Dictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
-    private AkburaDeclarationTable? _declarationTable;
+    private readonly SyntaxAndDeclarationManager _syntaxAndDeclarations;
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
@@ -47,12 +47,27 @@ internal sealed class AkburaCompilation
         string rootNamespace = "",
         string projectDirectory = "",
         AkburaCompilation? previousCompilation = null)
+        : this(
+            csharpCompilation,
+            new SyntaxAndDeclarationManager(
+                syntaxTrees,
+                akcssSyntaxTrees,
+                previousCompilation?._syntaxAndDeclarations),
+            rootNamespace,
+            projectDirectory,
+            previousCompilation)
+    {
+    }
+
+    private AkburaCompilation(
+        CSharpCompilation csharpCompilation,
+        SyntaxAndDeclarationManager syntaxAndDeclarations,
+        string rootNamespace,
+        string projectDirectory,
+        AkburaCompilation? previousCompilation)
     {
         CSharpCompilation = csharpCompilation ?? throw new ArgumentNullException(nameof(csharpCompilation));
-        SyntaxTrees = syntaxTrees.IsDefault ? ImmutableArray<AkburaSyntaxTree>.Empty : syntaxTrees;
-        AkcssSyntaxTrees = akcssSyntaxTrees.IsDefault
-            ? ImmutableArray<AkcssSyntaxTree>.Empty
-            : akcssSyntaxTrees;
+        _syntaxAndDeclarations = syntaxAndDeclarations ?? throw new ArgumentNullException(nameof(syntaxAndDeclarations));
         RootNamespace = rootNamespace ?? string.Empty;
         ProjectDirectory = projectDirectory ?? string.Empty;
         PreviousCompilation = previousCompilation;
@@ -60,9 +75,9 @@ internal sealed class AkburaCompilation
 
     public CSharpCompilation CSharpCompilation { get; }
 
-    public ImmutableArray<AkburaSyntaxTree> SyntaxTrees { get; }
+    public ImmutableArray<AkburaSyntaxTree> SyntaxTrees => _syntaxAndDeclarations.SyntaxTrees;
 
-    public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees { get; }
+    public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees => _syntaxAndDeclarations.AkcssSyntaxTrees;
 
     public string RootNamespace { get; }
 
@@ -70,8 +85,9 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation? PreviousCompilation { get; }
 
-    public AkburaDeclarationTable DeclarationTable =>
-        _declarationTable ??= AkburaDeclarationTable.Create(this);
+    internal SyntaxAndDeclarationManager SyntaxAndDeclarations => _syntaxAndDeclarations;
+
+    public AkburaDeclarationTable DeclarationTable => _syntaxAndDeclarations.DeclarationTable;
 
     public AkburaCompilation WithSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
@@ -80,18 +96,15 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
     {
-        syntaxTrees = syntaxTrees.IsDefault
-            ? ImmutableArray<AkburaSyntaxTree>.Empty
-            : syntaxTrees;
-        if (SyntaxTrees.SequenceEqual(syntaxTrees))
+        var syntaxAndDeclarations = _syntaxAndDeclarations.WithSyntaxTrees(syntaxTrees);
+        if (ReferenceEquals(_syntaxAndDeclarations, syntaxAndDeclarations))
         {
             return this;
         }
 
         return new AkburaCompilation(
             CSharpCompilation,
-            syntaxTrees,
-            AkcssSyntaxTrees,
+            syntaxAndDeclarations,
             RootNamespace,
             ProjectDirectory,
             previousCompilation: this);
@@ -104,21 +117,52 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithAkcssSyntaxTrees(ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
     {
-        akcssSyntaxTrees = akcssSyntaxTrees.IsDefault
-            ? ImmutableArray<AkcssSyntaxTree>.Empty
-            : akcssSyntaxTrees;
-        if (AkcssSyntaxTrees.SequenceEqual(akcssSyntaxTrees))
+        var syntaxAndDeclarations = _syntaxAndDeclarations.WithAkcssSyntaxTrees(akcssSyntaxTrees);
+        if (ReferenceEquals(_syntaxAndDeclarations, syntaxAndDeclarations))
         {
             return this;
         }
 
         return new AkburaCompilation(
             CSharpCompilation,
-            SyntaxTrees,
-            akcssSyntaxTrees,
+            syntaxAndDeclarations,
             RootNamespace,
             ProjectDirectory,
             previousCompilation: this);
+    }
+
+    public AkburaCompilation AddSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
+    {
+        return WithSyntaxAndDeclarations(_syntaxAndDeclarations.AddSyntaxTrees(syntaxTrees));
+    }
+
+    public AkburaCompilation RemoveSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
+    {
+        return WithSyntaxAndDeclarations(_syntaxAndDeclarations.RemoveSyntaxTrees(syntaxTrees));
+    }
+
+    public AkburaCompilation ReplaceSyntaxTree(
+        AkburaSyntaxTree oldTree,
+        AkburaSyntaxTree newTree)
+    {
+        return WithSyntaxAndDeclarations(_syntaxAndDeclarations.ReplaceSyntaxTree(oldTree, newTree));
+    }
+
+    public AkburaCompilation AddAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> syntaxTrees)
+    {
+        return WithSyntaxAndDeclarations(_syntaxAndDeclarations.AddAkcssSyntaxTrees(syntaxTrees));
+    }
+
+    public AkburaCompilation RemoveAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> syntaxTrees)
+    {
+        return WithSyntaxAndDeclarations(_syntaxAndDeclarations.RemoveAkcssSyntaxTrees(syntaxTrees));
+    }
+
+    public AkburaCompilation ReplaceAkcssSyntaxTree(
+        AkcssSyntaxTree oldTree,
+        AkcssSyntaxTree newTree)
+    {
+        return WithSyntaxAndDeclarations(_syntaxAndDeclarations.ReplaceAkcssSyntaxTree(oldTree, newTree));
     }
 
     public AkburaCompilation WithCSharpCompilation(CSharpCompilation csharpCompilation)
@@ -130,8 +174,7 @@ internal sealed class AkburaCompilation
 
         return new AkburaCompilation(
             csharpCompilation,
-            SyntaxTrees,
-            AkcssSyntaxTrees,
+            _syntaxAndDeclarations,
             RootNamespace,
             ProjectDirectory,
             previousCompilation: this);
@@ -159,4 +202,16 @@ internal sealed class AkburaCompilation
         return semanticModel;
     }
 
+    private AkburaCompilation WithSyntaxAndDeclarations(
+        SyntaxAndDeclarationManager syntaxAndDeclarations)
+    {
+        return ReferenceEquals(_syntaxAndDeclarations, syntaxAndDeclarations)
+            ? this
+            : new AkburaCompilation(
+                CSharpCompilation,
+                syntaxAndDeclarations,
+                RootNamespace,
+                ProjectDirectory,
+                previousCompilation: this);
+    }
 }

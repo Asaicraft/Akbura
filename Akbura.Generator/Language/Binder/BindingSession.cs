@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Declarations;
 using Akbura.Language.Symbols;
@@ -15,12 +16,14 @@ internal sealed class BindingSession
 {
     private readonly AkburaSemanticModel _semanticModel;
     private readonly BinderFactory _binderFactory;
+    private readonly ConcurrentCache<BinderCacheKey, ExecutableCodeBinder> _executableBinderCache;
 
     public BindingSession(AkburaSemanticModel semanticModel)
     {
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         RootBinder = new CompilationBinder(semanticModel);
         _binderFactory = new BinderFactory(semanticModel, this);
+        _executableBinderCache = new ConcurrentCache<BinderCacheKey, ExecutableCodeBinder>(16);
     }
 
     public CompilationBinder RootBinder { get; }
@@ -34,19 +37,13 @@ internal sealed class BindingSession
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        if (!TryFindDeclarationPath(syntax, out var path) ||
-            path.Length == 0)
+        if (!TryFindRootDeclaration(syntax, out var rootDeclaration))
         {
             return RootBinder;
         }
 
-        var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
-            syntax,
-            usage);
-        return _binderFactory.GetOrCreateBinder(
-            key,
-            path,
-            usage);
+        return GetExecutableCodeBinder(rootDeclaration, usage)
+            .GetBinder(syntax);
     }
 
     public Binder GetBinder(
@@ -73,20 +70,13 @@ internal sealed class BindingSession
         var normalizedPosition = position == syntax.EndPosition
             ? position - 1
             : position;
-        if (!TryFindDeclarationPath(syntax, normalizedPosition, out var path) ||
-            path.Length == 0)
+        if (!TryFindRootDeclaration(syntax, normalizedPosition, out var rootDeclaration))
         {
             return RootBinder;
         }
 
-        var cacheSyntax = path[path.Length - 1].Syntax;
-        var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
-            cacheSyntax,
-            usage);
-        return _binderFactory.GetOrCreateBinder(
-            key,
-            path,
-            usage);
+        return GetExecutableCodeBinder(rootDeclaration, usage)
+            .GetBinder(syntax, normalizedPosition);
     }
 
     public CSharpProbeBinder GetCSharpProbeBinder(
@@ -208,25 +198,106 @@ internal sealed class BindingSession
         };
     }
 
-    private bool TryFindDeclarationPath(
+    internal Binder GetOrCreateBinder(
+        ImmutableArray<AkburaDeclaration> path,
+        BinderUsage usage)
+    {
+        if (path.IsDefaultOrEmpty)
+        {
+            return RootBinder;
+        }
+
+        var cacheSyntax = path[path.Length - 1].Syntax;
+        var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
+            cacheSyntax,
+            usage);
+        return _binderFactory.GetOrCreateBinder(
+            key,
+            path,
+            usage);
+    }
+
+    internal bool TryFindDeclarationPath(
+        AkburaDeclaration root,
         AkburaSyntax syntax,
         out ImmutableArray<AkburaDeclaration> path)
     {
         var finder = DeclarationPathFinder.GetInstance(syntax);
         return finder.TryFind(
-            _semanticModel.Compilation.DeclarationTable.Roots,
+            ImmutableArray.Create(root),
             out path);
     }
 
-    private bool TryFindDeclarationPath(
+    internal bool TryFindDeclarationPath(
+        AkburaDeclaration root,
         AkburaSyntax syntax,
         int position,
         out ImmutableArray<AkburaDeclaration> path)
     {
         var finder = DeclarationPathFinder.GetInstance(syntax, position);
         return finder.TryFind(
-            _semanticModel.Compilation.DeclarationTable.Roots,
+            ImmutableArray.Create(root),
             out path);
+    }
+
+    private ExecutableCodeBinder GetExecutableCodeBinder(
+        AkburaDeclaration rootDeclaration,
+        BinderUsage usage)
+    {
+        var key = new BinderCacheKey(rootDeclaration.Syntax.Green, usage);
+        if (_executableBinderCache.TryGetValue(key, out var executableBinder))
+        {
+            return executableBinder;
+        }
+
+        executableBinder = new ExecutableCodeBinder(
+            this,
+            rootDeclaration,
+            RootBinder,
+            usage);
+        if (!_executableBinderCache.TryAdd(key, executableBinder) &&
+            _executableBinderCache.TryGetValue(key, out var cachedExecutableBinder))
+        {
+            return cachedExecutableBinder;
+        }
+
+        return executableBinder;
+    }
+
+    private bool TryFindRootDeclaration(
+        AkburaSyntax syntax,
+        out AkburaDeclaration rootDeclaration)
+    {
+        foreach (var root in _semanticModel.Compilation.DeclarationTable.Roots)
+        {
+            if (ReferenceEquals(root.Syntax.Root.Green, syntax.Root.Green))
+            {
+                rootDeclaration = root;
+                return true;
+            }
+        }
+
+        rootDeclaration = null!;
+        return false;
+    }
+
+    private bool TryFindRootDeclaration(
+        AkburaSyntax syntax,
+        int position,
+        out AkburaDeclaration rootDeclaration)
+    {
+        foreach (var root in _semanticModel.Compilation.DeclarationTable.Roots)
+        {
+            if (ReferenceEquals(root.Syntax.Root.Green, syntax.Root.Green) &&
+                ContainsPosition(root.Syntax, position))
+            {
+                rootDeclaration = root;
+                return true;
+            }
+        }
+
+        rootDeclaration = null!;
+        return false;
     }
 
     private sealed class DeclarationPathFinder
@@ -348,8 +419,7 @@ internal sealed class BindingSession
 
         private static bool ContainsPosition(AkburaSyntax syntax, int position)
         {
-            return syntax.FullSpan.Contains(position) ||
-                   (syntax.FullWidth == 0 && position == syntax.Position);
+            return BindingSession.ContainsPosition(syntax, position);
         }
 
         private static ObjectPool<DeclarationPathFinder> CreatePool()
@@ -360,5 +430,11 @@ internal sealed class BindingSession
                 size: 16);
             return pool;
         }
+    }
+
+    private static bool ContainsPosition(AkburaSyntax syntax, int position)
+    {
+        return syntax.FullSpan.Contains(position) ||
+               (syntax.FullWidth == 0 && position == syntax.Position);
     }
 }

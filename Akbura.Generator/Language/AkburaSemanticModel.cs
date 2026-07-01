@@ -26,6 +26,7 @@ using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 using RoslynEventSymbol = Microsoft.CodeAnalysis.IEventSymbol;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 using BinderType = Akbura.Language.Binder.Binder;
+using System.Diagnostics;
 
 namespace Akbura.Language;
 
@@ -1923,26 +1924,12 @@ internal sealed partial class AkburaSemanticModel
 
     private static CSharp.ExpressionSyntax? ParseAkcssAssignmentExpression(AkcssAssignmentSyntax assignment)
     {
-        try
-        {
-            return CSharpSyntaxFactory.ParseExpression(assignment.Expression.ToFullString());
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
+        return assignment.Expression.GetRawCSharpExpression();
     }
 
     private static CSharp.ExpressionSyntax? ParseAkcssConditionExpression(AkcssIfDirectiveSyntax ifDirective)
     {
-        try
-        {
-            return CSharpSyntaxFactory.ParseExpression(ifDirective.Condition.ToFullString());
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
+        return ifDirective.Condition.GetRawCSharpExpression();
     }
 
     private static bool TryGetAkcssColorIdentifierText(
@@ -5359,6 +5346,7 @@ internal sealed partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
+    [Conditional("DEBUG")]
     private void ValidateSyntaxTreeOwnership(AkburaSyntax syntax)
     {
         if (!ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()))
@@ -5367,6 +5355,7 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
+    [Conditional("DEBUG")]
     private void ValidateBoundSyntaxOwnership(AkburaSyntax syntax)
     {
         if (ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()) ||

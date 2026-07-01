@@ -889,12 +889,8 @@ internal sealed partial class AkburaSemanticModel
                 return CSharpBindingResult.Empty;
             }
 
-            CSharp.ExpressionSyntax csharpExpression;
-            try
-            {
-                csharpExpression = CSharpSyntaxFactory.ParseExpression(defaultValue.ToFullString());
-            }
-            catch (ArgumentException)
+            var csharpExpression = defaultValue.GetRawCSharpExpression();
+            if (csharpExpression == null)
             {
                 return CSharpBindingResult.Empty;
             }
@@ -908,12 +904,8 @@ internal sealed partial class AkburaSemanticModel
             StateDeclarationSyntax stateDeclaration,
             ITypeSymbol? targetType = null)
         {
-            CSharp.ExpressionSyntax csharpExpression;
-            try
-            {
-                csharpExpression = CSharpSyntaxFactory.ParseExpression(stateDeclaration.Initializer.Expression.ToFullString());
-            }
-            catch (ArgumentException)
+            var csharpExpression = stateDeclaration.Initializer.Expression.GetRawCSharpExpression();
+            if (csharpExpression == null)
             {
                 return CSharpBindingResult.Empty;
             }

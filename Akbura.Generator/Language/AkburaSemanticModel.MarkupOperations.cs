@@ -66,14 +66,7 @@ internal sealed partial class AkburaSemanticModel
 
     internal static CSharp.ExpressionSyntax? ParseInlineExpression(InlineExpressionSyntax inlineExpression)
     {
-        try
-        {
-            return CSharpSyntaxFactory.ParseExpression(inlineExpression.Expression.ToFullString());
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
+        return inlineExpression.GetRawCSharpExpression();
     }
 
     internal static void AddMarkupAttributeBindingDiagnostics(

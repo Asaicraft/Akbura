@@ -44,7 +44,7 @@ internal sealed class ExecutableCodeBinder : Binder
         _usage = usage;
     }
 
-    public Binder GetBinder(AkburaSyntax syntax)
+    public override Binder? GetBinder(AkburaSyntax syntax)
     {
         if (syntax == null)
         {

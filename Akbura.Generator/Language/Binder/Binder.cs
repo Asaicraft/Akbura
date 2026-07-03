@@ -62,6 +62,11 @@ internal abstract class Binder
                AkburaSymbolInfo.None(Symbols.CandidateReason.UnsupportedSyntax);
     }
 
+    public virtual Binder? GetBinder(AkburaSyntax syntax)
+    {
+        return Next?.GetBinder(syntax);
+    }
+
     public virtual BoundNode BindOperationSyntax(AkburaSyntax syntax)
     {
         return Next?.BindOperationSyntax(syntax) ??

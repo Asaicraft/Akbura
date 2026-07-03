@@ -664,7 +664,126 @@ public sealed class SemanticArchitectureTests
         Assert.Same(rootModel, stateModel);
         Assert.Same(rootModel, paramModel);
         Assert.Same(root, rootModel.Scope);
-        Assert.IsType<AkburaSemanticModel.ComponentMemberSemanticModel>(rootModel);
+        Assert.IsType<ComponentMemberSemanticModel>(rootModel);
+    }
+
+    [Fact]
+    public void MemberSemanticModel_ClassesAreTopLevelAndCreatedThroughFactory()
+    {
+        var nestedTypes = typeof(AkburaSemanticModel).GetNestedTypes(
+            BindingFlags.Public |
+            BindingFlags.NonPublic);
+
+        Assert.DoesNotContain(nestedTypes, type => type.Name.Contains("MemberSemanticModel", StringComparison.Ordinal));
+        Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(ComponentMemberSemanticModel)));
+        Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(InitializerMemberSemanticModel)));
+        Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(ExecutableMemberSemanticModel)));
+        Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(MarkupMemberSemanticModel)));
+        Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(AkcssMemberSemanticModel)));
+
+        var incrementalBinder = typeof(ExecutableMemberSemanticModel).GetNestedType(
+            "IncrementalBinder",
+            BindingFlags.NonPublic);
+        Assert.NotNull(incrementalBinder);
+        Assert.True(typeof(BinderType).IsAssignableFrom(incrementalBinder));
+
+        var semanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "AkburaSemanticModel.cs");
+
+        Assert.Contains(nameof(MemberSemanticModelFactory), semanticModelSource);
+        Assert.DoesNotContain("new ComponentMemberSemanticModel", semanticModelSource);
+    }
+
+    [Fact]
+    public void MemberSemanticModel_BoundNodeMapUsesReaderWriterLock()
+    {
+        var source = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "AkburaSemanticModel.MemberSemanticModel.cs");
+
+        Assert.Contains("ReaderWriterLockSlim", source);
+        Assert.Contains("LockRecursionPolicy.NoRecursion", source);
+        Assert.Contains("EnterReadLock", source);
+        Assert.Contains("EnterWriteLock", source);
+        Assert.Contains("ExitReadLock", source);
+        Assert.Contains("ExitWriteLock", source);
+        Assert.Contains("Dictionary<AkburaSyntax, OneOrMany<BoundNode>> _guardedBoundNodeMap", source);
+        Assert.Contains("new();", source);
+        Assert.DoesNotContain("SmallDictionary<AkburaSyntax, OneOrMany<BoundNode>>", source);
+        Assert.DoesNotContain("AkburaSyntaxGreenComparer", source);
+        Assert.DoesNotContain("private readonly object _", source);
+    }
+
+    [Fact]
+    public void IncrementalBinder_RewrapsNestedBinders()
+    {
+        var binderSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Binder",
+            "Binder.cs");
+        var executableBinderSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Binder",
+            "ExecutableCodeBinder.cs");
+        var memberModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "MemberSemanticModelFactory.cs");
+
+        Assert.Contains("public virtual Binder? GetBinder", binderSource);
+        Assert.Contains("public override Binder? GetBinder", executableBinderSource);
+        Assert.Contains("public override Akbura.Language.Binder.Binder? GetBinder", memberModelSource);
+        Assert.Contains("Debug.Assert(binder is not IncrementalBinder)", memberModelSource);
+        Assert.Contains("return new IncrementalBinder(_memberModel, binder)", memberModelSource);
+    }
+
+    [Fact]
+    public void MemberSemanticModelFactory_RoutesSyntaxToSpecializedModels()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "param int UserId = 1;\n" +
+            "state int count = 0;\n" +
+            "useEffect(count) { Console.WriteLine(count); }\n" +
+            "<TextBlock Text={count.ToString()} />\n" +
+            "@akcss { .card { Width: 10; } }";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[1]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
+        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[3]);
+        var markupRoot = Assert.IsType<MarkupRootSyntax>(root.Members[4]);
+        var attribute = Assert.Single(markupRoot.Element.StartTag!.Attributes);
+        var akcssBlock = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[5]);
+        var style = Assert.IsType<AkcssStyleRuleSyntax>(akcssBlock.Members[0]);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(style.Members[0]);
+
+        Assert.IsType<ComponentMemberSemanticModel>(model.GetMemberSemanticModel(root));
+        Assert.IsType<ComponentMemberSemanticModel>(model.GetMemberSemanticModel(state));
+        Assert.IsType<ComponentMemberSemanticModel>(model.GetMemberSemanticModel(param));
+        Assert.IsType<InitializerMemberSemanticModel>(model.GetMemberSemanticModel(state.Initializer));
+        Assert.IsType<InitializerMemberSemanticModel>(model.GetMemberSemanticModel(param.DefaultValue!));
+        Assert.IsType<ExecutableMemberSemanticModel>(model.GetMemberSemanticModel(useEffect.Body));
+        Assert.IsType<MarkupMemberSemanticModel>(model.GetMemberSemanticModel(markupRoot));
+        Assert.IsType<MarkupMemberSemanticModel>(model.GetMemberSemanticModel(markupRoot.Element));
+        Assert.IsType<MarkupMemberSemanticModel>(model.GetMemberSemanticModel(attribute));
+        Assert.IsType<AkcssMemberSemanticModel>(model.GetMemberSemanticModel(akcssBlock));
+        Assert.IsType<AkcssMemberSemanticModel>(model.GetMemberSemanticModel(style));
+        Assert.IsType<AkcssMemberSemanticModel>(model.GetMemberSemanticModel(assignment));
+
+        var stateInitializerModel = model.GetMemberSemanticModel(state.Initializer);
+        var paramDefaultModel = model.GetMemberSemanticModel(param.DefaultValue!);
+        Assert.IsType<BoundStateInitializer>(stateInitializerModel.BindSemanticSyntax(state.Initializer));
+        Assert.IsType<BoundParamDefaultValue>(paramDefaultModel.BindSemanticSyntax(param.DefaultValue!));
+        Assert.Same(
+            stateInitializerModel.BindSemanticSyntax(state.Initializer),
+            stateInitializerModel.BindSemanticSyntax(state.Initializer));
     }
 
     [Fact]
@@ -1002,7 +1121,7 @@ public sealed class SemanticArchitectureTests
             "Language",
             "AkburaSemanticModel.MarkupOperations.cs");
 
-        Assert.Contains("GetOperationBinder(syntax).BindOperationSyntax(syntax)", source);
+        Assert.Contains("GetMemberSemanticModel(syntax).BindOperationSyntax(syntax)", source);
         Assert.DoesNotContain("CreateBoundMarkupAttribute", source);
         Assert.DoesNotContain("CreateBoundAkcss", source);
         Assert.DoesNotContain("BindMarkupAttributeOperation", semanticModelSource + markupSemanticModelSource);

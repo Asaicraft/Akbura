@@ -84,6 +84,12 @@ internal sealed class BindingSession
         BinderUsage usage = BinderUsage.Expression)
     {
         var next = GetBinder(syntax, usage);
+        if (IsCurrentSemanticModelSyntax(syntax) &&
+            _semanticModel.GetMemberSemanticModel(syntax) is ExecutableMemberSemanticModel executableModel)
+        {
+            next = executableModel.CreateIncrementalBinder(next);
+        }
+
         return new CSharpProbeBinder(_semanticModel, next);
     }
 
@@ -96,7 +102,9 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => GetOperationBinder(syntax).BindOperationSyntax(syntax));
+            () => IsCurrentSemanticModelSyntax(syntax)
+                ? _semanticModel.GetMemberSemanticModel(syntax).BindOperationSyntax(syntax)
+                : GetOperationBinder(syntax).BindOperationSyntax(syntax));
     }
 
     public BoundNode BindSemanticSyntax(AkburaSyntax syntax)
@@ -108,15 +116,22 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
+            () => IsCurrentSemanticModelSyntax(syntax)
+                ? _semanticModel.GetMemberSemanticModel(syntax).BindSemanticSyntax(syntax)
+                : GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
     }
 
-    private Binder GetOperationBinder(AkburaSyntax syntax)
+    private bool IsCurrentSemanticModelSyntax(AkburaSyntax syntax)
+    {
+        return ReferenceEquals(syntax.Root.Green, _semanticModel.SyntaxTree.GetRoot().Green);
+    }
+
+    internal Binder GetOperationBinder(AkburaSyntax syntax)
     {
         return GetBinder(syntax.Root, syntax.Position, GetOperationUsage(syntax.Kind));
     }
 
-    private Binder GetSemanticBinder(AkburaSyntax syntax)
+    internal Binder GetSemanticBinder(AkburaSyntax syntax)
     {
         return GetBinder(syntax.Root, syntax.Position, GetSemanticUsage(syntax.Kind));
     }
@@ -225,7 +240,7 @@ internal sealed class BindingSession
         {
             var targetSyntax = path[path.Length - 1].Syntax;
             return GetExecutableCodeBinder(executableRootPath, usage)
-                .GetBinder(targetSyntax);
+                .GetBinder(targetSyntax) ?? RootBinder;
         }
 
         return GetOrCreateBinder(path, usage);

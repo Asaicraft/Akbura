@@ -32,7 +32,7 @@ namespace Akbura.Language;
 
 internal sealed partial class AkburaSemanticModel
 {
-    private readonly Dictionary<AkburaSyntax, MemberSemanticModel> _memberSemanticModelCache = new();
+    private readonly MemberSemanticModelFactory _memberSemanticModelFactory;
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
     private readonly AkburaOperationFactory _operationFactory;
@@ -44,6 +44,7 @@ internal sealed partial class AkburaSemanticModel
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
         _bindingCache = new SemanticBindingCache();
         _bindingSession = new BindingSession(this);
+        _memberSemanticModelFactory = new MemberSemanticModelFactory(this);
         _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
         _declarationSymbols = new AkburaDeclarationSymbolTable(this);
     }
@@ -233,6 +234,11 @@ internal sealed partial class AkburaSemanticModel
         return _bindingCache.TryGetBoundNode(syntax, out boundNode!);
     }
 
+    internal bool TryGetCachedSymbolInfo(AkburaSyntax syntax, out AkburaSymbolInfo symbolInfo)
+    {
+        return _bindingCache.TryGetSymbolInfo(syntax, out symbolInfo);
+    }
+
     internal void SetCachedSymbolInfo(AkburaSyntax syntax, AkburaSymbolInfo symbolInfo)
     {
         _bindingCache.SetSymbolInfo(syntax, symbolInfo);
@@ -276,15 +282,7 @@ internal sealed partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(syntax);
 
-        var scope = GetMemberSemanticModelScope(syntax);
-        if (_memberSemanticModelCache.TryGetValue(scope, out var memberModel))
-        {
-            return memberModel;
-        }
-
-        memberModel = new ComponentMemberSemanticModel(this, scope);
-        _memberSemanticModelCache.Add(scope, memberModel);
-        return memberModel;
+        return _memberSemanticModelFactory.GetMemberSemanticModel(syntax);
     }
 
     internal BindingSession BindingSession
@@ -337,19 +335,6 @@ internal sealed partial class AkburaSemanticModel
             : GetMemberSemanticModel(syntax).GetSymbolInfo(syntax);
     }
 
-    private AkburaDocumentSyntax GetMemberSemanticModelScope(AkburaSyntax syntax)
-    {
-        for (var node = syntax; node != null; node = node.Parent)
-        {
-            if (node.Kind == AkburaSyntaxKind.AkburaDocumentSyntax)
-            {
-                return Unsafe.As<AkburaDocumentSyntax>(node);
-            }
-        }
-
-        return SyntaxTree.GetRoot();
-    }
-
     private AkburaSymbolInfo ResolveInlineAkcssModule(InlineAkcssBlockSyntax inlineAkcssBlock)
     {
         var componentInfo = GetSymbolInfo(SyntaxTree.GetRoot());
@@ -368,7 +353,7 @@ internal sealed partial class AkburaSemanticModel
         return symbolInfo;
     }
 
-    private ImmutableArray<IAkcssModuleSymbol> CreateInlineAkcssModuleSymbols(
+    internal ImmutableArray<IAkcssModuleSymbol> CreateInlineAkcssModuleSymbols(
         ReadOnlySpan<InlineAkcssBlockSyntax> inlineAkcssBlocks,
         IAkburaComponentSymbol containingComponent)
     {
@@ -2632,7 +2617,7 @@ internal sealed partial class AkburaSemanticModel
             IsAssignableTo(type, runtimeType);
     }
 
-    private static CSharp.ParameterListSyntax? GetCSharpParameterList(
+    internal static CSharp.ParameterListSyntax? GetCSharpParameterList(
         CSharpParameterListSyntax parameterListSyntax)
     {
         return parameterListSyntax.Parameters.Node is GreenSyntaxToken.CSharpRawToken rawToken
@@ -2640,7 +2625,7 @@ internal sealed partial class AkburaSemanticModel
             : null;
     }
 
-    private static CSharp.ArgumentListSyntax? GetCSharpArgumentList(
+    internal static CSharp.ArgumentListSyntax? GetCSharpArgumentList(
         CSharpArgumentListSyntax argumentListSyntax)
     {
         return argumentListSyntax.Parameters.Node is GreenSyntaxToken.CSharpRawToken rawToken
@@ -2648,7 +2633,7 @@ internal sealed partial class AkburaSemanticModel
             : null;
     }
 
-    private static bool TryGetUseEffectDependencyRootName(
+    internal static bool TryGetUseEffectDependencyRootName(
         CSharp.ExpressionSyntax expression,
         out string rootName)
     {
@@ -2688,7 +2673,7 @@ internal sealed partial class AkburaSemanticModel
         return expression;
     }
 
-    private IUserHookSymbol? ResolveUserHookInvocation(string invocationName)
+    internal IUserHookSymbol? ResolveUserHookInvocation(string invocationName)
     {
         var candidates = GetUserHookTypeNameCandidates(invocationName);
         foreach (var candidate in candidates)
@@ -2757,7 +2742,7 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
-    private static bool TryGetStateUserHookInvocation(
+    internal static bool TryGetStateUserHookInvocation(
         StateDeclarationSyntax stateDeclaration,
         out string invocationName)
     {
@@ -2899,7 +2884,7 @@ internal sealed partial class AkburaSemanticModel
         return false;
     }
 
-    private static StateBindingKind GetStateBindingKind(StateInitializerSyntax initializer)
+    internal static StateBindingKind GetStateBindingKind(StateInitializerSyntax initializer)
     {
         if (initializer.Kind != AkburaSyntaxKind.BindableStateInitializer)
         {
@@ -2916,7 +2901,7 @@ internal sealed partial class AkburaSemanticModel
         };
     }
 
-    private static ParamBindingKind GetParamBindingKind(ParamDeclarationSyntax paramDeclaration)
+    internal static ParamBindingKind GetParamBindingKind(ParamDeclarationSyntax paramDeclaration)
     {
         return paramDeclaration.BindingKeyword.Kind switch
         {
@@ -2926,7 +2911,7 @@ internal sealed partial class AkburaSemanticModel
         };
     }
 
-    private ImmutableArray<AkburaSemanticDiagnostic> CreateStateBindingDiagnostics(
+    internal ImmutableArray<AkburaSemanticDiagnostic> CreateStateBindingDiagnostics(
         StateDeclarationSyntax stateDeclaration,
         StateBindingKind bindingKind,
         CSharpSymbolDefinition stateType,
@@ -3011,7 +2996,7 @@ internal sealed partial class AkburaSemanticModel
             ImplementsINotifyPropertyChanged(binding.TypeSymbol);
     }
 
-    private static bool IsStateBindingPath(CSharp.ExpressionSyntax expression)
+    internal static bool IsStateBindingPath(CSharp.ExpressionSyntax expression)
     {
         return expression switch
         {
@@ -3739,7 +3724,7 @@ internal sealed partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
+    internal string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
     {
         var componentName = syntaxTree.ComponentName;
         if (componentName.Length == 0)
@@ -3753,7 +3738,7 @@ internal sealed partial class AkburaSemanticModel
             : namespaceText + "." + componentName;
     }
 
-    private string GetAkburaNamespaceText(AkburaDocumentSyntax root, AkburaSyntaxTree? syntaxTree = null)
+    internal string GetAkburaNamespaceText(AkburaDocumentSyntax root, AkburaSyntaxTree? syntaxTree = null)
     {
         foreach (var member in root.Members)
         {
@@ -4425,7 +4410,7 @@ internal sealed partial class AkburaSemanticModel
         return false;
     }
 
-    private MarkupContentModel CreateMarkupContentModel(
+    internal MarkupContentModel CreateMarkupContentModel(
         INamedTypeSymbol componentType,
         MarkupElementSyntax? markupElement = null)
     {
@@ -4526,7 +4511,7 @@ internal sealed partial class AkburaSemanticModel
         return false;
     }
 
-    private ImmutableArray<MarkupChildContent> CreateMarkupChildren(
+    internal ImmutableArray<MarkupChildContent> CreateMarkupChildren(
         MarkupElementSyntax markupElement,
         MarkupContentModel contentModel,
         out ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
@@ -4864,7 +4849,7 @@ internal sealed partial class AkburaSemanticModel
             right.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
 
-    private CSharpBindingResult BindCSharpType(
+    internal CSharpBindingResult BindCSharpType(
         CSharp.TypeSyntax typeSyntax,
         ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives = default)
     {
@@ -4883,7 +4868,7 @@ internal sealed partial class AkburaSemanticModel
             .BindFieldType(compilationUnit);
     }
 
-    private CSharpBindingResult BindCSharpExpression(
+    internal CSharpBindingResult BindCSharpExpression(
         CSharp.ExpressionSyntax expressionSyntax,
         StateDeclarationSyntax? scopeStateDeclaration = null,
         bool isBindingPath = true,
@@ -5402,7 +5387,7 @@ internal sealed partial class AkburaSemanticModel
         }
     }
 
-    private static void AddCSharpBindingDiagnostics(
+    internal static void AddCSharpBindingDiagnostics(
         AkburaSyntax syntax,
         string expressionText,
         CSharpBindingResult binding,

@@ -19,7 +19,7 @@ using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Language;
 
-internal sealed partial class AkburaSemanticModel
+internal partial class AkburaSemanticModel
 {
     internal IMarkupComponentSymbol? GetContainingMarkupComponentSymbol(MarkupAttributeSyntax markupAttribute)
     {

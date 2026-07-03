@@ -1,4 +1,3 @@
-using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
@@ -8,10 +7,8 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
@@ -19,174 +16,6 @@ using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Language;
-
-internal abstract class MemberSemanticModel
-{
-    private readonly ReaderWriterLockSlim _nodeMapLock = new(LockRecursionPolicy.NoRecursion);
-    private readonly Dictionary<AkburaSyntax, OneOrMany<BoundNode>> _guardedBoundNodeMap =
-        new();
-
-    protected MemberSemanticModel(
-        AkburaSemanticModel semanticModel,
-        AkburaDocumentSyntax scope,
-        AkburaSyntax? root = null)
-    {
-        SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
-        Scope = scope ?? throw new ArgumentNullException(nameof(scope));
-        Root = root ?? scope;
-    }
-
-    protected AkburaSemanticModel SemanticModel { get; }
-
-    public AkburaDocumentSyntax Scope { get; }
-
-    public AkburaSyntax Root { get; }
-
-    public Akbura.Language.Binder.Binder RootBinder => SemanticModel.GetBinder(Root);
-
-    public abstract AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax);
-
-    public abstract BoundNode BindSemanticSyntax(AkburaSyntax syntax);
-
-    public virtual BoundNode BindOperationSyntax(AkburaSyntax syntax)
-    {
-        if (TryGetBoundNodeFromMap(syntax, out var cached))
-        {
-            return cached;
-        }
-
-        var boundNode = RootBinder.BindOperationSyntax(syntax);
-        AddBoundTreeToMap(boundNode);
-        return boundNode;
-    }
-
-    public bool TryGetBoundNodeFromMap(
-        AkburaSyntax syntax,
-        out BoundNode boundNode)
-    {
-        if (syntax == null)
-        {
-            throw new ArgumentNullException(nameof(syntax));
-        }
-
-        if (TryGetBoundNodeFromGuardedMap(syntax, out boundNode!))
-        {
-            return true;
-        }
-
-        if (SemanticModel.TryGetCachedBoundNode(syntax, out boundNode!))
-        {
-            AddBoundTreeToMap(boundNode);
-            return true;
-        }
-
-        boundNode = null!;
-        return false;
-    }
-
-    public void AddBoundTreeToMap(BoundNode boundNode)
-    {
-        if (boundNode == null)
-        {
-            throw new ArgumentNullException(nameof(boundNode));
-        }
-
-        var builder = new BoundNodeMapBuilder(this);
-        _nodeMapLock.EnterWriteLock();
-        try
-        {
-            builder.Visit(boundNode);
-        }
-        finally
-        {
-            _nodeMapLock.ExitWriteLock();
-        }
-    }
-
-    protected TBoundNode CacheBoundNode<TBoundNode>(
-        AkburaSyntax syntax,
-        TBoundNode boundNode)
-        where TBoundNode : BoundNode
-    {
-        AddBoundNodeToMap(syntax, boundNode);
-        SemanticModel.SetCachedBoundNode(syntax, boundNode);
-        return boundNode;
-    }
-
-    private void AddBoundNodeToMap(
-        AkburaSyntax syntax,
-        BoundNode boundNode)
-    {
-        _nodeMapLock.EnterWriteLock();
-        try
-        {
-            GuardedAddBoundNodeToMap(syntax, boundNode);
-        }
-        finally
-        {
-            _nodeMapLock.ExitWriteLock();
-        }
-    }
-
-    private bool TryGetBoundNodeFromGuardedMap(
-        AkburaSyntax syntax,
-        out BoundNode boundNode)
-    {
-        _nodeMapLock.EnterReadLock();
-        try
-        {
-            if (_guardedBoundNodeMap.TryGetValue(syntax, out var nodes) &&
-                !nodes.IsEmpty)
-            {
-                boundNode = nodes[0];
-                return true;
-            }
-        }
-        finally
-        {
-            _nodeMapLock.ExitReadLock();
-        }
-
-        boundNode = null!;
-        return false;
-    }
-
-    private void GuardedAddBoundNodeToMap(
-        AkburaSyntax syntax,
-        BoundNode boundNode)
-    {
-        if (!ReferenceEquals(syntax.Root.Green, Root.Root.Green))
-        {
-            return;
-        }
-
-        if (_guardedBoundNodeMap.TryGetValue(syntax, out var nodes))
-        {
-            _guardedBoundNodeMap[syntax] = nodes.Add(boundNode);
-            return;
-        }
-
-        _guardedBoundNodeMap.Add(syntax, OneOrMany.Create(boundNode));
-    }
-
-    private sealed class BoundNodeMapBuilder : BoundTreeWalker
-    {
-        private readonly MemberSemanticModel _memberModel;
-
-        public BoundNodeMapBuilder(MemberSemanticModel memberModel)
-        {
-            _memberModel = memberModel;
-        }
-
-        public override void DefaultVisit(BoundNode node)
-        {
-            _memberModel.GuardedAddBoundNodeToMap(node.Syntax, node);
-            _memberModel.SemanticModel.SetCachedBoundNode(node.Syntax, node);
-            base.DefaultVisit(node);
-        }
-    }
-
-}
 
 internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 {
@@ -199,7 +28,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
         public override AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax)
         {
-            if (SemanticModel.TryGetCachedSymbolInfo(syntax, out var cached))
+            if (TryGetCachedSymbolInfo(syntax, out var cached))
             {
                 return cached;
             }
@@ -215,19 +44,19 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
             };
 
-            SemanticModel.SetCachedSymbolInfo(syntax, symbolInfo);
+            SetCachedSymbolInfo(syntax, symbolInfo);
             return symbolInfo;
         }
 
         public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
         {
-            if (SemanticModel.TryGetCachedBoundNode(syntax, out var cached))
+            if (TryGetCachedBoundNode(syntax, out var cached))
             {
                 return cached;
             }
 
             var symbolInfo = GetSymbolInfo(syntax);
-            if (SemanticModel.TryGetCachedBoundNode(syntax, out cached))
+            if (TryGetCachedBoundNode(syntax, out cached))
             {
                 return cached;
             }
@@ -237,9 +66,9 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 AkburaSyntaxKind.AkburaDocumentSyntax =>
                     CacheBoundNode(Unsafe.As<AkburaDocumentSyntax>(syntax), new BoundComponentDeclaration(
                         Unsafe.As<AkburaDocumentSyntax>(syntax),
-                        SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                        GetBinder(syntax, BinderUsage.Expression),
                         symbolInfo,
-                        SemanticModel.GetCachedSemanticDiagnostics(syntax),
+                        GetCachedSemanticDiagnostics(syntax),
                         CreateBoundChildrenForComponent(Unsafe.As<AkburaDocumentSyntax>(syntax)))),
                 AkburaSyntaxKind.StateDeclarationSyntax =>
                     CreateAndCacheBoundStateDeclaration(Unsafe.As<StateDeclarationSyntax>(syntax), symbolInfo),
@@ -248,36 +77,36 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 AkburaSyntaxKind.InjectDeclarationSyntax =>
                     CacheBoundNode(Unsafe.As<InjectDeclarationSyntax>(syntax), new BoundInjectDeclaration(
                         Unsafe.As<InjectDeclarationSyntax>(syntax),
-                        SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                        GetBinder(syntax, BinderUsage.Expression),
                         symbolInfo,
-                        SemanticModel.GetCachedSemanticDiagnostics(syntax))),
+                        GetCachedSemanticDiagnostics(syntax))),
                 AkburaSyntaxKind.CommandDeclarationSyntax =>
                     CacheBoundNode(Unsafe.As<CommandDeclarationSyntax>(syntax), new BoundCommandDeclaration(
                         Unsafe.As<CommandDeclarationSyntax>(syntax),
-                        SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                        GetBinder(syntax, BinderUsage.Expression),
                         symbolInfo,
-                        SemanticModel.GetCachedSemanticDiagnostics(syntax))),
+                        GetCachedSemanticDiagnostics(syntax))),
                 AkburaSyntaxKind.UseEffectDeclarationSyntax =>
                     CreateAndCacheBoundUseEffectDeclaration(Unsafe.As<UseEffectDeclarationSyntax>(syntax), symbolInfo),
                 _ => new BoundDeclaration(
                     syntax,
-                    SemanticModel.GetBinder(syntax, BinderUsage.Expression),
+                    GetBinder(syntax, BinderUsage.Expression),
                     AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax)),
             };
         }
 
         private AkburaSymbolInfo ResolveAkburaComponent(AkburaDocumentSyntax document)
         {
-            var componentName = SemanticModel.SyntaxTree.ComponentName;
+            var componentName = SyntaxTree.ComponentName;
             if (string.IsNullOrWhiteSpace(componentName))
             {
                 return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
             }
 
-            var namespaceName = SemanticModel.GetAkburaNamespaceText(document, SemanticModel.SyntaxTree);
-            var partialTypes = ResolveAkburaComponentPartialTypes(SemanticModel.SyntaxTree);
+            var namespaceName = GetAkburaNamespaceText(document, SyntaxTree);
+            var partialTypes = ResolveAkburaComponentPartialTypes(SyntaxTree);
             var contentModel = partialTypes.Length > 0
-                ? SemanticModel.CreateMarkupContentModel(partialTypes[0])
+                ? CreateMarkupContentModel(partialTypes[0])
                 : default;
 
             using var markupRootsBuilder = ImmutableArrayBuilder<MarkupRootSyntax>.Rent();
@@ -305,19 +134,19 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             }
 
             var children = markupRootsBuilder.Count == 1
-                ? SemanticModel.CreateMarkupChildren(markupRootsBuilder.WrittenSpan[0].Element, contentModel, out _)
+                ? CreateMarkupChildren(markupRootsBuilder.WrittenSpan[0].Element, contentModel, out _)
                 : ImmutableArray<MarkupChildContent>.Empty;
 
             foreach (var markupRoot in markupRootsBuilder.WrittenSpan)
             {
-                if (SemanticModel.GetSymbolInfo(markupRoot.Element).Symbol is IMarkupComponentSymbol markupComponentSymbol)
+                if (GetSyntaxTreeSymbolInfo(markupRoot.Element).Symbol is IMarkupComponentSymbol markupComponentSymbol)
                 {
                     markupRootSymbolsBuilder.Add(markupComponentSymbol);
                 }
             }
 
             var componentSymbol = new AkburaComponentSymbol(
-                SemanticModel.SyntaxTree,
+                SyntaxTree,
                 document,
                 componentName,
                 namespaceName,
@@ -333,20 +162,20 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 userHooksBuilder.ToImmutable(),
                 akcssModules: ImmutableArray<IAkcssModuleSymbol>.Empty);
             var symbolInfo = AkburaSymbolInfo.Success(componentSymbol);
-            SemanticModel.SetCachedSymbolInfo(document, symbolInfo);
+            SetCachedSymbolInfo(document, symbolInfo);
 
-            componentSymbol.SetAkcssModules(SemanticModel.CreateInlineAkcssModuleSymbols(
+            componentSymbol.SetAkcssModules(CreateInlineAkcssModuleSymbols(
                 inlineAkcssBuilder.WrittenSpan,
                 componentSymbol));
 
-            SemanticModel.SetSemanticDiagnostics(
+            SetSemanticDiagnostics(
                 document,
                 CreateUserHookDuplicateComponentMemberDiagnostics(document));
-            SemanticModel.SetCachedBoundNode(document, new BoundComponentDeclaration(
+            SetCachedBoundNode(document, new BoundComponentDeclaration(
                 document,
-                SemanticModel.GetBinder(document, BinderUsage.Expression),
+                GetBinder(document, BinderUsage.Expression),
                 symbolInfo,
-                SemanticModel.GetCachedSemanticDiagnostics(document),
+                GetCachedSemanticDiagnostics(document),
                 CreateBoundChildrenForComponent(document)));
 
             return symbolInfo;
@@ -372,7 +201,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
                 case AkburaSyntaxKind.StateDeclarationSyntax:
                     var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
-                    if (SemanticModel.GetSymbolInfo(stateDeclaration).Symbol is IStateSymbol stateSymbol)
+                    if (GetSymbolInfo(stateDeclaration).Symbol is IStateSymbol stateSymbol)
                     {
                         statesBuilder.Add(stateSymbol);
                     }
@@ -381,7 +210,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
                 case AkburaSyntaxKind.ParamDeclarationSyntax:
                     var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
-                    if (SemanticModel.GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
+                    if (GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
                     {
                         parametersBuilder.Add(paramSymbol);
                     }
@@ -390,7 +219,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
                 case AkburaSyntaxKind.InjectDeclarationSyntax:
                     var injectDeclaration = Unsafe.As<InjectDeclarationSyntax>(member);
-                    if (SemanticModel.GetSymbolInfo(injectDeclaration).Symbol is IInjectSymbol injectSymbol)
+                    if (GetSymbolInfo(injectDeclaration).Symbol is IInjectSymbol injectSymbol)
                     {
                         injectedServicesBuilder.Add(injectSymbol);
                     }
@@ -399,7 +228,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
                 case AkburaSyntaxKind.CommandDeclarationSyntax:
                     var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
-                    if (SemanticModel.GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
+                    if (GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
                     {
                         commandsBuilder.Add(commandSymbol);
                     }
@@ -408,7 +237,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
                 case AkburaSyntaxKind.UseEffectDeclarationSyntax:
                     var useEffectDeclaration = Unsafe.As<UseEffectDeclarationSyntax>(member);
-                    if (SemanticModel.GetSymbolInfo(useEffectDeclaration).Symbol is IUseEffectSymbol useEffectSymbol)
+                    if (GetSymbolInfo(useEffectDeclaration).Symbol is IUseEffectSymbol useEffectSymbol)
                     {
                         useEffectsBuilder.Add(useEffectSymbol);
                     }
@@ -485,13 +314,13 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
         private ImmutableArray<INamedTypeSymbol> ResolveAkburaComponentPartialTypes(AkburaSyntaxTree syntaxTree)
         {
-            var metadataName = SemanticModel.GetAkburaComponentMetadataName(syntaxTree);
+            var metadataName = GetAkburaComponentMetadataName(syntaxTree);
             if (metadataName.Length == 0)
             {
                 return ImmutableArray<INamedTypeSymbol>.Empty;
             }
 
-            var type = SemanticModel.Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
+            var type = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
             return type == null
                 ? ImmutableArray<INamedTypeSymbol>.Empty
                 : ImmutableArray.Create(type);
@@ -523,7 +352,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 ? explicitType
                 : initializerType;
             var diagnosticsBag = new BindingDiagnosticBag();
-            diagnosticsBag.AddRange(SemanticModel.CreateStateBindingDiagnostics(
+            diagnosticsBag.AddRange(CreateStateBindingDiagnostics(
                     stateDeclaration,
                     bindingKind,
                     type,
@@ -542,7 +371,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
                 diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
-            var diagnostics = SemanticModel.SetSemanticDiagnostics(stateDeclaration, diagnosticsBag);
+            var diagnostics = SetSemanticDiagnostics(stateDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new StateSymbol(
                 stateDeclaration,
@@ -600,7 +429,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
 
-            var diagnostics = SemanticModel.SetSemanticDiagnostics(paramDeclaration, diagnosticsBag);
+            var diagnostics = SetSemanticDiagnostics(paramDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new ParamSymbol(
                 paramDeclaration,
@@ -632,12 +461,12 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 AddDuplicateComponentMemberDiagnostics(injectDeclaration, name, diagnosticsBuilder);
                 diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
-            var diagnostics = SemanticModel.SetSemanticDiagnostics(injectDeclaration, diagnosticsBag);
+            var diagnostics = SetSemanticDiagnostics(injectDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new InjectSymbol(injectDeclaration, type));
-            SemanticModel.SetCachedBoundNode(injectDeclaration, new BoundInjectDeclaration(
+            SetCachedBoundNode(injectDeclaration, new BoundInjectDeclaration(
                 injectDeclaration,
-                SemanticModel.GetBinder(injectDeclaration, BinderUsage.Expression),
+                GetBinder(injectDeclaration, BinderUsage.Expression),
                 symbolInfo,
                 diagnostics));
             return symbolInfo;
@@ -665,7 +494,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 AddDuplicateCommandParameterDiagnostics(commandDeclaration, diagnosticsBuilder);
                 diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
-            var diagnostics = SemanticModel.SetSemanticDiagnostics(commandDeclaration, diagnosticsBag);
+            var diagnostics = SetSemanticDiagnostics(commandDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new CommandSymbol(
                 commandDeclaration,
@@ -675,9 +504,9 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 isVoid,
                 isAsyncLike,
                 hasResult));
-            SemanticModel.SetCachedBoundNode(commandDeclaration, new BoundCommandDeclaration(
+            SetCachedBoundNode(commandDeclaration, new BoundCommandDeclaration(
                 commandDeclaration,
-                SemanticModel.GetBinder(commandDeclaration, BinderUsage.Expression),
+                GetBinder(commandDeclaration, BinderUsage.Expression),
                 symbolInfo,
                 diagnostics));
             return symbolInfo;
@@ -697,7 +526,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     case AkburaSyntaxKind.UseEffectDeclarationSyntax:
                     case AkburaSyntaxKind.MarkupRootSyntax:
                     case AkburaSyntaxKind.InlineAkcssBlockSyntax:
-                        builder.Add(SemanticModel.BindingSession.BindSemanticSyntax(member));
+                        builder.Add(BindingSession.BindSemanticSyntax(member));
                         break;
                 }
             }
@@ -722,7 +551,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 initializerBinding,
                 bindingKind,
                 userHook,
-                SemanticModel.GetCachedSemanticDiagnostics(stateDeclaration));
+                GetCachedSemanticDiagnostics(stateDeclaration));
         }
 
         private BoundNode CacheBoundStateDeclaration(
@@ -733,7 +562,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             IUserHookSymbol? userHook,
             ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
         {
-            var binder = SemanticModel.GetBinder(stateDeclaration, BinderUsage.Expression);
+            var binder = GetBinder(stateDeclaration, BinderUsage.Expression);
             var initializer = new BoundStateInitializer(
                 stateDeclaration.Initializer,
                 binder,
@@ -741,7 +570,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 bindingKind,
                 userHook,
                 diagnostics);
-            SemanticModel.SetCachedBoundNode(stateDeclaration.Initializer, initializer);
+            SetCachedBoundNode(stateDeclaration.Initializer, initializer);
 
             var declaration = new BoundStateDeclaration(
                 stateDeclaration,
@@ -749,7 +578,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 symbolInfo,
                 diagnostics,
                 ImmutableArray.Create<BoundNode>(initializer));
-            SemanticModel.SetCachedBoundNode(stateDeclaration, declaration);
+            SetCachedBoundNode(stateDeclaration, declaration);
             return declaration;
         }
 
@@ -765,7 +594,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 paramDeclaration,
                 symbolInfo,
                 defaultValueBinding,
-                SemanticModel.GetCachedSemanticDiagnostics(paramDeclaration));
+                GetCachedSemanticDiagnostics(paramDeclaration));
         }
 
         private BoundNode CacheBoundParamDeclaration(
@@ -774,7 +603,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             CSharpBindingResult defaultValueBinding,
             ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
         {
-            var binder = SemanticModel.GetBinder(paramDeclaration, BinderUsage.Expression);
+            var binder = GetBinder(paramDeclaration, BinderUsage.Expression);
             ImmutableArray<BoundNode> children;
             if (paramDeclaration.DefaultValue == null)
             {
@@ -787,7 +616,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     binder,
                     defaultValueBinding,
                     diagnostics);
-                SemanticModel.SetCachedBoundNode(paramDeclaration.DefaultValue, defaultValue);
+                SetCachedBoundNode(paramDeclaration.DefaultValue, defaultValue);
                 children = ImmutableArray.Create<BoundNode>(defaultValue);
             }
 
@@ -797,7 +626,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 symbolInfo,
                 diagnostics,
                 children);
-            SemanticModel.SetCachedBoundNode(paramDeclaration, declaration);
+            SetCachedBoundNode(paramDeclaration, declaration);
             return declaration;
         }
 
@@ -815,7 +644,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 useEffectDeclaration,
                 symbolInfo,
                 dependencyNodes,
-                SemanticModel.GetCachedSemanticDiagnostics(useEffectDeclaration));
+                GetCachedSemanticDiagnostics(useEffectDeclaration));
         }
 
         private BoundNode CacheBoundUseEffectDeclaration(
@@ -824,7 +653,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             ImmutableArray<BoundNode> dependencyNodes,
             ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
         {
-            var binder = SemanticModel.GetBinder(useEffectDeclaration, BinderUsage.Expression);
+            var binder = GetBinder(useEffectDeclaration, BinderUsage.Expression);
             using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
             childrenBuilder.AddRange(dependencyNodes);
             childrenBuilder.Add(CreateBoundUseEffectBody(useEffectDeclaration.Body));
@@ -839,19 +668,19 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 symbolInfo,
                 diagnostics,
                 childrenBuilder.ToImmutable());
-            SemanticModel.SetCachedBoundNode(useEffectDeclaration, declaration);
+            SetCachedBoundNode(useEffectDeclaration, declaration);
             return declaration;
         }
 
         private BoundUseEffectBody CreateBoundUseEffectBody(CSharpBlockSyntax body)
         {
-            var binder = SemanticModel.GetBinder(body, BinderUsage.Expression);
+            var binder = GetBinder(body, BinderUsage.Expression);
             using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
             foreach (var token in body.Tokens)
             {
                 if (token.Kind == AkburaSyntaxKind.MarkupRootSyntax)
                 {
-                    childrenBuilder.Add(SemanticModel.BindingSession.BindSemanticSyntax(token));
+                    childrenBuilder.Add(BindingSession.BindSemanticSyntax(token));
                 }
             }
 
@@ -859,7 +688,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 body,
                 binder,
                 children: childrenBuilder.ToImmutable());
-            SemanticModel.SetCachedBoundNode(body, boundBody);
+            SetCachedBoundNode(body, boundBody);
             return boundBody;
         }
 
@@ -868,7 +697,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             var placeholderInfo = AkburaSymbolInfo.Success(new UseEffectSymbol(
                 useEffectDeclaration,
                 ImmutableArray<UseEffectDependency>.Empty));
-            SemanticModel.SetCachedSymbolInfo(useEffectDeclaration, placeholderInfo);
+            SetCachedSymbolInfo(useEffectDeclaration, placeholderInfo);
 
             var diagnosticsBag = new BindingDiagnosticBag();
             var dependencies = CreateUseEffectDependencies(
@@ -876,7 +705,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 diagnosticsBag,
                 out var dependencyNodes);
 
-            var diagnostics = SemanticModel.SetSemanticDiagnostics(useEffectDeclaration, diagnosticsBag);
+            var diagnostics = SetSemanticDiagnostics(useEffectDeclaration, diagnosticsBag);
 
             var symbolInfo = AkburaSymbolInfo.Success(new UseEffectSymbol(
                 useEffectDeclaration,
@@ -907,7 +736,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return default;
             }
 
-            var binding = SemanticModel.BindCSharpType(csharpType);
+            var binding = BindCSharpType(csharpType);
             var typeSymbol = binding.TypeSymbol;
             return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
         }
@@ -930,7 +759,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return default;
             }
 
-            var binding = SemanticModel.BindCSharpType(csharpType);
+            var binding = BindCSharpType(csharpType);
             var typeSymbol = binding.TypeSymbol;
             return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
         }
@@ -947,7 +776,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return default;
             }
 
-            var binding = SemanticModel.BindCSharpType(csharpType);
+            var binding = BindCSharpType(csharpType);
             var typeSymbol = binding.TypeSymbol;
             return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
         }
@@ -964,7 +793,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return default;
             }
 
-            var binding = SemanticModel.BindCSharpType(csharpType);
+            var binding = BindCSharpType(csharpType);
             var typeSymbol = binding.TypeSymbol;
             return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
         }
@@ -1003,7 +832,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
         private CSharpSymbolDefinition ResolveCSharpParameterType(CSharp.TypeSyntax typeSyntax)
         {
-            var binding = SemanticModel.BindCSharpType(typeSyntax);
+            var binding = BindCSharpType(typeSyntax);
             return binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol);
         }
 
@@ -1036,7 +865,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return CSharpBindingResult.Empty;
             }
 
-            return SemanticModel.BindCSharpExpression(
+            return BindCSharpExpression(
                 csharpExpression,
                 targetType: targetType);
         }
@@ -1051,7 +880,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return CSharpBindingResult.Empty;
             }
 
-            return SemanticModel.BindCSharpExpression(
+            return BindCSharpExpression(
                 csharpExpression,
                 stateDeclaration,
                 isBindingPath: AkburaSemanticModel.IsStateBindingPath(csharpExpression),
@@ -1065,7 +894,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return null;
             }
 
-            return SemanticModel.ResolveUserHookInvocation(invocationName);
+            return ResolveUserHookInvocation(invocationName);
         }
 
         private ImmutableArray<UseEffectDependency> CreateUseEffectDependencies(
@@ -1082,7 +911,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
             using var builder = ImmutableArrayBuilder<UseEffectDependency>.Rent(argumentList.Arguments.Count);
             using var boundBuilder = ImmutableArrayBuilder<BoundNode>.Rent(argumentList.Arguments.Count);
-            var binder = SemanticModel.GetBinder(useEffectDeclaration.Arguments, BinderUsage.Expression);
+            var binder = GetBinder(useEffectDeclaration.Arguments, BinderUsage.Expression);
             foreach (var argument in argumentList.Arguments)
             {
                 var expression = argument.Expression;
@@ -1092,7 +921,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     continue;
                 }
 
-                var binding = SemanticModel.BindMarkupAttributeExpression(
+                var binding = BindMarkupAttributeExpression(
                     useEffectDeclaration,
                     expression);
                 using (var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent())
@@ -1141,7 +970,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                         var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
                         if (stateDeclaration.Name.Identifier.ValueText == name)
                         {
-                            return SemanticModel.GetSymbolInfo(stateDeclaration).Symbol;
+                            return GetSymbolInfo(stateDeclaration).Symbol;
                         }
 
                         break;
@@ -1150,7 +979,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                         var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
                         if (paramDeclaration.Name.Identifier.ValueText == name)
                         {
-                            return SemanticModel.GetSymbolInfo(paramDeclaration).Symbol;
+                            return GetSymbolInfo(paramDeclaration).Symbol;
                         }
 
                         break;
@@ -1159,7 +988,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                         var injectDeclaration = Unsafe.As<InjectDeclarationSyntax>(member);
                         if (injectDeclaration.Name.Identifier.ValueText == name)
                         {
-                            return SemanticModel.GetSymbolInfo(injectDeclaration).Symbol;
+                            return GetSymbolInfo(injectDeclaration).Symbol;
                         }
 
                         break;
@@ -1168,7 +997,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                         var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
                         if (commandDeclaration.Name.Identifier.ValueText == name)
                         {
-                            return SemanticModel.GetSymbolInfo(commandDeclaration).Symbol;
+                            return GetSymbolInfo(commandDeclaration).Symbol;
                         }
 
                         break;

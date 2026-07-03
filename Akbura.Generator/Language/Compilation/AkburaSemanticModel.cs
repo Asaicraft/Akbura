@@ -30,7 +30,7 @@ using System.Diagnostics;
 
 namespace Akbura.Language;
 
-internal sealed partial class AkburaSemanticModel
+internal partial class AkburaSemanticModel
 {
     private readonly MemberSemanticModelFactory _memberSemanticModelFactory;
     private readonly SemanticBindingCache _bindingCache;
@@ -49,11 +49,37 @@ internal sealed partial class AkburaSemanticModel
         _declarationSymbols = new AkburaDeclarationSymbolTable(this);
     }
 
+    protected AkburaSemanticModel(AkburaSemanticModel semanticModel)
+    {
+        if (semanticModel == null)
+        {
+            throw new ArgumentNullException(nameof(semanticModel));
+        }
+
+        Compilation = semanticModel.Compilation;
+        SyntaxTree = semanticModel.SyntaxTree;
+        _bindingCache = semanticModel._bindingCache;
+        _bindingSession = semanticModel._bindingSession;
+        _memberSemanticModelFactory = semanticModel._memberSemanticModelFactory;
+        _operationFactory = semanticModel._operationFactory;
+        _declarationSymbols = semanticModel._declarationSymbols;
+    }
+
     public AkburaCompilation Compilation { get; }
 
     public AkburaSyntaxTree SyntaxTree { get; }
 
-    public AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax)
+    public virtual AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax)
+    {
+        return GetSymbolInfoCore(syntax);
+    }
+
+    protected AkburaSymbolInfo GetSyntaxTreeSymbolInfo(AkburaSyntax syntax)
+    {
+        return GetSymbolInfoCore(syntax);
+    }
+
+    private AkburaSymbolInfo GetSymbolInfoCore(AkburaSyntax syntax)
     {
         if (syntax == null)
         {
@@ -3536,7 +3562,6 @@ internal sealed partial class AkburaSemanticModel
         }
 
         SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-
         var candidates = CreateMarkupComponentCandidates(componentNameText, binding.CandidateSymbols);
         if (candidates.Length > 0)
         {
@@ -4600,7 +4625,7 @@ internal sealed partial class AkburaSemanticModel
         ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
-        var symbolInfo = GetSymbolInfo(elementContent.Element);
+        var symbolInfo = GetSyntaxTreeSymbolInfo(elementContent.Element);
         var componentSymbol = symbolInfo.Symbol as IMarkupComponentSymbol;
         var childType = componentSymbol?.CSharpDefinition ?? default;
 

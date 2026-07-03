@@ -675,6 +675,7 @@ public sealed class SemanticArchitectureTests
             BindingFlags.NonPublic);
 
         Assert.DoesNotContain(nestedTypes, type => type.Name.Contains("MemberSemanticModel", StringComparison.Ordinal));
+        Assert.True(typeof(AkburaSemanticModel).IsAssignableFrom(typeof(MemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(ComponentMemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(InitializerMemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(ExecutableMemberSemanticModel)));
@@ -690,10 +691,98 @@ public sealed class SemanticArchitectureTests
         var semanticModelSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
+            "Compilation",
             "AkburaSemanticModel.cs");
 
         Assert.Contains(nameof(MemberSemanticModelFactory), semanticModelSource);
         Assert.DoesNotContain("new ComponentMemberSemanticModel", semanticModelSource);
+    }
+
+    [Fact]
+    public void CompilationFacade_FilesLiveInCompilationFolder()
+    {
+        var compilationSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkburaCompilation.cs");
+        var semanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkburaSemanticModel.cs");
+        var csharpReferencesSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkburaSemanticModel.CSharpReferences.cs");
+        var markupOperationsSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkburaSemanticModel.MarkupOperations.cs");
+
+        Assert.Contains("internal sealed class AkburaCompilation", compilationSource);
+        Assert.Contains("internal partial class AkburaSemanticModel", semanticModelSource);
+        Assert.Contains("partial class AkburaSemanticModel", csharpReferencesSource);
+        Assert.Contains("partial class AkburaSemanticModel", markupOperationsSource);
+    }
+
+    [Fact]
+    public void MemberSemanticModel_ClassesLiveInCompilationFolder()
+    {
+        var baseModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "MemberSemanticModel.cs");
+        var componentModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "ComponentMemberSemanticModel.cs");
+        var factorySource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "MemberSemanticModelFactory.cs");
+        var binderBackedSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "BinderBackedMemberSemanticModel.cs");
+        var initializerSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "InitializerMemberSemanticModel.cs");
+        var markupSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "MarkupMemberSemanticModel.cs");
+        var akcssSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkcssMemberSemanticModel.cs");
+        var executableSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "ExecutableMemberSemanticModel.cs");
+
+        Assert.Contains("internal abstract class MemberSemanticModel : AkburaSemanticModel", baseModelSource);
+        Assert.DoesNotContain("ComponentMemberSemanticModel", baseModelSource);
+        Assert.Contains("internal sealed class ComponentMemberSemanticModel", componentModelSource);
+        Assert.DoesNotContain("internal abstract class MemberSemanticModel", componentModelSource);
+        Assert.Contains("internal sealed class MemberSemanticModelFactory", factorySource);
+        Assert.DoesNotContain("internal abstract class BinderBackedMemberSemanticModel", factorySource);
+        Assert.Contains("internal abstract class BinderBackedMemberSemanticModel", binderBackedSource);
+        Assert.Contains("internal sealed class InitializerMemberSemanticModel", initializerSource);
+        Assert.Contains("internal sealed class MarkupMemberSemanticModel", markupSource);
+        Assert.Contains("internal sealed class AkcssMemberSemanticModel", akcssSource);
+        Assert.Contains("internal sealed class ExecutableMemberSemanticModel", executableSource);
     }
 
     [Fact]
@@ -702,7 +791,8 @@ public sealed class SemanticArchitectureTests
         var source = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
-            "AkburaSemanticModel.MemberSemanticModel.cs");
+            "Compilation",
+            "MemberSemanticModel.cs");
 
         Assert.Contains("ReaderWriterLockSlim", source);
         Assert.Contains("LockRecursionPolicy.NoRecursion", source);
@@ -730,16 +820,17 @@ public sealed class SemanticArchitectureTests
             "Language",
             "Binder",
             "ExecutableCodeBinder.cs");
-        var memberModelSource = ReadRepositoryFile(
+        var executableMemberModelSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
-            "MemberSemanticModelFactory.cs");
+            "Compilation",
+            "ExecutableMemberSemanticModel.cs");
 
         Assert.Contains("public virtual Binder? GetBinder", binderSource);
         Assert.Contains("public override Binder? GetBinder", executableBinderSource);
-        Assert.Contains("public override Akbura.Language.Binder.Binder? GetBinder", memberModelSource);
-        Assert.Contains("Debug.Assert(binder is not IncrementalBinder)", memberModelSource);
-        Assert.Contains("return new IncrementalBinder(_memberModel, binder)", memberModelSource);
+        Assert.Contains("public override Akbura.Language.Binder.Binder? GetBinder", executableMemberModelSource);
+        Assert.Contains("Debug.Assert(binder is not IncrementalBinder)", executableMemberModelSource);
+        Assert.Contains("return new IncrementalBinder(_memberModel, binder)", executableMemberModelSource);
     }
 
     [Fact]
@@ -1115,10 +1206,12 @@ public sealed class SemanticArchitectureTests
         var semanticModelSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
+            "Compilation",
             "AkburaSemanticModel.cs");
         var markupSemanticModelSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
+            "Compilation",
             "AkburaSemanticModel.MarkupOperations.cs");
 
         Assert.Contains("GetMemberSemanticModel(syntax).BindOperationSyntax(syntax)", source);
@@ -1136,10 +1229,12 @@ public sealed class SemanticArchitectureTests
         var semanticModelSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
+            "Compilation",
             "AkburaSemanticModel.cs");
         var markupSemanticModelSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
+            "Compilation",
             "AkburaSemanticModel.MarkupOperations.cs");
         var markupBinderSource = ReadRepositoryFile(
             "Akbura.Generator",

@@ -17,7 +17,7 @@ using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language;
 
-internal sealed partial class AkburaSemanticModel
+internal partial class AkburaSemanticModel
 {
     private const string CSharpReferenceProbeMethodName = "__AkburaSemanticProbe";
     private const string MarkupInlineReferenceProbeMethodName = "__AkburaMarkupInlineReferenceProbe";

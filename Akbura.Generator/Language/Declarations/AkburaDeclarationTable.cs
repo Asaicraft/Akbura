@@ -78,8 +78,7 @@ internal sealed class AkburaDeclarationTable
             while (stack.Count > 0)
             {
                 var current = stack.Pop();
-                if (ReferenceEquals(current.Syntax, syntax) ||
-                    ReferenceEquals(current.Syntax.Green, syntax.Green))
+                if (SemanticSyntaxIdentity.Equals(current.Syntax, syntax))
                 {
                     declaration = current;
                     return true;
@@ -114,8 +113,7 @@ internal sealed class AkburaDeclarationTable
 
         foreach (var candidate in previous.Components)
         {
-            if (candidate.SyntaxTree?.FilePath == tree.FilePath &&
-                ReferenceEquals(candidate.Syntax.Green, tree.GreenRoot))
+            if (ReferenceEquals(candidate.SyntaxTree, tree))
             {
                 declaration = candidate;
                 return true;
@@ -138,9 +136,7 @@ internal sealed class AkburaDeclarationTable
 
         foreach (var candidate in previous.AkcssModules)
         {
-            if (candidate.AkcssSyntaxTree?.FilePath == tree.FilePath &&
-                candidate.AkcssSyntaxTree?.LogicalName == tree.LogicalName &&
-                ReferenceEquals(candidate.Syntax.Green, tree.GreenRoot))
+            if (ReferenceEquals(candidate.AkcssSyntaxTree, tree))
             {
                 declaration = candidate;
                 return true;

@@ -808,6 +808,41 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
+    public void SemanticInfrastructure_DoesNotDependOnGreenNodes()
+    {
+        var paths = new List<string>
+        {
+            GetRepositoryPath("Akbura.Generator", "Language", "SemanticSyntaxIdentity.cs"),
+        };
+        foreach (var folder in new[]
+        {
+            GetRepositoryPath("Akbura.Generator", "Language", "Compilation"),
+            GetRepositoryPath("Akbura.Generator", "Language", "Binder"),
+            GetRepositoryPath("Akbura.Generator", "Language", "Declarations"),
+            GetRepositoryPath("Akbura.Generator", "Language", "Symbols"),
+        })
+        {
+            paths.AddRange(Directory.EnumerateFiles(folder, "*.cs", SearchOption.AllDirectories));
+        }
+
+        foreach (var path in paths)
+        {
+            var source = File.ReadAllText(path);
+            Assert.DoesNotContain("using Akbura.Language.Syntax.Green", source);
+            Assert.DoesNotContain("GreenNode", source);
+            Assert.DoesNotContain("GreenRoot", source);
+            Assert.DoesNotContain(".Green", source);
+        }
+
+        var identitySource = File.ReadAllText(paths[0]);
+        Assert.Contains("return ReferenceEquals(left, right);", identitySource);
+        Assert.Contains("RuntimeHelpers.GetHashCode(syntax)", identitySource);
+        Assert.DoesNotContain("Position", identitySource);
+        Assert.DoesNotContain("FullWidth", identitySource);
+        Assert.DoesNotContain("RawKind", identitySource);
+    }
+
+    [Fact]
     public void IncrementalBinder_RewrapsNestedBinders()
     {
         var binderSource = ReadRepositoryFile(
@@ -2736,7 +2771,7 @@ public sealed class SemanticArchitectureTests
         var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
         var statementDeclaration = Assert.Single(
             rootDeclaration.Children,
-            declaration => ReferenceEquals(declaration.Syntax.Green, ifStatement.Green));
+            declaration => SemanticSyntaxIdentity.Equals(declaration.Syntax, ifStatement));
         var executableRootPath = ImmutableArray.Create(rootDeclaration, statementDeclaration);
         var next = model.GetBinder(root);
         var executableBinder = new ExecutableCodeBinder(
@@ -3765,6 +3800,11 @@ public sealed class SemanticArchitectureTests
 
     private static string ReadRepositoryFile(params string[] pathParts)
     {
+        return File.ReadAllText(GetRepositoryPath(pathParts));
+    }
+
+    private static string GetRepositoryPath(params string[] pathParts)
+    {
         var parts = new string[pathParts.Length + 5];
         parts[0] = AppContext.BaseDirectory;
         parts[1] = "..";
@@ -3773,7 +3813,7 @@ public sealed class SemanticArchitectureTests
         parts[4] = "..";
         Array.Copy(pathParts, 0, parts, 5, pathParts.Length);
 
-        return File.ReadAllText(Path.GetFullPath(Path.Combine(parts)));
+        return Path.GetFullPath(Path.Combine(parts));
     }
 
     private static Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax CreateReturnExpressionProbe(

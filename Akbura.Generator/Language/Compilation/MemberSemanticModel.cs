@@ -142,7 +142,7 @@ internal abstract class MemberSemanticModel : AkburaSemanticModel
         AkburaSyntax syntax,
         BoundNode boundNode)
     {
-        if (!ReferenceEquals(syntax.Root.Green, Root.Root.Green))
+        if (!SemanticSyntaxIdentity.IsInSameTree(syntax, Root))
         {
             return;
         }

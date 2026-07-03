@@ -1,6 +1,5 @@
 using Akbura.Language.BoundTree;
 using Akbura.Language.Syntax;
-using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language;
@@ -46,9 +45,9 @@ internal sealed class InitializerMemberSemanticModel : BinderBackedMemberSemanti
         return syntax.Parent?.Kind switch
         {
             AkburaSyntaxKind.StateDeclarationSyntax => syntax.Parent,
-            AkburaSyntaxKind.ParamDeclarationSyntax when ReferenceEquals(
-                Unsafe.As<ParamDeclarationSyntax>(syntax.Parent).DefaultValue?.Green,
-                syntax.Green) => syntax.Parent,
+            AkburaSyntaxKind.ParamDeclarationSyntax when SemanticSyntaxIdentity.Equals(
+                ((ParamDeclarationSyntax)syntax.Parent).DefaultValue,
+                syntax) => syntax.Parent,
             _ => null,
         };
     }

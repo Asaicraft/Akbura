@@ -1,5 +1,4 @@
 using Akbura.Language.Syntax;
-using Akbura.Language.Syntax.Green;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -27,7 +26,7 @@ internal sealed class MemberSemanticModelFactory
         var scope = FindDocumentScope(syntax);
         var kind = GetModelKind(syntax);
         var root = GetModelRoot(syntax, kind, scope);
-        var key = new MemberSemanticModelCacheKey(root.Green, kind);
+        var key = new MemberSemanticModelCacheKey(root, kind);
         if (_cache.TryGetValue(key, out var model))
         {
             return model;
@@ -116,9 +115,9 @@ internal sealed class MemberSemanticModelFactory
     private static bool IsParamDefaultValue(AkburaSyntax syntax)
     {
         return syntax.Parent?.Kind == AkburaSyntaxKind.ParamDeclarationSyntax &&
-               ReferenceEquals(
-                   Unsafe.As<ParamDeclarationSyntax>(syntax.Parent).DefaultValue?.Green,
-                   syntax.Green);
+               SemanticSyntaxIdentity.Equals(
+                   Unsafe.As<ParamDeclarationSyntax>(syntax.Parent).DefaultValue,
+                   syntax);
     }
 
     private static AkburaSyntax GetModelRoot(
@@ -168,20 +167,20 @@ internal sealed class MemberSemanticModelFactory
 
     private readonly struct MemberSemanticModelCacheKey : IEquatable<MemberSemanticModelCacheKey>
     {
-        private readonly GreenNode _root;
+        private readonly AkburaSyntax _root;
         private readonly MemberSemanticModelKind _kind;
 
         public MemberSemanticModelCacheKey(
-            GreenNode root,
+            AkburaSyntax root,
             MemberSemanticModelKind kind)
         {
-            _root = root;
+            _root = root ?? throw new ArgumentNullException(nameof(root));
             _kind = kind;
         }
 
         public bool Equals(MemberSemanticModelCacheKey other)
         {
-            return ReferenceEquals(_root, other._root) &&
+            return SemanticSyntaxIdentity.Equals(_root, other._root) &&
                    _kind == other._kind;
         }
 
@@ -193,7 +192,7 @@ internal sealed class MemberSemanticModelFactory
 
         public override int GetHashCode()
         {
-            return (RuntimeHelpers.GetHashCode(_root) * 397) ^ (int)_kind;
+            return HashCode.Combine(SemanticSyntaxIdentity.GetHashCode(_root), (int)_kind);
         }
     }
 }

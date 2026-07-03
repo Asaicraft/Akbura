@@ -3,9 +3,7 @@ using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Akbura.Language.Binder;
@@ -59,8 +57,7 @@ internal sealed class ExecutableCodeBinder : Binder
 
     private void ComputeBinderMap()
     {
-        var map = new SmallDictionary<AkburaSyntax, Binder>(
-            AkburaSyntaxGreenComparer.Instance);
+        var map = new SmallDictionary<AkburaSyntax, Binder>();
         var path = ArrayBuilder<AkburaDeclaration>.GetInstance();
         try
         {
@@ -115,23 +112,5 @@ internal sealed class ExecutableCodeBinder : Binder
         return !rootPath.IsDefaultOrEmpty
             ? rootPath[rootPath.Length - 1]
             : throw new ArgumentException("Executable root path cannot be empty.", nameof(rootPath));
-    }
-
-    private sealed class AkburaSyntaxGreenComparer : IEqualityComparer<AkburaSyntax>
-    {
-        public static readonly AkburaSyntaxGreenComparer Instance = new();
-
-        public bool Equals(AkburaSyntax? x, AkburaSyntax? y)
-        {
-            return ReferenceEquals(x, y) ||
-                   x != null &&
-                   y != null &&
-                   ReferenceEquals(x.Green, y.Green);
-        }
-
-        public int GetHashCode(AkburaSyntax obj)
-        {
-            return RuntimeHelpers.GetHashCode(obj.Green);
-        }
     }
 }

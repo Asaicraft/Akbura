@@ -173,8 +173,7 @@ internal abstract class Binder
     protected bool OwnsScope(AkburaSyntax scopeDesignator)
     {
         return ScopeDesignator != null &&
-               (ReferenceEquals(ScopeDesignator, scopeDesignator) ||
-                ReferenceEquals(ScopeDesignator.Green, scopeDesignator.Green));
+               SemanticSyntaxIdentity.Equals(ScopeDesignator, scopeDesignator);
     }
 
     protected static AkburaSymbol? FindDeclaredSymbol(

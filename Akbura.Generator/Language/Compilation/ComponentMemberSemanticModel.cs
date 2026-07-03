@@ -2,7 +2,6 @@ using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
-using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;

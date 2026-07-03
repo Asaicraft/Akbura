@@ -1,6 +1,5 @@
-using Akbura.Language.Syntax.Green;
+using Akbura.Language.Syntax;
 using System;
-using System.Runtime.CompilerServices;
 
 namespace Akbura.Language.Binder;
 
@@ -8,19 +7,19 @@ namespace Akbura.Language.Binder;
 // PERF: keep this tiny; semantic cross-compilation reuse has a separate key.
 internal readonly struct BinderCacheKey : IEquatable<BinderCacheKey>
 {
-    public BinderCacheKey(GreenNode syntax, BinderUsage usage)
+    public BinderCacheKey(AkburaSyntax syntax, BinderUsage usage)
     {
-        Syntax = syntax;
+        Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         Usage = usage;
     }
 
-    public GreenNode Syntax { get; }
+    public AkburaSyntax Syntax { get; }
 
     public BinderUsage Usage { get; }
 
     public bool Equals(BinderCacheKey other)
     {
-        return ReferenceEquals(Syntax, other.Syntax) &&
+        return SemanticSyntaxIdentity.Equals(Syntax, other.Syntax) &&
                Usage == other.Usage;
     }
 
@@ -31,9 +30,6 @@ internal readonly struct BinderCacheKey : IEquatable<BinderCacheKey>
 
     public override int GetHashCode()
     {
-        unchecked
-        {
-            return (RuntimeHelpers.GetHashCode(Syntax) * 397) ^ (int)Usage;
-        }
+        return HashCode.Combine(SemanticSyntaxIdentity.GetHashCode(Syntax), (int)Usage);
     }
 }

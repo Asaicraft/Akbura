@@ -61,7 +61,7 @@ internal sealed partial class BinderFactory
                 throw new ArgumentNullException(nameof(syntax));
             }
 
-            return new BinderCacheKey(syntax.Green, usage);
+            return new BinderCacheKey(syntax, usage);
         }
 
         public override Binder DefaultVisit(AkburaSyntax akburaSyntax)

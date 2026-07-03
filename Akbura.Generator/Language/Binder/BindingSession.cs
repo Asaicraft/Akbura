@@ -123,7 +123,9 @@ internal sealed class BindingSession
 
     private bool IsCurrentSemanticModelSyntax(AkburaSyntax syntax)
     {
-        return ReferenceEquals(syntax.Root.Green, _semanticModel.SyntaxTree.GetRoot().Green);
+        return SemanticSyntaxIdentity.IsInSameTree(
+            syntax,
+            _semanticModel.SyntaxTree.GetRoot());
     }
 
     internal Binder GetOperationBinder(AkburaSyntax syntax)
@@ -272,7 +274,7 @@ internal sealed class BindingSession
         BinderUsage usage)
     {
         var rootDeclaration = executableRootPath[executableRootPath.Length - 1];
-        var key = new BinderCacheKey(rootDeclaration.Syntax.Green, usage);
+        var key = new BinderCacheKey(rootDeclaration.Syntax, usage);
         if (_executableBinderCache.TryGetValue(key, out var executableBinder))
         {
             return executableBinder;
@@ -406,8 +408,7 @@ internal sealed class BindingSession
             }
 
             var syntax = _syntax!;
-            if (ReferenceEquals(current.Syntax, syntax) ||
-                ReferenceEquals(current.Syntax.Green, syntax.Green))
+            if (SemanticSyntaxIdentity.Equals(current.Syntax, syntax))
             {
                 return true;
             }
@@ -427,7 +428,7 @@ internal sealed class BindingSession
         private bool VisitByPosition(AkburaDeclaration current)
         {
             var syntax = _syntax!;
-            if (!ReferenceEquals(current.Syntax.Root.Green, syntax.Root.Green) ||
+            if (!SemanticSyntaxIdentity.IsInSameTree(current.Syntax, syntax) ||
                 !ContainsPosition(current.Syntax, _position))
             {
                 _path!.RemoveLast();

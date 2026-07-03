@@ -162,11 +162,7 @@ internal sealed class AkburaDeclarationSymbolTable
 
         public override int GetHashCode()
         {
-            unchecked
-            {
-                return (RuntimeHelpers.GetHashCode(Syntax) * 397) ^
-                       KindMask.GetHashCode();
-            }
+            return HashCode.Combine(RuntimeHelpers.GetHashCode(Syntax), KindMask);
         }
     }
 }

@@ -4,7 +4,6 @@ using Akbura.Language.Declarations;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
-using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -2646,17 +2645,13 @@ internal partial class AkburaSemanticModel
     internal static CSharp.ParameterListSyntax? GetCSharpParameterList(
         CSharpParameterListSyntax parameterListSyntax)
     {
-        return parameterListSyntax.Parameters.Node is GreenSyntaxToken.CSharpRawToken rawToken
-            ? rawToken.RawNode as CSharp.ParameterListSyntax
-            : null;
+        return parameterListSyntax.GetRawCSharpParameterList();
     }
 
     internal static CSharp.ArgumentListSyntax? GetCSharpArgumentList(
         CSharpArgumentListSyntax argumentListSyntax)
     {
-        return argumentListSyntax.Parameters.Node is GreenSyntaxToken.CSharpRawToken rawToken
-            ? rawToken.RawNode as CSharp.ArgumentListSyntax
-            : null;
+        return argumentListSyntax.GetRawCSharpArgumentList();
     }
 
     internal static bool TryGetUseEffectDependencyRootName(

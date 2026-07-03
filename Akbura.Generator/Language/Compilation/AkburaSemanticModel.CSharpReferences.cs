@@ -1,6 +1,5 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
-using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -599,7 +598,7 @@ internal partial class AkburaSemanticModel
         foreach (var member in block.Tokens)
         {
             if (ReferenceEquals(member, statementSyntax) ||
-                ReferenceEquals(member.Green, statementSyntax.Green) ||
+                SemanticSyntaxIdentity.Equals(member, statementSyntax) ||
                 member.Position >= statementSyntax.Position)
             {
                 break;

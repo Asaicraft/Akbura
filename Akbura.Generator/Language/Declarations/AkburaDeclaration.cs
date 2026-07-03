@@ -43,7 +43,7 @@ internal sealed class AkburaDeclaration
     {
         return Kind == other.Kind &&
                Name == other.Name &&
-               ReferenceEquals(Syntax.Green, other.Syntax.Green);
+               SemanticSyntaxIdentity.Equals(Syntax, other.Syntax);
     }
 
     public override string ToString()

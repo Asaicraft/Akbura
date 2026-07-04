@@ -31,19 +31,17 @@ namespace Akbura.Language;
 
 internal partial class AkburaSemanticModel
 {
-    private readonly MemberSemanticModelFactory _memberSemanticModelFactory;
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
     private readonly AkburaOperationFactory _operationFactory;
     private readonly AkburaDeclarationSymbolTable _declarationSymbols;
 
-    public AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
+    protected AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
         _bindingCache = new SemanticBindingCache();
         _bindingSession = new BindingSession(this);
-        _memberSemanticModelFactory = new MemberSemanticModelFactory(this);
         _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
         _declarationSymbols = new AkburaDeclarationSymbolTable(this);
     }
@@ -59,7 +57,6 @@ internal partial class AkburaSemanticModel
         SyntaxTree = semanticModel.SyntaxTree;
         _bindingCache = semanticModel._bindingCache;
         _bindingSession = semanticModel._bindingSession;
-        _memberSemanticModelFactory = semanticModel._memberSemanticModelFactory;
         _operationFactory = semanticModel._operationFactory;
         _declarationSymbols = semanticModel._declarationSymbols;
     }
@@ -298,17 +295,9 @@ internal partial class AkburaSemanticModel
         return _bindingSession.GetBinder(syntax, position, usage);
     }
 
-    internal MemberSemanticModel GetMemberSemanticModel(AkburaSyntax syntax)
-    {
-        if (syntax == null)
-        {
-            throw new ArgumentNullException(nameof(syntax));
-        }
-
-        ValidateSyntaxTreeOwnership(syntax);
-
-        return _memberSemanticModelFactory.GetMemberSemanticModel(syntax);
-    }
+    internal virtual MemberSemanticModel GetMemberSemanticModel(AkburaSyntax syntax)
+        => throw new NotSupportedException(
+            "Only syntax-tree semantic models can dispatch to member semantic models.");
 
     internal BindingSession BindingSession
     {
@@ -5352,7 +5341,7 @@ internal partial class AkburaSemanticModel
     }
 
     [Conditional("DEBUG")]
-    private void ValidateSyntaxTreeOwnership(AkburaSyntax syntax)
+    protected void ValidateSyntaxTreeOwnership(AkburaSyntax syntax)
     {
         if (!ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()))
         {

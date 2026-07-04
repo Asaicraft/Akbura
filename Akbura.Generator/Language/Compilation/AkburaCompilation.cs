@@ -195,7 +195,7 @@ internal sealed class AkburaCompilation
 
         return _semanticModels.GetOrAdd(
             syntaxTree,
-            tree => new AkburaSemanticModel(this, tree));
+            tree => new SyntaxTreeSemanticModel(this, tree));
     }
 
     private AkburaCompilation WithSyntaxAndDeclarations(

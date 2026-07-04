@@ -1,6 +1,5 @@
 using Akbura.Language.Syntax;
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
@@ -9,30 +8,28 @@ namespace Akbura.Language;
 internal sealed class MemberSemanticModelFactory
 {
     private readonly AkburaSemanticModel _semanticModel;
-    private readonly Dictionary<MemberSemanticModelCacheKey, MemberSemanticModel> _cache = new();
 
     public MemberSemanticModelFactory(AkburaSemanticModel semanticModel)
     {
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
     }
 
-    public MemberSemanticModel GetMemberSemanticModel(AkburaSyntax syntax)
+    public MemberSemanticModel CreateMemberSemanticModel(
+        AkburaSyntax root,
+        MemberSemanticModelKind kind,
+        AkburaDocumentSyntax scope)
     {
-        if (syntax == null)
+        if (root == null)
         {
-            throw new ArgumentNullException(nameof(syntax));
+            throw new ArgumentNullException(nameof(root));
         }
 
-        var scope = FindDocumentScope(syntax);
-        var kind = GetModelKind(syntax);
-        var root = GetModelRoot(syntax, kind, scope);
-        var key = new MemberSemanticModelCacheKey(root, kind);
-        if (_cache.TryGetValue(key, out var model))
+        if (scope == null)
         {
-            return model;
+            throw new ArgumentNullException(nameof(scope));
         }
 
-        model = kind switch
+        return kind switch
         {
             MemberSemanticModelKind.Component => new ComponentMemberSemanticModel(_semanticModel, scope),
             MemberSemanticModelKind.Initializer => new InitializerMemberSemanticModel(_semanticModel, scope, root),
@@ -41,11 +38,9 @@ internal sealed class MemberSemanticModelFactory
             MemberSemanticModelKind.Akcss => new AkcssMemberSemanticModel(_semanticModel, scope, root),
             _ => new ComponentMemberSemanticModel(_semanticModel, scope),
         };
-        _cache.Add(key, model);
-        return model;
     }
 
-    private AkburaDocumentSyntax FindDocumentScope(AkburaSyntax syntax)
+    public AkburaDocumentSyntax FindDocumentScope(AkburaSyntax syntax)
     {
         for (var node = syntax; node != null; node = node.Parent)
         {
@@ -58,7 +53,7 @@ internal sealed class MemberSemanticModelFactory
         return _semanticModel.SyntaxTree.GetRoot();
     }
 
-    private static MemberSemanticModelKind GetModelKind(AkburaSyntax syntax)
+    public static MemberSemanticModelKind GetModelKind(AkburaSyntax syntax)
     {
         if (IsParamDefaultValue(syntax))
         {
@@ -112,19 +107,17 @@ internal sealed class MemberSemanticModelFactory
         return MemberSemanticModelKind.Component;
     }
 
-    private static bool IsParamDefaultValue(AkburaSyntax syntax)
-    {
-        return syntax.Parent?.Kind == AkburaSyntaxKind.ParamDeclarationSyntax &&
-               SemanticSyntaxIdentity.Equals(
-                   Unsafe.As<ParamDeclarationSyntax>(syntax.Parent).DefaultValue,
-                   syntax);
-    }
-
-    private static AkburaSyntax GetModelRoot(
+    public static AkburaSyntax GetModelRoot(
         AkburaSyntax syntax,
         MemberSemanticModelKind kind,
         AkburaDocumentSyntax scope)
     {
+        if (kind == MemberSemanticModelKind.Initializer &&
+            IsParamDefaultValue(syntax))
+        {
+            return syntax;
+        }
+
         if (kind == MemberSemanticModelKind.Component)
         {
             return scope;
@@ -139,6 +132,14 @@ internal sealed class MemberSemanticModelFactory
         }
 
         return scope;
+    }
+
+    private static bool IsParamDefaultValue(AkburaSyntax syntax)
+    {
+        return syntax.Parent?.Kind == AkburaSyntaxKind.ParamDeclarationSyntax &&
+               SemanticSyntaxIdentity.Equals(
+                   Unsafe.As<ParamDeclarationSyntax>(syntax.Parent).DefaultValue,
+                   syntax);
     }
 
     private static bool IsModelRoot(
@@ -163,36 +164,5 @@ internal sealed class MemberSemanticModelFactory
                     AkburaSyntaxKind.AkcssUtilityDeclarationSyntax,
             _ => syntaxKind == AkburaSyntaxKind.AkburaDocumentSyntax,
         };
-    }
-
-    private readonly struct MemberSemanticModelCacheKey : IEquatable<MemberSemanticModelCacheKey>
-    {
-        private readonly AkburaSyntax _root;
-        private readonly MemberSemanticModelKind _kind;
-
-        public MemberSemanticModelCacheKey(
-            AkburaSyntax root,
-            MemberSemanticModelKind kind)
-        {
-            _root = root ?? throw new ArgumentNullException(nameof(root));
-            _kind = kind;
-        }
-
-        public bool Equals(MemberSemanticModelCacheKey other)
-        {
-            return SemanticSyntaxIdentity.Equals(_root, other._root) &&
-                   _kind == other._kind;
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is MemberSemanticModelCacheKey other &&
-                   Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(SemanticSyntaxIdentity.GetHashCode(_root), (int)_kind);
-        }
     }
 }

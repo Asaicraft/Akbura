@@ -681,6 +681,8 @@ public sealed class SemanticArchitectureTests
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(ExecutableMemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(MarkupMemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(AkcssMemberSemanticModel)));
+        Assert.True(typeof(AkburaSemanticModel).IsAssignableFrom(typeof(PublicSemanticModel)));
+        Assert.True(typeof(PublicSemanticModel).IsAssignableFrom(typeof(SyntaxTreeSemanticModel)));
 
         var incrementalBinder = typeof(ExecutableMemberSemanticModel).GetNestedType(
             "IncrementalBinder",
@@ -693,9 +695,29 @@ public sealed class SemanticArchitectureTests
             "Language",
             "Compilation",
             "AkburaSemanticModel.cs");
+        var syntaxTreeSemanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "SyntaxTreeSemanticModel.cs");
 
-        Assert.Contains(nameof(MemberSemanticModelFactory), semanticModelSource);
+        Assert.DoesNotContain(nameof(MemberSemanticModelFactory), semanticModelSource);
         Assert.DoesNotContain("new ComponentMemberSemanticModel", semanticModelSource);
+        Assert.Contains(nameof(MemberSemanticModelFactory), syntaxTreeSemanticModelSource);
+        Assert.Contains("internal sealed class SyntaxTreeSemanticModel : PublicSemanticModel", syntaxTreeSemanticModelSource);
+    }
+
+    [Fact]
+    public void Compilation_GetSemanticModel_ReturnsSyntaxTreeSemanticModel()
+    {
+        var tree = AkburaSyntaxTree.ParseText("<Button />", "Button.akbura");
+        var compilation = CreateCompilation(tree);
+
+        var semanticModel = compilation.GetSemanticModel(tree);
+
+        Assert.IsType<SyntaxTreeSemanticModel>(semanticModel);
+        Assert.IsAssignableFrom<PublicSemanticModel>(semanticModel);
+        Assert.IsAssignableFrom<AkburaSemanticModel>(semanticModel);
     }
 
     [Fact]
@@ -711,6 +733,16 @@ public sealed class SemanticArchitectureTests
             "Language",
             "Compilation",
             "AkburaSemanticModel.cs");
+        var syntaxTreeSemanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "SyntaxTreeSemanticModel.cs");
+        var publicSemanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "PublicSemanticModel.cs");
         var csharpReferencesSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
@@ -724,6 +756,8 @@ public sealed class SemanticArchitectureTests
 
         Assert.Contains("internal sealed class AkburaCompilation", compilationSource);
         Assert.Contains("internal partial class AkburaSemanticModel", semanticModelSource);
+        Assert.Contains("internal abstract class PublicSemanticModel", publicSemanticModelSource);
+        Assert.Contains("internal sealed class SyntaxTreeSemanticModel", syntaxTreeSemanticModelSource);
         Assert.Contains("partial class AkburaSemanticModel", csharpReferencesSource);
         Assert.Contains("partial class AkburaSemanticModel", markupOperationsSource);
     }
@@ -746,6 +780,11 @@ public sealed class SemanticArchitectureTests
             "Language",
             "Compilation",
             "MemberSemanticModelFactory.cs");
+        var syntaxTreeSemanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "SyntaxTreeSemanticModel.cs");
         var binderBackedSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
@@ -777,7 +816,11 @@ public sealed class SemanticArchitectureTests
         Assert.Contains("internal sealed class ComponentMemberSemanticModel", componentModelSource);
         Assert.DoesNotContain("internal abstract class MemberSemanticModel", componentModelSource);
         Assert.Contains("internal sealed class MemberSemanticModelFactory", factorySource);
+        Assert.DoesNotContain("Dictionary<", factorySource);
+        Assert.DoesNotContain("MemberSemanticModelCacheKey", factorySource);
         Assert.DoesNotContain("internal abstract class BinderBackedMemberSemanticModel", factorySource);
+        Assert.Contains("ImmutableDictionary<AkburaSyntax, MemberSemanticModel> _memberModels", syntaxTreeSemanticModelSource);
+        Assert.Contains("ImmutableInterlocked.GetOrAdd", syntaxTreeSemanticModelSource);
         Assert.Contains("internal abstract class BinderBackedMemberSemanticModel", binderBackedSource);
         Assert.Contains("internal sealed class InitializerMemberSemanticModel", initializerSource);
         Assert.Contains("internal sealed class MarkupMemberSemanticModel", markupSource);
@@ -805,6 +848,29 @@ public sealed class SemanticArchitectureTests
         Assert.DoesNotContain("SmallDictionary<AkburaSyntax, OneOrMany<BoundNode>>", source);
         Assert.DoesNotContain("AkburaSyntaxGreenComparer", source);
         Assert.DoesNotContain("private readonly object _", source);
+    }
+
+    [Fact]
+    public void MemberSemanticModel_NodeMapBuilderUsesOrderPreservingAdditionMap()
+    {
+        var memberModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "MemberSemanticModel.cs");
+        var collectionSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Collections",
+            "OrderPreservingMultiDictionary.cs");
+
+        Assert.Contains("private sealed class NodeMapBuilder : BoundTreeWalker", memberModelSource);
+        Assert.Contains("OrderPreservingMultiDictionary<AkburaSyntax, BoundNode>.GetInstance()", memberModelSource);
+        Assert.Contains("GetAsOneOrMany", memberModelSource);
+        Assert.Contains("map.ContainsKey(key)", memberModelSource);
+        Assert.Contains("additionMap.Free()", memberModelSource);
+        Assert.Contains("internal sealed class OrderPreservingMultiDictionary", collectionSource);
+        Assert.Contains("ObjectPool<OrderPreservingMultiDictionary<TKey, TValue>>", collectionSource);
+        Assert.Contains("public OneOrMany<TValue> GetAsOneOrMany", collectionSource);
     }
 
     [Fact]

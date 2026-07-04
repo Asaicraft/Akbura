@@ -142,16 +142,8 @@ public sealed class SemanticArchitectureTests
     }
 
     [Fact]
-    public void DeclarationTable_UsesPooledDeclarationStackForTraversal()
+    public void DeclarationTable_IndexesDeclarationPathsForBinderLookup()
     {
-        var stackField = typeof(AkburaDeclarationTable).GetField(
-            "s_declarationStack",
-            BindingFlags.Static | BindingFlags.NonPublic);
-        Assert.NotNull(stackField);
-        Assert.Same(
-            typeof(ObjectPool<Stack<AkburaDeclaration>>),
-            stackField.FieldType);
-
         const string code =
             """
             if(true)
@@ -174,6 +166,29 @@ public sealed class SemanticArchitectureTests
         Assert.True(table.TryGetDeclaration(textBlock, out var declaration));
         Assert.Equal(AkburaDeclarationKind.MarkupElement, declaration.Kind);
         Assert.Equal("TextBlock", declaration.Name);
+
+        Assert.True(table.TryGetDeclarationPath(textBlock, out var exactPath));
+        Assert.Collection(
+            exactPath,
+            item => Assert.Equal(AkburaDeclarationKind.Component, item.Kind),
+            item => Assert.Equal(AkburaDeclarationKind.CSharpStatement, item.Kind),
+            item => Assert.Equal(AkburaDeclarationKind.CSharpBlock, item.Kind),
+            item => Assert.Equal(AkburaDeclarationKind.MarkupRoot, item.Kind),
+            item => Assert.Equal(AkburaDeclarationKind.MarkupElement, item.Kind),
+            item =>
+            {
+                Assert.Equal(AkburaDeclarationKind.MarkupElement, item.Kind);
+                Assert.Equal("TextBlock", item.Name);
+            });
+
+        Assert.True(table.TryGetDeclarationPath(root, textBlock.Position, out var positionPath));
+        Assert.Equal(exactPath.Length, positionPath.Length);
+        for (var index = 0; index < exactPath.Length; index++)
+        {
+            Assert.Equal(exactPath[index].Kind, positionPath[index].Kind);
+            Assert.Equal(exactPath[index].Name, positionPath[index].Name);
+            Assert.Same(exactPath[index].Syntax, positionPath[index].Syntax);
+        }
     }
 
     [Fact]
@@ -866,8 +881,11 @@ public sealed class SemanticArchitectureTests
         Assert.Contains("private sealed class NodeMapBuilder : BoundTreeWalker", memberModelSource);
         Assert.Contains("OrderPreservingMultiDictionary<AkburaSyntax, BoundNode>.GetInstance()", memberModelSource);
         Assert.Contains("GetAsOneOrMany", memberModelSource);
+        Assert.Contains("map.ContainsKey(root.Syntax)", memberModelSource);
         Assert.Contains("map.ContainsKey(key)", memberModelSource);
         Assert.Contains("additionMap.Free()", memberModelSource);
+        Assert.Contains("AddBoundTreeToMap(boundNode);", memberModelSource);
+        Assert.DoesNotContain("AddBoundNodeToMap", memberModelSource);
         Assert.Contains("internal sealed class OrderPreservingMultiDictionary", collectionSource);
         Assert.Contains("ObjectPool<OrderPreservingMultiDictionary<TKey, TValue>>", collectionSource);
         Assert.Contains("public OneOrMany<TValue> GetAsOneOrMany", collectionSource);

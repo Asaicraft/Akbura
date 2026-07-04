@@ -252,9 +252,8 @@ internal sealed class BindingSession
         AkburaSyntax syntax,
         out ImmutableArray<AkburaDeclaration> path)
     {
-        var finder = DeclarationPathFinder.GetInstance(syntax);
-        return finder.TryFind(
-            _semanticModel.Compilation.DeclarationTable.Roots,
+        return _semanticModel.Compilation.DeclarationTable.TryGetDeclarationPath(
+            syntax,
             out path);
     }
 
@@ -263,9 +262,9 @@ internal sealed class BindingSession
         int position,
         out ImmutableArray<AkburaDeclaration> path)
     {
-        var finder = DeclarationPathFinder.GetInstance(syntax, position);
-        return finder.TryFind(
-            _semanticModel.Compilation.DeclarationTable.Roots,
+        return _semanticModel.Compilation.DeclarationTable.TryGetDeclarationPath(
+            syntax,
+            position,
             out path);
     }
 
@@ -328,10 +327,10 @@ internal sealed class BindingSession
     {
         if (length == 0)
         {
-            return ImmutableArray<AkburaDeclaration>.Empty;
+            return [];
         }
 
-        var builder = ImmutableArray.CreateBuilder<AkburaDeclaration>(length);
+        using var builder = ImmutableArrayBuilder<AkburaDeclaration>.Rent(length);
         for (var index = 0; index < length; index++)
         {
             builder.Add(path[index]);
@@ -340,140 +339,4 @@ internal sealed class BindingSession
         return builder.ToImmutable();
     }
 
-    private sealed class DeclarationPathFinder
-    {
-        private static readonly ObjectPool<DeclarationPathFinder> s_pool = CreatePool();
-
-        private readonly ObjectPool<DeclarationPathFinder> _pool;
-        private AkburaSyntax? _syntax;
-        private int _position;
-        private bool _findByPosition;
-        private ArrayBuilder<AkburaDeclaration>? _path;
-
-        private DeclarationPathFinder(ObjectPool<DeclarationPathFinder> pool)
-        {
-            _pool = pool;
-        }
-
-        public static DeclarationPathFinder GetInstance(AkburaSyntax syntax)
-        {
-            var finder = s_pool.Allocate();
-            finder._syntax = syntax;
-            finder._position = 0;
-            finder._findByPosition = false;
-            finder._path = ArrayBuilder<AkburaDeclaration>.GetInstance();
-            return finder;
-        }
-
-        public static DeclarationPathFinder GetInstance(
-            AkburaSyntax syntax,
-            int position)
-        {
-            var finder = s_pool.Allocate();
-            finder._syntax = syntax;
-            finder._position = position;
-            finder._findByPosition = true;
-            finder._path = ArrayBuilder<AkburaDeclaration>.GetInstance();
-            return finder;
-        }
-
-        public bool TryFind(
-            ImmutableArray<AkburaDeclaration> roots,
-            out ImmutableArray<AkburaDeclaration> path)
-        {
-            foreach (var root in roots)
-            {
-                _path!.Clear();
-                if (Visit(root))
-                {
-                    path = _path.ToImmutableAndFree();
-                    _path = null;
-                    Free();
-                    return true;
-                }
-            }
-
-            path = default;
-            Free();
-            return false;
-        }
-
-        private bool Visit(AkburaDeclaration current)
-        {
-            _path!.Add(current);
-
-            if (_findByPosition)
-            {
-                return VisitByPosition(current);
-            }
-
-            var syntax = _syntax!;
-            if (SemanticSyntaxIdentity.Equals(current.Syntax, syntax))
-            {
-                return true;
-            }
-
-            foreach (var child in current.Children)
-            {
-                if (Visit(child))
-                {
-                    return true;
-                }
-            }
-
-            _path.RemoveLast();
-            return false;
-        }
-
-        private bool VisitByPosition(AkburaDeclaration current)
-        {
-            var syntax = _syntax!;
-            if (!SemanticSyntaxIdentity.IsInSameTree(current.Syntax, syntax) ||
-                !ContainsPosition(current.Syntax, _position))
-            {
-                _path!.RemoveLast();
-                return false;
-            }
-
-            foreach (var child in current.Children)
-            {
-                if (Visit(child))
-                {
-                    return true;
-                }
-            }
-
-            return true;
-        }
-
-        private void Free()
-        {
-            _syntax = null;
-            _position = 0;
-            _findByPosition = false;
-            _path?.Free();
-            _path = null;
-            _pool.Free(this);
-        }
-
-        private static bool ContainsPosition(AkburaSyntax syntax, int position)
-        {
-            return BindingSession.ContainsPosition(syntax, position);
-        }
-
-        private static ObjectPool<DeclarationPathFinder> CreatePool()
-        {
-            ObjectPool<DeclarationPathFinder>? pool = null;
-            pool = new ObjectPool<DeclarationPathFinder>(
-                () => new DeclarationPathFinder(pool!),
-                size: 16);
-            return pool;
-        }
-    }
-
-    private static bool ContainsPosition(AkburaSyntax syntax, int position)
-    {
-        return syntax.FullSpan.Contains(position) ||
-               (syntax.FullWidth == 0 && position == syntax.Position);
-    }
 }

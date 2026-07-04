@@ -102,24 +102,9 @@ internal abstract class MemberSemanticModel : AkburaSemanticModel
         TBoundNode boundNode)
         where TBoundNode : BoundNode
     {
-        AddBoundNodeToMap(syntax, boundNode);
+        AddBoundTreeToMap(boundNode);
         SetCachedBoundNode(syntax, boundNode);
         return boundNode;
-    }
-
-    private void AddBoundNodeToMap(
-        AkburaSyntax syntax,
-        BoundNode boundNode)
-    {
-        _nodeMapLock.EnterWriteLock();
-        try
-        {
-            GuardedAddBoundNodeToMap(syntax, boundNode);
-        }
-        finally
-        {
-            _nodeMapLock.ExitWriteLock();
-        }
     }
 
     private bool TryGetBoundNodeFromGuardedMap(
@@ -143,24 +128,6 @@ internal abstract class MemberSemanticModel : AkburaSemanticModel
 
         boundNode = null!;
         return false;
-    }
-
-    private void GuardedAddBoundNodeToMap(
-        AkburaSyntax syntax,
-        BoundNode boundNode)
-    {
-        if (!SemanticSyntaxIdentity.IsInSameTree(syntax, Root))
-        {
-            return;
-        }
-
-        if (_guardedBoundNodeMap.TryGetValue(syntax, out var nodes))
-        {
-            _guardedBoundNodeMap[syntax] = nodes.Add(boundNode);
-            return;
-        }
-
-        _guardedBoundNodeMap.Add(syntax, OneOrMany.Create(boundNode));
     }
 
     private sealed class NodeMapBuilder : BoundTreeWalker
@@ -189,7 +156,8 @@ internal abstract class MemberSemanticModel : AkburaSemanticModel
                 node == null || root == null || root is not BoundStatement,
                 "Individually added nodes are not supposed to be statements.");
 
-            if (root == null)
+            if (root == null ||
+                map.ContainsKey(root.Syntax))
             {
                 return;
             }

@@ -1,5 +1,6 @@
-using Akbura.Pools;
+using Akbura.Collections;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -8,9 +9,6 @@ namespace Akbura.Language.Declarations;
 
 internal sealed class AkburaDeclarationTable
 {
-    private static readonly ObjectPool<Stack<AkburaDeclaration>> s_declarationStack =
-        new(() => new Stack<AkburaDeclaration>(), 16);
-
     private AkburaDeclarationTable(
         ImmutableArray<AkburaDeclaration> components,
         ImmutableArray<AkburaDeclaration> akcssModules)
@@ -22,6 +20,7 @@ internal sealed class AkburaDeclarationTable
             ? ImmutableArray<AkburaDeclaration>.Empty
             : akcssModules;
         Roots = Components.AddRange(AkcssModules);
+        PathsBySyntax = CreatePathMap(Roots);
     }
 
     public ImmutableArray<AkburaDeclaration> Roots { get; }
@@ -29,6 +28,8 @@ internal sealed class AkburaDeclarationTable
     public ImmutableArray<AkburaDeclaration> Components { get; }
 
     public ImmutableArray<AkburaDeclaration> AkcssModules { get; }
+
+    private Dictionary<AkburaSyntax, ImmutableArray<AkburaDeclaration>> PathsBySyntax { get; }
 
     public static AkburaDeclarationTable Create(AkburaCompilation compilation)
     {
@@ -65,38 +66,60 @@ internal sealed class AkburaDeclarationTable
         return new AkburaDeclarationTable(components, akcssModules);
     }
 
-    public bool TryGetDeclaration(Akbura.Language.Syntax.AkburaSyntax syntax, out AkburaDeclaration declaration)
+    public bool TryGetDeclaration(AkburaSyntax syntax, out AkburaDeclaration declaration)
     {
-        var stack = s_declarationStack.Allocate();
+        if (TryGetDeclarationPath(syntax, out var path))
+        {
+            declaration = path[path.Length - 1];
+            return true;
+        }
+
+        declaration = null!;
+        return false;
+    }
+
+    public bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        out ImmutableArray<AkburaDeclaration> path)
+    {
+        if (syntax == null)
+        {
+            throw new System.ArgumentNullException(nameof(syntax));
+        }
+
+        return PathsBySyntax.TryGetValue(syntax, out path);
+    }
+
+    public bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        int position,
+        out ImmutableArray<AkburaDeclaration> path)
+    {
+        if (syntax == null)
+        {
+            throw new System.ArgumentNullException(nameof(syntax));
+        }
+
+        var builder = ArrayBuilder<AkburaDeclaration>.GetInstance();
         try
         {
-            for (var index = Roots.Length - 1; index >= 0; index--)
+            foreach (var root in Roots)
             {
-                stack.Push(Roots[index]);
-            }
-
-            while (stack.Count > 0)
-            {
-                var current = stack.Pop();
-                if (SemanticSyntaxIdentity.Equals(current.Syntax, syntax))
+                builder.Clear();
+                if (TryBuildDeclarationPath(root, syntax, position, builder))
                 {
-                    declaration = current;
+                    path = builder.ToImmutableAndFree();
+                    builder = null;
                     return true;
                 }
-
-                for (var index = current.Children.Length - 1; index >= 0; index--)
-                {
-                    stack.Push(current.Children[index]);
-                }
             }
 
-            declaration = null!;
+            path = default;
             return false;
         }
         finally
         {
-            stack.Clear();
-            s_declarationStack.Free(stack);
+            builder?.Free();
         }
     }
 
@@ -144,6 +167,65 @@ internal sealed class AkburaDeclarationTable
         }
 
         return false;
+    }
+
+    private static Dictionary<AkburaSyntax, ImmutableArray<AkburaDeclaration>> CreatePathMap(
+        ImmutableArray<AkburaDeclaration> roots)
+    {
+        var map = new Dictionary<AkburaSyntax, ImmutableArray<AkburaDeclaration>>();
+        var path = ImmutableArray.CreateBuilder<AkburaDeclaration>();
+        foreach (var root in roots)
+        {
+            AddDeclarationPaths(root, path, map);
+        }
+
+        return map;
+    }
+
+    private static void AddDeclarationPaths(
+        AkburaDeclaration declaration,
+        ImmutableArray<AkburaDeclaration>.Builder path,
+        Dictionary<AkburaSyntax, ImmutableArray<AkburaDeclaration>> map)
+    {
+        path.Add(declaration);
+        map[declaration.Syntax] = path.ToImmutable();
+
+        foreach (var child in declaration.Children)
+        {
+            AddDeclarationPaths(child, path, map);
+        }
+
+        path.RemoveAt(path.Count - 1);
+    }
+
+    private static bool TryBuildDeclarationPath(
+        AkburaDeclaration current,
+        AkburaSyntax syntax,
+        int position,
+        ArrayBuilder<AkburaDeclaration> path)
+    {
+        if (!SemanticSyntaxIdentity.IsInSameTree(current.Syntax, syntax) ||
+            !ContainsPosition(current.Syntax, position))
+        {
+            return false;
+        }
+
+        path.Add(current);
+        foreach (var child in current.Children)
+        {
+            if (TryBuildDeclarationPath(child, syntax, position, path))
+            {
+                return true;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ContainsPosition(AkburaSyntax syntax, int position)
+    {
+        return syntax.FullSpan.Contains(position) ||
+               (syntax.FullWidth == 0 && position == syntax.Position);
     }
 
 }

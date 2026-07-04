@@ -39,13 +39,6 @@ internal sealed class AkburaDeclaration
     public bool ContainsDiagnosticsOrSkippedText =>
         Syntax.ContainsDiagnostics || Syntax.ContainsSkippedText;
 
-    public bool IsIncrementallyIdenticalTo(AkburaDeclaration other)
-    {
-        return Kind == other.Kind &&
-               Name == other.Name &&
-               SemanticSyntaxIdentity.Equals(Syntax, other.Syntax);
-    }
-
     public override string ToString()
     {
         return string.IsNullOrEmpty(Name)

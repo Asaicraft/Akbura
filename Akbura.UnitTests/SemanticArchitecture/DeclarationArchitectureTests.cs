@@ -240,6 +240,33 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
+    public void SyntaxAndDeclarationManager_AddRemoveSyntaxTreesUpdatesHotStateIncrementally()
+    {
+        var first = AkburaSyntaxTree.ParseText("state int first = 0;", "First.akbura");
+        var second = AkburaSyntaxTree.ParseText("state int second = 0;", "Second.akbura");
+        var third = AkburaSyntaxTree.ParseText("state int third = 0;", "Third.akbura");
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [first, second]);
+        var oldTable = compilation.DeclarationTable;
+
+        var added = compilation.AddSyntaxTrees([third]);
+        var addedTable = added.DeclarationTable;
+        var removed = added.RemoveSyntaxTrees([second]);
+        var removedTable = removed.DeclarationTable;
+
+        Assert.Equal(3, addedTable.Components.Length);
+        Assert.Same(oldTable.Components[0], addedTable.Components[0]);
+        Assert.Same(oldTable.Components[1], addedTable.Components[1]);
+        Assert.Equal("Third", addedTable.Components[2].Name);
+        Assert.Same(oldTable.Components[0], removedTable.Components[0]);
+        Assert.Same(addedTable.Components[2], removedTable.Components[1]);
+        Assert.Equal(0, removed.SyntaxAndDeclarations.GetLazyState().SyntaxOrdinalMap[first]);
+        Assert.Equal(1, removed.SyntaxAndDeclarations.GetLazyState().SyntaxOrdinalMap[third]);
+    }
+
+
+    [Fact]
     public void SyntaxAndDeclarationManager_UpdateDoesNotForceColdPreviousState()
     {
         var first = AkburaSyntaxTree.ParseText("state int first = 0;", "First.akbura");

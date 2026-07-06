@@ -66,6 +66,13 @@ internal sealed class AkburaDeclarationTable
         return new AkburaDeclarationTable(components, akcssModules);
     }
 
+    internal static AkburaDeclarationTable Create(
+        ImmutableArray<AkburaDeclaration> components,
+        ImmutableArray<AkburaDeclaration> akcssModules)
+    {
+        return new AkburaDeclarationTable(components, akcssModules);
+    }
+
     public bool TryGetDeclaration(AkburaSyntax syntax, out AkburaDeclaration declaration)
     {
         if (TryGetDeclarationPath(syntax, out var path))
@@ -173,18 +180,25 @@ internal sealed class AkburaDeclarationTable
         ImmutableArray<AkburaDeclaration> roots)
     {
         var map = new Dictionary<AkburaSyntax, ImmutableArray<AkburaDeclaration>>();
-        var path = ImmutableArray.CreateBuilder<AkburaDeclaration>();
-        foreach (var root in roots)
+        var path = ArrayBuilder<AkburaDeclaration>.GetInstance();
+        try
         {
-            AddDeclarationPaths(root, path, map);
-        }
+            foreach (var root in roots)
+            {
+                AddDeclarationPaths(root, path, map);
+            }
 
-        return map;
+            return map;
+        }
+        finally
+        {
+            path.Free();
+        }
     }
 
     private static void AddDeclarationPaths(
         AkburaDeclaration declaration,
-        ImmutableArray<AkburaDeclaration>.Builder path,
+        ArrayBuilder<AkburaDeclaration> path,
         Dictionary<AkburaSyntax, ImmutableArray<AkburaDeclaration>> map)
     {
         path.Add(declaration);
@@ -195,7 +209,7 @@ internal sealed class AkburaDeclarationTable
             AddDeclarationPaths(child, path, map);
         }
 
-        path.RemoveAt(path.Count - 1);
+        path.RemoveLast();
     }
 
     private static bool TryBuildDeclarationPath(

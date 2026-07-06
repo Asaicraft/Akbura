@@ -71,7 +71,20 @@ internal sealed partial class SyntaxAndDeclarationManager
             throw new ArgumentNullException(nameof(syntaxTrees));
         }
 
-        return WithSyntaxTrees(_syntaxTrees.AddRange(syntaxTrees));
+        var addedTrees = syntaxTrees.ToImmutableArray();
+        if (addedTrees.IsEmpty)
+        {
+            return this;
+        }
+
+        var newSyntaxTrees = _syntaxTrees.AddRange(addedTrees);
+        var state = _lazyState;
+        return state == null
+            ? new SyntaxAndDeclarationManager(newSyntaxTrees, _akcssSyntaxTrees)
+            : new SyntaxAndDeclarationManager(
+                newSyntaxTrees,
+                _akcssSyntaxTrees,
+                AddSyntaxTrees(state, newSyntaxTrees, addedTrees));
     }
 
     public SyntaxAndDeclarationManager RemoveSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
@@ -82,9 +95,24 @@ internal sealed partial class SyntaxAndDeclarationManager
         }
 
         var removeSet = syntaxTrees.ToImmutableHashSet();
-        return removeSet.Count == 0
-            ? this
-            : WithSyntaxTrees(_syntaxTrees.RemoveAll(removeSet.Contains));
+        if (removeSet.Count == 0)
+        {
+            return this;
+        }
+
+        var newSyntaxTrees = _syntaxTrees.RemoveAll(removeSet.Contains);
+        if (newSyntaxTrees.Length == _syntaxTrees.Length)
+        {
+            return this;
+        }
+
+        var state = _lazyState;
+        return state == null
+            ? new SyntaxAndDeclarationManager(newSyntaxTrees, _akcssSyntaxTrees)
+            : new SyntaxAndDeclarationManager(
+                newSyntaxTrees,
+                _akcssSyntaxTrees,
+                RemoveSyntaxTrees(state, newSyntaxTrees, removeSet));
     }
 
     public SyntaxAndDeclarationManager ReplaceSyntaxTree(
@@ -107,9 +135,19 @@ internal sealed partial class SyntaxAndDeclarationManager
             throw new ArgumentException("Syntax tree is not part of this manager.", nameof(oldTree));
         }
 
-        return ReferenceEquals(oldTree, newTree)
-            ? this
-            : WithSyntaxTrees(_syntaxTrees.SetItem(index, newTree));
+        if (ReferenceEquals(oldTree, newTree))
+        {
+            return this;
+        }
+
+        var newSyntaxTrees = _syntaxTrees.SetItem(index, newTree);
+        var state = _lazyState;
+        return state == null
+            ? new SyntaxAndDeclarationManager(newSyntaxTrees, _akcssSyntaxTrees)
+            : new SyntaxAndDeclarationManager(
+                newSyntaxTrees,
+                _akcssSyntaxTrees,
+                ReplaceSyntaxTree(state, newSyntaxTrees, index, newTree));
     }
 
     public SyntaxAndDeclarationManager AddAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> syntaxTrees)
@@ -119,7 +157,20 @@ internal sealed partial class SyntaxAndDeclarationManager
             throw new ArgumentNullException(nameof(syntaxTrees));
         }
 
-        return WithAkcssSyntaxTrees(_akcssSyntaxTrees.AddRange(syntaxTrees));
+        var addedTrees = syntaxTrees.ToImmutableArray();
+        if (addedTrees.IsEmpty)
+        {
+            return this;
+        }
+
+        var newAkcssSyntaxTrees = _akcssSyntaxTrees.AddRange(addedTrees);
+        var state = _lazyState;
+        return state == null
+            ? new SyntaxAndDeclarationManager(_syntaxTrees, newAkcssSyntaxTrees)
+            : new SyntaxAndDeclarationManager(
+                _syntaxTrees,
+                newAkcssSyntaxTrees,
+                AddAkcssSyntaxTrees(state, newAkcssSyntaxTrees, addedTrees));
     }
 
     public SyntaxAndDeclarationManager RemoveAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> syntaxTrees)
@@ -130,9 +181,24 @@ internal sealed partial class SyntaxAndDeclarationManager
         }
 
         var removeSet = syntaxTrees.ToImmutableHashSet();
-        return removeSet.Count == 0
-            ? this
-            : WithAkcssSyntaxTrees(_akcssSyntaxTrees.RemoveAll(removeSet.Contains));
+        if (removeSet.Count == 0)
+        {
+            return this;
+        }
+
+        var newAkcssSyntaxTrees = _akcssSyntaxTrees.RemoveAll(removeSet.Contains);
+        if (newAkcssSyntaxTrees.Length == _akcssSyntaxTrees.Length)
+        {
+            return this;
+        }
+
+        var state = _lazyState;
+        return state == null
+            ? new SyntaxAndDeclarationManager(_syntaxTrees, newAkcssSyntaxTrees)
+            : new SyntaxAndDeclarationManager(
+                _syntaxTrees,
+                newAkcssSyntaxTrees,
+                RemoveAkcssSyntaxTrees(state, newAkcssSyntaxTrees, removeSet));
     }
 
     public SyntaxAndDeclarationManager ReplaceAkcssSyntaxTree(
@@ -155,9 +221,19 @@ internal sealed partial class SyntaxAndDeclarationManager
             throw new ArgumentException("AKCSS syntax tree is not part of this manager.", nameof(oldTree));
         }
 
-        return ReferenceEquals(oldTree, newTree)
-            ? this
-            : WithAkcssSyntaxTrees(_akcssSyntaxTrees.SetItem(index, newTree));
+        if (ReferenceEquals(oldTree, newTree))
+        {
+            return this;
+        }
+
+        var newAkcssSyntaxTrees = _akcssSyntaxTrees.SetItem(index, newTree);
+        var state = _lazyState;
+        return state == null
+            ? new SyntaxAndDeclarationManager(_syntaxTrees, newAkcssSyntaxTrees)
+            : new SyntaxAndDeclarationManager(
+                _syntaxTrees,
+                newAkcssSyntaxTrees,
+                ReplaceAkcssSyntaxTree(state, newAkcssSyntaxTrees, index, newTree));
     }
 
     private SyntaxAndDeclarationManager WithTrees(
@@ -174,5 +250,125 @@ internal sealed partial class SyntaxAndDeclarationManager
             syntaxTrees,
             akcssSyntaxTrees,
             CreateState(syntaxTrees, akcssSyntaxTrees, state.DeclarationTable));
+    }
+
+    private static State AddSyntaxTrees(
+        State state,
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        ImmutableArray<AkburaSyntaxTree> addedTrees)
+    {
+        var components = state.DeclarationTable.Components.ToBuilder();
+        foreach (var tree in addedTrees)
+        {
+            components.Add(AkburaDeclarationCollector.Collect(tree));
+        }
+
+        return new State(
+            syntaxTrees,
+            state.AkcssSyntaxTrees,
+            CreateOrdinalMap(syntaxTrees),
+            state.AkcssOrdinalMap,
+            AkburaDeclarationTable.Create(
+                components.ToImmutable(),
+                state.DeclarationTable.AkcssModules));
+    }
+
+    private static State RemoveSyntaxTrees(
+        State state,
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        IImmutableSet<AkburaSyntaxTree> removeSet)
+    {
+        var components = state.DeclarationTable.Components
+            .RemoveAll(declaration => declaration.SyntaxTree != null &&
+                                      removeSet.Contains(declaration.SyntaxTree));
+
+        return new State(
+            syntaxTrees,
+            state.AkcssSyntaxTrees,
+            CreateOrdinalMap(syntaxTrees),
+            state.AkcssOrdinalMap,
+            AkburaDeclarationTable.Create(
+                components,
+                state.DeclarationTable.AkcssModules));
+    }
+
+    private static State ReplaceSyntaxTree(
+        State state,
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        int index,
+        AkburaSyntaxTree newTree)
+    {
+        var components = state.DeclarationTable.Components.SetItem(
+            index,
+            AkburaDeclarationCollector.Collect(newTree));
+
+        return new State(
+            syntaxTrees,
+            state.AkcssSyntaxTrees,
+            CreateOrdinalMap(syntaxTrees),
+            state.AkcssOrdinalMap,
+            AkburaDeclarationTable.Create(
+                components,
+                state.DeclarationTable.AkcssModules));
+    }
+
+    private static State AddAkcssSyntaxTrees(
+        State state,
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
+        ImmutableArray<AkcssSyntaxTree> addedTrees)
+    {
+        var akcssModules = state.DeclarationTable.AkcssModules.ToBuilder();
+        foreach (var tree in addedTrees)
+        {
+            akcssModules.Add(AkburaDeclarationCollector.Collect(tree));
+        }
+
+        return new State(
+            state.SyntaxTrees,
+            akcssSyntaxTrees,
+            state.SyntaxOrdinalMap,
+            CreateOrdinalMap(akcssSyntaxTrees),
+            AkburaDeclarationTable.Create(
+                state.DeclarationTable.Components,
+                akcssModules.ToImmutable()));
+    }
+
+    private static State RemoveAkcssSyntaxTrees(
+        State state,
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
+        IImmutableSet<AkcssSyntaxTree> removeSet)
+    {
+        var akcssModules = state.DeclarationTable.AkcssModules
+            .RemoveAll(declaration => declaration.AkcssSyntaxTree != null &&
+                                      removeSet.Contains(declaration.AkcssSyntaxTree));
+
+        return new State(
+            state.SyntaxTrees,
+            akcssSyntaxTrees,
+            state.SyntaxOrdinalMap,
+            CreateOrdinalMap(akcssSyntaxTrees),
+            AkburaDeclarationTable.Create(
+                state.DeclarationTable.Components,
+                akcssModules));
+    }
+
+    private static State ReplaceAkcssSyntaxTree(
+        State state,
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
+        int index,
+        AkcssSyntaxTree newTree)
+    {
+        var akcssModules = state.DeclarationTable.AkcssModules.SetItem(
+            index,
+            AkburaDeclarationCollector.Collect(newTree));
+
+        return new State(
+            state.SyntaxTrees,
+            akcssSyntaxTrees,
+            state.SyntaxOrdinalMap,
+            CreateOrdinalMap(akcssSyntaxTrees),
+            AkburaDeclarationTable.Create(
+                state.DeclarationTable.Components,
+                akcssModules));
     }
 }

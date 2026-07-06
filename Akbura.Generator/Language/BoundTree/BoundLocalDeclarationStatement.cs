@@ -87,15 +87,9 @@ internal sealed class BoundLocalDeclarationStatement : BoundStatement
     {
         if (initializers.IsDefaultOrEmpty)
         {
-            return ImmutableArray<BoundNode>.Empty;
+            return [];
         }
 
-        var builder = ArrayBuilder<BoundNode>.GetInstance(initializers.Length);
-        foreach (var initializer in initializers)
-        {
-            builder.Add(initializer);
-        }
-
-        return builder.ToImmutableAndFree();
+        return [.. initializers];
     }
 }

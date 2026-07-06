@@ -91,8 +91,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(ExecutableMemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(MarkupMemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(AkcssMemberSemanticModel)));
-        Assert.True(typeof(AkburaSemanticModel).IsAssignableFrom(typeof(PublicSemanticModel)));
-        Assert.True(typeof(PublicSemanticModel).IsAssignableFrom(typeof(SyntaxTreeSemanticModel)));
+        Assert.True(typeof(AkburaSemanticModel).IsAssignableFrom(typeof(SyntaxTreeSemanticModel)));
 
         var incrementalBinder = typeof(ExecutableMemberSemanticModel).GetNestedType(
             "IncrementalBinder",
@@ -114,7 +113,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
         Assert.DoesNotContain(nameof(MemberSemanticModelFactory), semanticModelSource);
         Assert.DoesNotContain("new ComponentMemberSemanticModel", semanticModelSource);
         Assert.Contains(nameof(MemberSemanticModelFactory), syntaxTreeSemanticModelSource);
-        Assert.Contains("internal sealed class SyntaxTreeSemanticModel : PublicSemanticModel", syntaxTreeSemanticModelSource);
+        Assert.Contains("internal sealed class SyntaxTreeSemanticModel : AkburaSemanticModel", syntaxTreeSemanticModelSource);
     }
 
 
@@ -127,7 +126,6 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
         var semanticModel = compilation.GetSemanticModel(tree);
 
         Assert.IsType<SyntaxTreeSemanticModel>(semanticModel);
-        Assert.IsAssignableFrom<PublicSemanticModel>(semanticModel);
         Assert.IsAssignableFrom<AkburaSemanticModel>(semanticModel);
     }
 
@@ -150,11 +148,6 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
             "Language",
             "Compilation",
             "SyntaxTreeSemanticModel.cs");
-        var publicSemanticModelSource = ReadRepositoryFile(
-            "Akbura.Generator",
-            "Language",
-            "Compilation",
-            "PublicSemanticModel.cs");
         var csharpReferencesSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
@@ -168,7 +161,6 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
 
         Assert.Contains("internal sealed class AkburaCompilation", compilationSource);
         Assert.Contains("internal partial class AkburaSemanticModel", semanticModelSource);
-        Assert.Contains("internal abstract class PublicSemanticModel", publicSemanticModelSource);
         Assert.Contains("internal sealed class SyntaxTreeSemanticModel", syntaxTreeSemanticModelSource);
         Assert.Contains("partial class AkburaSemanticModel", csharpReferencesSource);
         Assert.Contains("partial class AkburaSemanticModel", markupOperationsSource);

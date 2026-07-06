@@ -7,7 +7,7 @@ namespace Akbura.Language;
 /// <summary>
 /// Allows asking semantic questions about any node in an Akbura syntax tree within a compilation.
 /// </summary>
-internal sealed class SyntaxTreeSemanticModel : PublicSemanticModel
+internal sealed class SyntaxTreeSemanticModel : AkburaSemanticModel
 {
     /// <summary>
     /// Note, the name of this field could be somewhat confusing because it is also

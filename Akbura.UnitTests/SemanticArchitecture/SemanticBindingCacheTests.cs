@@ -478,7 +478,7 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
             isEnabledByDefault: true);
         var csharpDiagnostic = Diagnostic.Create(
             descriptor,
-            Location.None);
+            Microsoft.CodeAnalysis.Location.None);
         var bag = new BindingDiagnosticBag();
 
         bag.Add(semanticDiagnostic);

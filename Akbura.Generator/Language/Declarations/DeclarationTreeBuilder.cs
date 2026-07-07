@@ -1,0 +1,343 @@
+// This file is ported and adapted from the Roslyn (dotnet/roslyn)
+
+#nullable disable
+
+using Akbura.Language.Syntax;
+using Akbura.Pools;
+using System;
+using System.Collections.Immutable;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
+
+namespace Akbura.Language;
+
+internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTypeDeclaration>
+{
+    private string _componentName;
+    private string _akcssLogicalName;
+
+    private DeclarationTreeBuilder()
+    {
+    }
+
+    public static RootSingleNamespaceDeclaration ForTree(AkburaSyntaxTree syntaxTree)
+    {
+        if (syntaxTree == null)
+        {
+            throw new ArgumentNullException(nameof(syntaxTree));
+        }
+
+        var builder = new DeclarationTreeBuilder
+        {
+            _componentName = syntaxTree.ComponentName,
+        };
+
+        return builder.CreateAkburaRootDeclaration(syntaxTree.GetRoot());
+    }
+
+    public static RootSingleNamespaceDeclaration ForTree(AkcssSyntaxTree syntaxTree)
+    {
+        if (syntaxTree == null)
+        {
+            throw new ArgumentNullException(nameof(syntaxTree));
+        }
+
+        var builder = new DeclarationTreeBuilder
+        {
+            _akcssLogicalName = syntaxTree.LogicalName,
+        };
+
+        return builder.CreateAkcssRootDeclaration(syntaxTree.GetRoot());
+    }
+
+    public override SingleNamespaceOrTypeDeclaration VisitNamespaceDeclarationSyntax(NamespaceDeclarationSyntax node)
+    {
+        return SingleNamespaceDeclaration.Create(
+            name: node.Name.ToFullString().Trim(),
+            hasUsings: false,
+            hasExternAliases: false,
+            syntax: node,
+            nameLocation: new SourceLocation(node.Name),
+            children: ImmutableArray<SingleNamespaceOrTypeDeclaration>.Empty,
+            diagnostics: GetDiagnostics(node));
+    }
+
+    public override SingleNamespaceOrTypeDeclaration VisitInlineAkcssBlockSyntax(InlineAkcssBlockSyntax node)
+    {
+        return CreateAkcssModuleDeclaration(
+            name: "@akcss",
+            syntax: node,
+            members: node.Members);
+    }
+
+    public override SingleNamespaceOrTypeDeclaration VisitAkcssStyleRuleSyntax(AkcssStyleRuleSyntax node)
+    {
+        return CreateLeafDeclaration(
+            DeclarationKind.AkcssStyle,
+            node.Selector.ToFullString().Trim(),
+            node);
+    }
+
+    public override SingleNamespaceOrTypeDeclaration VisitAkcssUtilityDeclarationSyntax(AkcssUtilityDeclarationSyntax node)
+    {
+        return CreateLeafDeclaration(
+            DeclarationKind.AkcssUtility,
+            node.Selector.ToFullString().Trim(),
+            node);
+    }
+
+    private RootSingleNamespaceDeclaration CreateAkburaRootDeclaration(AkburaDocumentSyntax root)
+    {
+        var component = CreateComponentDeclaration(root);
+        var child = WrapInNamespaces(component, GetNamespaceName(root), root);
+
+        return new RootSingleNamespaceDeclaration(
+            hasGlobalUsings: HasGlobalUsings(root),
+            hasUsings: HasUsings(root),
+            hasExternAliases: false,
+            treeNode: root,
+            children: ImmutableArray.Create(child),
+            referenceDirectives: ImmutableArray<ReferenceDirective>.Empty,
+            hasAssemblyAttributes: false,
+            diagnostics: GetDiagnostics(root),
+            globalAliasedQuickAttributes: QuickAttributes.None);
+    }
+
+    private RootSingleNamespaceDeclaration CreateAkcssRootDeclaration(AkcssDocumentSyntax root)
+    {
+        var module = CreateAkcssModuleDeclaration(
+            string.IsNullOrWhiteSpace(_akcssLogicalName) ? "akcss" : _akcssLogicalName,
+            root,
+            root.Members);
+
+        return new RootSingleNamespaceDeclaration(
+            hasGlobalUsings: false,
+            hasUsings: HasAkcssUsings(root),
+            hasExternAliases: false,
+            treeNode: root,
+            children: ImmutableArray.Create<SingleNamespaceOrTypeDeclaration>(module),
+            referenceDirectives: ImmutableArray<ReferenceDirective>.Empty,
+            hasAssemblyAttributes: false,
+            diagnostics: GetDiagnostics(root),
+            globalAliasedQuickAttributes: QuickAttributes.None);
+    }
+
+    private SingleTypeDeclaration CreateComponentDeclaration(AkburaDocumentSyntax root)
+    {
+        var children = ArrayBuilder<SingleTypeDeclaration>.GetInstance();
+        foreach (var member in root.Members)
+        {
+            if (member.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax)
+            {
+                children.Add((SingleTypeDeclaration)Visit(member)!);
+            }
+        }
+
+        return new SingleTypeDeclaration(
+            kind: DeclarationKind.Component,
+            name: _componentName ?? string.Empty,
+            arity: 0,
+            modifiers: DeclarationModifiers.None,
+            declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
+            syntax: root,
+            nameLocation: new SourceLocation(root),
+            memberNames: GetComponentMemberNames(root),
+            children: children.ToImmutableAndFree(),
+            diagnostics: GetDiagnostics(root),
+            quickAttributes: QuickAttributes.None);
+    }
+
+    private SingleTypeDeclaration CreateAkcssModuleDeclaration(
+        string name,
+        AkburaSyntax syntax,
+        SyntaxList<AkcssTopLevelMemberSyntax> members)
+    {
+        var children = ArrayBuilder<SingleTypeDeclaration>.GetInstance();
+        foreach (var member in members)
+        {
+            if (member.Kind == AkburaSyntaxKind.AkcssStyleRuleSyntax)
+            {
+                children.Add((SingleTypeDeclaration)Visit(member)!);
+            }
+            else if (member.Kind == AkburaSyntaxKind.AkcssUtilitiesSectionSyntax)
+            {
+                foreach (var utility in ((AkcssUtilitiesSectionSyntax)member).Utilities)
+                {
+                    children.Add((SingleTypeDeclaration)Visit(utility)!);
+                }
+            }
+        }
+
+        return new SingleTypeDeclaration(
+            kind: DeclarationKind.AkcssModule,
+            name: name ?? string.Empty,
+            arity: 0,
+            modifiers: DeclarationModifiers.None,
+            declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
+            syntax: syntax,
+            nameLocation: new SourceLocation(syntax),
+            memberNames: GetAkcssMemberNames(members),
+            children: children.ToImmutableAndFree(),
+            diagnostics: GetDiagnostics(syntax),
+            quickAttributes: QuickAttributes.None);
+    }
+
+    private SingleTypeDeclaration CreateLeafDeclaration(
+        DeclarationKind kind,
+        string name,
+        AkburaSyntax syntax)
+    {
+        return new SingleTypeDeclaration(
+            kind,
+            name ?? string.Empty,
+            arity: 0,
+            modifiers: DeclarationModifiers.None,
+            declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
+            syntax: syntax,
+            nameLocation: new SourceLocation(syntax),
+            memberNames: ImmutableArray<string>.Empty,
+            children: ImmutableArray<SingleTypeDeclaration>.Empty,
+            diagnostics: GetDiagnostics(syntax),
+            quickAttributes: QuickAttributes.None);
+    }
+
+    private static SingleNamespaceOrTypeDeclaration WrapInNamespaces(
+        SingleNamespaceOrTypeDeclaration declaration,
+        string namespaceName,
+        AkburaDocumentSyntax root)
+    {
+        if (string.IsNullOrWhiteSpace(namespaceName))
+        {
+            return declaration;
+        }
+
+        var parts = namespaceName.Split('.');
+        var current = declaration;
+        for (var index = parts.Length - 1; index >= 0; index--)
+        {
+            var name = parts[index].Trim();
+            if (name.Length == 0)
+            {
+                continue;
+            }
+
+            current = SingleNamespaceDeclaration.Create(
+                name,
+                hasUsings: false,
+                hasExternAliases: false,
+                root,
+                new SourceLocation(root),
+                ImmutableArray.Create(current),
+                ImmutableArray<AkburaDiagnostic>.Empty);
+        }
+
+        return current;
+    }
+
+    private static string GetNamespaceName(AkburaDocumentSyntax root)
+    {
+        foreach (var member in root.Members)
+        {
+            if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
+            {
+                return ((NamespaceDeclarationSyntax)member).Name.ToFullString().Trim();
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static bool HasUsings(AkburaDocumentSyntax root)
+    {
+        foreach (var member in root.Members)
+        {
+            if (member.Kind == AkburaSyntaxKind.UsingDirectiveSyntax)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasGlobalUsings(AkburaDocumentSyntax root)
+    {
+        foreach (var member in root.Members)
+        {
+            if (member.Kind == AkburaSyntaxKind.UsingDirectiveSyntax &&
+                ((UsingDirectiveSyntax)member).GlobalKeyword.RawKind != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasAkcssUsings(AkcssDocumentSyntax root)
+    {
+        foreach (var member in root.Members)
+        {
+            if (member.Kind == AkburaSyntaxKind.AkcssUsingDirectiveSyntax)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static ImmutableArray<string> GetComponentMemberNames(AkburaDocumentSyntax root)
+    {
+        var builder = ArrayBuilder<string>.GetInstance();
+        foreach (var member in root.Members)
+        {
+            var name = GetComponentMemberName(member);
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                builder.Add(name);
+            }
+        }
+
+        return builder.ToImmutableAndFree();
+    }
+
+    private static string GetComponentMemberName(AkTopLevelMemberSyntax member)
+    {
+        return member.Kind switch
+        {
+            AkburaSyntaxKind.StateDeclarationSyntax => ((StateDeclarationSyntax)member).Name.ToFullString().Trim(),
+            AkburaSyntaxKind.ParamDeclarationSyntax => ((ParamDeclarationSyntax)member).Name.ToFullString().Trim(),
+            AkburaSyntaxKind.InjectDeclarationSyntax => ((InjectDeclarationSyntax)member).Name.ToFullString().Trim(),
+            AkburaSyntaxKind.CommandDeclarationSyntax => ((CommandDeclarationSyntax)member).Name.ToFullString().Trim(),
+            AkburaSyntaxKind.UserHook => ((UserHookSyntax)member).Name.ToFullString().Trim(),
+            AkburaSyntaxKind.InlineAkcssBlockSyntax => "@akcss",
+            _ => string.Empty,
+        };
+    }
+
+    private static ImmutableArray<string> GetAkcssMemberNames(SyntaxList<AkcssTopLevelMemberSyntax> members)
+    {
+        var builder = ArrayBuilder<string>.GetInstance();
+        foreach (var member in members)
+        {
+            if (member.Kind == AkburaSyntaxKind.AkcssStyleRuleSyntax)
+            {
+                builder.Add(((AkcssStyleRuleSyntax)member).Selector.ToFullString().Trim());
+            }
+            else if (member.Kind == AkburaSyntaxKind.AkcssUtilitiesSectionSyntax)
+            {
+                foreach (var utility in ((AkcssUtilitiesSectionSyntax)member).Utilities)
+                {
+                    builder.Add(utility.Selector.ToFullString().Trim());
+                }
+            }
+        }
+
+        return builder.ToImmutableAndFree();
+    }
+
+    private static ImmutableArray<AkburaDiagnostic> GetDiagnostics(AkburaSyntax syntax)
+    {
+        return syntax.GetDiagnostics();
+    }
+}

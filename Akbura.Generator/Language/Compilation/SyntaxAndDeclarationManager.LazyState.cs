@@ -1,8 +1,9 @@
+using Akbura.Language.Declarations;
 using System;
 using System.Collections.Immutable;
 using System.Threading;
 
-namespace Akbura.Language.Declarations;
+namespace Akbura.Language;
 
 internal sealed partial class SyntaxAndDeclarationManager
 {

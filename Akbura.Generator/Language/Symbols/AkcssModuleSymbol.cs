@@ -13,7 +13,7 @@ internal sealed class AkcssModuleSymbol : Symbol, IAkcssModuleSymbol
         IAkburaComponentSymbol? containingSymbol,
         ImmutableArray<IAkcssSymbol> akcssSymbols,
         string? path,
-        ImmutableArray<Location> locations = default,
+        ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
         bool isImplicitlyDeclared = false)
         : base(containingSymbol, locations, declaringSyntaxReferences, isImplicitlyDeclared)

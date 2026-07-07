@@ -531,4 +531,242 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         }
     }
 
+
+    [Fact]
+    public void DeclarationTable_BuilderAddsAndRemovesLatestRootDeclaration()
+    {
+        var oldRoot = new Lazy<Declaration>(() => new TestDeclaration(
+            "Old",
+            [new TestDeclaration("Nested")]));
+        var latestRoot = new Lazy<Declaration>(() => new TestDeclaration("Latest"));
+        var builder = DeclarationTable.Empty.ToBuilder();
+        builder.AddRootDeclaration(oldRoot);
+        var oldTable = builder.ToDeclarationTableAndFree();
+
+        builder = oldTable.ToBuilder();
+        builder.AddRootDeclaration(latestRoot);
+        var tableWithLatest = builder.ToDeclarationTableAndFree();
+
+        Assert.Collection(
+            tableWithLatest.RootDeclarations,
+            declaration => Assert.Equal("Old", declaration.Name),
+            declaration => Assert.Equal("Latest", declaration.Name));
+        Assert.Collection(
+            tableWithLatest.MergedRoot.Declarations,
+            declaration => Assert.Equal("Old", declaration.Name),
+            declaration => Assert.Equal("Latest", declaration.Name));
+        Assert.Collection(
+            tableWithLatest.MergedRoot.Children,
+            declaration => Assert.Equal("Nested", declaration.Name));
+        Assert.Contains("Old", tableWithLatest.DeclarationNames);
+        Assert.Contains("Nested", tableWithLatest.DeclarationNames);
+        Assert.Contains("Latest", tableWithLatest.DeclarationNames);
+
+        builder = tableWithLatest.ToBuilder();
+        builder.RemoveRootDeclaration(latestRoot);
+        var tableWithoutLatest = builder.ToDeclarationTableAndFree();
+
+        Assert.Collection(
+            tableWithoutLatest.RootDeclarations,
+            declaration => Assert.Equal("Old", declaration.Name));
+        Assert.Collection(
+            tableWithoutLatest.MergedRoot.Declarations,
+            declaration => Assert.Equal("Old", declaration.Name));
+        Assert.Contains("Old", tableWithoutLatest.DeclarationNames);
+        Assert.Contains("Nested", tableWithoutLatest.DeclarationNames);
+        Assert.DoesNotContain("Latest", tableWithoutLatest.DeclarationNames);
+    }
+
+    [Fact]
+    public void DeclarationKind_ConvertsFromSyntaxKind()
+    {
+        Assert.Equal(DeclarationKind.Component, AkburaSyntaxKind.AkburaDocumentSyntax.ToDeclarationKind());
+        Assert.Equal(DeclarationKind.Namespace, AkburaSyntaxKind.NamespaceDeclarationSyntax.ToDeclarationKind());
+        Assert.Equal(DeclarationKind.AkcssModule, AkburaSyntaxKind.AkcssDocumentSyntax.ToDeclarationKind());
+        Assert.Equal(DeclarationKind.AkcssModule, AkburaSyntaxKind.InlineAkcssBlockSyntax.ToDeclarationKind());
+        Assert.Equal(DeclarationKind.AkcssStyle, AkburaSyntaxKind.AkcssStyleRuleSyntax.ToDeclarationKind());
+        Assert.Equal(DeclarationKind.AkcssUtility, AkburaSyntaxKind.AkcssUtilityDeclarationSyntax.ToDeclarationKind());
+        Assert.ThrowsAny<Exception>(() => AkburaSyntaxKind.StateDeclarationSyntax.ToDeclarationKind());
+    }
+
+    [Fact]
+    public void SingleNamespaceDeclarations_PreserveFlagsLocationsAndChildren()
+    {
+        var root = AkburaSyntaxTree.ParseText("namespace Demo;\n<TextBlock />").GetRoot();
+        var nameLocation = new SourceLocation(root);
+        var child = SingleNamespaceDeclaration.Create(
+            "Child",
+            hasUsings: false,
+            hasExternAliases: false,
+            root,
+            nameLocation,
+            ImmutableArray<SingleNamespaceOrTypeDeclaration>.Empty,
+            ImmutableArray<AkburaDiagnostic>.Empty);
+        var namespaceWithImports = SingleNamespaceDeclaration.Create(
+            "Demo",
+            hasUsings: true,
+            hasExternAliases: true,
+            root,
+            nameLocation,
+            ImmutableArray.Create<SingleNamespaceOrTypeDeclaration>(child),
+            ImmutableArray<AkburaDiagnostic>.Empty);
+        var rootDeclaration = new RootSingleNamespaceDeclaration(
+            hasGlobalUsings: true,
+            hasUsings: true,
+            hasExternAliases: true,
+            root,
+            ImmutableArray.Create<SingleNamespaceOrTypeDeclaration>(namespaceWithImports),
+            ImmutableArray.Create(new ReferenceDirective("demo.dll")),
+            hasAssemblyAttributes: true,
+            ImmutableArray<AkburaDiagnostic>.Empty,
+            QuickAttributes.None);
+
+        Assert.Equal(DeclarationKind.Namespace, namespaceWithImports.Kind);
+        Assert.True(namespaceWithImports.HasUsings);
+        Assert.True(namespaceWithImports.HasExternAliases);
+        Assert.Single(namespaceWithImports.Children);
+        Assert.Single(((Declaration)namespaceWithImports).Children);
+        Assert.Same(root, namespaceWithImports.Syntax);
+        Assert.Same(root, namespaceWithImports.Location.Syntax);
+        Assert.Same(root, namespaceWithImports.NameLocation.Syntax);
+
+        Assert.True(rootDeclaration.HasGlobalUsings);
+        Assert.True(rootDeclaration.HasUsings);
+        Assert.True(rootDeclaration.HasExternAliases);
+        Assert.True(rootDeclaration.HasAssemblyAttributes);
+        Assert.Equal("demo.dll", Assert.Single(rootDeclaration.ReferenceDirectives).File);
+        Assert.Same(namespaceWithImports, Assert.Single(rootDeclaration.Children));
+    }
+
+    [Fact]
+    public void SourceLocation_PreservesKindSyntaxSpanAndEquality()
+    {
+        var root = AkburaSyntaxTree.ParseText("namespace Demo;\n<TextBlock />").GetRoot();
+        var location = new SourceLocation(root);
+        var sameLocation = new SourceLocation(root, root.Span);
+        var differentLocation = new SourceLocation(root, new TextSpan(root.Span.Start, 0));
+
+        Assert.Equal(Akbura.Language.LocationKind.SourceFile, location.Kind);
+        Assert.Same(root, location.SourceSyntax);
+        Assert.Same(root, location.Syntax);
+        Assert.Equal(root.Span, location.SourceSpan);
+        Assert.Equal(root.Span, location.Span);
+        Assert.Equal(location, sameLocation);
+        Assert.NotEqual(location, differentLocation);
+        Assert.Equal(Akbura.Language.LocationKind.None, Akbura.Language.Location.None.Kind);
+        Assert.Same(Akbura.Language.Location.None, NoLocation.Singleton);
+    }
+
+    [Fact]
+    public void DeclarationTreeBuilder_BuildsAkburaRootDeclaration()
+    {
+        const string code =
+            """
+            global using System;
+            using Avalonia.Controls;
+            namespace Demo.Pages;
+
+            state int count = 0;
+            param string Title = "";
+
+            @akcss {
+                .card {
+                    Width: 1;
+                }
+
+                @utilities {
+                    .w-(double value) {
+                        Width: value;
+                    }
+                }
+            }
+
+            <TextBlock />
+            """;
+        var tree = AkburaSyntaxTree.ParseText(code, "Pages/Dashboard.akbura");
+
+        var declaration = DeclarationTreeBuilder.ForTree(tree);
+
+        Assert.True(declaration.HasGlobalUsings);
+        Assert.True(declaration.HasUsings);
+        var demoNamespace = Assert.IsType<SingleNamespaceDeclaration>(Assert.Single(declaration.Children));
+        Assert.Equal("Demo", demoNamespace.Name);
+        var pagesNamespace = Assert.IsType<SingleNamespaceDeclaration>(Assert.Single(demoNamespace.Children));
+        Assert.Equal("Pages", pagesNamespace.Name);
+        var component = Assert.IsType<SingleTypeDeclaration>(Assert.Single(pagesNamespace.Children));
+        Assert.Equal(DeclarationKind.Component, component.Kind);
+        Assert.Equal("Dashboard", component.Name);
+        Assert.Contains("count", component.MemberNames);
+        Assert.Contains("Title", component.MemberNames);
+        Assert.Contains("@akcss", component.MemberNames);
+
+        var inlineAkcss = Assert.IsType<SingleTypeDeclaration>(Assert.Single(component.Children));
+        Assert.Equal(DeclarationKind.AkcssModule, inlineAkcss.Kind);
+        Assert.Equal("@akcss", inlineAkcss.Name);
+        Assert.Contains(".card", inlineAkcss.MemberNames);
+        Assert.Contains(".w-(double value)", inlineAkcss.MemberNames);
+        Assert.Collection(
+            inlineAkcss.Children,
+            child => Assert.Equal(DeclarationKind.AkcssStyle, child.Kind),
+            child => Assert.Equal(DeclarationKind.AkcssUtility, child.Kind));
+    }
+
+    [Fact]
+    public void DeclarationTreeBuilder_BuildsAkcssRootDeclaration()
+    {
+        const string code =
+            """
+            @using Demo.Shared;
+
+            .card {
+                Width: 1;
+            }
+
+            @utilities {
+                .w {
+                    Width: 1;
+                }
+            }
+            """;
+        var tree = AkcssSyntaxTree.ParseText(
+            code,
+            "Styles.akcss",
+            "Demo.Styles.akcss");
+
+        var declaration = DeclarationTreeBuilder.ForTree(tree);
+
+        Assert.True(declaration.HasUsings);
+        var module = Assert.IsType<SingleTypeDeclaration>(Assert.Single(declaration.Children));
+        Assert.Equal(DeclarationKind.AkcssModule, module.Kind);
+        Assert.Equal("Demo.Styles.akcss", module.Name);
+        Assert.Contains(".card", module.MemberNames);
+        Assert.Contains(".w", module.MemberNames);
+        Assert.Collection(
+            module.Children,
+            child => Assert.Equal(DeclarationKind.AkcssStyle, child.Kind),
+            child => Assert.Equal(DeclarationKind.AkcssUtility, child.Kind));
+    }
+
+    private sealed class TestDeclaration : Declaration
+    {
+        private readonly ImmutableArray<Declaration> _children;
+
+        public TestDeclaration(
+            string name,
+            ImmutableArray<Declaration> children = default)
+            : base(name)
+        {
+            _children = children.IsDefault
+                ? ImmutableArray<Declaration>.Empty
+                : children;
+        }
+
+        public override DeclarationKind Kind => DeclarationKind.Component;
+
+        protected override ImmutableArray<Declaration> GetDeclarationChildren()
+        {
+            return _children;
+        }
+    }
+
 }

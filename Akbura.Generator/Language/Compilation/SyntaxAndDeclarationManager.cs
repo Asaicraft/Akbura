@@ -1,9 +1,10 @@
+using Akbura.Language.Declarations;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
-namespace Akbura.Language.Declarations;
+namespace Akbura.Language;
 
 internal sealed partial class SyntaxAndDeclarationManager
 {

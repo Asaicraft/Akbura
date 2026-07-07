@@ -16,7 +16,7 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         ICommandSymbol? command = null,
         SymbolLanguage language = SymbolLanguage.Markup,
         ISymbol? containingSymbol = null,
-        ImmutableArray<Location> locations = default,
+        ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
         bool isImplicitlyDeclared = false)
         : base(containingSymbol, locations, declaringSyntaxReferences, isImplicitlyDeclared)

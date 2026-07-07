@@ -9,12 +9,12 @@ internal abstract class Symbol : ISymbol
 {
     protected Symbol(
         ISymbol? containingSymbol = null,
-        ImmutableArray<Location> locations = default,
+        ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
         bool isImplicitlyDeclared = false)
     {
         ContainingSymbol = containingSymbol;
-        Locations = locations.IsDefault ? ImmutableArray<Location>.Empty : locations;
+        Locations = locations.IsDefault ? ImmutableArray<Microsoft.CodeAnalysis.Location>.Empty : locations;
         DeclaringSyntaxReferences = declaringSyntaxReferences.IsDefault
             ? ImmutableArray<ISymbolDeclarationReference>.Empty
             : declaringSyntaxReferences;
@@ -35,7 +35,7 @@ internal abstract class Symbol : ISymbol
 
     public virtual CSharpSymbolDefinition CSharpDefinition => default;
 
-    public ImmutableArray<Location> Locations { get; }
+    public ImmutableArray<Microsoft.CodeAnalysis.Location> Locations { get; }
 
     public ImmutableArray<ISymbolDeclarationReference> DeclaringSyntaxReferences { get; }
 

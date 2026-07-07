@@ -15,7 +15,7 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
         ImmutableArray<IMarkupAttributeOperation> attributeOperations = default,
         IAkburaComponentSymbol? akburaComponent = null,
         ISymbol? containingSymbol = null,
-        ImmutableArray<Location> locations = default,
+        ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
         bool isImplicitlyDeclared = false)
         : base(containingSymbol, locations, declaringSyntaxReferences, isImplicitlyDeclared)

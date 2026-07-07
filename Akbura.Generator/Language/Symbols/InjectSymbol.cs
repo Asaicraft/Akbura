@@ -11,7 +11,7 @@ internal sealed class InjectSymbol : Symbol, IInjectSymbol
         InjectDeclarationSyntax declarationSyntax,
         CSharpSymbolDefinition type,
         ISymbol? containingSymbol = null,
-        ImmutableArray<Location> locations = default,
+        ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
         bool isImplicitlyDeclared = false)
         : base(containingSymbol, locations, declaringSyntaxReferences, isImplicitlyDeclared)

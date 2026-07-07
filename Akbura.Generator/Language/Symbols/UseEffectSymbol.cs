@@ -12,7 +12,7 @@ internal sealed class UseEffectSymbol : Symbol, IUseEffectSymbol
         UseEffectDeclarationSyntax declarationSyntax,
         ImmutableArray<UseEffectDependency> dependencies,
         ISymbol? containingSymbol = null,
-        ImmutableArray<Location> locations = default,
+        ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
         bool isImplicitlyDeclared = false)
         : base(containingSymbol, locations, declaringSyntaxReferences, isImplicitlyDeclared)

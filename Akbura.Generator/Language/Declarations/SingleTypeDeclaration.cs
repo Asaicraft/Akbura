@@ -6,6 +6,7 @@ using Akbura.Language.Syntax;
 using Akbura.Collections;
 using System;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 
 namespace Akbura.Language;
 
@@ -22,7 +23,7 @@ internal sealed class SingleTypeDeclaration : SingleNamespaceOrTypeDeclaration
         TypeDeclarationFlags declFlags,
         AkburaSyntax syntax,
         SourceLocation nameLocation,
-        ImmutableSegmentedHashSet<string> memberNames,
+        StrongBox<ImmutableSegmentedHashSet<string>> memberNames,
         ImmutableArray<SingleTypeDeclaration> children,
         ImmutableArray<AkburaDiagnostic> diagnostics,
         QuickAttributes quickAttributes)
@@ -32,9 +33,8 @@ internal sealed class SingleTypeDeclaration : SingleNamespaceOrTypeDeclaration
         Arity = arity;
         Modifiers = modifiers;
         DeclarationFlags = declFlags;
-        MemberNames = memberNames.IsDefault
-            ? ImmutableSegmentedHashSet<string>.Empty
-            : memberNames;
+        MemberNames = memberNames ?? new StrongBox<ImmutableSegmentedHashSet<string>>(
+            ImmutableSegmentedHashSet<string>.Empty);
         _children = children.IsDefault
             ? ImmutableArray<SingleNamespaceOrTypeDeclaration>.Empty
             : ImmutableArray<SingleNamespaceOrTypeDeclaration>.CastUp(children);
@@ -55,7 +55,7 @@ internal sealed class SingleTypeDeclaration : SingleNamespaceOrTypeDeclaration
 
     public TypeDeclarationFlags DeclarationFlags { get; }
 
-    public ImmutableSegmentedHashSet<string> MemberNames { get; }
+    public StrongBox<ImmutableSegmentedHashSet<string>> MemberNames { get; }
 
     public QuickAttributes QuickAttributes { get; }
 

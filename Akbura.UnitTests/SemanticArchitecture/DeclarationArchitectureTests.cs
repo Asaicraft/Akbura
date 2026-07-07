@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaOperationKind = Akbura.Language.Operations.OperationKind;
@@ -138,9 +139,25 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Same(akcss, Assert.Single(state.AkcssSyntaxTrees));
         Assert.Equal(0, state.SyntaxOrdinalMap[component]);
         Assert.Equal(0, state.AkcssOrdinalMap[akcss]);
+        Assert.Same(component, Assert.Single(state.RootNamespaces).Key);
+        Assert.Same(akcss, Assert.Single(state.AkcssRootNamespaces).Key);
         Assert.Same(compilation.DeclarationTable, state.DeclarationTable);
         Assert.Equal("Counter", Assert.Single(state.DeclarationTable.Components).Name);
         Assert.Equal("Demo.Pages.Counter.akcss", Assert.Single(state.DeclarationTable.AkcssModules).Name);
+        Assert.Collection(
+            state.RootDeclarationTable.RootDeclarations,
+            declaration =>
+            {
+                Assert.Equal(string.Empty, declaration.Name);
+                Assert.Equal("Counter", Assert.Single(declaration.Children).Name);
+            },
+            declaration =>
+            {
+                Assert.Equal(string.Empty, declaration.Name);
+                Assert.Equal("Demo.Pages.Counter.akcss", Assert.Single(declaration.Children).Name);
+            });
+        Assert.Equal(1, state.LastComputedMemberNames[component].Count);
+        Assert.Equal(1, state.LastComputedAkcssMemberNames[akcss].Count);
     }
 
 
@@ -216,6 +233,60 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.NotSame(oldTable.Components[1], newTable.Components[1]);
         Assert.Equal(0, newCompilation.SyntaxAndDeclarations.GetLazyState().SyntaxOrdinalMap[first]);
         Assert.Equal(1, newCompilation.SyntaxAndDeclarations.GetLazyState().SyntaxOrdinalMap[newSecond]);
+    }
+
+
+    [Fact]
+    public void SyntaxAndDeclarationManager_ReplaceSyntaxTreeCarriesLastComputedMemberNameBoxes()
+    {
+        var oldTree = AkburaSyntaxTree.ParseText(
+            """
+            state int count = 0;
+
+            @akcss {
+                .card {
+                    Width: 1;
+                }
+            }
+            """,
+            "Counter.akbura");
+        var newTree = AkburaSyntaxTree.ParseText(
+            """
+            state int count = 1;
+
+            @akcss {
+                .card {
+                    Width: 2;
+                }
+            }
+            """,
+            "Counter.akbura");
+        var oldCompilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [oldTree]);
+        var oldState = oldCompilation.SyntaxAndDeclarations.GetLazyState();
+        var oldRoot = oldState.RootNamespaces[oldTree].Value;
+        var oldComponent = Assert.IsType<SingleTypeDeclaration>(Assert.Single(oldRoot.Children));
+        var oldInlineAkcss = Assert.IsType<SingleTypeDeclaration>(Assert.Single(oldComponent.Children));
+        Assert.True(oldState.LastComputedMemberNames[oldTree][0].TryGetTarget(out var oldComponentNames));
+        Assert.True(oldState.LastComputedMemberNames[oldTree][1].TryGetTarget(out var oldInlineAkcssNames));
+        Assert.Same(oldComponent.MemberNames, oldComponentNames);
+        Assert.Same(oldInlineAkcss.MemberNames, oldInlineAkcssNames);
+
+        var newCompilation = oldCompilation.ReplaceSyntaxTree(oldTree, newTree);
+        var newState = newCompilation.SyntaxAndDeclarations.GetLazyState();
+        var newRoot = newState.RootNamespaces[newTree].Value;
+        var newComponent = Assert.IsType<SingleTypeDeclaration>(Assert.Single(newRoot.Children));
+        var newInlineAkcss = Assert.IsType<SingleTypeDeclaration>(Assert.Single(newComponent.Children));
+
+        Assert.Equal(2, newState.LastComputedMemberNames[newTree].Count);
+        Assert.True(newState.LastComputedMemberNames[newTree][0].TryGetTarget(out var newComponentNames));
+        Assert.True(newState.LastComputedMemberNames[newTree][1].TryGetTarget(out var newInlineAkcssNames));
+        Assert.Same(newComponent.MemberNames, newComponentNames);
+        Assert.Same(newInlineAkcss.MemberNames, newInlineAkcssNames);
+        Assert.Contains("count", newComponentNames.Value);
+        Assert.Contains("@akcss", newComponentNames.Value);
+        Assert.Contains(".card", newInlineAkcssNames.Value);
     }
 
 
@@ -730,15 +801,15 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         var component = Assert.IsType<SingleTypeDeclaration>(Assert.Single(pagesNamespace.Children));
         Assert.Equal(DeclarationKind.Component, component.Kind);
         Assert.Equal("Dashboard", component.Name);
-        Assert.Contains("count", component.MemberNames);
-        Assert.Contains("Title", component.MemberNames);
-        Assert.Contains("@akcss", component.MemberNames);
+        Assert.Contains("count", component.MemberNames.Value);
+        Assert.Contains("Title", component.MemberNames.Value);
+        Assert.Contains("@akcss", component.MemberNames.Value);
 
         var inlineAkcss = Assert.IsType<SingleTypeDeclaration>(Assert.Single(component.Children));
         Assert.Equal(DeclarationKind.AkcssModule, inlineAkcss.Kind);
         Assert.Equal("@akcss", inlineAkcss.Name);
-        Assert.Contains(".card", inlineAkcss.MemberNames);
-        Assert.Contains(".w-(double value)", inlineAkcss.MemberNames);
+        Assert.Contains(".card", inlineAkcss.MemberNames.Value);
+        Assert.Contains(".w-(double value)", inlineAkcss.MemberNames.Value);
         Assert.Collection(
             inlineAkcss.Children,
             child => Assert.Equal(DeclarationKind.AkcssStyle, child.Kind),
@@ -780,11 +851,11 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.True(DeclarationTreeBuilder.CachesComputedMemberNames(component));
         Assert.True(DeclarationTreeBuilder.CachesComputedMemberNames(inlineAkcss));
         Assert.False(DeclarationTreeBuilder.CachesComputedMemberNames(style));
-        Assert.Equal(2, component.MemberNames.Count);
-        Assert.Contains("count", component.MemberNames);
-        Assert.Contains("@akcss", component.MemberNames);
-        Assert.Single(inlineAkcss.MemberNames);
-        Assert.Contains(".card", inlineAkcss.MemberNames);
+        Assert.Equal(2, component.MemberNames.Value.Count);
+        Assert.Contains("count", component.MemberNames.Value);
+        Assert.Contains("@akcss", component.MemberNames.Value);
+        Assert.Single(inlineAkcss.MemberNames.Value);
+        Assert.Contains(".card", inlineAkcss.MemberNames.Value);
     }
 
     [Fact]
@@ -815,8 +886,8 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         var module = Assert.IsType<SingleTypeDeclaration>(Assert.Single(declaration.Children));
         Assert.Equal(DeclarationKind.AkcssModule, module.Kind);
         Assert.Equal("Demo.Styles.akcss", module.Name);
-        Assert.Contains(".card", module.MemberNames);
-        Assert.Contains(".w", module.MemberNames);
+        Assert.Contains(".card", module.MemberNames.Value);
+        Assert.Contains(".w", module.MemberNames.Value);
         Assert.Collection(
             module.Children,
             child => Assert.Equal(DeclarationKind.AkcssStyle, child.Kind),
@@ -861,7 +932,7 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
             syntax,
             new SourceLocation(syntax),
-            ImmutableSegmentedHashSet<string>.Empty,
+            new StrongBox<ImmutableSegmentedHashSet<string>>(ImmutableSegmentedHashSet<string>.Empty),
             children,
             ImmutableArray<AkburaDiagnostic>.Empty,
             QuickAttributes.None);

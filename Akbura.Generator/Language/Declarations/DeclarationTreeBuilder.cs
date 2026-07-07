@@ -22,19 +22,27 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
 
     private string _componentName;
     private string _akcssLogicalName;
+    private OneOrMany<WeakReference<BoxedMemberNames>> _previousMemberNames;
+    private int _currentTypeIndex;
 
-    private DeclarationTreeBuilder()
+    private DeclarationTreeBuilder(
+        OneOrMany<WeakReference<BoxedMemberNames>> previousMemberNames = default)
     {
+        _previousMemberNames = previousMemberNames.IsDefault
+            ? OneOrMany<WeakReference<BoxedMemberNames>>.Empty
+            : previousMemberNames;
     }
 
-    public static RootSingleNamespaceDeclaration ForTree(AkburaSyntaxTree syntaxTree)
+    public static RootSingleNamespaceDeclaration ForTree(
+        AkburaSyntaxTree syntaxTree,
+        OneOrMany<WeakReference<BoxedMemberNames>> previousMemberNames = default)
     {
         if (syntaxTree == null)
         {
             throw new ArgumentNullException(nameof(syntaxTree));
         }
 
-        var builder = new DeclarationTreeBuilder
+        var builder = new DeclarationTreeBuilder(previousMemberNames)
         {
             _componentName = syntaxTree.ComponentName,
         };
@@ -42,14 +50,16 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         return builder.CreateAkburaRootDeclaration(syntaxTree.GetRoot());
     }
 
-    public static RootSingleNamespaceDeclaration ForTree(AkcssSyntaxTree syntaxTree)
+    public static RootSingleNamespaceDeclaration ForTree(
+        AkcssSyntaxTree syntaxTree,
+        OneOrMany<WeakReference<BoxedMemberNames>> previousMemberNames = default)
     {
         if (syntaxTree == null)
         {
             throw new ArgumentNullException(nameof(syntaxTree));
         }
 
-        var builder = new DeclarationTreeBuilder
+        var builder = new DeclarationTreeBuilder(previousMemberNames)
         {
             _akcssLogicalName = syntaxTree.LogicalName,
         };
@@ -215,7 +225,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
             syntax: syntax,
             nameLocation: new SourceLocation(syntax),
-            memberNames: ImmutableSegmentedHashSet<string>.Empty,
+            memberNames: s_emptyMemberNames,
             children: ImmutableArray<SingleTypeDeclaration>.Empty,
             diagnostics: GetDiagnostics(syntax),
             quickAttributes: QuickAttributes.None);
@@ -307,7 +317,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         return false;
     }
 
-    private static ImmutableSegmentedHashSet<string> GetComponentMemberNames(AkburaDocumentSyntax root)
+    private BoxedMemberNames GetComponentMemberNames(AkburaDocumentSyntax root)
     {
         return GetOrComputeMemberNames(
             root,
@@ -335,7 +345,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         };
     }
 
-    private static ImmutableSegmentedHashSet<string> GetAkcssMemberNames(
+    private BoxedMemberNames GetAkcssMemberNames(
         AkburaSyntax syntax,
         SyntaxList<AkcssTopLevelMemberSyntax> members)
     {
@@ -365,14 +375,15 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             members);
     }
 
-    private static ImmutableSegmentedHashSet<string> GetOrComputeMemberNames<TData>(
+    private BoxedMemberNames GetOrComputeMemberNames<TData>(
         AkburaSyntax syntax,
         Action<ImmutableSegmentedHashSet<string>.Builder, TData> addMemberNames,
         TData data)
     {
+        var typeIndex = _currentTypeIndex++;
         if (s_nodeToMemberNames.TryGetValue(syntax.Green, out var memberNames))
         {
-            return memberNames.Value;
+            return memberNames;
         }
 
         var builder = ImmutableSegmentedHashSet.CreateBuilder<string>(StringComparer.Ordinal);
@@ -381,13 +392,57 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
 
         if (value.Count == 0)
         {
-            return s_emptyMemberNames.Value;
+            return s_emptyMemberNames;
+        }
+
+        if (TryGetPreviousMemberNames(typeIndex, value, out var previousMemberNames))
+        {
+            return s_nodeToMemberNames.GetValue(
+                syntax.Green,
+                _ => previousMemberNames);
         }
 
         var computedMemberNames = new BoxedMemberNames(value);
         return s_nodeToMemberNames.GetValue(
             syntax.Green,
-            _ => computedMemberNames).Value;
+            _ => computedMemberNames);
+    }
+
+    private bool TryGetPreviousMemberNames(
+        int index,
+        ImmutableSegmentedHashSet<string> value,
+        out BoxedMemberNames memberNames)
+    {
+        if (index < _previousMemberNames.Count &&
+            _previousMemberNames[index].TryGetTarget(out var candidate) &&
+            MemberNamesEqual(candidate.Value, value))
+        {
+            memberNames = candidate;
+            return true;
+        }
+
+        memberNames = null!;
+        return false;
+    }
+
+    private static bool MemberNamesEqual(
+        ImmutableSegmentedHashSet<string> left,
+        ImmutableSegmentedHashSet<string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        foreach (var name in right)
+        {
+            if (!left.Contains(name))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void AddMemberName(

@@ -78,7 +78,7 @@ internal sealed class AkcssSyntaxTree
         IEnumerable<TextChangeRange>? changes = null,
         CancellationToken cancellationToken = default)
     {
-        var changeRanges = changes?.ToArray() ?? newText.GetChangeRanges(Text).ToArray();
+        var changeRanges = changes?.ToArray() ?? [.. newText.GetChangeRanges(Text)];
         if (changeRanges.Length == 0 && newText.ToString() == Text.ToString())
         {
             return this;

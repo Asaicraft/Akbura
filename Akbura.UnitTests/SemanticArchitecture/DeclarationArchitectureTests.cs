@@ -342,6 +342,107 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Same(secondAkcss, Assert.Single(removed.AkcssSyntaxTrees));
     }
 
+    [Fact]
+    public void DeclarationTable_UpdatesAkcssStyleDeclarationsAcrossIncrementalEdits()
+    {
+        var component = AkburaSyntaxTree.ParseText("state int count = 0;", "Counter.akbura");
+        const string firstCode =
+            """
+            .before {
+                Padding: 1;
+            }
+
+            .myclass {
+                Background: White;
+            }
+
+            .after {
+                Margin: 2;
+            }
+            """;
+        const string secondCode =
+            """
+            .before {
+                Padding: 1;
+            }
+
+            .myclasss {
+                Background: White;
+            }
+
+            .after {
+                Margin: 2;
+            }
+            """;
+        const string thirdCode =
+            """
+            .before {
+                Padding: 1;
+            }
+
+            .myclassss {
+                Background: White;
+            }
+
+            .after {
+                Margin: 2;
+            }
+            """;
+
+        var firstAkcss = AkcssSyntaxTree.ParseText(firstCode, "Counter.akcss", "Demo.Counter.akcss");
+        var firstCompilation = CreateCompilation(component, [firstAkcss]);
+        var firstTable = firstCompilation.DeclarationTable;
+        AssertAkcssStyleDeclarations(firstCompilation, firstAkcss, ".myclass");
+
+        var secondAkcss = ReplaceText(firstAkcss, firstCode, secondCode, ".myclass", ".myclasss");
+        var secondCompilation = firstCompilation.ReplaceAkcssSyntaxTree(firstAkcss, secondAkcss);
+        var secondTable = secondCompilation.DeclarationTable;
+        AssertAkcssStyleDeclarations(secondCompilation, secondAkcss, ".myclasss");
+        Assert.Same(firstTable.Components[0], secondTable.Components[0]);
+        Assert.NotSame(firstTable.AkcssModules[0], secondTable.AkcssModules[0]);
+
+        var thirdAkcss = ReplaceText(secondAkcss, secondCode, thirdCode, ".myclasss", ".myclassss");
+        var thirdCompilation = secondCompilation.ReplaceAkcssSyntaxTree(secondAkcss, thirdAkcss);
+        var thirdTable = thirdCompilation.DeclarationTable;
+        AssertAkcssStyleDeclarations(thirdCompilation, thirdAkcss, ".myclassss");
+        Assert.Same(secondTable.Components[0], thirdTable.Components[0]);
+        Assert.NotSame(secondTable.AkcssModules[0], thirdTable.AkcssModules[0]);
+
+        static AkcssSyntaxTree ReplaceText(
+            AkcssSyntaxTree oldTree,
+            string oldText,
+            string newText,
+            string oldSelector,
+            string newSelector)
+        {
+            var changeStart = oldText.IndexOf(oldSelector, StringComparison.Ordinal);
+            Assert.True(changeStart >= 0);
+            var change = new TextChangeRange(
+                new TextSpan(changeStart, oldSelector.Length),
+                newSelector.Length);
+            return oldTree.WithChangedText(SourceText.From(newText), [change]);
+        }
+
+        static void AssertAkcssStyleDeclarations(
+            AkburaCompilation compilation,
+            AkcssSyntaxTree syntaxTree,
+            string expectedStyle)
+        {
+            var module = Assert.Single(compilation.DeclarationTable.AkcssModules);
+            Assert.Equal("Demo.Counter.akcss", module.Name);
+            Assert.Same(syntaxTree, DeclarationFacts.GetAkcssSyntaxTree(module));
+
+            Assert.Contains(module.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle && declaration.Name == ".before");
+            Assert.Contains(module.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle && declaration.Name == expectedStyle);
+            Assert.Contains(module.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle && declaration.Name == ".after");
+
+            Assert.DoesNotContain(module.Children, declaration =>
+                declaration.Kind == DeclarationKind.AkcssStyle &&
+                declaration.Name.StartsWith(".myclass", StringComparison.Ordinal) &&
+                declaration.Name != expectedStyle);
+        }
+    }
+
 
     [Fact]
     public void SyntaxAndDeclarationManager_AddRemoveSyntaxTreesUpdatesHotStateIncrementally()

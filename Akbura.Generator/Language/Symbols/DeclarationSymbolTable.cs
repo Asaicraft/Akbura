@@ -20,7 +20,12 @@ internal sealed class DeclarationSymbolTable
 
     public AkburaSymbolInfo GetSymbolInfo(Declaration declaration)
     {
-        var syntax = declaration.Syntax;
+        if (declaration is not SingleDeclaration singleDeclaration)
+        {
+            return AkburaSymbolInfo.None(CandidateReason.UnsupportedSyntax);
+        }
+
+        var syntax = singleDeclaration.Syntax;
         if (_symbolInfos.TryGetValue(syntax, out var symbolInfo))
         {
             return symbolInfo;
@@ -35,7 +40,12 @@ internal sealed class DeclarationSymbolTable
         Declaration declaration,
         params DeclarationKind[] allowedKinds)
     {
-        var key = new DeclaredSymbolsKey(declaration.Syntax, GetKindMask(allowedKinds));
+        if (declaration is not SingleDeclaration singleDeclaration)
+        {
+            return ImmutableArray<AkburaSymbol>.Empty;
+        }
+
+        var key = new DeclaredSymbolsKey(singleDeclaration.Syntax, GetKindMask(allowedKinds));
         if (_declaredSymbols.TryGetValue(key, out var symbols))
         {
             return symbols;

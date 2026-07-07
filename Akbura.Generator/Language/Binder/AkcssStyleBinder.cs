@@ -23,7 +23,7 @@ internal sealed class AkcssStyleBinder : Binder
             semanticModel,
             next,
             declaration,
-            declaration.Syntax,
+            DeclarationFacts.GetSyntax(declaration),
             flags | AkburaBinderFlags.InAkcss |
                 (declaration.Kind == DeclarationKind.AkcssUtility
                     ? AkburaBinderFlags.InAkcssUtility
@@ -177,7 +177,7 @@ internal sealed class AkcssStyleBinder : Binder
             return;
         }
 
-        var symbol = FindDeclaredSymbol(GetDeclaredSymbolsForScope(Declaration.Syntax), name);
+        var symbol = FindDeclaredSymbol(GetDeclaredSymbolsForScope(DeclarationFacts.GetSyntax(Declaration)), name);
         if (symbol != null)
         {
             result.SetSymbol(symbol);

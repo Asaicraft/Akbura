@@ -45,7 +45,7 @@ internal sealed partial class BinderFactory
             {
                 _next = current;
                 _declaration = declaration;
-                current = Visit(declaration.Syntax) ?? current;
+                current = Visit(DeclarationFacts.GetSyntax(declaration)) ?? current;
             }
 
             return current;
@@ -166,7 +166,7 @@ internal sealed partial class BinderFactory
             }
 
             throw new InvalidOperationException(
-                $"Declaration kind {declaration.Kind} cannot create binder for {declaration.Syntax.GetType().Name}.");
+                $"Declaration kind {declaration.Kind} cannot create binder for {DeclarationFacts.GetSyntax(declaration).GetType().Name}.");
         }
 
         private BinderFactory Factory =>

@@ -3,7 +3,6 @@
 #nullable disable
 
 using System.Collections.Immutable;
-using Akbura.Language.Syntax;
 
 namespace Akbura.Language;
 
@@ -27,49 +26,9 @@ internal abstract class Declaration
         }
     }
 
-    public ImmutableArray<Declaration> Children
-    {
-        get
-        {
-            return GetDeclarationChildren();
-        }
-    }
+    public ImmutableArray<Declaration> Children => GetDeclarationChildren();
 
     public abstract DeclarationKind Kind { get; }
-
-    public virtual AkburaSyntax Syntax
-    {
-        get
-        {
-            return null;
-        }
-    }
-
-    public virtual AkburaSyntaxTree SyntaxTree
-    {
-        get
-        {
-            return null;
-        }
-    }
-
-    public virtual AkcssSyntaxTree AkcssSyntaxTree
-    {
-        get
-        {
-            return null;
-        }
-    }
-
-    public bool ContainsDiagnosticsOrSkippedText
-    {
-        get
-        {
-            var syntax = Syntax;
-            return syntax != null &&
-                   (syntax.ContainsDiagnostics || syntax.ContainsSkippedText);
-        }
-    }
 
     protected abstract ImmutableArray<Declaration> GetDeclarationChildren();
 }

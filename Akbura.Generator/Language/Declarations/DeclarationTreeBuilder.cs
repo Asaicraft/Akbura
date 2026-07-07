@@ -137,8 +137,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             hasUsings: HasUsings(root),
             hasExternAliases: false,
             treeNode: root,
-            children: ImmutableArray.Create(child),
-            referenceDirectives: ImmutableArray<ReferenceDirective>.Empty,
+            children: [child],
             hasAssemblyAttributes: false,
             diagnostics: GetDiagnostics(root),
             globalAliasedQuickAttributes: QuickAttributes.None);
@@ -156,8 +155,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             hasUsings: HasAkcssUsings(root),
             hasExternAliases: false,
             treeNode: root,
-            children: ImmutableArray.Create<SingleNamespaceOrTypeDeclaration>(module),
-            referenceDirectives: ImmutableArray<ReferenceDirective>.Empty,
+            children: [module],
             hasAssemblyAttributes: false,
             diagnostics: GetDiagnostics(root),
             globalAliasedQuickAttributes: QuickAttributes.None);
@@ -268,8 +266,8 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
                 hasExternAliases: false,
                 root,
                 new SourceLocation(root),
-                ImmutableArray.Create(current),
-                ImmutableArray<AkburaDiagnostic>.Empty);
+                [current],
+                []);
         }
 
         return current;
@@ -524,7 +522,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             var root = syntaxTree.GetRoot();
             VisitAkburaDocumentSyntax(root);
 
-            return new SingleDeclaration(
+            return new SingleSyntaxDeclaration(
                 DeclarationKind.Component,
                 syntaxTree.ComponentName,
                 root,
@@ -543,7 +541,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             var root = syntaxTree.GetRoot();
             VisitAkcssDocumentSyntax(root);
 
-            return new SingleDeclaration(
+            return new SingleSyntaxDeclaration(
                 DeclarationKind.AkcssModule,
                 syntaxTree.LogicalName,
                 root,
@@ -727,7 +725,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
 
         private Declaration CreateCSharpBlockDeclaration(CSharpBlockSyntax block)
         {
-            return new SingleDeclaration(
+            return new SingleSyntaxDeclaration(
                 DeclarationKind.CSharpBlock,
                 "{...}",
                 block,
@@ -738,7 +736,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
 
         private Declaration CreateMarkupRootDeclaration(MarkupRootSyntax root)
         {
-            return new SingleDeclaration(
+            return new SingleSyntaxDeclaration(
                 DeclarationKind.MarkupRoot,
                 GetMarkupElementName(root.Element),
                 root,
@@ -763,7 +761,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
 
         private Declaration CreateMarkupElementDeclaration(MarkupElementSyntax element)
         {
-            return new SingleDeclaration(
+            return new SingleSyntaxDeclaration(
                 DeclarationKind.MarkupElement,
                 GetMarkupElementName(element),
                 element,
@@ -791,7 +789,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             AkburaSyntax syntax,
             ImmutableArray<Declaration> children = default)
         {
-            Add(new SingleDeclaration(
+            Add(new SingleSyntaxDeclaration(
                 kind,
                 name,
                 syntax,

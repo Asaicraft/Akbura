@@ -4,13 +4,11 @@
 
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace Akbura.Language;
 
 internal sealed class RootSingleNamespaceDeclaration : SingleNamespaceDeclaration
 {
-    private readonly ImmutableArray<ReferenceDirective> _referenceDirectives;
     private readonly bool _hasAssemblyAttributes;
     private readonly bool _hasGlobalUsings;
     private readonly bool _hasUsings;
@@ -27,7 +25,6 @@ internal sealed class RootSingleNamespaceDeclaration : SingleNamespaceDeclaratio
         bool hasExternAliases,
         AkburaSyntax treeNode,
         ImmutableArray<SingleNamespaceOrTypeDeclaration> children,
-        ImmutableArray<ReferenceDirective> referenceDirectives,
         bool hasAssemblyAttributes,
         ImmutableArray<AkburaDiagnostic> diagnostics,
         QuickAttributes globalAliasedQuickAttributes)
@@ -38,24 +35,11 @@ internal sealed class RootSingleNamespaceDeclaration : SingleNamespaceDeclaratio
             children: children,
             diagnostics: diagnostics)
     {
-        Debug.Assert(!referenceDirectives.IsDefault);
-
-        _referenceDirectives = referenceDirectives.IsDefault
-            ? ImmutableArray<ReferenceDirective>.Empty
-            : referenceDirectives;
         _hasAssemblyAttributes = hasAssemblyAttributes;
         _hasGlobalUsings = hasGlobalUsings;
         _hasUsings = hasUsings;
         _hasExternAliases = hasExternAliases;
         GlobalAliasedQuickAttributes = globalAliasedQuickAttributes;
-    }
-
-    public ImmutableArray<ReferenceDirective> ReferenceDirectives
-    {
-        get
-        {
-            return _referenceDirectives;
-        }
     }
 
     public bool HasAssemblyAttributes

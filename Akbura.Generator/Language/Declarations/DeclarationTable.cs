@@ -271,13 +271,10 @@ internal sealed partial class DeclarationTable
         if (olderRoots.IsDefaultOrEmpty)
         {
             return MergedNamespaceDeclaration.Create(
-                ImmutableArray.Create<Declaration>(_latestLazyRootDeclaration.Value));
+                [_latestLazyRootDeclaration.Value]);
         }
 
-        var builder = ArrayBuilder<Declaration>.GetInstance(olderRoots.Length + 1);
-        builder.AddRange(olderRoots);
-        builder.Add(_latestLazyRootDeclaration.Value);
-        return MergedNamespaceDeclaration.Create(builder.ToImmutableAndFree());
+        return MergedNamespaceDeclaration.Create([.. olderRoots, _latestLazyRootDeclaration.Value]);
     }
 
     private ICollection<string> GetMergedDeclarationNames()
@@ -354,7 +351,8 @@ internal sealed partial class DeclarationTable
 
         foreach (var candidate in previous.Components)
         {
-            if (ReferenceEquals(candidate.SyntaxTree, tree))
+            if (candidate is SingleSyntaxDeclaration { SyntaxTree: var syntaxTree } &&
+                ReferenceEquals(syntaxTree, tree))
             {
                 declaration = candidate;
                 return true;
@@ -377,7 +375,8 @@ internal sealed partial class DeclarationTable
 
         foreach (var candidate in previous.AkcssModules)
         {
-            if (ReferenceEquals(candidate.AkcssSyntaxTree, tree))
+            if (candidate is SingleSyntaxDeclaration { AkcssSyntaxTree: var syntaxTree } &&
+                ReferenceEquals(syntaxTree, tree))
             {
                 declaration = candidate;
                 return true;
@@ -412,12 +411,12 @@ internal sealed partial class DeclarationTable
         ArrayBuilder<Declaration> path,
         Dictionary<AkburaSyntax, ImmutableArray<Declaration>> map)
     {
-        var syntax = declaration.Syntax;
-        if (syntax == null)
+        if (declaration is not SingleDeclaration singleDeclaration)
         {
             return;
         }
 
+        var syntax = singleDeclaration.Syntax;
         path.Add(declaration);
         map[syntax] = path.ToImmutable();
 
@@ -435,10 +434,9 @@ internal sealed partial class DeclarationTable
         int position,
         ArrayBuilder<Declaration> path)
     {
-        var currentSyntax = current.Syntax;
-        if (currentSyntax == null ||
-            !SemanticSyntaxIdentity.IsInSameTree(currentSyntax, syntax) ||
-            !ContainsPosition(currentSyntax, position))
+        if (current is not SingleDeclaration singleDeclaration ||
+            !SemanticSyntaxIdentity.IsInSameTree(singleDeclaration.Syntax, syntax) ||
+            !ContainsPosition(singleDeclaration.Syntax, position))
         {
             return false;
         }

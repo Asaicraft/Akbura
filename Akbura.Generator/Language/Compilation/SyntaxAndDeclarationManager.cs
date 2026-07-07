@@ -287,8 +287,9 @@ internal sealed partial class SyntaxAndDeclarationManager
         IImmutableSet<AkburaSyntaxTree> removeSet)
     {
         var components = state.DeclarationTable.Components
-            .RemoveAll(declaration => declaration.SyntaxTree != null &&
-                                      removeSet.Contains(declaration.SyntaxTree));
+            .RemoveAll(declaration => declaration is SingleSyntaxDeclaration { SyntaxTree: var syntaxTree } &&
+                                      syntaxTree != null &&
+                                      removeSet.Contains(syntaxTree));
 
         return CreateState(
             syntaxTrees,
@@ -356,8 +357,9 @@ internal sealed partial class SyntaxAndDeclarationManager
         IImmutableSet<AkcssSyntaxTree> removeSet)
     {
         var akcssModules = state.DeclarationTable.AkcssModules
-            .RemoveAll(declaration => declaration.AkcssSyntaxTree != null &&
-                                      removeSet.Contains(declaration.AkcssSyntaxTree));
+            .RemoveAll(declaration => declaration is SingleSyntaxDeclaration { AkcssSyntaxTree: var syntaxTree } &&
+                                      syntaxTree != null &&
+                                      removeSet.Contains(syntaxTree));
 
         return CreateState(
             state.SyntaxTrees,

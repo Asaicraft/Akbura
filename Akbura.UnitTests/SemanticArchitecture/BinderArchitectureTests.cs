@@ -468,7 +468,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
         var statementDeclaration = Assert.Single(
             rootDeclaration.Children,
-            declaration => SemanticSyntaxIdentity.Equals(declaration.Syntax, ifStatement));
+            declaration => SemanticSyntaxIdentity.Equals(DeclarationFacts.GetSyntax(declaration), ifStatement));
         var executableRootPath = ImmutableArray.Create(rootDeclaration, statementDeclaration);
         var next = model.GetBinder(root);
         var executableBinder = new ExecutableCodeBinder(

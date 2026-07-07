@@ -19,7 +19,7 @@ internal sealed class AkcssModuleBinder : Binder
             semanticModel,
             next,
             declaration,
-            declaration.Syntax,
+            DeclarationFacts.GetSyntax(declaration),
             flags | AkburaBinderFlags.InAkcss)
     {
     }
@@ -60,7 +60,7 @@ internal sealed class AkcssModuleBinder : Binder
             return;
         }
 
-        var symbol = FindDeclaredSymbol(GetDeclaredSymbolsForScope(Declaration.Syntax), name);
+        var symbol = FindDeclaredSymbol(GetDeclaredSymbolsForScope(DeclarationFacts.GetSyntax(Declaration)), name);
         if (symbol != null)
         {
             result.SetSymbol(symbol);

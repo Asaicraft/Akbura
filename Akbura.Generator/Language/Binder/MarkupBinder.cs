@@ -24,7 +24,7 @@ internal sealed partial class MarkupBinder : Binder
             semanticModel,
             next,
             declaration,
-            declaration.Syntax,
+            DeclarationFacts.GetSyntax(declaration),
             flags | AkburaBinderFlags.InMarkup)
     {
     }
@@ -33,12 +33,12 @@ internal sealed partial class MarkupBinder : Binder
     {
         get
         {
-            return Declaration?.Syntax switch
+            return Declaration != null ? DeclarationFacts.GetSyntax(Declaration) switch
             {
                 MarkupRootSyntax markupRoot => SemanticModel.GetSymbolInfo(markupRoot.Element).Symbol as IMarkupComponentSymbol,
                 MarkupElementSyntax markupElement => SemanticModel.GetSymbolInfo(markupElement).Symbol as IMarkupComponentSymbol,
                 _ => null,
-            };
+            } : null;
         }
     }
 

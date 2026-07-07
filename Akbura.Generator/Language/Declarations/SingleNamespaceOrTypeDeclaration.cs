@@ -7,52 +7,15 @@ using System.Collections.Immutable;
 
 namespace Akbura.Language;
 
-internal abstract class SingleNamespaceOrTypeDeclaration : Declaration
+internal abstract class SingleNamespaceOrTypeDeclaration : SingleDeclaration
 {
-    private readonly AkburaSyntax _syntax;
-    private readonly SourceLocation _nameLocation;
-
-    /// <summary>
-    /// Any diagnostics reported while converting syntax into the Declaration instance.
-    /// </summary>
-    public readonly ImmutableArray<AkburaDiagnostic> Diagnostics;
-
     protected SingleNamespaceOrTypeDeclaration(
         string name,
         AkburaSyntax syntax,
         SourceLocation nameLocation,
         ImmutableArray<AkburaDiagnostic> diagnostics)
-        : base(name)
+        : base(name, syntax, nameLocation, diagnostics)
     {
-        _syntax = syntax;
-        _nameLocation = nameLocation;
-        Diagnostics = diagnostics.IsDefault
-            ? ImmutableArray<AkburaDiagnostic>.Empty
-            : diagnostics;
-    }
-
-    public SourceLocation Location
-    {
-        get
-        {
-            return new SourceLocation(Syntax);
-        }
-    }
-
-    public override AkburaSyntax Syntax
-    {
-        get
-        {
-            return _syntax;
-        }
-    }
-
-    public SourceLocation NameLocation
-    {
-        get
-        {
-            return _nameLocation;
-        }
     }
 
     protected override ImmutableArray<Declaration> GetDeclarationChildren()

@@ -223,7 +223,7 @@ internal sealed class BindingSession
             return RootBinder;
         }
 
-        var cacheSyntax = path[path.Length - 1].Syntax;
+        var cacheSyntax = DeclarationFacts.GetSyntax(path[path.Length - 1]);
         var key = BinderFactory.BinderFactoryVisitor.CreateBinderCacheKey(
             cacheSyntax,
             usage);
@@ -239,7 +239,7 @@ internal sealed class BindingSession
     {
         if (TryGetExecutableRootPath(path, out var executableRootPath))
         {
-            var targetSyntax = path[path.Length - 1].Syntax;
+            var targetSyntax = DeclarationFacts.GetSyntax(path[path.Length - 1]);
             return GetExecutableCodeBinder(executableRootPath, usage)
                 .GetBinder(targetSyntax) ?? RootBinder;
         }
@@ -272,7 +272,7 @@ internal sealed class BindingSession
         BinderUsage usage)
     {
         var rootDeclaration = executableRootPath[executableRootPath.Length - 1];
-        var key = new BinderCacheKey(rootDeclaration.Syntax, usage);
+        var key = new BinderCacheKey(DeclarationFacts.GetSyntax(rootDeclaration), usage);
         if (_executableBinderCache.TryGetValue(key, out var executableBinder))
         {
             return executableBinder;

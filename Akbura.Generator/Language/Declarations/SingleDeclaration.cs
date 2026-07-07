@@ -4,47 +4,45 @@ using System.Collections.Immutable;
 
 namespace Akbura.Language;
 
-internal sealed class SingleDeclaration : Declaration
+internal abstract class SingleDeclaration : Declaration
 {
-    private readonly DeclarationKind _kind;
     private readonly AkburaSyntax _syntax;
-    private readonly ImmutableArray<Declaration> _children;
+    private readonly SourceLocation _nameLocation;
 
-    public SingleDeclaration(
-        DeclarationKind kind,
+    /// <summary>
+    /// Any diagnostics reported while converting syntax into the declaration instance.
+    /// </summary>
+    public readonly ImmutableArray<AkburaDiagnostic> Diagnostics;
+
+    protected SingleDeclaration(
         string name,
         AkburaSyntax syntax,
-        AkburaSyntaxTree? syntaxTree = null,
-        AkcssSyntaxTree? akcssSyntaxTree = null,
-        ImmutableArray<Declaration> children = default)
+        SourceLocation nameLocation,
+        ImmutableArray<AkburaDiagnostic> diagnostics)
         : base(name ?? string.Empty)
     {
-        _kind = kind;
         _syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
-        SyntaxTree = syntaxTree;
-        AkcssSyntaxTree = akcssSyntaxTree;
-        _children = children.IsDefault
-            ? ImmutableArray<Declaration>.Empty
-            : children;
+        _nameLocation = nameLocation ?? throw new ArgumentNullException(nameof(nameLocation));
+        Diagnostics = diagnostics.IsDefault
+            ? ImmutableArray<AkburaDiagnostic>.Empty
+            : diagnostics;
     }
 
-    public override DeclarationKind Kind => _kind;
-
-    public override AkburaSyntax Syntax => _syntax;
-
-    public override AkburaSyntaxTree? SyntaxTree { get; }
-
-    public override AkcssSyntaxTree? AkcssSyntaxTree { get; }
-
-    protected override ImmutableArray<Declaration> GetDeclarationChildren()
+    public SourceLocation Location
     {
-        return _children;
+        get
+        {
+            return new SourceLocation(Syntax);
+        }
     }
 
-    public override string ToString()
+    public AkburaSyntax Syntax => _syntax;
+
+    public SourceLocation NameLocation
     {
-        return string.IsNullOrEmpty(Name)
-            ? Kind.ToString()
-            : $"{Kind} {Name}";
+        get
+        {
+            return _nameLocation;
+        }
     }
 }

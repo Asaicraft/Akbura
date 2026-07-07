@@ -23,7 +23,7 @@ internal sealed class BlockBinder : Binder
             semanticModel,
             next,
             declaration,
-            declaration.Syntax,
+            DeclarationFacts.GetSyntax(declaration),
             flags | AkburaBinderFlags.InCSharpBlock)
     {
     }
@@ -53,7 +53,7 @@ internal sealed class BlockBinder : Binder
             return;
         }
 
-        var symbols = GetDeclaredSymbolsForScope(Declaration.Syntax);
+        var symbols = GetDeclaredSymbolsForScope(DeclarationFacts.GetSyntax(Declaration));
         foreach (var symbol in symbols)
         {
             if (!string.Equals(symbol.Name, name, System.StringComparison.Ordinal) ||
@@ -92,12 +92,13 @@ internal sealed class BlockBinder : Binder
         foreach (var child in Declaration.Children)
         {
             if (child.Kind != DeclarationKind.CSharpStatement ||
-                child.Syntax.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
+                !DeclarationFacts.TryGetSyntax(child, out var childSyntax) ||
+                childSyntax.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
             {
                 continue;
             }
 
-            var statement = Unsafe.As<CSharpStatementSyntax>(child.Syntax);
+            var statement = Unsafe.As<CSharpStatementSyntax>(childSyntax);
             AddLocalSymbols(builder, statement);
         }
 

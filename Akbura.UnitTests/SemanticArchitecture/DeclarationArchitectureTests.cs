@@ -82,6 +82,35 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Contains(externalAkcss.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle);
     }
 
+    [Fact]
+    public void DeclarationLayer_KeepsSyntaxOnlyOnSingleDeclarations()
+    {
+        var tree = AkburaSyntaxTree.ParseText("state int count = 0;", "Counter.akbura");
+        var declaration = DeclarationTreeBuilder.ForSyntaxDeclaration(tree);
+        var root = tree.GetRoot();
+
+        Assert.Null(typeof(Declaration).GetProperty("Syntax", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+        Assert.Null(typeof(Declaration).GetProperty("SyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+        Assert.Null(typeof(Declaration).GetProperty("AkcssSyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+
+        var single = Assert.IsType<SingleSyntaxDeclaration>(declaration);
+        Assert.Same(root, single.Syntax);
+        Assert.Same(tree, single.SyntaxTree);
+        Assert.Null(single.AkcssSyntaxTree);
+        Assert.Same(root, single.Location.SourceSyntax);
+        Assert.Same(root, single.NameLocation.SourceSyntax);
+
+        var compilation = CreateCompilation(tree);
+        var rootSingleDeclaration = Assert.Single(compilation.DeclarationTable.RootDeclarations);
+        Assert.True(DeclarationFacts.TryGetSyntax(rootSingleDeclaration, out _));
+
+        var mergedRoot = compilation.DeclarationTable.MergedRoot;
+        Assert.False(DeclarationFacts.TryGetSyntax(mergedRoot, out _));
+        Assert.Null(typeof(MergedNamespaceOrTypeDeclaration).GetProperty("Syntax", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+        Assert.Null(typeof(MergedNamespaceOrTypeDeclaration).GetProperty("SyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+        Assert.Null(typeof(MergedNamespaceOrTypeDeclaration).GetProperty("AkcssSyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
+    }
+
 
     [Fact]
     public void DeclarationTreeBuilder_BuildsSyntaxDeclarationsAndResetsState()
@@ -209,7 +238,9 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         {
             Assert.Equal(exactPath[index].Kind, positionPath[index].Kind);
             Assert.Equal(exactPath[index].Name, positionPath[index].Name);
-            Assert.Same(exactPath[index].Syntax, positionPath[index].Syntax);
+            Assert.Same(
+                DeclarationFacts.GetSyntax(exactPath[index]),
+                DeclarationFacts.GetSyntax(positionPath[index]));
         }
     }
 
@@ -723,7 +754,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             hasExternAliases: true,
             root,
             ImmutableArray.Create<SingleNamespaceOrTypeDeclaration>(namespaceWithImports),
-            ImmutableArray.Create(new ReferenceDirective("demo.dll")),
             hasAssemblyAttributes: true,
             ImmutableArray<AkburaDiagnostic>.Empty,
             QuickAttributes.None);
@@ -741,7 +771,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.True(rootDeclaration.HasUsings);
         Assert.True(rootDeclaration.HasExternAliases);
         Assert.True(rootDeclaration.HasAssemblyAttributes);
-        Assert.Equal("demo.dll", Assert.Single(rootDeclaration.ReferenceDirectives).File);
         Assert.Same(namespaceWithImports, Assert.Single(rootDeclaration.Children));
     }
 
@@ -914,7 +943,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
                 hasExternAliases: false,
                 root,
                 ImmutableArray.Create<SingleNamespaceOrTypeDeclaration>(child),
-                ImmutableArray<ReferenceDirective>.Empty,
                 hasAssemblyAttributes: false,
                 ImmutableArray<AkburaDiagnostic>.Empty,
                 QuickAttributes.None);

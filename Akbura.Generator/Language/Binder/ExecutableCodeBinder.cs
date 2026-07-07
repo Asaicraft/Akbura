@@ -27,7 +27,7 @@ internal sealed class ExecutableCodeBinder : Binder
             next?.SemanticModel ?? throw new ArgumentNullException(nameof(next)),
             next,
             GetRootDeclaration(rootPath),
-            GetRootDeclaration(rootPath).Syntax,
+            DeclarationFacts.GetSyntax(GetRootDeclaration(rootPath)),
             next.Flags)
     {
         _bindingSession = bindingSession ?? throw new ArgumentNullException(nameof(bindingSession));
@@ -80,8 +80,13 @@ internal sealed class ExecutableCodeBinder : Binder
         ArrayBuilder<Declaration> path,
         Declaration declaration)
     {
+        if (!DeclarationFacts.TryGetSyntax(declaration, out var declarationSyntax))
+        {
+            return;
+        }
+
         path.Add(declaration);
-        map[declaration.Syntax] = _bindingSession.GetOrCreateBinder(
+        map[declarationSyntax] = _bindingSession.GetOrCreateBinder(
             path.ToImmutable(),
             _usage);
 

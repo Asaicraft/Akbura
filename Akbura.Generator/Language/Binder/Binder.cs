@@ -53,7 +53,7 @@ internal abstract class Binder
     public virtual string ScopeKey =>
         Declaration == null
             ? GetType().Name
-            : $"{GetType().Name}:{Declaration.Kind}:{Declaration.Name}:{ScopeDesignator?.FullSpan.ToString() ?? Declaration.Syntax.FullSpan.ToString()}";
+            : $"{GetType().Name}:{Declaration.Kind}:{Declaration.Name}:{ScopeDesignator?.FullSpan.ToString() ?? DeclarationFacts.GetSyntax(Declaration).FullSpan.ToString()}";
 
     public virtual AkburaSymbolInfo LookupSymbol(AkburaSyntax syntax)
     {

@@ -310,11 +310,18 @@ internal partial class AkburaSemanticModel
 
     internal AkburaSymbolInfo CreateDeclarationSymbolInfo(Declaration declaration)
     {
-        if (declaration.SyntaxTree != null &&
-            !ReferenceEquals(declaration.Syntax.Root, SyntaxTree.GetRoot()))
+        if (declaration is not SingleDeclaration singleDeclaration)
         {
-            var containingModel = Compilation.GetSemanticModel(declaration.SyntaxTree);
-            var symbol = containingModel.GetDeclaredSymbol(declaration.Syntax);
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var syntax = singleDeclaration.Syntax;
+        if (declaration is SingleSyntaxDeclaration syntaxDeclaration &&
+            syntaxDeclaration.SyntaxTree != null &&
+            !ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()))
+        {
+            var containingModel = Compilation.GetSemanticModel(syntaxDeclaration.SyntaxTree);
+            var symbol = containingModel.GetDeclaredSymbol(syntax);
             return symbol == null
                 ? AkburaSymbolInfo.None(AkburaCandidateReason.NotFound)
                 : AkburaSymbolInfo.Success(symbol);
@@ -328,15 +335,15 @@ internal partial class AkburaSemanticModel
                 DeclarationKind.InjectedService or
                 DeclarationKind.Command or
                 DeclarationKind.UseEffect =>
-                GetMemberSemanticModel(declaration.Syntax).GetSymbolInfo(declaration.Syntax),
-            DeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax =>
-                ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(declaration.Syntax)),
-            DeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.AkcssDocumentSyntax =>
+                GetMemberSemanticModel(syntax).GetSymbolInfo(syntax),
+            DeclarationKind.AkcssModule when syntax.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax =>
+                ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(syntax)),
+            DeclarationKind.AkcssModule when syntax.Kind == AkburaSyntaxKind.AkcssDocumentSyntax =>
                 ResolveExternalAkcssModule(declaration),
             DeclarationKind.AkcssStyle =>
-                ResolveAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(declaration.Syntax)),
+                ResolveAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(syntax)),
             DeclarationKind.AkcssUtility =>
-                ResolveTailwindUtility(Unsafe.As<AkcssUtilityDeclarationSyntax>(declaration.Syntax)),
+                ResolveTailwindUtility(Unsafe.As<AkcssUtilityDeclarationSyntax>(syntax)),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         };
     }
@@ -403,7 +410,7 @@ internal partial class AkburaSemanticModel
 
     private AkburaSymbolInfo ResolveExternalAkcssModule(Declaration declaration)
     {
-        var document = Unsafe.As<AkcssDocumentSyntax>(declaration.Syntax);
+        var document = Unsafe.As<AkcssDocumentSyntax>(DeclarationFacts.GetSyntax(declaration));
         if (_bindingCache.TryGetSymbolInfo(document, out var cachedInfo))
         {
             return cachedInfo;
@@ -425,7 +432,7 @@ internal partial class AkburaSemanticModel
 
     private static string? GetExternalAkcssPath(Declaration declaration)
     {
-        var syntaxTree = declaration.AkcssSyntaxTree;
+        var syntaxTree = DeclarationFacts.GetAkcssSyntaxTree(declaration);
         if (syntaxTree == null)
         {
             return string.IsNullOrWhiteSpace(declaration.Name)

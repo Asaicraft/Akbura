@@ -1,5 +1,4 @@
 using Akbura.Collections;
-using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System;
@@ -56,7 +55,7 @@ internal sealed partial class BinderFactory
 
     internal Binder GetOrCreateBinder(
         BinderCacheKey key,
-        ImmutableArray<AkburaDeclaration> path,
+        ImmutableArray<Declaration> path,
         BinderUsage usage)
     {
         if (_binderCache.TryGetValue(key, out var binder))
@@ -77,7 +76,7 @@ internal sealed partial class BinderFactory
     internal int CachedBinderCount => _binderCache.Count;
 
     private Binder CreateBinder(
-        ImmutableArray<AkburaDeclaration> path,
+        ImmutableArray<Declaration> path,
         BinderUsage usage)
     {
         var visitor = GetBinderFactoryVisitor(path, usage);
@@ -96,7 +95,7 @@ internal sealed partial class BinderFactory
     internal CompilationBinder RootBinder => _bindingSession.RootBinder;
 
     private BinderFactoryVisitor GetBinderFactoryVisitor(
-        ImmutableArray<AkburaDeclaration> path,
+        ImmutableArray<Declaration> path,
         BinderUsage usage)
     {
         var visitor = _binderFactoryVisitorPool.Allocate();

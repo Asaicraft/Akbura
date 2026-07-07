@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -27,7 +26,7 @@ internal sealed partial class SyntaxAndDeclarationManager
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
         State? state,
-        AkburaDeclarationTable? previousDeclarationTable = null)
+        DeclarationTable? previousDeclarationTable = null)
     {
         _syntaxTrees = syntaxTrees.IsDefault
             ? ImmutableArray<AkburaSyntaxTree>.Empty
@@ -43,7 +42,7 @@ internal sealed partial class SyntaxAndDeclarationManager
 
     public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees => _akcssSyntaxTrees;
 
-    public AkburaDeclarationTable DeclarationTable => GetLazyState().DeclarationTable;
+    public DeclarationTable DeclarationTable => GetLazyState().DeclarationTable;
 
     public SyntaxAndDeclarationManager WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
     {
@@ -253,7 +252,7 @@ internal sealed partial class SyntaxAndDeclarationManager
             CreateState(
                 syntaxTrees,
                 akcssSyntaxTrees,
-                AkburaDeclarationTable.Create(
+                DeclarationTable.Create(
                     syntaxTrees,
                     akcssSyntaxTrees,
                     state.DeclarationTable),
@@ -269,13 +268,13 @@ internal sealed partial class SyntaxAndDeclarationManager
         var components = state.DeclarationTable.Components.ToBuilder();
         foreach (var tree in addedTrees)
         {
-            components.Add(AkburaDeclarationCollector.Collect(tree));
+            components.Add(DeclarationTreeBuilder.ForSyntaxDeclaration(tree));
         }
 
         return CreateState(
             syntaxTrees,
             state.AkcssSyntaxTrees,
-            AkburaDeclarationTable.Create(
+            DeclarationTable.Create(
                 components.ToImmutable(),
                 state.DeclarationTable.AkcssModules),
             state.LastComputedMemberNames,
@@ -294,7 +293,7 @@ internal sealed partial class SyntaxAndDeclarationManager
         return CreateState(
             syntaxTrees,
             state.AkcssSyntaxTrees,
-            AkburaDeclarationTable.Create(
+            DeclarationTable.Create(
                 components,
                 state.DeclarationTable.AkcssModules),
             state.LastComputedMemberNames,
@@ -309,7 +308,7 @@ internal sealed partial class SyntaxAndDeclarationManager
     {
         var components = state.DeclarationTable.Components.SetItem(
             index,
-            AkburaDeclarationCollector.Collect(newTree));
+            DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
 
         var previousMemberNames = state.LastComputedMemberNames;
         var oldTree = state.SyntaxTrees[index];
@@ -323,7 +322,7 @@ internal sealed partial class SyntaxAndDeclarationManager
         return CreateState(
             syntaxTrees,
             state.AkcssSyntaxTrees,
-            AkburaDeclarationTable.Create(
+            DeclarationTable.Create(
                 components,
                 state.DeclarationTable.AkcssModules),
             previousMemberNames,
@@ -338,13 +337,13 @@ internal sealed partial class SyntaxAndDeclarationManager
         var akcssModules = state.DeclarationTable.AkcssModules.ToBuilder();
         foreach (var tree in addedTrees)
         {
-            akcssModules.Add(AkburaDeclarationCollector.Collect(tree));
+            akcssModules.Add(DeclarationTreeBuilder.ForSyntaxDeclaration(tree));
         }
 
         return CreateState(
             state.SyntaxTrees,
             akcssSyntaxTrees,
-            AkburaDeclarationTable.Create(
+            DeclarationTable.Create(
                 state.DeclarationTable.Components,
                 akcssModules.ToImmutable()),
             state.LastComputedMemberNames,
@@ -363,7 +362,7 @@ internal sealed partial class SyntaxAndDeclarationManager
         return CreateState(
             state.SyntaxTrees,
             akcssSyntaxTrees,
-            AkburaDeclarationTable.Create(
+            DeclarationTable.Create(
                 state.DeclarationTable.Components,
                 akcssModules),
             state.LastComputedMemberNames,
@@ -378,7 +377,7 @@ internal sealed partial class SyntaxAndDeclarationManager
     {
         var akcssModules = state.DeclarationTable.AkcssModules.SetItem(
             index,
-            AkburaDeclarationCollector.Collect(newTree));
+            DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
 
         var previousMemberNames = state.LastComputedAkcssMemberNames;
         var oldTree = state.AkcssSyntaxTrees[index];
@@ -392,7 +391,7 @@ internal sealed partial class SyntaxAndDeclarationManager
         return CreateState(
             state.SyntaxTrees,
             akcssSyntaxTrees,
-            AkburaDeclarationTable.Create(
+            DeclarationTable.Create(
                 state.DeclarationTable.Components,
                 akcssModules),
             state.LastComputedMemberNames,

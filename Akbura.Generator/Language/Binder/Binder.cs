@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -18,7 +17,7 @@ internal abstract class Binder
     protected Binder(
         AkburaSemanticModel semanticModel,
         Binder? next,
-        AkburaDeclaration? declaration,
+        Declaration? declaration,
         AkburaSyntax? scopeDesignator,
         AkburaBinderFlags flags)
     {
@@ -39,7 +38,7 @@ internal abstract class Binder
     public Binder NextRequired =>
         Next ?? throw new InvalidOperationException($"{GetType().Name} does not have a next binder.");
 
-    public AkburaDeclaration? Declaration { get; }
+    public Declaration? Declaration { get; }
 
     public AkburaSyntax? ScopeDesignator { get; }
 

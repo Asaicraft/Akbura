@@ -4,6 +4,7 @@
 
 using Akbura.Pools;
 using Akbura.Collections;
+using Akbura.Language.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -21,19 +22,44 @@ internal sealed partial class DeclarationTable
     private readonly ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>> _allOlderRootDeclarations;
     private readonly Lazy<RootSingleNamespaceDeclaration> _latestLazyRootDeclaration;
     private readonly Cache _cache;
+    private readonly ImmutableArray<Declaration> _components;
+    private readonly ImmutableArray<Declaration> _akcssModules;
 
     private MergedNamespaceDeclaration _mergedRoot;
     private ImmutableArray<Declaration> _rootDeclarations;
+    private ImmutableArray<Declaration> _roots;
     private ICollection<string> _declarationNames;
+    private Dictionary<AkburaSyntax, ImmutableArray<Declaration>> _pathsBySyntax;
 
     private DeclarationTable(
         ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>> allOlderRootDeclarations,
         Lazy<RootSingleNamespaceDeclaration> latestLazyRootDeclaration,
         Cache cache)
+        : this(
+            allOlderRootDeclarations,
+            latestLazyRootDeclaration,
+            cache,
+            components: default,
+            akcssModules: default)
+    {
+    }
+
+    private DeclarationTable(
+        ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>> allOlderRootDeclarations,
+        Lazy<RootSingleNamespaceDeclaration> latestLazyRootDeclaration,
+        Cache cache,
+        ImmutableArray<Declaration> components,
+        ImmutableArray<Declaration> akcssModules)
     {
         _allOlderRootDeclarations = allOlderRootDeclarations ?? ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>>.Empty;
         _latestLazyRootDeclaration = latestLazyRootDeclaration;
         _cache = cache ?? new Cache(this);
+        _components = components.IsDefault
+            ? ImmutableArray<Declaration>.Empty
+            : components;
+        _akcssModules = akcssModules.IsDefault
+            ? ImmutableArray<Declaration>.Empty
+            : akcssModules;
     }
 
     public Builder ToBuilder()
@@ -55,6 +81,25 @@ internal sealed partial class DeclarationTable
             return _rootDeclarations;
         }
     }
+
+    public ImmutableArray<Declaration> Roots
+    {
+        get
+        {
+            if (_roots.IsDefault)
+            {
+                ImmutableInterlocked.InterlockedInitialize(
+                    ref _roots,
+                    Components.AddRange(AkcssModules));
+            }
+
+            return _roots;
+        }
+    }
+
+    public ImmutableArray<Declaration> Components => _components;
+
+    public ImmutableArray<Declaration> AkcssModules => _akcssModules;
 
     public MergedNamespaceDeclaration MergedRoot
     {
@@ -85,6 +130,128 @@ internal sealed partial class DeclarationTable
             }
 
             return _declarationNames;
+        }
+    }
+
+    public static DeclarationTable Create(AkburaCompilation compilation)
+    {
+        return Create(
+            compilation.SyntaxTrees,
+            compilation.AkcssSyntaxTrees,
+            compilation.PreviousCompilation?.DeclarationTable);
+    }
+
+    public static DeclarationTable Create(
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
+        DeclarationTable previous)
+    {
+        syntaxTrees = syntaxTrees.IsDefault
+            ? []
+            : syntaxTrees;
+        akcssSyntaxTrees = akcssSyntaxTrees.IsDefault
+            ? []
+            : akcssSyntaxTrees;
+
+        var componentsBuilder = ImmutableArray.CreateBuilder<Declaration>(syntaxTrees.Length);
+        foreach (var tree in syntaxTrees)
+        {
+            componentsBuilder.Add(TryReuseComponent(previous, tree, out var declaration)
+                ? declaration
+                : DeclarationTreeBuilder.ForSyntaxDeclaration(tree));
+        }
+
+        var akcssModulesBuilder = ImmutableArray.CreateBuilder<Declaration>(akcssSyntaxTrees.Length);
+        foreach (var tree in akcssSyntaxTrees)
+        {
+            akcssModulesBuilder.Add(TryReuseAkcssModule(previous, tree, out var declaration)
+                ? declaration
+                : DeclarationTreeBuilder.ForSyntaxDeclaration(tree));
+        }
+
+        return Create(
+            componentsBuilder.ToImmutable(),
+            akcssModulesBuilder.ToImmutable());
+    }
+
+    internal static DeclarationTable Create(
+        ImmutableArray<Declaration> components,
+        ImmutableArray<Declaration> akcssModules)
+    {
+        return new DeclarationTable(
+            ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>>.Empty,
+            latestLazyRootDeclaration: null,
+            cache: null,
+            components,
+            akcssModules);
+    }
+
+    internal DeclarationTable WithSyntaxDeclarations(
+        ImmutableArray<Declaration> components,
+        ImmutableArray<Declaration> akcssModules)
+    {
+        return new DeclarationTable(
+            _allOlderRootDeclarations,
+            _latestLazyRootDeclaration,
+            _cache,
+            components,
+            akcssModules);
+    }
+
+    public bool TryGetDeclaration(AkburaSyntax syntax, out Declaration declaration)
+    {
+        if (TryGetDeclarationPath(syntax, out var path))
+        {
+            declaration = path[path.Length - 1];
+            return true;
+        }
+
+        declaration = null!;
+        return false;
+    }
+
+    public bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        out ImmutableArray<Declaration> path)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        return PathsBySyntax.TryGetValue(syntax, out path);
+    }
+
+    public bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        int position,
+        out ImmutableArray<Declaration> path)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        var builder = ArrayBuilder<Declaration>.GetInstance();
+        try
+        {
+            foreach (var root in Roots)
+            {
+                builder.Clear();
+                if (TryBuildDeclarationPath(root, syntax, position, builder))
+                {
+                    path = builder.ToImmutableAndFree();
+                    builder = null;
+                    return true;
+                }
+            }
+
+            path = default;
+            return false;
+        }
+        finally
+        {
+            builder?.Free();
         }
     }
 
@@ -156,5 +323,141 @@ internal sealed partial class DeclarationTable
                 stack.Push(child);
             }
         }
+    }
+
+    private Dictionary<AkburaSyntax, ImmutableArray<Declaration>> PathsBySyntax
+    {
+        get
+        {
+            if (_pathsBySyntax == null)
+            {
+                Interlocked.CompareExchange(
+                    ref _pathsBySyntax,
+                    CreatePathMap(Roots),
+                    comparand: null);
+            }
+
+            return _pathsBySyntax;
+        }
+    }
+
+    private static bool TryReuseComponent(
+        DeclarationTable previous,
+        AkburaSyntaxTree tree,
+        out Declaration declaration)
+    {
+        declaration = null!;
+        if (previous == null)
+        {
+            return false;
+        }
+
+        foreach (var candidate in previous.Components)
+        {
+            if (ReferenceEquals(candidate.SyntaxTree, tree))
+            {
+                declaration = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryReuseAkcssModule(
+        DeclarationTable previous,
+        AkcssSyntaxTree tree,
+        out Declaration declaration)
+    {
+        declaration = null!;
+        if (previous == null)
+        {
+            return false;
+        }
+
+        foreach (var candidate in previous.AkcssModules)
+        {
+            if (ReferenceEquals(candidate.AkcssSyntaxTree, tree))
+            {
+                declaration = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static Dictionary<AkburaSyntax, ImmutableArray<Declaration>> CreatePathMap(
+        ImmutableArray<Declaration> roots)
+    {
+        var map = new Dictionary<AkburaSyntax, ImmutableArray<Declaration>>();
+        var path = ArrayBuilder<Declaration>.GetInstance();
+        try
+        {
+            foreach (var root in roots)
+            {
+                AddDeclarationPaths(root, path, map);
+            }
+
+            return map;
+        }
+        finally
+        {
+            path.Free();
+        }
+    }
+
+    private static void AddDeclarationPaths(
+        Declaration declaration,
+        ArrayBuilder<Declaration> path,
+        Dictionary<AkburaSyntax, ImmutableArray<Declaration>> map)
+    {
+        var syntax = declaration.Syntax;
+        if (syntax == null)
+        {
+            return;
+        }
+
+        path.Add(declaration);
+        map[syntax] = path.ToImmutable();
+
+        foreach (var child in declaration.Children)
+        {
+            AddDeclarationPaths(child, path, map);
+        }
+
+        path.RemoveLast();
+    }
+
+    private static bool TryBuildDeclarationPath(
+        Declaration current,
+        AkburaSyntax syntax,
+        int position,
+        ArrayBuilder<Declaration> path)
+    {
+        var currentSyntax = current.Syntax;
+        if (currentSyntax == null ||
+            !SemanticSyntaxIdentity.IsInSameTree(currentSyntax, syntax) ||
+            !ContainsPosition(currentSyntax, position))
+        {
+            return false;
+        }
+
+        path.Add(current);
+        foreach (var child in current.Children)
+        {
+            if (TryBuildDeclarationPath(child, syntax, position, path))
+            {
+                return true;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ContainsPosition(AkburaSyntax syntax, int position)
+    {
+        return syntax.FullSpan.Contains(position) ||
+               (syntax.FullWidth == 0 && position == syntax.Position);
     }
 }

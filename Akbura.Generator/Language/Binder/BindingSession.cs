@@ -1,6 +1,5 @@
 using Akbura.Collections;
 using Akbura.Language.BoundTree;
-using Akbura.Language.Declarations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -216,7 +215,7 @@ internal sealed class BindingSession
     }
 
     internal Binder GetOrCreateBinder(
-        ImmutableArray<AkburaDeclaration> path,
+        ImmutableArray<Declaration> path,
         BinderUsage usage)
     {
         if (path.IsDefaultOrEmpty)
@@ -235,7 +234,7 @@ internal sealed class BindingSession
     }
 
     private Binder GetBinderFromPath(
-        ImmutableArray<AkburaDeclaration> path,
+        ImmutableArray<Declaration> path,
         BinderUsage usage)
     {
         if (TryGetExecutableRootPath(path, out var executableRootPath))
@@ -250,7 +249,7 @@ internal sealed class BindingSession
 
     private bool TryFindDeclarationPath(
         AkburaSyntax syntax,
-        out ImmutableArray<AkburaDeclaration> path)
+        out ImmutableArray<Declaration> path)
     {
         return _semanticModel.Compilation.DeclarationTable.TryGetDeclarationPath(
             syntax,
@@ -260,7 +259,7 @@ internal sealed class BindingSession
     private bool TryFindDeclarationPath(
         AkburaSyntax syntax,
         int position,
-        out ImmutableArray<AkburaDeclaration> path)
+        out ImmutableArray<Declaration> path)
     {
         return _semanticModel.Compilation.DeclarationTable.TryGetDeclarationPath(
             syntax,
@@ -269,7 +268,7 @@ internal sealed class BindingSession
     }
 
     private ExecutableCodeBinder GetExecutableCodeBinder(
-        ImmutableArray<AkburaDeclaration> executableRootPath,
+        ImmutableArray<Declaration> executableRootPath,
         BinderUsage usage)
     {
         var rootDeclaration = executableRootPath[executableRootPath.Length - 1];
@@ -298,8 +297,8 @@ internal sealed class BindingSession
     }
 
     private static bool TryGetExecutableRootPath(
-        ImmutableArray<AkburaDeclaration> path,
-        out ImmutableArray<AkburaDeclaration> executableRootPath)
+        ImmutableArray<Declaration> path,
+        out ImmutableArray<Declaration> executableRootPath)
     {
         for (var index = 0; index < path.Length; index++)
         {
@@ -314,15 +313,15 @@ internal sealed class BindingSession
         return false;
     }
 
-    private static bool IsExecutableRoot(AkburaDeclaration declaration)
+    private static bool IsExecutableRoot(Declaration declaration)
     {
         return declaration.Kind is
-            AkburaDeclarationKind.CSharpStatement or
-            AkburaDeclarationKind.CSharpBlock;
+            DeclarationKind.CSharpStatement or
+            DeclarationKind.CSharpBlock;
     }
 
-    private static ImmutableArray<AkburaDeclaration> SlicePath(
-        ImmutableArray<AkburaDeclaration> path,
+    private static ImmutableArray<Declaration> SlicePath(
+        ImmutableArray<Declaration> path,
         int length)
     {
         if (length == 0)
@@ -330,7 +329,7 @@ internal sealed class BindingSession
             return [];
         }
 
-        using var builder = ImmutableArrayBuilder<AkburaDeclaration>.Rent(length);
+        using var builder = ImmutableArrayBuilder<Declaration>.Rent(length);
         for (var index = 0; index < length; index++)
         {
             builder.Add(path[index]);

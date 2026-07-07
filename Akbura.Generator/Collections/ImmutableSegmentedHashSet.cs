@@ -15,7 +15,7 @@ internal readonly partial struct ImmutableSegmentedHashSet<T> :
     ICollection,
     IEquatable<ImmutableSegmentedHashSet<T>>
 {
-    public static readonly ImmutableSegmentedHashSet<T> Empty = new(new SegmentedHashSet<T>());
+    public static readonly ImmutableSegmentedHashSet<T> Empty = new([]);
 
     private readonly SegmentedHashSet<T>? _set;
 

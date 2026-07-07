@@ -2,7 +2,6 @@ using Akbura.Language;
 using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
-using Akbura.Language.Declarations;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;

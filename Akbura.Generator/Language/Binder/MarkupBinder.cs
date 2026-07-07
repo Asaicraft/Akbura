@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -19,7 +18,7 @@ internal sealed partial class MarkupBinder : Binder
     public MarkupBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
-        AkburaDeclaration declaration,
+        Declaration declaration,
         AkburaBinderFlags flags = AkburaBinderFlags.None)
         : base(
             semanticModel,

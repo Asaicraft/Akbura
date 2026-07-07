@@ -71,11 +71,15 @@ internal sealed partial class DeclarationTable
                     ? new DeclarationTable(
                         _table._allOlderRootDeclarations,
                         lastDeclaration,
-                        _table._cache)
+                        _table._cache,
+                        _table._components,
+                        _table._akcssModules)
                     : new DeclarationTable(
                         _table._allOlderRootDeclarations.Add(_table._latestLazyRootDeclaration),
                         lastDeclaration,
-                        cache: null);
+                        null,
+                        _table._components,
+                        _table._akcssModules);
             }
             else
             {
@@ -90,7 +94,9 @@ internal sealed partial class DeclarationTable
                 _table = new DeclarationTable(
                     olderRootDeclarations,
                     lastDeclaration,
-                    cache: null);
+                    null,
+                    _table._components,
+                    _table._akcssModules);
             }
 
             _addedLazyRootDeclarations.Clear();
@@ -109,12 +115,16 @@ internal sealed partial class DeclarationTable
                 _table = _table._latestLazyRootDeclaration == firstDeclaration
                     ? new DeclarationTable(
                         _table._allOlderRootDeclarations,
-                        latestLazyRootDeclaration: null,
-                        cache: _table._cache)
+                        null,
+                        _table._cache,
+                        _table._components,
+                        _table._akcssModules)
                     : new DeclarationTable(
                         _table._allOlderRootDeclarations.Remove(firstDeclaration),
                         _table._latestLazyRootDeclaration,
-                        cache: null);
+                        null,
+                        _table._components,
+                        _table._akcssModules);
             }
             else
             {
@@ -128,7 +138,9 @@ internal sealed partial class DeclarationTable
                 _table = new DeclarationTable(
                     olderRootDeclarations,
                     latestLazyRootDeclaration,
-                    cache: null);
+                    null,
+                    _table._components,
+                    _table._akcssModules);
             }
 
             _removedLazyRootDeclarations.Clear();

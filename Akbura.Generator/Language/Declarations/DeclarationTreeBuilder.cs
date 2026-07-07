@@ -8,6 +8,7 @@ using Akbura.Pools;
 using Akbura.Collections;
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using BoxedMemberNames = System.Runtime.CompilerServices.StrongBox<Akbura.Collections.ImmutableSegmentedHashSet<string>>;
@@ -65,6 +66,16 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         };
 
         return builder.CreateAkcssRootDeclaration(syntaxTree.GetRoot());
+    }
+
+    public static Declaration ForSyntaxDeclaration(AkburaSyntaxTree syntaxTree)
+    {
+        return SyntaxDeclarationBuilder.Build(syntaxTree);
+    }
+
+    public static Declaration ForSyntaxDeclaration(AkcssSyntaxTree syntaxTree)
+    {
+        return SyntaxDeclarationBuilder.Build(syntaxTree);
     }
 
     public static bool CachesComputedMemberNames(SingleTypeDeclaration typeDeclaration)
@@ -458,5 +469,348 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
     private static ImmutableArray<AkburaDiagnostic> GetDiagnostics(AkburaSyntax syntax)
     {
         return syntax.GetDiagnostics();
+    }
+
+    private sealed class SyntaxDeclarationBuilder : SyntaxVisitor
+    {
+        private static readonly ObjectPool<SyntaxDeclarationBuilder> s_pool = new(
+            pool => new SyntaxDeclarationBuilder(pool),
+            size: 16);
+
+        private readonly ObjectPool<SyntaxDeclarationBuilder> _pool;
+        private readonly ImmutableArray<Declaration>.Builder _children = ImmutableArray.CreateBuilder<Declaration>();
+        private AkburaSyntaxTree _syntaxTree;
+        private AkcssSyntaxTree _akcssSyntaxTree;
+
+        private SyntaxDeclarationBuilder(ObjectPool<SyntaxDeclarationBuilder> pool)
+        {
+            _pool = pool;
+        }
+
+        public static Declaration Build(AkburaSyntaxTree syntaxTree)
+        {
+            var builder = s_pool.Allocate();
+            try
+            {
+                return builder.BuildCore(syntaxTree);
+            }
+            finally
+            {
+                builder.Free();
+            }
+        }
+
+        public static Declaration Build(AkcssSyntaxTree syntaxTree)
+        {
+            var builder = s_pool.Allocate();
+            try
+            {
+                return builder.BuildCore(syntaxTree);
+            }
+            finally
+            {
+                builder.Free();
+            }
+        }
+
+        private Declaration BuildCore(AkburaSyntaxTree syntaxTree)
+        {
+            Debug.Assert(_children.Count == 0);
+            Debug.Assert(_syntaxTree == null);
+            Debug.Assert(_akcssSyntaxTree == null);
+
+            _syntaxTree = syntaxTree;
+
+            var root = syntaxTree.GetRoot();
+            VisitAkburaDocumentSyntax(root);
+
+            return new SingleDeclaration(
+                DeclarationKind.Component,
+                syntaxTree.ComponentName,
+                root,
+                syntaxTree,
+                children: _children.ToImmutable());
+        }
+
+        private Declaration BuildCore(AkcssSyntaxTree syntaxTree)
+        {
+            Debug.Assert(_children.Count == 0);
+            Debug.Assert(_syntaxTree == null);
+            Debug.Assert(_akcssSyntaxTree == null);
+
+            _akcssSyntaxTree = syntaxTree;
+
+            var root = syntaxTree.GetRoot();
+            VisitAkcssDocumentSyntax(root);
+
+            return new SingleDeclaration(
+                DeclarationKind.AkcssModule,
+                syntaxTree.LogicalName,
+                root,
+                akcssSyntaxTree: syntaxTree,
+                children: _children.ToImmutable());
+        }
+
+        public override void VisitAkburaDocumentSyntax(AkburaDocumentSyntax node)
+        {
+            foreach (var member in node.Members)
+            {
+                Visit(member);
+            }
+        }
+
+        public override void VisitAkcssDocumentSyntax(AkcssDocumentSyntax node)
+        {
+            foreach (var member in node.Members)
+            {
+                Visit(member);
+            }
+        }
+
+        public override void VisitNamespaceDeclarationSyntax(NamespaceDeclarationSyntax node)
+        {
+            Add(DeclarationKind.Namespace, node.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitUsingDirectiveSyntax(UsingDirectiveSyntax node)
+        {
+            Add(DeclarationKind.Using, node.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitStateDeclarationSyntax(StateDeclarationSyntax node)
+        {
+            Add(DeclarationKind.State, node.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitParamDeclarationSyntax(ParamDeclarationSyntax node)
+        {
+            Add(DeclarationKind.Parameter, node.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitInjectDeclarationSyntax(InjectDeclarationSyntax node)
+        {
+            Add(DeclarationKind.InjectedService, node.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitCommandDeclarationSyntax(CommandDeclarationSyntax node)
+        {
+            Add(DeclarationKind.Command, node.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitUseEffectDeclarationSyntax(UseEffectDeclarationSyntax node)
+        {
+            Add(DeclarationKind.UseEffect, "useEffect", node, CollectUseEffectChildren(node));
+        }
+
+        public override void VisitUserHookSyntax(UserHookSyntax node)
+        {
+            Add(
+                DeclarationKind.UserHook,
+                node.Name.ToFullString().Trim(),
+                node,
+                ImmutableArray.Create(CreateCSharpBlockDeclaration(node.Body)));
+        }
+
+        public override void VisitCSharpStatementSyntax(CSharpStatementSyntax node)
+        {
+            Add(
+                DeclarationKind.CSharpStatement,
+                GetCSharpStatementName(node),
+                node,
+                CollectCSharpStatementChildren(node));
+        }
+
+        public override void VisitCSharpBlockSyntax(CSharpBlockSyntax node)
+        {
+            Add(
+                DeclarationKind.CSharpBlock,
+                "{...}",
+                node,
+                CollectCSharpBlockMembers(node));
+        }
+
+        public override void VisitMarkupRootSyntax(MarkupRootSyntax node)
+        {
+            Add(CreateMarkupRootDeclaration(node));
+        }
+
+        public override void VisitInlineAkcssBlockSyntax(InlineAkcssBlockSyntax node)
+        {
+            var children = CollectAkcssMembers(node.Members);
+            Add(DeclarationKind.AkcssModule, "@akcss", node, children);
+        }
+
+        public override void VisitAkcssUsingDirectiveSyntax(AkcssUsingDirectiveSyntax node)
+        {
+            Add(DeclarationKind.AkcssUsing, node.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitAkcssStyleRuleSyntax(AkcssStyleRuleSyntax node)
+        {
+            Add(DeclarationKind.AkcssStyle, node.Selector.ToFullString().Trim(), node);
+        }
+
+        public override void VisitAkcssUtilityDeclarationSyntax(AkcssUtilityDeclarationSyntax node)
+        {
+            Add(DeclarationKind.AkcssUtility, node.Selector.Name.ToFullString().Trim(), node);
+        }
+
+        public override void VisitAkcssUtilitiesSectionSyntax(AkcssUtilitiesSectionSyntax node)
+        {
+            foreach (var utility in node.Utilities)
+            {
+                Visit(utility);
+            }
+        }
+
+        private ImmutableArray<Declaration> CollectAkcssMembers(SyntaxList<AkcssTopLevelMemberSyntax> members)
+        {
+            var nested = s_pool.Allocate();
+            try
+            {
+                nested._syntaxTree = _syntaxTree;
+                nested._akcssSyntaxTree = _akcssSyntaxTree;
+
+                foreach (var member in members)
+                {
+                    nested.Visit(member);
+                }
+
+                return nested._children.ToImmutable();
+            }
+            finally
+            {
+                nested.Free();
+            }
+        }
+
+        private ImmutableArray<Declaration> CollectUseEffectChildren(UseEffectDeclarationSyntax node)
+        {
+            var builder = ImmutableArray.CreateBuilder<Declaration>(1 + node.Tails.Count);
+            builder.Add(CreateCSharpBlockDeclaration(node.Body));
+
+            foreach (var tail in node.Tails)
+            {
+                builder.Add(CreateCSharpBlockDeclaration(tail.Body));
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private ImmutableArray<Declaration> CollectCSharpStatementChildren(CSharpStatementSyntax statement)
+        {
+            return statement.Body == null
+                ? ImmutableArray<Declaration>.Empty
+                : ImmutableArray.Create(CreateCSharpBlockDeclaration(statement.Body));
+        }
+
+        private ImmutableArray<Declaration> CollectCSharpBlockMembers(CSharpBlockSyntax block)
+        {
+            var nested = s_pool.Allocate();
+            try
+            {
+                nested._syntaxTree = _syntaxTree;
+                nested._akcssSyntaxTree = _akcssSyntaxTree;
+
+                foreach (var member in block.Tokens)
+                {
+                    nested.Visit(member);
+                }
+
+                return nested._children.ToImmutable();
+            }
+            finally
+            {
+                nested.Free();
+            }
+        }
+
+        private Declaration CreateCSharpBlockDeclaration(CSharpBlockSyntax block)
+        {
+            return new SingleDeclaration(
+                DeclarationKind.CSharpBlock,
+                "{...}",
+                block,
+                _syntaxTree,
+                _akcssSyntaxTree,
+                CollectCSharpBlockMembers(block));
+        }
+
+        private Declaration CreateMarkupRootDeclaration(MarkupRootSyntax root)
+        {
+            return new SingleDeclaration(
+                DeclarationKind.MarkupRoot,
+                GetMarkupElementName(root.Element),
+                root,
+                _syntaxTree,
+                _akcssSyntaxTree,
+                CollectMarkupElementChildren(root.Element));
+        }
+
+        private ImmutableArray<Declaration> CollectMarkupElementChildren(MarkupElementSyntax element)
+        {
+            var builder = ImmutableArray.CreateBuilder<Declaration>();
+            foreach (var content in element.Body)
+            {
+                if (content.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)
+                {
+                    builder.Add(CreateMarkupElementDeclaration(Unsafe.As<MarkupElementContentSyntax>(content).Element));
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private Declaration CreateMarkupElementDeclaration(MarkupElementSyntax element)
+        {
+            return new SingleDeclaration(
+                DeclarationKind.MarkupElement,
+                GetMarkupElementName(element),
+                element,
+                _syntaxTree,
+                _akcssSyntaxTree,
+                CollectMarkupElementChildren(element));
+        }
+
+        private static string GetMarkupElementName(MarkupElementSyntax element)
+        {
+            return element.StartTag?.Name.ToFullString().Trim() ?? string.Empty;
+        }
+
+        private static string GetCSharpStatementName(CSharpStatementSyntax statement)
+        {
+            var text = statement.Tokens.ToFullString().Trim();
+            return text.Length == 0
+                ? "statement"
+                : text;
+        }
+
+        private void Add(
+            DeclarationKind kind,
+            string name,
+            AkburaSyntax syntax,
+            ImmutableArray<Declaration> children = default)
+        {
+            Add(new SingleDeclaration(
+                kind,
+                name,
+                syntax,
+                _syntaxTree,
+                _akcssSyntaxTree,
+                children));
+        }
+
+        private void Add(Declaration declaration)
+        {
+            _children.Add(declaration);
+        }
+
+        private void Free()
+        {
+            _syntaxTree = null;
+            _akcssSyntaxTree = null;
+            _children.Clear();
+            _pool.Free(this);
+        }
     }
 }

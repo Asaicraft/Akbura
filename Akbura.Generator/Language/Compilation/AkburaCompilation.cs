@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Concurrent;
@@ -88,7 +87,7 @@ internal sealed class AkburaCompilation
 
     internal SyntaxAndDeclarationManager SyntaxAndDeclarations => _syntaxAndDeclarations;
 
-    public AkburaDeclarationTable DeclarationTable => _syntaxAndDeclarations.DeclarationTable;
+    public DeclarationTable DeclarationTable => _syntaxAndDeclarations.DeclarationTable;
 
     public AkburaCompilation WithSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {

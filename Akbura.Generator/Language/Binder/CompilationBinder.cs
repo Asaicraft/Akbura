@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 
 namespace Akbura.Language.Binder;
 
@@ -14,5 +13,5 @@ internal sealed class CompilationBinder : Binder
     {
     }
 
-    public AkburaDeclarationTable DeclarationTable => Compilation.DeclarationTable;
+    public DeclarationTable DeclarationTable => Compilation.DeclarationTable;
 }

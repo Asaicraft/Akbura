@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
 using System;
 using System.Collections.Generic;
@@ -8,18 +7,18 @@ using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 
 namespace Akbura.Language.Symbols;
 
-internal sealed class AkburaDeclarationSymbolTable
+internal sealed class DeclarationSymbolTable
 {
     private readonly AkburaSemanticModel _semanticModel;
     private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfos = new();
     private readonly Dictionary<DeclaredSymbolsKey, ImmutableArray<AkburaSymbol>> _declaredSymbols = new();
 
-    public AkburaDeclarationSymbolTable(AkburaSemanticModel semanticModel)
+    public DeclarationSymbolTable(AkburaSemanticModel semanticModel)
     {
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
     }
 
-    public AkburaSymbolInfo GetSymbolInfo(AkburaDeclaration declaration)
+    public AkburaSymbolInfo GetSymbolInfo(Declaration declaration)
     {
         var syntax = declaration.Syntax;
         if (_symbolInfos.TryGetValue(syntax, out var symbolInfo))
@@ -33,8 +32,8 @@ internal sealed class AkburaDeclarationSymbolTable
     }
 
     public ImmutableArray<AkburaSymbol> GetDeclaredSymbols(
-        AkburaDeclaration declaration,
-        params AkburaDeclarationKind[] allowedKinds)
+        Declaration declaration,
+        params DeclarationKind[] allowedKinds)
     {
         var key = new DeclaredSymbolsKey(declaration.Syntax, GetKindMask(allowedKinds));
         if (_declaredSymbols.TryGetValue(key, out var symbols))
@@ -48,7 +47,7 @@ internal sealed class AkburaDeclarationSymbolTable
     }
 
     public bool TryGetDeclaredSymbol(
-        AkburaDeclaration declaration,
+        Declaration declaration,
         out AkburaSymbol symbol)
     {
         var symbolInfo = GetSymbolInfo(declaration);
@@ -62,7 +61,7 @@ internal sealed class AkburaDeclarationSymbolTable
         return false;
     }
 
-    public ImmutableArray<AkburaSymbol> GetTailwindUtilityParameters(AkburaDeclaration utilityDeclaration)
+    public ImmutableArray<AkburaSymbol> GetTailwindUtilityParameters(Declaration utilityDeclaration)
     {
         if (GetSymbolInfo(utilityDeclaration).Symbol is not ITailwindUtilitySymbol utility ||
             utility.Parameters.IsDefaultOrEmpty)
@@ -74,7 +73,7 @@ internal sealed class AkburaDeclarationSymbolTable
     }
 
     private ImmutableArray<AkburaSymbol> CreateDeclaredSymbols(
-        AkburaDeclaration declaration,
+        Declaration declaration,
         ulong allowedKindMask)
     {
         if (declaration.Children.IsDefaultOrEmpty)
@@ -96,29 +95,29 @@ internal sealed class AkburaDeclarationSymbolTable
         return builder.ToImmutable();
     }
 
-    private static bool CanCreateDeclaredSymbol(AkburaDeclarationKind declarationKind)
+    private static bool CanCreateDeclaredSymbol(DeclarationKind declarationKind)
     {
         return declarationKind is
-            AkburaDeclarationKind.State or
-            AkburaDeclarationKind.Parameter or
-            AkburaDeclarationKind.InjectedService or
-            AkburaDeclarationKind.Command or
-            AkburaDeclarationKind.UseEffect or
-            AkburaDeclarationKind.UserHook or
-            AkburaDeclarationKind.AkcssModule or
-            AkburaDeclarationKind.AkcssStyle or
-            AkburaDeclarationKind.AkcssUtility;
+            DeclarationKind.State or
+            DeclarationKind.Parameter or
+            DeclarationKind.InjectedService or
+            DeclarationKind.Command or
+            DeclarationKind.UseEffect or
+            DeclarationKind.UserHook or
+            DeclarationKind.AkcssModule or
+            DeclarationKind.AkcssStyle or
+            DeclarationKind.AkcssUtility;
     }
 
     private static bool IsAllowed(
-        AkburaDeclarationKind declarationKind,
+        DeclarationKind declarationKind,
         ulong allowedKindMask)
     {
         return allowedKindMask == 0 ||
                (allowedKindMask & GetKindBit(declarationKind)) != 0;
     }
 
-    private static ulong GetKindMask(AkburaDeclarationKind[] allowedKinds)
+    private static ulong GetKindMask(DeclarationKind[] allowedKinds)
     {
         var mask = 0UL;
         foreach (var kind in allowedKinds)
@@ -129,7 +128,7 @@ internal sealed class AkburaDeclarationSymbolTable
         return mask;
     }
 
-    private static ulong GetKindBit(AkburaDeclarationKind declarationKind)
+    private static ulong GetKindBit(DeclarationKind declarationKind)
     {
         var shift = (int)declarationKind;
         return shift is >= 0 and < 64

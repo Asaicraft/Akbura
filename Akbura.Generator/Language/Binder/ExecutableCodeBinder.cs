@@ -1,5 +1,4 @@
 using Akbura.Collections;
-using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System;
@@ -14,14 +13,14 @@ namespace Akbura.Language.Binder;
 internal sealed class ExecutableCodeBinder : Binder
 {
     private readonly BindingSession _bindingSession;
-    private readonly ImmutableArray<AkburaDeclaration> _rootPath;
-    private readonly AkburaDeclaration _rootDeclaration;
+    private readonly ImmutableArray<Declaration> _rootPath;
+    private readonly Declaration _rootDeclaration;
     private readonly BinderUsage _usage;
     private SmallDictionary<AkburaSyntax, Binder>? _lazyBinderMap;
 
     public ExecutableCodeBinder(
         BindingSession bindingSession,
-        ImmutableArray<AkburaDeclaration> rootPath,
+        ImmutableArray<Declaration> rootPath,
         Binder next,
         BinderUsage usage)
         : base(
@@ -58,7 +57,7 @@ internal sealed class ExecutableCodeBinder : Binder
     private void ComputeBinderMap()
     {
         var map = new SmallDictionary<AkburaSyntax, Binder>();
-        var path = ArrayBuilder<AkburaDeclaration>.GetInstance();
+        var path = ArrayBuilder<Declaration>.GetInstance();
         try
         {
             for (var index = 0; index < _rootPath.Length - 1; index++)
@@ -78,8 +77,8 @@ internal sealed class ExecutableCodeBinder : Binder
 
     private void AddDeclarationBinders(
         SmallDictionary<AkburaSyntax, Binder> map,
-        ArrayBuilder<AkburaDeclaration> path,
-        AkburaDeclaration declaration)
+        ArrayBuilder<Declaration> path,
+        Declaration declaration)
     {
         path.Add(declaration);
         map[declaration.Syntax] = _bindingSession.GetOrCreateBinder(
@@ -107,7 +106,7 @@ internal sealed class ExecutableCodeBinder : Binder
         }
     }
 
-    private static AkburaDeclaration GetRootDeclaration(ImmutableArray<AkburaDeclaration> rootPath)
+    private static Declaration GetRootDeclaration(ImmutableArray<Declaration> rootPath)
     {
         return !rootPath.IsDefaultOrEmpty
             ? rootPath[rootPath.Length - 1]

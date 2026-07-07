@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using Akbura.Language.Syntax;
 using System;
 using System.Collections.Immutable;
@@ -11,14 +10,14 @@ internal sealed partial class BinderFactory
     internal sealed class BinderFactoryVisitor : SyntaxVisitor<Binder>
     {
         private BinderFactory? _factory;
-        private ImmutableArray<AkburaDeclaration> _path;
+        private ImmutableArray<Declaration> _path;
         private BinderUsage _usage;
         private Binder? _next;
-        private AkburaDeclaration? _declaration;
+        private Declaration? _declaration;
 
         internal void Initialize(
             BinderFactory factory,
-            ImmutableArray<AkburaDeclaration> path,
+            ImmutableArray<Declaration> path,
             BinderUsage usage)
         {
             Debug.Assert(!path.IsDefault);
@@ -71,7 +70,7 @@ internal sealed partial class BinderFactory
 
         public override Binder VisitAkburaDocumentSyntax(AkburaDocumentSyntax node)
         {
-            var declaration = RequiredDeclaration(AkburaDeclarationKind.Component);
+            var declaration = RequiredDeclaration(DeclarationKind.Component);
             return new ComponentBinder(
                 Factory.SemanticModel,
                 Next,
@@ -111,7 +110,7 @@ internal sealed partial class BinderFactory
 
         public override Binder VisitCSharpBlockSyntax(CSharpBlockSyntax node)
         {
-            var declaration = RequiredDeclaration(AkburaDeclarationKind.CSharpBlock);
+            var declaration = RequiredDeclaration(DeclarationKind.CSharpBlock);
             return new BlockBinder(
                 Factory.SemanticModel,
                 Next,
@@ -122,8 +121,8 @@ internal sealed partial class BinderFactory
         private MarkupBinder CreateMarkupBinder()
         {
             var declaration = RequiredDeclaration(
-                AkburaDeclarationKind.MarkupRoot,
-                AkburaDeclarationKind.MarkupElement);
+                DeclarationKind.MarkupRoot,
+                DeclarationKind.MarkupElement);
             return new MarkupBinder(
                 Factory.SemanticModel,
                 Next,
@@ -133,7 +132,7 @@ internal sealed partial class BinderFactory
 
         private AkcssModuleBinder CreateAkcssModuleBinder()
         {
-            var declaration = RequiredDeclaration(AkburaDeclarationKind.AkcssModule);
+            var declaration = RequiredDeclaration(DeclarationKind.AkcssModule);
             return new AkcssModuleBinder(
                 Factory.SemanticModel,
                 Next,
@@ -144,8 +143,8 @@ internal sealed partial class BinderFactory
         private AkcssStyleBinder CreateAkcssStyleBinder()
         {
             var declaration = RequiredDeclaration(
-                AkburaDeclarationKind.AkcssStyle,
-                AkburaDeclarationKind.AkcssUtility);
+                DeclarationKind.AkcssStyle,
+                DeclarationKind.AkcssUtility);
             return new AkcssStyleBinder(
                 Factory.SemanticModel,
                 Next,
@@ -153,7 +152,7 @@ internal sealed partial class BinderFactory
                 Next.Flags | GetUsageFlags(_usage));
         }
 
-        private AkburaDeclaration RequiredDeclaration(params AkburaDeclarationKind[] expectedKinds)
+        private Declaration RequiredDeclaration(params DeclarationKind[] expectedKinds)
         {
             var declaration = _declaration ??
                 throw new InvalidOperationException($"{nameof(BinderFactoryVisitor)} is not visiting a declaration.");

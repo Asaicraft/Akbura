@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -18,7 +17,7 @@ internal sealed class AkcssStyleBinder : Binder
     public AkcssStyleBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
-        AkburaDeclaration declaration,
+        Declaration declaration,
         AkburaBinderFlags flags = AkburaBinderFlags.None)
         : base(
             semanticModel,
@@ -26,7 +25,7 @@ internal sealed class AkcssStyleBinder : Binder
             declaration,
             declaration.Syntax,
             flags | AkburaBinderFlags.InAkcss |
-                (declaration.Kind == AkburaDeclarationKind.AkcssUtility
+                (declaration.Kind == DeclarationKind.AkcssUtility
                     ? AkburaBinderFlags.InAkcssUtility
                     : AkburaBinderFlags.InAkcssStyle))
     {
@@ -35,7 +34,7 @@ internal sealed class AkcssStyleBinder : Binder
     public override ImmutableArray<ISymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
     {
         if (!OwnsScope(scopeDesignator) ||
-            Declaration?.Kind != AkburaDeclarationKind.AkcssUtility)
+            Declaration?.Kind != DeclarationKind.AkcssUtility)
         {
             return base.GetDeclaredSymbolsForScope(scopeDesignator);
         }
@@ -173,7 +172,7 @@ internal sealed class AkcssStyleBinder : Binder
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
-        if (Declaration?.Kind != AkburaDeclarationKind.AkcssUtility)
+        if (Declaration?.Kind != DeclarationKind.AkcssUtility)
         {
             return;
         }

@@ -1,7 +1,9 @@
 using Akbura.Collections;
-using Akbura.Language.Declarations;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using BoxedMemberNames = System.Runtime.CompilerServices.StrongBox<Akbura.Collections.ImmutableSegmentedHashSet<string>>;
@@ -10,7 +12,7 @@ namespace Akbura.Language;
 
 internal sealed partial class SyntaxAndDeclarationManager
 {
-    private readonly AkburaDeclarationTable? _previousDeclarationTable;
+    private readonly DeclarationTable? _previousDeclarationTable;
     private State? _lazyState;
 
     internal bool HasLazyState => _lazyState != null;
@@ -39,7 +41,7 @@ internal sealed partial class SyntaxAndDeclarationManager
     private static State CreateState(
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
-        AkburaDeclarationTable? previousTable)
+        DeclarationTable? previousTable)
     {
         syntaxTrees = syntaxTrees.IsDefault
             ? ImmutableArray<AkburaSyntaxTree>.Empty
@@ -53,15 +55,18 @@ internal sealed partial class SyntaxAndDeclarationManager
         var previousAkcssMemberNames = ImmutableDictionary<AkcssSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>>.Empty;
         var rootNamespaces = CreateRootNamespaces(syntaxTrees, previousMemberNames);
         var akcssRootNamespaces = CreateAkcssRootNamespaces(akcssSyntaxTrees, previousAkcssMemberNames);
-        var declarationTable = AkburaDeclarationTable.Create(
+        var syntaxDeclarationTable = DeclarationTable.Create(
             syntaxTrees,
             akcssSyntaxTrees,
             previousTable);
-        var rootDeclarationTable = CreateRootDeclarationTable(
-            syntaxTrees,
-            akcssSyntaxTrees,
-            rootNamespaces,
-            akcssRootNamespaces);
+        var declarationTable = CreateRootDeclarationTable(
+                syntaxTrees,
+                akcssSyntaxTrees,
+                rootNamespaces,
+                akcssRootNamespaces)
+            .WithSyntaxDeclarations(
+                syntaxDeclarationTable.Components,
+                syntaxDeclarationTable.AkcssModules);
         var lastComputedMemberNames = CreateLastComputedMemberNames(rootNamespaces);
         var lastComputedAkcssMemberNames = CreateLastComputedMemberNames(akcssRootNamespaces);
         return new State(
@@ -73,14 +78,13 @@ internal sealed partial class SyntaxAndDeclarationManager
             akcssRootNamespaces,
             lastComputedMemberNames,
             lastComputedAkcssMemberNames,
-            declarationTable,
-            rootDeclarationTable);
+            declarationTable);
     }
 
     private static State CreateState(
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
-        AkburaDeclarationTable declarationTable,
+        DeclarationTable declarationTable,
         ImmutableDictionary<AkburaSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> previousMemberNames,
         ImmutableDictionary<AkcssSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> previousAkcssMemberNames)
     {
@@ -95,11 +99,14 @@ internal sealed partial class SyntaxAndDeclarationManager
 
         var rootNamespaces = CreateRootNamespaces(syntaxTrees, previousMemberNames);
         var akcssRootNamespaces = CreateAkcssRootNamespaces(akcssSyntaxTrees, previousAkcssMemberNames);
-        var rootDeclarationTable = CreateRootDeclarationTable(
-            syntaxTrees,
-            akcssSyntaxTrees,
-            rootNamespaces,
-            akcssRootNamespaces);
+        var combinedDeclarationTable = CreateRootDeclarationTable(
+                syntaxTrees,
+                akcssSyntaxTrees,
+                rootNamespaces,
+                akcssRootNamespaces)
+            .WithSyntaxDeclarations(
+                declarationTable.Components,
+                declarationTable.AkcssModules);
         var lastComputedMemberNames = CreateLastComputedMemberNames(rootNamespaces);
         var lastComputedAkcssMemberNames = CreateLastComputedMemberNames(akcssRootNamespaces);
 
@@ -112,8 +119,7 @@ internal sealed partial class SyntaxAndDeclarationManager
             akcssRootNamespaces,
             lastComputedMemberNames,
             lastComputedAkcssMemberNames,
-            declarationTable,
-            rootDeclarationTable);
+            combinedDeclarationTable);
     }
 
     private static ImmutableDictionary<TTree, int> CreateOrdinalMap<TTree>(
@@ -228,6 +234,28 @@ internal sealed partial class SyntaxAndDeclarationManager
 
     internal sealed class State
     {
+        internal readonly ImmutableArray<AkburaSyntaxTree> SyntaxTrees;
+        internal readonly ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees;
+        internal readonly ImmutableDictionary<AkburaSyntaxTree, int> SyntaxOrdinalMap;
+        internal readonly ImmutableDictionary<AkcssSyntaxTree, int> AkcssOrdinalMap;
+        internal readonly ImmutableDictionary<AkburaSyntaxTree, Lazy<RootSingleNamespaceDeclaration>> RootNamespaces;
+        internal readonly ImmutableDictionary<AkcssSyntaxTree, Lazy<RootSingleNamespaceDeclaration>> AkcssRootNamespaces;
+
+        /// <summary>
+        /// Mapping from a syntax tree to the last fully computed member names for declaration containers in lexical order.
+        /// </summary>
+        /// <remarks>
+        /// Member names often do not change for most edits, so keeping weak references lets the next state reuse the same
+        /// immutable set when the old declaration is still alive.
+        /// </remarks>
+        internal readonly ImmutableDictionary<AkburaSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> LastComputedMemberNames;
+
+        /// <summary>
+        /// Mapping from an AKCSS syntax tree to the last fully computed member names for declaration containers in lexical order.
+        /// </summary>
+        internal readonly ImmutableDictionary<AkcssSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> LastComputedAkcssMemberNames;
+        internal readonly DeclarationTable DeclarationTable;
+
         public State(
             ImmutableArray<AkburaSyntaxTree> syntaxTrees,
             ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
@@ -237,9 +265,13 @@ internal sealed partial class SyntaxAndDeclarationManager
             ImmutableDictionary<AkcssSyntaxTree, Lazy<RootSingleNamespaceDeclaration>> akcssRootNamespaces,
             ImmutableDictionary<AkburaSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> lastComputedMemberNames,
             ImmutableDictionary<AkcssSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> lastComputedAkcssMemberNames,
-            AkburaDeclarationTable declarationTable,
-            DeclarationTable rootDeclarationTable)
+            DeclarationTable declarationTable)
         {
+            Debug.Assert(syntaxTrees.All(tree => syntaxTrees[syntaxOrdinalMap[tree]] == tree));
+            Debug.Assert(akcssSyntaxTrees.All(tree => akcssSyntaxTrees[akcssOrdinalMap[tree]] == tree));
+            Debug.Assert(syntaxTrees.SetEquals(rootNamespaces.Keys.ToImmutableArray(), EqualityComparer<AkburaSyntaxTree>.Default));
+            Debug.Assert(akcssSyntaxTrees.SetEquals(akcssRootNamespaces.Keys.ToImmutableArray(), EqualityComparer<AkcssSyntaxTree>.Default));
+
             SyntaxTrees = syntaxTrees;
             AkcssSyntaxTrees = akcssSyntaxTrees;
             SyntaxOrdinalMap = syntaxOrdinalMap;
@@ -249,27 +281,6 @@ internal sealed partial class SyntaxAndDeclarationManager
             LastComputedMemberNames = lastComputedMemberNames;
             LastComputedAkcssMemberNames = lastComputedAkcssMemberNames;
             DeclarationTable = declarationTable ?? throw new ArgumentNullException(nameof(declarationTable));
-            RootDeclarationTable = rootDeclarationTable ?? throw new ArgumentNullException(nameof(rootDeclarationTable));
         }
-
-        public ImmutableArray<AkburaSyntaxTree> SyntaxTrees { get; }
-
-        public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees { get; }
-
-        public ImmutableDictionary<AkburaSyntaxTree, int> SyntaxOrdinalMap { get; }
-
-        public ImmutableDictionary<AkcssSyntaxTree, int> AkcssOrdinalMap { get; }
-
-        public ImmutableDictionary<AkburaSyntaxTree, Lazy<RootSingleNamespaceDeclaration>> RootNamespaces { get; }
-
-        public ImmutableDictionary<AkcssSyntaxTree, Lazy<RootSingleNamespaceDeclaration>> AkcssRootNamespaces { get; }
-
-        public ImmutableDictionary<AkburaSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> LastComputedMemberNames { get; }
-
-        public ImmutableDictionary<AkcssSyntaxTree, OneOrMany<WeakReference<BoxedMemberNames>>> LastComputedAkcssMemberNames { get; }
-
-        public AkburaDeclarationTable DeclarationTable { get; }
-
-        public DeclarationTable RootDeclarationTable { get; }
     }
 }

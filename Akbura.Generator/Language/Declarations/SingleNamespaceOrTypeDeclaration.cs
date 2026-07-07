@@ -39,7 +39,7 @@ internal abstract class SingleNamespaceOrTypeDeclaration : Declaration
         }
     }
 
-    public AkburaSyntax Syntax
+    public override AkburaSyntax Syntax
     {
         get
         {

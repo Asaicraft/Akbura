@@ -1,5 +1,4 @@
 using Akbura.Language.BoundTree;
-using Akbura.Language.Declarations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -18,7 +17,7 @@ internal sealed class BlockBinder : Binder
     public BlockBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
-        AkburaDeclaration declaration,
+        Declaration declaration,
         AkburaBinderFlags flags = AkburaBinderFlags.None)
         : base(
             semanticModel,
@@ -92,7 +91,7 @@ internal sealed class BlockBinder : Binder
         var builder = ArrayBuilder<ISymbol>.GetInstance();
         foreach (var child in Declaration.Children)
         {
-            if (child.Kind != AkburaDeclarationKind.CSharpStatement ||
+            if (child.Kind != DeclarationKind.CSharpStatement ||
                 child.Syntax.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
             {
                 continue;

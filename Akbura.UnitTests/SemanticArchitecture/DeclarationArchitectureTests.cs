@@ -2,7 +2,6 @@ using Akbura.Language;
 using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
-using Akbura.Language.Declarations;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -61,40 +60,43 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         var table = compilation.DeclarationTable;
 
         var component = Assert.Single(table.Components);
-        Assert.Equal(AkburaDeclarationKind.Component, component.Kind);
+        Assert.Equal(DeclarationKind.Component, component.Kind);
         Assert.Equal("Dashboard", component.Name);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.Using);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.Namespace);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssModule);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.InjectedService);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.Parameter);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.State);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.Command);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.UseEffect);
-        Assert.Contains(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.MarkupRoot);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.Using);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.Namespace);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.AkcssModule);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.InjectedService);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.Parameter);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.State);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.Command);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.UseEffect);
+        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.MarkupRoot);
 
-        var inlineAkcss = Assert.Single(component.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssModule);
-        Assert.Contains(inlineAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssStyle);
-        Assert.Contains(inlineAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssUtility);
+        var inlineAkcss = Assert.Single(component.Children, declaration => declaration.Kind == DeclarationKind.AkcssModule);
+        Assert.Contains(inlineAkcss.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle);
+        Assert.Contains(inlineAkcss.Children, declaration => declaration.Kind == DeclarationKind.AkcssUtility);
 
         var externalAkcss = Assert.Single(table.AkcssModules);
         Assert.Equal("Demo.Pages.Dashboard.akcss", externalAkcss.Name);
-        Assert.Contains(externalAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssUsing);
-        Assert.Contains(externalAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssStyle);
+        Assert.Contains(externalAkcss.Children, declaration => declaration.Kind == DeclarationKind.AkcssUsing);
+        Assert.Contains(externalAkcss.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle);
     }
 
 
     [Fact]
-    public void DeclarationCollector_UsesPooledVisitorAndResetsState()
+    public void DeclarationTreeBuilder_BuildsSyntaxDeclarationsAndResetsState()
     {
-        var poolField = typeof(AkburaDeclarationCollector).GetField(
+        var builderType = typeof(DeclarationTreeBuilder).GetNestedType(
+            "SyntaxDeclarationBuilder",
+            BindingFlags.NonPublic);
+        Assert.NotNull(builderType);
+
+        var poolField = builderType.GetField(
             "s_pool",
-            System.Reflection.BindingFlags.Static |
-            System.Reflection.BindingFlags.NonPublic);
+            BindingFlags.Static |
+            BindingFlags.NonPublic);
         Assert.NotNull(poolField);
-        Assert.Same(
-            typeof(ObjectPool<AkburaDeclarationCollector>),
-            poolField.FieldType);
+        Assert.Equal("ObjectPool`1", poolField.FieldType.Name);
 
         const string firstCode =
             "@akcss { .first { Background: White; } }\n" +
@@ -103,23 +105,23 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             "@akcss { .second { Background: White; } }\n" +
             "state int second = 0;";
 
-        var first = AkburaDeclarationCollector.Collect(
+        var first = DeclarationTreeBuilder.ForSyntaxDeclaration(
             AkburaSyntaxTree.ParseText(firstCode, "First.akbura"));
-        var second = AkburaDeclarationCollector.Collect(
+        var second = DeclarationTreeBuilder.ForSyntaxDeclaration(
             AkburaSyntaxTree.ParseText(secondCode, "Second.akbura"));
 
         Assert.Equal("First", first.Name);
         Assert.Equal("Second", second.Name);
-        Assert.Contains(first.Children, declaration => declaration.Kind == AkburaDeclarationKind.State && declaration.Name == "first");
+        Assert.Contains(first.Children, declaration => declaration.Kind == DeclarationKind.State && declaration.Name == "first");
         Assert.DoesNotContain(first.Children, declaration => declaration.Name == "second");
-        Assert.Contains(second.Children, declaration => declaration.Kind == AkburaDeclarationKind.State && declaration.Name == "second");
+        Assert.Contains(second.Children, declaration => declaration.Kind == DeclarationKind.State && declaration.Name == "second");
         Assert.DoesNotContain(second.Children, declaration => declaration.Name == "first");
 
-        var firstInlineAkcss = Assert.Single(first.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssModule);
-        var secondInlineAkcss = Assert.Single(second.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssModule);
-        Assert.Contains(firstInlineAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssStyle && declaration.Name == ".first");
+        var firstInlineAkcss = Assert.Single(first.Children, declaration => declaration.Kind == DeclarationKind.AkcssModule);
+        var secondInlineAkcss = Assert.Single(second.Children, declaration => declaration.Kind == DeclarationKind.AkcssModule);
+        Assert.Contains(firstInlineAkcss.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle && declaration.Name == ".first");
         Assert.DoesNotContain(firstInlineAkcss.Children, declaration => declaration.Name == ".second");
-        Assert.Contains(secondInlineAkcss.Children, declaration => declaration.Kind == AkburaDeclarationKind.AkcssStyle && declaration.Name == ".second");
+        Assert.Contains(secondInlineAkcss.Children, declaration => declaration.Kind == DeclarationKind.AkcssStyle && declaration.Name == ".second");
         Assert.DoesNotContain(secondInlineAkcss.Children, declaration => declaration.Name == ".first");
     }
 
@@ -145,7 +147,7 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Equal("Counter", Assert.Single(state.DeclarationTable.Components).Name);
         Assert.Equal("Demo.Pages.Counter.akcss", Assert.Single(state.DeclarationTable.AkcssModules).Name);
         Assert.Collection(
-            state.RootDeclarationTable.RootDeclarations,
+            state.DeclarationTable.RootDeclarations,
             declaration =>
             {
                 Assert.Equal(string.Empty, declaration.Name);
@@ -184,20 +186,20 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         var textBlock = Assert.IsType<MarkupElementContentSyntax>(Assert.Single(border.Body)).Element;
 
         Assert.True(table.TryGetDeclaration(textBlock, out var declaration));
-        Assert.Equal(AkburaDeclarationKind.MarkupElement, declaration.Kind);
+        Assert.Equal(DeclarationKind.MarkupElement, declaration.Kind);
         Assert.Equal("TextBlock", declaration.Name);
 
         Assert.True(table.TryGetDeclarationPath(textBlock, out var exactPath));
         Assert.Collection(
             exactPath,
-            item => Assert.Equal(AkburaDeclarationKind.Component, item.Kind),
-            item => Assert.Equal(AkburaDeclarationKind.CSharpStatement, item.Kind),
-            item => Assert.Equal(AkburaDeclarationKind.CSharpBlock, item.Kind),
-            item => Assert.Equal(AkburaDeclarationKind.MarkupRoot, item.Kind),
-            item => Assert.Equal(AkburaDeclarationKind.MarkupElement, item.Kind),
+            item => Assert.Equal(DeclarationKind.Component, item.Kind),
+            item => Assert.Equal(DeclarationKind.CSharpStatement, item.Kind),
+            item => Assert.Equal(DeclarationKind.CSharpBlock, item.Kind),
+            item => Assert.Equal(DeclarationKind.MarkupRoot, item.Kind),
+            item => Assert.Equal(DeclarationKind.MarkupElement, item.Kind),
             item =>
             {
-                Assert.Equal(AkburaDeclarationKind.MarkupElement, item.Kind);
+                Assert.Equal(DeclarationKind.MarkupElement, item.Kind);
                 Assert.Equal("TextBlock", item.Name);
             });
 
@@ -396,8 +398,8 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
     public void DeclarationSymbolTable_CachesSymbolsBySyntaxIdentity()
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        var symbolInfosField = typeof(AkburaDeclarationSymbolTable).GetField("_symbolInfos", flags);
-        var declaredSymbolsField = typeof(AkburaDeclarationSymbolTable).GetField("_declaredSymbols", flags);
+        var symbolInfosField = typeof(DeclarationSymbolTable).GetField("_symbolInfos", flags);
+        var declaredSymbolsField = typeof(DeclarationSymbolTable).GetField("_declaredSymbols", flags);
 
         Assert.NotNull(symbolInfosField);
         Assert.NotNull(declaredSymbolsField);
@@ -431,11 +433,11 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
 
         var declaredSymbols = model.DeclarationSymbols.GetDeclaredSymbols(
             declaration,
-            AkburaDeclarationKind.State,
-            AkburaDeclarationKind.Parameter,
-            AkburaDeclarationKind.InjectedService,
-            AkburaDeclarationKind.Command,
-            AkburaDeclarationKind.UseEffect);
+            DeclarationKind.State,
+            DeclarationKind.Parameter,
+            DeclarationKind.InjectedService,
+            DeclarationKind.Command,
+            DeclarationKind.UseEffect);
         var binder = Assert.IsType<ComponentBinder>(model.GetBinder(root));
 
         Assert.Contains(declaredSymbols, symbol => symbol is IInjectSymbol { Name: "service" });
@@ -523,8 +525,8 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         var module = Assert.IsAssignableFrom<IAkcssModuleSymbol>(model.GetDeclaredSymbol(document));
         var declaredSymbols = model.DeclarationSymbols.GetDeclaredSymbols(
             Assert.Single(compilation.DeclarationTable.AkcssModules),
-            AkburaDeclarationKind.AkcssStyle,
-            AkburaDeclarationKind.AkcssUtility);
+            DeclarationKind.AkcssStyle,
+            DeclarationKind.AkcssUtility);
 
         Assert.False(module.IsInlined);
         Assert.Null(module.ContainingSymbol);

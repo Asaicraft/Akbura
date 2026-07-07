@@ -1,4 +1,3 @@
-using Akbura.Language.Declarations;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -14,7 +13,7 @@ internal sealed class AkcssModuleBinder : Binder
     public AkcssModuleBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
-        AkburaDeclaration declaration,
+        Declaration declaration,
         AkburaBinderFlags flags = AkburaBinderFlags.None)
         : base(
             semanticModel,
@@ -78,8 +77,8 @@ internal sealed class AkcssModuleBinder : Binder
 
         symbols = SemanticModel.DeclarationSymbols.GetDeclaredSymbols(
             Declaration!,
-            AkburaDeclarationKind.AkcssStyle,
-            AkburaDeclarationKind.AkcssUtility);
+            DeclarationKind.AkcssStyle,
+            DeclarationKind.AkcssUtility);
 
         ImmutableInterlocked.InterlockedInitialize(ref _lazyDeclaredSymbols, symbols);
         return _lazyDeclaredSymbols;

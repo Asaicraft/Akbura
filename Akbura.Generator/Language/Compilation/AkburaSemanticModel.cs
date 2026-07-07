@@ -1,6 +1,5 @@
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
-using Akbura.Language.Declarations;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -34,7 +33,7 @@ internal partial class AkburaSemanticModel
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
     private readonly AkburaOperationFactory _operationFactory;
-    private readonly AkburaDeclarationSymbolTable _declarationSymbols;
+    private readonly DeclarationSymbolTable _declarationSymbols;
 
     protected AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
@@ -43,7 +42,7 @@ internal partial class AkburaSemanticModel
         _bindingCache = new SemanticBindingCache();
         _bindingSession = new BindingSession(this);
         _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
-        _declarationSymbols = new AkburaDeclarationSymbolTable(this);
+        _declarationSymbols = new DeclarationSymbolTable(this);
     }
 
     protected AkburaSemanticModel(AkburaSemanticModel semanticModel)
@@ -307,9 +306,9 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    internal AkburaDeclarationSymbolTable DeclarationSymbols => _declarationSymbols;
+    internal DeclarationSymbolTable DeclarationSymbols => _declarationSymbols;
 
-    internal AkburaSymbolInfo CreateDeclarationSymbolInfo(AkburaDeclaration declaration)
+    internal AkburaSymbolInfo CreateDeclarationSymbolInfo(Declaration declaration)
     {
         if (declaration.SyntaxTree != null &&
             !ReferenceEquals(declaration.Syntax.Root, SyntaxTree.GetRoot()))
@@ -323,20 +322,20 @@ internal partial class AkburaSemanticModel
 
         return declaration.Kind switch
         {
-            AkburaDeclarationKind.Component or
-                AkburaDeclarationKind.State or
-                AkburaDeclarationKind.Parameter or
-                AkburaDeclarationKind.InjectedService or
-                AkburaDeclarationKind.Command or
-                AkburaDeclarationKind.UseEffect =>
+            DeclarationKind.Component or
+                DeclarationKind.State or
+                DeclarationKind.Parameter or
+                DeclarationKind.InjectedService or
+                DeclarationKind.Command or
+                DeclarationKind.UseEffect =>
                 GetMemberSemanticModel(declaration.Syntax).GetSymbolInfo(declaration.Syntax),
-            AkburaDeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax =>
+            DeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax =>
                 ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(declaration.Syntax)),
-            AkburaDeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.AkcssDocumentSyntax =>
+            DeclarationKind.AkcssModule when declaration.Syntax.Kind == AkburaSyntaxKind.AkcssDocumentSyntax =>
                 ResolveExternalAkcssModule(declaration),
-            AkburaDeclarationKind.AkcssStyle =>
+            DeclarationKind.AkcssStyle =>
                 ResolveAkcssStyle(Unsafe.As<AkcssStyleRuleSyntax>(declaration.Syntax)),
-            AkburaDeclarationKind.AkcssUtility =>
+            DeclarationKind.AkcssUtility =>
                 ResolveTailwindUtility(Unsafe.As<AkcssUtilityDeclarationSyntax>(declaration.Syntax)),
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         };
@@ -402,7 +401,7 @@ internal partial class AkburaSemanticModel
             path: null);
     }
 
-    private AkburaSymbolInfo ResolveExternalAkcssModule(AkburaDeclaration declaration)
+    private AkburaSymbolInfo ResolveExternalAkcssModule(Declaration declaration)
     {
         var document = Unsafe.As<AkcssDocumentSyntax>(declaration.Syntax);
         if (_bindingCache.TryGetSymbolInfo(document, out var cachedInfo))
@@ -424,7 +423,7 @@ internal partial class AkburaSemanticModel
         return symbolInfo;
     }
 
-    private static string? GetExternalAkcssPath(AkburaDeclaration declaration)
+    private static string? GetExternalAkcssPath(Declaration declaration)
     {
         var syntaxTree = declaration.AkcssSyntaxTree;
         if (syntaxTree == null)

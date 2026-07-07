@@ -9,50 +9,45 @@ namespace Akbura.Collections;
 
 internal readonly partial struct ImmutableSegmentedHashSet<T>
 {
+    /// <summary>
+    /// Private helper class for use only by <see cref="RoslynImmutableInterlocked"/> and
+    /// <see cref="SegmentedCollectionsMarshal"/>.
+    /// </summary>
     internal static class PrivateMarshal
     {
         internal static ImmutableSegmentedHashSet<T> VolatileRead(in ImmutableSegmentedHashSet<T> location)
         {
             var set = Volatile.Read(ref Unsafe.AsRef(in location._set));
-            return set is null
-                ? default
-                : new ImmutableSegmentedHashSet<T>(set);
+            if (set is null)
+                return default;
+
+            return new ImmutableSegmentedHashSet<T>(set);
         }
 
-        internal static ImmutableSegmentedHashSet<T> InterlockedExchange(
-            ref ImmutableSegmentedHashSet<T> location,
-            ImmutableSegmentedHashSet<T> value)
+        internal static ImmutableSegmentedHashSet<T> InterlockedExchange(ref ImmutableSegmentedHashSet<T> location, ImmutableSegmentedHashSet<T> value)
         {
             var set = Interlocked.Exchange(ref Unsafe.AsRef(in location._set), value._set);
-            return set is null
-                ? default
-                : new ImmutableSegmentedHashSet<T>(set);
+            if (set is null)
+                return default;
+
+            return new ImmutableSegmentedHashSet<T>(set);
         }
 
-        internal static ImmutableSegmentedHashSet<T> InterlockedCompareExchange(
-            ref ImmutableSegmentedHashSet<T> location,
-            ImmutableSegmentedHashSet<T> value,
-            ImmutableSegmentedHashSet<T> comparand)
+        internal static ImmutableSegmentedHashSet<T> InterlockedCompareExchange(ref ImmutableSegmentedHashSet<T> location, ImmutableSegmentedHashSet<T> value, ImmutableSegmentedHashSet<T> comparand)
         {
-            var set = Interlocked.CompareExchange(
-                ref Unsafe.AsRef(in location._set),
-                value._set,
-                comparand._set);
-            return set is null
-                ? default
-                : new ImmutableSegmentedHashSet<T>(set);
+            var set = Interlocked.CompareExchange(ref Unsafe.AsRef(in location._set), value._set, comparand._set);
+            if (set is null)
+                return default;
+
+            return new ImmutableSegmentedHashSet<T>(set);
         }
 
+        /// <inheritdoc cref="SegmentedCollectionsMarshal.AsImmutableSegmentedHashSet{T}(SegmentedHashSet{T}?)"/>
         internal static ImmutableSegmentedHashSet<T> AsImmutableSegmentedHashSet(SegmentedHashSet<T>? set)
-        {
-            return set is not null
-                ? new ImmutableSegmentedHashSet<T>(set)
-                : default;
-        }
+            => set is not null ? new ImmutableSegmentedHashSet<T>(set) : default;
 
+        /// <inheritdoc cref="SegmentedCollectionsMarshal.AsSegmentedHashSet{T}(ImmutableSegmentedHashSet{T})"/>
         internal static SegmentedHashSet<T>? AsSegmentedHashSet(ImmutableSegmentedHashSet<T> set)
-        {
-            return set._set;
-        }
+            => set._set;
     }
 }

@@ -11,149 +11,115 @@ internal readonly partial struct ImmutableSegmentedHashSet<T>
 {
     public sealed class Builder : ISet<T>, IReadOnlyCollection<T>
     {
-        private SegmentedHashSet<T> _set;
+        /// <summary>
+        /// The private builder implementation.
+        /// </summary>
+        private ValueBuilder _builder;
 
         internal Builder(ImmutableSegmentedHashSet<T> set)
-        {
-            _set = new SegmentedHashSet<T>(set.Set, set.KeyComparer);
-        }
+            => _builder = new ValueBuilder(set);
 
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.KeyComparer"/>
         public IEqualityComparer<T> KeyComparer
         {
-            get
-            {
-                return _set.Comparer;
-            }
-
-            set
-            {
-                var comparer = value ?? EqualityComparer<T>.Default;
-                if (Equals(_set.Comparer, comparer))
-                {
-                    return;
-                }
-
-                _set = new SegmentedHashSet<T>(_set, comparer);
-            }
+            get => _builder.KeyComparer;
+            set => _builder.KeyComparer = value;
         }
 
-        public int Count => _set.Count;
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.Count"/>
+        public int Count => _builder.Count;
 
-        bool ICollection<T>.IsReadOnly => false;
+        bool ICollection<T>.IsReadOnly => ICollectionCalls<T>.IsReadOnly(ref _builder);
 
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.Add(T)"/>
         public bool Add(T item)
-        {
-            return _set.Add(item);
-        }
+            => _builder.Add(item);
 
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.Clear()"/>
         public void Clear()
-        {
-            _set.Clear();
-        }
+            => _builder.Clear();
 
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.Contains(T)"/>
         public bool Contains(T item)
-        {
-            return _set.Contains(item);
-        }
+            => _builder.Contains(item);
 
-        public void CopyTo(T[] array, int arrayIndex)
-        {
-            _set.CopyTo(array, arrayIndex);
-        }
-
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.ExceptWith(IEnumerable{T})"/>
         public void ExceptWith(IEnumerable<T> other)
         {
-            _set.ExceptWith(other);
-        }
-
-        public Enumerator GetEnumerator()
-        {
-            return new Enumerator(new SegmentedHashSet<T>(_set, _set.Comparer));
-        }
-
-        public void IntersectWith(IEnumerable<T> other)
-        {
-            _set.IntersectWith(other);
-        }
-
-        public bool IsProperSubsetOf(IEnumerable<T> other)
-        {
-            return _set.IsProperSubsetOf(other);
-        }
-
-        public bool IsProperSupersetOf(IEnumerable<T> other)
-        {
-            return _set.IsProperSupersetOf(other);
-        }
-
-        public bool IsSubsetOf(IEnumerable<T> other)
-        {
-            return _set.IsSubsetOf(other);
-        }
-
-        public bool IsSupersetOf(IEnumerable<T> other)
-        {
-            return _set.IsSupersetOf(other);
-        }
-
-        public bool Overlaps(IEnumerable<T> other)
-        {
-            return _set.Overlaps(other);
-        }
-
-        public bool Remove(T item)
-        {
-            return _set.Remove(item);
-        }
-
-        public bool SetEquals(IEnumerable<T> other)
-        {
-            return _set.SetEquals(other);
-        }
-
-        public void SymmetricExceptWith(IEnumerable<T> other)
-        {
-            _set.SymmetricExceptWith(other);
-        }
-
-        public bool TryGetValue(T equalValue, out T actualValue)
-        {
-            foreach (var item in _set)
+            if (other == this)
             {
-                if (_set.Comparer.Equals(item, equalValue))
-                {
-                    actualValue = item;
-                    return true;
-                }
+                // The ValueBuilder knows how to optimize for this case by calling Clear, provided it does not need
+                // to access properties of the wrapping Builder instance.
+                _builder.ExceptWith(_builder.ReadOnlySet);
             }
-
-            actualValue = equalValue;
-            return false;
+            else
+            {
+                _builder.ExceptWith(other);
+            }
         }
 
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.GetEnumerator()"/>
+        public Enumerator GetEnumerator()
+            => _builder.GetEnumerator();
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.IntersectWith(IEnumerable{T})"/>
+        public void IntersectWith(IEnumerable<T> other)
+            => _builder.IntersectWith(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.IsProperSubsetOf(IEnumerable{T})"/>
+        public bool IsProperSubsetOf(IEnumerable<T> other)
+            => _builder.IsProperSubsetOf(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.IsProperSupersetOf(IEnumerable{T})"/>
+        public bool IsProperSupersetOf(IEnumerable<T> other)
+            => _builder.IsProperSupersetOf(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.IsSubsetOf(IEnumerable{T})"/>
+        public bool IsSubsetOf(IEnumerable<T> other)
+            => _builder.IsSubsetOf(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.IsSupersetOf(IEnumerable{T})"/>
+        public bool IsSupersetOf(IEnumerable<T> other)
+            => _builder.IsSupersetOf(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.Overlaps(IEnumerable{T})"/>
+        public bool Overlaps(IEnumerable<T> other)
+            => _builder.Overlaps(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.Remove(T)"/>
+        public bool Remove(T item)
+            => _builder.Remove(item);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.SetEquals(IEnumerable{T})"/>
+        public bool SetEquals(IEnumerable<T> other)
+            => _builder.SetEquals(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.SymmetricExceptWith(IEnumerable{T})"/>
+        public void SymmetricExceptWith(IEnumerable<T> other)
+            => _builder.SymmetricExceptWith(other);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.TryGetValue(T, out T)"/>
+        public bool TryGetValue(T equalValue, out T actualValue)
+            => _builder.TryGetValue(equalValue, out actualValue);
+
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.UnionWith(IEnumerable{T})"/>
         public void UnionWith(IEnumerable<T> other)
-        {
-            _set.UnionWith(other);
-        }
+            => _builder.UnionWith(other);
 
+        /// <inheritdoc cref="ImmutableHashSet{T}.Builder.ToImmutable()"/>
         public ImmutableSegmentedHashSet<T> ToImmutable()
-        {
-            return new ImmutableSegmentedHashSet<T>(new SegmentedHashSet<T>(_set, _set.Comparer));
-        }
+            => _builder.ToImmutable();
 
         void ICollection<T>.Add(T item)
-        {
-            Add(item);
-        }
+            => ICollectionCalls<T>.Add(ref _builder, item);
+
+        void ICollection<T>.CopyTo(T[] array, int arrayIndex)
+            => ICollectionCalls<T>.CopyTo(ref _builder, array, arrayIndex);
 
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+            => IEnumerableCalls<T>.GetEnumerator(ref _builder);
 
         IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+            => IEnumerableCalls.GetEnumerator(ref _builder);
     }
 }

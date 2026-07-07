@@ -251,6 +251,12 @@ internal static class ThrowHelper
     }
 
     [DoesNotReturn]
+    public static void ConcurrentOperationsNotSupported()
+    {
+        throw new InvalidOperationException("Operations that change non-concurrent collections must have exclusive access. A concurrent update was performed on this collection and corrupted its state.");
+    }
+
+    [DoesNotReturn]
     public static void BadComparer(object? comparer)
     {
         throw new ArgumentException($"Unable to sort because the IComparer.Compare() method returns inconsistent results. Either a value does not compare equal to itself, or one value repeatedly compared to another value yields different results. IComparer: '{comparer}'.", nameof(comparer));

@@ -535,10 +535,8 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
     [Fact]
     public void DeclarationTable_BuilderAddsAndRemovesLatestRootDeclaration()
     {
-        var oldRoot = new Lazy<Declaration>(() => new TestDeclaration(
-            "Old",
-            [new TestDeclaration("Nested")]));
-        var latestRoot = new Lazy<Declaration>(() => new TestDeclaration("Latest"));
+        var oldRoot = CreateLazyRoot("Old", "Nested");
+        var latestRoot = CreateLazyRoot("Latest");
         var builder = DeclarationTable.Empty.ToBuilder();
         builder.AddRootDeclaration(oldRoot);
         var oldTable = builder.ToDeclarationTableAndFree();
@@ -549,15 +547,16 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
 
         Assert.Collection(
             tableWithLatest.RootDeclarations,
-            declaration => Assert.Equal("Old", declaration.Name),
-            declaration => Assert.Equal("Latest", declaration.Name));
+            declaration => Assert.Same(oldRoot.Value, declaration),
+            declaration => Assert.Same(latestRoot.Value, declaration));
         Assert.Collection(
             tableWithLatest.MergedRoot.Declarations,
-            declaration => Assert.Equal("Old", declaration.Name),
-            declaration => Assert.Equal("Latest", declaration.Name));
+            declaration => Assert.Same(oldRoot.Value, declaration),
+            declaration => Assert.Same(latestRoot.Value, declaration));
         Assert.Collection(
             tableWithLatest.MergedRoot.Children,
-            declaration => Assert.Equal("Nested", declaration.Name));
+            declaration => Assert.Equal("Old", declaration.Name),
+            declaration => Assert.Equal("Latest", declaration.Name));
         Assert.Contains("Old", tableWithLatest.DeclarationNames);
         Assert.Contains("Nested", tableWithLatest.DeclarationNames);
         Assert.Contains("Latest", tableWithLatest.DeclarationNames);
@@ -568,13 +567,48 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
 
         Assert.Collection(
             tableWithoutLatest.RootDeclarations,
-            declaration => Assert.Equal("Old", declaration.Name));
+            declaration => Assert.Same(oldRoot.Value, declaration));
         Assert.Collection(
             tableWithoutLatest.MergedRoot.Declarations,
-            declaration => Assert.Equal("Old", declaration.Name));
+            declaration => Assert.Same(oldRoot.Value, declaration));
         Assert.Contains("Old", tableWithoutLatest.DeclarationNames);
         Assert.Contains("Nested", tableWithoutLatest.DeclarationNames);
         Assert.DoesNotContain("Latest", tableWithoutLatest.DeclarationNames);
+    }
+
+    [Fact]
+    public void DeclarationTable_OlderRootsPreserveInsertionOrder()
+    {
+        var first = CreateLazyRoot("First");
+        var second = CreateLazyRoot("Second");
+        var third = CreateLazyRoot("Third");
+        var builder = DeclarationTable.Empty.ToBuilder();
+        builder.AddRootDeclaration(first);
+        var table = builder.ToDeclarationTableAndFree();
+
+        builder = table.ToBuilder();
+        builder.AddRootDeclaration(second);
+        table = builder.ToDeclarationTableAndFree();
+
+        builder = table.ToBuilder();
+        builder.AddRootDeclaration(third);
+        table = builder.ToDeclarationTableAndFree();
+
+        Assert.Collection(
+            table.RootDeclarations,
+            declaration => Assert.Same(first.Value, declaration),
+            declaration => Assert.Same(second.Value, declaration),
+            declaration => Assert.Same(third.Value, declaration));
+        Assert.Collection(
+            table.MergedRoot.Declarations,
+            declaration => Assert.Same(first.Value, declaration),
+            declaration => Assert.Same(second.Value, declaration),
+            declaration => Assert.Same(third.Value, declaration));
+        Assert.Collection(
+            table.MergedRoot.Children,
+            declaration => Assert.Equal("First", declaration.Name),
+            declaration => Assert.Equal("Second", declaration.Name),
+            declaration => Assert.Equal("Third", declaration.Name));
     }
 
     [Fact]
@@ -712,6 +746,48 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
     }
 
     [Fact]
+    public void DeclarationTreeBuilder_CachesContainerMemberNames()
+    {
+        const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+        var cacheField = typeof(DeclarationTreeBuilder).GetField("s_nodeToMemberNames", flags);
+        Assert.NotNull(cacheField);
+        Assert.Contains(
+            "ConditionalWeakTable",
+            cacheField!.FieldType.FullName);
+        const string code =
+            """
+            state int count = 0;
+            state int count = 1;
+
+            @akcss {
+                .card {
+                    Width: 1;
+                }
+
+                .card {
+                    Width: 2;
+                }
+            }
+            """;
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+
+        var declaration = DeclarationTreeBuilder.ForTree(tree);
+
+        var component = Assert.IsType<SingleTypeDeclaration>(Assert.Single(declaration.Children));
+        var inlineAkcss = Assert.IsType<SingleTypeDeclaration>(Assert.Single(component.Children));
+        Assert.Equal(2, inlineAkcss.Children.Length);
+        var style = Assert.IsType<SingleTypeDeclaration>(inlineAkcss.Children[0]);
+        Assert.True(DeclarationTreeBuilder.CachesComputedMemberNames(component));
+        Assert.True(DeclarationTreeBuilder.CachesComputedMemberNames(inlineAkcss));
+        Assert.False(DeclarationTreeBuilder.CachesComputedMemberNames(style));
+        Assert.Equal(2, component.MemberNames.Count);
+        Assert.Contains("count", component.MemberNames);
+        Assert.Contains("@akcss", component.MemberNames);
+        Assert.Single(inlineAkcss.MemberNames);
+        Assert.Contains(".card", inlineAkcss.MemberNames);
+    }
+
+    [Fact]
     public void DeclarationTreeBuilder_BuildsAkcssRootDeclaration()
     {
         const string code =
@@ -747,26 +823,49 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             child => Assert.Equal(DeclarationKind.AkcssUtility, child.Kind));
     }
 
-    private sealed class TestDeclaration : Declaration
+    private static Lazy<RootSingleNamespaceDeclaration> CreateLazyRoot(
+        string childName,
+        string? nestedChildName = null)
     {
-        private readonly ImmutableArray<Declaration> _children;
-
-        public TestDeclaration(
-            string name,
-            ImmutableArray<Declaration> children = default)
-            : base(name)
+        return new Lazy<RootSingleNamespaceDeclaration>(() =>
         {
-            _children = children.IsDefault
-                ? ImmutableArray<Declaration>.Empty
-                : children;
-        }
+            var root = AkburaSyntaxTree.ParseText("<TextBlock />").GetRoot();
+            var children = nestedChildName == null
+                ? ImmutableArray<SingleTypeDeclaration>.Empty
+                : ImmutableArray.Create(CreateTypeDeclaration(root, nestedChildName));
+            var child = CreateTypeDeclaration(root, childName, children);
 
-        public override DeclarationKind Kind => DeclarationKind.Component;
-
-        protected override ImmutableArray<Declaration> GetDeclarationChildren()
-        {
-            return _children;
-        }
+            return new RootSingleNamespaceDeclaration(
+                hasGlobalUsings: false,
+                hasUsings: false,
+                hasExternAliases: false,
+                root,
+                ImmutableArray.Create<SingleNamespaceOrTypeDeclaration>(child),
+                ImmutableArray<ReferenceDirective>.Empty,
+                hasAssemblyAttributes: false,
+                ImmutableArray<AkburaDiagnostic>.Empty,
+                QuickAttributes.None);
+        });
     }
+
+    private static SingleTypeDeclaration CreateTypeDeclaration(
+        AkburaSyntax syntax,
+        string name,
+        ImmutableArray<SingleTypeDeclaration> children = default)
+    {
+        return new SingleTypeDeclaration(
+            DeclarationKind.Component,
+            name,
+            arity: 0,
+            modifiers: DeclarationModifiers.None,
+            declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
+            syntax,
+            new SourceLocation(syntax),
+            ImmutableSegmentedHashSet<string>.Empty,
+            children,
+            ImmutableArray<AkburaDiagnostic>.Empty,
+            QuickAttributes.None);
+    }
+
 
 }

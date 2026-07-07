@@ -3,15 +3,23 @@
 #nullable disable
 
 using Akbura.Language.Syntax;
+using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
+using Akbura.Collections;
 using System;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
+using BoxedMemberNames = System.Runtime.CompilerServices.StrongBox<Akbura.Collections.ImmutableSegmentedHashSet<string>>;
 
 namespace Akbura.Language;
 
 internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTypeDeclaration>
 {
+    private static readonly ConditionalWeakTable<GreenNode, BoxedMemberNames> s_nodeToMemberNames = new();
+    private static readonly BoxedMemberNames s_emptyMemberNames = new(
+        ImmutableSegmentedHashSet<string>.Empty.WithComparer(StringComparer.Ordinal));
+
     private string _componentName;
     private string _akcssLogicalName;
 
@@ -47,6 +55,19 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         };
 
         return builder.CreateAkcssRootDeclaration(syntaxTree.GetRoot());
+    }
+
+    public static bool CachesComputedMemberNames(SingleTypeDeclaration typeDeclaration)
+    {
+        return typeDeclaration.Kind switch
+        {
+            DeclarationKind.Namespace => ThrowHelper.UnexpectedValue<bool>(typeDeclaration.Kind),
+            DeclarationKind.Component or
+            DeclarationKind.AkcssModule => true,
+            DeclarationKind.AkcssStyle or
+            DeclarationKind.AkcssUtility => false,
+            _ => false,
+        };
     }
 
     public override SingleNamespaceOrTypeDeclaration VisitNamespaceDeclarationSyntax(NamespaceDeclarationSyntax node)
@@ -175,7 +196,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
             syntax: syntax,
             nameLocation: new SourceLocation(syntax),
-            memberNames: GetAkcssMemberNames(members),
+            memberNames: GetAkcssMemberNames(syntax, members),
             children: children.ToImmutableAndFree(),
             diagnostics: GetDiagnostics(syntax),
             quickAttributes: QuickAttributes.None);
@@ -194,7 +215,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             declFlags: SingleTypeDeclaration.TypeDeclarationFlags.None,
             syntax: syntax,
             nameLocation: new SourceLocation(syntax),
-            memberNames: ImmutableArray<string>.Empty,
+            memberNames: ImmutableSegmentedHashSet<string>.Empty,
             children: ImmutableArray<SingleTypeDeclaration>.Empty,
             diagnostics: GetDiagnostics(syntax),
             quickAttributes: QuickAttributes.None);
@@ -286,19 +307,18 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         return false;
     }
 
-    private static ImmutableArray<string> GetComponentMemberNames(AkburaDocumentSyntax root)
+    private static ImmutableSegmentedHashSet<string> GetComponentMemberNames(AkburaDocumentSyntax root)
     {
-        var builder = ArrayBuilder<string>.GetInstance();
-        foreach (var member in root.Members)
-        {
-            var name = GetComponentMemberName(member);
-            if (!string.IsNullOrWhiteSpace(name))
+        return GetOrComputeMemberNames(
+            root,
+            static (builder, root) =>
             {
-                builder.Add(name);
-            }
-        }
-
-        return builder.ToImmutableAndFree();
+                foreach (var member in root.Members)
+                {
+                    AddMemberName(builder, GetComponentMemberName(member));
+                }
+            },
+            root);
     }
 
     private static string GetComponentMemberName(AkTopLevelMemberSyntax member)
@@ -315,25 +335,69 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         };
     }
 
-    private static ImmutableArray<string> GetAkcssMemberNames(SyntaxList<AkcssTopLevelMemberSyntax> members)
+    private static ImmutableSegmentedHashSet<string> GetAkcssMemberNames(
+        AkburaSyntax syntax,
+        SyntaxList<AkcssTopLevelMemberSyntax> members)
     {
-        var builder = ArrayBuilder<string>.GetInstance();
-        foreach (var member in members)
-        {
-            if (member.Kind == AkburaSyntaxKind.AkcssStyleRuleSyntax)
+        return GetOrComputeMemberNames(
+            syntax,
+            static (builder, members) =>
             {
-                builder.Add(((AkcssStyleRuleSyntax)member).Selector.ToFullString().Trim());
-            }
-            else if (member.Kind == AkburaSyntaxKind.AkcssUtilitiesSectionSyntax)
-            {
-                foreach (var utility in ((AkcssUtilitiesSectionSyntax)member).Utilities)
+                foreach (var member in members)
                 {
-                    builder.Add(utility.Selector.ToFullString().Trim());
+                    if (member.Kind == AkburaSyntaxKind.AkcssStyleRuleSyntax)
+                    {
+                        AddMemberName(
+                            builder,
+                            ((AkcssStyleRuleSyntax)member).Selector.ToFullString().Trim());
+                    }
+                    else if (member.Kind == AkburaSyntaxKind.AkcssUtilitiesSectionSyntax)
+                    {
+                        foreach (var utility in ((AkcssUtilitiesSectionSyntax)member).Utilities)
+                        {
+                            AddMemberName(
+                                builder,
+                                utility.Selector.ToFullString().Trim());
+                        }
+                    }
                 }
-            }
+            },
+            members);
+    }
+
+    private static ImmutableSegmentedHashSet<string> GetOrComputeMemberNames<TData>(
+        AkburaSyntax syntax,
+        Action<ImmutableSegmentedHashSet<string>.Builder, TData> addMemberNames,
+        TData data)
+    {
+        if (s_nodeToMemberNames.TryGetValue(syntax.Green, out var memberNames))
+        {
+            return memberNames.Value;
         }
 
-        return builder.ToImmutableAndFree();
+        var builder = ImmutableSegmentedHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        addMemberNames(builder, data);
+        var value = builder.ToImmutable();
+
+        if (value.Count == 0)
+        {
+            return s_emptyMemberNames.Value;
+        }
+
+        var computedMemberNames = new BoxedMemberNames(value);
+        return s_nodeToMemberNames.GetValue(
+            syntax.Green,
+            _ => computedMemberNames).Value;
+    }
+
+    private static void AddMemberName(
+        ImmutableSegmentedHashSet<string>.Builder builder,
+        string name)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            builder.Add(name);
+        }
     }
 
     private static ImmutableArray<AkburaDiagnostic> GetDiagnostics(AkburaSyntax syntax)

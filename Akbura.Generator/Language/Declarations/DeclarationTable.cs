@@ -3,6 +3,7 @@
 #nullable disable
 
 using Akbura.Pools;
+using Akbura.Collections;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -13,12 +14,12 @@ namespace Akbura.Language;
 internal sealed partial class DeclarationTable
 {
     public static readonly DeclarationTable Empty = new(
-        allOlderRootDeclarations: [],
+        allOlderRootDeclarations: ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>>.Empty,
         latestLazyRootDeclaration: null,
         cache: null);
 
-    private readonly ImmutableArray<Lazy<Declaration>> _allOlderRootDeclarations;
-    private readonly Lazy<Declaration> _latestLazyRootDeclaration;
+    private readonly ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>> _allOlderRootDeclarations;
+    private readonly Lazy<RootSingleNamespaceDeclaration> _latestLazyRootDeclaration;
     private readonly Cache _cache;
 
     private MergedNamespaceDeclaration _mergedRoot;
@@ -26,13 +27,11 @@ internal sealed partial class DeclarationTable
     private ICollection<string> _declarationNames;
 
     private DeclarationTable(
-        ImmutableArray<Lazy<Declaration>> allOlderRootDeclarations,
-        Lazy<Declaration> latestLazyRootDeclaration,
+        ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>> allOlderRootDeclarations,
+        Lazy<RootSingleNamespaceDeclaration> latestLazyRootDeclaration,
         Cache cache)
     {
-        _allOlderRootDeclarations = allOlderRootDeclarations.IsDefault
-            ? ImmutableArray<Lazy<Declaration>>.Empty
-            : allOlderRootDeclarations;
+        _allOlderRootDeclarations = allOlderRootDeclarations ?? ImmutableSetWithInsertionOrder<Lazy<RootSingleNamespaceDeclaration>>.Empty;
         _latestLazyRootDeclaration = latestLazyRootDeclaration;
         _cache = cache ?? new Cache(this);
     }
@@ -104,7 +103,8 @@ internal sealed partial class DeclarationTable
 
         if (olderRoots.IsDefaultOrEmpty)
         {
-            return MergedNamespaceDeclaration.Create([_latestLazyRootDeclaration.Value]);
+            return MergedNamespaceDeclaration.Create(
+                ImmutableArray.Create<Declaration>(_latestLazyRootDeclaration.Value));
         }
 
         var builder = ArrayBuilder<Declaration>.GetInstance(olderRoots.Length + 1);

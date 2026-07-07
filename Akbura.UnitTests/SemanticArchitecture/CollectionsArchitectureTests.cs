@@ -94,6 +94,109 @@ public sealed class CollectionsArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
+    public void SegmentedHashSet_MatchesSetSemanticsAndComparer()
+    {
+        var set = new SegmentedHashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        Assert.True(set.Add("alpha"));
+        Assert.False(set.Add("ALPHA"));
+        Assert.True(set.Add("beta"));
+        Assert.Equal(2, set.Count);
+        Assert.Contains("alpha", set);
+        Assert.Contains("ALPHA", set);
+        Assert.True(set.TryGetValue("ALPHA", out var actual));
+        Assert.Equal("alpha", actual);
+
+        set.ExceptWith(["BETA"]);
+        Assert.Single(set);
+        Assert.Contains("alpha", set);
+
+        var comparer = SegmentedHashSet<string>.CreateSetComparer();
+        Assert.True(comparer.Equals(
+            set,
+            new SegmentedHashSet<string>(["alpha"], StringComparer.OrdinalIgnoreCase)));
+    }
+
+
+    [Fact]
+    public void ImmutableSegmentedHashSet_AddRemoveAndBuilderPreserveImmutability()
+    {
+        var empty = ImmutableSegmentedHashSet<string>.Empty;
+        var first = empty.Add("first");
+        var second = first.Add("second");
+        var removed = second.Remove("first");
+
+        Assert.True(empty.IsEmpty);
+        Assert.Single(first);
+        Assert.Contains("first", first);
+        Assert.DoesNotContain("second", first);
+        Assert.Equal(2, second.Count);
+        Assert.Contains("first", second);
+        Assert.Contains("second", second);
+        Assert.Single(removed);
+        Assert.DoesNotContain("first", removed);
+        Assert.Contains("second", removed);
+
+        var builder = second.ToBuilder();
+        Assert.False(builder.Add("second"));
+        Assert.True(builder.Add("third"));
+
+        var built = builder.ToImmutable();
+        Assert.Equal(3, built.Count);
+        Assert.Contains("first", built);
+        Assert.Contains("second", built);
+        Assert.Contains("third", built);
+        Assert.Equal(2, second.Count);
+    }
+
+
+    [Fact]
+    public void ImmutableSegmentedHashSet_FactoryRangeAndComparerMatchImmutableSetShape()
+    {
+        var set = ImmutableSegmentedHashSet.Create(
+            StringComparer.OrdinalIgnoreCase,
+            "first",
+            "FIRST",
+            "second");
+
+        Assert.Equal(2, set.Count);
+        Assert.Contains("first", set);
+        Assert.Contains("FIRST", set);
+        Assert.True(set.TryGetValue("FIRST", out var actual));
+        Assert.Equal("first", actual);
+
+        var builder = ImmutableSegmentedHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
+        Assert.True(builder.Add("alpha"));
+        Assert.False(builder.Add("ALPHA"));
+        Assert.True(builder.TryGetValue("ALPHA", out var builderActual));
+        Assert.Equal("alpha", builderActual);
+
+        var range = new[] { "one", "two", "two" }.ToImmutableSegmentedHashSet();
+        Assert.Equal(2, range.Count);
+        Assert.Contains("one", range);
+        Assert.Contains("two", range);
+    }
+
+
+    [Fact]
+    public void ImmutableSegmentedHashSet_MarshalExposesSegmentedBacking()
+    {
+        var set = ImmutableSegmentedHashSet.Create("first", "second");
+        var backing = SegmentedCollectionsMarshal.AsSegmentedHashSet(set);
+
+        Assert.NotNull(backing);
+        Assert.Equal(2, backing.Count);
+        Assert.Contains("first", backing);
+        Assert.Contains("second", backing);
+
+        var roundTrip = SegmentedCollectionsMarshal.AsImmutableSegmentedHashSet(backing);
+        Assert.Equal(2, roundTrip.Count);
+        Assert.Contains("first", roundTrip);
+        Assert.Contains("second", roundTrip);
+    }
+
+
+    [Fact]
     public void LookupResult_PooledInstancesResetBeforeReuse()
     {
         const string code = "state int count = 0;";

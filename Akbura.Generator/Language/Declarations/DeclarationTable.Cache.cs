@@ -33,7 +33,8 @@ internal sealed partial class DeclarationTable
                         ref _mergedRoot,
                         MergedNamespaceDeclaration.Create(
                             _table._allOlderRootDeclarations
-                                .Select(static lazyRoot => lazyRoot.Value)
+                                .InInsertionOrder
+                                .Select(static lazyRoot => (Declaration)lazyRoot.Value)
                                 .ToImmutableArray()),
                         comparand: null);
                 }

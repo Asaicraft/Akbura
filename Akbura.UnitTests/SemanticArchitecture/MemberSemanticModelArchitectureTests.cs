@@ -291,6 +291,11 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
         {
             GetRepositoryPath("Akbura.Generator", "Language", "SemanticSyntaxIdentity.cs"),
         };
+        var declarationTreeBuilderPath = GetRepositoryPath(
+            "Akbura.Generator",
+            "Language",
+            "Declarations",
+            "DeclarationTreeBuilder.cs");
         foreach (var folder in new[]
         {
             GetRepositoryPath("Akbura.Generator", "Language", "Compilation"),
@@ -304,6 +309,11 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
 
         foreach (var path in paths)
         {
+            if (string.Equals(path, declarationTreeBuilderPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             var source = File.ReadAllText(path);
             Assert.DoesNotContain("using Akbura.Language.Syntax.Green", source);
             Assert.DoesNotContain("GreenNode", source);

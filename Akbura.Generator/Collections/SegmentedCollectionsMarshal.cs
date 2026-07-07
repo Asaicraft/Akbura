@@ -40,4 +40,16 @@ public static class SegmentedCollectionsMarshal
     /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="segments"/> is <see langword="null"/></exception>
     public static SegmentedArray<T> AsSegmentedArray<T>(int length, T[][] segments)
         => SegmentedArray<T>.PrivateMarshal.AsSegmentedArray(length, segments);
+
+    internal static ImmutableSegmentedHashSet<T> AsImmutableSegmentedHashSet<T>(
+        SegmentedHashSet<T>? set)
+    {
+        return ImmutableSegmentedHashSet<T>.PrivateMarshal.AsImmutableSegmentedHashSet(set);
+    }
+
+    internal static SegmentedHashSet<T>? AsSegmentedHashSet<T>(
+        ImmutableSegmentedHashSet<T> set)
+    {
+        return ImmutableSegmentedHashSet<T>.PrivateMarshal.AsSegmentedHashSet(set);
+    }
 }

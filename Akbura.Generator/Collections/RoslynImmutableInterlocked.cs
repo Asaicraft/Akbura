@@ -37,4 +37,30 @@ public static class RoslynImmutableInterlocked
         Interlocked.MemoryBarrier();
         location = value;
     }
+
+    internal static ImmutableSegmentedHashSet<T> VolatileRead<T>(
+        ref readonly ImmutableSegmentedHashSet<T> location)
+    {
+        return ImmutableSegmentedHashSet<T>.PrivateMarshal.VolatileRead(in location);
+    }
+
+    internal static ImmutableSegmentedHashSet<T> InterlockedExchange<T>(
+        ref ImmutableSegmentedHashSet<T> location,
+        ImmutableSegmentedHashSet<T> value)
+    {
+        return ImmutableSegmentedHashSet<T>.PrivateMarshal.InterlockedExchange(
+            ref location,
+            value);
+    }
+
+    internal static ImmutableSegmentedHashSet<T> InterlockedCompareExchange<T>(
+        ref ImmutableSegmentedHashSet<T> location,
+        ImmutableSegmentedHashSet<T> value,
+        ImmutableSegmentedHashSet<T> comparand)
+    {
+        return ImmutableSegmentedHashSet<T>.PrivateMarshal.InterlockedCompareExchange(
+            ref location,
+            value,
+            comparand);
+    }
 }

@@ -15,8 +15,8 @@ internal sealed partial class DeclarationTable
         private static readonly ObjectPool<Builder> s_builderPool = new(() => new Builder());
 
         private DeclarationTable _table;
-        private readonly List<Lazy<Declaration>> _addedLazyRootDeclarations;
-        private readonly List<Lazy<Declaration>> _removedLazyRootDeclarations;
+        private readonly List<Lazy<RootSingleNamespaceDeclaration>> _addedLazyRootDeclarations;
+        private readonly List<Lazy<RootSingleNamespaceDeclaration>> _removedLazyRootDeclarations;
 
         private Builder()
         {
@@ -32,13 +32,13 @@ internal sealed partial class DeclarationTable
             return builder;
         }
 
-        public void AddRootDeclaration(Lazy<Declaration> lazyRootDeclaration)
+        public void AddRootDeclaration(Lazy<RootSingleNamespaceDeclaration> lazyRootDeclaration)
         {
             RealizeRemoves();
             _addedLazyRootDeclarations.Add(lazyRootDeclaration);
         }
 
-        public void RemoveRootDeclaration(Lazy<Declaration> lazyRootDeclaration)
+        public void RemoveRootDeclaration(Lazy<RootSingleNamespaceDeclaration> lazyRootDeclaration)
         {
             RealizeAdds();
             _removedLazyRootDeclarations.Add(lazyRootDeclaration);

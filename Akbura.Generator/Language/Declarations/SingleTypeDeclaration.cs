@@ -3,6 +3,7 @@
 #nullable disable
 
 using Akbura.Language.Syntax;
+using Akbura.Collections;
 using System;
 using System.Collections.Immutable;
 
@@ -21,7 +22,7 @@ internal sealed class SingleTypeDeclaration : SingleNamespaceOrTypeDeclaration
         TypeDeclarationFlags declFlags,
         AkburaSyntax syntax,
         SourceLocation nameLocation,
-        ImmutableArray<string> memberNames,
+        ImmutableSegmentedHashSet<string> memberNames,
         ImmutableArray<SingleTypeDeclaration> children,
         ImmutableArray<AkburaDiagnostic> diagnostics,
         QuickAttributes quickAttributes)
@@ -32,7 +33,7 @@ internal sealed class SingleTypeDeclaration : SingleNamespaceOrTypeDeclaration
         Modifiers = modifiers;
         DeclarationFlags = declFlags;
         MemberNames = memberNames.IsDefault
-            ? ImmutableArray<string>.Empty
+            ? ImmutableSegmentedHashSet<string>.Empty
             : memberNames;
         _children = children.IsDefault
             ? ImmutableArray<SingleNamespaceOrTypeDeclaration>.Empty
@@ -54,7 +55,7 @@ internal sealed class SingleTypeDeclaration : SingleNamespaceOrTypeDeclaration
 
     public TypeDeclarationFlags DeclarationFlags { get; }
 
-    public ImmutableArray<string> MemberNames { get; }
+    public ImmutableSegmentedHashSet<string> MemberNames { get; }
 
     public QuickAttributes QuickAttributes { get; }
 

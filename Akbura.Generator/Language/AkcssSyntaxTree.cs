@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace Akbura.Language;
 
-internal sealed class AkcssSyntaxTree
+internal sealed class AkcssSyntaxTree : AkburaSyntaxTree
 {
     private AkcssDocumentSyntax? _root;
 
@@ -17,29 +17,26 @@ internal sealed class AkcssSyntaxTree
         string filePath,
         string logicalName,
         GreenAkcssDocumentSyntax greenRoot)
+        : base(text, filePath)
     {
-        Text = text;
-        FilePath = filePath;
         LogicalName = string.IsNullOrWhiteSpace(logicalName)
             ? GetDefaultLogicalName(filePath)
             : logicalName;
         GreenRoot = greenRoot;
     }
 
-    public SourceText Text { get; }
-
-    public string FilePath { get; }
+    public override SyntaxTreeKind Kind => SyntaxTreeKind.Akcss;
 
     public string LogicalName { get; }
 
     public GreenAkcssDocumentSyntax GreenRoot { get; }
 
-    public static AkcssSyntaxTree ParseText(string text, CancellationToken cancellationToken = default)
+    public new static AkcssSyntaxTree ParseText(string text, CancellationToken cancellationToken = default)
     {
         return ParseText(SourceText.From(text), filePath: string.Empty, logicalName: string.Empty, cancellationToken);
     }
 
-    public static AkcssSyntaxTree ParseText(
+    public new static AkcssSyntaxTree ParseText(
         string text,
         string filePath,
         CancellationToken cancellationToken = default)
@@ -56,7 +53,7 @@ internal sealed class AkcssSyntaxTree
         return ParseText(SourceText.From(text), filePath, logicalName, cancellationToken);
     }
 
-    public static AkcssSyntaxTree ParseText(SourceText text, CancellationToken cancellationToken = default)
+    public new static AkcssSyntaxTree ParseText(SourceText text, CancellationToken cancellationToken = default)
     {
         return ParseText(text, filePath: string.Empty, logicalName: string.Empty, cancellationToken);
     }
@@ -98,9 +95,14 @@ internal sealed class AkcssSyntaxTree
         return WithChangedText(SourceText.From(newText), changes, cancellationToken);
     }
 
-    public AkcssDocumentSyntax GetRoot()
+    public new AkcssDocumentSyntax GetRoot()
     {
         return _root ??= (AkcssDocumentSyntax)GreenRoot.CreateRed();
+    }
+
+    public override AkburaSyntax GetRootSyntax()
+    {
+        return GetRoot();
     }
 
     private static string GetDefaultLogicalName(string filePath)

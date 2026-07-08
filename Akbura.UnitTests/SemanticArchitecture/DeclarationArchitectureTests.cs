@@ -32,6 +32,22 @@ namespace Akbura.UnitTests;
 public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
 {
     [Fact]
+    public void SyntaxTrees_HaveCommonBaseAndKind()
+    {
+        var componentTree = AkburaSyntaxTree.ParseText("<TextBlock />", "Counter.akbura");
+        var akcssTree = AkcssSyntaxTree.ParseText(".card { Padding: 4; }", "Counter.akcss");
+
+        Assert.IsType<ComponentSyntaxTree>(componentTree);
+        Assert.IsAssignableFrom<AkburaSyntaxTree>(componentTree);
+        Assert.IsAssignableFrom<AkburaSyntaxTree>(akcssTree);
+        Assert.Equal(SyntaxTreeKind.Component, componentTree.Kind);
+        Assert.Equal(SyntaxTreeKind.Akcss, akcssTree.Kind);
+        Assert.IsType<AkburaDocumentSyntax>(componentTree.GetRootSyntax());
+        Assert.IsType<AkcssDocumentSyntax>(akcssTree.GetRootSyntax());
+    }
+
+
+    [Fact]
     public void DeclarationTable_CollectsComponentAndAkcssDeclarations()
     {
         const string code =

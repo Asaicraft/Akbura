@@ -1,29 +1,26 @@
 using Akbura.Language.Syntax;
-using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 
 namespace Akbura.Language;
 
-internal sealed class AkburaSyntaxTree
+internal abstract class AkburaSyntaxTree
 {
-    private AkburaDocumentSyntax? _root;
-
-    private AkburaSyntaxTree(SourceText text, string filePath, GreenAkburaDocumentSyntax greenRoot)
+    protected AkburaSyntaxTree(SourceText text, string filePath)
     {
         Text = text;
         FilePath = filePath;
-        GreenRoot = greenRoot;
     }
 
     public SourceText Text { get; }
 
     public string FilePath { get; }
 
-    public string ComponentName
+    public abstract SyntaxTreeKind Kind { get; }
+
+    public virtual string ComponentName
     {
         get
         {
@@ -36,64 +33,36 @@ internal sealed class AkburaSyntaxTree
         }
     }
 
-    public GreenAkburaDocumentSyntax GreenRoot { get; }
-
-    public static AkburaSyntaxTree ParseText(string text, CancellationToken cancellationToken = default)
+    public virtual AkburaDocumentSyntax GetRoot()
     {
-        return ParseText(SourceText.From(text), filePath: string.Empty, cancellationToken);
+        throw new System.InvalidOperationException("Only component syntax trees expose an Akbura document root.");
     }
 
-    public static AkburaSyntaxTree ParseText(
+    public abstract AkburaSyntax GetRootSyntax();
+
+    public static ComponentSyntaxTree ParseText(string text, CancellationToken cancellationToken = default)
+    {
+        return ComponentSyntaxTree.ParseText(text, cancellationToken);
+    }
+
+    public static ComponentSyntaxTree ParseText(
         string text,
         string filePath,
         CancellationToken cancellationToken = default)
     {
-        return ParseText(SourceText.From(text), filePath, cancellationToken);
+        return ComponentSyntaxTree.ParseText(text, filePath, cancellationToken);
     }
 
-    public static AkburaSyntaxTree ParseText(SourceText text, CancellationToken cancellationToken = default)
+    public static ComponentSyntaxTree ParseText(SourceText text, CancellationToken cancellationToken = default)
     {
-        return ParseText(text, filePath: string.Empty, cancellationToken);
+        return ComponentSyntaxTree.ParseText(text, cancellationToken);
     }
 
-    public static AkburaSyntaxTree ParseText(
+    public static ComponentSyntaxTree ParseText(
         SourceText text,
         string filePath,
         CancellationToken cancellationToken = default)
     {
-        var lexer = new Lexer(text);
-        using var parser = new Parser(lexer, cancellationToken);
-
-        return new AkburaSyntaxTree(text, filePath, parser.ParseCompilationUnit());
-    }
-
-    public AkburaSyntaxTree WithChangedText(
-        SourceText newText,
-        IEnumerable<TextChangeRange>? changes = null,
-        CancellationToken cancellationToken = default)
-    {
-        var changeRanges = changes?.ToArray() ?? newText.GetChangeRanges(Text).ToArray();
-        if (changeRanges.Length == 0 && newText.ToString() == Text.ToString())
-        {
-            return this;
-        }
-
-        var lexer = new Lexer(newText);
-        using var parser = new Parser(lexer, cancellationToken, GetRoot(), changeRanges);
-
-        return new AkburaSyntaxTree(newText, FilePath, parser.ParseCompilationUnit());
-    }
-
-    public AkburaSyntaxTree WithChangedText(
-        string newText,
-        IEnumerable<TextChangeRange>? changes = null,
-        CancellationToken cancellationToken = default)
-    {
-        return WithChangedText(SourceText.From(newText), changes, cancellationToken);
-    }
-
-    public AkburaDocumentSyntax GetRoot()
-    {
-        return _root ??= (AkburaDocumentSyntax)GreenRoot.CreateRed();
+        return ComponentSyntaxTree.ParseText(text, filePath, cancellationToken);
     }
 }

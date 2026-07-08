@@ -103,18 +103,23 @@ public sealed class OperationArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
-    public void AkcssOperationMaterializer_OwnsAkcssOperationBatchMaterialization()
+    public void OperationFactory_OwnsAkcssOperationBatchMaterialization()
     {
         var styleBinderSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
             "Binder",
             "AkcssStyleBinder.cs");
-        var materializerSource = ReadRepositoryFile(
+        var factorySource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
-            "Compilation",
-            "AkcssOperationMaterializer.cs");
+            "Operations",
+            "AkburaOperationFactory.cs");
+        var operationFactoryInterfaceSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Operations",
+            "IOperationFactory.cs");
         var semanticModelSource = ReadRepositoryFile(
             "Akbura.Generator",
             "Language",
@@ -126,22 +131,28 @@ public sealed class OperationArchitectureTests : SemanticArchitectureTestBase
             "Language",
             "Compilation",
             "AkcssBoundNodeFactory.cs")));
+        Assert.False(File.Exists(GetRepositoryPath(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkcssOperationMaterializer.cs")));
         Assert.Contains("internal BoundAkcssOperation BindAkcssOperation", styleBinderSource);
         Assert.Contains("BindAkcssPropertySetterCore(", styleBinderSource);
         Assert.Contains("BindAkcssIfCore(", styleBinderSource);
         Assert.Contains("BindAkcssApplyCore(", styleBinderSource);
         Assert.Contains("BindAkcssInterceptCore(", styleBinderSource);
         Assert.Contains("new BoundAkcss", styleBinderSource);
-        Assert.Contains("internal sealed class AkcssOperationMaterializer", materializerSource);
-        Assert.Contains("CreateOperations(", materializerSource);
-        Assert.Contains("binder.BindAkcssOperation", materializerSource);
-        Assert.DoesNotContain("new BoundAkcss", materializerSource);
-        Assert.DoesNotContain("AkcssBoundNodeFactory", materializerSource);
-        Assert.DoesNotContain("private ImmutableArray<BoundAkcssOperation> CreateBoundOperations", materializerSource);
+        Assert.Contains("internal interface IOperationFactory", operationFactoryInterfaceSource);
+        Assert.Contains("CreateAkcssOperations(", operationFactoryInterfaceSource);
+        Assert.Contains("CreateAkcssOperations(", factorySource);
+        Assert.Contains("binder.BindAkcssOperation", factorySource);
+        Assert.DoesNotContain("new BoundAkcss", factorySource);
+        Assert.DoesNotContain("AkcssBoundNodeFactory", factorySource);
+        Assert.DoesNotContain("private ImmutableArray<BoundAkcssOperation> CreateBoundOperations", factorySource);
         Assert.DoesNotContain("new AkcssBoundNodeFactory(this)", semanticModelSource);
         Assert.DoesNotContain("internal AkcssBoundNodeFactory AkcssBoundNodes", semanticModelSource);
-        Assert.Contains("_akcssOperationMaterializer.CreateOperations", semanticModelSource);
-        Assert.DoesNotContain("_akcssOperationMaterializer.CreateBoundOperations", semanticModelSource);
+        Assert.DoesNotContain("AkcssOperationMaterializer", semanticModelSource);
+        Assert.Contains("_operationFactory.CreateAkcssOperations", semanticModelSource);
         Assert.DoesNotContain("new BoundAkcss", semanticModelSource);
         Assert.DoesNotContain("CreateBoundAkcss", semanticModelSource);
         Assert.DoesNotContain("CreateAkcssBoundOperations", semanticModelSource);

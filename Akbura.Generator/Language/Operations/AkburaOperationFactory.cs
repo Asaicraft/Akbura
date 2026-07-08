@@ -1,14 +1,17 @@
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
+using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language.Operations;
 
-internal sealed class AkburaOperationFactory
+internal sealed class AkburaOperationFactory : IOperationFactory
 {
     private readonly Func<IAkcssSymbol?, Func<RoslynSymbol, ISymbol?>> _createCSharpOperationSymbolMapper;
 
@@ -40,6 +43,146 @@ internal sealed class AkburaOperationFactory
             BoundKind.AkcssIntercept => CreateAkcssInterceptOperation((BoundAkcssIntercept)boundNode),
             _ => null,
         };
+    }
+
+    public ImmutableArray<IAkcssOperation> CreateAkcssOperations(
+        SyntaxList<AkcssBodyMemberSyntax> members,
+        IAkcssSymbol containingSymbol,
+        IOperationFactoryContext context)
+    {
+        if (containingSymbol == null)
+        {
+            throw new ArgumentNullException(nameof(containingSymbol));
+        }
+
+        if (context == null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+
+        using var interceptOperationsBuilder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
+        foreach (var member in members)
+        {
+            if (member.Kind != AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
+            {
+                continue;
+            }
+
+            var interceptDirective = Unsafe.As<AkcssInterceptDirectiveSyntax>(member);
+            if (!context.TryGetCachedOperation(interceptDirective, out var cachedInterceptOperation) ||
+                cachedInterceptOperation is not IAkcssInterceptOperation interceptOperation)
+            {
+                var interceptBoundNode = BindAkcssOperation(context, interceptDirective, containingSymbol);
+                context.SetCachedBoundNode(interceptDirective, interceptBoundNode);
+                interceptOperation = (IAkcssInterceptOperation)CreateOperation(interceptBoundNode)!;
+                context.SetCachedOperation(interceptDirective, interceptOperation);
+            }
+
+            interceptOperationsBuilder.Add(interceptOperation);
+            if (!interceptOperation.InterceptType.IsDefault)
+            {
+                SetAkcssInterceptType(containingSymbol, interceptOperation.InterceptType);
+            }
+        }
+
+        var interceptOperations = interceptOperationsBuilder.ToImmutable();
+        if (containingSymbol.IsIntercepted)
+        {
+            foreach (var member in members)
+            {
+                if (member.Kind != AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
+                {
+                    context.SetAkcssInterceptIgnoredDiagnostics(member, containingSymbol);
+                }
+            }
+
+            return interceptOperations;
+        }
+
+        using var builder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
+        foreach (var member in members)
+        {
+            switch (member.Kind)
+            {
+                case AkburaSyntaxKind.AkcssAssignmentSyntax:
+                    builder.Add(GetOrCreateAkcssOperation(
+                        context,
+                        Unsafe.As<AkcssAssignmentSyntax>(member),
+                        containingSymbol));
+                    break;
+
+                case AkburaSyntaxKind.AkcssIfDirectiveSyntax:
+                    builder.Add(GetOrCreateAkcssOperation(
+                        context,
+                        Unsafe.As<AkcssIfDirectiveSyntax>(member),
+                        containingSymbol));
+                    break;
+
+                case AkburaSyntaxKind.AkcssApplyDirectiveSyntax:
+                    builder.Add(GetOrCreateAkcssOperation(
+                        context,
+                        Unsafe.As<AkcssApplyDirectiveSyntax>(member),
+                        containingSymbol));
+                    break;
+
+                case AkburaSyntaxKind.AkcssInterceptDirectiveSyntax:
+                    builder.Add(GetOrCreateAkcssOperation(
+                        context,
+                        Unsafe.As<AkcssInterceptDirectiveSyntax>(member),
+                        containingSymbol));
+                    break;
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private IAkcssOperation GetOrCreateAkcssOperation<TSyntax>(
+        IOperationFactoryContext context,
+        TSyntax syntax,
+        IAkcssSymbol containingSymbol)
+        where TSyntax : AkcssBodyMemberSyntax
+    {
+        if (context.TryGetCachedOperation(syntax, out var cachedOperation) &&
+            cachedOperation is IAkcssOperation operation)
+        {
+            return operation;
+        }
+
+        var boundNode = BindAkcssOperation(context, syntax, containingSymbol);
+        context.SetCachedBoundNode(syntax, boundNode);
+        operation = (IAkcssOperation)CreateOperation(boundNode)!;
+        context.SetCachedOperation(syntax, operation);
+        return operation;
+    }
+
+    private static BoundAkcssOperation BindAkcssOperation(
+        IOperationFactoryContext context,
+        AkcssBodyMemberSyntax syntax,
+        IAkcssSymbol containingSymbol)
+    {
+        if (context.GetBinder(containingSymbol.DeclarationSyntax, BinderUsage.Akcss) is AkcssStyleBinder binder)
+        {
+            return binder.BindAkcssOperation(syntax, containingSymbol);
+        }
+
+        throw new InvalidOperationException(
+            $"AKCSS operation binding requires {nameof(AkcssStyleBinder)}.");
+    }
+
+    private static void SetAkcssInterceptType(
+        IAkcssSymbol containingSymbol,
+        CSharpSymbolDefinition interceptType)
+    {
+        switch (containingSymbol)
+        {
+            case AkcssStyleSymbol styleSymbol:
+                styleSymbol.SetInterceptType(interceptType);
+                break;
+            case TailwindUtilitySymbol utilitySymbol:
+                utilitySymbol.SetInterceptType(interceptType);
+                break;
+        }
     }
 
     private MarkupContentOperation? CreateMarkupContentOperation(

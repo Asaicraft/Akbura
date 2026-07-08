@@ -28,12 +28,11 @@ using System.Diagnostics;
 
 namespace Akbura.Language;
 
-internal partial class AkburaSemanticModel
+internal partial class AkburaSemanticModel : IOperationFactoryContext
 {
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
-    private readonly AkburaOperationFactory _operationFactory;
-    private readonly AkcssOperationMaterializer _akcssOperationMaterializer;
+    private readonly IOperationFactory _operationFactory;
     private readonly DeclarationSymbolTable _declarationSymbols;
 
     protected AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
@@ -43,7 +42,6 @@ internal partial class AkburaSemanticModel
         _bindingCache = new SemanticBindingCache();
         _bindingSession = new BindingSession(this);
         _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
-        _akcssOperationMaterializer = new AkcssOperationMaterializer(this, _operationFactory);
         _declarationSymbols = new DeclarationSymbolTable(this);
     }
 
@@ -59,7 +57,6 @@ internal partial class AkburaSemanticModel
         _bindingCache = semanticModel._bindingCache;
         _bindingSession = semanticModel._bindingSession;
         _operationFactory = semanticModel._operationFactory;
-        _akcssOperationMaterializer = semanticModel._akcssOperationMaterializer;
         _declarationSymbols = semanticModel._declarationSymbols;
     }
 
@@ -289,6 +286,27 @@ internal partial class AkburaSemanticModel
         _bindingCache.SetOperation(syntax, operation);
     }
 
+    bool IOperationFactoryContext.TryGetCachedOperation(
+        AkburaSyntax syntax,
+        out AkburaOperation? operation)
+    {
+        return TryGetCachedOperation(syntax, out operation);
+    }
+
+    void IOperationFactoryContext.SetCachedBoundNode(
+        AkburaSyntax syntax,
+        BoundNode boundNode)
+    {
+        SetCachedBoundNode(syntax, boundNode);
+    }
+
+    void IOperationFactoryContext.SetCachedOperation(
+        AkburaSyntax syntax,
+        AkburaOperation? operation)
+    {
+        SetCachedOperation(syntax, operation);
+    }
+
     internal BinderType GetBinder(AkburaSyntax syntax)
     {
         return _bindingSession.GetBinder(syntax);
@@ -297,6 +315,20 @@ internal partial class AkburaSemanticModel
     internal BinderType GetBinder(AkburaSyntax syntax, BinderUsage usage)
     {
         return _bindingSession.GetBinder(syntax, usage);
+    }
+
+    BinderType IOperationFactoryContext.GetBinder(
+        AkburaSyntax syntax,
+        BinderUsage usage)
+    {
+        return GetBinder(syntax, usage);
+    }
+
+    void IOperationFactoryContext.SetAkcssInterceptIgnoredDiagnostics(
+        AkcssBodyMemberSyntax member,
+        IAkcssSymbol containingSymbol)
+    {
+        SetAkcssInterceptIgnoredDiagnostics(member, containingSymbol);
     }
 
     internal BinderType GetBinder(AkburaSyntax syntax, int position, BinderUsage usage)
@@ -855,7 +887,7 @@ internal partial class AkburaSemanticModel
         Akbura.Language.Syntax.SyntaxList<AkcssBodyMemberSyntax> members,
         IAkcssSymbol containingSymbol)
     {
-        return _akcssOperationMaterializer.CreateOperations(members, containingSymbol);
+        return _operationFactory.CreateAkcssOperations(members, containingSymbol, this);
     }
 
     internal IAkcssSymbol? GetContainingAkcssSymbol(AkburaSyntax syntax)

@@ -478,7 +478,7 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
         var csharpDiagnostic = Diagnostic.Create(
             descriptor,
             Microsoft.CodeAnalysis.Location.None);
-        var bag = new BindingDiagnosticBag();
+        var bag = BindingDiagnosticBag.GetInstance();
 
         bag.Add(semanticDiagnostic);
         bag.Add(semanticDiagnostic);
@@ -487,6 +487,280 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
 
         Assert.Single(bag.ToSemanticDiagnostics());
         Assert.Single(bag.ToCSharpDiagnostics());
+    }
+
+
+    [Fact]
+    public void BindingDiagnosticBag_IsAbstractWithPooledAndDiscardedInstances()
+    {
+        var bag = BindingDiagnosticBag.GetInstance();
+
+        Assert.True(typeof(BindingDiagnosticBag).IsAbstract);
+        Assert.False(bag.GetType().IsAbstract);
+        Assert.True(bag.AccumulatesDiagnostics);
+        Assert.False(BindingDiagnosticBag.Discarded.AccumulatesDiagnostics);
+        Assert.True(BindingDiagnosticBag.Discarded.IsEmpty);
+        Assert.Empty(BindingDiagnosticBag.Discarded.ToSemanticDiagnostics());
+        Assert.Empty(BindingDiagnosticBag.Discarded.ToCSharpDiagnostics());
+
+        bag.Free();
+    }
+
+
+    [Fact]
+    public void BindingDiagnosticBag_AllowsConcurrentAddsAndDeduplicatesDiagnostics()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var descriptor = new DiagnosticDescriptor(
+            "AKBURA_TEST",
+            "Title",
+            "Message {0}",
+            "Test",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+        var bag = BindingDiagnosticBag.GetInstance();
+
+        Parallel.For(0, 128, index =>
+        {
+            var semanticDiagnostic = new AkburaSemanticDiagnostic(
+                state,
+                ErrorCodes.ERR_SyntaxError,
+                [$"semantic-{index}"]);
+            var csharpDiagnostic = Diagnostic.Create(
+                descriptor,
+                Microsoft.CodeAnalysis.Location.None,
+                index);
+
+            bag.Add(semanticDiagnostic);
+            bag.Add(semanticDiagnostic);
+            bag.AddCSharp(csharpDiagnostic);
+            bag.AddCSharp(csharpDiagnostic);
+        });
+
+        Assert.Equal(128, bag.ToSemanticDiagnostics().Length);
+        Assert.Equal(128, bag.ToCSharpDiagnostics().Length);
+        Assert.Equal(256, bag.Count);
+
+        bag.Free();
+    }
+
+
+    [Fact]
+    public void BindingDiagnosticBag_FreeClearsPooledInstance()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var bag = BindingDiagnosticBag.GetInstance();
+        bag.Add(new AkburaSemanticDiagnostic(
+            state,
+            ErrorCodes.ERR_SyntaxError,
+            ["before-free"]));
+
+        Assert.False(bag.IsEmpty);
+
+        bag.Free();
+
+        var reused = BindingDiagnosticBag.GetInstance();
+        Assert.True(reused.IsEmpty);
+        Assert.Empty(reused.ToSemanticDiagnostics());
+        Assert.Empty(reused.ToCSharpDiagnostics());
+        reused.Free();
+    }
+
+
+    [Fact]
+    public void BindingDiagnosticBag_AddRangeAndFreeMovesDiagnostics()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var source = BindingDiagnosticBag.GetInstance();
+        var target = BindingDiagnosticBag.GetInstance();
+        source.Add(new AkburaSemanticDiagnostic(
+            state,
+            ErrorCodes.ERR_SyntaxError,
+            ["moved"]));
+
+        target.AddRangeAndFree(source);
+
+        Assert.Single(target.ToSemanticDiagnostics());
+        Assert.True(source.IsEmpty);
+
+        target.Free();
+    }
+
+
+    [Fact]
+    public void BindingDiagnosticBag_RoslynDiagnosticApiAccumulatesCSharpDiagnostics()
+    {
+        var descriptor = new DiagnosticDescriptor(
+            "AKBURA_TEST",
+            "Title",
+            "Message {0}",
+            "Test",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+        var first = Diagnostic.Create(
+            descriptor,
+            Microsoft.CodeAnalysis.Location.None,
+            1);
+        var second = Diagnostic.Create(
+            descriptor,
+            Microsoft.CodeAnalysis.Location.None,
+            2);
+        var source = DiagnosticBag.GetInstance();
+        source.Add(second);
+        var bag = BindingDiagnosticBag.GetInstance();
+
+        bag.Add(first);
+        bag.AddRange(ImmutableArray.Create(first));
+        bag.AddRange(source);
+
+        Assert.True(bag.AccumulatesDiagnostics);
+        Assert.NotNull(bag.DiagnosticBag);
+        Assert.Equal(2, bag.ToCSharpDiagnostics().Length);
+        Assert.True(bag.HasAnyErrors());
+
+        source.Free();
+        bag.Free();
+    }
+
+
+    [Fact]
+    public void ReadOnlyBindingDiagnostic_EmptyNormalizesDefaultArrays()
+    {
+        var diagnostics = default(ReadOnlyBindingDiagnostic);
+
+        Assert.True(diagnostics.IsEmpty);
+        Assert.Empty(diagnostics.SemanticDiagnostics);
+        Assert.Empty(diagnostics.CSharpDiagnostics);
+        Assert.False(diagnostics.HasAnyErrors());
+        Assert.False(diagnostics.HasAnyResolvedErrors());
+        Assert.Equal(ReadOnlyBindingDiagnostic.Empty, diagnostics.NullToEmpty());
+    }
+
+
+    [Fact]
+    public void BindingDiagnosticBag_AddRangeReadOnlyBindingDiagnosticCopiesBothChannels()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var descriptor = new DiagnosticDescriptor(
+            "AKBURA_TEST",
+            "Title",
+            "Message",
+            "Test",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+        var source = BindingDiagnosticBag.GetInstance();
+        source.Add(new AkburaSemanticDiagnostic(
+            state,
+            ErrorCodes.ERR_SyntaxError,
+            ["snapshot"]));
+        source.Add(Diagnostic.Create(
+            descriptor,
+            Microsoft.CodeAnalysis.Location.None));
+        var snapshot = source.ToReadOnlyAndFree();
+        var target = BindingDiagnosticBag.GetInstance();
+
+        target.AddRange(snapshot);
+
+        Assert.Single(target.ToSemanticDiagnostics());
+        Assert.Single(target.ToCSharpDiagnostics());
+        Assert.True(target.HasAnyErrors());
+
+        target.Free();
+    }
+
+
+    [Fact]
+    public void BindingDiagnosticBag_ToReadOnlyAndFreeReturnsImmutableSnapshot()
+    {
+        const string code = "state int count = 0;";
+        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[0]);
+        var descriptor = new DiagnosticDescriptor(
+            "AKBURA_TEST",
+            "Title",
+            "Message",
+            "Test",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+        var bag = BindingDiagnosticBag.GetInstance();
+        bag.Add(new AkburaSemanticDiagnostic(
+            state,
+            ErrorCodes.ERR_SyntaxError,
+            ["read-only"]));
+        bag.Add(Diagnostic.Create(
+            descriptor,
+            Microsoft.CodeAnalysis.Location.None));
+
+        var snapshot = bag.ToReadOnlyAndFree();
+
+        Assert.Single(snapshot.SemanticDiagnostics);
+        Assert.Single(snapshot.CSharpDiagnostics);
+        Assert.False(snapshot.IsEmpty);
+        Assert.True(snapshot.HasAnyErrors());
+        Assert.True(snapshot.HasAnyResolvedErrors());
+        Assert.True(bag.IsEmpty);
+    }
+
+
+    [Fact]
+    public void DiagnosticBag_AllowsConcurrentAddsAndClearsWhenFreed()
+    {
+        var descriptor = new DiagnosticDescriptor(
+            "AKBURA_TEST",
+            "Title",
+            "Message {0}",
+            "Test",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+        var bag = DiagnosticBag.GetInstance();
+
+        Parallel.For(0, 128, index =>
+        {
+            bag.Add(Diagnostic.Create(
+                descriptor,
+                Microsoft.CodeAnalysis.Location.None,
+                index));
+        });
+
+        Assert.Equal(128, bag.ToReadOnly().Length);
+        Assert.Equal(128, bag.Count);
+
+        bag.Free();
+
+        var reused = DiagnosticBag.GetInstance();
+        Assert.True(reused.IsEmptyWithoutResolution);
+        Assert.Empty(reused.ToReadOnly());
+        reused.Free();
+    }
+
+
+    [Fact]
+    public void DiagnosticBag_ToReadOnlyAndFreeReturnsDiagnosticsAndClearsPooledInstance()
+    {
+        var descriptor = new DiagnosticDescriptor(
+            "AKBURA_TEST",
+            "Title",
+            "Message",
+            "Test",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+        var bag = DiagnosticBag.GetInstance();
+        bag.Add(Diagnostic.Create(
+            descriptor,
+            Microsoft.CodeAnalysis.Location.None));
+
+        var diagnostics = bag.ToReadOnlyAndFree();
+
+        Assert.Single(diagnostics);
+        Assert.True(bag.IsEmptyWithoutResolution);
     }
 
 

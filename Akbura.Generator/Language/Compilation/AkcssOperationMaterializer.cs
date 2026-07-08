@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -14,16 +15,13 @@ internal sealed class AkcssOperationMaterializer
 {
     private readonly AkburaSemanticModel _semanticModel;
     private readonly AkburaOperationFactory _operationFactory;
-    private readonly AkcssBoundNodeFactory _boundNodes;
 
     public AkcssOperationMaterializer(
         AkburaSemanticModel semanticModel,
-        AkburaOperationFactory operationFactory,
-        AkcssBoundNodeFactory boundNodes)
+        AkburaOperationFactory operationFactory)
     {
         _semanticModel = semanticModel ?? throw new System.ArgumentNullException(nameof(semanticModel));
         _operationFactory = operationFactory ?? throw new System.ArgumentNullException(nameof(operationFactory));
-        _boundNodes = boundNodes ?? throw new System.ArgumentNullException(nameof(boundNodes));
     }
 
     public ImmutableArray<IAkcssOperation> CreateOperations(
@@ -42,7 +40,7 @@ internal sealed class AkcssOperationMaterializer
             if (!_semanticModel.TryGetCachedOperation(interceptDirective, out var cachedInterceptOperation) ||
                 cachedInterceptOperation is not IAkcssInterceptOperation interceptOperation)
             {
-                var interceptBoundNode = _boundNodes.CreateIntercept(interceptDirective, containingSymbol);
+                var interceptBoundNode = BindAkcssOperation(interceptDirective, containingSymbol);
                 _semanticModel.SetCachedBoundNode(interceptDirective, interceptBoundNode);
                 interceptOperation = (IAkcssInterceptOperation)_operationFactory.CreateOperation(interceptBoundNode)!;
                 _semanticModel.SetCachedOperation(interceptDirective, interceptOperation);
@@ -78,9 +76,7 @@ internal sealed class AkcssOperationMaterializer
                 {
                     builder.Add(GetOrCreateAkcssOperation(
                         Unsafe.As<AkcssAssignmentSyntax>(member),
-                        containingSymbol,
-                        static (boundNodes, syntax, symbol) =>
-                            boundNodes.CreatePropertySetter(syntax, symbol)));
+                        containingSymbol));
                     break;
                 }
 
@@ -88,9 +84,7 @@ internal sealed class AkcssOperationMaterializer
                 {
                     builder.Add(GetOrCreateAkcssOperation(
                         Unsafe.As<AkcssIfDirectiveSyntax>(member),
-                        containingSymbol,
-                        static (boundNodes, syntax, symbol) =>
-                            boundNodes.CreateIf(syntax, symbol)));
+                        containingSymbol));
                     break;
                 }
 
@@ -98,9 +92,7 @@ internal sealed class AkcssOperationMaterializer
                 {
                     builder.Add(GetOrCreateAkcssOperation(
                         Unsafe.As<AkcssApplyDirectiveSyntax>(member),
-                        containingSymbol,
-                        static (boundNodes, syntax, symbol) =>
-                            boundNodes.CreateApply(syntax, symbol)));
+                        containingSymbol));
                     break;
                 }
 
@@ -108,9 +100,7 @@ internal sealed class AkcssOperationMaterializer
                 {
                     builder.Add(GetOrCreateAkcssOperation(
                         Unsafe.As<AkcssInterceptDirectiveSyntax>(member),
-                        containingSymbol,
-                        static (boundNodes, syntax, symbol) =>
-                            boundNodes.CreateIntercept(syntax, symbol)));
+                        containingSymbol));
                     break;
                 }
             }
@@ -121,8 +111,7 @@ internal sealed class AkcssOperationMaterializer
 
     private IAkcssOperation GetOrCreateAkcssOperation<TSyntax>(
         TSyntax syntax,
-        IAkcssSymbol containingSymbol,
-        Func<AkcssBoundNodeFactory, TSyntax, IAkcssSymbol, BoundAkcssOperation> bind)
+        IAkcssSymbol containingSymbol)
         where TSyntax : AkcssBodyMemberSyntax
     {
         if (_semanticModel.TryGetCachedOperation(syntax, out var cachedOperation) &&
@@ -131,11 +120,24 @@ internal sealed class AkcssOperationMaterializer
             return operation;
         }
 
-        var boundNode = bind(_boundNodes, syntax, containingSymbol);
+        var boundNode = BindAkcssOperation(syntax, containingSymbol);
         _semanticModel.SetCachedBoundNode(syntax, boundNode);
         operation = (IAkcssOperation)_operationFactory.CreateOperation(boundNode)!;
         _semanticModel.SetCachedOperation(syntax, operation);
         return operation;
+    }
+
+    private BoundAkcssOperation BindAkcssOperation(
+        AkcssBodyMemberSyntax syntax,
+        IAkcssSymbol containingSymbol)
+    {
+        if (_semanticModel.GetBinder(containingSymbol.DeclarationSyntax, BinderUsage.Akcss) is AkcssStyleBinder binder)
+        {
+            return binder.BindAkcssOperation(syntax, containingSymbol);
+        }
+
+        throw new System.InvalidOperationException(
+            $"AKCSS operation binding requires {nameof(AkcssStyleBinder)}.");
     }
 
     private static void SetAkcssInterceptType(

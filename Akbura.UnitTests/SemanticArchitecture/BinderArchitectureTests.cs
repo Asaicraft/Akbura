@@ -100,7 +100,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[1]);
         var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(inlineAkcss.Members[0]);
         var utility = Assert.Single(utilities.Utilities);
-        var diagnostics = new BindingDiagnosticBag();
+        var diagnostics = BindingDiagnosticBag.GetInstance();
 
         var markupBinder = Assert.IsType<MarkupBinder>(model.GetBinder(markup, BinderUsage.Markup));
         var delegatedSymbol = markupBinder.LookupSymbol(
@@ -144,7 +144,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
                 BinderLookupOptions.None,
                 originalBinder: binder,
                 markup,
-                new BindingDiagnosticBag());
+                BindingDiagnosticBag.GetInstance());
 
             Assert.True(result.IsGood);
             var symbolInfo = result.ToSymbolInfo();
@@ -173,7 +173,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
             BinderLookupOptions.None,
             originalBinder: binder,
             tree.GetRoot(),
-            new BindingDiagnosticBag());
+            BindingDiagnosticBag.GetInstance());
 
         var symbolInfo = result.ToSymbolInfoAndFree();
         Assert.Null(symbolInfo.Symbol);
@@ -201,7 +201,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         Assert.IsType<CSharpStatementSyntax>(block.Tokens[0]);
         var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
         var binder = Assert.IsType<BlockBinder>(model.GetBinder(writeLine, BinderUsage.Statement));
-        var diagnostics = new BindingDiagnosticBag();
+        var diagnostics = BindingDiagnosticBag.GetInstance();
 
         Assert.Same(block, binder.ScopeDesignator);
         Assert.True(binder.Flags.HasFlag(AkburaBinderFlags.InCSharpBlock));
@@ -247,7 +247,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
             "count",
             BinderLookupOptions.None,
             writeLine,
-            new BindingDiagnosticBag()).Symbol;
+            BindingDiagnosticBag.GetInstance()).Symbol;
 
         Assert.IsType<CSharpLocalSymbol>(symbol);
     }
@@ -277,7 +277,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
             "count",
             BinderLookupOptions.None,
             markup,
-            new BindingDiagnosticBag()).Symbol;
+            BindingDiagnosticBag.GetInstance()).Symbol;
 
         Assert.Same(block, blockBinder.ScopeDesignator);
         Assert.IsType<CSharpLocalSymbol>(symbol);

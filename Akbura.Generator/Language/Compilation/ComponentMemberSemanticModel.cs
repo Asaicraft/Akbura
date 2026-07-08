@@ -350,7 +350,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             var type = hasExplicitType
                 ? explicitType
                 : initializerType;
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             diagnosticsBag.AddRange(CreateStateBindingDiagnostics(
                     stateDeclaration,
                     bindingKind,
@@ -412,7 +412,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 : defaultValueType;
             var bindingKind = AkburaSemanticModel.GetParamBindingKind(paramDeclaration);
 
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddDuplicateComponentMemberDiagnostics(paramDeclaration, name, diagnosticsBuilder);
@@ -454,7 +454,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
             var type = ResolveInjectType(injectDeclaration);
 
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddDuplicateComponentMemberDiagnostics(injectDeclaration, name, diagnosticsBuilder);
@@ -486,7 +486,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             var resultType = GetCommandResultType(returnType, isVoid);
             var hasResult = !resultType.IsDefault;
 
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddDuplicateComponentMemberDiagnostics(commandDeclaration, name, diagnosticsBuilder);
@@ -633,7 +633,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             UseEffectDeclarationSyntax useEffectDeclaration,
             AkburaSymbolInfo symbolInfo)
         {
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             _ = CreateUseEffectDependencies(
                 useEffectDeclaration,
                 diagnosticsBag,
@@ -698,7 +698,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 ImmutableArray<UseEffectDependency>.Empty));
             SetCachedSymbolInfo(useEffectDeclaration, placeholderInfo);
 
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             var dependencies = CreateUseEffectDependencies(
                 useEffectDeclaration,
                 diagnosticsBag,

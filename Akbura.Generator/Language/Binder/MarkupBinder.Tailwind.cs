@@ -23,7 +23,7 @@ internal sealed partial class MarkupBinder
 {
     internal BoundNode CreateBoundTailwindUtilityAttribute(TailwindAttributeSyntax attribute)
     {
-        var diagnosticsBag = new BindingDiagnosticBag();
+        var diagnosticsBag = BindingDiagnosticBag.GetInstance();
 
         var containingComponent = SemanticModel.GetContainingMarkupComponentSymbol(attribute);
         var componentName = containingComponent?.Name ?? "<unknown>";

@@ -148,9 +148,11 @@ internal abstract class Binder
 
     public virtual ImmutableArray<Diagnostic> GetCSharpDiagnostics()
     {
-        var diagnostics = new BindingDiagnosticBag();
+        var diagnostics = BindingDiagnosticBag.GetInstance();
         AddCSharpDiagnostics(diagnostics);
-        return diagnostics.ToCSharpDiagnostics();
+        var result = diagnostics.ToCSharpDiagnostics();
+        diagnostics.Free();
+        return result;
     }
 
     public virtual void AddCSharpDiagnostics(BindingDiagnosticBag diagnostics)

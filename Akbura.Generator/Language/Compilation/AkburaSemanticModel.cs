@@ -33,8 +33,6 @@ internal partial class AkburaSemanticModel
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
     private readonly AkburaOperationFactory _operationFactory;
-    private readonly MarkupBoundNodeFactory _markupBoundNodeFactory;
-    private readonly AkcssBoundNodeFactory _akcssBoundNodeFactory;
     private readonly AkcssOperationMaterializer _akcssOperationMaterializer;
     private readonly DeclarationSymbolTable _declarationSymbols;
 
@@ -45,9 +43,7 @@ internal partial class AkburaSemanticModel
         _bindingCache = new SemanticBindingCache();
         _bindingSession = new BindingSession(this);
         _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
-        _markupBoundNodeFactory = new MarkupBoundNodeFactory(this);
-        _akcssBoundNodeFactory = new AkcssBoundNodeFactory(this);
-        _akcssOperationMaterializer = new AkcssOperationMaterializer(this, _operationFactory, _akcssBoundNodeFactory);
+        _akcssOperationMaterializer = new AkcssOperationMaterializer(this, _operationFactory);
         _declarationSymbols = new DeclarationSymbolTable(this);
     }
 
@@ -63,8 +59,6 @@ internal partial class AkburaSemanticModel
         _bindingCache = semanticModel._bindingCache;
         _bindingSession = semanticModel._bindingSession;
         _operationFactory = semanticModel._operationFactory;
-        _markupBoundNodeFactory = semanticModel._markupBoundNodeFactory;
-        _akcssBoundNodeFactory = semanticModel._akcssBoundNodeFactory;
         _akcssOperationMaterializer = semanticModel._akcssOperationMaterializer;
         _declarationSymbols = semanticModel._declarationSymbols;
     }
@@ -198,9 +192,11 @@ internal partial class AkburaSemanticModel
     private static ImmutableArray<AkburaSemanticDiagnostic> CreateSemanticDiagnosticsFromBoundTree(
         BoundNode boundNode)
     {
-        var bag = new BindingDiagnosticBag();
+        var bag = BindingDiagnosticBag.GetInstance();
         AddBoundTreeDiagnostics(boundNode, bag);
-        return bag.ToSemanticDiagnostics();
+        var diagnostics = bag.ToSemanticDiagnostics();
+        bag.Free();
+        return diagnostics;
     }
 
     private static void AddBoundTreeDiagnostics(
@@ -319,10 +315,6 @@ internal partial class AkburaSemanticModel
             return _bindingSession;
         }
     }
-
-    internal MarkupBoundNodeFactory MarkupBoundNodes => _markupBoundNodeFactory;
-
-    internal AkcssBoundNodeFactory AkcssBoundNodes => _akcssBoundNodeFactory;
 
     internal DeclarationSymbolTable DeclarationSymbols => _declarationSymbols;
 
@@ -682,7 +674,7 @@ internal partial class AkburaSemanticModel
 
         if (!TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var targetType))
         {
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             diagnosticsBag.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     styleRule,
                     styleRule.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
@@ -709,7 +701,7 @@ internal partial class AkburaSemanticModel
 
         if (!TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var targetType))
         {
-            var diagnosticsBag = new BindingDiagnosticBag();
+            var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             diagnosticsBag.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     utilityDeclaration,
                     utilityDeclaration.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
@@ -720,7 +712,7 @@ internal partial class AkburaSemanticModel
 
         var symbol = CreateTailwindUtilitySymbolForAkcss(utilityDeclaration, targetType, includeOperations: true);
 
-        var diagnostics = new BindingDiagnosticBag();
+        var diagnostics = BindingDiagnosticBag.GetInstance();
         diagnostics.AddRange(CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
         SetSemanticDiagnostics(utilityDeclaration, diagnostics);
 
@@ -4573,6 +4565,7 @@ internal partial class AkburaSemanticModel
 
         var semanticDiagnostics = diagnostics.ToSemanticDiagnostics();
         SetSemanticDiagnostics(syntax, semanticDiagnostics);
+        diagnostics.Free();
         return semanticDiagnostics;
     }
 

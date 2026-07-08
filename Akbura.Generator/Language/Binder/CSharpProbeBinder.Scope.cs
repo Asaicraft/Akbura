@@ -38,7 +38,7 @@ internal sealed partial class CSharpProbeBinder
         using var memberDeclarations = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         using var localStatements = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
         var addedNames = new HashSet<string>(StringComparer.Ordinal);
-        var diagnostics = new BindingDiagnosticBag();
+        var diagnostics = BindingDiagnosticBag.GetInstance();
 
         foreach (var name in names)
         {

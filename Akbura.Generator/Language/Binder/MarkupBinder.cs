@@ -47,7 +47,7 @@ internal sealed partial class MarkupBinder : Binder
         return syntax.Kind switch
         {
             AkburaSyntaxKind.MarkupElementSyntax =>
-                SemanticModel.CreateBoundMarkupSyntax(syntax),
+                SemanticModel.MarkupBoundNodes.CreateSyntax(syntax),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
@@ -66,7 +66,7 @@ internal sealed partial class MarkupBinder : Binder
                 AkburaSyntaxKind.MarkupElementContentSyntax or
                 AkburaSyntaxKind.MarkupInlineExpressionSyntax or
                 AkburaSyntaxKind.MarkupTextLiteralSyntax =>
-                SemanticModel.CreateBoundMarkupSyntax(syntax),
+                SemanticModel.MarkupBoundNodes.CreateSyntax(syntax),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or

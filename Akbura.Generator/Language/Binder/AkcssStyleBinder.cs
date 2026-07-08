@@ -64,7 +64,7 @@ internal sealed class AkcssStyleBinder : Binder
         {
             AkburaSyntaxKind.AkcssStyleRuleSyntax or
                 AkburaSyntaxKind.AkcssUtilityDeclarationSyntax =>
-                SemanticModel.CreateBoundAkcssSyntax(syntax),
+                SemanticModel.AkcssBoundNodes.CreateSyntax(syntax),
             AkburaSyntaxKind.AkcssAssignmentSyntax or
                 AkburaSyntaxKind.AkcssIfDirectiveSyntax or
                 AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
@@ -78,8 +78,8 @@ internal sealed class AkcssStyleBinder : Binder
     {
         return BindAkcssOperation(
             assignment,
-            static (semanticModel, syntax, containingSymbol) =>
-                semanticModel.CreateBoundAkcssPropertySetterCore(
+            static (boundNodes, syntax, containingSymbol) =>
+                boundNodes.CreatePropertySetter(
                     Unsafe.As<AkcssAssignmentSyntax>(syntax),
                     containingSymbol));
     }
@@ -88,8 +88,8 @@ internal sealed class AkcssStyleBinder : Binder
     {
         return BindAkcssOperation(
             ifDirective,
-            static (semanticModel, syntax, containingSymbol) =>
-                semanticModel.CreateBoundAkcssIfCore(
+            static (boundNodes, syntax, containingSymbol) =>
+                boundNodes.CreateIf(
                     Unsafe.As<AkcssIfDirectiveSyntax>(syntax),
                     containingSymbol));
     }
@@ -98,8 +98,8 @@ internal sealed class AkcssStyleBinder : Binder
     {
         return BindAkcssOperation(
             applyDirective,
-            static (semanticModel, syntax, containingSymbol) =>
-                semanticModel.CreateBoundAkcssApplyCore(
+            static (boundNodes, syntax, containingSymbol) =>
+                boundNodes.CreateApply(
                     Unsafe.As<AkcssApplyDirectiveSyntax>(syntax),
                     containingSymbol));
     }
@@ -116,12 +116,12 @@ internal sealed class AkcssStyleBinder : Binder
             return cachedBoundNode;
         }
 
-        return SemanticModel.CreateBoundAkcssInterceptCore(interceptDirective, containingSymbol);
+        return SemanticModel.AkcssBoundNodes.CreateIntercept(interceptDirective, containingSymbol);
     }
 
     private BoundNode BindAkcssOperation(
         AkcssBodyMemberSyntax member,
-        Func<AkburaSemanticModel, AkburaSyntax, IAkcssSymbol, BoundNode> bindCore)
+        Func<AkcssBoundNodeFactory, AkburaSyntax, IAkcssSymbol, BoundNode> bindCore)
     {
         if (!TryGetContainingAkcssSymbol(member, out var containingSymbol))
         {
@@ -141,7 +141,7 @@ internal sealed class AkcssStyleBinder : Binder
                 AkburaSymbolInfo.None(AkburaCandidateReason.None));
         }
 
-        return bindCore(SemanticModel, member, containingSymbol);
+        return bindCore(SemanticModel.AkcssBoundNodes, member, containingSymbol);
     }
 
     private bool TryGetContainingAkcssSymbol(

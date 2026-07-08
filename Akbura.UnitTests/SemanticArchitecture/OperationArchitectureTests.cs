@@ -103,6 +103,92 @@ public sealed class OperationArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
+    public void AkcssOperationMaterializer_OwnsAkcssOperationBatchMaterialization()
+    {
+        var boundFactorySource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkcssBoundNodeFactory.cs");
+        var materializerSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkcssOperationMaterializer.cs");
+        var semanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkburaSemanticModel.cs");
+
+        Assert.Contains("internal sealed class AkcssBoundNodeFactory", boundFactorySource);
+        Assert.Contains("CreateSyntax(", boundFactorySource);
+        Assert.Contains("CreateBoundOperations(", boundFactorySource);
+        Assert.Contains("CreatePropertySetter(", boundFactorySource);
+        Assert.Contains("CreateIf(", boundFactorySource);
+        Assert.Contains("new BoundAkcss", boundFactorySource);
+        Assert.Contains("internal sealed class AkcssOperationMaterializer", materializerSource);
+        Assert.Contains("CreateOperations(", materializerSource);
+        Assert.Contains("boundNodes.CreatePropertySetter", materializerSource);
+        Assert.Contains("boundNodes.CreateIf", materializerSource);
+        Assert.Contains("boundNodes.CreateApply", materializerSource);
+        Assert.Contains("boundNodes.CreateIntercept", materializerSource);
+        Assert.DoesNotContain("new BoundAkcss", materializerSource);
+        Assert.DoesNotContain("private ImmutableArray<BoundAkcssOperation> CreateBoundOperations", materializerSource);
+        Assert.Contains("new AkcssBoundNodeFactory(this)", semanticModelSource);
+        Assert.Contains("internal AkcssBoundNodeFactory AkcssBoundNodes", semanticModelSource);
+        Assert.Contains("_akcssOperationMaterializer.CreateOperations", semanticModelSource);
+        Assert.DoesNotContain("_akcssOperationMaterializer.CreateBoundOperations", semanticModelSource);
+        Assert.DoesNotContain("new BoundAkcss", semanticModelSource);
+        Assert.DoesNotContain("CreateBoundAkcss", semanticModelSource);
+        Assert.DoesNotContain("CreateAkcssBoundOperations", semanticModelSource);
+        Assert.DoesNotContain("interceptOperationsBuilder", semanticModelSource);
+        Assert.DoesNotContain("GetOrCreateAkcssOperation", semanticModelSource);
+    }
+
+
+    [Fact]
+    public void MarkupBoundNodeFactory_OwnsMarkupSemanticBoundNodeConstruction()
+    {
+        var boundFactorySource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "MarkupBoundNodeFactory.cs");
+        var binderSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Binder",
+            "MarkupBinder.cs");
+        var semanticModelSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkburaSemanticModel.cs");
+        var markupOperationsSource = ReadRepositoryFile(
+            "Akbura.Generator",
+            "Language",
+            "Compilation",
+            "AkburaSemanticModel.MarkupOperations.cs");
+
+        Assert.Contains("internal sealed class MarkupBoundNodeFactory", boundFactorySource);
+        Assert.Contains("CreateSyntax(", boundFactorySource);
+        Assert.Contains("new BoundMarkupRoot", boundFactorySource);
+        Assert.Contains("new BoundMarkupComponent", boundFactorySource);
+        Assert.Contains("new BoundMarkupContentSetter", boundFactorySource);
+        Assert.Contains("new BoundMarkupContent", boundFactorySource);
+        Assert.Contains("SemanticModel.MarkupBoundNodes.CreateSyntax", binderSource);
+        Assert.DoesNotContain("SemanticModel.CreateBoundMarkupSyntax", binderSource);
+        Assert.Contains("new MarkupBoundNodeFactory(this)", semanticModelSource);
+        Assert.Contains("internal MarkupBoundNodeFactory MarkupBoundNodes", semanticModelSource);
+        Assert.DoesNotContain("new BoundMarkup", semanticModelSource);
+        Assert.DoesNotContain("CreateBoundMarkup", semanticModelSource);
+        Assert.DoesNotContain("new Bound", markupOperationsSource);
+        Assert.DoesNotContain("BoundTailwindUtilityArgument", markupOperationsSource);
+    }
+
+
+    [Fact]
     public void BindingSession_DelegatesOperationBindingToBinderChain()
     {
         var source = ReadRepositoryFile(

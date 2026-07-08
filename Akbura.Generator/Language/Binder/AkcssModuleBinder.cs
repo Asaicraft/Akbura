@@ -41,7 +41,7 @@ internal sealed class AkcssModuleBinder : Binder
         {
             AkburaSyntaxKind.InlineAkcssBlockSyntax or
                 AkburaSyntaxKind.AkcssDocumentSyntax =>
-                SemanticModel.CreateBoundAkcssSyntax(syntax),
+                SemanticModel.AkcssBoundNodes.CreateSyntax(syntax),
             _ => base.BindSemanticSyntax(syntax),
         };
     }

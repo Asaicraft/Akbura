@@ -28,7 +28,7 @@ using System.Diagnostics;
 
 namespace Akbura.Language;
 
-internal partial class AkburaSemanticModel : IOperationFactoryContext
+internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 {
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;

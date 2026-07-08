@@ -84,6 +84,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
             BindingFlags.NonPublic);
 
         Assert.DoesNotContain(nestedTypes, type => type.Name.Contains("MemberSemanticModel", StringComparison.Ordinal));
+        Assert.True(typeof(AkburaSemanticModel).IsAbstract);
         Assert.True(typeof(AkburaSemanticModel).IsAssignableFrom(typeof(MemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(ComponentMemberSemanticModel)));
         Assert.True(typeof(MemberSemanticModel).IsAssignableFrom(typeof(InitializerMemberSemanticModel)));
@@ -159,7 +160,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
             "AkburaSemanticModel.MarkupOperations.cs");
 
         Assert.Contains("internal sealed class AkburaCompilation", compilationSource);
-        Assert.Contains("internal partial class AkburaSemanticModel", semanticModelSource);
+        Assert.Contains("internal abstract partial class AkburaSemanticModel", semanticModelSource);
         Assert.Contains("internal sealed class SyntaxTreeSemanticModel", syntaxTreeSemanticModelSource);
         Assert.Contains("partial class AkburaSemanticModel", csharpReferencesSource);
         Assert.Contains("partial class AkburaSemanticModel", markupOperationsSource);

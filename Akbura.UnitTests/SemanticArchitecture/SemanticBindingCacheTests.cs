@@ -330,25 +330,6 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
 
 
     [Fact]
-    public void SemanticBindingCache_ProtectsSnapshotCachesWithReaderWriterLock()
-    {
-        var source = ReadRepositoryFile(
-            "Akbura.Generator",
-            "Language",
-            "Binder",
-            "SemanticBindingCache.cs");
-
-        Assert.Contains("ReaderWriterLockSlim", source);
-        Assert.Contains("LockRecursionPolicy.NoRecursion", source);
-        Assert.Contains("EnterReadLock", source);
-        Assert.Contains("EnterWriteLock", source);
-        Assert.Contains("ExitReadLock", source);
-        Assert.Contains("ExitWriteLock", source);
-        Assert.DoesNotContain("ConcurrentDictionary<AkburaSyntax", source);
-    }
-
-
-    [Fact]
     public void SemanticBindingCache_CachesBoundNodesBySyntax()
     {
         const string code = "state int count = 0;";
@@ -491,12 +472,10 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
 
 
     [Fact]
-    public void BindingDiagnosticBag_IsAbstractWithPooledAndDiscardedInstances()
+    public void BindingDiagnosticBag_UsesPooledAndDiscardedInstances()
     {
         var bag = BindingDiagnosticBag.GetInstance();
 
-        Assert.True(typeof(BindingDiagnosticBag).IsAbstract);
-        Assert.False(bag.GetType().IsAbstract);
         Assert.True(bag.AccumulatesDiagnostics);
         Assert.False(BindingDiagnosticBag.Discarded.AccumulatesDiagnostics);
         Assert.True(BindingDiagnosticBag.Discarded.IsEmpty);

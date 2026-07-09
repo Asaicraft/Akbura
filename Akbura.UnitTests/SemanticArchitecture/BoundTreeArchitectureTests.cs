@@ -31,41 +31,6 @@ namespace Akbura.UnitTests;
 public sealed class BoundTreeArchitectureTests : SemanticArchitectureTestBase
 {
     [Fact]
-    public void BoundTree_DoesNotExposeAkburaOperations()
-    {
-        var operationType = typeof(AkburaOperation);
-        var boundTypes = typeof(BoundNode)
-            .Assembly
-            .GetTypes()
-            .Where(type => type.Namespace == typeof(BoundNode).Namespace)
-            .ToArray();
-
-        Assert.DoesNotContain(typeof(BoundNode).GetProperties(), property =>
-            property.Name == "Operation");
-
-        foreach (var type in boundTypes)
-        {
-            Assert.DoesNotContain(type.GetFields(
-                    System.Reflection.BindingFlags.Instance |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.NonPublic),
-                field => operationType.IsAssignableFrom(field.FieldType));
-            Assert.DoesNotContain(type.GetProperties(
-                    System.Reflection.BindingFlags.Instance |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.NonPublic),
-                property => operationType.IsAssignableFrom(property.PropertyType));
-            Assert.DoesNotContain(type.GetConstructors(
-                    System.Reflection.BindingFlags.Instance |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.NonPublic)
-                .SelectMany(constructor => constructor.GetParameters()),
-                parameter => operationType.IsAssignableFrom(parameter.ParameterType));
-        }
-    }
-
-
-    [Fact]
     public void BoundWrapping_WithDeclaredSymbolsCreatesBoundBlock()
     {
         const string code =

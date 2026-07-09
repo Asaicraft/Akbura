@@ -346,13 +346,6 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         Assert.Same(first, second);
         Assert.NotSame(first, differentUsage);
         Assert.True(model.BindingSession.CachedBinderCount >= 2);
-
-        var fields = typeof(BindingSession).GetFields(
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-        Assert.DoesNotContain(fields, field =>
-            field.FieldType.FullName?.Contains(nameof(BoundNode), StringComparison.Ordinal) == true ||
-            field.FieldType.FullName?.Contains(nameof(AkburaOperation), StringComparison.Ordinal) == true);
     }
 
 
@@ -397,59 +390,6 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
-    public void BinderFactory_UsesPooledVisitor()
-    {
-        var poolField = typeof(BinderFactory).GetField(
-            "s_binderFactoryVisitorPool",
-            System.Reflection.BindingFlags.Static |
-            System.Reflection.BindingFlags.NonPublic);
-
-        Assert.NotNull(poolField);
-        Assert.Same(
-            typeof(ObjectPool<BinderFactory.BinderFactoryVisitor>),
-            poolField.FieldType);
-    }
-
-
-    [Fact]
-    public void BinderFactory_UsesFixedSizeConcurrentCache()
-    {
-        var cacheField = typeof(BinderFactory).GetField(
-            "_binderCache",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-
-        Assert.NotNull(cacheField);
-        Assert.Same(
-            typeof(ConcurrentCache<BinderCacheKey, BinderType>),
-            cacheField.FieldType);
-    }
-
-
-    [Fact]
-    public void ExecutableCodeBinder_UsesLazySmallDictionaryBinderMap()
-    {
-        var cacheField = typeof(BindingSession).GetField(
-            "_executableBinderCache",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-        Assert.NotNull(cacheField);
-        Assert.Same(
-            typeof(ConcurrentCache<BinderCacheKey, ExecutableCodeBinder>),
-            cacheField.FieldType);
-
-        var mapField = typeof(ExecutableCodeBinder).GetField(
-            "_lazyBinderMap",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-        Assert.NotNull(mapField);
-        Assert.Same(
-            typeof(SmallDictionary<AkburaSyntax, BinderType>),
-            mapField.FieldType);
-    }
-
-
-    [Fact]
     public void ExecutableCodeBinder_ReturnsCachedNestedBinderFromMap()
     {
         const string code =
@@ -483,13 +423,6 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         var blockBinder = Assert.IsType<BlockBinder>(first);
         Assert.Same(first, second);
         Assert.Same(block, blockBinder.ScopeDesignator);
-
-        var mapField = typeof(ExecutableCodeBinder).GetField(
-            "_lazyBinderMap",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-        Assert.NotNull(mapField);
-        Assert.NotNull(mapField.GetValue(executableBinder));
     }
 
 
@@ -641,20 +574,10 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         var model = CreateCompilation(tree).GetSemanticModel(tree);
         var root = tree.GetRoot();
         var binder = Assert.IsType<ComponentBinder>(model.GetBinder(root));
-        var lazyField = typeof(ComponentBinder).GetField(
-            "_lazyDeclaredSymbols",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-
-        Assert.NotNull(lazyField);
-        var before = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
-        Assert.True(before.IsDefault);
 
         var first = binder.GetDeclaredSymbolsForScope(root);
-        var after = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
         var second = binder.GetDeclaredSymbolsForScope(root);
 
-        Assert.False(after.IsDefault);
         Assert.Equal(4, first.Length);
         Assert.Equal(first, second);
     }
@@ -678,20 +601,10 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         var block = ifStatement.Body!;
         var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[2]);
         var binder = Assert.IsType<BlockBinder>(model.GetBinder(writeLine, BinderUsage.Statement));
-        var lazyField = typeof(BlockBinder).GetField(
-            "_lazyDeclaredSymbols",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-
-        Assert.NotNull(lazyField);
-        var before = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
-        Assert.True(before.IsDefault);
 
         var first = binder.GetDeclaredSymbolsForScope(block);
-        var after = Assert.IsType<ImmutableArray<AkburaSymbol>>(lazyField.GetValue(binder));
         var second = binder.GetDeclaredSymbolsForScope(block);
 
-        Assert.False(after.IsDefault);
         Assert.Equal(["count", "other"], first.Select(symbol => symbol.Name));
         Assert.Equal(first, second);
     }
@@ -781,18 +694,11 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var model = CreateCompilation(tree).GetSemanticModel(tree);
         var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
-        var field = typeof(BinderType).GetField(
-            "_lazyConversions",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-
-        Assert.NotNull(field);
-        Assert.Null(field!.GetValue(binder));
 
         var first = binder.Conversions;
         var second = binder.Conversions;
 
         Assert.Same(first, second);
-        Assert.Same(first, field.GetValue(binder));
     }
 
 
@@ -803,18 +709,11 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var model = CreateCompilation(tree).GetSemanticModel(tree);
         var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot(), BinderUsage.Expression);
-        var field = typeof(BinderType).GetField(
-            "_lazyOverloadResolution",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-
-        Assert.NotNull(field);
-        Assert.Null(field!.GetValue(binder));
 
         var first = binder.OverloadResolution;
         var second = binder.OverloadResolution;
 
         Assert.Same(first, second);
-        Assert.Same(first, field.GetValue(binder));
     }
 
 

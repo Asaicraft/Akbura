@@ -11,7 +11,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
@@ -56,24 +55,6 @@ public abstract class SemanticArchitectureTestBase
             "SemanticArchitectureTests",
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    }
-
-    private protected static string ReadRepositoryFile(params string[] pathParts)
-    {
-        return File.ReadAllText(GetRepositoryPath(pathParts));
-    }
-
-    private protected static string GetRepositoryPath(params string[] pathParts)
-    {
-        var parts = new string[pathParts.Length + 5];
-        parts[0] = AppContext.BaseDirectory;
-        parts[1] = "..";
-        parts[2] = "..";
-        parts[3] = "..";
-        parts[4] = "..";
-        Array.Copy(pathParts, 0, parts, 5, pathParts.Length);
-
-        return Path.GetFullPath(Path.Combine(parts));
     }
 
     private protected static Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax CreateReturnExpressionProbe(

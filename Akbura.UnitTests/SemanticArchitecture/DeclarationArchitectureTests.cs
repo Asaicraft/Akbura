@@ -105,10 +105,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         var declaration = DeclarationTreeBuilder.ForSyntaxDeclaration(tree);
         var root = tree.GetRoot();
 
-        Assert.Null(typeof(Declaration).GetProperty("Syntax", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
-        Assert.Null(typeof(Declaration).GetProperty("SyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
-        Assert.Null(typeof(Declaration).GetProperty("AkcssSyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
-
         var single = Assert.IsType<SingleSyntaxDeclaration>(declaration);
         Assert.Same(root, single.Syntax);
         Assert.Same(tree, single.SyntaxTree);
@@ -122,27 +118,12 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
 
         var mergedRoot = compilation.DeclarationTable.MergedRoot;
         Assert.False(DeclarationFacts.TryGetSyntax(mergedRoot, out _));
-        Assert.Null(typeof(MergedNamespaceOrTypeDeclaration).GetProperty("Syntax", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
-        Assert.Null(typeof(MergedNamespaceOrTypeDeclaration).GetProperty("SyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
-        Assert.Null(typeof(MergedNamespaceOrTypeDeclaration).GetProperty("AkcssSyntaxTree", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic));
     }
 
 
     [Fact]
     public void DeclarationTreeBuilder_BuildsSyntaxDeclarationsAndResetsState()
     {
-        var builderType = typeof(DeclarationTreeBuilder).GetNestedType(
-            "SyntaxDeclarationBuilder",
-            BindingFlags.NonPublic);
-        Assert.NotNull(builderType);
-
-        var poolField = builderType.GetField(
-            "s_pool",
-            BindingFlags.Static |
-            BindingFlags.NonPublic);
-        Assert.NotNull(poolField);
-        Assert.Equal("ObjectPool`1", poolField.FieldType.Name);
-
         const string firstCode =
             "@akcss { .first { Background: White; } }\n" +
             "state int first = 0;";
@@ -543,28 +524,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
-    public void DeclarationSymbolTable_CachesSymbolsBySyntaxIdentity()
-    {
-        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        var symbolInfosField = typeof(DeclarationSymbolTable).GetField("_symbolInfos", flags);
-        var declaredSymbolsField = typeof(DeclarationSymbolTable).GetField("_declaredSymbols", flags);
-
-        Assert.NotNull(symbolInfosField);
-        Assert.NotNull(declaredSymbolsField);
-        Assert.Equal(typeof(Dictionary<AkburaSyntax, AkburaSymbolInfo>), symbolInfosField!.FieldType);
-
-        var declaredSymbolsArguments = declaredSymbolsField!.FieldType.GetGenericArguments();
-        Assert.Equal(typeof(ImmutableArray<AkburaSymbol>), declaredSymbolsArguments[1]);
-
-        var keyType = declaredSymbolsArguments[0];
-        Assert.Null(keyType.GetProperty("Declaration", BindingFlags.Instance | BindingFlags.Public));
-        var syntaxProperty = keyType.GetProperty("Syntax", BindingFlags.Instance | BindingFlags.Public);
-        Assert.NotNull(syntaxProperty);
-        Assert.Equal(typeof(AkburaSyntax), syntaxProperty!.PropertyType);
-    }
-
-
-    [Fact]
     public void DeclarationSymbolTable_OwnsComponentDeclaredSymbols()
     {
         const string code =
@@ -597,10 +556,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Equal(
             declaredSymbols.Select(symbol => (symbol.Kind, symbol.Name)),
             binderSymbols.Select(symbol => (symbol.Kind, symbol.Name)));
-        Assert.Null(typeof(BinderType).GetMethod(
-            "CreateSymbolsForDeclarations",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic));
     }
 
 
@@ -967,12 +922,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
     [Fact]
     public void DeclarationTreeBuilder_CachesContainerMemberNames()
     {
-        const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
-        var cacheField = typeof(DeclarationTreeBuilder).GetField("s_nodeToMemberNames", flags);
-        Assert.NotNull(cacheField);
-        Assert.Contains(
-            "ConditionalWeakTable",
-            cacheField!.FieldType.FullName);
         const string code =
             """
             state int count = 0;

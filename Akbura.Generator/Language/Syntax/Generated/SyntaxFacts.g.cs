@@ -135,6 +135,7 @@ namespace Akbura.Language.Syntax
 				SyntaxKind.AkcssKeyword => "akcss",
 				SyntaxKind.ApplyKeyword => "apply",
 				SyntaxKind.InterceptKeyword => "intercept",
+				SyntaxKind.DollarToken => "$",
 
 				_ => string.Empty,
 			};

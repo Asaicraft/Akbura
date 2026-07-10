@@ -316,6 +316,16 @@ internal sealed partial class Lexer : IDisposable
 				info.Kind = SyntaxKind.QuestionToken;
 				return;
 
+			case '#':
+				TextWindow.AdvanceChar();
+				info.Kind = SyntaxKind.HashToken;
+				return;
+
+			case '$':
+				TextWindow.AdvanceChar();
+				info.Kind = SyntaxKind.DollarToken;
+				return;
+
 			// Arithmetic / bitwise operators
 			case '+':
 				TextWindow.AdvanceChar();

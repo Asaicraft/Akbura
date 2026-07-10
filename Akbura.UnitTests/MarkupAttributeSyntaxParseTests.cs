@@ -114,6 +114,58 @@ public class MarkupAttributeSyntaxParseTests
     }
 
     [Fact]
+    public void PlainAttribute_MarkupExtensionValue_ParseSuccessfully()
+    {
+        const string code = "World=${StaticResourceExtension 123}";
+
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+        var value = Assert.IsType<GreenMarkupExtensionAttributeValueSyntax>(syntax.Value);
+        var extension = value.Extension;
+        Assert.Equal(1, extension.Arguments.Count);
+        var argument = Assert.IsType<GreenMarkupExtensionPositionalArgumentSyntax>(extension.Arguments[0]);
+        var literal = Assert.IsType<GreenMarkupExtensionLiteralValueSyntax>(argument.Value);
+
+        Assert.Equal("${StaticResourceExtension 123}", extension.ToFullString());
+        Assert.Equal("StaticResourceExtension", extension.Type.ToFullString().Trim());
+        Assert.Equal("123", literal.Value.ToFullString().Trim());
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void PlainAttribute_ComplexMarkupExtensionValue_ParseSuccessfully()
+    {
+        const string code = "World=${MyMx 123, Hello, Property={mystate + 1}, Binding=${Binding Hello}}";
+
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+        var value = Assert.IsType<GreenMarkupExtensionAttributeValueSyntax>(syntax.Value);
+        var extension = value.Extension;
+
+        Assert.Equal("MyMx", extension.Type.ToFullString().Trim());
+        Assert.Equal(7, extension.Arguments.Count);
+        Assert.IsType<GreenMarkupExtensionPositionalArgumentSyntax>(extension.Arguments[0]);
+        Assert.IsType<GreenMarkupExtensionPositionalArgumentSyntax>(extension.Arguments[2]);
+
+        var propertyArgument = Assert.IsType<GreenMarkupExtensionPropertyArgumentSyntax>(extension.Arguments[4]);
+        Assert.Equal("Property", propertyArgument.Name.ToFullString());
+        Assert.IsType<GreenMarkupExtensionExpressionValueSyntax>(propertyArgument.Value);
+
+        var nestedArgument = Assert.IsType<GreenMarkupExtensionPropertyArgumentSyntax>(extension.Arguments[6]);
+        var nestedValue = Assert.IsType<GreenMarkupExtensionNestedValueSyntax>(nestedArgument.Value);
+        Assert.Equal("Binding", nestedValue.Extension.Type.ToFullString().Trim());
+        Assert.Equal(1, nestedValue.Extension.Arguments.Count);
+        Assert.Equal("Hello", Assert.IsType<GreenMarkupExtensionLiteralValueSyntax>(
+            Assert.IsType<GreenMarkupExtensionPositionalArgumentSyntax>(
+                nestedValue.Extension.Arguments[0]).Value).Value.ToFullString().Trim());
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
     public void PlainDynamicAttribute_CloseBraceIsSeparateToken()
     {
         const string code = "Click={count++}";

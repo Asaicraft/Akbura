@@ -1504,6 +1504,8 @@ partial class Parser
 	{
 		return CurrentToken.Kind switch
 		{
+			SyntaxKind.DollarToken => GreenSyntaxFactory.MarkupExtensionAttributeValueSyntax(
+				ParseMarkupExtensionSyntax()),
 			SyntaxKind.OpenBraceToken => GreenSyntaxFactory.MarkupDynamicAttributeValueSyntax(
 				prefix: null,
 				expression: ParseInlineExpressionSyntax()),
@@ -1516,7 +1518,8 @@ partial class Parser
 
 	private static bool IsMarkupAttributeValueStart(GreenSyntaxToken token)
 	{
-		return token.Kind is SyntaxKind.OpenBraceToken or
+		return token.Kind is SyntaxKind.DollarToken or
+			SyntaxKind.OpenBraceToken or
 			SyntaxKind.DoubleQuoteToken or
 			SyntaxKind.SingleQuoteToken;
 	}
@@ -1544,9 +1547,168 @@ partial class Parser
 		var closeQuote = EatToken(quoteKind);
 		rawText.Append(closeQuote.ToFullString());
 
-		var textToken = (GreenSyntaxToken)GreenSyntaxFactory.AkTextLiteralToken(
-			rawText.ToString(),
-			valueText.ToString())!;
+		return CreateMarkupTextLiteralSyntax(rawText.ToString(), valueText.ToString());
+	}
+
+	private GreenMarkupExtensionSyntax ParseMarkupExtensionSyntax()
+	{
+		var dollarToken = EatToken(SyntaxKind.DollarToken);
+		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+		var type = ParseMarkupExtensionTypeSyntax();
+		var arguments = _pool.AllocateSeparated<GreenMarkupExtensionArgumentSyntax>();
+
+		try
+		{
+			if (CurrentToken.Kind is not (SyntaxKind.CloseBraceToken or SyntaxKind.EndOfFileToken))
+			{
+				arguments.Add(ParseMarkupExtensionArgumentSyntax());
+
+				while (CurrentToken.Kind == SyntaxKind.CommaToken)
+				{
+					arguments.AddSeparator(EatToken(SyntaxKind.CommaToken));
+
+					if (CurrentToken.Kind is SyntaxKind.CloseBraceToken or SyntaxKind.EndOfFileToken)
+					{
+						break;
+					}
+
+					arguments.Add(ParseMarkupExtensionArgumentSyntax());
+				}
+			}
+
+			var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+
+			return GreenSyntaxFactory.MarkupExtensionSyntax(
+				dollarToken,
+				openBrace,
+				type,
+				arguments.ToList(),
+				closeBrace);
+		}
+		finally
+		{
+			_pool.Free(arguments);
+		}
+	}
+
+	private GreenMarkupExtensionTypeSyntax ParseMarkupExtensionTypeSyntax()
+	{
+		GreenMarkupAliasQualifierSyntax? aliasQualifier = null;
+		if (IsMarkupNameToken(CurrentToken) &&
+			PeekToken(1).Kind == SyntaxKind.DoubleColonToken)
+		{
+			aliasQualifier = GreenSyntaxFactory.MarkupAliasQualifierSyntax(
+				ParseMarkupSimpleName(),
+				EatToken(SyntaxKind.DoubleColonToken));
+		}
+
+		var segments = _pool.AllocateSeparated<GreenMarkupNameSegmentSyntax>();
+
+		try
+		{
+			segments.Add(ParseMarkupNameSegmentSyntax());
+
+			while (CurrentToken.Kind == SyntaxKind.DotToken)
+			{
+				segments.AddSeparator(EatToken(SyntaxKind.DotToken));
+				segments.Add(ParseMarkupNameSegmentSyntax());
+			}
+
+			return GreenSyntaxFactory.MarkupExtensionTypeSyntax(
+				aliasQualifier,
+				GreenSyntaxFactory.MarkupQualifiedNameSyntax(segments.ToList()));
+		}
+		finally
+		{
+			_pool.Free(segments);
+		}
+	}
+
+	private GreenMarkupExtensionArgumentSyntax ParseMarkupExtensionArgumentSyntax()
+	{
+		if (IsMarkupNameToken(CurrentToken) &&
+			PeekToken(1).Kind == SyntaxKind.EqualsToken)
+		{
+			var name = ParseMarkupSimpleName();
+			var equals = EatToken(SyntaxKind.EqualsToken);
+			var value = ParseMarkupExtensionValueSyntax();
+			return GreenSyntaxFactory.MarkupExtensionPropertyArgumentSyntax(name, equals, value);
+		}
+
+		return GreenSyntaxFactory.MarkupExtensionPositionalArgumentSyntax(
+			ParseMarkupExtensionValueSyntax());
+	}
+
+	private GreenMarkupExtensionValueSyntax ParseMarkupExtensionValueSyntax()
+	{
+		if (CurrentToken.Kind == SyntaxKind.DollarToken &&
+			PeekToken(1).Kind == SyntaxKind.OpenBraceToken)
+		{
+			return GreenSyntaxFactory.MarkupExtensionNestedValueSyntax(
+				ParseMarkupExtensionSyntax());
+		}
+
+		if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
+		{
+			return GreenSyntaxFactory.MarkupExtensionExpressionValueSyntax(
+				ParseInlineExpressionSyntax());
+		}
+
+		return GreenSyntaxFactory.MarkupExtensionLiteralValueSyntax(
+			ParseMarkupExtensionLiteralValueSyntax());
+	}
+
+	private GreenMarkupTextLiteralSyntax ParseMarkupExtensionLiteralValueSyntax()
+	{
+		var rawText = new StringBuilder();
+		var parenDepth = 0;
+		var bracketDepth = 0;
+		var braceDepth = 0;
+
+		while (CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+		{
+			var kind = CurrentToken.Kind;
+			if (parenDepth == 0 &&
+				bracketDepth == 0 &&
+				braceDepth == 0 &&
+				kind is SyntaxKind.CommaToken or SyntaxKind.CloseBraceToken)
+			{
+				break;
+			}
+
+			var token = EatToken();
+			rawText.Append(token.ToFullString());
+
+			switch (kind)
+			{
+				case SyntaxKind.OpenParenToken:
+					parenDepth++;
+					break;
+				case SyntaxKind.CloseParenToken when parenDepth > 0:
+					parenDepth--;
+					break;
+				case SyntaxKind.OpenBracketToken:
+					bracketDepth++;
+					break;
+				case SyntaxKind.CloseBracketToken when bracketDepth > 0:
+					bracketDepth--;
+					break;
+				case SyntaxKind.OpenBraceToken:
+					braceDepth++;
+					break;
+				case SyntaxKind.CloseBraceToken when braceDepth > 0:
+					braceDepth--;
+					break;
+			}
+		}
+
+		var raw = rawText.ToString();
+		return CreateMarkupTextLiteralSyntax(raw, raw.Trim());
+	}
+
+	private GreenMarkupTextLiteralSyntax CreateMarkupTextLiteralSyntax(string rawText, string valueText)
+	{
+		var textToken = (GreenSyntaxToken)GreenSyntaxFactory.AkTextLiteralToken(rawText, valueText)!;
 
 		var tokens = _pool.Allocate<GreenSyntaxToken>();
 		try

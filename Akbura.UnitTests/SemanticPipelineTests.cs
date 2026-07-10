@@ -3143,6 +3143,410 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupExtensionAttribute_ResolvesExtensionSuffixAndProvideValue()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            <Button Content=${StaticResource 123} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public sealed class StaticResourceExtension
+            {
+                public StaticResourceExtension(object resourceKey)
+                {
+                    ResourceKey = resourceKey;
+                }
+
+                public object? ResourceKey { get; set; }
+
+                public string ProvideValue(System.IServiceProvider serviceProvider)
+                {
+                    return ResourceKey?.ToString() ?? "";
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupAttributeValueKind.MarkupExtension, operation.ValueKind);
+        Assert.Equal("Content", operation.Property?.Name);
+        Assert.True(
+            operation.ConvertedValue is MarkupExtensionValue,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(attribute).Select(diagnostic => diagnostic.Message)));
+        var value = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        Assert.Equal(value, operation.ConstantValue);
+        Assert.Equal("StaticResource", value.Name);
+        Assert.Equal("StaticResourceExtension", value.ExtensionType.Name);
+        Assert.Equal(".ctor", value.Constructor.Name);
+        Assert.Equal("ProvideValue", value.ProvideValueMethod.Name);
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(value.ResultType.Symbol).SpecialType);
+        var argument = Assert.Single(value.Arguments);
+        Assert.Equal("123", argument.Text);
+        Assert.Equal("resourceKey", argument.Parameter.Name);
+        Assert.Empty(value.Properties);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupExtensionAttribute_ResolvesGlobalQualifiedExtension()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <Button Content=${global::Demo.Extensions.StaticResourceExtension 123} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public sealed class StaticResourceExtension
+            {
+                public StaticResourceExtension(object resourceKey)
+                {
+                }
+
+                public object? ProvideValue(System.IServiceProvider serviceProvider)
+                {
+                    return null;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var value = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+
+        Assert.Equal(MarkupAttributeValueKind.MarkupExtension, operation.ValueKind);
+        Assert.Equal("global::Demo.Extensions.StaticResourceExtension", value.Name);
+        Assert.Equal("Demo.Extensions.StaticResourceExtension", value.ExtensionType.Symbol?.ToDisplayString());
+        Assert.Equal("123", Assert.Single(value.Arguments).Text);
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupExtensionAttribute_FindsProvideValueOnBaseType()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            <Button Content=${Derived Key=Hello} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public abstract class BaseExtension
+            {
+                public object? ProvideValue(System.IServiceProvider serviceProvider)
+                {
+                    return null;
+                }
+            }
+
+            public sealed class DerivedExtension : BaseExtension
+            {
+                public string? Key { get; set; }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var value = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+
+        Assert.Equal("DerivedExtension", value.ExtensionType.Name);
+        Assert.Equal("BaseExtension", value.ProvideValueMethod.Symbol?.ContainingType.Name);
+        var property = Assert.Single(value.Properties);
+        Assert.Equal("Key", property.Name);
+        Assert.Equal("Hello", property.Value);
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupExtensionAttribute_PreservesBindingRichSyntax()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            <TextBlock Text=${Binding #input.Text, Mode=TwoWay, StringFormat='{}{0} items'} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public sealed class BindingExtension
+            {
+                public BindingExtension(object path)
+                {
+                    Path = path;
+                }
+
+                public object? Path { get; }
+
+                public string? Mode { get; set; }
+
+                public string? StringFormat { get; set; }
+
+                public object? ProvideValue(System.IServiceProvider serviceProvider)
+                {
+                    return null;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var value = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+
+        Assert.Equal(MarkupAttributeValueKind.MarkupExtension, operation.ValueKind);
+        Assert.Equal("Binding", value.Name);
+        Assert.Equal("BindingExtension", value.ExtensionType.Name);
+        Assert.Equal("#input.Text", Assert.Single(value.Arguments).Text);
+        Assert.Collection(
+            value.Properties,
+            mode =>
+            {
+                Assert.Equal("Mode", mode.Name);
+                Assert.Equal("TwoWay", mode.Value);
+            },
+            stringFormat =>
+            {
+                Assert.Equal("StringFormat", stringFormat.Name);
+                Assert.Equal("'{}{0} items'", stringFormat.Value);
+            });
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupExtensionAttribute_BindsNamedExpressionAndNestedExtension()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            state int mystate = 1;
+
+            <Button Content=${MyMx 123, Hello, Property={mystate + 1}, Binding=${Binding Hello}} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public sealed class MyMxExtension
+            {
+                public MyMxExtension(object first, object second)
+                {
+                }
+
+                public int Property { get; set; }
+
+                public object? Binding { get; set; }
+
+                public object? ProvideValue(System.IServiceProvider serviceProvider)
+                {
+                    return null;
+                }
+            }
+
+            public sealed class BindingExtension
+            {
+                public BindingExtension(object path)
+                {
+                }
+
+                public object? ProvideValue(System.IServiceProvider serviceProvider)
+                {
+                    return null;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes));
+        var syntaxValue = Assert.IsType<MarkupExtensionAttributeValueSyntax>(attribute.Value);
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var value = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+
+        Assert.Equal("MyMx", value.Name);
+        Assert.Equal(2, value.Arguments.Length);
+        Assert.Equal(["123", "Hello"], value.Arguments.Select(argument => argument.Text).ToArray());
+        Assert.Collection(
+            value.Properties,
+            property =>
+            {
+                Assert.Equal("Property", property.Name);
+                Assert.Equal("int", property.Type.Symbol?.ToDisplayString());
+                Assert.False(property.Operation.IsDefault);
+            },
+            property =>
+            {
+                Assert.Equal("Binding", property.Name);
+                Assert.NotNull(property.NestedValue);
+                Assert.Equal("Binding", property.NestedValue!.Name);
+                Assert.Equal("Hello", Assert.Single(property.NestedValue.Arguments).Text);
+            });
+
+        var references = semanticModel.GetCSharpSymbolReferences(attribute);
+        Assert.Contains(references, reference => reference.AkburaSymbol is IStateSymbol { Name: "mystate" });
+        Assert.DoesNotContain(references, reference => reference.Name == "Hello");
+        Assert.False(operation.HasErrors, string.Join(" | ", semanticModel.GetSemanticDiagnostics(attribute).Select(diagnostic => diagnostic.Message)));
+        Assert.True(semanticModel.GetSemanticDiagnostics(syntaxValue).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupExtensionAttribute_BindingWithoutDataTypeCreatesReflectionBindingPayload()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <TextBlock Text=${Binding Name, Mode=TwoWay} />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(AvaloniaBindingCSharpCode));
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var value = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        var binding = value.Binding;
+        Assert.NotNull(binding);
+
+        Assert.Equal(MarkupAttributeValueKind.MarkupExtension, operation.ValueKind);
+        Assert.Equal(MarkupBindingKind.Reflection, binding!.Kind);
+        Assert.Equal("Name", binding.Path);
+        Assert.Equal("Binding", binding.BindingType.Name);
+        Assert.Equal("BindingBase", value.ResultType.Name);
+        Assert.True(binding.SourceType.IsDefault);
+        Assert.Collection(
+            value.Properties,
+            mode =>
+            {
+                Assert.Equal("Mode", mode.Name);
+                Assert.Equal("TwoWay", mode.Value);
+                Assert.Equal("Avalonia.Data.BindingMode", mode.Type.Symbol?.ToDisplayString());
+                Assert.False(mode.Operation.IsDefault);
+            });
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(attribute).IsEmpty,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(attribute).Select(diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupExtensionAttribute_BindingWithDataTypeCreatesCompiledBindingPath()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <StackPanel x.DataType="Demo.ViewModel">
+                <TextBlock Text=${Binding User.Name} />
+            </StackPanel>
+            """;
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public sealed class ViewModel
+            {
+                public User User { get; } = new();
+            }
+
+            public sealed class User
+            {
+                public string Name { get; } = "";
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(AvaloniaBindingCSharpCode, csharpCode));
+        var stackPanel = GetOnlyMarkupElement(syntaxTree);
+        var dataTypeAttribute = Assert.IsType<MarkupAttachedPropertyAttributeSyntax>(
+            Assert.Single(stackPanel.StartTag!.Attributes));
+        var textBlock = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(stackPanel.Body)).Element;
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+
+        var dataTypeOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(dataTypeAttribute));
+        var dataTypeValue = Assert.IsType<CSharpSymbolDefinition>(dataTypeOperation.ConvertedValue);
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var value = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        var binding = value.Binding;
+        Assert.NotNull(binding);
+
+        Assert.Equal("Demo.ViewModel", dataTypeValue.Symbol?.ToDisplayString());
+        Assert.Equal(MarkupBindingKind.Compiled, binding!.Kind);
+        Assert.Equal("User.Name", binding.Path);
+        Assert.Equal("CompiledBinding", binding.BindingType.Name);
+        Assert.Equal("Demo.ViewModel", binding.SourceType.Symbol?.ToDisplayString());
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(binding.ResultType.Symbol).SpecialType);
+        Assert.Collection(
+            binding.PathElements,
+            user =>
+            {
+                Assert.Equal(MarkupBindingPathElementKind.Property, user.Kind);
+                Assert.Equal("User", user.Text);
+                Assert.Equal("Demo.User", user.Type.Symbol?.ToDisplayString());
+            },
+            name =>
+            {
+                Assert.Equal(MarkupBindingPathElementKind.Property, name.Kind);
+                Assert.Equal("Name", name.Text);
+                Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(name.Type.Symbol).SpecialType);
+            });
+        Assert.True(semanticModel.GetSemanticDiagnostics(dataTypeAttribute).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty);
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
     public void SemanticModel_MarkupDynamicAttribute_BindsInComponentScope()
     {
         const string code =
@@ -4842,6 +5246,67 @@ public class SemanticPipelineTests
     {
         return CreateSemanticModel(syntaxTree, CreateCSharpCompilation());
     }
+
+    private const string AvaloniaBindingCSharpCode =
+        """
+        namespace Avalonia.Data;
+
+        public abstract class BindingBase
+        {
+        }
+
+        public class ReflectionBinding : BindingBase
+        {
+            public ReflectionBinding()
+            {
+            }
+
+            public ReflectionBinding(string path)
+            {
+                Path = path;
+            }
+
+            public string Path { get; set; } = "";
+
+            public BindingMode Mode { get; set; }
+
+            public string? StringFormat { get; set; }
+        }
+
+        public class Binding : ReflectionBinding
+        {
+            public Binding()
+            {
+            }
+
+            public Binding(string path)
+                : base(path)
+            {
+            }
+        }
+
+        public sealed class CompiledBindingPath
+        {
+        }
+
+        public class CompiledBinding : BindingBase
+        {
+            public CompiledBinding()
+            {
+            }
+
+            public CompiledBinding(CompiledBindingPath path)
+            {
+                Path = path;
+            }
+
+            public CompiledBindingPath? Path { get; set; }
+
+            public BindingMode Mode { get; set; }
+
+            public string? StringFormat { get; set; }
+        }
+        """;
 
     private static AkburaSemanticModel CreateSemanticModel(
         AkburaSyntaxTree syntaxTree,

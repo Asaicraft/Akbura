@@ -3078,6 +3078,15 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         var componentType = componentSymbol.ComponentType;
+        if (IsMarkupDataTypeDirective(markupAttribute))
+        {
+            SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.Success(new PropertySymbol(
+                "DataType",
+                new CSharpSymbolDefinition(Compilation.CSharpCompilation.GetTypeByMetadataName("System.Type")!),
+                containingSymbol: componentSymbol));
+        }
+
         if (markupAttribute.Kind == AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax &&
             componentType != null)
         {

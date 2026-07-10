@@ -301,6 +301,7 @@ internal sealed partial class MarkupBinder : Binder
         var valueOperation = default(CSharpOperationDefinition);
         var dynamicExpression = default(CSharp.ExpressionSyntax);
         var valueBinding = CSharpBindingResult.Empty;
+        var markupExtensionBinding = default(MarkupExtensionBindingResult);
         var targetType = GetExpectedValueType(property);
         object? convertedValue = null;
         var appliedAkcssSymbols = ImmutableArray<IAkcssSymbol>.Empty;
@@ -315,7 +316,13 @@ internal sealed partial class MarkupBinder : Binder
                 CSharpSyntaxFactory.Literal(literalValue)));
             valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
             valueOperation = valueBinding.OperationDefinition;
-            if (property?.Type.Symbol is CSharpTypeSymbol literalTargetType &&
+            if (AkburaSemanticModel.IsMarkupDataTypeDirective(markupAttribute) &&
+                SemanticModel.TryBindMarkupDataTypeDirective(literalValue, out var dataType))
+            {
+                valueType = property?.Type ?? valueType;
+                convertedValue = new CSharpSymbolDefinition(dataType);
+            }
+            else if (property?.Type.Symbol is CSharpTypeSymbol literalTargetType &&
                 AkburaSemanticModel.IsAvaloniaGridDefinitionListType(literalTargetType) &&
                 GridDefinitionLiteralParser.TryParse(literalValue, out var gridDefinitions))
             {
@@ -339,6 +346,17 @@ internal sealed partial class MarkupBinder : Binder
                 valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
                 valueOperation = valueBinding.OperationDefinition;
             }
+        }
+        else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
+        {
+            var markupExtensionValueSyntax = Unsafe.As<MarkupExtensionAttributeValueSyntax>(valueSyntax);
+            valueKind = MarkupAttributeValueKind.MarkupExtension;
+            markupExtensionBinding = SemanticModel.BindMarkupExtensionAttributeValue(
+                markupAttribute,
+                markupExtensionValueSyntax.Extension,
+                property);
+            valueType = markupExtensionBinding.ResultType;
+            convertedValue = markupExtensionBinding.Value;
         }
 
         var commandHandler = default(AkburaSemanticModel.MarkupCommandHandlerAnalysis);
@@ -402,6 +420,10 @@ internal sealed partial class MarkupBinder : Binder
                             valueBinding,
                             diagnosticsBuilder);
                     }
+                }
+                else if (valueKind == MarkupAttributeValueKind.MarkupExtension)
+                {
+                    diagnosticsBuilder.AddRange(markupExtensionBinding.Diagnostics);
                 }
 
                 if (property.Command is { } commandSymbol)
@@ -486,6 +508,10 @@ internal sealed partial class MarkupBinder : Binder
         else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupLiteralAttributeValueSyntax)
         {
             valueKind = MarkupAttributeValueKind.Literal;
+        }
+        else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
+        {
+            valueKind = MarkupAttributeValueKind.MarkupExtension;
         }
 
         var handler = SemanticModel.AnalyzeMarkupEventHandler(markupAttribute, routedEvent, expression);

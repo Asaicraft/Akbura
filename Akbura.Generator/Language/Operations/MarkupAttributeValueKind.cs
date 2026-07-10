@@ -5,5 +5,6 @@ internal enum MarkupAttributeValueKind
     None = 0,
     Literal,
     DynamicExpression,
+    MarkupExtension,
     Error,
 }

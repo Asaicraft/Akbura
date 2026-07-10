@@ -94,13 +94,60 @@ internal partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(markupAttribute);
 
-        if (GetMarkupAttributeValue(markupAttribute)?.Kind != AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
+        var value = GetMarkupAttributeValue(markupAttribute);
+        if (value == null)
         {
             return ImmutableArray<CSharpSymbolReference>.Empty;
         }
 
-        var dynamicValue = Unsafe.As<MarkupDynamicAttributeValueSyntax>(GetMarkupAttributeValue(markupAttribute)!);
-        return GetCSharpSymbolReferences(dynamicValue.Expression);
+        if (value.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
+        {
+            var dynamicValue = Unsafe.As<MarkupDynamicAttributeValueSyntax>(value);
+            return GetCSharpSymbolReferences(dynamicValue.Expression);
+        }
+
+        if (value.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
+        {
+            var extensionValue = Unsafe.As<MarkupExtensionAttributeValueSyntax>(value);
+            using var builder = ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
+            AddMarkupExtensionCSharpSymbolReferences(extensionValue.Extension, builder);
+            return builder.ToImmutable();
+        }
+
+        return ImmutableArray<CSharpSymbolReference>.Empty;
+    }
+
+    private void AddMarkupExtensionCSharpSymbolReferences(
+        MarkupExtensionSyntax extensionSyntax,
+        ImmutableArrayBuilder<CSharpSymbolReference> builder)
+    {
+        foreach (var argument in extensionSyntax.Arguments)
+        {
+            var value = argument.Kind switch
+            {
+                AkburaSyntaxKind.MarkupExtensionPositionalArgumentSyntax => Unsafe.As<MarkupExtensionPositionalArgumentSyntax>(argument).Value,
+                AkburaSyntaxKind.MarkupExtensionPropertyArgumentSyntax => Unsafe.As<MarkupExtensionPropertyArgumentSyntax>(argument).Value,
+                _ => null,
+            };
+
+            if (value == null)
+            {
+                continue;
+            }
+
+            switch (value.Kind)
+            {
+                case AkburaSyntaxKind.MarkupExtensionExpressionValueSyntax:
+                    builder.AddRange(GetCSharpSymbolReferences(Unsafe.As<MarkupExtensionExpressionValueSyntax>(value).Expression));
+                    break;
+
+                case AkburaSyntaxKind.MarkupExtensionNestedValueSyntax:
+                    AddMarkupExtensionCSharpSymbolReferences(
+                        Unsafe.As<MarkupExtensionNestedValueSyntax>(value).Extension,
+                        builder);
+                    break;
+            }
+        }
     }
 
     public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(InlineExpressionSyntax inlineExpressionSyntax)

@@ -89,6 +89,37 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void MarkupExtensionExpressionEdit_ReusesUnaffectedArguments()
+    {
+        const string oldCode = "<Button Content=${MyMx 123, Property={mystate + 1}, Binding=${Binding Hello}} class=\"primary\"/>";
+        const string newCode = "<Button Content=${MyMx 123, Property={mystate + 2}, Binding=${Binding Hello}} class=\"primary\"/>";
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            oldCode.IndexOf("mystate + 1"),
+            oldLength: "mystate + 1".Length,
+            newLength: "mystate + 2".Length);
+
+        var oldContent = Assert.IsType<GreenMarkupPlainAttributeSyntax>(oldMarkup.Element.StartTag!.Attributes[0]);
+        var newContent = Assert.IsType<GreenMarkupPlainAttributeSyntax>(newMarkup.Element.StartTag!.Attributes[0]);
+        var oldValue = Assert.IsType<GreenMarkupExtensionAttributeValueSyntax>(oldContent.Value);
+        var newValue = Assert.IsType<GreenMarkupExtensionAttributeValueSyntax>(newContent.Value);
+        var oldArguments = oldValue.Extension.Arguments;
+        var newArguments = newValue.Extension.Arguments;
+
+        Assert.NotSame(oldContent, newContent);
+        Assert.Same(oldContent.Name.Identifier, newContent.Name.Identifier);
+        Assert.Same(oldContent.EqualsToken, newContent.EqualsToken);
+        Assert.Same(oldValue.Extension.Type, newValue.Extension.Type);
+        Assert.Same(oldArguments[0], newArguments[0]);
+        Assert.NotSame(oldArguments[2], newArguments[2]);
+        Assert.Same(oldArguments[4], newArguments[4]);
+        Assert.Same(oldMarkup.Element.StartTag.Attributes[1], newMarkup.Element.StartTag.Attributes[1]);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void TextContentEdit_ReusesSiblingMarkupContent()
     {
         const string oldCode =

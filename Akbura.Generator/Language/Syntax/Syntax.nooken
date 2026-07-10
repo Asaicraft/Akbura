@@ -53,6 +53,7 @@ token GreaterEqualsToken = ">=";
 token LessEqualsToken    = "<=";
 token ArrowToken         = "=>";
 token HashToken          = "#";
+token DollarToken        = "$";
 
 token OpenBraceToken     = "{";
 token CloseBraceToken    = "}";
@@ -506,6 +507,55 @@ node MarkupLiteralAttributeValueSyntax : MarkupAttributeValueSyntax {
 node MarkupDynamicAttributeValueSyntax : MarkupAttributeValueSyntax {
 	Prefix?    : MarkupTextLiteralSyntax;
 	Expression : InlineExpressionSyntax;
+}
+
+/// <summary>
+/// Markup extension attribute value, e.g. ${Binding Text}.
+/// </summary>
+node MarkupExtensionAttributeValueSyntax : MarkupAttributeValueSyntax {
+	Extension : MarkupExtensionSyntax;
+}
+
+/// <summary>
+/// Markup extension body, e.g. ${MyMx 123, Property={state}, Nested=${Binding Name}}.
+/// </summary>
+node MarkupExtensionSyntax : MarkupSyntaxNode {
+	DollarToken : DollarToken;
+	OpenBrace   : OpenBraceToken;
+	Type        : MarkupExtensionTypeSyntax;
+	Arguments   : syntaxlist<MarkupExtensionArgumentSyntax, CommaToken>;
+	CloseBrace  : CloseBraceToken;
+}
+
+node MarkupExtensionTypeSyntax : MarkupSyntaxNode {
+	AliasQualifier? : MarkupAliasQualifierSyntax;
+	Name            : MarkupQualifiedNameSyntax;
+}
+
+abstract node MarkupExtensionArgumentSyntax : MarkupSyntaxNode;
+
+node MarkupExtensionPositionalArgumentSyntax : MarkupExtensionArgumentSyntax {
+	Value : MarkupExtensionValueSyntax;
+}
+
+node MarkupExtensionPropertyArgumentSyntax : MarkupExtensionArgumentSyntax {
+	Name        : SimpleName;
+	EqualsToken : EqualsToken;
+	Value       : MarkupExtensionValueSyntax;
+}
+
+abstract node MarkupExtensionValueSyntax : MarkupSyntaxNode;
+
+node MarkupExtensionLiteralValueSyntax : MarkupExtensionValueSyntax {
+	Value : MarkupTextLiteralSyntax;
+}
+
+node MarkupExtensionExpressionValueSyntax : MarkupExtensionValueSyntax {
+	Expression : InlineExpressionSyntax;
+}
+
+node MarkupExtensionNestedValueSyntax : MarkupExtensionValueSyntax {
+	Extension : MarkupExtensionSyntax;
 }
 
 // ─────────────────────────────────────────────────────────────

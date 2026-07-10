@@ -20,6 +20,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
         string? literalValue,
+        object? convertedValue,
         bool hasErrors,
         ICSharpOperation? valueOperationTree = null)
     {
@@ -35,6 +36,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         ValueKind = valueKind;
         ValueSyntax = valueSyntax;
         LiteralValue = literalValue;
+        ConvertedValue = convertedValue;
         HasErrors = hasErrors;
         ValueOperationTree = valueOperationTree;
         AdoptCSharpOperationTree(ValueOperationTree);
@@ -65,7 +67,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
 
     public bool HasErrors { get; }
 
-    public object? ConstantValue => LiteralValue;
+    public object? ConstantValue => ConvertedValue ?? LiteralValue;
 
     public IMarkupComponentSymbol? ContainingComponent { get; }
 
@@ -86,6 +88,8 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
     public MarkupAttributeValueSyntax? ValueSyntax { get; }
 
     public string? LiteralValue { get; }
+
+    public object? ConvertedValue { get; }
 
     public void Accept(OperationVisitor visitor)
     {

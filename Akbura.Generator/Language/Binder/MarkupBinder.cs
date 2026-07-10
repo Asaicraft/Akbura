@@ -302,6 +302,7 @@ internal sealed partial class MarkupBinder : Binder
         var dynamicExpression = default(CSharp.ExpressionSyntax);
         var valueBinding = CSharpBindingResult.Empty;
         var targetType = GetExpectedValueType(property);
+        object? convertedValue = null;
         var appliedAkcssSymbols = ImmutableArray<IAkcssSymbol>.Empty;
 
         if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupLiteralAttributeValueSyntax)
@@ -314,6 +315,13 @@ internal sealed partial class MarkupBinder : Binder
                 CSharpSyntaxFactory.Literal(literalValue)));
             valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
             valueOperation = valueBinding.OperationDefinition;
+            if (property?.Type.Symbol is CSharpTypeSymbol literalTargetType &&
+                AkburaSemanticModel.IsAvaloniaGridDefinitionListType(literalTargetType) &&
+                GridDefinitionLiteralParser.TryParse(literalValue, out var gridDefinitions))
+            {
+                valueType = new CSharpSymbolDefinition(literalTargetType);
+                convertedValue = gridDefinitions;
+            }
         }
         else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
         {
@@ -370,6 +378,12 @@ internal sealed partial class MarkupBinder : Binder
                         markupAttribute,
                         literalValue,
                         containingComponent,
+                        diagnosticsBuilder);
+
+                    SemanticModel.AddMarkupDefinitionListLiteralDiagnostics(
+                        markupAttribute,
+                        property,
+                        literalValue,
                         diagnosticsBuilder);
                 }
 
@@ -446,6 +460,7 @@ internal sealed partial class MarkupBinder : Binder
             valueKind,
             valueSyntax,
             literalValue,
+            convertedValue,
             diagnostics,
             property == null || valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
     }

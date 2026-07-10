@@ -172,6 +172,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
         string? literalValue,
+        object? convertedValue,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
         bool hasErrors = false)
         : base(
@@ -193,6 +194,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         ValueKind = valueKind;
         ValueSyntax = valueSyntax;
         LiteralValue = literalValue;
+        ConvertedValue = convertedValue;
     }
 
     public IPropertySymbol? Property { get; }
@@ -211,6 +213,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
 
     public string? LiteralValue { get; }
 
+    public object? ConvertedValue { get; }
+
     public BoundMarkupPropertySetter Update(
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol? property,
@@ -220,7 +224,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         MarkupAttributeBindingKind bindingKind,
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
-        string? literalValue)
+        string? literalValue,
+        object? convertedValue)
     {
         if (ReferenceEquals(containingComponent, ContainingComponent) &&
             ReferenceEquals(property, Property) &&
@@ -230,7 +235,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             bindingKind == BindingKind &&
             valueKind == ValueKind &&
             ReferenceEquals(valueSyntax, ValueSyntax) &&
-            literalValue == LiteralValue)
+            literalValue == LiteralValue &&
+            Equals(convertedValue, ConvertedValue))
         {
             return this;
         }
@@ -247,6 +253,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             valueKind,
             valueSyntax,
             literalValue,
+            convertedValue,
             Diagnostics,
             HasErrors);
     }

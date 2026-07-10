@@ -215,7 +215,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             node.BindingKind,
             node.ValueKind,
             node.ValueSyntax,
-            node.LiteralValue);
+            node.LiteralValue,
+            node.ConvertedValue);
     }
 
     public override BoundNode? VisitMarkupCommandBinding(BoundMarkupCommandBinding node)

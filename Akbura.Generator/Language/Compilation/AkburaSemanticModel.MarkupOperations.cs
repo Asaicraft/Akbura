@@ -352,6 +352,39 @@ internal partial class AkburaSemanticModel
         return null;
     }
 
+    internal static bool IsAvaloniaGridDefinitionListType(ITypeSymbol? type)
+    {
+        if (type is not INamedTypeSymbol namedType)
+        {
+            return false;
+        }
+
+        var originalDefinition = namedType.OriginalDefinition;
+        return originalDefinition.ContainingNamespace.ToDisplayString() == "Avalonia.Controls" &&
+               originalDefinition.Name is "ColumnDefinitions" or "RowDefinitions";
+    }
+
+    internal void AddMarkupDefinitionListLiteralDiagnostics(
+        MarkupAttributeSyntax markupAttribute,
+        Symbols.IPropertySymbol property,
+        string literalValue,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (property.Type.Symbol is not ITypeSymbol targetType ||
+            !IsAvaloniaGridDefinitionListType(targetType) ||
+            GridDefinitionLiteralParser.TryParse(literalValue))
+        {
+            return;
+        }
+
+        AddMarkupAttributeCannotConvertDiagnostic(
+            markupAttribute,
+            property,
+            Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_String),
+            targetType,
+            diagnosticsBuilder);
+    }
+
     internal void AddMarkupAttributeValueDiagnostics(
         MarkupAttributeSyntax markupAttribute,
         Symbols.IPropertySymbol property,

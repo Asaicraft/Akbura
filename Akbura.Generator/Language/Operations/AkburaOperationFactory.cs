@@ -233,6 +233,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             boundNode.ValueKind,
             boundNode.ValueSyntax,
             boundNode.LiteralValue,
+            boundNode.ConvertedValue,
             boundNode.HasErrors,
             CreateCSharpOperationTree(
                 boundNode.Syntax,

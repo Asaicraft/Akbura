@@ -3040,6 +3040,109 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupGridDefinitionsLiteral_ConvertsToDefinitionListTypes()
+    {
+        const string columnDefinitions = "*, 100, Auto, min(100), max(300), min-max(100, 300), min-max(100, *, 300), min-max(0, auto, 100)";
+        const string rowDefinitions = "Auto * 2* 48 min-max(0, auto, 100)";
+        const string code =
+            $$"""
+            using Avalonia.Controls;
+
+            <Grid ColumnDefinitions="{{columnDefinitions}}" RowDefinitions="{{rowDefinitions}}" />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var attributes = GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes
+            .Cast<MarkupPlainAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(2, attributes.Length);
+
+        var columnOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attributes[0]));
+        var rowOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attributes[1]));
+
+        Assert.Equal("ColumnDefinitions", columnOperation.Property?.Name);
+        Assert.Equal(columnDefinitions, columnOperation.LiteralValue);
+        Assert.Equal(MarkupAttributeValueKind.Literal, columnOperation.ValueKind);
+        Assert.Equal("Avalonia.Controls.ColumnDefinitions", columnOperation.ValueType.Symbol?.ToDisplayString());
+        var columnValue = Assert.IsType<GridDefinitionListValue>(columnOperation.ConvertedValue);
+        Assert.Equal(columnValue, columnOperation.ConstantValue);
+        Assert.Equal(8, columnValue.Definitions.Length);
+        AssertDefinition(columnValue.Definitions[0], GridDefinitionUnitType.Star, 1);
+        AssertDefinition(columnValue.Definitions[1], GridDefinitionUnitType.Pixel, 100);
+        AssertDefinition(columnValue.Definitions[2], GridDefinitionUnitType.Auto, 0);
+        AssertDefinition(columnValue.Definitions[3], GridDefinitionUnitType.Star, 1, min: 100);
+        AssertDefinition(columnValue.Definitions[4], GridDefinitionUnitType.Star, 1, max: 300);
+        AssertDefinition(columnValue.Definitions[5], GridDefinitionUnitType.Star, 1, min: 100, max: 300);
+        AssertDefinition(columnValue.Definitions[6], GridDefinitionUnitType.Star, 1, min: 100, max: 300);
+        AssertDefinition(columnValue.Definitions[7], GridDefinitionUnitType.Auto, 0, min: 0, max: 100);
+        Assert.False(columnOperation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attributes[0]).IsEmpty);
+
+        Assert.Equal("RowDefinitions", rowOperation.Property?.Name);
+        Assert.Equal(rowDefinitions, rowOperation.LiteralValue);
+        Assert.Equal(MarkupAttributeValueKind.Literal, rowOperation.ValueKind);
+        Assert.Equal("Avalonia.Controls.RowDefinitions", rowOperation.ValueType.Symbol?.ToDisplayString());
+        var rowValue = Assert.IsType<GridDefinitionListValue>(rowOperation.ConvertedValue);
+        Assert.Equal(rowValue, rowOperation.ConstantValue);
+        Assert.Equal(5, rowValue.Definitions.Length);
+        AssertDefinition(rowValue.Definitions[0], GridDefinitionUnitType.Auto, 0);
+        AssertDefinition(rowValue.Definitions[1], GridDefinitionUnitType.Star, 1);
+        AssertDefinition(rowValue.Definitions[2], GridDefinitionUnitType.Star, 2);
+        AssertDefinition(rowValue.Definitions[3], GridDefinitionUnitType.Pixel, 48);
+        AssertDefinition(rowValue.Definitions[4], GridDefinitionUnitType.Auto, 0, min: 0, max: 100);
+        Assert.False(rowOperation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attributes[1]).IsEmpty);
+
+        static void AssertDefinition(
+            GridDefinitionValue actual,
+            GridDefinitionUnitType unitType,
+            double value,
+            double? min = null,
+            double? max = null)
+        {
+            Assert.Equal(unitType, actual.Length.UnitType);
+            Assert.Equal(value, actual.Length.Value);
+            Assert.Equal(min, actual.Min);
+            Assert.Equal(max, actual.Max);
+        }
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupGridDefinitionsLiteral_InvalidDefinitionProducesDiagnostic()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <Grid ColumnDefinitions="*, nope" RowDefinitions="min-max(100, auto)" />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var attributes = GetOnlyMarkupElement(syntaxTree).StartTag!.Attributes
+            .Cast<MarkupPlainAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(2, attributes.Length);
+
+        foreach (var attribute in attributes)
+        {
+            var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+                semanticModel.GetOperation(attribute));
+            var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(attribute));
+
+            Assert.True(operation.HasErrors);
+            Assert.Null(operation.ConvertedValue);
+            Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert, diagnostic.Code);
+            Assert.Contains(attribute.Name.Identifier.ValueText, diagnostic.Message);
+        }
+    }
+
+    [Fact]
     public void SemanticModel_MarkupDynamicAttribute_BindsInComponentScope()
     {
         const string code =

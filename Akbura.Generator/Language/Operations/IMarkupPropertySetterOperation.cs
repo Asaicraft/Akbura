@@ -16,4 +16,6 @@ internal interface IMarkupPropertySetterOperation : IPropertySetterOperation, IM
     MarkupAttributeValueSyntax? ValueSyntax { get; }
 
     string? LiteralValue { get; }
+
+    object? ConvertedValue { get; }
 }

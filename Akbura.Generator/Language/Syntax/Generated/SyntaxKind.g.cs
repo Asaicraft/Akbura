@@ -126,93 +126,95 @@ namespace Akbura.Language.Syntax
 
 		// Document root
 		AkburaDocumentSyntax = 506,
-		InlineAkcssBlockSyntax = 764,
-
-		// Inject / Param / State / Command Declarations
-		InjectDeclarationSyntax = 507,
-		ParamDeclarationSyntax = 508,
-		StateDeclarationSyntax = 509,
-		StateInitializer = 510,
-		SimpleStateInitializer = 511,
-		BindableStateInitializer = 512,
-
-		// useEffect Declaration (+ cancel / finally blocks)
-		UseEffectDeclarationSyntax = 513,
-		EffectCancelBlockSyntax = 514,
-		EffectFinallyBlockSyntax = 515,
-		CommandDeclarationSyntax = 516,
-
-		// Function Declarations
-		//FunctionDeclarationSyntax = 517,
-		CSharpParameterListSyntax = 517,
-		CSharpArgumentListSyntax = 518,
-
-		// User hooks
-		UserHook = 519,
+		InlineAkcssBlockSyntax = 507,
 
 		// Using and namespace directives
-		UsingAliasSyntax = 761,
-		UsingDirectiveSyntax = 762,
-		NamespaceDeclarationSyntax = 763,
+		UsingAliasSyntax = 508,
+		UsingDirectiveSyntax = 509,
+		NamespaceDeclarationSyntax = 510,
+
+		// Inject / Param / State / Command Declarations
+		InjectDeclarationSyntax = 511,
+		ParamDeclarationSyntax = 512,
+		StateDeclarationSyntax = 513,
+		StateInitializer = 514,
+		SimpleStateInitializer = 515,
+		BindableStateInitializer = 516,
+
+		// useEffect Declaration (+ cancel / finally blocks)
+		UseEffectDeclarationSyntax = 517,
+		UseEffectTailBlockSyntax = 518,
+		EffectCancelBlockSyntax = 519,
+		EffectFinallyBlockSyntax = 520,
+		CommandDeclarationSyntax = 521,
+
+		// Function Declarations
+		//FunctionDeclarationSyntax = 522,
+		CSharpParameterListSyntax = 522,
+		CSharpArgumentListSyntax = 523,
+
+		// User hooks
+		UserHook = 524,
 
 		// Markup tree
-		MarkupSyntaxNode = 520,
-		MarkupRootSyntax = 521,
-		MarkupNodeSyntax = 522,
-		MarkupElementSyntax = 523,
-		MarkupStartTagSyntax = 524,
-		MarkupEndTagSyntax = 525,
+		MarkupSyntaxNode = 525,
+		MarkupRootSyntax = 526,
+		MarkupNodeSyntax = 527,
+		MarkupElementSyntax = 528,
+		MarkupStartTagSyntax = 529,
+		MarkupEndTagSyntax = 530,
 
 		// Markup content nodes
-		MarkupContentSyntax = 526,
-		MarkupTextLiteralSyntax = 527,
-		MarkupElementContentSyntax = 528,
-		MarkupInlineExpressionSyntax = 529,
+		MarkupContentSyntax = 531,
+		MarkupTextLiteralSyntax = 532,
+		MarkupElementContentSyntax = 533,
+		MarkupInlineExpressionSyntax = 534,
 
 		// Markup attributes
-		MarkupAttributeSyntax = 530,
-		MarkupPlainAttributeSyntax = 531,
-		MarkupPrefixedAttributeSyntax = 532,
-		MarkupAttributeValueSyntax = 533,
-		MarkupLiteralAttributeValueSyntax = 534,
-		MarkupDynamicAttributeValueSyntax = 535,
+		MarkupAttributeSyntax = 535,
+		MarkupPlainAttributeSyntax = 536,
+		MarkupAttachedPropertyAttributeSyntax = 537,
+		MarkupPrefixedAttributeSyntax = 538,
+		MarkupAttributeValueSyntax = 539,
+		MarkupLiteralAttributeValueSyntax = 540,
+		MarkupDynamicAttributeValueSyntax = 541,
 
 		// Tailwind attributes
-		TailwindAttributeSyntax = 536,
-		TailwindSegmentSyntax = 537,
-		TailwindIdentifierSegmentSyntax = 538,
-		TailwindNumericSegmentSyntax = 539,
-		TailwindExpressionSegmentSyntax = 540,
-		TailwindFlagAttributeSyntax = 541,
-		TailwindPrefixSegmentSyntax = 542,
-		SimpleConditionalPrefixSyntax = 543,
-		ExpressionConditionalPrefixSyntax = 544,
-		TailwindFullAttributeSyntax = 545,
+		TailwindAttributeSyntax = 542,
+		TailwindSegmentSyntax = 543,
+		TailwindIdentifierSegmentSyntax = 544,
+		TailwindNumericSegmentSyntax = 545,
+		TailwindExpressionSegmentSyntax = 546,
+		TailwindFlagAttributeSyntax = 547,
+		TailwindPrefixSegmentSyntax = 548,
+		SimpleConditionalPrefixSyntax = 549,
+		ExpressionConditionalPrefixSyntax = 550,
+		TailwindFullAttributeSyntax = 551,
 
 		// AKCSS root
-		AkcssDocumentSyntax = 546,
-		AkcssTopLevelMember = 547,
-		AkcssUsingDirectiveSyntax = 560,
+		AkcssDocumentSyntax = 552,
+		AkcssTopLevelMember = 553,
+		AkcssUsingDirectiveSyntax = 554,
 
 		// Shared body members
-		AkcssBodyMemberSyntax = 548,
-		AkcssAssignmentSyntax = 549,
-		AkcssIfDirectiveSyntax = 550,
-		AkcssAdditionalPseudoStateSyntax = 551,
-		AkcssPseudoSelectorSyntax = 552,
-		AkcssPseudoBlockSyntax = 553,
-		AkcssApplyDirectiveSyntax = 561,
-		AkcssInterceptDirectiveSyntax = 562,
+		AkcssBodyMemberSyntax = 555,
+		AkcssAssignmentSyntax = 556,
+		AkcssApplyDirectiveSyntax = 557,
+		AkcssInterceptDirectiveSyntax = 558,
+		AkcssIfDirectiveSyntax = 559,
+		AkcssAdditionalPseudoStateSyntax = 560,
+		AkcssPseudoSelectorSyntax = 561,
+		AkcssPseudoBlockSyntax = 562,
 
 		// AKCSS style rules
-		AkcssStyleRuleSyntax = 554,
-		AkcssStyleSelectorSyntax = 555,
+		AkcssStyleRuleSyntax = 563,
+		AkcssStyleSelectorSyntax = 564,
 
 		// AKCSS utilities
-		AkcssUtilitiesSectionSyntax = 556,
-		AkcssUtilityParameterSyntax = 557,
-		AkcssUtilitySelectorSyntax = 558,
-		AkcssUtilityDeclarationSyntax = 559,
+		AkcssUtilitiesSectionSyntax = 565,
+		AkcssUtilityParameterSyntax = 566,
+		AkcssUtilitySelectorSyntax = 567,
+		AkcssUtilityDeclarationSyntax = 568,
 
 		// Identifiers and types
 		Type = 700,
@@ -220,13 +222,15 @@ namespace Akbura.Language.Syntax
 		SimpleName = 702,
 		IdentifierName = 703,
 
-		MarkupSimpleComponentNameSyntax = 754,
-		MarkupQualifiedNameSyntax = 755,
-		MarkupAliasQualifierSyntax = 756,
-		MarkupGenericArgumentListSyntax = 757,
-		MarkupQualifiedComponentNameSyntax = 758,
-		MarkupIdentifierNameSegmentSyntax = 759,
-		MarkupGenericNameSegmentSyntax = 760,
+		MarkupComponentNameSyntax = 704,
+		MarkupSimpleComponentNameSyntax = 705,
+		MarkupQualifiedNameSyntax = 706,
+		MarkupAliasQualifierSyntax = 707,
+		MarkupGenericArgumentListSyntax = 708,
+		MarkupQualifiedComponentNameSyntax = 709,
+		MarkupNameSegmentSyntax = 710,
+		MarkupIdentifierNameSegmentSyntax = 711,
+		MarkupGenericNameSegmentSyntax = 712,
 
 
 		// Trivia

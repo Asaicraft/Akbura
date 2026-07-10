@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using CSharpFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -849,6 +850,11 @@ internal sealed partial class Parser
             return ParseIncrementalMarkupPrefixedAttributeSyntax();
         }
 
+        if (IsIncrementalAttachedPropertyMarkupAttributeStart())
+        {
+            return ParseIncrementalMarkupAttachedPropertyAttributeSyntax();
+        }
+
         if (IsIncrementalPlainMarkupAttributeStart())
         {
             return ParseIncrementalMarkupPlainAttributeSyntax();
@@ -972,6 +978,61 @@ internal sealed partial class Parser
         var value = ParseIncrementalMarkupAttributeValueSyntax();
 
         return GreenSyntaxFactory.MarkupPlainAttributeSyntax(name, equals, value);
+    }
+
+    private GreenMarkupAttachedPropertyAttributeSyntax ParseIncrementalMarkupAttachedPropertyAttributeSyntax()
+    {
+        if (TryReadReusableIncrementalNode<GreenMarkupAttachedPropertyAttributeSyntax>(out var attribute))
+        {
+            return attribute;
+        }
+
+        GreenMarkupAliasQualifierSyntax? aliasQualifier = null;
+        if (IsIncrementalMarkupNameToken(PeekIncrementalTokenKind()) &&
+            PeekIncrementalTokenKind(1) == SyntaxKind.DoubleColonToken)
+        {
+            aliasQualifier = ParseIncrementalMarkupAliasQualifierSyntax();
+        }
+
+        var ownerSegments = _pool.AllocateSeparated<GreenMarkupNameSegmentSyntax>();
+
+        try
+        {
+            ownerSegments.Add(ParseIncrementalMarkupNameSegmentSyntax());
+
+            while (PeekIncrementalTokenKind() == SyntaxKind.DotToken)
+            {
+                var dot = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
+                if (IsIncrementalMarkupNameToken(PeekIncrementalTokenKind()) &&
+                    PeekIncrementalTokenKind(1) == SyntaxKind.EqualsToken)
+                {
+                    var propertyName = ParseIncrementalMarkupSimpleName();
+                    var equals = ReadRequiredIncrementalToken(SyntaxKind.EqualsToken);
+                    var value = ParseIncrementalMarkupAttributeValueSyntax();
+
+                    return GreenSyntaxFactory.MarkupAttachedPropertyAttributeSyntax(
+                        CreateMarkupComponentName(aliasQualifier, ownerSegments),
+                        dot,
+                        propertyName,
+                        equals,
+                        value);
+                }
+
+                ownerSegments.AddSeparator(dot);
+                ownerSegments.Add(ParseIncrementalMarkupNameSegmentSyntax());
+            }
+
+            return GreenSyntaxFactory.MarkupAttachedPropertyAttributeSyntax(
+                CreateMarkupComponentName(aliasQualifier, ownerSegments),
+                ReadRequiredIncrementalToken(SyntaxKind.DotToken),
+                ParseIncrementalMarkupSimpleName(),
+                ReadRequiredIncrementalToken(SyntaxKind.EqualsToken),
+                ParseIncrementalMarkupAttributeValueSyntax());
+        }
+        finally
+        {
+            _pool.Free(ownerSegments);
+        }
     }
 
     private GreenMarkupPrefixedAttributeSyntax ParseIncrementalMarkupPrefixedAttributeSyntax()
@@ -1717,6 +1778,7 @@ internal sealed partial class Parser
     private bool IsIncrementalMarkupAttributeStart()
     {
         return IsIncrementalMarkupPrefixedAttributeStart() ||
+            IsIncrementalAttachedPropertyMarkupAttributeStart() ||
             IsIncrementalPlainMarkupAttributeStart() ||
             IsIncrementalTailwindAttributeStart();
     }
@@ -1732,6 +1794,55 @@ internal sealed partial class Parser
         return IsIncrementalMarkupNameToken(PeekIncrementalTokenKind()) &&
             (PeekIncrementalTokenKind(1) == SyntaxKind.EqualsToken ||
              IsIncrementalMarkupAttributeValueStart(PeekIncrementalTokenKind(1)));
+    }
+
+    private bool IsIncrementalAttachedPropertyMarkupAttributeStart()
+    {
+        if (!IsIncrementalMarkupNameToken(PeekIncrementalTokenKind()) ||
+            PeekIncrementalTokenKind(1) is not (SyntaxKind.DotToken or SyntaxKind.DoubleColonToken))
+        {
+            return false;
+        }
+
+        var offset = 0;
+        var braceDepth = 0;
+        var topLevelDotCount = 0;
+        var lastTopLevelDotOffset = -1;
+
+        while (true)
+        {
+            var kind = PeekIncrementalTokenKind(offset);
+            if (kind is SyntaxKind.EndOfFileToken or
+                SyntaxKind.GreaterThanToken or
+                SyntaxKind.SlashGreaterToken)
+            {
+                return false;
+            }
+
+            if (braceDepth == 0 && kind == SyntaxKind.EqualsToken)
+            {
+                return topLevelDotCount > 0 &&
+                    lastTopLevelDotOffset > 0 &&
+                    IsIncrementalMarkupNameToken(PeekIncrementalTokenKind(lastTopLevelDotOffset + 1)) &&
+                    lastTopLevelDotOffset + 2 == offset;
+            }
+
+            switch (kind)
+            {
+                case SyntaxKind.OpenBraceToken:
+                    braceDepth++;
+                    break;
+                case SyntaxKind.CloseBraceToken when braceDepth > 0:
+                    braceDepth--;
+                    break;
+                case SyntaxKind.DotToken when braceDepth == 0:
+                    topLevelDotCount++;
+                    lastTopLevelDotOffset = offset;
+                    break;
+            }
+
+            offset++;
+        }
     }
 
     private bool IsIncrementalTailwindAttributeStart()

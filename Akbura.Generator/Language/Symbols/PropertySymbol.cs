@@ -11,6 +11,10 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         string name,
         CSharpSymbolDefinition type,
         CSharpSymbolDefinition avaloniaPropertyDefinition = default,
+        CSharpSymbolDefinition attachedPropertyDefinition = default,
+        CSharpSymbolDefinition attachedGetterDefinition = default,
+        CSharpSymbolDefinition attachedSetterDefinition = default,
+        CSharpSymbolDefinition attachedTargetType = default,
         CSharpSymbolDefinition clrPropertyDefinition = default,
         IParamSymbol? parameter = null,
         ICommandSymbol? command = null,
@@ -29,6 +33,10 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         Name = name;
         Type = type;
         AvaloniaPropertyDefinition = avaloniaPropertyDefinition;
+        AttachedPropertyDefinition = attachedPropertyDefinition;
+        AttachedGetterDefinition = attachedGetterDefinition;
+        AttachedSetterDefinition = attachedSetterDefinition;
+        AttachedTargetType = attachedTargetType;
         ClrPropertyDefinition = clrPropertyDefinition;
         Parameter = parameter;
         Command = command;
@@ -45,6 +53,14 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
 
     public CSharpSymbolDefinition AvaloniaPropertyDefinition { get; }
 
+    public CSharpSymbolDefinition AttachedPropertyDefinition { get; }
+
+    public CSharpSymbolDefinition AttachedGetterDefinition { get; }
+
+    public CSharpSymbolDefinition AttachedSetterDefinition { get; }
+
+    public CSharpSymbolDefinition AttachedTargetType { get; }
+
     public CSharpSymbolDefinition ClrPropertyDefinition { get; }
 
     public IParamSymbol? Parameter { get; }
@@ -52,6 +68,8 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
     public ICommandSymbol? Command { get; }
 
     public bool IsAvaloniaProperty => !AvaloniaPropertyDefinition.IsDefault;
+
+    public bool IsAttachedProperty => !AttachedPropertyDefinition.IsDefault;
 
     public bool IsClrProperty => !ClrPropertyDefinition.IsDefault;
 
@@ -61,17 +79,21 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
 
     public bool CanRead => Parameter?.SendsValueToParent == true ||
         Command != null ||
+        !AttachedGetterDefinition.IsDefault ||
         IsAvaloniaProperty ||
         ClrPropertyDefinition.Symbol is RoslynPropertySymbol { GetMethod.DeclaredAccessibility: Accessibility.Public };
 
     public bool CanWrite => Parameter?.ReceivesValueFromParent == true ||
         Command != null ||
+        !AttachedSetterDefinition.IsDefault ||
         ClrPropertyDefinition.Symbol is RoslynPropertySymbol { SetMethod.DeclaredAccessibility: Accessibility.Public } ||
         (ClrPropertyDefinition.IsDefault && IsAvaloniaProperty);
 
     public override CSharpSymbolDefinition CSharpDefinition => !ClrPropertyDefinition.IsDefault
         ? ClrPropertyDefinition
-        : AvaloniaPropertyDefinition;
+        : !AvaloniaPropertyDefinition.IsDefault
+            ? AvaloniaPropertyDefinition
+            : AttachedPropertyDefinition;
 
     public override void Accept(SymbolVisitor visitor)
     {

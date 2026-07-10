@@ -56,6 +56,44 @@ public class MarkupAttributeSyntaxParseTests
         Assert.Equal(code, syntax.ToFullString());
     }
 
+    [Fact]
+    public void AttachedPropertyAttribute_ParseSuccessfully()
+    {
+        const string code = "Grid.Column={1}";
+
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenMarkupAttachedPropertyAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+
+        Assert.Equal("Grid", syntax.OwnerType.ToFullString());
+        Assert.Equal("Column", syntax.Name.Identifier.ValueText);
+        Assert.Equal(".", syntax.DotToken.ToFullString());
+        Assert.IsType<GreenMarkupDynamicAttributeValueSyntax>(syntax.Value);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Theory]
+    [InlineData("Attached.Property=\"value\"", "Attached", "Property")]
+    [InlineData("Namespace.Attached.Property=\"value\"", "Namespace.Attached", "Property")]
+    [InlineData("global::Namespace.AttachedGeneric{int}.Property=\"value\"", "global::Namespace.AttachedGeneric{int}", "Property")]
+    [InlineData("global::Namespace.AttachedGeneric{int}.NestedClass.Property=\"value\"", "global::Namespace.AttachedGeneric{int}.NestedClass", "Property")]
+    public void AttachedPropertyAttribute_ComplexOwner_ParseSuccessfully(
+        string code,
+        string expectedOwner,
+        string expectedProperty)
+    {
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenMarkupAttachedPropertyAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+
+        Assert.Equal(expectedOwner, syntax.OwnerType.ToFullString());
+        Assert.Equal(expectedProperty, syntax.Name.Identifier.ValueText);
+        Assert.IsType<GreenMarkupLiteralAttributeValueSyntax>(syntax.Value);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
     [Theory]
     [InlineData("Click={count++}", typeof(GreenMarkupDynamicAttributeValueSyntax))]
     [InlineData("Count={5}", typeof(GreenMarkupDynamicAttributeValueSyntax))]

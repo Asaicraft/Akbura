@@ -323,6 +323,30 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void AttachedPropertyValueEdit_PreservesAttachedPropertyShapeAndReusesSiblingAttribute()
+    {
+        const string oldCode = "<TextBlock global::MyControls.AttachedGeneric{int}.Nested.A={1} Text=\"Hi\"/>";
+        const string newCode = "<TextBlock global::MyControls.AttachedGeneric{int}.Nested.A={2} Text=\"Hi\"/>";
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            oldCode.IndexOf("1"),
+            oldLength: "1".Length,
+            newLength: "2".Length);
+
+        var oldAttribute = Assert.IsType<GreenMarkupAttachedPropertyAttributeSyntax>(oldMarkup.Element.StartTag!.Attributes[0]);
+        var newAttribute = Assert.IsType<GreenMarkupAttachedPropertyAttributeSyntax>(newMarkup.Element.StartTag!.Attributes[0]);
+
+        Assert.NotSame(oldAttribute, newAttribute);
+        Assert.Equal("global::MyControls.AttachedGeneric{int}.Nested", newAttribute.OwnerType.ToFullString());
+        Assert.Equal("A", newAttribute.Name.Identifier.ValueText);
+        Assert.IsType<GreenMarkupDynamicAttributeValueSyntax>(newAttribute.Value);
+        Assert.Same(oldMarkup.Element.StartTag.Attributes[1], newMarkup.Element.StartTag.Attributes[1]);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void OldMarkupWithDiagnostics_IsNotReusedAsWholeRoot()
     {
         const string code = "<Button>@if(isOpen){<FirstControl/>}</Button>";

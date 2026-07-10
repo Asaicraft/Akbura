@@ -18,6 +18,7 @@ using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using RoslynFieldSymbol = Microsoft.CodeAnalysis.IFieldSymbol;
+using RoslynMethodSymbol = Microsoft.CodeAnalysis.IMethodSymbol;
 using AkburaOperation = Akbura.Language.Operations.IOperation;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
@@ -96,6 +97,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 AkburaSyntaxKind.AkcssUtilityDeclarationSyntax => GetDeclarationSymbolInfo(syntax),
             AkburaSyntaxKind.MarkupElementSyntax => ResolveMarkupComponent(Unsafe.As<MarkupElementSyntax>(syntax)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveMarkupProperty(Unsafe.As<MarkupAttributeSyntax>(syntax)),
@@ -154,6 +156,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             }
 
             if (syntax.Kind is AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax or
@@ -1260,6 +1263,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             avaloniaProperty = FindExactAvaloniaPropertyField(ownerType, propertyName);
         }
 
+        if (TryCreateAttachedPropertySymbol(
+                ownerType,
+                propertyName,
+                containingSymbol.TargetType.Symbol as ITypeSymbol,
+                SymbolLanguage.Akcss,
+                containingSymbol,
+                out var attachedProperty))
+        {
+            return attachedProperty;
+        }
+
         if (clrProperty == null && avaloniaProperty == null)
         {
             diagnosticsBuilder.Add(HasInaccessiblePropertyMember(ownerType, propertyName)
@@ -1277,9 +1291,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 parameter: null,
                 command: null,
                 clrProperty,
-                avaloniaProperty),
-            avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
-            clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
+                avaloniaProperty,
+                attachedProperty: null),
+            avaloniaPropertyDefinition: avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
+            clrPropertyDefinition: clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
             language: SymbolLanguage.Akcss,
             containingSymbol: containingSymbol);
     }
@@ -2535,8 +2550,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return new PropertySymbol(
             contentProperty.Name,
             componentSymbol.ContentModel.AllowedChildType,
-            avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
-            new CSharpSymbolDefinition(contentProperty),
+            avaloniaPropertyDefinition: avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
+            clrPropertyDefinition: new CSharpSymbolDefinition(contentProperty),
             containingSymbol: componentSymbol,
             isImplicitlyDeclared: true);
     }
@@ -3063,6 +3078,31 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         var componentType = componentSymbol.ComponentType;
+        if (markupAttribute.Kind == AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax &&
+            componentType != null)
+        {
+            var attachedAttribute = Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute);
+            if (TryResolveMarkupAttachedProperty(
+                    attachedAttribute,
+                    componentType,
+                    componentSymbol,
+                    out var attachedPropertyInfo))
+            {
+                return attachedPropertyInfo;
+            }
+        }
+
+        if (componentType != null &&
+            TryResolveMarkupAttachedProperty(
+                markupAttribute,
+                propertyName,
+                componentType,
+                componentSymbol,
+                out var legacyAttachedPropertyInfo))
+        {
+            return legacyAttachedPropertyInfo;
+        }
+
         var memberName = GetMarkupMemberLookupName(propertyName);
         var parameter = FindComponentParameter(componentSymbol, propertyName);
         var command = FindComponentCommand(componentSymbol, propertyName);
@@ -3120,12 +3160,216 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         return AkburaSymbolInfo.Success(new PropertySymbol(
             memberName,
-            GetMarkupPropertyType(parameter, command, clrProperty, avaloniaProperty),
-            avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
-            clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
-            parameter,
-            command,
+            GetMarkupPropertyType(
+                parameter,
+                command,
+                clrProperty,
+                avaloniaProperty,
+                attachedProperty: null),
+            avaloniaPropertyDefinition: avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
+            clrPropertyDefinition: clrProperty == null ? default : new CSharpSymbolDefinition(clrProperty),
+            parameter: parameter,
+            command: command,
             containingSymbol: componentSymbol));
+    }
+
+    private bool TryResolveMarkupAttachedProperty(
+        MarkupAttachedPropertyAttributeSyntax markupAttribute,
+        INamedTypeSymbol componentType,
+        IMarkupComponentSymbol componentSymbol,
+        out AkburaSymbolInfo symbolInfo)
+    {
+        symbolInfo = default;
+        var propertyName = markupAttribute.Name.Identifier.ValueText;
+        if (!TryBindAttachedPropertyOwner(markupAttribute.OwnerType, out var ownerType))
+        {
+            return false;
+        }
+
+        if (!TryCreateAttachedPropertySymbol(
+                ownerType,
+                propertyName,
+                componentType,
+                SymbolLanguage.Markup,
+                componentSymbol,
+                out var property))
+        {
+            SetSemanticDiagnostics(
+                markupAttribute,
+                ImmutableArray.Create(HasInaccessiblePropertyMember(ownerType, propertyName)
+                    ? CreateInaccessibleMemberDiagnostic(markupAttribute, propertyName, ownerType)
+                    : CreateMarkupPropertyNotFoundDiagnostic(markupAttribute, propertyName, ownerType)));
+            symbolInfo = AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+            return true;
+        }
+
+        SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        symbolInfo = AkburaSymbolInfo.Success(property);
+        return true;
+    }
+
+    private bool TryResolveMarkupAttachedProperty(
+        MarkupAttributeSyntax markupAttribute,
+        string propertyReference,
+        INamedTypeSymbol componentType,
+        IMarkupComponentSymbol componentSymbol,
+        out AkburaSymbolInfo symbolInfo)
+    {
+        symbolInfo = default;
+        if (!TrySplitAttachedPropertyReference(
+                propertyReference,
+                out var ownerText,
+                out var propertyName))
+        {
+            return false;
+        }
+
+        if (!TryBindAttachedPropertyOwner(
+                ownerText,
+                GetCSharpUsingDirectives(),
+                out var ownerType))
+        {
+            return false;
+        }
+
+        if (!TryCreateAttachedPropertySymbol(
+                ownerType,
+                propertyName,
+                componentType,
+                SymbolLanguage.Markup,
+                componentSymbol,
+                out var property))
+        {
+            SetSemanticDiagnostics(
+                markupAttribute,
+                ImmutableArray.Create(HasInaccessiblePropertyMember(ownerType, propertyName)
+                    ? CreateInaccessibleMemberDiagnostic(markupAttribute, propertyName, ownerType)
+                    : CreateMarkupPropertyNotFoundDiagnostic(markupAttribute, propertyName, ownerType)));
+            symbolInfo = AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+            return true;
+        }
+
+        SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        symbolInfo = AkburaSymbolInfo.Success(property);
+        return true;
+    }
+
+    private bool TryBindAttachedPropertyOwner(
+        MarkupComponentNameSyntax ownerSyntax,
+        out INamedTypeSymbol ownerType)
+    {
+        ownerType = null!;
+        var binding = BindCSharpType(
+            ownerSyntax.ToCSharp(),
+            GetCSharpUsingDirectives());
+        if (binding.TypeSymbol is INamedTypeSymbol namedType)
+        {
+            ownerType = namedType;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryBindAttachedPropertyOwner(
+        string ownerText,
+        ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives,
+        out INamedTypeSymbol ownerType)
+    {
+        ownerType = null!;
+        try
+        {
+            var binding = BindCSharpType(
+                CSharpSyntaxFactory.ParseTypeName(ownerText),
+                usingDirectives);
+            if (binding.TypeSymbol is INamedTypeSymbol namedType)
+            {
+                ownerType = namedType;
+                return true;
+            }
+        }
+        catch (ArgumentException)
+        {
+        }
+
+        return false;
+    }
+
+    private bool TryCreateAttachedPropertySymbol(
+        INamedTypeSymbol ownerType,
+        string propertyName,
+        ITypeSymbol? appliedTargetType,
+        SymbolLanguage language,
+        AkburaSymbol? containingSymbol,
+        out PropertySymbol property)
+    {
+        property = null!;
+        var attachedProperty = FindPublicAttachedPropertyField(ownerType, propertyName);
+        if (attachedProperty == null)
+        {
+            return false;
+        }
+
+        TryGetAttachedPropertyValueType(attachedProperty.Type, out var attachedValueType);
+        var getter = FindPublicAttachedAccessor(
+            ownerType,
+            conventionalName: "Get" + propertyName,
+            fallbackName: "Get",
+            minimumParameterCount: 1,
+            attachedValueType,
+            isSetter: false);
+        var setter = FindPublicAttachedAccessor(
+            ownerType,
+            conventionalName: "Set" + propertyName,
+            fallbackName: "Set",
+            minimumParameterCount: 2,
+            attachedValueType,
+            isSetter: true);
+        var attachedTargetType = GetAttachedPropertyTargetType(getter, setter);
+        if (attachedTargetType != null &&
+            appliedTargetType != null &&
+            !IsAssignableTo(appliedTargetType, attachedTargetType))
+        {
+            return false;
+        }
+
+        property = new PropertySymbol(
+            propertyName,
+            GetMarkupPropertyType(
+                parameter: null,
+                command: null,
+                clrProperty: null,
+                avaloniaProperty: IsAvaloniaPropertyType(attachedProperty.Type) ? attachedProperty : null,
+                attachedProperty),
+            avaloniaPropertyDefinition: IsAvaloniaPropertyType(attachedProperty.Type)
+                ? new CSharpSymbolDefinition(attachedProperty)
+                : default,
+            attachedPropertyDefinition: new CSharpSymbolDefinition(attachedProperty),
+            attachedGetterDefinition: getter == null ? default : new CSharpSymbolDefinition(getter),
+            attachedSetterDefinition: setter == null ? default : new CSharpSymbolDefinition(setter),
+            attachedTargetType: attachedTargetType == null ? default : new CSharpSymbolDefinition(attachedTargetType),
+            language: language,
+            containingSymbol: containingSymbol);
+        return true;
+    }
+
+    private static bool TrySplitAttachedPropertyReference(
+        string propertyReference,
+        out string ownerText,
+        out string propertyName)
+    {
+        var lastDot = propertyReference.LastIndexOf('.');
+        if (lastDot <= 0 ||
+            lastDot >= propertyReference.Length - 1)
+        {
+            ownerText = string.Empty;
+            propertyName = string.Empty;
+            return false;
+        }
+
+        ownerText = propertyReference[..lastDot].Trim();
+        propertyName = propertyReference[(lastDot + 1)..].Trim();
+        return ownerText.Length > 0 && propertyName.Length > 0;
     }
 
     private static string GetMarkupMemberLookupName(string propertyName)
@@ -3140,6 +3384,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return markupAttribute.Kind switch
         {
             AkburaSyntaxKind.MarkupPlainAttributeSyntax => Unsafe.As<MarkupPlainAttributeSyntax>(markupAttribute).Name.Identifier.ValueText,
+            AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax => Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute).Name.Identifier.ValueText,
             AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => Unsafe.As<MarkupPrefixedAttributeSyntax>(markupAttribute).Name.Identifier.ValueText,
             _ => string.Empty,
         };
@@ -3215,6 +3460,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             [propertyName, componentName]);
     }
 
+    private static AkburaSemanticDiagnostic CreateMarkupPropertyNotFoundDiagnostic(
+        AkburaSyntax syntax,
+        string propertyName,
+        INamedTypeSymbol ownerType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyNotFound,
+            [propertyName, ownerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
+    }
+
     private bool HasInaccessibleMarkupMember(
         INamedTypeSymbol componentType,
         string memberName)
@@ -3229,6 +3485,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         string propertyName)
     {
         return HasInaccessibleClrProperty(componentType, propertyName) ||
+            HasInaccessibleAttachedPropertyField(componentType, propertyName) ||
             HasInaccessibleAvaloniaPropertyField(componentType, propertyName);
     }
 
@@ -3284,6 +3541,29 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                     IsAvaloniaPropertyType(field.Type))
                 {
                     return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasInaccessibleAttachedPropertyField(
+        INamedTypeSymbol componentType,
+        string propertyName)
+    {
+        foreach (var fieldName in GetAttachedPropertyFieldNames(propertyName))
+        {
+            for (var current = componentType; current != null; current = current.BaseType)
+            {
+                foreach (var field in current.GetMembers(fieldName).OfType<RoslynFieldSymbol>())
+                {
+                    if (field.IsStatic &&
+                        field.DeclaredAccessibility != Accessibility.Public &&
+                        IsAttachedPropertyType(field.Type))
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -3426,6 +3706,125 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return null;
     }
 
+    private RoslynFieldSymbol? FindPublicAttachedPropertyField(
+        INamedTypeSymbol ownerType,
+        string propertyName)
+    {
+        foreach (var fieldName in GetAttachedPropertyFieldNames(propertyName))
+        {
+            for (var current = ownerType; current != null; current = current.BaseType)
+            {
+                foreach (var field in current.GetMembers(fieldName).OfType<RoslynFieldSymbol>())
+                {
+                    if (field.IsStatic &&
+                        field.DeclaredAccessibility == Accessibility.Public &&
+                        IsAttachedPropertyType(field.Type))
+                    {
+                        return field;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static ImmutableArray<string> GetAttachedPropertyFieldNames(string propertyName)
+    {
+        return propertyName.EndsWith("Property", StringComparison.Ordinal)
+            ? ImmutableArray.Create(propertyName)
+            : ImmutableArray.Create(propertyName + "Property", propertyName);
+    }
+
+    private static RoslynMethodSymbol? FindPublicAttachedAccessor(
+        INamedTypeSymbol ownerType,
+        string conventionalName,
+        string fallbackName,
+        int minimumParameterCount,
+        ITypeSymbol? attachedValueType,
+        bool isSetter)
+    {
+        return FindPublicAttachedAccessor(
+                ownerType,
+                conventionalName,
+                minimumParameterCount,
+                attachedValueType,
+                isSetter) ??
+            FindPublicAttachedAccessor(
+                ownerType,
+                fallbackName,
+                minimumParameterCount,
+                attachedValueType,
+                isSetter);
+    }
+
+    private static RoslynMethodSymbol? FindPublicAttachedAccessor(
+        INamedTypeSymbol ownerType,
+        string methodName,
+        int minimumParameterCount,
+        ITypeSymbol? attachedValueType,
+        bool isSetter)
+    {
+        for (var current = ownerType; current != null; current = current.BaseType)
+        {
+            foreach (var method in current.GetMembers(methodName).OfType<RoslynMethodSymbol>())
+            {
+                if (IsAttachedAccessorCandidate(
+                        method,
+                        minimumParameterCount,
+                        attachedValueType,
+                        isSetter))
+                {
+                    return method;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsAttachedAccessorCandidate(
+        RoslynMethodSymbol method,
+        int minimumParameterCount,
+        ITypeSymbol? attachedValueType,
+        bool isSetter)
+    {
+        if (!method.IsStatic ||
+            method.DeclaredAccessibility != Accessibility.Public ||
+            method.Parameters.Length < minimumParameterCount)
+        {
+            return false;
+        }
+
+        if (attachedValueType == null)
+        {
+            return true;
+        }
+
+        return isSetter
+            ? method.ReturnsVoid &&
+              method.Parameters.Length > 1 &&
+              SymbolEqualityComparer.Default.Equals(method.Parameters[1].Type, attachedValueType)
+            : SymbolEqualityComparer.Default.Equals(method.ReturnType, attachedValueType);
+    }
+
+    private static ITypeSymbol? GetAttachedPropertyTargetType(
+        RoslynMethodSymbol? getter,
+        RoslynMethodSymbol? setter)
+    {
+        if (setter is { Parameters.Length: > 0 })
+        {
+            return setter.Parameters[0].Type;
+        }
+
+        if (getter is { Parameters.Length: > 0 })
+        {
+            return getter.Parameters[0].Type;
+        }
+
+        return null;
+    }
+
     private static RoslynEventSymbol? FindPublicClrEvent(
         INamedTypeSymbol componentType,
         string eventName)
@@ -3482,6 +3881,26 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         return TryGetAvaloniaPropertyType(out var avaloniaPropertyType) &&
             IsAssignableTo(type, avaloniaPropertyType);
+    }
+
+    private bool IsAttachedPropertyType(ITypeSymbol type)
+    {
+        if (type is not INamedTypeSymbol namedType)
+        {
+            return false;
+        }
+
+        for (var current = namedType; current != null; current = current.BaseType)
+        {
+            if (current.Name == "AttachedProperty" &&
+                current.TypeArguments.Length == 1 &&
+                current.TypeArguments[0].TypeKind != TypeKind.Error)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool TryGetAvaloniaPropertyType(out INamedTypeSymbol avaloniaPropertyType)
@@ -3575,7 +3994,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         IParamSymbol? parameter,
         ICommandSymbol? command,
         RoslynPropertySymbol? clrProperty,
-        RoslynFieldSymbol? avaloniaProperty)
+        RoslynFieldSymbol? avaloniaProperty,
+        RoslynFieldSymbol? attachedProperty)
     {
         if (parameter != null)
         {
@@ -3596,6 +4016,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             TryGetAvaloniaPropertyValueType(avaloniaProperty.Type, out var avaloniaPropertyType))
         {
             return new CSharpSymbolDefinition(avaloniaPropertyType);
+        }
+
+        if (attachedProperty != null &&
+            TryGetAttachedPropertyValueType(attachedProperty.Type, out var attachedPropertyType))
+        {
+            return new CSharpSymbolDefinition(attachedPropertyType);
         }
 
         return default;
@@ -3625,6 +4051,25 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 current.TypeArguments[1].TypeKind != TypeKind.Error)
             {
                 valueType = current.TypeArguments[1];
+                return true;
+            }
+        }
+
+        valueType = null!;
+        return false;
+    }
+
+    private static bool TryGetAttachedPropertyValueType(
+        ITypeSymbol propertyType,
+        out ITypeSymbol valueType)
+    {
+        for (var current = propertyType as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            if (current.Name == "AttachedProperty" &&
+                current.TypeArguments.Length == 1 &&
+                current.TypeArguments[0].TypeKind != TypeKind.Error)
+            {
+                valueType = current.TypeArguments[0];
                 return true;
             }
         }

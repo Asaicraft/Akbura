@@ -184,6 +184,7 @@ internal sealed class BindingSession
         {
             AkburaSyntaxKind.MarkupElementSyntax or
                 AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
@@ -205,6 +206,7 @@ internal sealed class BindingSession
                 AkburaSyntaxKind.MarkupInlineExpressionSyntax or
                 AkburaSyntaxKind.MarkupTextLiteralSyntax or
                 AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,

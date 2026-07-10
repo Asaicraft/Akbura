@@ -421,6 +421,7 @@ internal partial class AkburaSemanticModel
             switch (node.Kind)
             {
                 case AkburaSyntaxKind.MarkupPlainAttributeSyntax:
+                case AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax:
                 case AkburaSyntaxKind.MarkupPrefixedAttributeSyntax:
                 case AkburaSyntaxKind.TailwindFlagAttributeSyntax:
                 case AkburaSyntaxKind.TailwindFullAttributeSyntax:

@@ -78,7 +78,7 @@ public class SemanticSnapshotLazyBenchmarks
         var operation = model.GetOperation(_lazyQueryAttribute);
         var diagnostics = model.GetSemanticDiagnostics(_lazyQueryAttribute);
 
-        var checksum = _newDashboardTree.GreenRoot.FullWidth + diagnostics.Length;
+        var checksum = _newDashboardTree.GetRootSyntax().FullWidth + diagnostics.Length;
         if (operation != null)
         {
             checksum += (int)operation.Kind;

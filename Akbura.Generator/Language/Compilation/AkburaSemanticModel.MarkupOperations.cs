@@ -34,6 +34,7 @@ internal partial class AkburaSemanticModel
         return markupAttribute.Kind switch
         {
             AkburaSyntaxKind.MarkupPlainAttributeSyntax => Unsafe.As<MarkupPlainAttributeSyntax>(markupAttribute).Value,
+            AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax => Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute).Value,
             AkburaSyntaxKind.MarkupPrefixedAttributeSyntax => Unsafe.As<MarkupPrefixedAttributeSyntax>(markupAttribute).Value,
             _ => null,
         };

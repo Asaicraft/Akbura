@@ -459,6 +459,23 @@ node MarkupPlainAttributeSyntax : MarkupAttributeSyntax {
 }
 
 /// <summary>
+/// Attached property attribute: OwnerType.Property="Value".
+///
+/// OwnerType uses markup component-name syntax so it can preserve:
+///   Grid.Column=...
+///   Namespace.Attached.Property=...
+///   global::Namespace.AttachedGeneric{int}.Property=...
+///   global::Namespace.AttachedGeneric{int}.NestedClass.Property=...
+/// </summary>
+node MarkupAttachedPropertyAttributeSyntax : MarkupAttributeSyntax {
+	OwnerType   : MarkupComponentNameSyntax;
+	DotToken    : DotToken;
+	Name        : SimpleName;
+	EqualsToken : EqualsToken;
+	Value?      : MarkupAttributeValueSyntax;
+}
+
+/// <summary>
 /// Prefixed attribute: Prefix:Name="Value"
 /// (e.g. bind:Text=..., react={...}, OnClose={...}).
 /// </summary>

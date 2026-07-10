@@ -6,6 +6,14 @@ internal interface IPropertySymbol : ISymbol
 
     CSharpSymbolDefinition AvaloniaPropertyDefinition { get; }
 
+    CSharpSymbolDefinition AttachedPropertyDefinition { get; }
+
+    CSharpSymbolDefinition AttachedGetterDefinition { get; }
+
+    CSharpSymbolDefinition AttachedSetterDefinition { get; }
+
+    CSharpSymbolDefinition AttachedTargetType { get; }
+
     CSharpSymbolDefinition ClrPropertyDefinition { get; }
 
     IParamSymbol? Parameter { get; }
@@ -13,6 +21,8 @@ internal interface IPropertySymbol : ISymbol
     ICommandSymbol? Command { get; }
 
     bool IsAvaloniaProperty { get; }
+
+    bool IsAttachedProperty { get; }
 
     bool IsClrProperty { get; }
 

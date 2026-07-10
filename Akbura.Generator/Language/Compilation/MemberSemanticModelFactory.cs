@@ -80,6 +80,7 @@ internal sealed class MemberSemanticModelFactory
                 case AkburaSyntaxKind.MarkupInlineExpressionSyntax:
                 case AkburaSyntaxKind.MarkupTextLiteralSyntax:
                 case AkburaSyntaxKind.MarkupPlainAttributeSyntax:
+                case AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax:
                 case AkburaSyntaxKind.MarkupPrefixedAttributeSyntax:
                 case AkburaSyntaxKind.TailwindFlagAttributeSyntax:
                 case AkburaSyntaxKind.TailwindFullAttributeSyntax:

@@ -1336,6 +1336,11 @@ partial class Parser
 			return ParseMarkupPrefixedAttributeSyntax();
 		}
 
+		if (IsAttachedPropertyMarkupAttributeStart())
+		{
+			return ParseMarkupAttachedPropertyAttributeSyntax();
+		}
+
 		if (IsPlainMarkupAttributeStart())
 		{
 			return ParseMarkupPlainAttributeSyntax();
@@ -1347,6 +1352,7 @@ partial class Parser
 	private bool IsMarkupAttributeStart()
 	{
 		return IsMarkupPrefixedAttributeStart() ||
+			IsAttachedPropertyMarkupAttributeStart() ||
 			IsPlainMarkupAttributeStart() ||
 			IsTailwindAttributeStart();
 	}
@@ -1364,6 +1370,55 @@ partial class Parser
 			 IsMarkupAttributeValueStart(PeekToken(1)));
 	}
 
+	private bool IsAttachedPropertyMarkupAttributeStart()
+	{
+		if (!IsMarkupNameToken(CurrentToken) ||
+			PeekToken(1).Kind is not (SyntaxKind.DotToken or SyntaxKind.DoubleColonToken))
+		{
+			return false;
+		}
+
+		var offset = 0;
+		var braceDepth = 0;
+		var topLevelDotCount = 0;
+		var lastTopLevelDotOffset = -1;
+
+		while (true)
+		{
+			var kind = PeekToken(offset).Kind;
+			if (kind is SyntaxKind.EndOfFileToken or
+				SyntaxKind.GreaterThanToken or
+				SyntaxKind.SlashGreaterToken)
+			{
+				return false;
+			}
+
+			if (braceDepth == 0 && kind == SyntaxKind.EqualsToken)
+			{
+				return topLevelDotCount > 0 &&
+					lastTopLevelDotOffset > 0 &&
+					IsMarkupNameToken(PeekToken(lastTopLevelDotOffset + 1)) &&
+					lastTopLevelDotOffset + 2 == offset;
+			}
+
+			switch (kind)
+			{
+				case SyntaxKind.OpenBraceToken:
+					braceDepth++;
+					break;
+				case SyntaxKind.CloseBraceToken when braceDepth > 0:
+					braceDepth--;
+					break;
+				case SyntaxKind.DotToken when braceDepth == 0:
+					topLevelDotCount++;
+					lastTopLevelDotOffset = offset;
+					break;
+			}
+
+			offset++;
+		}
+	}
+
 	private bool IsTailwindAttributeStart()
 	{
 		return CurrentToken.Kind is SyntaxKind.OpenBraceToken or SyntaxKind.MinusToken ||
@@ -1377,6 +1432,59 @@ partial class Parser
 		var value = ParseMarkupAttributeValueSyntax();
 
 		return GreenSyntaxFactory.MarkupPlainAttributeSyntax(name, equals, value);
+	}
+
+	private GreenMarkupAttachedPropertyAttributeSyntax ParseMarkupAttachedPropertyAttributeSyntax()
+	{
+		GreenMarkupAliasQualifierSyntax? aliasQualifier = null;
+
+		if (IsMarkupNameToken(CurrentToken) &&
+			PeekToken(1).Kind == SyntaxKind.DoubleColonToken)
+		{
+			var alias = ParseMarkupSimpleName();
+			var doubleColon = EatToken(SyntaxKind.DoubleColonToken);
+			aliasQualifier = GreenSyntaxFactory.MarkupAliasQualifierSyntax(alias, doubleColon);
+		}
+
+		var ownerSegments = _pool.AllocateSeparated<GreenMarkupNameSegmentSyntax>();
+
+		try
+		{
+			ownerSegments.Add(ParseMarkupNameSegmentSyntax());
+
+			while (CurrentToken.Kind == SyntaxKind.DotToken)
+			{
+				var dot = EatToken(SyntaxKind.DotToken);
+				if (IsMarkupNameToken(CurrentToken) &&
+					PeekToken(1).Kind == SyntaxKind.EqualsToken)
+				{
+					var propertyName = ParseMarkupSimpleName();
+					var equals = EatToken(SyntaxKind.EqualsToken);
+					var value = ParseMarkupAttributeValueSyntax();
+
+					return GreenSyntaxFactory.MarkupAttachedPropertyAttributeSyntax(
+						CreateMarkupComponentName(aliasQualifier, ownerSegments),
+						dot,
+						propertyName,
+						equals,
+						value);
+				}
+
+				ownerSegments.AddSeparator(dot);
+				ownerSegments.Add(ParseMarkupNameSegmentSyntax());
+			}
+
+			return GreenSyntaxFactory.MarkupAttachedPropertyAttributeSyntax(
+				CreateMarkupComponentName(aliasQualifier, ownerSegments),
+				EatToken(SyntaxKind.DotToken),
+				ParseMarkupSimpleName(),
+				EatToken(SyntaxKind.EqualsToken),
+				ParseMarkupAttributeValueSyntax());
+		}
+		finally
+		{
+			_pool.Free(ownerSegments);
+		}
 	}
 
 	private GreenMarkupPrefixedAttributeSyntax ParseMarkupPrefixedAttributeSyntax()
@@ -1595,20 +1703,7 @@ partial class Parser
 			{
 				var dot = EatToken(SyntaxKind.DotToken);
 				segments.AddSeparator(dot);
-
-				var segName = ParseMarkupSimpleName();
-				GreenMarkupGenericArgumentListSyntax? segGenerics = null;
-
-				if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
-				{
-					segGenerics = ParseMarkupGenericArgumentListSyntax();
-				}
-
-				segments.Add(
-					segGenerics is null
-						? GreenSyntaxFactory.MarkupIdentifierNameSegmentSyntax(segName)
-						: GreenSyntaxFactory.MarkupGenericNameSegmentSyntax(segName, segGenerics)
-				);
+				segments.Add(ParseMarkupNameSegmentSyntax());
 			}
 
 			var qualifiedName = GreenSyntaxFactory.MarkupQualifiedNameSyntax(segments.ToList());
@@ -1622,6 +1717,34 @@ partial class Parser
 		{
 			_pool.Free(segments);
 		}
+	}
+
+	private GreenMarkupNameSegmentSyntax ParseMarkupNameSegmentSyntax()
+	{
+		var name = ParseMarkupSimpleName();
+
+		if (CurrentToken.Kind != SyntaxKind.OpenBraceToken)
+		{
+			return GreenSyntaxFactory.MarkupIdentifierNameSegmentSyntax(name);
+		}
+
+		var genericArgs = ParseMarkupGenericArgumentListSyntax();
+		return GreenSyntaxFactory.MarkupGenericNameSegmentSyntax(name, genericArgs);
+	}
+
+	private static GreenMarkupComponentNameSyntax CreateMarkupComponentName(
+		GreenMarkupAliasQualifierSyntax? aliasQualifier,
+		SeparatedGreenSyntaxListBuilder<GreenMarkupNameSegmentSyntax> segments)
+	{
+		if (aliasQualifier is null &&
+			segments.Count == 1 &&
+			segments[0] is GreenMarkupIdentifierNameSegmentSyntax identifierSegment)
+		{
+			return GreenSyntaxFactory.MarkupSimpleComponentNameSyntax(identifierSegment.Name);
+		}
+
+		var qualifiedName = GreenSyntaxFactory.MarkupQualifiedNameSyntax(segments.ToList());
+		return GreenSyntaxFactory.MarkupQualifiedComponentNameSyntax(aliasQualifier, qualifiedName);
 	}
 
 	private GreenMarkupGenericArgumentListSyntax ParseMarkupGenericArgumentListSyntax()

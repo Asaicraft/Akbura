@@ -1452,6 +1452,97 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssAvaloniaAttachedProperty_ResolvesHelpers()
+    {
+        const string code =
+            """
+            @akcss {
+                @using Avalonia.Controls;
+
+                TextBlock.item {
+                    Grid.Column: 1;
+                }
+            }
+            """;
+
+        var (semanticModel, assignment, operation, _) = GetSingleStyleOperation(code);
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(operation.Property);
+
+        Assert.Equal("Column", property.Name);
+        Assert.True(property.IsAttachedProperty);
+        Assert.True(property.IsAvaloniaProperty);
+        Assert.Equal("ColumnProperty", property.AttachedPropertyDefinition.Name);
+        Assert.Equal("ColumnProperty", property.AvaloniaPropertyDefinition.Name);
+        Assert.Equal("GetColumn", property.AttachedGetterDefinition.Name);
+        Assert.Equal("SetColumn", property.AttachedSetterDefinition.Name);
+        Assert.Equal("Control", property.AttachedTargetType.Name);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(property.Type.Symbol).SpecialType);
+        Assert.Equal("Int32", operation.ValueType.Name);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(assignment).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssCustomAttachedProperty_ResolvesHelpers()
+    {
+        const string code =
+            """
+            @akcss {
+                @using MyControls;
+
+                MyControl.item {
+                    MyAttached.A: 1;
+                }
+            }
+            """;
+        const string csharpCode =
+            """
+            namespace MyControls;
+
+            public sealed class MyControl : Avalonia.Controls.Control
+            {
+            }
+
+            public sealed class AttachedProperty<T>
+            {
+            }
+
+            public static class MyAttached
+            {
+                public static readonly AttachedProperty<int> AProperty = null!;
+
+                public static void Set(object element, int value)
+                {
+                }
+
+                public static int Get(object element)
+                {
+                    return 0;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(symbol.Operations));
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(operation.Property);
+
+        Assert.Equal("A", property.Name);
+        Assert.True(property.IsAttachedProperty);
+        Assert.False(property.IsAvaloniaProperty);
+        Assert.Equal("AProperty", property.AttachedPropertyDefinition.Name);
+        Assert.Equal("Get", property.AttachedGetterDefinition.Name);
+        Assert.Equal("Set", property.AttachedSetterDefinition.Name);
+        Assert.Equal(SpecialType.System_Object, Assert.IsAssignableFrom<INamedTypeSymbol>(property.AttachedTargetType.Symbol).SpecialType);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(property.Type.Symbol).SpecialType);
+        Assert.Equal("Int32", operation.ValueType.Name);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssUsing_ResolvesSelectorAndQualifiedProperty()
     {
         const string code =
@@ -1497,6 +1588,52 @@ public class SemanticPipelineTests
         Assert.Equal("Double", operation.ValueType.Name);
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssGenericQualifiedProperty_ResolvesProperty()
+    {
+        const string code =
+            """
+            @akcss {
+                .class {
+                    global::Ns.Class<int>.Property: 1.0;
+                }
+            }
+            """;
+        const string csharpCode =
+            """
+            namespace Ns;
+
+            public sealed class Class<T> : Avalonia.Controls.Control
+            {
+                public static readonly Avalonia.StyledProperty<double> PropertyProperty = null!;
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
+        var assignment = Assert.IsType<AkcssAssignmentSyntax>(Assert.Single(rule.Members));
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(symbol.Operations));
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(operation.Property);
+
+        Assert.Equal(code, syntaxTree.GetRoot().ToFullString());
+        Assert.Equal("global::Ns.Class<int>.Property", assignment.PropertyName.ToFullString().Trim());
+        Assert.False(symbol.HasTargetType);
+        Assert.Equal("Property", property.Name);
+        Assert.True(property.IsAvaloniaProperty);
+        Assert.False(property.IsAttachedProperty);
+        Assert.Equal("PropertyProperty", property.AvaloniaPropertyDefinition.Name);
+        var propertyField = Assert.IsAssignableFrom<IFieldSymbol>(property.AvaloniaPropertyDefinition.Symbol);
+        Assert.Equal("global::Ns.Class<T>",
+            propertyField.ContainingType.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal(SpecialType.System_Double, Assert.IsAssignableFrom<INamedTypeSymbol>(property.Type.Symbol).SpecialType);
+        Assert.Equal("Double", operation.ValueType.Name);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(assignment).IsEmpty);
     }
 
     [Fact]
@@ -2684,6 +2821,114 @@ public class SemanticPipelineTests
 
         var cachedSymbolInfo = semanticModel.GetSymbolInfo(attribute);
         Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesAvaloniaAttachedPropertySymbol()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <Grid>
+                <TextBlock Grid.Column={1}/>
+            </Grid>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var grid = GetOnlyMarkupElement(syntaxTree);
+        var textBlockContent = Assert.IsType<MarkupElementContentSyntax>(Assert.Single(grid.Body));
+        var textBlock = textBlockContent.Element;
+        var attribute = Assert.IsType<MarkupAttachedPropertyAttributeSyntax>(Assert.Single(textBlock.StartTag!.Attributes));
+
+        var symbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(semanticModel.GetSymbolInfo(attribute).Symbol);
+
+        Assert.Equal("Grid", attribute.OwnerType.ToFullString());
+        Assert.Equal("Column", symbol.Name);
+        Assert.True(symbol.IsAttachedProperty);
+        Assert.True(symbol.IsAvaloniaProperty);
+        Assert.Equal("ColumnProperty", symbol.AttachedPropertyDefinition.Name);
+        Assert.Equal("ColumnProperty", symbol.AvaloniaPropertyDefinition.Name);
+        Assert.Equal("GetColumn", symbol.AttachedGetterDefinition.Name);
+        Assert.Equal("SetColumn", symbol.AttachedSetterDefinition.Name);
+        Assert.Equal("Control", symbol.AttachedTargetType.Name);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.Type.Symbol).SpecialType);
+        Assert.True(symbol.CanRead);
+        Assert.True(symbol.CanWrite);
+
+        var operation = Assert.IsAssignableFrom<IPropertySetterOperation>(semanticModel.GetOperation(attribute));
+        var operationProperty = Assert.IsAssignableFrom<AkburaPropertySymbol>(operation.Property);
+        Assert.Equal("Column", operationProperty.Name);
+        Assert.True(operationProperty.IsAttachedProperty);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_ResolvesCustomAttachedPropertySymbol()
+    {
+        const string code =
+            """
+            using MyControls;
+
+            <MyControl global::MyControls.MyAttachedGeneric{int}.Nested.A={1}/>
+            """;
+        const string csharpCode =
+            """
+            namespace MyControls;
+
+            public sealed class MyControl : Avalonia.Controls.Control
+            {
+            }
+
+            public sealed class AttachedProperty<T>
+            {
+            }
+
+            public static class MyAttachedGeneric<T>
+            {
+                public static class Nested
+                {
+                    public static readonly AttachedProperty<int> AProperty = null!;
+
+                    public static void Set(object element, int value)
+                    {
+                    }
+
+                    public static int Get(object element)
+                    {
+                        return 0;
+                    }
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupAttachedPropertyAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var symbol = Assert.IsAssignableFrom<AkburaPropertySymbol>(semanticModel.GetSymbolInfo(attribute).Symbol);
+
+        Assert.Equal("global::MyControls.MyAttachedGeneric{int}.Nested", attribute.OwnerType.ToFullString());
+        Assert.Equal("A", symbol.Name);
+        Assert.True(symbol.IsAttachedProperty);
+        Assert.False(symbol.IsAvaloniaProperty);
+        Assert.Equal("AProperty", symbol.AttachedPropertyDefinition.Name);
+        Assert.Equal("Get", symbol.AttachedGetterDefinition.Name);
+        Assert.Equal("Set", symbol.AttachedSetterDefinition.Name);
+        Assert.Equal(SpecialType.System_Object, Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.AttachedTargetType.Symbol).SpecialType);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.Type.Symbol).SpecialType);
+        Assert.True(symbol.CanRead);
+        Assert.True(symbol.CanWrite);
+
+        var operation = Assert.IsAssignableFrom<IPropertySetterOperation>(semanticModel.GetOperation(attribute));
+        var operationProperty = Assert.IsAssignableFrom<AkburaPropertySymbol>(operation.Property);
+        Assert.Equal("A", operationProperty.Name);
+        Assert.True(operationProperty.IsAttachedProperty);
+        Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
 
     [Fact]

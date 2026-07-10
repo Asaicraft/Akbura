@@ -49,6 +49,7 @@ internal sealed partial class MarkupBinder : Binder
             AkburaSyntaxKind.MarkupElementSyntax =>
                 BindMarkupComponent(Unsafe.As<MarkupElementSyntax>(syntax)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax =>
@@ -64,10 +65,11 @@ internal sealed partial class MarkupBinder : Binder
             AkburaSyntaxKind.MarkupRootSyntax or
                 AkburaSyntaxKind.MarkupElementSyntax or
                 AkburaSyntaxKind.MarkupElementContentSyntax or
-                AkburaSyntaxKind.MarkupInlineExpressionSyntax or
+            AkburaSyntaxKind.MarkupInlineExpressionSyntax or
                 AkburaSyntaxKind.MarkupTextLiteralSyntax =>
                 BindMarkupSemanticSyntax(syntax),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax =>
@@ -269,6 +271,7 @@ internal sealed partial class MarkupBinder : Binder
                 AkburaSyntaxKind.TailwindFullAttributeSyntax =>
                 CreateBoundTailwindUtilityAttribute(Unsafe.As<TailwindAttributeSyntax>(markupAttribute)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax =>
                 BindMarkupPropertyOrEvent(markupAttribute),
             _ => new BoundDeclaration(

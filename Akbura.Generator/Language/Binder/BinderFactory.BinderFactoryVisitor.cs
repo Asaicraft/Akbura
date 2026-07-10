@@ -108,26 +108,20 @@ internal sealed partial class BinderFactory
             return CreateAkcssStyleBinder();
         }
 
-        public override Binder VisitCSharpBlockSyntax(CSharpBlockSyntax node)
-        {
-            var declaration = RequiredDeclaration(DeclarationKind.CSharpBlock);
-            return new BlockBinder(
-                Factory.SemanticModel,
-                Next,
-                declaration,
-                Next.Flags | GetUsageFlags(_usage));
-        }
-
         private MarkupBinder CreateMarkupBinder()
         {
             var declaration = RequiredDeclaration(
                 DeclarationKind.MarkupRoot,
                 DeclarationKind.MarkupElement);
+            var next = Factory.BindingSession.AddContainingBlockBinders(
+                Next,
+                DeclarationFacts.GetSyntax(declaration),
+                _usage);
             return new MarkupBinder(
                 Factory.SemanticModel,
-                Next,
+                next,
                 declaration,
-                Next.Flags | GetUsageFlags(_usage));
+                next.Flags | GetUsageFlags(_usage));
         }
 
         private AkcssModuleBinder CreateAkcssModuleBinder()

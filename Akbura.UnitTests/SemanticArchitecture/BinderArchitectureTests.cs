@@ -390,43 +390,6 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
-    public void ExecutableCodeBinder_ReturnsCachedNestedBinderFromMap()
-    {
-        const string code =
-            "state int total = 0;\n" +
-            "if(total > 0)\n" +
-            "{\n" +
-            "    int count = 1;\n" +
-            "    Console.WriteLine(count);\n" +
-            "}";
-        var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
-        var model = CreateCompilation(tree).GetSemanticModel(tree);
-        var rootDeclaration = Assert.Single(model.Compilation.DeclarationTable.Components);
-        var root = tree.GetRoot();
-        var ifStatement = Assert.IsType<CSharpStatementSyntax>(root.Members[1]);
-        var block = ifStatement.Body!;
-        var writeLine = Assert.IsType<CSharpStatementSyntax>(block.Tokens[1]);
-        var statementDeclaration = Assert.Single(
-            rootDeclaration.Children,
-            declaration => SemanticSyntaxIdentity.Equals(DeclarationFacts.GetSyntax(declaration), ifStatement));
-        var executableRootPath = ImmutableArray.Create(rootDeclaration, statementDeclaration);
-        var next = model.GetBinder(root);
-        var executableBinder = new ExecutableCodeBinder(
-            model.BindingSession,
-            executableRootPath,
-            next,
-            BinderUsage.Statement);
-
-        var first = executableBinder.GetBinder(writeLine);
-        var second = executableBinder.GetBinder(writeLine);
-
-        var blockBinder = Assert.IsType<BlockBinder>(first);
-        Assert.Same(first, second);
-        Assert.Same(block, blockBinder.ScopeDesignator);
-    }
-
-
-    [Fact]
     public void BinderFactoryVisitor_BuildsNestedMarkupBinderChain()
     {
         const string code = "<StackPanel><Button /></StackPanel>";

@@ -2,6 +2,7 @@ using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
+using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
@@ -17,21 +18,23 @@ internal sealed class BlockBinder : Binder
     public BlockBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
-        Declaration declaration,
+        CSharpBlockSyntax blockSyntax,
         AkburaBinderFlags flags = AkburaBinderFlags.None)
         : base(
             semanticModel,
             next,
-            declaration,
-            DeclarationFacts.GetSyntax(declaration),
+            declaration: null,
+            blockSyntax,
             flags | AkburaBinderFlags.InCSharpBlock)
     {
+        BlockSyntax = blockSyntax ?? throw new ArgumentNullException(nameof(blockSyntax));
     }
+
+    public CSharpBlockSyntax BlockSyntax { get; }
 
     public override ImmutableArray<ISymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
     {
-        if (!OwnsScope(scopeDesignator) ||
-            Declaration == null)
+        if (!OwnsScope(scopeDesignator))
         {
             return base.GetDeclaredSymbolsForScope(scopeDesignator);
         }
@@ -48,12 +51,7 @@ internal sealed class BlockBinder : Binder
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
-        if (Declaration == null)
-        {
-            return;
-        }
-
-        var symbols = GetDeclaredSymbolsForScope(DeclarationFacts.GetSyntax(Declaration));
+        var symbols = GetDeclaredSymbols();
         foreach (var symbol in symbols)
         {
             if (!string.Equals(symbol.Name, name, System.StringComparison.Ordinal) ||
@@ -82,23 +80,15 @@ internal sealed class BlockBinder : Binder
 
     private ImmutableArray<ISymbol> CreateLocalSymbols()
     {
-        if (Declaration == null ||
-            Declaration.Children.IsDefaultOrEmpty)
-        {
-            return ImmutableArray<ISymbol>.Empty;
-        }
-
         var builder = ArrayBuilder<ISymbol>.GetInstance();
-        foreach (var child in Declaration.Children)
+        foreach (var member in BlockSyntax.Tokens)
         {
-            if (child.Kind != DeclarationKind.CSharpStatement ||
-                !DeclarationFacts.TryGetSyntax(child, out var childSyntax) ||
-                childSyntax.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
+            if (member.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
             {
                 continue;
             }
 
-            var statement = Unsafe.As<CSharpStatementSyntax>(childSyntax);
+            var statement = Unsafe.As<CSharpStatementSyntax>(member);
             AddLocalSymbols(builder, statement);
         }
 

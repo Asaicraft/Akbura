@@ -9,6 +9,10 @@
     <File Path="draft-concepts/Dependecy Injection.md" />
     <File Path="draft-concepts/User defined hook.md" />
   </Folder>
+  <Folder Name="/For Contributors/">
+    <File Path="For Contributors/Make Your Own Syntax.md" />
+    <File Path="For Contributors/README.md" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="README.md" />

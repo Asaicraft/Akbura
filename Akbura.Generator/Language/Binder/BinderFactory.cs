@@ -92,6 +92,8 @@ internal sealed partial class BinderFactory
 
     internal AkburaSemanticModel SemanticModel => _semanticModel;
 
+    internal BindingSession BindingSession => _bindingSession;
+
     internal CompilationBinder RootBinder => _bindingSession.RootBinder;
 
     private BinderFactoryVisitor GetBinderFactoryVisitor(

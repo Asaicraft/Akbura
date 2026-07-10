@@ -6,6 +6,7 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
@@ -15,14 +16,14 @@ internal sealed class BindingSession
 {
     private readonly AkburaSemanticModel _semanticModel;
     private readonly BinderFactory _binderFactory;
-    private readonly ConcurrentCache<BinderCacheKey, ExecutableCodeBinder> _executableBinderCache;
+    private readonly ConcurrentCache<BinderCacheKey, Binder> _blockBinderCache;
 
     public BindingSession(AkburaSemanticModel semanticModel)
     {
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         RootBinder = new CompilationBinder(semanticModel);
         _binderFactory = new BinderFactory(semanticModel, this);
-        _executableBinderCache = new ConcurrentCache<BinderCacheKey, ExecutableCodeBinder>(16);
+        _blockBinderCache = new ConcurrentCache<BinderCacheKey, Binder>(32);
     }
 
     public CompilationBinder RootBinder { get; }
@@ -36,13 +37,16 @@ internal sealed class BindingSession
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        if (!TryFindDeclarationPath(syntax, out var path) ||
-            path.Length == 0)
+        if ((!TryFindDeclarationPath(syntax, out var path) ||
+             path.Length == 0) &&
+            (!TryFindDeclarationPath(syntax.Root, syntax.Position, out path) ||
+             path.Length == 0))
         {
-            return RootBinder;
+            return AddContainingBlockBinders(RootBinder, syntax, usage);
         }
 
-        return GetBinderFromPath(path, usage);
+        var binder = GetOrCreateBinder(path, usage);
+        return AddContainingBlockBinders(binder, syntax, usage);
     }
 
     public Binder GetBinder(
@@ -72,10 +76,11 @@ internal sealed class BindingSession
         if (!TryFindDeclarationPath(syntax, normalizedPosition, out var path) ||
             path.Length == 0)
         {
-            return RootBinder;
+            return AddContainingBlockBinders(RootBinder, syntax, normalizedPosition, usage);
         }
 
-        return GetBinderFromPath(path, usage);
+        var binder = GetOrCreateBinder(path, usage);
+        return AddContainingBlockBinders(binder, syntax, normalizedPosition, usage);
     }
 
     public CSharpProbeBinder GetCSharpProbeBinder(
@@ -233,20 +238,6 @@ internal sealed class BindingSession
             usage);
     }
 
-    private Binder GetBinderFromPath(
-        ImmutableArray<Declaration> path,
-        BinderUsage usage)
-    {
-        if (TryGetExecutableRootPath(path, out var executableRootPath))
-        {
-            var targetSyntax = DeclarationFacts.GetSyntax(path[path.Length - 1]);
-            return GetExecutableCodeBinder(executableRootPath, usage)
-                .GetBinder(targetSyntax) ?? RootBinder;
-        }
-
-        return GetOrCreateBinder(path, usage);
-    }
-
     private bool TryFindDeclarationPath(
         AkburaSyntax syntax,
         out ImmutableArray<Declaration> path)
@@ -267,75 +258,136 @@ internal sealed class BindingSession
             out path);
     }
 
-    private ExecutableCodeBinder GetExecutableCodeBinder(
-        ImmutableArray<Declaration> executableRootPath,
+    internal Binder AddContainingBlockBinders(
+        Binder binder,
+        AkburaSyntax syntax,
         BinderUsage usage)
     {
-        var rootDeclaration = executableRootPath[executableRootPath.Length - 1];
-        var key = new BinderCacheKey(DeclarationFacts.GetSyntax(rootDeclaration), usage);
-        if (_executableBinderCache.TryGetValue(key, out var executableBinder))
-        {
-            return executableBinder;
-        }
-
-        var nextPath = SlicePath(executableRootPath, executableRootPath.Length - 1);
-        var next = nextPath.IsDefaultOrEmpty
-            ? RootBinder
-            : GetOrCreateBinder(nextPath, usage);
-        executableBinder = new ExecutableCodeBinder(
-            this,
-            executableRootPath,
-            next,
+        return AddContainingBlockBinders(
+            binder,
+            GetContainingCSharpBlocks(syntax),
             usage);
-        if (!_executableBinderCache.TryAdd(key, executableBinder) &&
-            _executableBinderCache.TryGetValue(key, out var cachedExecutableBinder))
-        {
-            return cachedExecutableBinder;
-        }
-
-        return executableBinder;
     }
 
-    private static bool TryGetExecutableRootPath(
-        ImmutableArray<Declaration> path,
-        out ImmutableArray<Declaration> executableRootPath)
+    private Binder AddContainingBlockBinders(
+        Binder binder,
+        AkburaSyntax syntax,
+        int position,
+        BinderUsage usage)
     {
-        for (var index = 0; index < path.Length; index++)
+        return AddContainingBlockBinders(
+            binder,
+            GetContainingCSharpBlocks(syntax, position),
+            usage);
+    }
+
+    private Binder AddContainingBlockBinders(
+        Binder binder,
+        ImmutableArray<CSharpBlockSyntax> blocks,
+        BinderUsage usage)
+    {
+        var current = binder;
+        foreach (var block in blocks)
         {
-            if (IsExecutableRoot(path[index]))
+            if (BinderChainContainsScope(current, block))
             {
-                executableRootPath = SlicePath(path, index + 1);
+                continue;
+            }
+
+            current = GetOrCreateBlockBinder(block, current, usage);
+        }
+
+        return current;
+    }
+
+    private Binder GetOrCreateBlockBinder(
+        CSharpBlockSyntax block,
+        Binder next,
+        BinderUsage usage)
+    {
+        var key = new BinderCacheKey(block, usage);
+        if (_blockBinderCache.TryGetValue(key, out var binder))
+        {
+            return binder;
+        }
+
+        binder = new BlockBinder(
+            _semanticModel,
+            next,
+            block,
+            next.Flags | GetUsageFlags(usage));
+        if (!_blockBinderCache.TryAdd(key, binder) &&
+            _blockBinderCache.TryGetValue(key, out var cachedBinder))
+        {
+            return cachedBinder;
+        }
+
+        return binder;
+    }
+
+    private static ImmutableArray<CSharpBlockSyntax> GetContainingCSharpBlocks(AkburaSyntax syntax)
+    {
+        var builder = ArrayBuilder<CSharpBlockSyntax>.GetInstance();
+        for (var node = syntax; node != null; node = node.Parent)
+        {
+            if (node.Kind == AkburaSyntaxKind.CSharpBlockSyntax)
+            {
+                builder.Add(Unsafe.As<CSharpBlockSyntax>(node));
+            }
+        }
+
+        builder.ReverseContents();
+        return builder.ToImmutableAndFree();
+    }
+
+    private static ImmutableArray<CSharpBlockSyntax> GetContainingCSharpBlocks(
+        AkburaSyntax syntax,
+        int position)
+    {
+        var builder = ArrayBuilder<CSharpBlockSyntax>.GetInstance();
+        foreach (var node in syntax.DescendantNodesAndSelf(
+                     candidate => ContainsPosition(candidate, position)))
+        {
+            if (node.Kind == AkburaSyntaxKind.CSharpBlockSyntax &&
+                ContainsPosition(node, position))
+            {
+                builder.Add(Unsafe.As<CSharpBlockSyntax>(node));
+            }
+        }
+
+        return builder.ToImmutableAndFree();
+    }
+
+    private static bool BinderChainContainsScope(
+        Binder binder,
+        CSharpBlockSyntax block)
+    {
+        for (var current = binder; current != null; current = current.Next)
+        {
+            if (current.ScopeDesignator != null &&
+                SemanticSyntaxIdentity.Equals(current.ScopeDesignator, block))
+            {
                 return true;
             }
         }
 
-        executableRootPath = default;
         return false;
     }
 
-    private static bool IsExecutableRoot(Declaration declaration)
+    private static AkburaBinderFlags GetUsageFlags(BinderUsage usage)
     {
-        return declaration.Kind is
-            DeclarationKind.CSharpStatement or
-            DeclarationKind.CSharpBlock;
+        return usage switch
+        {
+            BinderUsage.Markup => AkburaBinderFlags.InMarkup,
+            BinderUsage.Akcss => AkburaBinderFlags.InAkcss,
+            _ => AkburaBinderFlags.None,
+        };
     }
 
-    private static ImmutableArray<Declaration> SlicePath(
-        ImmutableArray<Declaration> path,
-        int length)
+    private static bool ContainsPosition(AkburaSyntax syntax, int position)
     {
-        if (length == 0)
-        {
-            return [];
-        }
-
-        using var builder = ImmutableArrayBuilder<Declaration>.Rent(length);
-        for (var index = 0; index < length; index++)
-        {
-            builder.Add(path[index]);
-        }
-
-        return builder.ToImmutable();
+        return syntax.FullSpan.Contains(position) ||
+               (syntax.FullWidth == 0 && position == syntax.Position);
     }
 
 }

@@ -606,25 +606,23 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
                 DeclarationKind.UserHook,
                 node.Name.ToFullString().Trim(),
                 node,
-                ImmutableArray.Create(CreateCSharpBlockDeclaration(node.Body)));
+                CollectExecutableMarkupDeclarations(node.Body));
         }
 
         public override void VisitCSharpStatementSyntax(CSharpStatementSyntax node)
         {
-            Add(
-                DeclarationKind.CSharpStatement,
-                GetCSharpStatementName(node),
-                node,
-                CollectCSharpStatementChildren(node));
+            if (node.Body != null)
+            {
+                Visit(node.Body);
+            }
         }
 
         public override void VisitCSharpBlockSyntax(CSharpBlockSyntax node)
         {
-            Add(
-                DeclarationKind.CSharpBlock,
-                "{...}",
-                node,
-                CollectCSharpBlockMembers(node));
+            foreach (var member in node.Tokens)
+            {
+                Visit(member);
+            }
         }
 
         public override void VisitMarkupRootSyntax(MarkupRootSyntax node)
@@ -684,25 +682,18 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
 
         private ImmutableArray<Declaration> CollectUseEffectChildren(UseEffectDeclarationSyntax node)
         {
-            var builder = ImmutableArray.CreateBuilder<Declaration>(1 + node.Tails.Count);
-            builder.Add(CreateCSharpBlockDeclaration(node.Body));
+            using var builder = ImmutableArrayBuilder<Declaration>.Rent();
+            builder.AddRange(CollectExecutableMarkupDeclarations(node.Body));
 
             foreach (var tail in node.Tails)
             {
-                builder.Add(CreateCSharpBlockDeclaration(tail.Body));
+                builder.AddRange(CollectExecutableMarkupDeclarations(tail.Body));
             }
 
             return builder.ToImmutable();
         }
 
-        private ImmutableArray<Declaration> CollectCSharpStatementChildren(CSharpStatementSyntax statement)
-        {
-            return statement.Body == null
-                ? ImmutableArray<Declaration>.Empty
-                : ImmutableArray.Create(CreateCSharpBlockDeclaration(statement.Body));
-        }
-
-        private ImmutableArray<Declaration> CollectCSharpBlockMembers(CSharpBlockSyntax block)
+        private ImmutableArray<Declaration> CollectExecutableMarkupDeclarations(CSharpBlockSyntax block)
         {
             var nested = s_pool.Allocate();
             try
@@ -721,17 +712,6 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             {
                 nested.Free();
             }
-        }
-
-        private Declaration CreateCSharpBlockDeclaration(CSharpBlockSyntax block)
-        {
-            return new SingleSyntaxDeclaration(
-                DeclarationKind.CSharpBlock,
-                "{...}",
-                block,
-                _syntaxTree,
-                _akcssSyntaxTree,
-                CollectCSharpBlockMembers(block));
         }
 
         private Declaration CreateMarkupRootDeclaration(MarkupRootSyntax root)
@@ -773,14 +753,6 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         private static string GetMarkupElementName(MarkupElementSyntax element)
         {
             return element.StartTag?.Name.ToFullString().Trim() ?? string.Empty;
-        }
-
-        private static string GetCSharpStatementName(CSharpStatementSyntax statement)
-        {
-            var text = statement.Tokens.ToFullString().Trim();
-            return text.Length == 0
-                ? "statement"
-                : text;
         }
 
         private void Add(

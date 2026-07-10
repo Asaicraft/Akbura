@@ -219,8 +219,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Collection(
             exactPath,
             item => Assert.Equal(DeclarationKind.Component, item.Kind),
-            item => Assert.Equal(DeclarationKind.CSharpStatement, item.Kind),
-            item => Assert.Equal(DeclarationKind.CSharpBlock, item.Kind),
             item => Assert.Equal(DeclarationKind.MarkupRoot, item.Kind),
             item => Assert.Equal(DeclarationKind.MarkupElement, item.Kind),
             item =>

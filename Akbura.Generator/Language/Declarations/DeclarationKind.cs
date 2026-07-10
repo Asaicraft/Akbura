@@ -16,8 +16,6 @@ internal enum DeclarationKind : byte
     Command,
     UseEffect,
     UserHook,
-    CSharpStatement,
-    CSharpBlock,
     MarkupRoot,
     MarkupElement,
     AkcssModule,

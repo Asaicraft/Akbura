@@ -3064,6 +3064,23 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
+        if (IsMarkupDataTypeDirective(markupAttribute))
+        {
+            SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.Success(new PropertySymbol(
+                "DataType",
+                new CSharpSymbolDefinition(Compilation.CSharpCompilation.GetTypeByMetadataName("System.Type")!)));
+        }
+
+        if (IsMarkupItemNameDirective(markupAttribute))
+        {
+            SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.Success(new PropertySymbol(
+                "ItemName",
+                new CSharpSymbolDefinition(
+                    Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_String))));
+        }
+
         var markupElement = GetContainingMarkupElement(markupAttribute);
         if (markupElement == null)
         {
@@ -3078,15 +3095,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         var componentType = componentSymbol.ComponentType;
-        if (IsMarkupDataTypeDirective(markupAttribute))
-        {
-            SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-            return AkburaSymbolInfo.Success(new PropertySymbol(
-                "DataType",
-                new CSharpSymbolDefinition(Compilation.CSharpCompilation.GetTypeByMetadataName("System.Type")!),
-                containingSymbol: componentSymbol));
-        }
-
         if (markupAttribute.Kind == AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax &&
             componentType != null)
         {
@@ -3388,7 +3396,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             : propertyName;
     }
 
-    private static string GetMarkupPropertyName(MarkupAttributeSyntax markupAttribute)
+    internal static string GetMarkupPropertyName(MarkupAttributeSyntax markupAttribute)
     {
         return markupAttribute.Kind switch
         {
@@ -3643,7 +3651,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             [memberName, ownerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
     }
 
-    private static RoslynPropertySymbol? FindPublicClrProperty(
+    internal static RoslynPropertySymbol? FindPublicClrProperty(
         INamedTypeSymbol componentType,
         string propertyName)
     {

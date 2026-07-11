@@ -491,7 +491,7 @@ internal partial class AkburaSemanticModel
             return false;
         }
 
-        var hasDataType = TryGetMarkupDataType(markupAttribute, out var dataType);
+        var hasDataType = BindingSession.MarkupDataTypes.TryGetDataType(markupAttribute, out var dataType);
         var kind = GetMarkupBindingKind(bindingName, hasDataType);
         var bindingTypeName = kind == MarkupBindingKind.Compiled
             ? "Avalonia.Data.CompiledBinding"
@@ -1067,44 +1067,29 @@ internal partial class AkburaSemanticModel
 
     internal static bool IsMarkupDataTypeDirective(MarkupAttributeSyntax markupAttribute)
     {
-        return markupAttribute.Kind == AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax &&
-            Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute).OwnerType.ToFullString().Trim() == "x" &&
-            Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute).Name.Identifier.ValueText == "DataType";
+        return IsMarkupDirective(markupAttribute, "DataType");
     }
 
-    private bool TryGetMarkupDataType(
-        MarkupAttributeSyntax anchor,
-        out INamedTypeSymbol dataType)
+    internal static bool IsMarkupItemNameDirective(MarkupAttributeSyntax markupAttribute)
     {
-        for (var node = anchor.Parent; node != null; node = node.Parent)
+        return IsMarkupDirective(markupAttribute, "ItemName");
+    }
+
+    private static bool IsMarkupDirective(
+        MarkupAttributeSyntax markupAttribute,
+        string name)
+    {
+        if (markupAttribute.Kind != AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax)
         {
-            if (node.Kind != AkburaSyntaxKind.MarkupElementSyntax)
-            {
-                continue;
-            }
-
-            var markupElement = Unsafe.As<MarkupElementSyntax>(node);
-            if (markupElement.StartTag == null)
-            {
-                continue;
-            }
-
-            foreach (var attribute in markupElement.StartTag.Attributes)
-            {
-                if (IsMarkupDataTypeDirective(attribute) &&
-                    TryGetMarkupDataTypeText(attribute, out var typeText) &&
-                    TryBindMarkupDataType(typeText, out dataType))
-                {
-                    return true;
-                }
-            }
+            return false;
         }
 
-        dataType = null!;
-        return false;
+        var attachedProperty = Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute);
+        return attachedProperty.OwnerType.ToFullString().Trim() == "x" &&
+            attachedProperty.Name.Identifier.ValueText == name;
     }
 
-    private static bool TryGetMarkupDataTypeText(
+    internal static bool TryGetMarkupDataTypeText(
         MarkupAttributeSyntax attribute,
         out string typeText)
     {

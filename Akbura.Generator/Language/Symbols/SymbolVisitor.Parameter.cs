@@ -62,6 +62,11 @@ internal abstract class SymbolVisitor<TParameter, TResult>
         TParameter parameter) =>
         DefaultVisit(symbol, parameter);
 
+    public virtual TResult VisitMarkupItem(
+        IMarkupItemSymbol symbol,
+        TParameter parameter) =>
+        DefaultVisit(symbol, parameter);
+
     public virtual TResult VisitCSharpSymbol(
         CSharpLocalSymbol symbol,
         TParameter parameter) =>

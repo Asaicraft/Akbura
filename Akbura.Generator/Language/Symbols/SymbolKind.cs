@@ -14,6 +14,7 @@ internal enum SymbolKind
     Parameter,
     CommandParameter,
     TailwindUtilityParameter,
+    MarkupItem,
     InjectedService,
     Command,
     Function,

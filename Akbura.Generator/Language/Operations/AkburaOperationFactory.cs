@@ -13,10 +13,10 @@ namespace Akbura.Language.Operations;
 
 internal sealed class AkburaOperationFactory : IOperationFactory
 {
-    private readonly Func<IAkcssSymbol?, Func<RoslynSymbol, ISymbol?>> _createCSharpOperationSymbolMapper;
+    private readonly Func<AkburaSyntax, IAkcssSymbol?, Func<RoslynSymbol, ISymbol?>> _createCSharpOperationSymbolMapper;
 
     public AkburaOperationFactory(
-        Func<IAkcssSymbol?, Func<RoslynSymbol, ISymbol?>> createCSharpOperationSymbolMapper)
+        Func<AkburaSyntax, IAkcssSymbol?, Func<RoslynSymbol, ISymbol?>> createCSharpOperationSymbolMapper)
     {
         _createCSharpOperationSymbolMapper = createCSharpOperationSymbolMapper ??
             throw new ArgumentNullException(nameof(createCSharpOperationSymbolMapper));
@@ -216,7 +216,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ValueOperation,
-                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
     }
 
     private MarkupPropertySetterOperation CreateMarkupPropertySetterOperation(
@@ -238,7 +238,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ValueOperation,
-                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
     }
 
     private MarkupCommandBindingOperation CreateMarkupCommandBindingOperation(
@@ -265,7 +265,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.HandlerOperation,
-                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
     }
 
     private MarkupRoutedEventBindingOperation CreateMarkupRoutedEventBindingOperation(
@@ -288,13 +288,13 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.HandlerOperation,
-                CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
     }
 
     private TailwindUtilityAttributeOperation CreateTailwindUtilityAttributeOperation(
         BoundTailwindUtilityAttribute boundNode)
     {
-        var mapper = CreateCSharpOperationSymbolMapper(containingAkcssSymbol: null);
+        var mapper = CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null);
         return new TailwindUtilityAttributeOperation(
             boundNode.Syntax,
             boundNode.ContainingComponent,
@@ -329,7 +329,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ValueOperation,
-                CreateCSharpOperationSymbolMapper(boundNode.ContainingAkcssSymbol)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, boundNode.ContainingAkcssSymbol)));
     }
 
     private AkcssIfOperation CreateAkcssIfOperation(BoundAkcssIf boundNode)
@@ -353,7 +353,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ConditionOperation,
-                CreateCSharpOperationSymbolMapper(boundNode.ContainingAkcssSymbol)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, boundNode.ContainingAkcssSymbol)));
     }
 
     private static AkcssApplyOperation CreateAkcssApplyOperation(BoundAkcssApply boundNode)
@@ -403,9 +403,10 @@ internal sealed class AkburaOperationFactory : IOperationFactory
     }
 
     private Func<RoslynSymbol, ISymbol?> CreateCSharpOperationSymbolMapper(
+        AkburaSyntax syntax,
         IAkcssSymbol? containingAkcssSymbol)
     {
-        return _createCSharpOperationSymbolMapper(containingAkcssSymbol);
+        return _createCSharpOperationSymbolMapper(syntax, containingAkcssSymbol);
     }
 
     private static ICSharpOperation? CreateCSharpOperationTree(

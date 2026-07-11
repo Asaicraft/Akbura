@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -224,6 +225,7 @@ internal partial class AkburaSemanticModel
         var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
         var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
         AddCSharpProbeRootSymbolMappings(akburaSymbolsByName, akburaSymbolsByCommandTypeName);
+        AddMarkupScopeSymbolMappings(markupAttribute, akburaSymbolsByName);
 
         return CollectCSharpSymbolReferences(
             semanticModel,
@@ -236,18 +238,21 @@ internal partial class AkburaSemanticModel
         AkburaSyntax scopeSyntax,
         CSharp.ExpressionSyntax expression)
     {
+        var scope = GetMarkupBindingScope(scopeSyntax);
+        var probeScope = BindingSession
+            .GetCSharpProbeBinder(scope, BinderUsage.Markup)
+            .CreateProbeScope(scope, expression);
         using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-        foreach (var field in CreateMarkupAttributeProbeFields())
-        {
-            membersBuilder.Add(field);
-        }
+        AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
 
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 ContainsAwaitExpression(expression)
                     ? CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.Task<object>")
                     : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
                 MarkupInlineReferenceProbeMethodName)
-            .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.ReturnStatement(expression)));
+            .WithBody(CreateMarkupHandlerProbeBlock(
+                probeScope.LocalStatements,
+                CSharpSyntaxFactory.ReturnStatement(expression)));
         if (ContainsAwaitExpression(expression))
         {
             method = method.WithModifiers(CSharpSyntaxFactory.TokenList(
@@ -278,6 +283,7 @@ internal partial class AkburaSemanticModel
         var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
         var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
         AddCSharpProbeRootSymbolMappings(akburaSymbolsByName, akburaSymbolsByCommandTypeName);
+        AddMarkupScopeSymbolMappings(scopeSyntax, akburaSymbolsByName);
 
         return CollectCSharpSymbolReferences(
             semanticModel,
@@ -524,6 +530,7 @@ internal partial class AkburaSemanticModel
     }
 
     internal Func<RoslynSymbol, AkburaSymbol?> CreateCSharpOperationSymbolMapper(
+        AkburaSyntax scopeSyntax,
         IAkcssSymbol? containingAkcssSymbol = null)
     {
         var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
@@ -531,6 +538,7 @@ internal partial class AkburaSemanticModel
         AddCSharpProbeRootSymbolMappings(
             akburaSymbolsByName,
             akburaSymbolsByCommandTypeName);
+        AddMarkupScopeSymbolMappings(scopeSyntax, akburaSymbolsByName);
 
         if (containingAkcssSymbol is ITailwindUtilitySymbol utility)
         {
@@ -547,6 +555,29 @@ internal partial class AkburaSemanticModel
             symbol,
             akburaSymbolsByName,
             akburaSymbolsByCommandTypeName);
+    }
+
+    private void AddMarkupScopeSymbolMappings(
+        AkburaSyntax scopeSyntax,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByName)
+    {
+        if (scopeSyntax == null)
+        {
+            return;
+        }
+
+        var scope = GetMarkupBindingScope(scopeSyntax);
+        for (var binder = BindingSession.GetSemanticBinder(scope); binder != null; binder = binder.Next)
+        {
+            if (binder is not MarkupBinder markupBinder ||
+                markupBinder.GetDeclaredItemSymbol() is not { } itemSymbol)
+            {
+                continue;
+            }
+
+            akburaSymbolsByName[itemSymbol.Name] = itemSymbol;
+            return;
+        }
     }
 
     private static void AddCSharpProbeRootSymbolMapping(

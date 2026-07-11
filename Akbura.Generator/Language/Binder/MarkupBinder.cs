@@ -5,6 +5,7 @@ using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpTypeSymbol = Microsoft.CodeAnalysis.ITypeSymbol;
@@ -15,6 +16,9 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class MarkupBinder : Binder
 {
+    private IMarkupItemSymbol? _lazyItemSymbol;
+    private int _itemSymbolInitialized;
+
     public MarkupBinder(
         AkburaSemanticModel semanticModel,
         Binder next,
@@ -40,6 +44,58 @@ internal sealed partial class MarkupBinder : Binder
                 _ => null,
             } : null;
         }
+    }
+
+    public override ImmutableArray<ISymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
+    {
+        if (!OwnsScope(scopeDesignator) ||
+            GetDeclaredItemSymbol() is not { } itemSymbol)
+        {
+            return base.GetDeclaredSymbolsForScope(scopeDesignator);
+        }
+
+        return ImmutableArray.Create<ISymbol>(itemSymbol);
+    }
+
+    protected override void LookupSymbolsInSingleBinder(
+        LookupResult result,
+        string name,
+        int arity,
+        BinderLookupOptions options,
+        Binder originalBinder,
+        AkburaSyntax syntax,
+        BindingDiagnosticBag diagnostics)
+    {
+        var itemSymbol = GetDeclaredItemSymbol();
+        if (itemSymbol != null &&
+            string.Equals(itemSymbol.Name, name, System.StringComparison.Ordinal))
+        {
+            result.SetSymbol(itemSymbol);
+        }
+    }
+
+    internal IMarkupItemSymbol? GetDeclaredItemSymbol()
+    {
+        if (Volatile.Read(ref _itemSymbolInitialized) != 0)
+        {
+            return _lazyItemSymbol;
+        }
+
+        IMarkupItemSymbol? itemSymbol = null;
+        if (ScopeDesignator?.Kind == AkburaSyntaxKind.MarkupElementSyntax)
+        {
+            SemanticModel.BindingSession.MarkupDataTypes.TryCreateItemSymbol(
+                Unsafe.As<MarkupElementSyntax>(ScopeDesignator),
+                out itemSymbol);
+        }
+
+        if (itemSymbol != null)
+        {
+            Interlocked.CompareExchange(ref _lazyItemSymbol, itemSymbol, comparand: null);
+        }
+
+        Volatile.Write(ref _itemSymbolInitialized, 1);
+        return _lazyItemSymbol;
     }
 
     public override BoundNode BindOperationSyntax(AkburaSyntax syntax)

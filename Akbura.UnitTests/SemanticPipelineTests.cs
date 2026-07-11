@@ -3547,6 +3547,229 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ItemTemplateBinding_InheritsDataTypeFromItemsSource()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            inject ViewModel Vm;
+
+            <ItemsControl ItemsSource={Vm.Items}>
+                <ItemsControl.ItemTemplate>
+                    <TextBlock Text=${Binding FullName} />
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public sealed class ViewModel
+            {
+                public System.Collections.Generic.IReadOnlyList<VmItem> Items { get; } = null!;
+            }
+
+            public sealed class VmItem
+            {
+                public string FullName { get; } = "";
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(AvaloniaBindingCSharpCode, csharpCode));
+        var itemsControl = GetOnlyMarkupElement(syntaxTree);
+        var itemTemplate = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(itemsControl.Body, static content =>
+                content.Kind == Akbura.Language.Syntax.SyntaxKind.MarkupElementContentSyntax)).Element;
+        var textBlock = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(itemTemplate.Body, static content =>
+                content.Kind == Akbura.Language.Syntax.SyntaxKind.MarkupElementContentSyntax)).Element;
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        var binding = Assert.IsType<MarkupBindingValue>(extension.Binding);
+
+        Assert.Equal(MarkupBindingKind.Compiled, binding.Kind);
+        Assert.Equal("Demo.VmItem", binding.SourceType.Symbol?.ToDisplayString());
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(binding.ResultType.Symbol).SpecialType);
+        var fullName = Assert.Single(binding.PathElements);
+        Assert.Equal(MarkupBindingPathElementKind.Property, fullName.Kind);
+        Assert.Equal("FullName", fullName.Symbol.Name);
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(fullName.Type.Symbol).SpecialType);
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(textAttribute).Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_ItemTemplateItemName_DeclaresTypedMarkupItemForCSharpExpressions()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            inject ViewModel Vm;
+
+            <ItemsControl ItemsSource={Vm.Items}>
+                <ItemsControl.ItemTemplate x.ItemName="item">
+                    <TextBlock Text={item.FullName + " without MarkupExtension!"} />
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        const string csharpCode =
+            """
+            namespace Demo;
+
+            public sealed class ViewModel
+            {
+                public System.Collections.Generic.IEnumerable<VmItem> Items { get; } = null!;
+            }
+
+            public sealed class VmItem
+            {
+                public string FullName { get; } = "";
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var itemsControl = GetOnlyMarkupElement(syntaxTree);
+        var itemTemplate = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(itemsControl.Body, static content =>
+                content.Kind == Akbura.Language.Syntax.SyntaxKind.MarkupElementContentSyntax)).Element;
+        var itemNameAttribute = Assert.IsType<MarkupAttachedPropertyAttributeSyntax>(
+            Assert.Single(itemTemplate.StartTag!.Attributes));
+        var textBlock = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(itemTemplate.Body, static content =>
+                content.Kind == Akbura.Language.Syntax.SyntaxKind.MarkupElementContentSyntax)).Element;
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var itemOperation = Assert.Single(
+            EnumerateCSharpOperations(operation),
+            static candidate => candidate.TargetSymbol is IMarkupItemSymbol);
+        var itemSymbol = Assert.IsAssignableFrom<IMarkupItemSymbol>(itemOperation.TargetSymbol);
+        var references = semanticModel.GetCSharpSymbolReferences(textAttribute);
+
+        Assert.Equal("ItemName", semanticModel.GetSymbolInfo(itemNameAttribute).Symbol?.Name);
+        Assert.Equal("item", itemSymbol.Name);
+        Assert.Equal("Demo.VmItem", itemSymbol.Type.Symbol?.ToDisplayString());
+        var itemReference = Assert.Single(references, static reference =>
+            reference.AkburaSymbol is IMarkupItemSymbol { Name: "item" });
+        Assert.Same(itemSymbol, itemReference.AkburaSymbol);
+        Assert.Equal(SpecialType.System_String, Assert.IsAssignableFrom<INamedTypeSymbol>(operation.ValueType.Symbol).SpecialType);
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(textAttribute).Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_ItemTemplateBinding_UsesConfiguredItemsAncestorType()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            inject ViewModel Vm;
+
+            <ItemsHost ItemsSource={Vm.Items}>
+                <TemplateCarrier>
+                    <TemplateCarrier.ItemTemplate>
+                        <TextBlock Text=${Binding FullName} />
+                    </TemplateCarrier.ItemTemplate>
+                </TemplateCarrier>
+            </ItemsHost>
+            """;
+        const string csharpCode =
+            """
+            namespace Avalonia.Metadata
+            {
+                [System.AttributeUsage(System.AttributeTargets.Property)]
+                public sealed class InheritDataTypeFromItemsAttribute : System.Attribute
+                {
+                    public InheritDataTypeFromItemsAttribute(string ancestorItemsProperty)
+                    {
+                        AncestorItemsProperty = ancestorItemsProperty;
+                    }
+
+                    public string AncestorItemsProperty { get; }
+
+                    public System.Type? AncestorType { get; set; }
+                }
+            }
+
+            namespace Demo
+            {
+                public sealed class ViewModel
+                {
+                    public System.Collections.Generic.IEnumerable<VmItem> Items { get; } = null!;
+                }
+
+                public sealed class VmItem
+                {
+                    public string FullName { get; } = "";
+                }
+
+                public sealed class ItemsHost
+                {
+                    public System.Collections.IEnumerable? ItemsSource { get; set; }
+                }
+
+                public sealed class TemplateCarrier
+                {
+                    [Avalonia.Metadata.InheritDataTypeFromItems(
+                        "ItemsSource",
+                        AncestorType = typeof(ItemsHost))]
+                    public object? ItemTemplate { get; set; }
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(AvaloniaBindingCSharpCode, csharpCode));
+        var itemsHost = GetOnlyMarkupElement(syntaxTree);
+        var templateCarrier = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(itemsHost.Body, static content =>
+                content.Kind == Akbura.Language.Syntax.SyntaxKind.MarkupElementContentSyntax)).Element;
+        var itemTemplate = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(templateCarrier.Body, static content =>
+                content.Kind == Akbura.Language.Syntax.SyntaxKind.MarkupElementContentSyntax)).Element;
+        var textBlock = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(itemTemplate.Body, static content =>
+                content.Kind == Akbura.Language.Syntax.SyntaxKind.MarkupElementContentSyntax)).Element;
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        var binding = Assert.IsType<MarkupBindingValue>(extension.Binding);
+
+        Assert.Equal(MarkupBindingKind.Compiled, binding.Kind);
+        Assert.Equal("Demo.VmItem", binding.SourceType.Symbol?.ToDisplayString());
+        Assert.Equal("FullName", Assert.Single(binding.PathElements).Symbol.Name);
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(textAttribute).Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
     public void SemanticModel_MarkupDynamicAttribute_BindsInComponentScope()
     {
         const string code =

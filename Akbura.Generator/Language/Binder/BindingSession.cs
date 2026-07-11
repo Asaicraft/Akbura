@@ -22,11 +22,14 @@ internal sealed class BindingSession
     {
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         RootBinder = new CompilationBinder(semanticModel);
+        MarkupDataTypes = new MarkupDataTypeResolver(semanticModel);
         _binderFactory = new BinderFactory(semanticModel, this);
         _blockBinderCache = new ConcurrentCache<BinderCacheKey, Binder>(32);
     }
 
     public CompilationBinder RootBinder { get; }
+
+    public MarkupDataTypeResolver MarkupDataTypes { get; }
 
     public int CachedBinderCount => _binderFactory.CachedBinderCount;
 

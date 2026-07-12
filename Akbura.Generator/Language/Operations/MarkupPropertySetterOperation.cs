@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -16,6 +17,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         ImmutableArray<IAkcssSymbol> appliedAkcssSymbols,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         MarkupAttributeBindingKind bindingKind,
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
@@ -32,6 +34,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
             : appliedAkcssSymbols;
         ValueType = valueType;
         ValueOperation = valueOperation;
+        ValueConversion = valueConversion;
         BindingKind = bindingKind;
         ValueKind = valueKind;
         ValueSyntax = valueSyntax;
@@ -78,6 +81,8 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
     public CSharpSymbolDefinition ValueType { get; }
 
     public CSharpOperationDefinition ValueOperation { get; }
+
+    public AkburaConversion ValueConversion { get; }
 
     public ICSharpOperation? ValueOperationTree { get; }
 

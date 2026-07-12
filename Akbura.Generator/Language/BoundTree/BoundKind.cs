@@ -30,6 +30,7 @@ internal enum BoundKind : byte
     AkcssApply,
     AkcssIntercept,
     Block,
+    CSharpStatement,
     BadStatement,
     LocalDeclarationStatement,
     Expression,

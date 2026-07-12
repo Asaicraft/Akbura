@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -15,6 +16,7 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
         IPropertySymbol? property,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         AkcssPropertyValueKind valueKind,
         bool requiresBrushConversion,
         object? convertedValue,
@@ -26,6 +28,7 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
         Property = property;
         ValueType = valueType;
         ValueOperation = valueOperation;
+        ValueConversion = valueConversion;
         ValueKind = valueKind;
         RequiresBrushConversion = requiresBrushConversion;
         ConvertedValue = convertedValue;
@@ -68,6 +71,8 @@ internal sealed class AkcssPropertySetterOperation : IAkcssPropertySetterOperati
     public CSharpSymbolDefinition ValueType { get; }
 
     public CSharpOperationDefinition ValueOperation { get; }
+
+    public AkburaConversion ValueConversion { get; }
 
     public ICSharpOperation? ValueOperationTree { get; }
 

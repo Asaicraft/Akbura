@@ -16,6 +16,14 @@ internal interface IPropertySymbol : ISymbol
 
     CSharpSymbolDefinition ClrPropertyDefinition { get; }
 
+    PropertyAccessKind ReadKind { get; }
+
+    CSharpSymbolDefinition ReadDefinition { get; }
+
+    PropertyAccessKind WriteKind { get; }
+
+    CSharpSymbolDefinition WriteDefinition { get; }
+
     IParamSymbol? Parameter { get; }
 
     ICommandSymbol? Command { get; }

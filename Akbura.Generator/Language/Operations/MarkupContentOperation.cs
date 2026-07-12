@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -17,6 +18,7 @@ internal sealed class MarkupContentOperation : IMarkupContentOperation
         ImmutableArray<MarkupChildContent> content,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         string? literalValue,
         bool isSynthesizedString,
         bool hasErrors,
@@ -31,6 +33,7 @@ internal sealed class MarkupContentOperation : IMarkupContentOperation
             : content;
         ValueType = valueType;
         ValueOperation = valueOperation;
+        ValueConversion = valueConversion;
         LiteralValue = literalValue;
         IsSynthesizedString = isSynthesizedString;
         HasErrors = hasErrors;
@@ -76,6 +79,8 @@ internal sealed class MarkupContentOperation : IMarkupContentOperation
     public CSharpSymbolDefinition ValueType { get; }
 
     public CSharpOperationDefinition ValueOperation { get; }
+
+    public AkburaConversion ValueConversion { get; }
 
     public ICSharpOperation? ValueOperationTree { get; }
 

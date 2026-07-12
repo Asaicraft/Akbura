@@ -63,6 +63,30 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
 
     public CSharpSymbolDefinition ClrPropertyDefinition { get; }
 
+    public PropertyAccessKind ReadKind => GetReadKind();
+
+    public CSharpSymbolDefinition ReadDefinition => ReadKind switch
+    {
+        PropertyAccessKind.AttachedAccessor => AttachedGetterDefinition,
+        PropertyAccessKind.ClrProperty => ClrPropertyDefinition,
+        PropertyAccessKind.AvaloniaProperty => !AvaloniaPropertyDefinition.IsDefault
+            ? AvaloniaPropertyDefinition
+            : AttachedPropertyDefinition,
+        _ => default,
+    };
+
+    public PropertyAccessKind WriteKind => GetWriteKind();
+
+    public CSharpSymbolDefinition WriteDefinition => WriteKind switch
+    {
+        PropertyAccessKind.AttachedAccessor => AttachedSetterDefinition,
+        PropertyAccessKind.ClrProperty => ClrPropertyDefinition,
+        PropertyAccessKind.AvaloniaProperty => !AvaloniaPropertyDefinition.IsDefault
+            ? AvaloniaPropertyDefinition
+            : AttachedPropertyDefinition,
+        _ => default,
+    };
+
     public IParamSymbol? Parameter { get; }
 
     public ICommandSymbol? Command { get; }
@@ -88,6 +112,62 @@ internal sealed class PropertySymbol : Symbol, IPropertySymbol
         !AttachedSetterDefinition.IsDefault ||
         ClrPropertyDefinition.Symbol is RoslynPropertySymbol { SetMethod.DeclaredAccessibility: Accessibility.Public } ||
         (ClrPropertyDefinition.IsDefault && IsAvaloniaProperty);
+
+    private PropertyAccessKind GetReadKind()
+    {
+        if (!AttachedGetterDefinition.IsDefault)
+        {
+            return PropertyAccessKind.AttachedAccessor;
+        }
+
+        if (IsAvaloniaProperty)
+        {
+            return PropertyAccessKind.AvaloniaProperty;
+        }
+
+        if (ClrPropertyDefinition.Symbol is RoslynPropertySymbol { GetMethod.DeclaredAccessibility: Accessibility.Public })
+        {
+            return PropertyAccessKind.ClrProperty;
+        }
+
+        if (Parameter?.SendsValueToParent == true)
+        {
+            return PropertyAccessKind.Parameter;
+        }
+
+        return Command != null
+            ? PropertyAccessKind.Command
+            : PropertyAccessKind.None;
+    }
+
+    private PropertyAccessKind GetWriteKind()
+    {
+        if (!AttachedSetterDefinition.IsDefault)
+        {
+            return PropertyAccessKind.AttachedAccessor;
+        }
+
+        if (IsAvaloniaProperty &&
+            (ClrPropertyDefinition.IsDefault ||
+             ClrPropertyDefinition.Symbol is RoslynPropertySymbol { SetMethod.DeclaredAccessibility: Accessibility.Public }))
+        {
+            return PropertyAccessKind.AvaloniaProperty;
+        }
+
+        if (ClrPropertyDefinition.Symbol is RoslynPropertySymbol { SetMethod.DeclaredAccessibility: Accessibility.Public })
+        {
+            return PropertyAccessKind.ClrProperty;
+        }
+
+        if (Parameter?.ReceivesValueFromParent == true)
+        {
+            return PropertyAccessKind.Parameter;
+        }
+
+        return Command != null
+            ? PropertyAccessKind.Command
+            : PropertyAccessKind.None;
+    }
 
     public override CSharpSymbolDefinition CSharpDefinition => !ClrPropertyDefinition.IsDefault
         ? ClrPropertyDefinition

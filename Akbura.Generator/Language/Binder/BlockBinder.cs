@@ -7,7 +7,6 @@ using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
-using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Language.Binder;
 
@@ -31,6 +30,18 @@ internal sealed class BlockBinder : Binder
     }
 
     public CSharpBlockSyntax BlockSyntax { get; }
+
+    public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind switch
+        {
+            AkburaSyntaxKind.CSharpBlockSyntax =>
+                BindBlock(Unsafe.As<CSharpBlockSyntax>(syntax)),
+            AkburaSyntaxKind.CSharpStatementSyntax =>
+                BindStatement(Unsafe.As<CSharpStatementSyntax>(syntax)),
+            _ => base.BindSemanticSyntax(syntax),
+        };
+    }
 
     public override ImmutableArray<ISymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
     {
@@ -99,7 +110,7 @@ internal sealed class BlockBinder : Binder
         ArrayBuilder<ISymbol> builder,
         CSharpStatementSyntax statement)
     {
-        var parsedStatement = ParseStatement(statement);
+        var parsedStatement = statement.GetRawCSharpStatement();
         if (parsedStatement is not CSharp.LocalDeclarationStatementSyntax)
         {
             return;
@@ -118,9 +129,51 @@ internal sealed class BlockBinder : Binder
         }
     }
 
-    private static CSharp.StatementSyntax ParseStatement(CSharpStatementSyntax statement)
+    private BoundBlock BindBlock(CSharpBlockSyntax block)
     {
-        return CSharpSyntaxFactory.ParseStatement(statement.Tokens.ToFullString());
+        using var statements = ImmutableArrayBuilder<BoundNode>.Rent();
+        foreach (var member in block.Tokens)
+        {
+            switch (member.Kind)
+            {
+                case AkburaSyntaxKind.CSharpStatementSyntax:
+                    statements.Add(SemanticModel.BindingSession.BindSemanticSyntax(member));
+                    break;
+                case AkburaSyntaxKind.MarkupRootSyntax:
+                    statements.Add(SemanticModel.BindingSession.BindSemanticSyntax(member));
+                    break;
+            }
+        }
+
+        return new BoundBlock(
+            block,
+            this,
+            GetDeclaredSymbols(),
+            statements.ToImmutable());
+    }
+
+    private BoundStatement BindStatement(CSharpStatementSyntax statement)
+    {
+        var parsedStatement = statement.GetRawCSharpStatement();
+        if (parsedStatement == null)
+        {
+            return new BoundBadStatement(
+                statement,
+                this,
+                ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        }
+
+        var probeBinder = new CSharpProbeBinder(SemanticModel, this, Flags);
+        var boundStatement = probeBinder.BindStatement(statement, parsedStatement);
+        if (statement.Body != null && boundStatement.Kind == BoundKind.CSharpStatement)
+        {
+            var csharpStatement = Unsafe.As<BoundCSharpStatement>(boundStatement);
+            return csharpStatement.Update(
+                csharpStatement.BindingResult,
+                ImmutableArray.Create(SemanticModel.BindingSession.BindSemanticSyntax(statement.Body)));
+        }
+
+        return boundStatement;
     }
 
     private static bool IsVisibleAt(ISymbol symbol, AkburaSyntax syntax)

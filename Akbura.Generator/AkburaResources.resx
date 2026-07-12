@@ -204,6 +204,9 @@
   <data name="AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed" xml:space="preserve">
     <value>Markup attribute binding '{0}' is not allowed for parameter '{1}' declared as '{2}'.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported" xml:space="preserve">
+    <value>Markup property '{0}' does not provide the {1} required by '{2}' binding.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_MarkupDuplicatePropertySetter" xml:space="preserve">
     <value>Markup property '{0}' already has a setter on this element.</value>
   </data>

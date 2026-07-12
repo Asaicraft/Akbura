@@ -265,6 +265,7 @@ internal sealed partial class MarkupBinder : Binder
             componentSymbol.Children,
             valueType,
             binding.OperationDefinition,
+            binding.Conversion,
             literalValue,
             isSynthesizedString,
             diagnostics,
@@ -355,9 +356,11 @@ internal sealed partial class MarkupBinder : Binder
         var literalValue = default(string);
         var valueType = default(CSharpSymbolDefinition);
         var valueOperation = default(CSharpOperationDefinition);
+        var valueConversion = default(AkburaConversion);
         var dynamicExpression = default(CSharp.ExpressionSyntax);
         var valueBinding = CSharpBindingResult.Empty;
         var markupExtensionBinding = default(MarkupExtensionBindingResult);
+        var literalConversionStatus = MarkupLiteralConversionStatus.Unsupported;
         var targetType = GetExpectedValueType(property);
         object? convertedValue = null;
         var appliedAkcssSymbols = ImmutableArray<IAkcssSymbol>.Empty;
@@ -367,11 +370,15 @@ internal sealed partial class MarkupBinder : Binder
             var literalValueSyntax = Unsafe.As<MarkupLiteralAttributeValueSyntax>(valueSyntax);
             valueKind = MarkupAttributeValueKind.Literal;
             literalValue = AkburaSemanticModel.GetMarkupLiteralAttributeValueText(literalValueSyntax);
-            valueBinding = SemanticModel.BindMarkupAttributeExpression(markupAttribute, CSharpSyntaxFactory.LiteralExpression(
-                CSharpSyntaxKind.StringLiteralExpression,
-                CSharpSyntaxFactory.Literal(literalValue)));
+            valueBinding = SemanticModel.BindMarkupAttributeExpression(
+                markupAttribute,
+                CSharpSyntaxFactory.LiteralExpression(
+                    CSharpSyntaxKind.StringLiteralExpression,
+                    CSharpSyntaxFactory.Literal(literalValue)),
+                targetType);
             valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
             valueOperation = valueBinding.OperationDefinition;
+            valueConversion = valueBinding.Conversion;
             if (AkburaSemanticModel.IsMarkupDataTypeDirective(markupAttribute) &&
                 SemanticModel.TryBindMarkupDataTypeDirective(literalValue, out var dataType))
             {
@@ -379,11 +386,28 @@ internal sealed partial class MarkupBinder : Binder
                 convertedValue = new CSharpSymbolDefinition(dataType);
             }
             else if (property?.Type.Symbol is CSharpTypeSymbol literalTargetType &&
-                AkburaSemanticModel.IsAvaloniaGridDefinitionListType(literalTargetType) &&
-                GridDefinitionLiteralParser.TryParse(literalValue, out var gridDefinitions))
+                AkburaSemanticModel.IsAvaloniaGridDefinitionListType(literalTargetType))
             {
-                valueType = new CSharpSymbolDefinition(literalTargetType);
-                convertedValue = gridDefinitions;
+                if (GridDefinitionLiteralParser.TryParse(literalValue, out var gridDefinitions))
+                {
+                    valueType = new CSharpSymbolDefinition(literalTargetType);
+                    convertedValue = gridDefinitions;
+                }
+            }
+            else if (property?.Type.Symbol is CSharpTypeSymbol targetLiteralType)
+            {
+                literalConversionStatus = MarkupLiteralValueConverter.Convert(
+                    literalValue,
+                    targetLiteralType,
+                    SemanticModel.Compilation.CSharpCompilation,
+                    out convertedValue);
+                if (literalConversionStatus == MarkupLiteralConversionStatus.Success)
+                {
+                    if (targetLiteralType.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Object)
+                    {
+                        valueType = new CSharpSymbolDefinition(targetLiteralType);
+                    }
+                }
             }
         }
         else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
@@ -401,6 +425,7 @@ internal sealed partial class MarkupBinder : Binder
                 valueBinding = SemanticModel.BindMarkupAttributeExpression(markupAttribute, expression, targetType);
                 valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
                 valueOperation = valueBinding.OperationDefinition;
+                valueConversion = valueBinding.Conversion;
             }
         }
         else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
@@ -412,6 +437,7 @@ internal sealed partial class MarkupBinder : Binder
                 markupExtensionValueSyntax.Extension,
                 property);
             valueType = markupExtensionBinding.ResultType;
+            valueConversion = markupExtensionBinding.Conversion;
             convertedValue = markupExtensionBinding.Value;
         }
 
@@ -458,6 +484,11 @@ internal sealed partial class MarkupBinder : Binder
                         markupAttribute,
                         property,
                         literalValue,
+                        diagnosticsBuilder);
+                    SemanticModel.AddMarkupLiteralValueDiagnostics(
+                        markupAttribute,
+                        property,
+                        literalConversionStatus,
                         diagnosticsBuilder);
                 }
 
@@ -534,6 +565,7 @@ internal sealed partial class MarkupBinder : Binder
             appliedAkcssSymbols,
             valueType,
             valueOperation,
+            valueConversion,
             bindingKind,
             valueKind,
             valueSyntax,

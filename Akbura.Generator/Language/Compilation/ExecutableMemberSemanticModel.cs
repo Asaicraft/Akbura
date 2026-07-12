@@ -1,7 +1,10 @@
 using Akbura.Language.BoundTree;
+using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language;
 
@@ -18,6 +21,53 @@ internal sealed class ExecutableMemberSemanticModel : BinderBackedMemberSemantic
     public IncrementalBinder CreateIncrementalBinder(Akbura.Language.Binder.Binder next)
     {
         return new IncrementalBinder(this, next);
+    }
+
+    public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
+    {
+        if (syntax.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
+        {
+            return base.BindSemanticSyntax(syntax);
+        }
+
+        if (TryGetBoundNodeFromMap(syntax, out var cached))
+        {
+            return cached;
+        }
+
+        var statement = Unsafe.As<CSharpStatementSyntax>(syntax);
+        var csharpStatement = statement.GetRawCSharpStatement();
+        if (csharpStatement == null)
+        {
+            var badStatement = new BoundBadStatement(
+                statement,
+                GetBinder(statement, BinderUsage.Expression),
+                System.Collections.Immutable.ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            AddBoundTreeToMap(badStatement);
+            return badStatement;
+        }
+
+        var boundNode = BindingSession
+            .GetCSharpProbeBinder(statement, BinderUsage.Expression)
+            .BindStatement(statement, csharpStatement);
+        if (statement.Body != null && boundNode.Kind == BoundKind.CSharpStatement)
+        {
+            var boundStatement = Unsafe.As<BoundCSharpStatement>(boundNode);
+            boundNode = boundStatement.Update(
+                boundStatement.BindingResult,
+                System.Collections.Immutable.ImmutableArray.Create(
+                    BindingSession.BindSemanticSyntax(statement.Body)));
+        }
+
+        AddBoundTreeToMap(boundNode);
+        return boundNode;
+    }
+
+    public override BoundNode BindOperationSyntax(AkburaSyntax syntax)
+    {
+        return syntax.Kind == AkburaSyntaxKind.CSharpStatementSyntax
+            ? BindSemanticSyntax(syntax)
+            : base.BindOperationSyntax(syntax);
     }
 
     internal sealed class IncrementalBinder : Akbura.Language.Binder.Binder

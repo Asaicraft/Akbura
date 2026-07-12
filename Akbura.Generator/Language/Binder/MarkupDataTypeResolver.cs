@@ -23,6 +23,15 @@ internal sealed class MarkupDataTypeResolver
         MarkupAttributeSyntax anchor,
         out INamedTypeSymbol dataType)
     {
+        return TryGetDataType(anchor, out dataType, out _);
+    }
+
+    public bool TryGetDataType(
+        MarkupAttributeSyntax anchor,
+        out INamedTypeSymbol dataType,
+        out string? failureMessage)
+    {
+        failureMessage = null;
         for (var node = anchor.Parent; node != null; node = node.Parent)
         {
             if (node.Kind != AkburaSyntaxKind.MarkupElementSyntax)
@@ -32,12 +41,16 @@ internal sealed class MarkupDataTypeResolver
 
             var markupElement = Unsafe.As<MarkupElementSyntax>(node);
             if (TryGetExplicitDataType(markupElement, out dataType) ||
-                TryGetInheritedDataType(markupElement, out dataType, out var isTemplateBoundary))
+                TryGetInheritedDataType(
+                    markupElement,
+                    out dataType,
+                    out var isTemplateBoundary,
+                    out failureMessage))
             {
                 return true;
             }
 
-            if (isTemplateBoundary)
+            if (failureMessage != null || isTemplateBoundary)
             {
                 break;
             }
@@ -58,7 +71,7 @@ internal sealed class MarkupDataTypeResolver
         }
 
         if (!TryGetExplicitDataType(scope, out var itemType) &&
-            !TryGetInheritedDataType(scope, out itemType, out _))
+            !TryGetInheritedDataType(scope, out itemType, out _, out _))
         {
             return false;
         }
@@ -128,10 +141,12 @@ internal sealed class MarkupDataTypeResolver
     private bool TryGetInheritedDataType(
         MarkupElementSyntax propertyElement,
         out INamedTypeSymbol dataType,
-        out bool isTemplateBoundary)
+        out bool isTemplateBoundary,
+        out string? failureMessage)
     {
         dataType = null!;
         isTemplateBoundary = false;
+        failureMessage = null;
         if (!TryGetPropertyElement(
                 propertyElement,
                 out var property,
@@ -148,11 +163,22 @@ internal sealed class MarkupDataTypeResolver
         var itemsOwner = FindAncestor(containingElement, ancestorType);
         if (itemsOwner == null ||
             !TryFindAttribute(itemsOwner, itemsPropertyName, out var itemsAttribute) ||
-            !TryGetAttributeSourceType(itemsAttribute, out var itemsSourceType) ||
-            !TryGetEnumerableElementType(itemsSourceType, out var itemType) ||
+            !TryGetAttributeSourceType(itemsAttribute, out var itemsSourceType))
+        {
+            return false;
+        }
+
+        if (!TryGetEnumerableElementType(itemsSourceType, out var itemType))
+        {
+            failureMessage = $"Cannot infer template data type from '{itemsPropertyName}' because type '{itemsSourceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}' does not expose IEnumerable<T>.";
+            return false;
+        }
+
+        if (
             itemType is not INamedTypeSymbol namedItemType ||
             namedItemType.TypeKind == TypeKind.Error)
         {
+            failureMessage = $"Cannot infer a concrete template data type from '{itemsPropertyName}'.";
             return false;
         }
 

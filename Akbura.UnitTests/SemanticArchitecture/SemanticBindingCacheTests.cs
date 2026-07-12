@@ -440,6 +440,41 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
 
 
     [Fact]
+    public void SemanticBindingCache_LocalDiagnosticsInvalidateAncestorAggregate()
+    {
+        var tree = AkburaSyntaxTree.ParseText(
+            "using Avalonia.Controls;\n<TextBlock Text={missing} />",
+            "Counter.akbura");
+        var root = tree.GetRoot();
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[1]);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(markup.Element.StartTag!.Attributes[0]);
+        var cache = new SemanticBindingCache();
+        var bindCount = 0;
+
+        var initial = cache.GetAggregatedDiagnostics(root, BindAggregate);
+        cache.SetDiagnostics(
+            attribute,
+            ImmutableArray.Create(new AkburaSemanticDiagnostic(
+                attribute,
+                ErrorCodes.ERR_SyntaxError,
+                ["late diagnostic"])));
+        var updated = cache.GetAggregatedDiagnostics(root, BindAggregate);
+
+        Assert.Empty(initial);
+        Assert.Single(updated);
+        Assert.Equal(2, bindCount);
+
+        ImmutableArray<AkburaSemanticDiagnostic> BindAggregate()
+        {
+            bindCount++;
+            return cache.TryGetDiagnostics(attribute, out var diagnostics)
+                ? diagnostics
+                : [];
+        }
+    }
+
+
+    [Fact]
     public void BindingDiagnosticBag_DeduplicatesSemanticAndCSharpDiagnostics()
     {
         const string code = "state int count = 0;";

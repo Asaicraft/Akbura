@@ -66,6 +66,7 @@ internal sealed class BoundMarkupContentSetter : BoundNode
         ImmutableArray<MarkupChildContent> content,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         string? literalValue,
         bool isSynthesizedString,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
@@ -86,6 +87,7 @@ internal sealed class BoundMarkupContentSetter : BoundNode
             : content;
         ValueType = valueType;
         ValueOperation = valueOperation;
+        ValueConversion = valueConversion;
         LiteralValue = literalValue;
         IsSynthesizedString = isSynthesizedString;
     }
@@ -104,6 +106,8 @@ internal sealed class BoundMarkupContentSetter : BoundNode
 
     public CSharpOperationDefinition ValueOperation { get; }
 
+    public AkburaConversion ValueConversion { get; }
+
     public string? LiteralValue { get; }
 
     public bool IsSynthesizedString { get; }
@@ -115,6 +119,7 @@ internal sealed class BoundMarkupContentSetter : BoundNode
         ImmutableArray<MarkupChildContent> content,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         string? literalValue,
         bool isSynthesizedString)
     {
@@ -124,6 +129,7 @@ internal sealed class BoundMarkupContentSetter : BoundNode
             content == Content &&
             valueType.Equals(ValueType) &&
             valueOperation.Equals(ValueOperation) &&
+            valueConversion.Equals(ValueConversion) &&
             literalValue == LiteralValue &&
             isSynthesizedString == IsSynthesizedString)
         {
@@ -139,6 +145,7 @@ internal sealed class BoundMarkupContentSetter : BoundNode
             content,
             valueType,
             valueOperation,
+            valueConversion,
             literalValue,
             isSynthesizedString,
             Diagnostics,
@@ -168,6 +175,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         ImmutableArray<IAkcssSymbol> appliedAkcssSymbols,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         MarkupAttributeBindingKind bindingKind,
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
@@ -190,6 +198,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             : appliedAkcssSymbols;
         ValueType = valueType;
         ValueOperation = valueOperation;
+        ValueConversion = valueConversion;
         BindingKind = bindingKind;
         ValueKind = valueKind;
         ValueSyntax = valueSyntax;
@@ -204,6 +213,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
     public CSharpSymbolDefinition ValueType { get; }
 
     public CSharpOperationDefinition ValueOperation { get; }
+
+    public AkburaConversion ValueConversion { get; }
 
     public MarkupAttributeBindingKind BindingKind { get; }
 
@@ -221,6 +232,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         ImmutableArray<IAkcssSymbol> appliedAkcssSymbols,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         MarkupAttributeBindingKind bindingKind,
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
@@ -232,6 +244,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             appliedAkcssSymbols == AppliedAkcssSymbols &&
             valueType.Equals(ValueType) &&
             valueOperation.Equals(ValueOperation) &&
+            valueConversion.Equals(ValueConversion) &&
             bindingKind == BindingKind &&
             valueKind == ValueKind &&
             ReferenceEquals(valueSyntax, ValueSyntax) &&
@@ -249,6 +262,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             appliedAkcssSymbols,
             valueType,
             valueOperation,
+            valueConversion,
             bindingKind,
             valueKind,
             valueSyntax,
@@ -673,6 +687,7 @@ internal sealed class BoundAkcssPropertySetter : BoundAkcssOperation
         IPropertySymbol? property,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         AkcssPropertyValueKind valueKind,
         bool requiresBrushConversion,
         object? convertedValue,
@@ -690,6 +705,7 @@ internal sealed class BoundAkcssPropertySetter : BoundAkcssOperation
         Property = property;
         ValueType = valueType;
         ValueOperation = valueOperation;
+        ValueConversion = valueConversion;
         ValueKind = valueKind;
         RequiresBrushConversion = requiresBrushConversion;
         ConvertedValue = convertedValue;
@@ -703,6 +719,8 @@ internal sealed class BoundAkcssPropertySetter : BoundAkcssOperation
 
     public CSharpOperationDefinition ValueOperation { get; }
 
+    public AkburaConversion ValueConversion { get; }
+
     public AkcssPropertyValueKind ValueKind { get; }
 
     public bool RequiresBrushConversion { get; }
@@ -714,6 +732,7 @@ internal sealed class BoundAkcssPropertySetter : BoundAkcssOperation
         IPropertySymbol? property,
         CSharpSymbolDefinition valueType,
         CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
         AkcssPropertyValueKind valueKind,
         bool requiresBrushConversion,
         object? convertedValue)
@@ -722,6 +741,7 @@ internal sealed class BoundAkcssPropertySetter : BoundAkcssOperation
             ReferenceEquals(property, Property) &&
             valueType.Equals(ValueType) &&
             valueOperation.Equals(ValueOperation) &&
+            valueConversion.Equals(ValueConversion) &&
             valueKind == ValueKind &&
             requiresBrushConversion == RequiresBrushConversion &&
             Equals(convertedValue, ConvertedValue))
@@ -736,6 +756,7 @@ internal sealed class BoundAkcssPropertySetter : BoundAkcssOperation
             property,
             valueType,
             valueOperation,
+            valueConversion,
             valueKind,
             requiresBrushConversion,
             convertedValue,

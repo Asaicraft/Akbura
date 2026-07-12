@@ -101,6 +101,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveMarkupProperty(Unsafe.As<MarkupAttributeSyntax>(syntax)),
+            AkburaSyntaxKind.AkcssAssignmentSyntax =>
+                BindingSession.BindOperationSyntax(syntax).SymbolInfo,
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
         });
     }
@@ -129,70 +131,83 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         ValidateSyntaxTreeOwnership(syntax);
-        return _bindingCache.GetDiagnostics(syntax, () =>
+        return _bindingCache.GetAggregatedDiagnostics(
+            syntax,
+            () => GetSemanticDiagnosticsCore(syntax));
+    }
+
+    private ImmutableArray<AkburaSemanticDiagnostic> GetSemanticDiagnosticsCore(AkburaSyntax syntax)
+    {
+        _ = GetSymbolInfo(syntax);
+        if (syntax.Kind == AkburaSyntaxKind.AkburaDocumentSyntax)
         {
-            _ = GetSymbolInfo(syntax);
-            if (syntax.Kind == AkburaSyntaxKind.AkburaDocumentSyntax)
-            {
-                return CreateComponentSemanticDiagnostics(Unsafe.As<AkburaDocumentSyntax>(syntax));
-            }
+            return CreateComponentSemanticDiagnostics(Unsafe.As<AkburaDocumentSyntax>(syntax));
+        }
 
-            if (syntax.Kind is AkburaSyntaxKind.StateDeclarationSyntax or
-                AkburaSyntaxKind.ParamDeclarationSyntax or
-                AkburaSyntaxKind.InjectDeclarationSyntax or
-                AkburaSyntaxKind.CommandDeclarationSyntax or
-                AkburaSyntaxKind.UseEffectDeclarationSyntax or
-                AkburaSyntaxKind.MarkupRootSyntax or
-                AkburaSyntaxKind.MarkupElementSyntax or
-                AkburaSyntaxKind.MarkupElementContentSyntax or
-                AkburaSyntaxKind.MarkupInlineExpressionSyntax or
-                AkburaSyntaxKind.MarkupTextLiteralSyntax or
-                AkburaSyntaxKind.InlineAkcssBlockSyntax or
-                AkburaSyntaxKind.AkcssStyleRuleSyntax or
-                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax)
-            {
-                return CreateSemanticDiagnosticsFromBoundTree(
-                    BindingSession.BindSemanticSyntax(syntax));
-            }
+        if (syntax.Kind is AkburaSyntaxKind.StateDeclarationSyntax or
+            AkburaSyntaxKind.ParamDeclarationSyntax or
+            AkburaSyntaxKind.InjectDeclarationSyntax or
+            AkburaSyntaxKind.CommandDeclarationSyntax or
+            AkburaSyntaxKind.UseEffectDeclarationSyntax or
+            AkburaSyntaxKind.MarkupRootSyntax or
+            AkburaSyntaxKind.MarkupElementSyntax or
+            AkburaSyntaxKind.MarkupElementContentSyntax or
+            AkburaSyntaxKind.MarkupInlineExpressionSyntax or
+            AkburaSyntaxKind.MarkupTextLiteralSyntax or
+            AkburaSyntaxKind.InlineAkcssBlockSyntax or
+            AkburaSyntaxKind.AkcssStyleRuleSyntax or
+            AkburaSyntaxKind.AkcssUtilityDeclarationSyntax)
+        {
+            return CreateSemanticDiagnosticsFromBoundTree(
+                BindingSession.BindSemanticSyntax(syntax),
+                GetCachedSemanticDiagnostics(syntax));
+        }
 
-            if (syntax.Kind is AkburaSyntaxKind.MarkupPlainAttributeSyntax or
-                AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
-                AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
-                AkburaSyntaxKind.TailwindFlagAttributeSyntax or
-                AkburaSyntaxKind.TailwindFullAttributeSyntax or
-                AkburaSyntaxKind.AkcssAssignmentSyntax or
-                AkburaSyntaxKind.AkcssIfDirectiveSyntax or
-                AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
-                AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
-            {
-                return CreateSemanticDiagnosticsFromBoundTree(
-                    BindingSession.BindOperationSyntax(syntax));
-            }
-            else if (syntax.Kind == AkburaSyntaxKind.CSharpStatementSyntax)
-            {
-                var csharpStatement = Unsafe.As<CSharpStatementSyntax>(syntax);
-                SetSemanticDiagnosticsIfAbsent(
-                    csharpStatement,
-                    CreateCSharpStatementUserHookDiagnostics(csharpStatement));
-            }
+        if (syntax.Kind is AkburaSyntaxKind.MarkupPlainAttributeSyntax or
+            AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
+            AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
+            AkburaSyntaxKind.TailwindFlagAttributeSyntax or
+            AkburaSyntaxKind.TailwindFullAttributeSyntax or
+            AkburaSyntaxKind.AkcssAssignmentSyntax or
+            AkburaSyntaxKind.AkcssIfDirectiveSyntax or
+            AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
+            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
+        {
+            return CreateSemanticDiagnosticsFromBoundTree(
+                BindingSession.BindOperationSyntax(syntax),
+                GetCachedSemanticDiagnostics(syntax));
+        }
 
-            return _bindingCache.TryGetDiagnostics(syntax, out var diagnostics)
-                ? diagnostics
-                : [];
-        });
+        if (syntax.Kind == AkburaSyntaxKind.CSharpStatementSyntax)
+        {
+            var csharpStatement = Unsafe.As<CSharpStatementSyntax>(syntax);
+            var bag = BindingDiagnosticBag.GetInstance();
+            AddBoundTreeDiagnostics(
+                BindingSession.BindSemanticSyntax(csharpStatement),
+                bag);
+            bag.AddRange(CreateCSharpStatementUserHookDiagnostics(csharpStatement));
+            return SetSemanticDiagnostics(csharpStatement, bag);
+        }
+
+        return _bindingCache.TryGetDiagnostics(syntax, out var diagnostics)
+            ? diagnostics
+            : [];
     }
 
     private ImmutableArray<AkburaSemanticDiagnostic> CreateComponentSemanticDiagnostics(
         AkburaDocumentSyntax document)
     {
         return CreateSemanticDiagnosticsFromBoundTree(
-            BindingSession.BindSemanticSyntax(document));
+            BindingSession.BindSemanticSyntax(document),
+            GetCachedSemanticDiagnostics(document));
     }
 
     private static ImmutableArray<AkburaSemanticDiagnostic> CreateSemanticDiagnosticsFromBoundTree(
-        BoundNode boundNode)
+        BoundNode boundNode,
+        ImmutableArray<AkburaSemanticDiagnostic> additionalDiagnostics = default)
     {
         var bag = BindingDiagnosticBag.GetInstance();
+        bag.AddRange(additionalDiagnostics);
         AddBoundTreeDiagnostics(boundNode, bag);
         var diagnostics = bag.ToSemanticDiagnostics();
         bag.Free();
@@ -2118,7 +2133,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return null;
     }
 
-    private ImmutableArray<AkburaSemanticDiagnostic> CreateCSharpStatementUserHookDiagnostics(
+    internal ImmutableArray<AkburaSemanticDiagnostic> CreateCSharpStatementUserHookDiagnostics(
         CSharpStatementSyntax statement)
     {
         using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
@@ -3808,7 +3823,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         if (!method.IsStatic ||
             method.DeclaredAccessibility != Accessibility.Public ||
-            method.Parameters.Length < minimumParameterCount)
+            method.Arity != 0 ||
+            method.Parameters.Length != minimumParameterCount ||
+            method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None))
         {
             return false;
         }
@@ -3820,7 +3837,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         return isSetter
             ? method.ReturnsVoid &&
-              method.Parameters.Length > 1 &&
               SymbolEqualityComparer.Default.Equals(method.Parameters[1].Type, attachedValueType)
             : SymbolEqualityComparer.Default.Equals(method.ReturnType, attachedValueType);
     }

@@ -617,6 +617,7 @@ internal sealed partial class AkcssStyleBinder : Binder
             property,
             valueType,
             valueOperation,
+            activeBinding.Conversion,
             valueKind,
             requiresBrushConversion,
             convertedValue,

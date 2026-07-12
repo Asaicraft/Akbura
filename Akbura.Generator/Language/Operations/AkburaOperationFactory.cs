@@ -41,6 +41,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             BoundKind.AkcssIf => CreateAkcssIfOperation((BoundAkcssIf)boundNode),
             BoundKind.AkcssApply => CreateAkcssApplyOperation((BoundAkcssApply)boundNode),
             BoundKind.AkcssIntercept => CreateAkcssInterceptOperation((BoundAkcssIntercept)boundNode),
+            BoundKind.CSharpStatement => CreateCSharpStatementOperation((BoundCSharpStatement)boundNode),
+            BoundKind.LocalDeclarationStatement => CreateCSharpStatementOperation((BoundLocalDeclarationStatement)boundNode),
             _ => null,
         };
     }
@@ -210,6 +212,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             boundNode.Content,
             boundNode.ValueType,
             boundNode.ValueOperation,
+            boundNode.ValueConversion,
             boundNode.LiteralValue,
             boundNode.IsSynthesizedString,
             boundNode.HasErrors,
@@ -229,6 +232,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             boundNode.AppliedAkcssSymbols,
             boundNode.ValueType,
             boundNode.ValueOperation,
+            boundNode.ValueConversion,
             boundNode.BindingKind,
             boundNode.ValueKind,
             boundNode.ValueSyntax,
@@ -322,6 +326,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             boundNode.Property,
             boundNode.ValueType,
             boundNode.ValueOperation,
+            boundNode.ValueConversion,
             boundNode.ValueKind,
             boundNode.RequiresBrushConversion,
             boundNode.ConvertedValue,
@@ -407,6 +412,22 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         IAkcssSymbol? containingAkcssSymbol)
     {
         return _createCSharpOperationSymbolMapper(syntax, containingAkcssSymbol);
+    }
+
+    private ICSharpOperation? CreateCSharpStatementOperation(BoundCSharpStatement boundNode)
+    {
+        return CreateCSharpOperationTree(
+            boundNode.Syntax,
+            boundNode.BindingResult.OperationDefinition,
+            CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null));
+    }
+
+    private ICSharpOperation? CreateCSharpStatementOperation(BoundLocalDeclarationStatement boundNode)
+    {
+        return CreateCSharpOperationTree(
+            boundNode.Syntax,
+            boundNode.BindingResult.OperationDefinition,
+            CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null));
     }
 
     private static ICSharpOperation? CreateCSharpOperationTree(

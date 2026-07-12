@@ -259,6 +259,15 @@ namespace Akbura {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Markup property '{0}' does not provide the {1} required by '{2}' binding..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Markup property &apos;{0}&apos; already has a setter on this element..
         /// </summary>
         internal static string AKBURA_SEMANTIC_MarkupDuplicatePropertySetter {

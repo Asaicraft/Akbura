@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -167,7 +168,7 @@ internal sealed partial class CSharpProbeBinder : Binder
             .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == "__akbura_statement_probe")
             .Body!
             .Statements
-            .Single();
+            .Last();
 
         return BindStatementTree(syntax, semanticModel, probeStatement, isBindingPath);
     }
@@ -265,11 +266,21 @@ internal sealed partial class CSharpProbeBinder : Binder
         {
             CSharp.LocalDeclarationStatementSyntax localDeclaration =>
                 BindLocalDeclarationStatement(syntax, semanticModel, localDeclaration, isBindingPath),
-            _ => new BoundBadStatement(
-                syntax,
-                this,
-                ImmutableArray<AkburaSemanticDiagnostic>.Empty),
+            _ => BindCSharpStatement(syntax, semanticModel, statement),
         };
+    }
+
+    private BoundCSharpStatement BindCSharpStatement(
+        AkburaSyntax syntax,
+        RoslynSemanticModel semanticModel,
+        CSharp.StatementSyntax statement)
+    {
+        var bindingResult = BindStatement(semanticModel, statement, symbol: null);
+        return new BoundCSharpStatement(
+            syntax,
+            this,
+            bindingResult,
+            CreateStatementDiagnostics(syntax, bindingResult));
     }
 
     private BoundLocalDeclarationStatement BindLocalDeclarationStatement(
@@ -304,7 +315,31 @@ internal sealed partial class CSharpProbeBinder : Binder
             this,
             bindingResult,
             locals.ToImmutableAndFree(),
-            initializers.ToImmutableAndFree());
+            initializers.ToImmutableAndFree(),
+            CreateStatementDiagnostics(syntax, bindingResult));
+    }
+
+    private ImmutableArray<AkburaSemanticDiagnostic> CreateStatementDiagnostics(
+        AkburaSyntax syntax,
+        CSharpBindingResult bindingResult)
+    {
+        if (syntax.Kind == Akbura.Language.Syntax.SyntaxKind.CSharpStatementSyntax)
+        {
+            var statement = Unsafe.As<CSharpStatementSyntax>(syntax);
+            var userHookDiagnostics = SemanticModel.CreateCSharpStatementUserHookDiagnostics(statement);
+            if (!userHookDiagnostics.IsDefaultOrEmpty)
+            {
+                return userHookDiagnostics;
+            }
+        }
+
+        using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        AkburaSemanticModel.AddCSharpBindingDiagnostics(
+            syntax,
+            syntax.ToFullString().Trim(),
+            bindingResult,
+            builder);
+        return builder.ToImmutable();
     }
 
     private BoundExpression BindExpressionTree(

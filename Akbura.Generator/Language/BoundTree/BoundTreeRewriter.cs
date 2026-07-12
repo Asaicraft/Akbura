@@ -47,6 +47,13 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node.Update(declaredSymbols, statements);
     }
 
+    public override BoundNode? VisitCSharpStatement(BoundCSharpStatement node)
+    {
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
+        var children = VisitList(node.Children);
+        return node.Update(bindingResult, children);
+    }
+
     public override BoundNode? VisitBadStatement(BoundBadStatement node)
     {
         var children = VisitList(node.Children);
@@ -132,6 +139,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         var content = VisitMarkupChildContentList(node.Content);
         var valueType = VisitCSharpSymbolDefinition(node.ValueType);
         var valueOperation = VisitCSharpOperationDefinition(node.ValueOperation);
+        var valueConversion = VisitConversion(node.ValueConversion);
 
         return node.Update(
             containingComponent,
@@ -140,6 +148,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             content,
             valueType,
             valueOperation,
+            valueConversion,
             node.LiteralValue,
             node.IsSynthesizedString);
     }
@@ -205,6 +214,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         var appliedAkcssSymbols = VisitAkburaSymbolList(node.AppliedAkcssSymbols);
         var valueType = VisitCSharpSymbolDefinition(node.ValueType);
         var valueOperation = VisitCSharpOperationDefinition(node.ValueOperation);
+        var valueConversion = VisitConversion(node.ValueConversion);
 
         return node.Update(
             containingComponent,
@@ -212,6 +222,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             appliedAkcssSymbols,
             valueType,
             valueOperation,
+            valueConversion,
             node.BindingKind,
             node.ValueKind,
             node.ValueSyntax,
@@ -293,12 +304,14 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         var property = (Akbura.Language.Symbols.IPropertySymbol?)VisitSymbol(node.Property);
         var valueType = VisitCSharpSymbolDefinition(node.ValueType);
         var valueOperation = VisitCSharpOperationDefinition(node.ValueOperation);
+        var valueConversion = VisitConversion(node.ValueConversion);
 
         return node.Update(
             containingAkcssSymbol,
             property,
             valueType,
             valueOperation,
+            valueConversion,
             node.ValueKind,
             node.RequiresBrushConversion,
             node.ConvertedValue);

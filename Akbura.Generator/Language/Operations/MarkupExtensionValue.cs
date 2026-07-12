@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using System;
 using System.Collections.Immutable;
@@ -111,12 +112,22 @@ internal readonly struct MarkupBindingPathElement
         MarkupBindingPathElementKind kind,
         string text,
         CSharpSymbolDefinition symbol = default,
-        CSharpSymbolDefinition type = default)
+        CSharpSymbolDefinition type = default,
+        ImmutableArray<string> arguments = default,
+        ImmutableArray<MarkupBindingPathArgument> boundArguments = default,
+        int? level = null)
     {
         Kind = kind;
         Text = text ?? throw new ArgumentNullException(nameof(text));
         Symbol = symbol;
         Type = type;
+        Arguments = arguments.IsDefault
+            ? ImmutableArray<string>.Empty
+            : arguments;
+        BoundArguments = boundArguments.IsDefault
+            ? ImmutableArray<MarkupBindingPathArgument>.Empty
+            : boundArguments;
+        Level = level;
     }
 
     public MarkupBindingPathElementKind Kind { get; }
@@ -126,6 +137,43 @@ internal readonly struct MarkupBindingPathElement
     public CSharpSymbolDefinition Symbol { get; }
 
     public CSharpSymbolDefinition Type { get; }
+
+    public ImmutableArray<string> Arguments { get; }
+
+    public ImmutableArray<MarkupBindingPathArgument> BoundArguments { get; }
+
+    public int? Level { get; }
+}
+
+internal readonly struct MarkupBindingPathArgument
+{
+    public MarkupBindingPathArgument(
+        string text,
+        CSharpSymbolDefinition parameter,
+        CSharpSymbolDefinition type,
+        CSharpOperationDefinition operation,
+        AkburaConversion conversion,
+        object? convertedValue)
+    {
+        Text = text ?? throw new ArgumentNullException(nameof(text));
+        Parameter = parameter;
+        Type = type;
+        Operation = operation;
+        Conversion = conversion;
+        ConvertedValue = convertedValue;
+    }
+
+    public string Text { get; }
+
+    public CSharpSymbolDefinition Parameter { get; }
+
+    public CSharpSymbolDefinition Type { get; }
+
+    public CSharpOperationDefinition Operation { get; }
+
+    public AkburaConversion Conversion { get; }
+
+    public object? ConvertedValue { get; }
 }
 
 internal readonly struct MarkupExtensionArgumentValue
@@ -135,6 +183,7 @@ internal readonly struct MarkupExtensionArgumentValue
         CSharpSymbolDefinition parameter,
         CSharpSymbolDefinition type,
         CSharpOperationDefinition operation,
+        AkburaConversion conversion,
         object? convertedValue,
         MarkupExtensionValue? nestedValue)
     {
@@ -142,6 +191,7 @@ internal readonly struct MarkupExtensionArgumentValue
         Parameter = parameter;
         Type = type;
         Operation = operation;
+        Conversion = conversion;
         ConvertedValue = convertedValue;
         NestedValue = nestedValue;
     }
@@ -153,6 +203,8 @@ internal readonly struct MarkupExtensionArgumentValue
     public CSharpSymbolDefinition Type { get; }
 
     public CSharpOperationDefinition Operation { get; }
+
+    public AkburaConversion Conversion { get; }
 
     public object? ConvertedValue { get; }
 
@@ -167,6 +219,7 @@ internal readonly struct MarkupExtensionPropertyValue
         CSharpSymbolDefinition property,
         CSharpSymbolDefinition type,
         CSharpOperationDefinition operation,
+        AkburaConversion conversion,
         object? convertedValue,
         MarkupExtensionValue? nestedValue)
     {
@@ -175,6 +228,7 @@ internal readonly struct MarkupExtensionPropertyValue
         Property = property;
         Type = type;
         Operation = operation;
+        Conversion = conversion;
         ConvertedValue = convertedValue;
         NestedValue = nestedValue;
     }
@@ -188,6 +242,8 @@ internal readonly struct MarkupExtensionPropertyValue
     public CSharpSymbolDefinition Type { get; }
 
     public CSharpOperationDefinition Operation { get; }
+
+    public AkburaConversion Conversion { get; }
 
     public object? ConvertedValue { get; }
 

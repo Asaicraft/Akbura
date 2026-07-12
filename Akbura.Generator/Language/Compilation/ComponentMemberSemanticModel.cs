@@ -525,6 +525,7 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     case AkburaSyntaxKind.UseEffectDeclarationSyntax:
                     case AkburaSyntaxKind.MarkupRootSyntax:
                     case AkburaSyntaxKind.InlineAkcssBlockSyntax:
+                    case AkburaSyntaxKind.CSharpStatementSyntax:
                         builder.Add(BindingSession.BindSemanticSyntax(member));
                         break;
                 }
@@ -677,7 +678,9 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
             foreach (var token in body.Tokens)
             {
-                if (token.Kind == AkburaSyntaxKind.MarkupRootSyntax)
+                if (token.Kind is
+                    AkburaSyntaxKind.MarkupRootSyntax or
+                    AkburaSyntaxKind.CSharpStatementSyntax)
                 {
                     childrenBuilder.Add(BindingSession.BindSemanticSyntax(token));
                 }

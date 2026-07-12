@@ -16,6 +16,7 @@ internal sealed class SemanticBindingCache
     private readonly Dictionary<AkburaSyntax, IOperation?> _operationCache = new();
     private readonly Dictionary<AkburaSyntax, BoundNode> _boundNodeCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _diagnosticsCache = new();
+    private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _aggregatedDiagnosticsCache = new();
 
     public AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax, Func<AkburaSymbolInfo> bind)
     {
@@ -221,6 +222,42 @@ internal sealed class SemanticBindingCache
             }
 
             _diagnosticsCache[syntax] = created;
+            InvalidateAggregatedDiagnostics(syntax);
+            return created;
+        }
+        finally
+        {
+            _cacheLock.ExitWriteLock();
+        }
+    }
+
+    public ImmutableArray<AkburaSemanticDiagnostic> GetAggregatedDiagnostics(
+        AkburaSyntax syntax,
+        Func<ImmutableArray<AkburaSemanticDiagnostic>> bind)
+    {
+        _cacheLock.EnterReadLock();
+        try
+        {
+            if (_aggregatedDiagnosticsCache.TryGetValue(syntax, out var diagnostics))
+            {
+                return diagnostics;
+            }
+        }
+        finally
+        {
+            _cacheLock.ExitReadLock();
+        }
+
+        var created = bind();
+        _cacheLock.EnterWriteLock();
+        try
+        {
+            if (_aggregatedDiagnosticsCache.TryGetValue(syntax, out var diagnostics))
+            {
+                return diagnostics;
+            }
+
+            _aggregatedDiagnosticsCache[syntax] = created;
             return created;
         }
         finally
@@ -252,6 +289,7 @@ internal sealed class SemanticBindingCache
         try
         {
             _diagnosticsCache[syntax] = diagnostics;
+            InvalidateAggregatedDiagnostics(syntax);
         }
         finally
         {
@@ -269,6 +307,14 @@ internal sealed class SemanticBindingCache
         finally
         {
             _cacheLock.ExitReadLock();
+        }
+    }
+
+    private void InvalidateAggregatedDiagnostics(AkburaSyntax syntax)
+    {
+        for (AkburaSyntax? current = syntax; current != null; current = current.Parent)
+        {
+            _aggregatedDiagnosticsCache.Remove(current);
         }
     }
 }

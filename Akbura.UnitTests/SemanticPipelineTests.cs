@@ -119,6 +119,152 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ComponentWithoutCSharpPart_InheritsAkburaControlMembers()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            Width = count * 50;
+
+            <TextBlock Text={count} />
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(root).Symbol);
+        var statement = Assert.Single(root.Members.OfType<CSharpStatementSyntax>());
+
+        Assert.Empty(component.PartialTypes);
+        Assert.False(component.HasExplicitBaseType);
+        Assert.Equal("Akbura.AkburaControl", component.BaseType.Symbol?.ToDisplayString());
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(statement),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError);
+
+        var references = semanticModel.GetCSharpSymbolReferences(statement);
+        var width = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IPropertySymbol>(
+            Assert.Single(references, reference => reference.Name == "Width").CSharpDefinition.Symbol);
+        Assert.Equal("Width", width.Name);
+        Assert.IsAssignableFrom<IStateSymbol>(
+            Assert.Single(references, reference => reference.Name == "count").AkburaSymbol);
+    }
+
+    [Fact]
+    public void SemanticModel_ComponentPartialClassWithoutBase_InheritsAkburaControlAndBindsPrivateMembers()
+    {
+        const string code =
+            """
+            state int count = a;
+
+            Width = count * a;
+            """;
+        const string csharpCode =
+            """
+            partial class Counter
+            {
+                private int a = 34;
+            }
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var root = syntaxTree.GetRoot();
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(root).Symbol);
+        var state = Assert.Single(root.Members.OfType<StateDeclarationSyntax>());
+        var statement = Assert.Single(root.Members.OfType<CSharpStatementSyntax>());
+
+        Assert.False(component.HasExplicitBaseType);
+        Assert.Equal("Akbura.AkburaControl", component.BaseType.Symbol?.ToDisplayString());
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(state),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(statement),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError);
+
+        var references = semanticModel.GetCSharpSymbolReferences(statement);
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(
+            Assert.Single(references, reference => reference.Name == "a").CSharpDefinition.Symbol);
+        Assert.Equal(Accessibility.Private, field.DeclaredAccessibility);
+        Assert.Equal("Counter", field.ContainingType.Name);
+        var width = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IPropertySymbol>(
+            Assert.Single(references, reference => reference.Name == "Width").CSharpDefinition.Symbol);
+        Assert.Equal("Width", width.Name);
+    }
+
+    [Fact]
+    public void SemanticModel_ComponentPartialClassWithAkburaControlBase_UsesDeclaredBaseType()
+    {
+        const string code = "Width = a;";
+        const string csharpCode =
+            """
+            class CounterBase : Akbura.AkburaControl
+            {
+                protected override Avalonia.Controls.Control Update() => null!;
+            }
+
+            partial class Counter : CounterBase
+            {
+                private int a = 34;
+            }
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var root = syntaxTree.GetRoot();
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(root).Symbol);
+        var statement = Assert.Single(root.Members.OfType<CSharpStatementSyntax>());
+
+        Assert.True(component.HasExplicitBaseType);
+        Assert.Equal("CounterBase", component.BaseType.Name);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(root),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_ComponentBaseTypeInvalid);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(statement),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError);
+
+        var field = Assert.IsAssignableFrom<IFieldSymbol>(
+            Assert.Single(
+                semanticModel.GetCSharpSymbolReferences(statement),
+                reference => reference.Name == "a").CSharpDefinition.Symbol);
+        Assert.Equal(Accessibility.Private, field.DeclaredAccessibility);
+    }
+
+    [Fact]
+    public void SemanticModel_ComponentPartialClassWithInvalidBase_ProducesDiagnostic()
+    {
+        const string csharpCode =
+            """
+            class PlainBase
+            {
+            }
+
+            partial class Counter : PlainBase
+            {
+            }
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText("state int count = 0;", "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var root = syntaxTree.GetRoot();
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(root).Symbol);
+
+        Assert.True(component.HasExplicitBaseType);
+        Assert.Equal("PlainBase", component.BaseType.Name);
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(root),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_ComponentBaseTypeInvalid);
+        Assert.Contains("Counter", diagnostic.Message);
+        Assert.Contains("PlainBase", diagnostic.Message);
+        Assert.Contains("AkburaControl", diagnostic.Message);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesMarkupComponentSymbol_FromRealAvaloniaAssembly()
     {
         const string code =

@@ -63,11 +63,11 @@ internal partial class AkburaSemanticModel
             .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.List(statementsBuilder.ToImmutable())));
 
         classMembersBuilder.Add(method);
-
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(classMembersBuilder.ToImmutable()));
-
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var compilationUnit = BindingSession
+            .GetCSharpProbeBinder(statementSyntax, BinderUsage.Expression)
+            .CreateComponentProbeCompilationUnit(
+                classMembersBuilder.ToImmutable(),
+                "__AkburaSemanticProbe");
 
         var semanticModel = CreateReferenceProbeSemanticModel(compilationUnit, out var syntaxTree);
         var probeStatement = syntaxTree
@@ -208,10 +208,11 @@ internal partial class AkburaSemanticModel
             parameterNames,
             isAsync);
         membersBuilder.Add(method);
-
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var compilationUnit = BindingSession
+            .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
+            .CreateComponentProbeCompilationUnit(
+                membersBuilder.ToImmutable(),
+                "__AkburaSemanticProbe");
         var semanticModel = CreateReferenceProbeSemanticModel(compilationUnit, out var syntaxTree);
         var probeMethod = syntaxTree
             .GetCompilationUnitRoot()
@@ -239,9 +240,8 @@ internal partial class AkburaSemanticModel
         CSharp.ExpressionSyntax expression)
     {
         var scope = GetMarkupBindingScope(scopeSyntax);
-        var probeScope = BindingSession
-            .GetCSharpProbeBinder(scope, BinderUsage.Markup)
-            .CreateProbeScope(scope, expression);
+        var probeBinder = BindingSession.GetCSharpProbeBinder(scope, BinderUsage.Markup);
+        var probeScope = probeBinder.CreateProbeScope(scope, expression);
         using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
 
@@ -260,10 +260,9 @@ internal partial class AkburaSemanticModel
         }
 
         membersBuilder.Add(method);
-
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var compilationUnit = probeBinder.CreateComponentProbeCompilationUnit(
+            membersBuilder.ToImmutable(),
+            "__AkburaSemanticProbe");
         var semanticModel = CreateReferenceProbeSemanticModel(compilationUnit, out var syntaxTree);
         var targetExpression = syntaxTree
             .GetCompilationUnitRoot()

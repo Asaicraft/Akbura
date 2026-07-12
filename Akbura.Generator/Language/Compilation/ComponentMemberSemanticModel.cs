@@ -103,7 +103,12 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             }
 
             var namespaceName = GetAkburaNamespaceText(document, SyntaxTree);
-            var partialTypes = ResolveAkburaComponentPartialTypes(SyntaxTree);
+            var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
+                Compilation.CSharpCompilation,
+                GetAkburaComponentMetadataName(SyntaxTree));
+            var partialTypes = componentTypeInfo.DeclaredType == null
+                ? ImmutableArray<INamedTypeSymbol>.Empty
+                : ImmutableArray.Create(componentTypeInfo.DeclaredType);
             var contentModel = partialTypes.Length > 0
                 ? CreateMarkupContentModel(partialTypes[0])
                 : default;
@@ -150,6 +155,10 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 componentName,
                 namespaceName,
                 partialTypes,
+                componentTypeInfo.BaseType == null
+                    ? default
+                    : new CSharpSymbolDefinition(componentTypeInfo.BaseType),
+                componentTypeInfo.HasExplicitBaseType,
                 contentModel,
                 children,
                 markupRootSymbolsBuilder.ToImmutable(),
@@ -167,9 +176,10 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 inlineAkcssBuilder.WrittenSpan,
                 componentSymbol));
 
-            SetSemanticDiagnostics(
+            SetSemanticDiagnostics(document, CreateComponentDeclarationDiagnostics(
                 document,
-                CreateUserHookDuplicateComponentMemberDiagnostics(document));
+                componentName,
+                componentTypeInfo));
             SetCachedBoundNode(document, new BoundComponentDeclaration(
                 document,
                 GetBinder(document, BinderUsage.Expression),
@@ -309,20 +319,6 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                         break;
                 }
             }
-        }
-
-        private ImmutableArray<INamedTypeSymbol> ResolveAkburaComponentPartialTypes(AkburaSyntaxTree syntaxTree)
-        {
-            var metadataName = GetAkburaComponentMetadataName(syntaxTree);
-            if (metadataName.Length == 0)
-            {
-                return ImmutableArray<INamedTypeSymbol>.Empty;
-            }
-
-            var type = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
-            return type == null
-                ? ImmutableArray<INamedTypeSymbol>.Empty
-                : ImmutableArray.Create(type);
         }
 
         private AkburaSymbolInfo ResolveState(StateDeclarationSyntax stateDeclaration)
@@ -1051,6 +1047,32 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 }
 
                 AddDuplicateComponentMemberDiagnostics(member, name, builder);
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private ImmutableArray<AkburaSemanticDiagnostic> CreateComponentDeclarationDiagnostics(
+            AkburaDocumentSyntax document,
+            string componentName,
+            AkburaComponentTypeInfo componentTypeInfo)
+        {
+            using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            builder.AddRange(CreateUserHookDuplicateComponentMemberDiagnostics(document));
+            if (!componentTypeInfo.HasValidBaseType)
+            {
+                var actualBaseType = componentTypeInfo.BaseType?.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat) ??
+                    componentTypeInfo.DeclaredType?.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat) ??
+                    "<missing>";
+                var expectedBaseType = componentTypeInfo.AkburaControlType?.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat) ??
+                    "global::Akbura.AkburaControl";
+                builder.Add(new AkburaSemanticDiagnostic(
+                    document,
+                    ErrorCodes.AKBURA_SEMANTIC_ComponentBaseTypeInvalid,
+                    [componentName, actualBaseType, expectedBaseType]));
             }
 
             return builder.ToImmutable();

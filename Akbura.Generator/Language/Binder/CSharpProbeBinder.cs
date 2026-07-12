@@ -233,11 +233,9 @@ internal sealed partial class CSharpProbeBinder : Binder
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword)),
                 "__akbura_probe")
             .WithBody(CreateProbeBlock(probeScope.LocalStatements, returnStatement));
-        var type = CSharpSyntaxFactory.ClassDeclaration("__AkburaProbe")
-            .WithMembers(CSharpSyntaxFactory.List(AddProbeMethod(probeScope.MemberDeclarations, method)));
-
-        return CSharpSyntaxFactory.CompilationUnit()
-            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));
+        return CreateComponentProbeCompilationUnit(
+            AddProbeMethod(probeScope.MemberDeclarations, method),
+            "__AkburaProbe");
     }
 
     private CSharp.CompilationUnitSyntax CreateStatementProbe(
@@ -249,11 +247,64 @@ internal sealed partial class CSharpProbeBinder : Binder
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
                 "__akbura_statement_probe")
             .WithBody(CreateProbeBlock(probeScope.LocalStatements, statement));
-        var type = CSharpSyntaxFactory.ClassDeclaration("__AkburaStatementProbe")
-            .WithMembers(CSharpSyntaxFactory.List(AddProbeMethod(probeScope.MemberDeclarations, method)));
+        return CreateComponentProbeCompilationUnit(
+            AddProbeMethod(probeScope.MemberDeclarations, method),
+            "__AkburaStatementProbe");
+    }
 
-        return CSharpSyntaxFactory.CompilationUnit()
-            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(type));
+    internal CSharp.CompilationUnitSyntax CreateComponentProbeCompilationUnit(
+        ImmutableArray<CSharp.MemberDeclarationSyntax> members,
+        string fallbackTypeName,
+        ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives = default)
+    {
+        var componentName = SemanticModel.SyntaxTree.ComponentName;
+        CSharp.ClassDeclarationSyntax probeType;
+        if (string.IsNullOrWhiteSpace(componentName))
+        {
+            probeType = CSharpSyntaxFactory.ClassDeclaration(fallbackTypeName)
+                .WithMembers(CSharpSyntaxFactory.List(members));
+        }
+        else
+        {
+            var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
+                CSharpCompilation,
+                SemanticModel.GetAkburaComponentMetadataName(SemanticModel.SyntaxTree));
+            probeType = CSharpSyntaxFactory.ClassDeclaration(ToCSharpIdentifier(componentName))
+                .WithModifiers(CSharpSyntaxFactory.TokenList(
+                    CSharpSyntaxFactory.Token(CSharpSyntaxKind.PartialKeyword)))
+                .WithMembers(CSharpSyntaxFactory.List(members));
+            if (componentTypeInfo.ShouldDeclareAkburaControlBase &&
+                componentTypeInfo.AkburaControlType != null)
+            {
+                var baseType = CSharpSyntaxFactory.ParseTypeName(
+                    componentTypeInfo.AkburaControlType.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat));
+                probeType = probeType.WithBaseList(CSharpSyntaxFactory.BaseList(
+                    CSharpSyntaxFactory.SingletonSeparatedList<CSharp.BaseTypeSyntax>(
+                        CSharpSyntaxFactory.SimpleBaseType(baseType))));
+            }
+        }
+
+        var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
+            .WithExterns(CSharpSyntaxFactory.List(SemanticModel.GetCSharpExternAliases()))
+            .WithUsings(CSharpSyntaxFactory.List(
+                usingDirectives.IsDefault
+                    ? SemanticModel.GetCSharpUsingDirectives()
+                    : usingDirectives));
+        var namespaceName = SemanticModel.GetAkburaNamespaceText(
+            SemanticModel.SyntaxTree.GetRoot(),
+            SemanticModel.SyntaxTree);
+        if (namespaceName.Length == 0)
+        {
+            return compilationUnit.WithMembers(
+                CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeType));
+        }
+
+        var namespaceDeclaration = CSharpSyntaxFactory.FileScopedNamespaceDeclaration(
+                CSharpSyntaxFactory.ParseName(namespaceName))
+            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(probeType));
+        return compilationUnit.WithMembers(
+            CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(namespaceDeclaration));
     }
 
     private BoundStatement BindStatementTree(

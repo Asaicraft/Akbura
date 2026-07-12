@@ -26,6 +26,7 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_AkcssExpressionError = nameof(AKBURA_SEMANTIC_AkcssExpressionError);
     public const string AKBURA_SEMANTIC_AkcssPropertyNotFound = nameof(AKBURA_SEMANTIC_AkcssPropertyNotFound);
     public const string AKBURA_SEMANTIC_CSharpExpressionError = nameof(AKBURA_SEMANTIC_CSharpExpressionError);
+    public const string AKBURA_SEMANTIC_ComponentBaseTypeInvalid = nameof(AKBURA_SEMANTIC_ComponentBaseTypeInvalid);
     public const string AKBURA_SEMANTIC_DuplicateComponentMember = nameof(AKBURA_SEMANTIC_DuplicateComponentMember);
     public const string AKBURA_SEMANTIC_DuplicateCommandParameter = nameof(AKBURA_SEMANTIC_DuplicateCommandParameter);
     public const string AKBURA_SEMANTIC_DuplicateAkcssSymbol = nameof(AKBURA_SEMANTIC_DuplicateAkcssSymbol);

@@ -4575,31 +4575,25 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         bool isBindingPath = true,
         ITypeSymbol? targetType = null)
     {
+        var scope = (AkburaSyntax?)scopeStateDeclaration ?? SyntaxTree.GetRoot();
+        var binder = BindingSession.GetCSharpProbeBinder(scope, BinderUsage.Expression);
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
-                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(
+                    Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
                 "__AkburaSemanticProbe")
             .WithBody(CSharpSyntaxFactory.Block(returnStatement));
 
-        using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        using var members = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         if (scopeStateDeclaration != null)
         {
-            foreach (var field in CreateStateProbeFieldsBefore(scopeStateDeclaration))
-            {
-                membersBuilder.Add(field);
-            }
+            members.AddRange(CreateStateProbeFieldsBefore(scopeStateDeclaration));
         }
 
-        membersBuilder.Add(method);
-
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
-
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
-
-        var binder = BindingSession.GetCSharpProbeBinder(
-            (AkburaSyntax?)scopeStateDeclaration ?? SyntaxTree.GetRoot(),
-            BinderUsage.Expression);
+        members.Add(method);
+        var compilationUnit = binder.CreateComponentProbeCompilationUnit(
+            members.ToImmutable(),
+            "__AkburaSemanticProbe");
         var binding = binder.BindReturnExpression(compilationUnit, isBindingPath);
         return ApplyExpectedTypeConversion(binding, binder, targetType);
     }
@@ -4744,7 +4738,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
     }
 
-    private ImmutableArray<CSharp.UsingDirectiveSyntax> GetCSharpUsingDirectives()
+    internal ImmutableArray<CSharp.UsingDirectiveSyntax> GetCSharpUsingDirectives()
     {
         using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
         foreach (var member in SyntaxTree.GetRoot().Members)
@@ -4896,7 +4890,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             CSharpSyntaxFactory.ParseName(namespaceName)));
     }
 
-    private ImmutableArray<CSharp.ExternAliasDirectiveSyntax> GetCSharpExternAliases()
+    internal ImmutableArray<CSharp.ExternAliasDirectiveSyntax> GetCSharpExternAliases()
     {
         using var builder = ImmutableArrayBuilder<CSharp.ExternAliasDirectiveSyntax>.Rent();
         var seenAliases = new HashSet<string>(StringComparer.Ordinal);
@@ -5000,7 +4994,20 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         componentType = CSharpSyntaxFactory.ClassDeclaration(ToCSharpIdentifier(componentName))
             .WithModifiers(CSharpSyntaxFactory.TokenList(
-                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SealedKeyword)));
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PartialKeyword)));
+        var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
+            Compilation.CSharpCompilation,
+            metadataName);
+        if (componentTypeInfo.AkburaControlType != null)
+        {
+            var baseType = CSharpSyntaxFactory.ParseTypeName(
+                componentTypeInfo.AkburaControlType.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat));
+            componentType = componentType.WithBaseList(CSharpSyntaxFactory.BaseList(
+                CSharpSyntaxFactory.SingletonSeparatedList<CSharp.BaseTypeSyntax>(
+                    CSharpSyntaxFactory.SimpleBaseType(baseType))));
+        }
+
         return true;
     }
 

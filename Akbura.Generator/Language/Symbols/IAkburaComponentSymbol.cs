@@ -12,6 +12,10 @@ internal interface IAkburaComponentSymbol : IMarkupComponentSymbol
 
     string NamespaceName { get; }
 
+    CSharpSymbolDefinition BaseType { get; }
+
+    bool HasExplicitBaseType { get; }
+
     ImmutableArray<INamedTypeSymbol> PartialTypes { get; }
 
     ImmutableArray<IMarkupComponentSymbol> MarkupRoots { get; }

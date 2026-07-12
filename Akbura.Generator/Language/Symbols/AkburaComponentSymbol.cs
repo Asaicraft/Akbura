@@ -17,6 +17,8 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         string name,
         string namespaceName,
         ImmutableArray<INamedTypeSymbol> partialTypes,
+        CSharpSymbolDefinition baseType,
+        bool hasExplicitBaseType,
         MarkupContentModel contentModel,
         ImmutableArray<MarkupChildContent> children,
         ImmutableArray<IMarkupComponentSymbol> markupRoots,
@@ -45,6 +47,8 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         PartialTypes = partialTypes.IsDefault
             ? ImmutableArray<INamedTypeSymbol>.Empty
             : partialTypes;
+        BaseType = baseType;
+        HasExplicitBaseType = hasExplicitBaseType;
         ContentModel = contentModel;
         Children = children.IsDefault
             ? ImmutableArray<MarkupChildContent>.Empty
@@ -109,6 +113,10 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
     public AkburaDocumentSyntax DeclarationSyntax { get; }
 
     public string NamespaceName { get; }
+
+    public CSharpSymbolDefinition BaseType { get; }
+
+    public bool HasExplicitBaseType { get; }
 
     public ImmutableArray<INamedTypeSymbol> PartialTypes { get; }
 

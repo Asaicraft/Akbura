@@ -180,6 +180,9 @@
   <data name="AKBURA_SEMANTIC_CSharpExpressionError" xml:space="preserve">
     <value>C# expression '{0}' is not valid: {1}</value>
   </data>
+  <data name="AKBURA_SEMANTIC_ComponentBaseTypeInvalid" xml:space="preserve">
+    <value>Component '{0}' base type '{1}' must derive from '{2}'.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_DuplicateComponentMember" xml:space="preserve">
     <value>Component member '{0}' is already declared as '{1}'.</value>
   </data>

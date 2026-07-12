@@ -1,6 +1,5 @@
 using Akbura.Language.Syntax;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
@@ -10,8 +9,10 @@ namespace Akbura.Language.Symbols;
 internal sealed class DeclarationSymbolTable
 {
     private readonly AkburaSemanticModel _semanticModel;
-    private readonly Dictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfos = new();
-    private readonly Dictionary<DeclaredSymbolsKey, ImmutableArray<AkburaSymbol>> _declaredSymbols = new();
+    private ImmutableDictionary<AkburaSyntax, AkburaSymbolInfo> _symbolInfos =
+        ImmutableDictionary<AkburaSyntax, AkburaSymbolInfo>.Empty;
+    private ImmutableDictionary<DeclaredSymbolsKey, ImmutableArray<AkburaSymbol>> _declaredSymbols =
+        ImmutableDictionary<DeclaredSymbolsKey, ImmutableArray<AkburaSymbol>>.Empty;
 
     public DeclarationSymbolTable(AkburaSemanticModel semanticModel)
     {
@@ -25,15 +26,11 @@ internal sealed class DeclarationSymbolTable
             return AkburaSymbolInfo.None(CandidateReason.UnsupportedSyntax);
         }
 
-        var syntax = singleDeclaration.Syntax;
-        if (_symbolInfos.TryGetValue(syntax, out var symbolInfo))
-        {
-            return symbolInfo;
-        }
-
-        symbolInfo = _semanticModel.CreateDeclarationSymbolInfo(declaration);
-        _symbolInfos[syntax] = symbolInfo;
-        return symbolInfo;
+        return ImmutableInterlocked.GetOrAdd(
+            ref _symbolInfos,
+            singleDeclaration.Syntax,
+            static (_, arg) => arg.Table._semanticModel.CreateDeclarationSymbolInfo(arg.Declaration),
+            (Table: this, Declaration: declaration));
     }
 
     public ImmutableArray<AkburaSymbol> GetDeclaredSymbols(
@@ -46,14 +43,13 @@ internal sealed class DeclarationSymbolTable
         }
 
         var key = new DeclaredSymbolsKey(singleDeclaration.Syntax, GetKindMask(allowedKinds));
-        if (_declaredSymbols.TryGetValue(key, out var symbols))
-        {
-            return symbols;
-        }
-
-        symbols = CreateDeclaredSymbols(declaration, key.KindMask);
-        _declaredSymbols[key] = symbols;
-        return symbols;
+        return ImmutableInterlocked.GetOrAdd(
+            ref _declaredSymbols,
+            key,
+            static (cacheKey, arg) => arg.Table.CreateDeclaredSymbols(
+                arg.Declaration,
+                cacheKey.KindMask),
+            (Table: this, Declaration: declaration));
     }
 
     public bool TryGetDeclaredSymbol(

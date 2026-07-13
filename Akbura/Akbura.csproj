@@ -11,4 +11,8 @@
     <PackageReference Include="Avalonia" Version="12.0.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AvaloniaResource Include="Styles.axaml" />
+  </ItemGroup>
+
 </Project>

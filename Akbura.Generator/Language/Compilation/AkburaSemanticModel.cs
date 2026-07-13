@@ -1070,17 +1070,16 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         IAkcssSymbol containingSymbol,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
-        var (name, argumentCount) = ParseAkcssApplyItem(item);
-        if (name.Length == 0)
+        var text = item.Trim();
+        if (text.Length == 0)
         {
             diagnosticsBuilder.Add(CreateAkcssApplyItemNotFoundDiagnostic(applyDirective, item));
             return null;
         }
 
-        var localCandidates = FindAkcssApplyCandidates(
+        var localCandidates = FindAkcssApplyItemCandidates(
             GetContainingAkcssLayer(containingSymbol.DeclarationSyntax),
-            name,
-            argumentCount);
+            text);
         if (localCandidates.Length > 1)
         {
             diagnosticsBuilder.Add(CreateAkcssApplyItemAmbiguousDiagnostic(applyDirective, item));
@@ -1094,7 +1093,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         foreach (var layer in GetImportedAkcssSymbolLayers(containingSymbol.DeclarationSyntax, diagnosticsBuilder))
         {
-            var candidates = FindAkcssApplyCandidates(layer, name, argumentCount);
+            var candidates = FindAkcssApplyItemCandidates(layer, text);
             if (candidates.Length > 1)
             {
                 diagnosticsBuilder.Add(CreateAkcssApplyItemAmbiguousDiagnostic(applyDirective, item));
@@ -1111,25 +1110,32 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return null;
     }
 
-    private static (string Name, int ArgumentCount) ParseAkcssApplyItem(string item)
+    private ImmutableArray<IAkcssSymbol> FindAkcssApplyItemCandidates(
+        ImmutableArray<IAkcssSymbol> layer,
+        string item)
     {
-        var text = item.Trim();
-        if (text.Length == 0)
+        var exactCandidates = FindAkcssApplyCandidates(layer, item, argumentCount: 0);
+        if (!exactCandidates.IsDefaultOrEmpty)
         {
-            return (string.Empty, 0);
+            return exactCandidates;
         }
 
-        var firstDash = text.IndexOf('-');
-        if (firstDash < 0)
+        var argumentCount = 1;
+        for (var dashIndex = item.LastIndexOf('-');
+             dashIndex > 0;
+             dashIndex = item.LastIndexOf('-', dashIndex - 1), argumentCount++)
         {
-            return (text, 0);
+            var candidates = FindAkcssApplyCandidates(
+                layer,
+                item[..dashIndex],
+                argumentCount);
+            if (!candidates.IsDefaultOrEmpty)
+            {
+                return candidates;
+            }
         }
 
-        var name = text[..firstDash];
-        var argumentCount = text[(firstDash + 1)..]
-            .Split(['-'], StringSplitOptions.RemoveEmptyEntries)
-            .Length;
-        return (name, argumentCount);
+        return ImmutableArray<IAkcssSymbol>.Empty;
     }
 
     private ImmutableArray<IAkcssSymbol> FindAkcssApplyCandidates(

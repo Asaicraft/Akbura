@@ -923,7 +923,7 @@ node AkcssUtilityParameterSyntax {
 /// Parsed as:
 ///   TargetType? : Button / Grid / Control / ...
 ///   DotToken    : '.'
-///   Name        : 'flag' / 'w' / 'someutil' / 'btn'
+///   Name        : 'flag' / 'w' / 'self-start' / 'min-w' / 'btn'
 ///   Parameters  : [ AkcssUtilityParameterSyntax, ... ]  // may be empty
 ///
 /// When TargetType is omitted (".btn-..."), the semantic layer may treat
@@ -934,7 +934,7 @@ node AkcssUtilitySelectorSyntax {
 	TargetType? : CSharpTypeSyntax;                  // optional: Button / Control / ...
 	CloseParen? : CloseParenToken;
 	DotToken    : DotToken;                          // '.'
-	Name        : SimpleName;                        // utility name: w / flag / someutil / btn
+	Name        : SimpleName;                        // utility name: w / self-start / min-w / btn
 	Parameters  : syntaxlist<AkcssUtilityParameterSyntax>;
 }
 

@@ -621,7 +621,7 @@ partial class Parser
 	{
 		var (openParen, targetType, closeParen) = ParseAkcssOptionalSelectorTarget();
 		var dotToken = EatToken(SyntaxKind.DotToken);
-		var name = ParseAkcssSimpleName();
+		var name = ParseAkcssUtilityName();
 		return (openParen, targetType, closeParen, dotToken, name);
 	}
 
@@ -680,6 +680,66 @@ partial class Parser
 		}
 
 		return GreenSyntaxFactory.IdentifierName(ParseIdentifierToken());
+	}
+
+	private GreenIdentifierNameSyntax ParseAkcssUtilityName()
+	{
+		var first = IsAkcssNameToken(CurrentToken)
+			? EatMarkupNameTokenAsIdentifier()
+			: ParseIdentifierToken();
+		if (first.ContainsDiagnostics)
+		{
+			return GreenSyntaxFactory.IdentifierName(first);
+		}
+
+		StringBuilder? text = null;
+		var last = first;
+		while (CurrentToken.Kind == SyntaxKind.MinusToken &&
+			PeekToken(1).Kind != SyntaxKind.OpenParenToken &&
+			IsAkcssUtilityNamePartToken(PeekToken(1)) &&
+			!CurrentToken.ContainsDiagnostics &&
+			!PeekToken(1).ContainsDiagnostics &&
+			AreAdjacent(last, CurrentToken) &&
+			AreAdjacent(CurrentToken, PeekToken(1)))
+		{
+			text ??= new StringBuilder(first.Text);
+			text.Append(EatToken(SyntaxKind.MinusToken).Text);
+
+			last = EatToken();
+			text.Append(last.Text);
+			while (IsAkcssUtilityNamePartToken(CurrentToken) &&
+				!CurrentToken.ContainsDiagnostics &&
+				AreAdjacent(last, CurrentToken))
+			{
+				last = EatToken();
+				text.Append(last.Text);
+			}
+		}
+
+		if (text == null)
+		{
+			return GreenSyntaxFactory.IdentifierName(first);
+		}
+
+		var value = text.ToString();
+		return GreenSyntaxFactory.IdentifierName(GreenSyntaxToken.Identifier(
+			SyntaxKind.IdentifierToken,
+			first.LeadingTrivia.Node,
+			value,
+			value,
+			last.TrailingTrivia.Node));
+	}
+
+	private static bool IsAkcssUtilityNamePartToken(GreenSyntaxToken token)
+	{
+		return IsAkcssNameToken(token) ||
+			token.Kind == SyntaxKind.NumericLiteralToken;
+	}
+
+	private static bool AreAdjacent(GreenSyntaxToken left, GreenSyntaxToken right)
+	{
+		return left.GetTrailingTriviaWidth() == 0 &&
+			right.GetLeadingTriviaWidth() == 0;
 	}
 
 	private static bool IsAkcssNameToken(GreenSyntaxToken token)

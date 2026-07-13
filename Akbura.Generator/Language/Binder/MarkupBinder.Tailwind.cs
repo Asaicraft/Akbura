@@ -27,7 +27,8 @@ internal sealed partial class MarkupBinder
 
         var containingComponent = SemanticModel.GetContainingMarkupComponentSymbol(attribute);
         var componentName = containingComponent?.Name ?? "<unknown>";
-        var utilityName = AkburaSemanticModel.GetTailwindUtilityName(attribute);
+        var requestedUtilityName = AkburaSemanticModel.GetTailwindUtilityName(attribute);
+        var utilityName = requestedUtilityName;
         var arguments = CreateTailwindUtilityArguments(attribute);
         var validatedArguments = arguments;
         var condition = CreateTailwindCondition(attribute);
@@ -36,10 +37,11 @@ internal sealed partial class MarkupBinder
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
             utilities = ResolveTailwindUtilitiesForAttribute(
                 attribute,
-                utilityName,
+                requestedUtilityName,
                 arguments,
                 containingComponent,
                 diagnosticsBuilder,
+                out utilityName,
                 out validatedArguments);
             AddTailwindExpressionDiagnostics(attribute, validatedArguments, diagnosticsBuilder);
             diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
@@ -198,21 +200,19 @@ internal sealed partial class MarkupBinder
         ImmutableArray<BoundTailwindUtilityArgument> arguments,
         IMarkupComponentSymbol? containingComponent,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        out string resolvedUtilityName,
         out ImmutableArray<BoundTailwindUtilityArgument> validatedArguments)
     {
+        resolvedUtilityName = utilityName;
         validatedArguments = arguments;
-        var localCandidates = FindTailwindUtilityCandidates(
-            GetLocalAkcssUtilityDeclarations(diagnosticsBuilder),
-            utilityName,
-            arguments.Length,
-            containingComponent);
-        if (TryResolveTailwindUtilityLayer(
+        if (TryResolveTailwindUtilityDeclarationLayer(
+                GetLocalAkcssUtilityDeclarations(diagnosticsBuilder),
                 attribute,
                 utilityName,
-                localCandidates,
                 arguments,
                 containingComponent,
                 diagnosticsBuilder,
+                out resolvedUtilityName,
                 out validatedArguments,
                 out var localUtilities))
         {
@@ -221,18 +221,14 @@ internal sealed partial class MarkupBinder
 
         foreach (var importLayer in GetImportedAkcssUtilityDeclarationLayers(diagnosticsBuilder))
         {
-            var importCandidates = FindTailwindUtilityCandidates(
-                importLayer,
-                utilityName,
-                arguments.Length,
-                containingComponent);
-            if (TryResolveTailwindUtilityLayer(
+            if (TryResolveTailwindUtilityDeclarationLayer(
+                    importLayer,
                     attribute,
                     utilityName,
-                    importCandidates,
                     arguments,
                     containingComponent,
                     diagnosticsBuilder,
+                    out resolvedUtilityName,
                     out validatedArguments,
                     out var importedUtilities))
             {
@@ -240,11 +236,134 @@ internal sealed partial class MarkupBinder
             }
         }
 
-        diagnosticsBuilder.Add(SemanticModel.CreateTailwindUtilityNotFoundDiagnostic(
+        resolvedUtilityName = GetTailwindUtilityCandidateName(
             attribute,
             utilityName,
+            GetStaticTailwindNameSegmentCount(attribute));
+        diagnosticsBuilder.Add(SemanticModel.CreateTailwindUtilityNotFoundDiagnostic(
+            attribute,
+            resolvedUtilityName,
             containingComponent));
         return ImmutableArray<ITailwindUtilitySymbol>.Empty;
+    }
+
+    private bool TryResolveTailwindUtilityDeclarationLayer(
+        ImmutableArray<AkcssUtilityDeclarationSyntax> declarations,
+        TailwindAttributeSyntax attribute,
+        string utilityName,
+        ImmutableArray<BoundTailwindUtilityArgument> arguments,
+        IMarkupComponentSymbol? containingComponent,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        out string resolvedUtilityName,
+        out ImmutableArray<BoundTailwindUtilityArgument> validatedArguments,
+        out ImmutableArray<ITailwindUtilitySymbol> utilities)
+    {
+        var staticSegmentCount = GetStaticTailwindNameSegmentCount(attribute);
+        for (var consumedSegmentCount = staticSegmentCount;
+             consumedSegmentCount >= 0;
+             consumedSegmentCount--)
+        {
+            var candidateName = GetTailwindUtilityCandidateName(
+                attribute,
+                utilityName,
+                consumedSegmentCount);
+            var candidateArguments = GetTailwindUtilityArgumentSuffix(
+                arguments,
+                consumedSegmentCount);
+            var candidates = FindTailwindUtilityCandidates(
+                declarations,
+                candidateName,
+                candidateArguments.Length,
+                containingComponent);
+            if (TryResolveTailwindUtilityLayer(
+                    attribute,
+                    candidateName,
+                    candidates,
+                    candidateArguments,
+                    containingComponent,
+                    diagnosticsBuilder,
+                    out validatedArguments,
+                    out utilities))
+            {
+                resolvedUtilityName = candidateName;
+                return true;
+            }
+        }
+
+        resolvedUtilityName = utilityName;
+        validatedArguments = arguments;
+        utilities = ImmutableArray<ITailwindUtilitySymbol>.Empty;
+        return false;
+    }
+
+    private static int GetStaticTailwindNameSegmentCount(TailwindAttributeSyntax attribute)
+    {
+        if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
+        {
+            return 0;
+        }
+
+        var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
+        var count = 0;
+        foreach (var segment in fullAttribute.Segments)
+        {
+            if (segment.Kind is not (
+                    AkburaSyntaxKind.TailwindIdentifierSegmentSyntax or
+                    AkburaSyntaxKind.TailwindNumericSegmentSyntax))
+            {
+                break;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    private static string GetTailwindUtilityCandidateName(
+        TailwindAttributeSyntax attribute,
+        string utilityName,
+        int consumedSegmentCount)
+    {
+        if (consumedSegmentCount == 0 ||
+            attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
+        {
+            return utilityName;
+        }
+
+        var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
+        var builder = new StringBuilder(utilityName);
+        for (var index = 0; index < consumedSegmentCount; index++)
+        {
+            builder.Append('-');
+            builder.Append(fullAttribute.Segments[index].ToFullString().Trim());
+        }
+
+        return builder.ToString();
+    }
+
+    private static ImmutableArray<BoundTailwindUtilityArgument> GetTailwindUtilityArgumentSuffix(
+        ImmutableArray<BoundTailwindUtilityArgument> arguments,
+        int consumedSegmentCount)
+    {
+        if (consumedSegmentCount == 0)
+        {
+            return arguments;
+        }
+
+        if (consumedSegmentCount == arguments.Length)
+        {
+            return ImmutableArray<BoundTailwindUtilityArgument>.Empty;
+        }
+
+        using var builder = ImmutableArrayBuilder<BoundTailwindUtilityArgument>.Rent(
+            arguments.Length - consumedSegmentCount);
+        for (var index = consumedSegmentCount; index < arguments.Length; index++)
+        {
+            builder.Add(arguments[index]);
+        }
+
+        return builder.ToImmutable();
     }
 
     private bool TryResolveTailwindUtilityLayer(

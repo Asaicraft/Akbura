@@ -1860,6 +1860,50 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssApply_ResolvesHyphenatedStaticUtility()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        Control.self-start {\n" +
+            "            HorizontalAlignment: Left;\n" +
+            "        }\n" +
+            "\n" +
+            "        Control.min-w-(double value) {\n" +
+            "            MinWidth: value;\n" +
+            "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    .target {\n" +
+            "        @apply self-start min-w-2;\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
+        var targetRule = inlineAkcss.Members
+            .OfType<AkcssStyleRuleSyntax>()
+            .Single(rule => rule.Selector.Name?.Identifier.ValueText == "target");
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(targetRule).Symbol);
+        var apply = Assert.IsAssignableFrom<IAkcssApplyOperation>(Assert.Single(symbol.Operations));
+
+        Assert.Equal(2, apply.AppliedSymbols.Length);
+
+        var appliedUtility = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            apply.AppliedSymbols[0]);
+        var appliedParameterizedUtility = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            apply.AppliedSymbols[1]);
+
+        Assert.Equal("self-start", appliedUtility.Name);
+        Assert.True(appliedUtility.Parameters.IsEmpty);
+        Assert.Equal("min-w", appliedParameterizedUtility.Name);
+        Assert.Single(appliedParameterizedUtility.Parameters);
+        Assert.False(apply.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(apply.Syntax).IsEmpty);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssApply_DuplicateSameLayerCandidatesProduceDiagnostic()
     {
         const string code =

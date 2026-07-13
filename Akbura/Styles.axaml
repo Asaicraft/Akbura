@@ -1,0 +1,393 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Tailwind-compatible defaults expressed in Avalonia device-independent pixels. -->
+  <x:Double x:Key="--spacing">4</x:Double>
+
+  <FontFamily x:Key="--font-sans">Segoe UI, Arial, Helvetica, Noto Sans, Liberation Sans, sans-serif</FontFamily>
+  <FontFamily x:Key="--font-serif">Georgia, Times New Roman, Noto Serif, Liberation Serif, serif</FontFamily>
+  <FontFamily x:Key="--font-mono">Cascadia Mono, Consolas, Menlo, Monaco, Noto Sans Mono, Liberation Mono, monospace</FontFamily>
+
+  <x:Double x:Key="--text-xs">12</x:Double>
+  <x:Double x:Key="--text-sm">14</x:Double>
+  <x:Double x:Key="--text-base">16</x:Double>
+  <x:Double x:Key="--text-lg">18</x:Double>
+  <x:Double x:Key="--text-xl">20</x:Double>
+  <x:Double x:Key="--text-2xl">24</x:Double>
+  <x:Double x:Key="--text-3xl">30</x:Double>
+  <x:Double x:Key="--text-4xl">36</x:Double>
+  <x:Double x:Key="--text-5xl">48</x:Double>
+  <x:Double x:Key="--text-6xl">60</x:Double>
+  <x:Double x:Key="--text-7xl">72</x:Double>
+  <x:Double x:Key="--text-8xl">96</x:Double>
+  <x:Double x:Key="--text-9xl">128</x:Double>
+
+  <FontWeight x:Key="--font-weight-thin">Thin</FontWeight>
+  <FontWeight x:Key="--font-weight-extralight">ExtraLight</FontWeight>
+  <FontWeight x:Key="--font-weight-light">Light</FontWeight>
+  <FontWeight x:Key="--font-weight-normal">Normal</FontWeight>
+  <FontWeight x:Key="--font-weight-medium">Medium</FontWeight>
+  <FontWeight x:Key="--font-weight-semibold">SemiBold</FontWeight>
+  <FontWeight x:Key="--font-weight-bold">Bold</FontWeight>
+  <FontWeight x:Key="--font-weight-extrabold">ExtraBold</FontWeight>
+  <FontWeight x:Key="--font-weight-black">Black</FontWeight>
+
+  <CornerRadius x:Key="--radius-xs">2</CornerRadius>
+  <CornerRadius x:Key="--radius-sm">4</CornerRadius>
+  <CornerRadius x:Key="--radius-md">6</CornerRadius>
+  <CornerRadius x:Key="--radius-lg">8</CornerRadius>
+  <CornerRadius x:Key="--radius-xl">12</CornerRadius>
+  <CornerRadius x:Key="--radius-2xl">16</CornerRadius>
+  <CornerRadius x:Key="--radius-3xl">24</CornerRadius>
+  <CornerRadius x:Key="--radius-4xl">32</CornerRadius>
+
+  <BoxShadows x:Key="--shadow-2xs">0 1 0 0 #0D000000</BoxShadows>
+  <BoxShadows x:Key="--shadow-xs">0 1 2 0 #0D000000</BoxShadows>
+  <BoxShadows x:Key="--shadow-sm">0 1 3 0 #1A000000, 0 1 2 -1 #1A000000</BoxShadows>
+  <BoxShadows x:Key="--shadow-md">0 4 6 -1 #1A000000, 0 2 4 -2 #1A000000</BoxShadows>
+  <BoxShadows x:Key="--shadow-lg">0 10 15 -3 #1A000000, 0 4 6 -4 #1A000000</BoxShadows>
+  <BoxShadows x:Key="--shadow-xl">0 20 25 -5 #1A000000, 0 8 10 -6 #1A000000</BoxShadows>
+  <BoxShadows x:Key="--shadow-2xl">0 25 50 -12 #40000000</BoxShadows>
+
+  <!-- Tailwind default color palette. Applications can override any key locally. -->
+  <SolidColorBrush x:Key="--color-transparent" Color="Transparent" />
+  <SolidColorBrush x:Key="--color-black" Color="#000000" />
+  <SolidColorBrush x:Key="--color-white" Color="#FFFFFF" />
+
+  <!-- red -->
+  <SolidColorBrush x:Key="--color-red-50" Color="#FEF2F2" />
+  <SolidColorBrush x:Key="--color-red-100" Color="#FEE2E2" />
+  <SolidColorBrush x:Key="--color-red-200" Color="#FECACA" />
+  <SolidColorBrush x:Key="--color-red-300" Color="#FCA5A5" />
+  <SolidColorBrush x:Key="--color-red-400" Color="#F87171" />
+  <SolidColorBrush x:Key="--color-red-500" Color="#EF4444" />
+  <SolidColorBrush x:Key="--color-red-600" Color="#DC2626" />
+  <SolidColorBrush x:Key="--color-red-700" Color="#B91C1C" />
+  <SolidColorBrush x:Key="--color-red-800" Color="#991B1B" />
+  <SolidColorBrush x:Key="--color-red-900" Color="#7F1D1D" />
+  <SolidColorBrush x:Key="--color-red-950" Color="#450A0A" />
+
+  <!-- orange -->
+  <SolidColorBrush x:Key="--color-orange-50" Color="#FFF7ED" />
+  <SolidColorBrush x:Key="--color-orange-100" Color="#FFEDD5" />
+  <SolidColorBrush x:Key="--color-orange-200" Color="#FED7AA" />
+  <SolidColorBrush x:Key="--color-orange-300" Color="#FDBA74" />
+  <SolidColorBrush x:Key="--color-orange-400" Color="#FB923C" />
+  <SolidColorBrush x:Key="--color-orange-500" Color="#F97316" />
+  <SolidColorBrush x:Key="--color-orange-600" Color="#EA580C" />
+  <SolidColorBrush x:Key="--color-orange-700" Color="#C2410C" />
+  <SolidColorBrush x:Key="--color-orange-800" Color="#9A3412" />
+  <SolidColorBrush x:Key="--color-orange-900" Color="#7C2D12" />
+  <SolidColorBrush x:Key="--color-orange-950" Color="#431407" />
+
+  <!-- amber -->
+  <SolidColorBrush x:Key="--color-amber-50" Color="#FFFBEB" />
+  <SolidColorBrush x:Key="--color-amber-100" Color="#FEF3C7" />
+  <SolidColorBrush x:Key="--color-amber-200" Color="#FDE68A" />
+  <SolidColorBrush x:Key="--color-amber-300" Color="#FCD34D" />
+  <SolidColorBrush x:Key="--color-amber-400" Color="#FBBF24" />
+  <SolidColorBrush x:Key="--color-amber-500" Color="#F59E0B" />
+  <SolidColorBrush x:Key="--color-amber-600" Color="#D97706" />
+  <SolidColorBrush x:Key="--color-amber-700" Color="#B45309" />
+  <SolidColorBrush x:Key="--color-amber-800" Color="#92400E" />
+  <SolidColorBrush x:Key="--color-amber-900" Color="#78350F" />
+  <SolidColorBrush x:Key="--color-amber-950" Color="#451A03" />
+
+  <!-- yellow -->
+  <SolidColorBrush x:Key="--color-yellow-50" Color="#FEFCE8" />
+  <SolidColorBrush x:Key="--color-yellow-100" Color="#FEF9C3" />
+  <SolidColorBrush x:Key="--color-yellow-200" Color="#FEF08A" />
+  <SolidColorBrush x:Key="--color-yellow-300" Color="#FDE047" />
+  <SolidColorBrush x:Key="--color-yellow-400" Color="#FACC15" />
+  <SolidColorBrush x:Key="--color-yellow-500" Color="#EAB308" />
+  <SolidColorBrush x:Key="--color-yellow-600" Color="#CA8A04" />
+  <SolidColorBrush x:Key="--color-yellow-700" Color="#A16207" />
+  <SolidColorBrush x:Key="--color-yellow-800" Color="#854D0E" />
+  <SolidColorBrush x:Key="--color-yellow-900" Color="#713F12" />
+  <SolidColorBrush x:Key="--color-yellow-950" Color="#422006" />
+
+  <!-- lime -->
+  <SolidColorBrush x:Key="--color-lime-50" Color="#F7FEE7" />
+  <SolidColorBrush x:Key="--color-lime-100" Color="#ECFCCB" />
+  <SolidColorBrush x:Key="--color-lime-200" Color="#D9F99D" />
+  <SolidColorBrush x:Key="--color-lime-300" Color="#BEF264" />
+  <SolidColorBrush x:Key="--color-lime-400" Color="#A3E635" />
+  <SolidColorBrush x:Key="--color-lime-500" Color="#84CC16" />
+  <SolidColorBrush x:Key="--color-lime-600" Color="#65A30D" />
+  <SolidColorBrush x:Key="--color-lime-700" Color="#4D7C0F" />
+  <SolidColorBrush x:Key="--color-lime-800" Color="#3F6212" />
+  <SolidColorBrush x:Key="--color-lime-900" Color="#365314" />
+  <SolidColorBrush x:Key="--color-lime-950" Color="#1A2E05" />
+
+  <!-- green -->
+  <SolidColorBrush x:Key="--color-green-50" Color="#F0FDF4" />
+  <SolidColorBrush x:Key="--color-green-100" Color="#DCFCE7" />
+  <SolidColorBrush x:Key="--color-green-200" Color="#BBF7D0" />
+  <SolidColorBrush x:Key="--color-green-300" Color="#86EFAC" />
+  <SolidColorBrush x:Key="--color-green-400" Color="#4ADE80" />
+  <SolidColorBrush x:Key="--color-green-500" Color="#22C55E" />
+  <SolidColorBrush x:Key="--color-green-600" Color="#16A34A" />
+  <SolidColorBrush x:Key="--color-green-700" Color="#15803D" />
+  <SolidColorBrush x:Key="--color-green-800" Color="#166534" />
+  <SolidColorBrush x:Key="--color-green-900" Color="#14532D" />
+  <SolidColorBrush x:Key="--color-green-950" Color="#052E16" />
+
+  <!-- emerald -->
+  <SolidColorBrush x:Key="--color-emerald-50" Color="#ECFDF5" />
+  <SolidColorBrush x:Key="--color-emerald-100" Color="#D1FAE5" />
+  <SolidColorBrush x:Key="--color-emerald-200" Color="#A7F3D0" />
+  <SolidColorBrush x:Key="--color-emerald-300" Color="#6EE7B7" />
+  <SolidColorBrush x:Key="--color-emerald-400" Color="#34D399" />
+  <SolidColorBrush x:Key="--color-emerald-500" Color="#10B981" />
+  <SolidColorBrush x:Key="--color-emerald-600" Color="#059669" />
+  <SolidColorBrush x:Key="--color-emerald-700" Color="#047857" />
+  <SolidColorBrush x:Key="--color-emerald-800" Color="#065F46" />
+  <SolidColorBrush x:Key="--color-emerald-900" Color="#064E3B" />
+  <SolidColorBrush x:Key="--color-emerald-950" Color="#022C22" />
+
+  <!-- teal -->
+  <SolidColorBrush x:Key="--color-teal-50" Color="#F0FDFA" />
+  <SolidColorBrush x:Key="--color-teal-100" Color="#CCFBF1" />
+  <SolidColorBrush x:Key="--color-teal-200" Color="#99F6E4" />
+  <SolidColorBrush x:Key="--color-teal-300" Color="#5EEAD4" />
+  <SolidColorBrush x:Key="--color-teal-400" Color="#2DD4BF" />
+  <SolidColorBrush x:Key="--color-teal-500" Color="#14B8A6" />
+  <SolidColorBrush x:Key="--color-teal-600" Color="#0D9488" />
+  <SolidColorBrush x:Key="--color-teal-700" Color="#0F766E" />
+  <SolidColorBrush x:Key="--color-teal-800" Color="#115E59" />
+  <SolidColorBrush x:Key="--color-teal-900" Color="#134E4A" />
+  <SolidColorBrush x:Key="--color-teal-950" Color="#042F2E" />
+
+  <!-- cyan -->
+  <SolidColorBrush x:Key="--color-cyan-50" Color="#ECFEFF" />
+  <SolidColorBrush x:Key="--color-cyan-100" Color="#CFFAFE" />
+  <SolidColorBrush x:Key="--color-cyan-200" Color="#A5F3FC" />
+  <SolidColorBrush x:Key="--color-cyan-300" Color="#67E8F9" />
+  <SolidColorBrush x:Key="--color-cyan-400" Color="#22D3EE" />
+  <SolidColorBrush x:Key="--color-cyan-500" Color="#06B6D4" />
+  <SolidColorBrush x:Key="--color-cyan-600" Color="#0891B2" />
+  <SolidColorBrush x:Key="--color-cyan-700" Color="#0E7490" />
+  <SolidColorBrush x:Key="--color-cyan-800" Color="#155E75" />
+  <SolidColorBrush x:Key="--color-cyan-900" Color="#164E63" />
+  <SolidColorBrush x:Key="--color-cyan-950" Color="#083344" />
+
+  <!-- sky -->
+  <SolidColorBrush x:Key="--color-sky-50" Color="#F0F9FF" />
+  <SolidColorBrush x:Key="--color-sky-100" Color="#E0F2FE" />
+  <SolidColorBrush x:Key="--color-sky-200" Color="#BAE6FD" />
+  <SolidColorBrush x:Key="--color-sky-300" Color="#7DD3FC" />
+  <SolidColorBrush x:Key="--color-sky-400" Color="#38BDF8" />
+  <SolidColorBrush x:Key="--color-sky-500" Color="#0EA5E9" />
+  <SolidColorBrush x:Key="--color-sky-600" Color="#0284C7" />
+  <SolidColorBrush x:Key="--color-sky-700" Color="#0369A1" />
+  <SolidColorBrush x:Key="--color-sky-800" Color="#075985" />
+  <SolidColorBrush x:Key="--color-sky-900" Color="#0C4A6E" />
+  <SolidColorBrush x:Key="--color-sky-950" Color="#082F49" />
+
+  <!-- blue -->
+  <SolidColorBrush x:Key="--color-blue-50" Color="#EFF6FF" />
+  <SolidColorBrush x:Key="--color-blue-100" Color="#DBEAFE" />
+  <SolidColorBrush x:Key="--color-blue-200" Color="#BFDBFE" />
+  <SolidColorBrush x:Key="--color-blue-300" Color="#93C5FD" />
+  <SolidColorBrush x:Key="--color-blue-400" Color="#60A5FA" />
+  <SolidColorBrush x:Key="--color-blue-500" Color="#3B82F6" />
+  <SolidColorBrush x:Key="--color-blue-600" Color="#2563EB" />
+  <SolidColorBrush x:Key="--color-blue-700" Color="#1D4ED8" />
+  <SolidColorBrush x:Key="--color-blue-800" Color="#1E40AF" />
+  <SolidColorBrush x:Key="--color-blue-900" Color="#1E3A8A" />
+  <SolidColorBrush x:Key="--color-blue-950" Color="#172554" />
+
+  <!-- indigo -->
+  <SolidColorBrush x:Key="--color-indigo-50" Color="#EEF2FF" />
+  <SolidColorBrush x:Key="--color-indigo-100" Color="#E0E7FF" />
+  <SolidColorBrush x:Key="--color-indigo-200" Color="#C7D2FE" />
+  <SolidColorBrush x:Key="--color-indigo-300" Color="#A5B4FC" />
+  <SolidColorBrush x:Key="--color-indigo-400" Color="#818CF8" />
+  <SolidColorBrush x:Key="--color-indigo-500" Color="#6366F1" />
+  <SolidColorBrush x:Key="--color-indigo-600" Color="#4F46E5" />
+  <SolidColorBrush x:Key="--color-indigo-700" Color="#4338CA" />
+  <SolidColorBrush x:Key="--color-indigo-800" Color="#3730A3" />
+  <SolidColorBrush x:Key="--color-indigo-900" Color="#312E81" />
+  <SolidColorBrush x:Key="--color-indigo-950" Color="#1E1B4B" />
+
+  <!-- violet -->
+  <SolidColorBrush x:Key="--color-violet-50" Color="#F5F3FF" />
+  <SolidColorBrush x:Key="--color-violet-100" Color="#EDE9FE" />
+  <SolidColorBrush x:Key="--color-violet-200" Color="#DDD6FE" />
+  <SolidColorBrush x:Key="--color-violet-300" Color="#C4B5FD" />
+  <SolidColorBrush x:Key="--color-violet-400" Color="#A78BFA" />
+  <SolidColorBrush x:Key="--color-violet-500" Color="#8B5CF6" />
+  <SolidColorBrush x:Key="--color-violet-600" Color="#7C3AED" />
+  <SolidColorBrush x:Key="--color-violet-700" Color="#6D28D9" />
+  <SolidColorBrush x:Key="--color-violet-800" Color="#5B21B6" />
+  <SolidColorBrush x:Key="--color-violet-900" Color="#4C1D95" />
+  <SolidColorBrush x:Key="--color-violet-950" Color="#2E1065" />
+
+  <!-- purple -->
+  <SolidColorBrush x:Key="--color-purple-50" Color="#FAF5FF" />
+  <SolidColorBrush x:Key="--color-purple-100" Color="#F3E8FF" />
+  <SolidColorBrush x:Key="--color-purple-200" Color="#E9D5FF" />
+  <SolidColorBrush x:Key="--color-purple-300" Color="#D8B4FE" />
+  <SolidColorBrush x:Key="--color-purple-400" Color="#C084FC" />
+  <SolidColorBrush x:Key="--color-purple-500" Color="#A855F7" />
+  <SolidColorBrush x:Key="--color-purple-600" Color="#9333EA" />
+  <SolidColorBrush x:Key="--color-purple-700" Color="#7E22CE" />
+  <SolidColorBrush x:Key="--color-purple-800" Color="#6B21A8" />
+  <SolidColorBrush x:Key="--color-purple-900" Color="#581C87" />
+  <SolidColorBrush x:Key="--color-purple-950" Color="#3B0764" />
+
+  <!-- fuchsia -->
+  <SolidColorBrush x:Key="--color-fuchsia-50" Color="#FDF4FF" />
+  <SolidColorBrush x:Key="--color-fuchsia-100" Color="#FAE8FF" />
+  <SolidColorBrush x:Key="--color-fuchsia-200" Color="#F5D0FE" />
+  <SolidColorBrush x:Key="--color-fuchsia-300" Color="#F0ABFC" />
+  <SolidColorBrush x:Key="--color-fuchsia-400" Color="#E879F9" />
+  <SolidColorBrush x:Key="--color-fuchsia-500" Color="#D946EF" />
+  <SolidColorBrush x:Key="--color-fuchsia-600" Color="#C026D3" />
+  <SolidColorBrush x:Key="--color-fuchsia-700" Color="#A21CAF" />
+  <SolidColorBrush x:Key="--color-fuchsia-800" Color="#86198F" />
+  <SolidColorBrush x:Key="--color-fuchsia-900" Color="#701A75" />
+  <SolidColorBrush x:Key="--color-fuchsia-950" Color="#4A044E" />
+
+  <!-- pink -->
+  <SolidColorBrush x:Key="--color-pink-50" Color="#FDF2F8" />
+  <SolidColorBrush x:Key="--color-pink-100" Color="#FCE7F3" />
+  <SolidColorBrush x:Key="--color-pink-200" Color="#FBCFE8" />
+  <SolidColorBrush x:Key="--color-pink-300" Color="#F9A8D4" />
+  <SolidColorBrush x:Key="--color-pink-400" Color="#F472B6" />
+  <SolidColorBrush x:Key="--color-pink-500" Color="#EC4899" />
+  <SolidColorBrush x:Key="--color-pink-600" Color="#DB2777" />
+  <SolidColorBrush x:Key="--color-pink-700" Color="#BE185D" />
+  <SolidColorBrush x:Key="--color-pink-800" Color="#9D174D" />
+  <SolidColorBrush x:Key="--color-pink-900" Color="#831843" />
+  <SolidColorBrush x:Key="--color-pink-950" Color="#500724" />
+
+  <!-- rose -->
+  <SolidColorBrush x:Key="--color-rose-50" Color="#FFF1F2" />
+  <SolidColorBrush x:Key="--color-rose-100" Color="#FFE4E6" />
+  <SolidColorBrush x:Key="--color-rose-200" Color="#FECDD3" />
+  <SolidColorBrush x:Key="--color-rose-300" Color="#FDA4AF" />
+  <SolidColorBrush x:Key="--color-rose-400" Color="#FB7185" />
+  <SolidColorBrush x:Key="--color-rose-500" Color="#F43F5E" />
+  <SolidColorBrush x:Key="--color-rose-600" Color="#E11D48" />
+  <SolidColorBrush x:Key="--color-rose-700" Color="#BE123C" />
+  <SolidColorBrush x:Key="--color-rose-800" Color="#9F1239" />
+  <SolidColorBrush x:Key="--color-rose-900" Color="#881337" />
+  <SolidColorBrush x:Key="--color-rose-950" Color="#4C0519" />
+
+  <!-- slate -->
+  <SolidColorBrush x:Key="--color-slate-50" Color="#F8FAFC" />
+  <SolidColorBrush x:Key="--color-slate-100" Color="#F1F5F9" />
+  <SolidColorBrush x:Key="--color-slate-200" Color="#E2E8F0" />
+  <SolidColorBrush x:Key="--color-slate-300" Color="#CBD5E1" />
+  <SolidColorBrush x:Key="--color-slate-400" Color="#94A3B8" />
+  <SolidColorBrush x:Key="--color-slate-500" Color="#64748B" />
+  <SolidColorBrush x:Key="--color-slate-600" Color="#475569" />
+  <SolidColorBrush x:Key="--color-slate-700" Color="#334155" />
+  <SolidColorBrush x:Key="--color-slate-800" Color="#1E293B" />
+  <SolidColorBrush x:Key="--color-slate-900" Color="#0F172A" />
+  <SolidColorBrush x:Key="--color-slate-950" Color="#020617" />
+
+  <!-- gray -->
+  <SolidColorBrush x:Key="--color-gray-50" Color="#F9FAFB" />
+  <SolidColorBrush x:Key="--color-gray-100" Color="#F3F4F6" />
+  <SolidColorBrush x:Key="--color-gray-200" Color="#E5E7EB" />
+  <SolidColorBrush x:Key="--color-gray-300" Color="#D1D5DB" />
+  <SolidColorBrush x:Key="--color-gray-400" Color="#9CA3AF" />
+  <SolidColorBrush x:Key="--color-gray-500" Color="#6B7280" />
+  <SolidColorBrush x:Key="--color-gray-600" Color="#4B5563" />
+  <SolidColorBrush x:Key="--color-gray-700" Color="#374151" />
+  <SolidColorBrush x:Key="--color-gray-800" Color="#1F2937" />
+  <SolidColorBrush x:Key="--color-gray-900" Color="#111827" />
+  <SolidColorBrush x:Key="--color-gray-950" Color="#030712" />
+
+  <!-- zinc -->
+  <SolidColorBrush x:Key="--color-zinc-50" Color="#FAFAFA" />
+  <SolidColorBrush x:Key="--color-zinc-100" Color="#F4F4F5" />
+  <SolidColorBrush x:Key="--color-zinc-200" Color="#E4E4E7" />
+  <SolidColorBrush x:Key="--color-zinc-300" Color="#D4D4D8" />
+  <SolidColorBrush x:Key="--color-zinc-400" Color="#A1A1AA" />
+  <SolidColorBrush x:Key="--color-zinc-500" Color="#71717A" />
+  <SolidColorBrush x:Key="--color-zinc-600" Color="#52525B" />
+  <SolidColorBrush x:Key="--color-zinc-700" Color="#3F3F46" />
+  <SolidColorBrush x:Key="--color-zinc-800" Color="#27272A" />
+  <SolidColorBrush x:Key="--color-zinc-900" Color="#18181B" />
+  <SolidColorBrush x:Key="--color-zinc-950" Color="#09090B" />
+
+  <!-- neutral -->
+  <SolidColorBrush x:Key="--color-neutral-50" Color="#FAFAFA" />
+  <SolidColorBrush x:Key="--color-neutral-100" Color="#F5F5F5" />
+  <SolidColorBrush x:Key="--color-neutral-200" Color="#E5E5E5" />
+  <SolidColorBrush x:Key="--color-neutral-300" Color="#D4D4D4" />
+  <SolidColorBrush x:Key="--color-neutral-400" Color="#A3A3A3" />
+  <SolidColorBrush x:Key="--color-neutral-500" Color="#737373" />
+  <SolidColorBrush x:Key="--color-neutral-600" Color="#525252" />
+  <SolidColorBrush x:Key="--color-neutral-700" Color="#404040" />
+  <SolidColorBrush x:Key="--color-neutral-800" Color="#262626" />
+  <SolidColorBrush x:Key="--color-neutral-900" Color="#171717" />
+  <SolidColorBrush x:Key="--color-neutral-950" Color="#0A0A0A" />
+
+  <!-- stone -->
+  <SolidColorBrush x:Key="--color-stone-50" Color="#FAFAF9" />
+  <SolidColorBrush x:Key="--color-stone-100" Color="#F5F5F4" />
+  <SolidColorBrush x:Key="--color-stone-200" Color="#E7E5E4" />
+  <SolidColorBrush x:Key="--color-stone-300" Color="#D6D3D1" />
+  <SolidColorBrush x:Key="--color-stone-400" Color="#A8A29E" />
+  <SolidColorBrush x:Key="--color-stone-500" Color="#78716C" />
+  <SolidColorBrush x:Key="--color-stone-600" Color="#57534E" />
+  <SolidColorBrush x:Key="--color-stone-700" Color="#44403C" />
+  <SolidColorBrush x:Key="--color-stone-800" Color="#292524" />
+  <SolidColorBrush x:Key="--color-stone-900" Color="#1C1917" />
+  <SolidColorBrush x:Key="--color-stone-950" Color="#0C0A09" />
+
+  <!-- mauve -->
+  <SolidColorBrush x:Key="--color-mauve-50" Color="#FAFAFA" />
+  <SolidColorBrush x:Key="--color-mauve-100" Color="#F3F1F3" />
+  <SolidColorBrush x:Key="--color-mauve-200" Color="#E7E4E7" />
+  <SolidColorBrush x:Key="--color-mauve-300" Color="#D7D0D7" />
+  <SolidColorBrush x:Key="--color-mauve-400" Color="#A89EA9" />
+  <SolidColorBrush x:Key="--color-mauve-500" Color="#79697B" />
+  <SolidColorBrush x:Key="--color-mauve-600" Color="#594C5B" />
+  <SolidColorBrush x:Key="--color-mauve-700" Color="#463947" />
+  <SolidColorBrush x:Key="--color-mauve-800" Color="#2A212C" />
+  <SolidColorBrush x:Key="--color-mauve-900" Color="#1D161E" />
+  <SolidColorBrush x:Key="--color-mauve-950" Color="#0C090C" />
+
+  <!-- olive -->
+  <SolidColorBrush x:Key="--color-olive-50" Color="#FBFBF9" />
+  <SolidColorBrush x:Key="--color-olive-100" Color="#F4F4F0" />
+  <SolidColorBrush x:Key="--color-olive-200" Color="#E8E8E3" />
+  <SolidColorBrush x:Key="--color-olive-300" Color="#D8D8D0" />
+  <SolidColorBrush x:Key="--color-olive-400" Color="#ABAB9C" />
+  <SolidColorBrush x:Key="--color-olive-500" Color="#7C7C67" />
+  <SolidColorBrush x:Key="--color-olive-600" Color="#5B5B4B" />
+  <SolidColorBrush x:Key="--color-olive-700" Color="#474739" />
+  <SolidColorBrush x:Key="--color-olive-800" Color="#2B2B22" />
+  <SolidColorBrush x:Key="--color-olive-900" Color="#1D1D16" />
+  <SolidColorBrush x:Key="--color-olive-950" Color="#0C0C09" />
+
+  <!-- mist -->
+  <SolidColorBrush x:Key="--color-mist-50" Color="#F9FBFB" />
+  <SolidColorBrush x:Key="--color-mist-100" Color="#F1F3F3" />
+  <SolidColorBrush x:Key="--color-mist-200" Color="#E3E7E8" />
+  <SolidColorBrush x:Key="--color-mist-300" Color="#D0D6D8" />
+  <SolidColorBrush x:Key="--color-mist-400" Color="#9CA8AB" />
+  <SolidColorBrush x:Key="--color-mist-500" Color="#67787C" />
+  <SolidColorBrush x:Key="--color-mist-600" Color="#4B585B" />
+  <SolidColorBrush x:Key="--color-mist-700" Color="#394447" />
+  <SolidColorBrush x:Key="--color-mist-800" Color="#22292B" />
+  <SolidColorBrush x:Key="--color-mist-900" Color="#161B1D" />
+  <SolidColorBrush x:Key="--color-mist-950" Color="#090B0C" />
+
+  <!-- taupe -->
+  <SolidColorBrush x:Key="--color-taupe-50" Color="#FBFAF9" />
+  <SolidColorBrush x:Key="--color-taupe-100" Color="#F3F1F1" />
+  <SolidColorBrush x:Key="--color-taupe-200" Color="#E8E4E3" />
+  <SolidColorBrush x:Key="--color-taupe-300" Color="#D8D2D0" />
+  <SolidColorBrush x:Key="--color-taupe-400" Color="#ABA09C" />
+  <SolidColorBrush x:Key="--color-taupe-500" Color="#7C6D67" />
+  <SolidColorBrush x:Key="--color-taupe-600" Color="#5B4F4B" />
+  <SolidColorBrush x:Key="--color-taupe-700" Color="#473C39" />
+  <SolidColorBrush x:Key="--color-taupe-800" Color="#2B2422" />
+  <SolidColorBrush x:Key="--color-taupe-900" Color="#1D1816" />
+  <SolidColorBrush x:Key="--color-taupe-950" Color="#0C0A09" />
+</ResourceDictionary>

@@ -7,6 +7,34 @@ namespace Akbura.UnitTests;
 public sealed class AkcssIncrementalParserTests
 {
     [Fact]
+    public void UtilitySelector_ParsesHyphenatedStaticAndParameterizedNames()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        Control.self-start { HorizontalAlignment: Left; }\n" +
+            "        Control.min-w-(double value) { MinWidth: value; }\n" +
+            "        TextBlock.text-2xl { FontSize: 24; }\n" +
+            "    }\n" +
+            "}";
+
+        var syntax = Parse(code);
+        var block = Assert.IsType<GreenInlineAkcssBlockSyntax>(syntax.Members[0]);
+        var section = Assert.IsType<GreenAkcssUtilitiesSectionSyntax>(block.Members[0]);
+        var selfStart = section.Utilities[0]!;
+        var minWidth = section.Utilities[1]!;
+        var text2Xl = section.Utilities[2]!;
+
+        Assert.Equal("self-start", selfStart.Selector.Name.Identifier.ValueText);
+        Assert.Equal(0, selfStart.Selector.Parameters.Count);
+        Assert.Equal("min-w", minWidth.Selector.Name.Identifier.ValueText);
+        Assert.Equal(1, minWidth.Selector.Parameters.Count);
+        Assert.Equal("text-2xl", text2Xl.Selector.Name.Identifier.ValueText);
+        Assert.Equal(0, text2Xl.Selector.Parameters.Count);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
     public void StyleRuleAssignmentEdit_ReusesSiblingBodyMembersAndRules()
     {
         const string oldCode =

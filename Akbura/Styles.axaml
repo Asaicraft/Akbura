@@ -3,9 +3,9 @@
   <!-- Tailwind-compatible defaults expressed in Avalonia device-independent pixels. -->
   <x:Double x:Key="--spacing">4</x:Double>
 
-  <FontFamily x:Key="--font-sans">Segoe UI, Arial, Helvetica, Noto Sans, Liberation Sans, sans-serif</FontFamily>
-  <FontFamily x:Key="--font-serif">Georgia, Times New Roman, Noto Serif, Liberation Serif, serif</FontFamily>
-  <FontFamily x:Key="--font-mono">Cascadia Mono, Consolas, Menlo, Monaco, Noto Sans Mono, Liberation Mono, monospace</FontFamily>
+  <FontFamily x:Key="--font-sans">Segoe UI, Arial, Helvetica, Noto Sans, Liberation Sans, $Default</FontFamily>
+  <FontFamily x:Key="--font-serif">Georgia, Times New Roman, Noto Serif, Liberation Serif, $Default</FontFamily>
+  <FontFamily x:Key="--font-mono">Cascadia Mono, Consolas, Menlo, Monaco, Noto Sans Mono, Liberation Mono, $Default</FontFamily>
 
   <x:Double x:Key="--text-xs">12</x:Double>
   <x:Double x:Key="--text-sm">14</x:Double>
@@ -390,4 +390,91 @@
   <SolidColorBrush x:Key="--color-taupe-800" Color="#2B2422" />
   <SolidColorBrush x:Key="--color-taupe-900" Color="#1D1816" />
   <SolidColorBrush x:Key="--color-taupe-950" Color="#0C0A09" />
+
+  <Design.PreviewWith>
+    <Border Width="960"
+            Height="720"
+            Padding="32"
+            Background="{StaticResource --color-slate-950}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="28">
+          <StackPanel Spacing="6">
+            <TextBlock FontFamily="{StaticResource --font-sans}"
+                       FontSize="{StaticResource --text-4xl}"
+                       FontWeight="{StaticResource --font-weight-bold}"
+                       Foreground="{StaticResource --color-white}"
+                       Text="Akbura theme" />
+            <TextBlock FontFamily="{StaticResource --font-sans}"
+                       Foreground="{StaticResource --color-slate-400}"
+                       Text="Tailwind-compatible resources for Avalonia" />
+          </StackPanel>
+
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+            <Border Padding="20" Background="{StaticResource --color-slate-900}"
+                    BoxShadow="{StaticResource --shadow-lg}" CornerRadius="{StaticResource --radius-xl}">
+              <StackPanel Spacing="8">
+                <TextBlock FontFamily="{StaticResource --font-sans}" FontSize="{StaticResource --text-xl}"
+                           FontWeight="{StaticResource --font-weight-semibold}"
+                           Foreground="{StaticResource --color-blue-400}" Text="Sans" />
+                <TextBlock FontFamily="{StaticResource --font-sans}"
+                           Foreground="{StaticResource --color-slate-200}"
+                           Text="The quick brown fox jumps over the lazy dog." TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Padding="20" Background="{StaticResource --color-slate-900}"
+                    BoxShadow="{StaticResource --shadow-lg}" CornerRadius="{StaticResource --radius-xl}">
+              <StackPanel Spacing="8">
+                <TextBlock FontFamily="{StaticResource --font-serif}" FontSize="{StaticResource --text-xl}"
+                           FontWeight="{StaticResource --font-weight-semibold}"
+                           Foreground="{StaticResource --color-emerald-400}" Text="Serif" />
+                <TextBlock FontFamily="{StaticResource --font-serif}"
+                           Foreground="{StaticResource --color-slate-200}"
+                           Text="The quick brown fox jumps over the lazy dog." TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Padding="20" Background="{StaticResource --color-slate-900}"
+                    BoxShadow="{StaticResource --shadow-lg}" CornerRadius="{StaticResource --radius-xl}">
+              <StackPanel Spacing="8">
+                <TextBlock FontFamily="{StaticResource --font-mono}" FontSize="{StaticResource --text-xl}"
+                           FontWeight="{StaticResource --font-weight-semibold}"
+                           Foreground="{StaticResource --color-amber-400}" Text="Mono" />
+                <TextBlock FontFamily="{StaticResource --font-mono}"
+                           Foreground="{StaticResource --color-slate-200}" Text="state count = 42;" />
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <StackPanel Spacing="12">
+            <TextBlock FontFamily="{StaticResource --font-sans}" FontSize="{StaticResource --text-lg}"
+                       FontWeight="{StaticResource --font-weight-semibold}"
+                       Foreground="{StaticResource --color-white}" Text="Blue color scale" />
+            <Grid ColumnDefinitions="*,*,*,*,*,*,*,*,*,*,*" ColumnSpacing="4">
+              <Border Height="64" Background="{StaticResource --color-blue-50}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="1" Background="{StaticResource --color-blue-100}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="2" Background="{StaticResource --color-blue-200}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="3" Background="{StaticResource --color-blue-300}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="4" Background="{StaticResource --color-blue-400}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="5" Background="{StaticResource --color-blue-500}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="6" Background="{StaticResource --color-blue-600}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="7" Background="{StaticResource --color-blue-700}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="8" Background="{StaticResource --color-blue-800}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="9" Background="{StaticResource --color-blue-900}" CornerRadius="{StaticResource --radius-sm}" />
+              <Border Grid.Column="10" Background="{StaticResource --color-blue-950}" CornerRadius="{StaticResource --radius-sm}" />
+            </Grid>
+          </StackPanel>
+
+          <Border Width="220" Height="96" HorizontalAlignment="Left"
+                  Background="{StaticResource --color-white}"
+                  BoxShadow="{StaticResource --shadow-2xl}"
+                  CornerRadius="{StaticResource --radius-2xl}">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontFamily="{StaticResource --font-sans}"
+                       FontWeight="{StaticResource --font-weight-semibold}"
+                       Foreground="{StaticResource --color-slate-900}"
+                       Text="shadow-2xl | radius-2xl" />
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+  </Design.PreviewWith>
 </ResourceDictionary>

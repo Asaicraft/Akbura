@@ -11,5 +11,6 @@ internal enum LocationKind : byte
 {
     None = 0,
     SourceFile = 1,
-    ExternalFile = 2,
+    MetadataFile = 2,
+    ExternalFile = 3,
 }

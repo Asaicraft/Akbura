@@ -19,6 +19,14 @@ internal abstract class Location
 
     public abstract LocationKind Kind { get; }
 
+    internal virtual AkburaReferencedModule? MetadataModule
+    {
+        get
+        {
+            return null;
+        }
+    }
+
     public virtual AkburaSyntax? SourceSyntax
     {
         get

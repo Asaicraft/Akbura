@@ -1,0 +1,52 @@
+<Project>
+
+  <PropertyGroup>
+    <AkburaEmbedSourceFiles Condition="'$(AkburaEmbedSourceFiles)' == ''">true</AkburaEmbedSourceFiles>
+    <AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Akbura.module.xml</AkburaModuleManifestPath>
+    <AkburaBuildTasksAssembly Condition="'$(AkburaBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tools\net10.0\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Akbura.Build.GenerateAkburaModuleManifest"
+             AssemblyFile="$(AkburaBuildTasksAssembly)"
+             Condition="'$(AkburaEmbedSourceFiles)' == 'true'" />
+
+  <ItemGroup Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
+    <None Remove="**\*.akbura;**\*.akcss" />
+
+    <EmbeddedResource Include="**\*.akbura;**\*.akcss"
+                      Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder);@(EmbeddedResource)" />
+
+    <EmbeddedResource Update="**\*.akbura;**\*.akcss">
+      <LogicalName>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</LogicalName>
+    </EmbeddedResource>
+
+    <_AkburaModuleSource Include="**\*.akbura;**\*.akcss"
+                         Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)">
+      <LogicalName>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</LogicalName>
+    </_AkburaModuleSource>
+
+    <EmbeddedResource Include="$(AkburaModuleManifestPath)">
+      <LogicalName>!Akbura</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <Target Name="GenerateAkburaModuleManifest"
+          BeforeTargets="PrepareResourceNames"
+          DependsOnTargets="FindReferenceAssembliesForReferences"
+          Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(AkburaModuleManifestPath)'))" />
+
+    <GenerateAkburaModuleManifest Sources="@(_AkburaModuleSource)"
+                                  CSharpSources="@(Compile)"
+                                  References="@(ReferencePathWithRefAssemblies)"
+                                  OutputPath="$(AkburaModuleManifestPath)"
+                                  AssemblyName="$(AssemblyName)"
+                                  RootNamespace="$(RootNamespace)"
+                                  ProjectDirectory="$(MSBuildProjectDirectory)"
+                                  DefineConstants="$(DefineConstants)"
+                                  LanguageVersion="$(LangVersion)"
+                                  Nullable="$(Nullable)"
+                                  AllowUnsafeBlocks="$(AllowUnsafeBlocks)" />
+  </Target>
+
+</Project>

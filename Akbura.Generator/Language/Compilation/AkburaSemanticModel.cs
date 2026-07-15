@@ -1183,9 +1183,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<IAkcssSymbol>>.Rent();
         foreach (var importName in GetAkcssImportNames(syntax))
         {
-            var matches = Compilation.AkcssSyntaxTrees
-                .Where(tree => string.Equals(tree.LogicalName, importName, StringComparison.Ordinal))
-                .ToImmutableArray();
+            var matches = Compilation.GetAkcssSyntaxTreesByLogicalName(importName);
             if (matches.Length == 0)
             {
                 diagnosticsBuilder.Add(CreateAkcssImportNotFoundDiagnostic(importName));
@@ -2812,7 +2810,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         foreach (var candidateMetadataName in GetAkburaComponentCandidateMetadataNames(markupElement.StartTag!.Name))
         {
-            foreach (var syntaxTree in Compilation.SyntaxTrees)
+            foreach (var syntaxTree in Compilation.AllSyntaxTrees)
             {
                 if (ReferenceEquals(syntaxTree, SyntaxTree))
                 {
@@ -2986,6 +2984,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     internal string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
     {
         var componentName = syntaxTree.ComponentName;
+        if (Compilation.TryGetReferencedComponentDeclaration(syntaxTree, out var declaration) &&
+            declaration.MetadataName is { Length: > 0 } metadataName)
+        {
+            return metadataName.StartsWith("global::", StringComparison.Ordinal)
+                ? metadataName["global::".Length..]
+                : metadataName;
+        }
+
         if (componentName.Length == 0)
         {
             return string.Empty;

@@ -96,16 +96,20 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
 
         private AkburaSymbolInfo ResolveAkburaComponent(AkburaDocumentSyntax document)
         {
-            var componentName = SyntaxTree.ComponentName;
-            if (string.IsNullOrWhiteSpace(componentName))
+            var componentMetadataName = GetAkburaComponentMetadataName(SyntaxTree);
+            if (string.IsNullOrWhiteSpace(componentMetadataName))
             {
                 return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
             }
 
-            var namespaceName = GetAkburaNamespaceText(document, SyntaxTree);
+            var namespaceSeparator = componentMetadataName.LastIndexOf('.');
+            var componentName = namespaceSeparator < 0
+                ? componentMetadataName
+                : componentMetadataName[(namespaceSeparator + 1)..];
+            var namespaceName = namespaceSeparator < 0 ? string.Empty : componentMetadataName[..namespaceSeparator];
             var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
                 Compilation.CSharpCompilation,
-                GetAkburaComponentMetadataName(SyntaxTree));
+                componentMetadataName);
             var partialTypes = componentTypeInfo.DeclaredType == null
                 ? ImmutableArray<INamedTypeSymbol>.Empty
                 : ImmutableArray.Create(componentTypeInfo.DeclaredType);

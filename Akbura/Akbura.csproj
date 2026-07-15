@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
+    <AkburaBuildTasksOutputDirectory>$(MSBuildThisFileDirectory)..\Akbura.Build.Tasks\bin\$(Configuration)\net10.0</AkburaBuildTasksOutputDirectory>
+    <AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAkburaBuildTasks</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,7 +15,30 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Akbura.Build.Tasks\Akbura.Build.Tasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <AvaloniaResource Include="Styles.axaml" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="buildTransitive\\Akbura.targets"
+          Pack="true"
+          PackagePath="buildTransitive/Akbura.targets" />
+  </ItemGroup>
+
+  <Import Project="buildTransitive\\Akbura.targets" />
+
+  <Target Name="PackAkburaBuildTasks"
+          DependsOnTargets="ResolveProjectReferences">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(AkburaBuildTasksOutputDirectory)\*.dll;$(AkburaBuildTasksOutputDirectory)\*.json">
+        <PackagePath>tools/net10.0/%(Filename)%(Extension)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
 
 </Project>

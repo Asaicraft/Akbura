@@ -788,9 +788,7 @@ internal sealed partial class MarkupBinder
         using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<AkcssUtilityDeclarationSyntax>>.Rent();
         foreach (var importName in GetAkcssImportNames())
         {
-            var matches = Compilation.AkcssSyntaxTrees
-                .Where(tree => string.Equals(tree.LogicalName, importName, StringComparison.Ordinal))
-                .ToImmutableArray();
+            var matches = Compilation.GetAkcssSyntaxTreesByLogicalName(importName);
             if (matches.Length == 0)
             {
                 diagnosticsBuilder.Add(SemanticModel.CreateAkcssImportNotFoundDiagnostic(importName));
@@ -815,9 +813,7 @@ internal sealed partial class MarkupBinder
         using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<AkcssStyleRuleSyntax>>.Rent();
         foreach (var importName in GetAkcssImportNames())
         {
-            var matches = Compilation.AkcssSyntaxTrees
-                .Where(tree => string.Equals(tree.LogicalName, importName, StringComparison.Ordinal))
-                .ToImmutableArray();
+            var matches = Compilation.GetAkcssSyntaxTreesByLogicalName(importName);
             if (matches.Length == 0)
             {
                 diagnosticsBuilder.Add(SemanticModel.CreateAkcssImportNotFoundDiagnostic(importName));

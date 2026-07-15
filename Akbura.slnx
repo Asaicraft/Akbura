@@ -18,6 +18,7 @@
     <File Path="README.md" />
   </Folder>
   <Project Path="Akbura.AotTest/Akbura.AotTest.csproj" />
+  <Project Path="Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />
   <Project Path="Akbura.Preview/Akbura.Preview.csproj" />
   <Project Path="Akbura.Benchmarks/Akbura.Benchmarks.csproj" />
   <Project Path="Akbura.Generator/Akbura.Generator.csproj" />

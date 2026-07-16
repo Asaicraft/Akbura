@@ -247,7 +247,7 @@ internal sealed class BindingSession
         AkburaSyntax syntax,
         out ImmutableArray<Declaration> path)
     {
-        return _semanticModel.Compilation.DeclarationTable.TryGetDeclarationPath(
+        return _semanticModel.Compilation.TryGetDeclarationPath(
             syntax,
             out path);
     }
@@ -257,7 +257,7 @@ internal sealed class BindingSession
         int position,
         out ImmutableArray<Declaration> path)
     {
-        return _semanticModel.Compilation.DeclarationTable.TryGetDeclarationPath(
+        return _semanticModel.Compilation.TryGetDeclarationPath(
             syntax,
             position,
             out path);

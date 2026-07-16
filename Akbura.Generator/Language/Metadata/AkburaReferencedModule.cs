@@ -1,3 +1,5 @@
+using Akbura.Language.Symbols;
+using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,21 +11,17 @@ namespace Akbura.Language;
 
 internal sealed class AkburaReferencedModule
 {
-    private readonly ImmutableDictionary<AkburaSyntaxTree, AkburaModuleDeclaration> _componentDeclarations;
+    private readonly ImmutableArray<AkburaReferencedSource> _sources;
 
     private AkburaReferencedModule(
         PortableExecutableReference reference,
         AkburaModuleManifest manifest,
-        ImmutableArray<AkburaSyntaxTree> componentSyntaxTrees,
-        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
-        ImmutableDictionary<AkburaSyntaxTree, AkburaModuleDeclaration> componentDeclarations)
+        ImmutableArray<AkburaReferencedSource> sources)
     {
         Reference = reference;
         Manifest = manifest;
         Location = new MetadataLocation(this);
-        ComponentSyntaxTrees = componentSyntaxTrees;
-        AkcssSyntaxTrees = akcssSyntaxTrees;
-        _componentDeclarations = componentDeclarations;
+        _sources = sources;
     }
 
     public PortableExecutableReference Reference { get; }
@@ -32,15 +30,116 @@ internal sealed class AkburaReferencedModule
 
     public MetadataLocation Location { get; }
 
-    public ImmutableArray<AkburaSyntaxTree> ComponentSyntaxTrees { get; }
+    internal bool IsSyntaxTreeMaterialized(string sourceCodePath)
+    {
+        foreach (var source in _sources)
+        {
+            if (string.Equals(
+                    source.Source.SourceCodePath,
+                    sourceCodePath,
+                    StringComparison.Ordinal))
+            {
+                return source.IsSyntaxTreeMaterialized;
+            }
+        }
 
-    public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees { get; }
+        return false;
+    }
+
+    public bool TryGetComponentSymbol(
+        string metadataName,
+        out IAkburaComponentSymbol symbol)
+    {
+        foreach (var source in _sources)
+        {
+            if (source.TryGetComponentSymbol(metadataName, out symbol))
+            {
+                return true;
+            }
+        }
+
+        symbol = null!;
+        return false;
+    }
+
+    public ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(
+        string logicalName)
+    {
+        using var builder = ImmutableArrayBuilder<AkcssSyntaxTree>.Rent();
+        foreach (var source in _sources)
+        {
+            if (source.TryGetAkcssSyntaxTree(logicalName, out var syntaxTree))
+            {
+                builder.Add(syntaxTree);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
 
     public bool TryGetComponentDeclaration(
         AkburaSyntaxTree syntaxTree,
         out AkburaModuleDeclaration declaration)
     {
-        return _componentDeclarations.TryGetValue(syntaxTree, out declaration!);
+        foreach (var source in _sources)
+        {
+            if (source.TryGetComponentDeclaration(syntaxTree, out declaration))
+            {
+                return true;
+            }
+        }
+
+        declaration = null!;
+        return false;
+    }
+
+    public bool TryGetDeclaration(
+        AkburaSyntax syntax,
+        out Declaration declaration)
+    {
+        foreach (var source in _sources)
+        {
+            if (source.TryGetDeclaration(syntax, out declaration))
+            {
+                return true;
+            }
+        }
+
+        declaration = null!;
+        return false;
+    }
+
+    public bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        out ImmutableArray<Declaration> path)
+    {
+        foreach (var source in _sources)
+        {
+            if (source.TryGetDeclarationPath(syntax, out path))
+            {
+                return true;
+            }
+        }
+
+        path = default;
+        return false;
+    }
+
+    public bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        int position,
+        out ImmutableArray<Declaration> path)
+    {
+        foreach (var source in _sources)
+        {
+            if (source.TryGetDeclarationPath(syntax, position, out path))
+            {
+                return true;
+            }
+        }
+
+        path = default;
+        return false;
     }
 
     public static ImmutableArray<AkburaReferencedModule> Load(CSharpCompilation compilation)
@@ -54,7 +153,7 @@ internal sealed class AkburaReferencedModule
         foreach (var reference in compilation.References)
         {
             if (reference is PortableExecutableReference portableReference &&
-                TryLoad(portableReference, out var module))
+                TryLoad(compilation, portableReference, out var module))
             {
                 modules.Add(module);
             }
@@ -64,6 +163,7 @@ internal sealed class AkburaReferencedModule
     }
 
     private static bool TryLoad(
+        CSharpCompilation compilation,
         PortableExecutableReference reference,
         out AkburaReferencedModule module)
     {
@@ -89,84 +189,18 @@ internal sealed class AkburaReferencedModule
             }
         }
 
-        var componentTrees = ImmutableArray.CreateBuilder<AkburaSyntaxTree>();
-        var akcssTrees = ImmutableArray.CreateBuilder<AkcssSyntaxTree>();
-        var componentDeclarations = ImmutableDictionary.CreateBuilder<AkburaSyntaxTree, AkburaModuleDeclaration>();
-
+        var typeResolver = new AkburaModuleTypeResolver(compilation);
+        using var sources = ImmutableArrayBuilder<AkburaReferencedSource>.Rent(
+            manifest.Sources.Length);
         foreach (var source in manifest.Sources)
         {
-            if (!PortableExecutableResourceReader.TryOpenResource(
-                    reference,
-                    source.SourceCodePath,
-                    out var sourceStream))
-            {
-                continue;
-            }
-
-            string text;
-            using (sourceStream)
-            using (var reader = new StreamReader(sourceStream))
-            {
-                text = reader.ReadToEnd();
-            }
-
-            if (source.Kind == AkburaModuleSourceKind.Component)
-            {
-                var declaration = GetSingleDeclaration(source, DeclarationKind.Component);
-                if (declaration == null || declaration.Component == null)
-                {
-                    continue;
-                }
-
-                var syntaxTree = AkburaSyntaxTree.ParseText(text, source.SourceCodePath);
-                componentTrees.Add(syntaxTree);
-                componentDeclarations.Add(syntaxTree, declaration);
-            }
-            else if (source.Kind == AkburaModuleSourceKind.Akcss)
-            {
-                var declaration = GetSingleDeclaration(source, DeclarationKind.AkcssModule);
-                if (declaration == null)
-                {
-                    continue;
-                }
-
-                var logicalName = declaration.MetadataName ?? source.SourceCodePath;
-                akcssTrees.Add(AkcssSyntaxTree.ParseText(
-                    text,
-                    source.SourceCodePath,
-                    logicalName));
-            }
+            sources.Add(new AkburaReferencedSource(reference, source, typeResolver));
         }
 
         module = new AkburaReferencedModule(
             reference,
             manifest,
-            componentTrees.ToImmutable(),
-            akcssTrees.ToImmutable(),
-            componentDeclarations.ToImmutable());
+            sources.ToImmutable());
         return true;
-    }
-
-    private static AkburaModuleDeclaration? GetSingleDeclaration(
-        AkburaModuleSource source,
-        DeclarationKind kind)
-    {
-        AkburaModuleDeclaration? result = null;
-        foreach (var declaration in source.Declarations)
-        {
-            if (declaration.Kind != kind)
-            {
-                continue;
-            }
-
-            if (result != null)
-            {
-                return null;
-            }
-
-            result = declaration;
-        }
-
-        return result;
     }
 }

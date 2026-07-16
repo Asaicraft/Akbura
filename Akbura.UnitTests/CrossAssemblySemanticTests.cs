@@ -19,6 +19,12 @@ public sealed class CrossAssemblySemanticTests
             namespace Library.Components;
 
             param string Title;
+            inject System.IServiceProvider Services;
+            """;
+        const string unusedComponentSource =
+            """
+            namespace Library.Components;
+            param string Ignored;
             """;
         const string akcssSource =
             """
@@ -75,6 +81,9 @@ public sealed class CrossAssemblySemanticTests
                         "Components/LibraryCard.akbura",
                         componentSource),
                     new AkburaModuleSourceText(
+                        "Components/Unused.akbura",
+                        unusedComponentSource),
+                    new AkburaModuleSourceText(
                         "Styles/Theme.akcss",
                         akcssSource),
                 ],
@@ -83,8 +92,9 @@ public sealed class CrossAssemblySemanticTests
             var resources = new[]
             {
                 CreateResource(AkburaModuleManifest.ResourceName, manifestBytes),
-                CreateResource("Components/LibraryCard.akbura", Encoding.UTF8.GetBytes(componentSource)),
-                CreateResource("Styles/Theme.akcss", Encoding.UTF8.GetBytes(akcssSource)),
+                CreateEmbeddedSourceResource("Components/LibraryCard.akbura", componentSource),
+                CreateEmbeddedSourceResource("Components/Unused.akbura", unusedComponentSource),
+                CreateEmbeddedSourceResource("Styles/Theme.akcss", akcssSource),
             };
 
             var emitResult = libraryCompilation.Emit(
@@ -111,17 +121,35 @@ public sealed class CrossAssemblySemanticTests
 
             Assert.Single(compilation.SyntaxTrees);
             Assert.Empty(compilation.AkcssSyntaxTrees);
+            Assert.Single(compilation.DeclarationTable.Components);
+            Assert.Empty(compilation.DeclarationTable.AkcssModules);
             var referencedModule = Assert.Single(
                 compilation.ReferencedModules,
                 static module => module.Manifest.AssemblyName == "Library");
-            Assert.Single(referencedModule.ComponentSyntaxTrees);
+            Assert.False(referencedModule.IsSyntaxTreeMaterialized("Components/LibraryCard.akbura"));
+            Assert.False(referencedModule.IsSyntaxTreeMaterialized("Components/Unused.akbura"));
+            Assert.False(referencedModule.IsSyntaxTreeMaterialized("Styles/Theme.akcss"));
             Assert.Equal(Akbura.Language.LocationKind.MetadataFile, referencedModule.Location.Kind);
             Assert.Same(referencedModule, referencedModule.Location.MetadataModule);
             Assert.Equal(referencedModule.Location, new MetadataLocation(referencedModule));
-            Assert.Single(referencedModule.AkcssSyntaxTrees);
+            var referencedComponentSource = Assert.Single(
+                referencedModule.Manifest.Sources,
+                static source => source.SourceCodePath == "Components/LibraryCard.akbura");
+            var referencedComponentDeclaration = Assert.Single(referencedComponentSource.Declarations);
+            var referencedAkcssSource = Assert.Single(
+                referencedModule.Manifest.Sources,
+                static source => source.SourceCodePath == "Styles/Theme.akcss");
             Assert.Equal(
                 "Library.Styles.Theme.akcss",
-                referencedModule.AkcssSyntaxTrees[0].LogicalName);
+                Assert.Single(referencedAkcssSource.Declarations).MetadataName);
+
+            var updatedCSharpCompilation = consumerCSharpCompilation.AddSyntaxTrees(
+                CSharpSyntaxTree.ParseText("internal sealed class AddedType { }"));
+            var updatedCompilation = compilation.WithCSharpCompilation(updatedCSharpCompilation);
+            var reusedModule = Assert.Single(
+                updatedCompilation.ReferencedModules,
+                static module => module.Manifest.AssemblyName == "Library");
+            Assert.Same(referencedModule, reusedModule);
 
             var markupRoot = Assert.IsType<MarkupRootSyntax>(
                 Assert.Single(
@@ -137,6 +165,10 @@ public sealed class CrossAssemblySemanticTests
             Assert.Equal(
                 SpecialType.System_String,
                 Assert.IsAssignableFrom<ITypeSymbol>(titleParameter.Type.Symbol).SpecialType);
+            var injectedService = Assert.Single(component.AkburaComponent.InjectedServices);
+            Assert.Equal("Services", injectedService.Name);
+            Assert.Equal("IServiceProvider", injectedService.Type.Name);
+            Assert.False(referencedModule.IsSyntaxTreeMaterialized("Components/LibraryCard.akbura"));
 
             var attributes = element.StartTag!.Attributes;
             Assert.Equal(3, attributes.Count);
@@ -164,6 +196,27 @@ public sealed class CrossAssemblySemanticTests
             {
                 Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
             }
+
+            Assert.False(referencedModule.IsSyntaxTreeMaterialized("Components/LibraryCard.akbura"));
+            Assert.True(referencedModule.IsSyntaxTreeMaterialized("Styles/Theme.akcss"));
+            Assert.False(referencedModule.IsSyntaxTreeMaterialized("Components/Unused.akbura"));
+
+            var titleSyntax = titleParameter.DeclarationSyntax;
+            var injectSyntax = injectedService.DeclarationSyntax;
+            var componentSyntax = component.AkburaComponent.DeclarationSyntax;
+            Assert.Same(titleSyntax, titleParameter.DeclarationSyntax);
+            Assert.Same(injectSyntax, injectedService.DeclarationSyntax);
+            Assert.Same(componentSyntax, component.AkburaComponent.DeclarationSyntax);
+            Assert.Same(componentSyntax, titleSyntax.Root);
+            Assert.Same(componentSyntax, injectSyntax.Root);
+            Assert.Equal(
+                Assert.Single(referencedComponentDeclaration.Component!.Parameters).SourceStart,
+                titleSyntax.FullSpan.Start);
+            Assert.Equal(
+                Assert.Single(referencedComponentDeclaration.Component.InjectedServices).SourceStart,
+                injectSyntax.FullSpan.Start);
+            Assert.True(referencedModule.IsSyntaxTreeMaterialized("Components/LibraryCard.akbura"));
+            Assert.False(referencedModule.IsSyntaxTreeMaterialized("Components/Unused.akbura"));
         }
         finally
         {
@@ -205,6 +258,16 @@ public sealed class CrossAssemblySemanticTests
         return stream.ToArray();
     }
 
+    private static ResourceDescription CreateEmbeddedSourceResource(string name, string content)
+    {
+        var preamble = Encoding.Unicode.GetPreamble();
+        var text = Encoding.Unicode.GetBytes(content);
+        var bytes = new byte[preamble.Length + text.Length];
+        preamble.CopyTo(bytes, 0);
+        text.CopyTo(bytes, preamble.Length);
+        return CreateResource(name, bytes);
+    }
+
     private static ResourceDescription CreateResource(string name, byte[] content)
     {
         return new ResourceDescription(
@@ -213,4 +276,3 @@ public sealed class CrossAssemblySemanticTests
             isPublic: true);
     }
 }
-

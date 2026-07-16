@@ -1,16 +1,25 @@
 using Akbura.Language;
 using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Akbura.Build;
 
 public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Task
 {
+    private const int CopyBufferLength = 4096;
+    private static readonly Encoding s_embeddedSourceEncoding =
+        new UnicodeEncoding(bigEndian: false, byteOrderMark: true, throwOnInvalidBytes: true);
+
     [Required]
     public ITaskItem[] Sources { get; set; } = [];
 
@@ -20,6 +29,9 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
 
     [Required]
     public string OutputPath { get; set; } = string.Empty;
+
+    [Required]
+    public string EmbeddedSourcesDirectory { get; set; } = string.Empty;
 
     [Required]
     public string AssemblyName { get; set; } = string.Empty;
@@ -37,11 +49,20 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
 
     public bool AllowUnsafeBlocks { get; set; }
 
+    [Output]
+    public ITaskItem[] EmbeddedSources { get; private set; } = [];
+
     public override bool Execute()
     {
+        EmbeddedSources = [];
         try
         {
             var sourceTexts = ReadSources();
+            if (Log.HasLoggedErrors)
+            {
+                return false;
+            }
+
             var csharpCompilation = CreateCSharpCompilation();
             if (Log.HasLoggedErrors)
             {
@@ -70,6 +91,7 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
     private IReadOnlyList<AkburaModuleSourceText> ReadSources()
     {
         var result = new List<AkburaModuleSourceText>(Sources.Length);
+        var embeddedSources = new List<ITaskItem>(Sources.Length);
         var paths = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var source in Sources.OrderBy(
@@ -91,11 +113,22 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
                 continue;
             }
 
-            result.Add(new AkburaModuleSourceText(
-                sourceCodePath,
-                File.ReadAllText(fullPath)));
+            SourceText sourceText;
+            using (var stream = File.OpenRead(fullPath))
+            {
+                sourceText = SourceText.From(stream, encoding: null);
+            }
+
+            result.Add(new AkburaModuleSourceText(sourceCodePath, sourceText));
+
+            var embeddedPath = GetEmbeddedSourcePath(sourceCodePath);
+            WriteEmbeddedSourceIfChanged(embeddedPath, sourceText);
+            var embeddedSource = new TaskItem(embeddedPath);
+            embeddedSource.SetMetadata("LogicalName", sourceCodePath);
+            embeddedSources.Add(embeddedSource);
         }
 
+        EmbeddedSources = embeddedSources.ToArray();
         return result;
     }
 
@@ -115,8 +148,14 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
                 continue;
             }
 
+            SourceText sourceText;
+            using (var stream = File.OpenRead(fullPath))
+            {
+                sourceText = SourceText.From(stream, encoding: null);
+            }
+
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(
-                File.ReadAllText(fullPath),
+                sourceText,
                 parseOptions,
                 fullPath));
         }
@@ -193,6 +232,118 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
         return string.IsNullOrWhiteSpace(fullPath)
             ? Path.GetFullPath(item.ItemSpec, ProjectDirectory)
             : fullPath;
+    }
+
+    private string GetEmbeddedSourcePath(string sourceCodePath)
+    {
+        var pathBytes = Encoding.UTF8.GetBytes(sourceCodePath);
+        var fileName = Convert.ToHexString(SHA256.HashData(pathBytes)) +
+                       Path.GetExtension(sourceCodePath);
+        return Path.Combine(EmbeddedSourcesDirectory, fileName);
+    }
+
+    private static void WriteEmbeddedSourceIfChanged(
+        string outputPath,
+        SourceText sourceText)
+    {
+        var directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var temporaryPath = outputPath + ".tmp";
+        try
+        {
+            using (var stream = new FileStream(
+                       temporaryPath,
+                       FileMode.Create,
+                       FileAccess.Write,
+                       FileShare.None))
+            using (var writer = new StreamWriter(
+                       stream,
+                       s_embeddedSourceEncoding,
+                       CopyBufferLength))
+            {
+                WriteSourceText(writer, sourceText);
+            }
+
+            if (File.Exists(outputPath) && FilesEqual(outputPath, temporaryPath))
+            {
+                return;
+            }
+
+            File.Move(temporaryPath, outputPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static void WriteSourceText(TextWriter writer, SourceText sourceText)
+    {
+        var buffer = ArrayPool<char>.Shared.Rent(CopyBufferLength);
+        try
+        {
+            for (var position = 0; position < sourceText.Length;)
+            {
+                var count = Math.Min(buffer.Length, sourceText.Length - position);
+                sourceText.CopyTo(position, buffer, 0, count);
+                writer.Write(buffer, 0, count);
+                position += count;
+            }
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+        }
+    }
+
+    private static bool FilesEqual(string leftPath, string rightPath)
+    {
+        var leftInfo = new FileInfo(leftPath);
+        var rightInfo = new FileInfo(rightPath);
+        if (leftInfo.Length != rightInfo.Length)
+        {
+            return false;
+        }
+
+        var leftBuffer = ArrayPool<byte>.Shared.Rent(CopyBufferLength);
+        var rightBuffer = ArrayPool<byte>.Shared.Rent(CopyBufferLength);
+        try
+        {
+            using var left = File.OpenRead(leftPath);
+            using var right = File.OpenRead(rightPath);
+            while (true)
+            {
+                var leftCount = left.Read(leftBuffer, 0, leftBuffer.Length);
+                var rightCount = right.Read(rightBuffer, 0, rightBuffer.Length);
+                if (leftCount != rightCount)
+                {
+                    return false;
+                }
+
+                if (leftCount == 0)
+                {
+                    return true;
+                }
+
+                if (!leftBuffer.AsSpan(0, leftCount).SequenceEqual(
+                        rightBuffer.AsSpan(0, rightCount)))
+                {
+                    return false;
+                }
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(leftBuffer);
+            ArrayPool<byte>.Shared.Return(rightBuffer);
+        }
     }
 
     private void WriteIfChanged(AkburaModuleManifest manifest)

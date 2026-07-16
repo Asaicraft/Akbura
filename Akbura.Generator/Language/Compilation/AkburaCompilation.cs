@@ -1,3 +1,5 @@
+using Akbura.Language.Symbols;
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Concurrent;
@@ -7,13 +9,11 @@ using System.Linq;
 
 namespace Akbura.Language;
 
-internal sealed class AkburaCompilation
+internal sealed partial class AkburaCompilation
 {
     private readonly ConcurrentDictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
     private readonly SyntaxAndDeclarationManager _syntaxAndDeclarations;
-    private readonly ImmutableArray<AkburaSyntaxTree> _syntaxTrees;
-    private readonly ImmutableArray<AkcssSyntaxTree> _akcssSyntaxTrees;
-    private readonly ImmutableArray<AkburaReferencedModule> _referencedModules;
+    private readonly ReferenceManager _referenceManager;
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
@@ -52,32 +52,14 @@ internal sealed class AkburaCompilation
         AkburaCompilation? previousCompilation = null)
         : this(
             csharpCompilation,
-            syntaxTrees.IsDefault ? ImmutableArray<AkburaSyntaxTree>.Empty : syntaxTrees,
-            akcssSyntaxTrees.IsDefault ? ImmutableArray<AkcssSyntaxTree>.Empty : akcssSyntaxTrees,
-            GetReferencedModules(csharpCompilation, previousCompilation),
-            rootNamespace,
-            projectDirectory,
-            previousCompilation)
-    {
-    }
-
-    private AkburaCompilation(
-        CSharpCompilation csharpCompilation,
-        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
-        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
-        ImmutableArray<AkburaReferencedModule> referencedModules,
-        string rootNamespace,
-        string projectDirectory,
-        AkburaCompilation? previousCompilation)
-        : this(
-            csharpCompilation,
-            syntaxTrees,
-            akcssSyntaxTrees,
-            referencedModules,
             new SyntaxAndDeclarationManager(
-                syntaxTrees.AddRange(GetReferencedComponentSyntaxTrees(referencedModules)),
-                akcssSyntaxTrees.AddRange(GetReferencedAkcssSyntaxTrees(referencedModules)),
+                syntaxTrees.IsDefault ? ImmutableArray<AkburaSyntaxTree>.Empty : syntaxTrees,
+                akcssSyntaxTrees.IsDefault ? ImmutableArray<AkcssSyntaxTree>.Empty : akcssSyntaxTrees,
                 previousCompilation?._syntaxAndDeclarations),
+            ReferenceManager.Create(
+                csharpCompilation,
+                previousCompilation?.CSharpCompilation,
+                previousCompilation?._referenceManager),
             rootNamespace,
             projectDirectory,
             previousCompilation)
@@ -86,19 +68,15 @@ internal sealed class AkburaCompilation
 
     private AkburaCompilation(
         CSharpCompilation csharpCompilation,
-        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
-        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
-        ImmutableArray<AkburaReferencedModule> referencedModules,
         SyntaxAndDeclarationManager syntaxAndDeclarations,
+        ReferenceManager referenceManager,
         string rootNamespace,
         string projectDirectory,
         AkburaCompilation? previousCompilation)
     {
         CSharpCompilation = csharpCompilation ?? throw new ArgumentNullException(nameof(csharpCompilation));
-        _syntaxTrees = syntaxTrees;
-        _akcssSyntaxTrees = akcssSyntaxTrees;
-        _referencedModules = referencedModules;
         _syntaxAndDeclarations = syntaxAndDeclarations ?? throw new ArgumentNullException(nameof(syntaxAndDeclarations));
+        _referenceManager = referenceManager ?? throw new ArgumentNullException(nameof(referenceManager));
         RootNamespace = rootNamespace ?? string.Empty;
         ProjectDirectory = projectDirectory ?? string.Empty;
         PreviousCompilation = previousCompilation;
@@ -106,15 +84,11 @@ internal sealed class AkburaCompilation
 
     public CSharpCompilation CSharpCompilation { get; }
 
-    public ImmutableArray<AkburaSyntaxTree> SyntaxTrees => _syntaxTrees;
+    public ImmutableArray<AkburaSyntaxTree> SyntaxTrees => _syntaxAndDeclarations.SyntaxTrees;
 
-    public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees => _akcssSyntaxTrees;
+    public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees => _syntaxAndDeclarations.AkcssSyntaxTrees;
 
-    internal ImmutableArray<AkburaSyntaxTree> AllSyntaxTrees => _syntaxAndDeclarations.SyntaxTrees;
-
-    internal ImmutableArray<AkcssSyntaxTree> AllAkcssSyntaxTrees => _syntaxAndDeclarations.AkcssSyntaxTrees;
-
-    internal ImmutableArray<AkburaReferencedModule> ReferencedModules => _referencedModules;
+    internal ImmutableArray<AkburaReferencedModule> ReferencedModules => _referenceManager.Modules;
 
     public string RootNamespace { get; }
 
@@ -133,19 +107,8 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
     {
-        syntaxTrees = syntaxTrees.IsDefault ? [] : syntaxTrees;
-        if (_syntaxTrees.SequenceEqual(syntaxTrees))
-        {
-            return this;
-        }
-
-        return new AkburaCompilation(
-            CSharpCompilation,
-            syntaxTrees,
-            _akcssSyntaxTrees,
-            RootNamespace,
-            ProjectDirectory,
-            previousCompilation: this);
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.WithSyntaxTrees(syntaxTrees));
     }
 
     public AkburaCompilation WithAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> akcssSyntaxTrees)
@@ -155,115 +118,48 @@ internal sealed class AkburaCompilation
 
     public AkburaCompilation WithAkcssSyntaxTrees(ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
     {
-        akcssSyntaxTrees = akcssSyntaxTrees.IsDefault ? [] : akcssSyntaxTrees;
-        if (_akcssSyntaxTrees.SequenceEqual(akcssSyntaxTrees))
-        {
-            return this;
-        }
-
-        return new AkburaCompilation(
-            CSharpCompilation,
-            _syntaxTrees,
-            akcssSyntaxTrees,
-            RootNamespace,
-            ProjectDirectory,
-            previousCompilation: this);
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.WithAkcssSyntaxTrees(akcssSyntaxTrees));
     }
 
     public AkburaCompilation AddSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
-        if (syntaxTrees == null)
-        {
-            throw new ArgumentNullException(nameof(syntaxTrees));
-        }
-
-        return WithSyntaxTrees(_syntaxTrees.AddRange(syntaxTrees));
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.AddSyntaxTrees(syntaxTrees));
     }
 
     public AkburaCompilation RemoveSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
-        if (syntaxTrees == null)
-        {
-            throw new ArgumentNullException(nameof(syntaxTrees));
-        }
-
-        var removeSet = syntaxTrees.ToImmutableHashSet();
-        return removeSet.Count == 0
-            ? this
-            : WithSyntaxTrees(_syntaxTrees.RemoveAll(removeSet.Contains));
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.RemoveSyntaxTrees(syntaxTrees));
     }
 
     public AkburaCompilation ReplaceSyntaxTree(
         AkburaSyntaxTree oldTree,
         AkburaSyntaxTree newTree)
     {
-        if (oldTree == null)
-        {
-            throw new ArgumentNullException(nameof(oldTree));
-        }
-
-        if (newTree == null)
-        {
-            throw new ArgumentNullException(nameof(newTree));
-        }
-
-        var index = _syntaxTrees.IndexOf(oldTree);
-        if (index < 0)
-        {
-            throw new ArgumentException("Syntax tree is not part of this compilation.", nameof(oldTree));
-        }
-
-        return ReferenceEquals(oldTree, newTree)
-            ? this
-            : WithSyntaxTrees(_syntaxTrees.SetItem(index, newTree));
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.ReplaceSyntaxTree(oldTree, newTree));
     }
 
     public AkburaCompilation AddAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> syntaxTrees)
     {
-        if (syntaxTrees == null)
-        {
-            throw new ArgumentNullException(nameof(syntaxTrees));
-        }
-
-        return WithAkcssSyntaxTrees(_akcssSyntaxTrees.AddRange(syntaxTrees));
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.AddAkcssSyntaxTrees(syntaxTrees));
     }
 
     public AkburaCompilation RemoveAkcssSyntaxTrees(IEnumerable<AkcssSyntaxTree> syntaxTrees)
     {
-        if (syntaxTrees == null)
-        {
-            throw new ArgumentNullException(nameof(syntaxTrees));
-        }
-
-        var removeSet = syntaxTrees.ToImmutableHashSet();
-        return removeSet.Count == 0
-            ? this
-            : WithAkcssSyntaxTrees(_akcssSyntaxTrees.RemoveAll(removeSet.Contains));
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.RemoveAkcssSyntaxTrees(syntaxTrees));
     }
 
     public AkburaCompilation ReplaceAkcssSyntaxTree(
         AkcssSyntaxTree oldTree,
         AkcssSyntaxTree newTree)
     {
-        if (oldTree == null)
-        {
-            throw new ArgumentNullException(nameof(oldTree));
-        }
-
-        if (newTree == null)
-        {
-            throw new ArgumentNullException(nameof(newTree));
-        }
-
-        var index = _akcssSyntaxTrees.IndexOf(oldTree);
-        if (index < 0)
-        {
-            throw new ArgumentException("AKCSS syntax tree is not part of this compilation.", nameof(oldTree));
-        }
-
-        return ReferenceEquals(oldTree, newTree)
-            ? this
-            : WithAkcssSyntaxTrees(_akcssSyntaxTrees.SetItem(index, newTree));
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.ReplaceAkcssSyntaxTree(oldTree, newTree));
     }
 
     public AkburaCompilation WithCSharpCompilation(CSharpCompilation csharpCompilation)
@@ -275,8 +171,11 @@ internal sealed class AkburaCompilation
 
         return new AkburaCompilation(
             csharpCompilation,
-            _syntaxTrees,
-            _akcssSyntaxTrees,
+            _syntaxAndDeclarations,
+            ReferenceManager.Create(
+                csharpCompilation,
+                CSharpCompilation,
+                _referenceManager),
             RootNamespace,
             ProjectDirectory,
             previousCompilation: this);
@@ -289,7 +188,8 @@ internal sealed class AkburaCompilation
             throw new ArgumentNullException(nameof(syntaxTree));
         }
 
-        if (!AllSyntaxTrees.Contains(syntaxTree))
+        if (!SyntaxTrees.Contains(syntaxTree) &&
+            !_referenceManager.ContainsComponentSyntaxTree(syntaxTree))
         {
             throw new ArgumentException("Syntax tree is not part of this compilation.", nameof(syntaxTree));
         }
@@ -299,65 +199,66 @@ internal sealed class AkburaCompilation
             tree => new SyntaxTreeSemanticModel(this, tree));
     }
 
+    internal IEnumerable<IAkburaComponentSymbol> GetReferencedComponentSymbols(string metadataName)
+    {
+        foreach (var symbol in _referenceManager.GetComponentSymbols(metadataName))
+        {
+            yield return symbol;
+        }
+    }
+
     internal ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
     {
-        var localMatches = _akcssSyntaxTrees
+        var localMatches = AkcssSyntaxTrees
             .Where(tree => string.Equals(tree.LogicalName, logicalName, StringComparison.Ordinal))
             .ToImmutableArray();
         return localMatches.Length > 0
             ? localMatches
-            : AllAkcssSyntaxTrees
-                .Where(tree => string.Equals(tree.LogicalName, logicalName, StringComparison.Ordinal))
-                .ToImmutableArray();
+            : _referenceManager.GetAkcssSyntaxTreesByLogicalName(logicalName);
     }
 
     internal bool TryGetReferencedComponentDeclaration(
         AkburaSyntaxTree syntaxTree,
         out AkburaModuleDeclaration declaration)
     {
-        foreach (var module in _referencedModules)
-        {
-            if (module.TryGetComponentDeclaration(syntaxTree, out declaration))
-            {
-                return true;
-            }
-        }
-
-        declaration = null!;
-        return false;
+        return _referenceManager.TryGetComponentDeclaration(syntaxTree, out declaration);
+    }
+    internal bool TryGetDeclaration(
+        AkburaSyntax syntax,
+        out Declaration declaration)
+    {
+        return DeclarationTable.TryGetDeclaration(syntax, out declaration) ||
+               _referenceManager.TryGetDeclaration(syntax, out declaration);
     }
 
-    private static ImmutableArray<AkburaReferencedModule> GetReferencedModules(
-        CSharpCompilation csharpCompilation,
-        AkburaCompilation? previousCompilation)
+    internal bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        out ImmutableArray<Declaration> path)
     {
-        return previousCompilation != null &&
-               ReferenceEquals(csharpCompilation, previousCompilation.CSharpCompilation)
-            ? previousCompilation._referencedModules
-            : AkburaReferencedModule.Load(csharpCompilation);
+        return DeclarationTable.TryGetDeclarationPath(syntax, out path) ||
+               _referenceManager.TryGetDeclarationPath(syntax, out path);
     }
 
-    private static ImmutableArray<AkburaSyntaxTree> GetReferencedComponentSyntaxTrees(
-        ImmutableArray<AkburaReferencedModule> modules)
+    internal bool TryGetDeclarationPath(
+        AkburaSyntax syntax,
+        int position,
+        out ImmutableArray<Declaration> path)
     {
-        var builder = ImmutableArray.CreateBuilder<AkburaSyntaxTree>();
-        foreach (var module in modules)
-        {
-            builder.AddRange(module.ComponentSyntaxTrees);
-        }
-
-        return builder.ToImmutable();
+        return DeclarationTable.TryGetDeclarationPath(syntax, position, out path) ||
+               _referenceManager.TryGetDeclarationPath(syntax, position, out path);
     }
 
-    private static ImmutableArray<AkcssSyntaxTree> GetReferencedAkcssSyntaxTrees(
-        ImmutableArray<AkburaReferencedModule> modules)
+    private AkburaCompilation WithSyntaxAndDeclarations(
+        SyntaxAndDeclarationManager syntaxAndDeclarations)
     {
-        var builder = ImmutableArray.CreateBuilder<AkcssSyntaxTree>();
-        foreach (var module in modules)
-        {
-            builder.AddRange(module.AkcssSyntaxTrees);
-        }
-
-        return builder.ToImmutable();
+        return ReferenceEquals(_syntaxAndDeclarations, syntaxAndDeclarations)
+            ? this
+            : new AkburaCompilation(
+                CSharpCompilation,
+                syntaxAndDeclarations,
+                _referenceManager,
+                RootNamespace,
+                ProjectDirectory,
+                previousCompilation: this);
     }
 }

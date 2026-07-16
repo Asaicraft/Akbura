@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using Akbura.Language.Symbols;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Language;
 
@@ -340,6 +341,13 @@ internal sealed class AkburaModuleAkcssUtilityParameter
 internal readonly struct AkburaModuleSourceText
 {
     public AkburaModuleSourceText(string sourceCodePath, string text)
+        : this(
+            sourceCodePath,
+            SourceText.From(text ?? throw new ArgumentNullException(nameof(text))))
+    {
+    }
+
+    public AkburaModuleSourceText(string sourceCodePath, SourceText text)
     {
         SourceCodePath = sourceCodePath ?? throw new ArgumentNullException(nameof(sourceCodePath));
         Text = text ?? throw new ArgumentNullException(nameof(text));
@@ -347,5 +355,5 @@ internal readonly struct AkburaModuleSourceText
 
     public string SourceCodePath { get; }
 
-    public string Text { get; }
+    public SourceText Text { get; }
 }

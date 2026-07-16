@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.Symbols;
+using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
@@ -45,6 +46,7 @@ public sealed class AkburaBuildTargetsTests
         Assert.True(widthParameter.SourceLength > 0);
 
         using var sourceStream = AkburaModuleManifestSerializer.OpenSource(assembly, source);
+        AssertUtf16LittleEndianBom(sourceStream);
         using var reader = new StreamReader(sourceStream);
         Assert.Contains("@utilities", reader.ReadToEnd(), StringComparison.Ordinal);
     }
@@ -195,6 +197,9 @@ public sealed class AkburaBuildTargetsTests
             Assert.Contains("Styles/Theme.akcss", resourceNames);
             Assert.Contains(AkburaModuleManifest.ResourceName, resourceNames);
             Assert.DoesNotContain("obj/Ignored.akbura", resourceNames);
+            var assemblyReference = (PortableExecutableReference)MetadataReference.CreateFromFile(assemblyPath);
+            AssertEmbeddedSourceIsUtf16LittleEndian(assemblyReference, "Views/Counter.akbura");
+            AssertEmbeddedSourceIsUtf16LittleEndian(assemblyReference, "Styles/Theme.akcss");
 
             var manifestPath = Path.Combine(
                 projectPath,
@@ -286,6 +291,29 @@ public sealed class AkburaBuildTargetsTests
                 Directory.Delete(projectPath, recursive: true);
             }
         }
+    }
+
+    private static void AssertEmbeddedSourceIsUtf16LittleEndian(
+        PortableExecutableReference reference,
+        string resourceName)
+    {
+        Assert.True(
+            PortableExecutableResourceReader.TryOpenResource(
+                reference,
+                resourceName,
+                out var stream));
+        using (stream)
+        {
+            AssertUtf16LittleEndianBom(stream!);
+        }
+    }
+
+    private static void AssertUtf16LittleEndianBom(Stream stream)
+    {
+        var position = stream.Position;
+        Assert.Equal(0xff, stream.ReadByte());
+        Assert.Equal(0xfe, stream.ReadByte());
+        stream.Position = position;
     }
 
     private static async Task<(int ExitCode, string Output)> BuildProjectAsync(string projectPath)

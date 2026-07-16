@@ -114,7 +114,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        if (Compilation.DeclarationTable.TryGetDeclaration(syntax, out var declaration))
+        if (Compilation.TryGetDeclaration(syntax, out var declaration))
         {
             return _declarationSymbols.GetSymbolInfo(declaration).Symbol;
         }
@@ -410,7 +410,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     internal AkburaSymbolInfo GetDeclarationSymbolInfo(AkburaSyntax syntax)
     {
-        return Compilation.DeclarationTable.TryGetDeclaration(syntax, out var declaration)
+        return Compilation.TryGetDeclaration(syntax, out var declaration)
             ? _declarationSymbols.GetSymbolInfo(declaration)
             : GetMemberSemanticModel(syntax).GetSymbolInfo(syntax);
     }
@@ -2810,7 +2810,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         foreach (var candidateMetadataName in GetAkburaComponentCandidateMetadataNames(markupElement.StartTag!.Name))
         {
-            foreach (var syntaxTree in Compilation.AllSyntaxTrees)
+            foreach (var syntaxTree in Compilation.SyntaxTrees)
             {
                 if (ReferenceEquals(syntaxTree, SyntaxTree))
                 {
@@ -2830,23 +2830,47 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                     continue;
                 }
 
-                SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
-                var usageSymbol = new MarkupComponentSymbol(
+                symbol = CreateAkburaMarkupComponentUsage(
+                    markupElement,
                     componentNameText,
-                    componentSymbol.CSharpDefinition,
-                    componentSymbol.ContentModel,
-                    children: ImmutableArray<MarkupChildContent>.Empty,
-                    akburaComponent: componentSymbol);
-                SetCachedSymbolInfo(markupElement, AkburaSymbolInfo.Success(usageSymbol));
-                usageSymbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
+                    componentSymbol);
+                return true;
+            }
 
-                symbol = usageSymbol;
+            foreach (var componentSymbol in
+                     Compilation.GetReferencedComponentSymbols(candidateMetadataName))
+            {
+                symbol = CreateAkburaMarkupComponentUsage(
+                    markupElement,
+                    componentNameText,
+                    componentSymbol);
                 return true;
             }
         }
 
         symbol = null!;
         return false;
+    }
+
+    private IMarkupComponentSymbol CreateAkburaMarkupComponentUsage(
+        MarkupElementSyntax markupElement,
+        string componentNameText,
+        IAkburaComponentSymbol componentSymbol)
+    {
+        SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        var contentModel = componentSymbol.ComponentType is { } componentType
+            ? CreateMarkupContentModel(componentType, markupElement)
+            : componentSymbol.ContentModel;
+        var usageSymbol = new MarkupComponentSymbol(
+            componentNameText,
+            componentSymbol.CSharpDefinition,
+            contentModel,
+            children: ImmutableArray<MarkupChildContent>.Empty,
+            akburaComponent: componentSymbol);
+        SetCachedSymbolInfo(markupElement, AkburaSymbolInfo.Success(usageSymbol));
+        usageSymbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
+
+        return usageSymbol;
     }
 
     private ImmutableArray<IMarkupAttributeOperation> CreateMarkupAttributeOperations(
@@ -5064,7 +5088,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private void ValidateBoundSyntaxOwnership(AkburaSyntax syntax)
     {
         if (ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()) ||
-            Compilation.DeclarationTable.TryGetDeclaration(syntax.Root, out _))
+            Compilation.TryGetDeclaration(syntax.Root, out _))
         {
             return;
         }

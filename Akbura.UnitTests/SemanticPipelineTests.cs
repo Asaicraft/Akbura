@@ -3014,6 +3014,85 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_PropertyElementNode_BindsAsPropertySetter()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Media;
+
+            <Border>
+                <Border.Background>
+                    <SolidColorBrush Color="#E4000000" />
+                </Border.Background>
+            </Border>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var border = GetOnlyMarkupElement(syntaxTree);
+        var propertyContent = Assert.IsType<MarkupElementContentSyntax>(Assert.Single(border.Body));
+        var propertyElement = propertyContent.Element;
+        var brushContent = Assert.IsType<MarkupElementContentSyntax>(Assert.Single(propertyElement.Body));
+
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(propertyElement).Symbol);
+        var operation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(propertyElement));
+        var child = Assert.Single(operation.Content);
+
+        Assert.Equal("Border.Background", propertyElement.StartTag!.Name.ToFullString());
+        Assert.Equal("Background", property.Name);
+        Assert.Equal("Background", property.ClrPropertyDefinition.Name);
+        Assert.Equal("BackgroundProperty", property.AvaloniaPropertyDefinition.Name);
+        Assert.Equal("IBrush", property.Type.Name);
+        Assert.True(property.CanWrite);
+        Assert.Same(property, operation.Property);
+        Assert.Equal("Border", operation.ContainingComponent!.Name);
+        Assert.False(operation.ContentModel.IsCollection);
+        Assert.Equal(MarkupChildKind.Element, child.Kind);
+        Assert.Same(brushContent, child.Syntax);
+        Assert.Equal("SolidColorBrush", child.ComponentSymbol!.Name);
+        Assert.Equal("SolidColorBrush", child.Type.Name);
+        Assert.True(operation.ValueConversion.IsImplicit);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(propertyElement).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(syntaxTree.GetRoot()).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_PropertyElementNode_ReportsInvalidChildType()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <Border>
+                <Border.Background>
+                    <Button />
+                </Border.Background>
+            </Border>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var border = GetOnlyMarkupElement(syntaxTree);
+        var propertyElement = Assert.IsType<MarkupElementContentSyntax>(
+            Assert.Single(border.Body)).Element;
+
+        var operation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(propertyElement));
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(propertyElement),
+            static candidate => candidate.Code == ErrorCodes.AKBURA_SEMANTIC_InvalidMarkupChild);
+
+        Assert.Equal("Background", operation.Property!.Name);
+        Assert.True(operation.HasErrors);
+        Assert.Contains("Button", diagnostic.Message);
+        Assert.Contains("IBrush", diagnostic.Message);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesAvaloniaAttachedPropertySymbol()
     {
         const string code =

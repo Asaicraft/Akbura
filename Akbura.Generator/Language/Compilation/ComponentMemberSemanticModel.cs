@@ -142,7 +142,11 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             }
 
             var children = markupRootsBuilder.Count == 1
-                ? CreateMarkupChildren(markupRootsBuilder.WrittenSpan[0].Element, contentModel, out _)
+                ? CreateMarkupChildren(
+                    markupRootsBuilder.WrittenSpan[0].Element,
+                    contentModel,
+                    out _,
+                    partialTypes.Length == 0 ? null : partialTypes[0])
                 : ImmutableArray<MarkupChildContent>.Empty;
 
             foreach (var markupRoot in markupRootsBuilder.WrittenSpan)

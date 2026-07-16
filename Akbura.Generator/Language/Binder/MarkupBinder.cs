@@ -171,6 +171,7 @@ internal sealed partial class MarkupBinder : Binder
     {
         var symbolInfo = SemanticModel.GetSymbolInfo(markupElement);
         var componentSymbol = symbolInfo.Symbol as IMarkupComponentSymbol;
+        var propertySymbol = symbolInfo.Symbol as IPropertySymbol;
         using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
 
         if (markupElement.StartTag != null)
@@ -186,7 +187,9 @@ internal sealed partial class MarkupBinder : Binder
             childrenBuilder.Add(SemanticModel.BindingSession.BindSemanticSyntax(content));
         }
 
-        var contentSetter = BindMarkupContentSetter(markupElement, componentSymbol);
+        var contentSetter = propertySymbol == null
+            ? BindMarkupContentSetter(markupElement, componentSymbol)
+            : BindMarkupPropertyElementSetter(markupElement, propertySymbol);
         if (contentSetter != null)
         {
             childrenBuilder.Add(contentSetter);
@@ -200,6 +203,58 @@ internal sealed partial class MarkupBinder : Binder
             childrenBuilder.ToImmutable());
         SemanticModel.SetCachedBoundNode(markupElement, boundComponent);
         return boundComponent;
+    }
+
+    private BoundMarkupContentSetter BindMarkupPropertyElementSetter(
+        MarkupElementSyntax markupElement,
+        IPropertySymbol property)
+    {
+        var containingElement = AkburaSemanticModel.GetParentMarkupElement(markupElement);
+        var containingComponent = containingElement == null
+            ? null
+            : SemanticModel.GetSymbolInfo(containingElement).Symbol as IMarkupComponentSymbol;
+        var contentModel = SemanticModel.CreateMarkupPropertyElementContentModel(property);
+        var content = SemanticModel.CreateMarkupChildren(
+            markupElement,
+            contentModel,
+            out var contentDiagnostics);
+
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        diagnosticsBuilder.AddRange(contentDiagnostics);
+        if (!contentModel.IsCollection && !property.CanWrite)
+        {
+            diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
+                markupElement,
+                ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported,
+                [property.Name, "public setter", "node"]));
+        }
+
+        var diagnostics = diagnosticsBuilder.ToImmutable();
+        SemanticModel.SetSemanticDiagnostics(markupElement, diagnostics);
+
+        var valueType = content.Length == 1
+            ? content[0].Type
+            : property.Type;
+        var valueConversion = content.Length == 1
+            ? Conversions.ClassifyConversion(
+                content[0].Type.Symbol as CSharpTypeSymbol,
+                contentModel.AllowedChildType.Symbol as CSharpTypeSymbol)
+            : default;
+
+        return new BoundMarkupContentSetter(
+            markupElement,
+            this,
+            containingComponent,
+            property,
+            contentModel,
+            content,
+            valueType,
+            valueOperation: default,
+            valueConversion,
+            literalValue: null,
+            isSynthesizedString: false,
+            diagnostics,
+            diagnostics.Length > 0);
     }
 
     private BoundMarkupContentSetter? BindMarkupContentSetter(

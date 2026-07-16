@@ -2759,6 +2759,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
+        if (TryResolveMarkupPropertyElement(
+                markupElement,
+                componentNameText,
+                out var propertyElementSymbolInfo))
+        {
+            return propertyElementSymbolInfo;
+        }
+
         CSharp.TypeSyntax csharpType;
         try
         {
@@ -2779,7 +2787,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             namedType.TypeKind != TypeKind.Error)
         {
             var contentModel = CreateMarkupContentModel(namedType, markupElement);
-            var children = CreateMarkupChildren(markupElement, contentModel, out var diagnostics);
+            var children = CreateMarkupChildren(
+                markupElement,
+                contentModel,
+                out var diagnostics,
+                namedType);
             SetSemanticDiagnostics(markupElement, diagnostics);
 
             var symbol = new MarkupComponentSymbol(
@@ -2801,6 +2813,141 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+    }
+
+    private bool TryResolveMarkupPropertyElement(
+        MarkupElementSyntax markupElement,
+        string elementName,
+        out AkburaSymbolInfo symbolInfo)
+    {
+        symbolInfo = default;
+        var separator = elementName.LastIndexOf('.');
+        if (separator <= 0 || separator == elementName.Length - 1)
+        {
+            return false;
+        }
+
+        var containingElement = GetParentMarkupElement(markupElement);
+        if (containingElement == null ||
+            GetSymbolInfo(containingElement).Symbol is not IMarkupComponentSymbol containingComponent ||
+            containingComponent.ComponentType is not { } componentType ||
+            !IsMarkupPropertyElementOwner(componentType, elementName[..separator]))
+        {
+            return false;
+        }
+
+        var propertyName = elementName[(separator + 1)..].Trim();
+        var clrProperty = FindPublicClrProperty(componentType, propertyName);
+        var avaloniaProperty = FindAvaloniaPropertyField(componentType, propertyName);
+        if (clrProperty == null && avaloniaProperty == null)
+        {
+            SetSemanticDiagnostics(
+                markupElement,
+                ImmutableArray.Create(HasInaccessiblePropertyMember(componentType, propertyName)
+                    ? CreateInaccessibleMemberDiagnostic(markupElement, propertyName, componentType)
+                    : CreateMarkupPropertyNotFoundDiagnostic(markupElement, propertyName, componentType)));
+            symbolInfo = AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+            return true;
+        }
+
+        var property = new PropertySymbol(
+            propertyName,
+            GetMarkupPropertyType(
+                parameter: null,
+                command: null,
+                clrProperty,
+                avaloniaProperty,
+                attachedProperty: null),
+            avaloniaPropertyDefinition: avaloniaProperty == null
+                ? default
+                : new CSharpSymbolDefinition(avaloniaProperty),
+            clrPropertyDefinition: clrProperty == null
+                ? default
+                : new CSharpSymbolDefinition(clrProperty),
+            containingSymbol: containingComponent);
+        SetSemanticDiagnosticsIfAbsent(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+        symbolInfo = AkburaSymbolInfo.Success(property);
+        return true;
+    }
+
+    internal MarkupContentModel CreateMarkupPropertyElementContentModel(
+        AkburaPropertySymbol property)
+    {
+        if (property.Type.Symbol is not ITypeSymbol propertyType)
+        {
+            return default;
+        }
+
+        if (TryGetIListElementType(propertyType, out var elementType))
+        {
+            return new MarkupContentModel(
+                property.CSharpDefinition,
+                new CSharpSymbolDefinition(elementType),
+                isCollection: true,
+                allowsText: AllowsTextContent(elementType));
+        }
+
+        return new MarkupContentModel(
+            property.CSharpDefinition,
+            property.Type,
+            isCollection: false,
+            allowsText: AllowsTextContent(propertyType));
+    }
+
+    internal static MarkupElementSyntax? GetParentMarkupElement(
+        MarkupElementSyntax markupElement)
+    {
+        for (var parent = markupElement.Parent; parent != null; parent = parent.Parent)
+        {
+            if (parent.Kind == AkburaSyntaxKind.MarkupElementSyntax)
+            {
+                return Unsafe.As<MarkupElementSyntax>(parent);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsMarkupPropertyElementOwner(
+        INamedTypeSymbol componentType,
+        string ownerName)
+    {
+        var simpleName = ownerName.Trim();
+        var aliasSeparator = simpleName.LastIndexOf("::", StringComparison.Ordinal);
+        if (aliasSeparator >= 0)
+        {
+            simpleName = simpleName[(aliasSeparator + 2)..];
+        }
+
+        var namespaceSeparator = simpleName.LastIndexOf('.');
+        if (namespaceSeparator >= 0)
+        {
+            simpleName = simpleName[(namespaceSeparator + 1)..];
+        }
+
+        var genericStart = simpleName.IndexOfAny(['{', '<']);
+        if (genericStart >= 0)
+        {
+            simpleName = simpleName[..genericStart];
+        }
+
+        for (var current = componentType; current != null; current = current.BaseType)
+        {
+            if (string.Equals(current.Name, simpleName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        foreach (var @interface in componentType.AllInterfaces)
+        {
+            if (string.Equals(@interface.Name, simpleName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool TryResolveAkburaMarkupComponent(
@@ -4251,16 +4398,27 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     internal ImmutableArray<MarkupChildContent> CreateMarkupChildren(
         MarkupElementSyntax markupElement,
         MarkupContentModel contentModel,
-        out ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
+        out ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
+        INamedTypeSymbol? containingType = null)
     {
         using var childrenBuilder = ImmutableArrayBuilder<MarkupChildContent>.Rent();
         using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
         var hasValueText = false;
+        var hasValueElement = false;
         var inlineExpressionCount = 0;
 
         foreach (var childSyntax in markupElement.Body)
         {
-            if (childSyntax.Kind == AkburaSyntaxKind.MarkupTextLiteralSyntax &&
+            if (IsMarkupPropertyElementContent(childSyntax, containingType))
+            {
+                continue;
+            }
+
+            if (childSyntax.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)
+            {
+                hasValueElement = true;
+            }
+            else if (childSyntax.Kind == AkburaSyntaxKind.MarkupTextLiteralSyntax &&
                 !string.IsNullOrWhiteSpace(childSyntax.ToFullString()))
             {
                 hasValueText = true;
@@ -4275,6 +4433,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         foreach (var childSyntax in markupElement.Body)
         {
+            if (IsMarkupPropertyElementContent(childSyntax, containingType))
+            {
+                continue;
+            }
+
             switch (childSyntax.Kind)
             {
                 case AkburaSyntaxKind.MarkupElementContentSyntax:
@@ -4306,7 +4469,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         if (!hasValueText &&
             inlineExpressionCount > 1 &&
-            !HasElementContent(markupElement) &&
+            !hasValueElement &&
             TryCreateMarkupContentValueExpression(
                 markupElement,
                 out var expression,
@@ -4329,6 +4492,31 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         diagnostics = diagnosticsBuilder.ToImmutable();
         return childrenBuilder.ToImmutable();
+    }
+
+    private bool IsMarkupPropertyElementContent(
+        MarkupContentSyntax content,
+        INamedTypeSymbol? containingType)
+    {
+        if (containingType == null ||
+            content.Kind != AkburaSyntaxKind.MarkupElementContentSyntax)
+        {
+            return false;
+        }
+
+        var propertyElement = Unsafe.As<MarkupElementContentSyntax>(content).Element;
+        var elementName = propertyElement.StartTag?.Name.ToFullString().Trim();
+        if (string.IsNullOrEmpty(elementName))
+        {
+            return false;
+        }
+
+        var separator = elementName!.LastIndexOf('.');
+        return separator > 0 &&
+            separator < elementName.Length - 1 &&
+            IsMarkupPropertyElementOwner(
+                containingType,
+                elementName[..separator]);
     }
 
     private void AddElementChild(

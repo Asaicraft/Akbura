@@ -49,7 +49,8 @@ internal sealed partial class AkburaCompilation
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
         string rootNamespace = "",
         string projectDirectory = "",
-        AkburaCompilation? previousCompilation = null)
+        AkburaCompilation? previousCompilation = null,
+        ImmutableArray<AkburaCompilationReference> compilationReferences = default)
         : this(
             csharpCompilation,
             new SyntaxAndDeclarationManager(
@@ -58,6 +59,10 @@ internal sealed partial class AkburaCompilation
                 previousCompilation?._syntaxAndDeclarations),
             ReferenceManager.Create(
                 csharpCompilation,
+                compilationReferences.IsDefault
+                    ? previousCompilation?._referenceManager.CompilationReferences ??
+                      ImmutableArray<AkburaCompilationReference>.Empty
+                    : compilationReferences,
                 previousCompilation?.CSharpCompilation,
                 previousCompilation?._referenceManager),
             rootNamespace,
@@ -89,6 +94,9 @@ internal sealed partial class AkburaCompilation
     public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees => _syntaxAndDeclarations.AkcssSyntaxTrees;
 
     internal ImmutableArray<AkburaReferencedModule> ReferencedModules => _referenceManager.Modules;
+
+    internal ImmutableArray<AkburaCompilationReference> CompilationReferences =>
+        _referenceManager.CompilationReferences;
 
     public string RootNamespace { get; }
 
@@ -162,6 +170,44 @@ internal sealed partial class AkburaCompilation
             _syntaxAndDeclarations.ReplaceAkcssSyntaxTree(oldTree, newTree));
     }
 
+    public AkburaCompilationReference ToReference()
+    {
+        return new AkburaCompilationReference(this);
+    }
+
+    public AkburaCompilation WithCompilationReferences(
+        IEnumerable<AkburaCompilationReference> references)
+    {
+        if (references == null)
+        {
+            throw new ArgumentNullException(nameof(references));
+        }
+
+        return WithCompilationReferences([.. references]);
+    }
+
+    public AkburaCompilation WithCompilationReferences(
+        ImmutableArray<AkburaCompilationReference> references)
+    {
+        references = references.IsDefault
+            ? ImmutableArray<AkburaCompilationReference>.Empty
+            : references;
+        var referenceManager = ReferenceManager.Create(
+            CSharpCompilation,
+            references,
+            CSharpCompilation,
+            _referenceManager);
+        return ReferenceEquals(referenceManager, _referenceManager)
+            ? this
+            : new AkburaCompilation(
+                CSharpCompilation,
+                _syntaxAndDeclarations,
+                referenceManager,
+                RootNamespace,
+                ProjectDirectory,
+                previousCompilation: this);
+    }
+
     public AkburaCompilation WithCSharpCompilation(CSharpCompilation csharpCompilation)
     {
         if (ReferenceEquals(CSharpCompilation, csharpCompilation))
@@ -174,6 +220,7 @@ internal sealed partial class AkburaCompilation
             _syntaxAndDeclarations,
             ReferenceManager.Create(
                 csharpCompilation,
+                _referenceManager.CompilationReferences,
                 CSharpCompilation,
                 _referenceManager),
             RootNamespace,
@@ -188,8 +235,19 @@ internal sealed partial class AkburaCompilation
             throw new ArgumentNullException(nameof(syntaxTree));
         }
 
-        if (!SyntaxTrees.Contains(syntaxTree) &&
-            !_referenceManager.ContainsComponentSyntaxTree(syntaxTree))
+        if (SyntaxTrees.Contains(syntaxTree))
+        {
+            return _semanticModels.GetOrAdd(
+                syntaxTree,
+                tree => new SyntaxTreeSemanticModel(this, tree));
+        }
+
+        if (_referenceManager.TryGetSemanticModel(syntaxTree, out var referencedModel))
+        {
+            return referencedModel;
+        }
+
+        if (!_referenceManager.ContainsComponentSyntaxTree(syntaxTree))
         {
             throw new ArgumentException("Syntax tree is not part of this compilation.", nameof(syntaxTree));
         }
@@ -197,6 +255,26 @@ internal sealed partial class AkburaCompilation
         return _semanticModels.GetOrAdd(
             syntaxTree,
             tree => new SyntaxTreeSemanticModel(this, tree));
+    }
+
+    internal bool ContainsComponentSyntaxTree(AkburaSyntaxTree syntaxTree)
+    {
+        return SyntaxTrees.Contains(syntaxTree) ||
+            _referenceManager.ContainsComponentSyntaxTree(syntaxTree);
+    }
+
+    internal bool TryGetSemanticModel(
+        AkburaSyntaxTree syntaxTree,
+        out AkburaSemanticModel semanticModel)
+    {
+        if (!ContainsComponentSyntaxTree(syntaxTree))
+        {
+            semanticModel = null!;
+            return false;
+        }
+
+        semanticModel = GetSemanticModel(syntaxTree);
+        return true;
     }
 
     internal IEnumerable<IAkburaComponentSymbol> GetReferencedComponentSymbols(string metadataName)
@@ -223,6 +301,7 @@ internal sealed partial class AkburaCompilation
     {
         return _referenceManager.TryGetComponentDeclaration(syntaxTree, out declaration);
     }
+
     internal bool TryGetDeclaration(
         AkburaSyntax syntax,
         out Declaration declaration)

@@ -4,6 +4,7 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,11 +14,14 @@ namespace Akbura.UnitTests;
 public sealed class BuiltInStylesTests
 {
     [Fact]
-    public void StylesResources_ProvideTailwindThemeValues()
+    public async Task StylesResources_ProvideTailwindThemeValues()
     {
-        var resources = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
-            new Uri("avares://Akbura/Styles.axaml"),
-            baseUri: null));
+        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var resources = await session.Dispatch(
+            () => Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
+                new Uri("avares://Akbura/Styles.axaml"),
+                baseUri: null)),
+            CancellationToken.None);
 
         Assert.Equal(4d, resources["--spacing"]);
         Assert.Equal(16d, resources["--text-base"]);

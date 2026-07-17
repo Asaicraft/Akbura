@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using Akbura.Engine;
 
 namespace Akbura;
 
@@ -92,6 +93,18 @@ public abstract class AkburaControl : Control
 		}
 
 		return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
+	}
+
+	private readonly AkburaEngine _engine;
+
+	public AkburaControl(): this(AkburaEngine.Singletone)
+	{
+
+	}
+
+	public AkburaControl(AkburaEngine akburaEngine)
+	{
+		_engine = akburaEngine;
 	}
 
 

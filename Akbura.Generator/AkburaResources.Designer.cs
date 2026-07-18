@@ -241,6 +241,15 @@ namespace Akbura {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Required parameter '{0}' must be set on component '{1}'..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupRequiredParameterNotSet {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupRequiredParameterNotSet", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Markup attribute value for &apos;{0}&apos; cannot be converted from &apos;{1}&apos; to &apos;{2}&apos;..
         /// </summary>
         internal static string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert {

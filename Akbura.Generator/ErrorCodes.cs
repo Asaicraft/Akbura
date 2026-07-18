@@ -32,6 +32,7 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_DuplicateAkcssSymbol = nameof(AKBURA_SEMANTIC_DuplicateAkcssSymbol);
     public const string AKBURA_SEMANTIC_InaccessibleMember = nameof(AKBURA_SEMANTIC_InaccessibleMember);
     public const string AKBURA_SEMANTIC_MarkupPropertyNotFound = nameof(AKBURA_SEMANTIC_MarkupPropertyNotFound);
+    public const string AKBURA_SEMANTIC_MarkupRequiredParameterNotSet = nameof(AKBURA_SEMANTIC_MarkupRequiredParameterNotSet);
     public const string AKBURA_SEMANTIC_MarkupExpressionError = nameof(AKBURA_SEMANTIC_MarkupExpressionError);
     public const string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert = nameof(AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert);
     public const string AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed = nameof(AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed);

@@ -195,14 +195,83 @@ internal sealed partial class MarkupBinder : Binder
             childrenBuilder.Add(contentSetter);
         }
 
+        var diagnostics = AddRequiredComponentParameterDiagnostics(markupElement, componentSymbol);
         var boundComponent = new BoundMarkupComponent(
             markupElement,
             this,
             symbolInfo,
-            SemanticModel.GetCachedSemanticDiagnostics(markupElement),
+            diagnostics,
             childrenBuilder.ToImmutable());
         SemanticModel.SetCachedBoundNode(markupElement, boundComponent);
         return boundComponent;
+    }
+
+    private ImmutableArray<AkburaSemanticDiagnostic> AddRequiredComponentParameterDiagnostics(
+        MarkupElementSyntax markupElement,
+        IMarkupComponentSymbol? componentSymbol)
+    {
+        var diagnostics = SemanticModel.GetCachedSemanticDiagnostics(markupElement);
+        var component = componentSymbol?.AkburaComponent;
+        if (component == null || component.Parameters.IsDefaultOrEmpty)
+        {
+            return diagnostics;
+        }
+
+        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent(
+            diagnostics.Length + component.Parameters.Length);
+        diagnosticsBuilder.AddRange(diagnostics);
+        var initialCount = diagnosticsBuilder.Count;
+
+        foreach (var parameter in component.Parameters)
+        {
+            if (!parameter.ReceivesValueFromParent ||
+                parameter.HasDefaultValue ||
+                IsComponentParameterSet(markupElement, parameter))
+            {
+                continue;
+            }
+
+            AkburaSyntax diagnosticSyntax = markupElement.StartTag == null
+                ? markupElement
+                : markupElement.StartTag.Name;
+            diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
+                diagnosticSyntax,
+                ErrorCodes.AKBURA_SEMANTIC_MarkupRequiredParameterNotSet,
+                [parameter.Name, component.MetadataName]));
+        }
+
+        if (diagnosticsBuilder.Count == initialCount)
+        {
+            return diagnostics;
+        }
+
+        diagnostics = diagnosticsBuilder.ToImmutable();
+        SemanticModel.SetSemanticDiagnostics(markupElement, diagnostics);
+        return diagnostics;
+    }
+
+    private bool IsComponentParameterSet(
+        MarkupElementSyntax markupElement,
+        IParamSymbol parameter)
+    {
+        if (markupElement.StartTag == null)
+        {
+            return false;
+        }
+
+        foreach (var attribute in markupElement.StartTag.Attributes)
+        {
+            if (SemanticModel.GetSymbolInfo(attribute).Symbol is IPropertySymbol
+                {
+                    Parameter: { } setParameter
+                } &&
+                ReferenceEquals(setParameter, parameter))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private BoundMarkupContentSetter BindMarkupPropertyElementSetter(

@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.Binder;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -5083,6 +5084,69 @@ public class SemanticPipelineTests
         Assert.Same(paramSymbol, propertySymbol.Parameter);
         Assert.Equal("Int32", propertySymbol.Type.Name);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(element),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupRequiredParameterNotSet);
+    }
+
+    [Fact]
+    public void SemanticModel_ReportsMissingRequiredAkburaComponentParam()
+    {
+        const string componentCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "param int A;\n" +
+            "param int B = 11;";
+        const string usageCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "<OneParam B={4}/>";
+
+        var componentTree = AkburaSyntaxTree.ParseText(componentCode, "OneParam.akbura");
+        var usageTree = AkburaSyntaxTree.ParseText(usageCode, "FromOther.akbura");
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [componentTree, usageTree]);
+        var semanticModel = compilation.GetSemanticModel(usageTree);
+        var element = GetOnlyMarkupElement(usageTree);
+
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(element),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupRequiredParameterNotSet);
+        var boundComponent = Assert.IsType<BoundMarkupComponent>(
+            semanticModel.BindingSession.BindSemanticSyntax(element));
+
+        Assert.Same(element.StartTag!.Name, diagnostic.Syntax);
+        Assert.Contains("A", diagnostic.Message);
+        Assert.Contains("SomeNs.OneParam", diagnostic.Message);
+        Assert.True(boundComponent.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_DoesNotRequireDefaultedOrOutAkburaComponentParams()
+    {
+        const string componentCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "param int A;\n" +
+            "param int B = 11;\n" +
+            "param out int Result;";
+        const string usageCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "<OneParam A={10}/>";
+
+        var componentTree = AkburaSyntaxTree.ParseText(componentCode, "OneParam.akbura");
+        var usageTree = AkburaSyntaxTree.ParseText(usageCode, "FromOther.akbura");
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [componentTree, usageTree]);
+        var semanticModel = compilation.GetSemanticModel(usageTree);
+        var element = GetOnlyMarkupElement(usageTree);
+
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(element),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupRequiredParameterNotSet);
     }
 
     [Fact]

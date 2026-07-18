@@ -198,6 +198,9 @@
   <data name="AKBURA_SEMANTIC_MarkupPropertyNotFound" xml:space="preserve">
     <value>Property '{0}' was not found on component '{1}'.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupRequiredParameterNotSet" xml:space="preserve">
+    <value>Required parameter '{0}' must be set on component '{1}'.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_MarkupExpressionError" xml:space="preserve">
     <value>Markup expression '{0}' is not valid C#: {1}</value>
   </data>

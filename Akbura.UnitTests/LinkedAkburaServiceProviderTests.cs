@@ -1,4 +1,6 @@
+using Akbura.ComponentTree;
 using Akbura.Engine;
+using System.Collections.Immutable;
 using Avalonia.Controls;
 
 namespace Akbura.UnitTests;
@@ -169,6 +171,8 @@ public sealed class LinkedAkburaServiceProviderTests
 
     private sealed class TestControl : AkburaControl
     {
+        private static readonly ImmutableArray<Parameter> s_parameters = [];
+
         public TestControl(AkburaEngine engine)
             : base(engine)
         {
@@ -176,7 +180,17 @@ public sealed class LinkedAkburaServiceProviderTests
 
         protected override Control Update()
         {
-            return this;
+            return new Border();
+        }
+
+        protected override Control FirstUpdate()
+        {
+            return new Border();
+        }
+
+        protected override ImmutableArray<Parameter> GetParameters()
+        {
+            return s_parameters;
         }
     }
 

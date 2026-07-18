@@ -1,4 +1,4 @@
-using Akbura.Language;
+﻿using Akbura.Language;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Akbura.UnitTests;
 
+[Collection(AvaloniaHeadlessCollection.Name)]
 public sealed class BuiltInStylesTests
 {
     [Fact]

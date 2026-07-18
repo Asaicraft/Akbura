@@ -46,7 +46,17 @@ public sealed class CrossAssemblySemanticTests
 
             public sealed partial class LibraryCard : Akbura.AkburaControl
             {
-                protected override Avalonia.Controls.Control Update() => this;
+                private static readonly System.Collections.Immutable.ImmutableArray<
+                    Akbura.ComponentTree.Parameter> s_parameters = [];
+
+                protected override Avalonia.Controls.Control Update() =>
+                    new Avalonia.Controls.Border();
+
+                protected override Avalonia.Controls.Control FirstUpdate() =>
+                    new Avalonia.Controls.Border();
+
+                protected override System.Collections.Immutable.ImmutableArray<
+                    Akbura.ComponentTree.Parameter> GetParameters() => s_parameters;
             }
             """;
         const string consumerSource =

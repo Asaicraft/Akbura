@@ -2,9 +2,11 @@ using Akbura.ComponentTree;
 using Akbura.Engine;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
 
+[Collection(AvaloniaHeadlessCollection.Name)]
 public sealed class ComponentTreeTests
 {
     [Fact]
@@ -17,9 +19,6 @@ public sealed class ComponentTreeTests
                 var engine = new AkburaEngineExtensions.AkburaEngineBuilder().Build();
                 var firstChild = new TestComponent(engine, static () => new Border());
                 var secondChild = new TestComponent(engine, static () => new Border());
-                firstChild.InvalidState();
-                secondChild.InvalidState();
-
                 var parent = new TestComponent(
                     engine,
                     () => new StackPanel
@@ -30,8 +29,6 @@ public sealed class ComponentTreeTests
                             secondChild,
                         },
                     });
-                parent.InvalidState();
-
                 var window = new Window { Content = parent };
                 window.Show();
 
@@ -60,6 +57,8 @@ public sealed class ComponentTreeTests
 
     private sealed class TestComponent : AkburaControl
     {
+        private static readonly ImmutableArray<Parameter> s_parameters = [];
+
         private readonly Func<Control> _update;
 
         public TestComponent(AkburaEngine engine, Func<Control> update)
@@ -71,6 +70,16 @@ public sealed class ComponentTreeTests
         protected override Control Update()
         {
             return _update();
+        }
+
+        protected override Control FirstUpdate()
+        {
+            return new Border();
+        }
+
+        protected override ImmutableArray<Parameter> GetParameters()
+        {
+            return s_parameters;
         }
     }
 }

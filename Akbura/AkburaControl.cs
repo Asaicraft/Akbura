@@ -126,7 +126,43 @@ public abstract class AkburaControl : Control, IComponentTree
 		Child = Update();
 	}
 
+	protected override void OnInitialized()
+	{
+		base.OnInitialized();
+
+		Child = FirstUpdate();
+
+		var parameters = GetParameters();
+		for (var index = 0; index < parameters.Length; index++)
+		{
+			var parameter = parameters[index];
+			if (!parameter.IsSet(this))
+			{
+				throw new AkburaParameterNotSettedException(this, parameter);
+			}
+		}
+
+		var validatedParameters = GetParameters();
+		if (parameters != validatedParameters)
+		{
+			throw new AkburaParametersArrayChangedException(this);
+		}
+
+		Child = Update();
+	}
+
 	protected abstract Control Update();
+
+	protected abstract Control FirstUpdate();
+
+	/// <summary>
+	/// Gets the parameters declared by this component.
+	/// </summary>
+	/// <remarks>
+	/// Implementations must cache and return the same immutable array instance on every call.
+	/// </remarks>
+	/// <returns>The component parameter descriptors.</returns>
+	protected abstract ImmutableArray<Parameter> GetParameters();
 
 	protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
 	{

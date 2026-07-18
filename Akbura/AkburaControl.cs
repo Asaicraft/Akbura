@@ -148,6 +148,13 @@ public abstract class AkburaControl : Control, IComponentTree
 			throw new AkburaParametersArrayChangedException(this);
 		}
 
+		var commands = GetCommands();
+		var validatedCommands = GetCommands();
+		if (commands != validatedCommands)
+		{
+			throw new AkburaCommandsArrayChangedException(this);
+		}
+
 		Child = Update();
 	}
 
@@ -163,6 +170,15 @@ public abstract class AkburaControl : Control, IComponentTree
 	/// </remarks>
 	/// <returns>The component parameter descriptors.</returns>
 	protected abstract ImmutableArray<Parameter> GetParameters();
+
+	/// <summary>
+	/// Gets the Avalonia properties that expose commands declared by this component.
+	/// </summary>
+	/// <remarks>
+	/// Implementations must cache and return the same immutable array instance on every call.
+	/// </remarks>
+	/// <returns>The component command properties.</returns>
+	protected abstract ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands();
 
 	protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
 	{

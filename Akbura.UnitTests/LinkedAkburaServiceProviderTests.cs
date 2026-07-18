@@ -172,6 +172,7 @@ public sealed class LinkedAkburaServiceProviderTests
     private sealed class TestControl : AkburaControl
     {
         private static readonly ImmutableArray<Parameter> s_parameters = [];
+        private static readonly ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> s_commands = [];
 
         public TestControl(AkburaEngine engine)
             : base(engine)
@@ -191,6 +192,11 @@ public sealed class LinkedAkburaServiceProviderTests
         protected override ImmutableArray<Parameter> GetParameters()
         {
             return s_parameters;
+        }
+
+        protected override ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> GetCommands()
+        {
+            return s_commands;
         }
     }
 

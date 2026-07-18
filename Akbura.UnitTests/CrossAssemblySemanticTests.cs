@@ -48,6 +48,8 @@ public sealed class CrossAssemblySemanticTests
             {
                 private static readonly System.Collections.Immutable.ImmutableArray<
                     Akbura.ComponentTree.Parameter> s_parameters = [];
+                private static readonly System.Collections.Immutable.ImmutableArray<
+                    Avalonia.AvaloniaProperty<Akbura.IAkburaCommand>> s_commands = [];
 
                 protected override Avalonia.Controls.Control Update() =>
                     new Avalonia.Controls.Border();
@@ -57,6 +59,9 @@ public sealed class CrossAssemblySemanticTests
 
                 protected override System.Collections.Immutable.ImmutableArray<
                     Akbura.ComponentTree.Parameter> GetParameters() => s_parameters;
+
+                protected override System.Collections.Immutable.ImmutableArray<
+                    Avalonia.AvaloniaProperty<Akbura.IAkburaCommand>> GetCommands() => s_commands;
             }
             """;
         const string consumerSource =

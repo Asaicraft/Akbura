@@ -1,17 +1,23 @@
 ﻿using Avalonia;
 using Akbura.Akcss;
+using Akbura.ComponentTree;
+using Akbura.Engine;
+using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
-using Akbura.Engine;
 
 namespace Akbura;
 
-public abstract class AkburaControl : Control
+public abstract class AkburaControl : Control, IComponentTree
 {
+	private readonly AvaloniaList<IComponentTree> _componentChildren = [];
+	private IComponentTree? _componentParent;
+
 	public static readonly DirectProperty<AkburaControl, Control?> ChildProperty =
 		AvaloniaProperty.RegisterDirect<AkburaControl, Control?>(nameof(Child), getter: x => x.Child);
 
@@ -107,6 +113,13 @@ public abstract class AkburaControl : Control
 		_engine = akburaEngine;
 	}
 
+	IComponentTree? IComponentTree.ComponentParent
+	{
+		get => _componentParent;
+	}
+
+	IAvaloniaReadOnlyList<IComponentTree> IComponentTree.ComponentChildren =>
+		_componentChildren;
 
 	public void InvalidState()
 	{
@@ -114,6 +127,52 @@ public abstract class AkburaControl : Control
 	}
 
 	protected abstract Control Update();
+
+	protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+	{
+		base.OnAttachedToVisualTree(e);
+		SetComponentParent(FindComponentParent());
+	}
+
+	protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+	{
+		base.OnDetachedFromVisualTree(e);
+		SetComponentParent(null);
+	}
+
+	private IComponentTree? FindComponentParent()
+	{
+		for (var parent = this.GetVisualParent(); parent != null; parent = parent.GetVisualParent())
+		{
+			if (parent is IComponentTree componentParent)
+			{
+				return componentParent;
+			}
+		}
+
+		return null;
+	}
+
+	private void SetComponentParent(IComponentTree? componentParent)
+	{
+		if (ReferenceEquals(_componentParent, componentParent))
+		{
+			return;
+		}
+
+		if (_componentParent is AkburaControl oldParent)
+		{
+			oldParent._componentChildren.Remove(this);
+		}
+
+		_componentParent = componentParent;
+
+		if (componentParent is AkburaControl newParent &&
+			!newParent._componentChildren.Contains(this))
+		{
+			newParent._componentChildren.Add(this);
+		}
+	}
 
 	/// <inheritdoc/>
 	protected override Size MeasureOverride(Size availableSize)
@@ -138,16 +197,12 @@ public abstract class AkburaControl : Control
 
 		if (oldChild != null)
 		{
-			((ISetLogicalParent)oldChild).SetParent(null);
-			LogicalChildren.Clear();
 			VisualChildren.Remove(oldChild);
 		}
 
 		if (newChild != null)
 		{
-			((ISetLogicalParent)newChild).SetParent(this);
 			VisualChildren.Add(newChild);
-			LogicalChildren.Add(newChild);
 		}
 	}
 

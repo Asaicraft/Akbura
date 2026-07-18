@@ -1,0 +1,76 @@
+using Akbura.ComponentTree;
+using Akbura.Engine;
+using Avalonia.Controls;
+using Avalonia.Headless;
+
+namespace Akbura.UnitTests;
+
+public sealed class ComponentTreeTests
+{
+    [Fact]
+    public async Task AkburaControl_MaintainsComponentTreeAcrossVisualAttachment()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var engine = new AkburaEngineExtensions.AkburaEngineBuilder().Build();
+                var firstChild = new TestComponent(engine, static () => new Border());
+                var secondChild = new TestComponent(engine, static () => new Border());
+                firstChild.InvalidState();
+                secondChild.InvalidState();
+
+                var parent = new TestComponent(
+                    engine,
+                    () => new StackPanel
+                    {
+                        Children =
+                        {
+                            new Border { Child = firstChild },
+                            secondChild,
+                        },
+                    });
+                parent.InvalidState();
+
+                var window = new Window { Content = parent };
+                window.Show();
+
+                var parentTree = (IComponentTree)parent;
+                var firstChildTree = (IComponentTree)firstChild;
+                var secondChildTree = (IComponentTree)secondChild;
+
+                Assert.Null(parentTree.ComponentParent);
+                Assert.Collection(
+                    parentTree.ComponentChildren,
+                    child => Assert.Same(firstChildTree, child),
+                    child => Assert.Same(secondChildTree, child));
+                Assert.Same(parentTree, firstChildTree.ComponentParent);
+                Assert.Same(parentTree, secondChildTree.ComponentParent);
+
+                window.Content = null;
+
+                Assert.Empty(parentTree.ComponentChildren);
+                Assert.Null(firstChildTree.ComponentParent);
+                Assert.Null(secondChildTree.ComponentParent);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    private sealed class TestComponent : AkburaControl
+    {
+        private readonly Func<Control> _update;
+
+        public TestComponent(AkburaEngine engine, Func<Control> update)
+            : base(engine)
+        {
+            _update = update;
+        }
+
+        protected override Control Update()
+        {
+            return _update();
+        }
+    }
+}

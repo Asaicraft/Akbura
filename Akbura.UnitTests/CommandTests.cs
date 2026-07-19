@@ -37,6 +37,7 @@ public sealed class CommandTests
             AvaloniaProperty.Register<TestComponent, IAkburaCommand>("SaveCommand");
 
         private static readonly ImmutableArray<Parameter> s_parameters = [];
+        private static readonly ImmutableArray<InjectService> s_services = [];
 
         private static readonly ImmutableArray<AvaloniaProperty<IAkburaCommand>> s_commands =
             [SaveCommandProperty];
@@ -74,6 +75,11 @@ public sealed class CommandTests
             return _returnNewArray
                 ? ImmutableArray.Create<AvaloniaProperty<IAkburaCommand>>(SaveCommandProperty)
                 : s_commands;
+        }
+
+        protected override ImmutableArray<InjectService> GetServices()
+        {
+            return s_services;
         }
     }
 }

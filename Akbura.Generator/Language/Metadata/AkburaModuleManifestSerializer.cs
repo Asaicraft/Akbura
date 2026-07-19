@@ -252,6 +252,9 @@ internal static class AkburaModuleManifestSerializer
             writer.WriteAttributeString("name", injectedService.Name);
             writer.WriteAttributeString("type", injectedService.TypeName);
             writer.WriteAttributeString(
+                "optional",
+                XmlConvert.ToString(injectedService.IsOptional));
+            writer.WriteAttributeString(
                 "start",
                 injectedService.SourceStart.ToString(CultureInfo.InvariantCulture));
             writer.WriteAttributeString(
@@ -513,6 +516,8 @@ internal static class AkburaModuleManifestSerializer
         var ordinal = ReadRequiredInt32(reader, "ordinal");
         var name = ReadRequiredAttribute(reader, "name");
         var typeName = ReadRequiredAttribute(reader, "type");
+        var isOptional = reader.GetAttribute("optional") != null &&
+            ReadRequiredBoolean(reader, "optional");
         var sourceStart = ReadRequiredInt32(reader, "start");
         var sourceLength = ReadRequiredInt32(reader, "length");
         reader.Skip();
@@ -521,6 +526,7 @@ internal static class AkburaModuleManifestSerializer
             ordinal,
             name,
             typeName,
+            isOptional,
             sourceStart,
             sourceLength);
     }

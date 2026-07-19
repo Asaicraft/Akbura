@@ -8,7 +8,7 @@ namespace Akbura.Language;
 internal sealed class AkburaModuleManifest
 {
     public const string ResourceName = "!Akbura";
-    public const int CurrentFormatVersion = 1;
+    public const int CurrentFormatVersion = 2;
 
     public AkburaModuleManifest(
         int formatVersion,
@@ -229,6 +229,7 @@ internal sealed class AkburaModuleComponentInject
         int ordinal,
         string name,
         string typeName,
+        bool isOptional,
         int sourceStart,
         int sourceLength)
     {
@@ -260,6 +261,7 @@ internal sealed class AkburaModuleComponentInject
         Ordinal = ordinal;
         Name = name;
         TypeName = typeName;
+        IsOptional = isOptional;
         SourceStart = sourceStart;
         SourceLength = sourceLength;
     }
@@ -269,6 +271,8 @@ internal sealed class AkburaModuleComponentInject
     public string Name { get; }
 
     public string TypeName { get; }
+
+    public bool IsOptional { get; }
 
     public int SourceStart { get; }
 

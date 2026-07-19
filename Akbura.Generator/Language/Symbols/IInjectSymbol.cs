@@ -8,5 +8,7 @@ internal interface IInjectSymbol : ISymbol
 
     CSharpSymbolDefinition Type { get; }
 
+    bool IsOptional { get; }
+
     bool IsRequired { get; }
 }

@@ -59,6 +59,7 @@ public sealed class ComponentTreeTests
     {
         private static readonly ImmutableArray<Parameter> s_parameters = [];
         private static readonly ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> s_commands = [];
+        private static readonly ImmutableArray<InjectService> s_services = [];
 
         private readonly Func<Control> _update;
 
@@ -86,6 +87,11 @@ public sealed class ComponentTreeTests
         protected override ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> GetCommands()
         {
             return s_commands;
+        }
+
+        protected override ImmutableArray<InjectService> GetServices()
+        {
+            return s_services;
         }
     }
 }

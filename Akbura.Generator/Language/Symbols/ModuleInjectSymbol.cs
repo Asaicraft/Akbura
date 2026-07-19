@@ -29,6 +29,7 @@ internal sealed class ModuleInjectSymbol : Symbol, IInjectSymbol
         Type = type;
         _sourceStart = injectedService.SourceStart;
         _sourceLength = injectedService.SourceLength;
+        IsOptional = injectedService.IsOptional;
     }
 
     public override SymbolKind Kind => SymbolKind.InjectedService;
@@ -54,7 +55,9 @@ internal sealed class ModuleInjectSymbol : Symbol, IInjectSymbol
 
     public CSharpSymbolDefinition Type { get; }
 
-    public bool IsRequired => true;
+    public bool IsOptional { get; }
+
+    public bool IsRequired => !IsOptional;
 
     public override void Accept(SymbolVisitor visitor)
     {

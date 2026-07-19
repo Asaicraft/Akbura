@@ -49,6 +49,7 @@ public sealed class ParameterTests
     private sealed class TestComponent : AkburaControl
     {
         private static readonly ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> s_commands = [];
+        private static readonly ImmutableArray<InjectService> s_services = [];
 
         public static readonly Parameter<TestComponent, int> RequiredParameter =
             Parameter.Create<TestComponent, int>(nameof(RequiredValue));
@@ -107,6 +108,11 @@ public sealed class ParameterTests
         protected override ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> GetCommands()
         {
             return s_commands;
+        }
+
+        protected override ImmutableArray<InjectService> GetServices()
+        {
+            return s_services;
         }
     }
 }

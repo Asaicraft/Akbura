@@ -1016,6 +1016,7 @@ public class SemanticPipelineTests
         Assert.Equal(SymbolLanguage.Akbura, symbol.Language);
         Assert.Equal("logger", symbol.Name);
         Assert.True(symbol.IsRequired);
+        Assert.False(symbol.IsOptional);
         Assert.False(symbol.Type.IsDefault);
         Assert.Equal("ILogger", symbol.Type.Name);
         var loggerType = Assert.IsAssignableFrom<INamedTypeSymbol>(symbol.Type.Symbol);
@@ -1028,6 +1029,25 @@ public class SemanticPipelineTests
 
         var cachedSymbolInfo = semanticModel.GetSymbolInfo(inject);
         Assert.Same(symbol, cachedSymbolInfo.Symbol);
+    }
+
+    [Fact]
+    public void SemanticModel_MarksNullableInjectAsOptional()
+    {
+        const string code = "inject ILogger? logger;";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation("#nullable enable\npublic interface ILogger { }"));
+        var inject = Assert.IsType<InjectDeclarationSyntax>(
+            syntaxTree.GetRoot().Members.Single());
+
+        var symbol = Assert.IsAssignableFrom<IInjectSymbol>(
+            semanticModel.GetSymbolInfo(inject).Symbol);
+
+        Assert.True(symbol.IsOptional);
+        Assert.False(symbol.IsRequired);
     }
 
     [Fact]

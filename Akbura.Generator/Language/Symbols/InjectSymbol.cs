@@ -2,6 +2,7 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language.Symbols;
 
@@ -26,6 +27,7 @@ internal sealed class InjectSymbol : Symbol, IInjectSymbol
 
         Name = name;
         Type = type;
+        IsOptional = IsOptionalType(declarationSyntax);
     }
 
     public override SymbolKind Kind => SymbolKind.InjectedService;
@@ -38,7 +40,9 @@ internal sealed class InjectSymbol : Symbol, IInjectSymbol
 
     public CSharpSymbolDefinition Type { get; }
 
-    public bool IsRequired => true;
+    public bool IsOptional { get; }
+
+    public bool IsRequired => !IsOptional;
 
     public override void Accept(SymbolVisitor visitor)
     {
@@ -62,5 +66,17 @@ internal sealed class InjectSymbol : Symbol, IInjectSymbol
         return !Type.IsDefault
             ? $"inject {Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)} {Name}"
             : $"inject {Name}";
+    }
+
+    private static bool IsOptionalType(InjectDeclarationSyntax declarationSyntax)
+    {
+        try
+        {
+            return declarationSyntax.Type.ToCSharp() is CSharp.NullableTypeSyntax;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 }

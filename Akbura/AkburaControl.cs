@@ -130,6 +130,18 @@ public abstract class AkburaControl : Control, IComponentTree
 	{
 		base.OnInitialized();
 
+		var services = GetServices();
+		var validatedServices = GetServices();
+		if (services != validatedServices)
+		{
+			throw new AkburaServicesArrayChangedException(this);
+		}
+
+		for (var index = 0; index < services.Length; index++)
+		{
+			services[index].Inject(this, _engine);
+		}
+
 		Child = FirstUpdate();
 
 		var parameters = GetParameters();
@@ -179,6 +191,15 @@ public abstract class AkburaControl : Control, IComponentTree
 	/// </remarks>
 	/// <returns>The component command properties.</returns>
 	protected abstract ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands();
+
+	/// <summary>
+	/// Gets the services injected into this component.
+	/// </summary>
+	/// <remarks>
+	/// Implementations must cache and return the same immutable array instance on every call.
+	/// </remarks>
+	/// <returns>The component injected-service descriptors.</returns>
+	protected abstract ImmutableArray<InjectService> GetServices();
 
 	protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
 	{

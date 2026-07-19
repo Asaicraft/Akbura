@@ -146,6 +146,7 @@ internal static class AkburaModuleManifestBuilder
                 ordinal,
                 injectedService.Name,
                 GetRequiredTypeName(injectedService.Type, $"injected service '{injectedService.Name}'"),
+                injectedService.IsOptional,
                 injectedService.DeclarationSyntax.FullSpan.Start,
                 injectedService.DeclarationSyntax.FullSpan.Length));
         }

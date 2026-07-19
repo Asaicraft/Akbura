@@ -26,10 +26,6 @@
     <None Update="buildTransitive\\Akbura.targets" Pack="true" PackagePath="buildTransitive/Akbura.targets" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Engine\" />
-  </ItemGroup>
-
   <Import Project="buildTransitive\\Akbura.targets" />
 
   <Target Name="PackAkburaBuildTasks" DependsOnTargets="ResolveProjectReferences">

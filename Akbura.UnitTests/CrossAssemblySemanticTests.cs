@@ -19,7 +19,7 @@ public sealed class CrossAssemblySemanticTests
             namespace Library.Components;
 
             param string Title;
-            inject System.IServiceProvider Services;
+            inject System.IServiceProvider? Services;
             """;
         const string unusedComponentSource =
             """
@@ -50,6 +50,8 @@ public sealed class CrossAssemblySemanticTests
                     Akbura.ComponentTree.Parameter> s_parameters = [];
                 private static readonly System.Collections.Immutable.ImmutableArray<
                     Avalonia.AvaloniaProperty<Akbura.IAkburaCommand>> s_commands = [];
+                private static readonly System.Collections.Immutable.ImmutableArray<
+                    Akbura.ComponentTree.InjectService> s_services = [];
 
                 protected override Avalonia.Controls.Control Update() =>
                     new Avalonia.Controls.Border();
@@ -62,6 +64,9 @@ public sealed class CrossAssemblySemanticTests
 
                 protected override System.Collections.Immutable.ImmutableArray<
                     Avalonia.AvaloniaProperty<Akbura.IAkburaCommand>> GetCommands() => s_commands;
+
+                protected override System.Collections.Immutable.ImmutableArray<
+                    Akbura.ComponentTree.InjectService> GetServices() => s_services;
             }
             """;
         const string consumerSource =
@@ -183,6 +188,8 @@ public sealed class CrossAssemblySemanticTests
             var injectedService = Assert.Single(component.AkburaComponent.InjectedServices);
             Assert.Equal("Services", injectedService.Name);
             Assert.Equal("IServiceProvider", injectedService.Type.Name);
+            Assert.True(injectedService.IsOptional);
+            Assert.False(injectedService.IsRequired);
             Assert.False(referencedModule.IsSyntaxTreeMaterialized("Components/LibraryCard.akbura"));
 
             var attributes = element.StartTag!.Attributes;

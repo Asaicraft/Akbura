@@ -11,6 +11,8 @@ namespace Akbura.Engine;
 /// </summary>
 public sealed class AkburaEngine
 {
+    public static readonly AkburaEngine Empty = new(EmptyServiceProvider.Instance);
+
 
     /// <summary>
     /// Gets or initializes the fallback engine instance used when an

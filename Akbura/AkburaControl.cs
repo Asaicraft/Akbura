@@ -102,6 +102,10 @@ public abstract class AkburaControl : Control, IComponentTree
 	}
 
 	private readonly AkburaEngine _engine;
+	private bool _updatesEnabled;
+	private bool _isUpdating;
+	private bool _updatePending;
+	private int _updateSuppressionDepth;
 
 	public AkburaControl(): this(AkburaEngine.Singletone)
 	{
@@ -123,7 +127,7 @@ public abstract class AkburaControl : Control, IComponentTree
 
 	public void InvalidState()
 	{
-		Child = Update();
+		RequestUpdate();
 	}
 
 	protected override void OnInitialized()
@@ -167,12 +171,43 @@ public abstract class AkburaControl : Control, IComponentTree
 			throw new AkburaCommandsArrayChangedException(this);
 		}
 
-		Child = Update();
+		var states = GetStates();
+		var validatedStates = GetStates();
+		if (states != validatedStates)
+		{
+			throw new AkburaStatesArrayChangedException(this);
+		}
+
+		_updatesEnabled = true;
+		RequestUpdate();
 	}
 
 	protected abstract Control Update();
 
 	protected abstract Control FirstUpdate();
+
+	/// <summary>
+	/// Creates an instance state from a state description.
+	/// </summary>
+	/// <typeparam name="T">The state value type.</typeparam>
+	/// <param name="info">The static state description.</param>
+	/// <returns>A state attached to this component.</returns>
+	protected State<T> CreateState<T>(StateInfo<T> info)
+	{
+		ArgumentNullException.ThrowIfNull(info);
+
+		return info.CreateTypedState(this);
+	}
+
+	/// <summary>
+	/// Suppresses component updates until the returned scope is disposed.
+	/// </summary>
+	/// <returns>An update suppression scope.</returns>
+	protected IDisposable SuppressUpdates()
+	{
+		_updateSuppressionDepth++;
+		return new UpdateSuppressionScope(this);
+	}
 
 	/// <summary>
 	/// Gets the parameters declared by this component.
@@ -200,6 +235,97 @@ public abstract class AkburaControl : Control, IComponentTree
 	/// </remarks>
 	/// <returns>The component injected-service descriptors.</returns>
 	protected abstract ImmutableArray<InjectService> GetServices();
+
+	/// <summary>
+	/// Gets the states declared by this component.
+	/// </summary>
+	/// <remarks>
+	/// Implementations must cache and return the same immutable array instance on every call.
+	/// </remarks>
+	/// <returns>The component states.</returns>
+	protected abstract ImmutableArray<State> GetStates();
+
+	internal void OnParameterChanged()
+	{
+		RequestUpdate();
+	}
+
+	internal void BeginStateNotification()
+	{
+		_updatePending = true;
+		_updateSuppressionDepth++;
+	}
+
+	internal void EndStateNotification()
+	{
+		EndUpdateSuppression();
+	}
+
+	private void RequestUpdate()
+	{
+		_updatePending = true;
+		ProcessPendingUpdates();
+	}
+
+	private void ProcessPendingUpdates()
+	{
+		if (!_updatesEnabled ||
+			_isUpdating ||
+			_updateSuppressionDepth != 0)
+		{
+			return;
+		}
+
+		while (_updatePending && _updateSuppressionDepth == 0)
+		{
+			_updatePending = false;
+			_isUpdating = true;
+			try
+			{
+				Child = Update();
+			}
+			finally
+			{
+				_isUpdating = false;
+			}
+		}
+	}
+
+	private void EndUpdateSuppression()
+	{
+		if (_updateSuppressionDepth == 0)
+		{
+			throw new InvalidOperationException("There is no active update suppression scope.");
+		}
+
+		_updateSuppressionDepth--;
+		if (_updateSuppressionDepth == 0)
+		{
+			ProcessPendingUpdates();
+		}
+	}
+
+	private sealed class UpdateSuppressionScope : IDisposable
+	{
+		private AkburaControl? _owner;
+
+		public UpdateSuppressionScope(AkburaControl owner)
+		{
+			_owner = owner;
+		}
+
+		public void Dispose()
+		{
+			var owner = _owner;
+			if (owner == null)
+			{
+				return;
+			}
+
+			_owner = null;
+			owner.EndUpdateSuppression();
+		}
+	}
 
 	protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
 	{

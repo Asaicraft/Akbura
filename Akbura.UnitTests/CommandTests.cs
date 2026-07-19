@@ -38,6 +38,7 @@ public sealed class CommandTests
 
         private static readonly ImmutableArray<Parameter> s_parameters = [];
         private static readonly ImmutableArray<InjectService> s_services = [];
+        private static readonly ImmutableArray<State> s_states = [];
 
         private static readonly ImmutableArray<AvaloniaProperty<IAkburaCommand>> s_commands =
             [SaveCommandProperty];
@@ -80,6 +81,11 @@ public sealed class CommandTests
         protected override ImmutableArray<InjectService> GetServices()
         {
             return s_services;
+        }
+
+        protected override ImmutableArray<State> GetStates()
+        {
+            return s_states;
         }
     }
 }

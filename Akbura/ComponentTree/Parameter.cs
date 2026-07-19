@@ -81,6 +81,9 @@ public abstract class Parameter
             defaultBindingMode: bindingMode);
 #pragma warning restore AVP1001 // The same AvaloniaProperty should not be registered twice
 
+        property.Changed.AddClassHandler<TOwner>(
+            static (owner, _) => owner.OnParameterChanged());
+
         return new(property, parameterBinding, defaultValue);
     }
 }

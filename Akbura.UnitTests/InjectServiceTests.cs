@@ -161,6 +161,7 @@ public sealed class InjectServiceTests
 
         private static readonly ImmutableArray<Parameter> s_parameters = [];
         private static readonly ImmutableArray<AvaloniaProperty<IAkburaCommand>> s_commands = [];
+        private static readonly ImmutableArray<State> s_states = [];
         private static readonly ImmutableArray<InjectService> s_requiredServices =
             [RequiredService];
         private static readonly ImmutableArray<InjectService> s_optionalServices =
@@ -237,6 +238,11 @@ public sealed class InjectServiceTests
             return _returnNewArray
                 ? ImmutableArray.Create(_services[0])
                 : _services;
+        }
+
+        protected override ImmutableArray<State> GetStates()
+        {
+            return s_states;
         }
     }
 }

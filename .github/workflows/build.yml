@@ -28,7 +28,7 @@ jobs:
 
       - name: Assign default GitHub URL base path
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
         run: |
           custom_domain=$(gh api "/repos/${{ github.repository }}/pages" | jq -r '.cname // empty')
           echo "CNAME config detected: $custom_domain"
@@ -80,7 +80,7 @@ jobs:
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_PAGES_TOKEN }}
           publish_dir: ./AkburaDocs/dist
           user_name: GitHub Action
           user_email: action@github.com

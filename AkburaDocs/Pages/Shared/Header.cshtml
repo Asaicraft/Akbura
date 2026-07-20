@@ -6,6 +6,12 @@
 		("creatorkit/", "Creator Kit"),
 		("videos", "Videos"),
 	};
+
+	bool IsActive(string href)
+	{
+		var path = "/" + href.TrimStart('/');
+		return Html.MatchesPath(path);
+	}
 }
 <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
   <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
@@ -23,7 +29,7 @@
 				@{
 					void RenderNavLink(string href, string childContent, string? cls = null)
 					{
-						<a href="@href" class="@Html.ClassNames("inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium", Html.MatchesPath(href) ? "border-indigo-500 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200", cls)">
+						<a href="@href" class="@Html.ClassNames("inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium", IsActive(href) ? "border-indigo-500 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200", cls)">
 							@Html.Raw(childContent)
 						</a>
 					}
@@ -62,7 +68,7 @@
 				void RenderMobileLink(string href, string childContent, string? cls = null)
 				{
 					<a href="@href" class="@Html.ClassNames("block border-l-4 py-2 pl-3 pr-4 text-base font-medium", 
-										   Html.MatchesPath(href) ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200" : "border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100", cls)">
+										   IsActive(href) ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200" : "border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100", cls)">
 						@Html.Raw(childContent)
 					</a>
 				}

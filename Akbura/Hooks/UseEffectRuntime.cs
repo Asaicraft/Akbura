@@ -3,34 +3,6 @@ using System.Runtime.ExceptionServices;
 
 namespace Akbura.Hooks;
 
-internal readonly struct UseHookKey : IEquatable<UseHookKey>
-{
-    public UseHookKey(Type declaringType, int overloadId)
-    {
-        DeclaringType = declaringType ?? throw new ArgumentNullException(nameof(declaringType));
-        OverloadId = overloadId;
-    }
-
-    public Type DeclaringType { get; }
-
-    public int OverloadId { get; }
-
-    public bool Equals(UseHookKey other)
-    {
-        return DeclaringType == other.DeclaringType && OverloadId == other.OverloadId;
-    }
-
-    public override bool Equals(object? obj)
-    {
-        return obj is UseHookKey other && Equals(other);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(DeclaringType, OverloadId);
-    }
-}
-
 internal delegate ValueTask<IDisposable?> UseEffectCallback(CancellationToken cancellationToken);
 
 internal readonly struct UseEffectRegistration
@@ -101,6 +73,14 @@ internal sealed class UseEffectSlot
         _restartRequired = true;
     }
 
+    public void Trigger()
+    {
+        if (_hasRun)
+        {
+            Restart();
+        }
+    }
+
     private bool ShouldRun(UseEffectRegistration registration)
     {
         if (_restartRequired || !_hasRun || !registration.HasDependencies)
@@ -134,6 +114,11 @@ internal sealed class UseEffectSlot
     private void Restart()
     {
         StopCurrentRun();
+        StartCurrentRun();
+    }
+
+    private void StartCurrentRun()
+    {
         _restartRequired = false;
         _hasRun = true;
 
@@ -225,122 +210,6 @@ internal sealed class UseEffectSlot
         _cleanup = null;
         cleanup?.Dispose();
         cancellation?.Dispose();
-    }
-}
-
-internal sealed class UseHookRuntime
-{
-    private readonly AkburaControl _owner;
-    private readonly List<UseEffectRegistration> _pending = [];
-    private List<UseEffectSlot>? _slots;
-    private bool _isCollecting;
-    private bool _needsRestart;
-
-    public UseHookRuntime(AkburaControl owner)
-    {
-        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
-    }
-
-    public bool HasSlots => _slots is { Count: > 0 };
-
-    public bool NeedsRestart => _needsRestart;
-
-    public void BeginFrame()
-    {
-        if (_isCollecting)
-        {
-            throw new InvalidOperationException("A use hook frame is already active.");
-        }
-
-        _pending.Clear();
-        _isCollecting = true;
-    }
-
-    public void Register(UseEffectRegistration registration)
-    {
-        if (!_isCollecting)
-        {
-            throw new AkburaUseHookOutsideRenderException(_owner);
-        }
-
-        _pending.Add(registration);
-    }
-
-    public void CompleteFrame()
-    {
-        if (!_isCollecting)
-        {
-            throw new InvalidOperationException("There is no active use hook frame.");
-        }
-
-        _isCollecting = false;
-        ValidateFrame();
-
-        if (_slots == null)
-        {
-            _slots = new List<UseEffectSlot>(_pending.Count);
-            foreach (var registration in _pending)
-            {
-                _slots.Add(new UseEffectSlot(registration.Key));
-            }
-        }
-
-        for (var index = 0; index < _pending.Count; index++)
-        {
-            _slots[index].Apply(_pending[index]);
-        }
-
-        _needsRestart = false;
-        _pending.Clear();
-    }
-
-    public void AbortFrame()
-    {
-        _isCollecting = false;
-        _pending.Clear();
-    }
-
-    public void StopForDetach()
-    {
-        if (_slots == null)
-        {
-            return;
-        }
-
-        foreach (var slot in _slots)
-        {
-            slot.StopForDetach();
-        }
-
-        _needsRestart = _slots.Count != 0;
-    }
-
-    private void ValidateFrame()
-    {
-        if (_slots == null)
-        {
-            return;
-        }
-
-        if (_slots.Count != _pending.Count)
-        {
-            throw new AkburaUseHooksFrameChangedException(
-                _owner,
-                _slots.Count,
-                _pending.Count);
-        }
-
-        for (var index = 0; index < _slots.Count; index++)
-        {
-            if (!_slots[index].Key.Equals(_pending[index].Key))
-            {
-                throw new AkburaUseHooksFrameChangedException(
-                    _owner,
-                    _slots.Count,
-                    _pending.Count,
-                    index);
-            }
-        }
     }
 }
 

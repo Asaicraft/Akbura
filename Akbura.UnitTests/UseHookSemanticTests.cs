@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.BoundTree;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -123,6 +124,90 @@ public sealed class UseHookSemanticTests
         Assert.False(invocation.HasPropertyArgumentSubstitution);
         Assert.Equal(SpecialType.System_Double, invocation.Hook.Method.Parameters[1].Type.SpecialType);
         Assert.True(semanticModel.GetSemanticDiagnostics(state).IsEmpty);
+    }
+
+    [Fact]
+    public void AvaloniaPropertyEffect_RewritesPropertiesInsideCollection()
+    {
+        const string code =
+            "using Akbura.Hooks;\n" +
+            "useAvaloniaProperty(() => { }, [Width, Height]);";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var statement = Assert.IsType<CSharpStatementSyntax>(
+            syntaxTree.GetRoot().Members.Last());
+
+        var bound = Assert.IsType<BoundUseHookStatement>(
+            semanticModel.BindingSession.BindSemanticSyntax(statement));
+        var invocation = bound.Invocation;
+
+        Assert.True(invocation.HasSyntheticSelf);
+        Assert.True(invocation.HasPropertyArgumentSubstitution);
+        Assert.Contains("WidthProperty", invocation.EffectiveInvocation.ToFullString());
+        Assert.Contains("HeightProperty", invocation.EffectiveInvocation.ToFullString());
+        var propertiesParameter = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            invocation.Hook.Method.Parameters[2].Type);
+        Assert.Equal("ReadOnlySpan", propertiesParameter.Name);
+        Assert.Equal("AvaloniaProperty", Assert.Single(propertiesParameter.TypeArguments).Name);
+
+        var operation = Assert.IsAssignableFrom<IUseHookOperation>(
+            semanticModel.GetOperation(statement));
+        Assert.Same(invocation.Hook, operation.Hook);
+        Assert.True(semanticModel.GetSemanticDiagnostics(statement).IsEmpty);
+    }
+
+    [Fact]
+    public void ExternalCustomRenderHook_CanUsePublicRuntimePrimitive()
+    {
+        const string hookSource =
+            """
+            using Akbura;
+            using Akbura.CompilerAnotations;
+            using Akbura.Hooks;
+
+            namespace Hooks;
+
+            public static class CustomHooks
+            {
+                private static readonly UseHookKey s_key = new();
+
+                [UseHook]
+                public static void useCounter([Self] AkburaControl control)
+                {
+                    control.UseHook(
+                        s_key,
+                        0,
+                        static _ => new object(),
+                        static (_, _) => { });
+                }
+            }
+            """;
+        var csharpCompilation = CSharpCompilation.Create(
+            "ExternalCustomHooks",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    hookSource,
+                    CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)),
+            ],
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(
+            csharpCompilation.GetDiagnostics(),
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(
+            "using Hooks;\nuseCounter();",
+            "Counter.akbura");
+        var semanticModel = new AkburaCompilation(csharpCompilation, [syntaxTree])
+            .GetSemanticModel(syntaxTree);
+        var statement = Assert.IsType<CSharpStatementSyntax>(
+            syntaxTree.GetRoot().Members.Last());
+
+        Assert.IsType<BoundUseHookStatement>(
+            semanticModel.BindingSession.BindSemanticSyntax(statement));
+        Assert.True(semanticModel.GetSemanticDiagnostics(statement).IsEmpty);
     }
 
     [Fact]

@@ -143,24 +143,89 @@ internal sealed partial class CSharpProbeBinder
         for (var index = 0; index < arguments.Count; index++)
         {
             var argument = arguments[index];
-            if (semanticModel.GetSymbolInfo(argument.Expression).Symbol is not IPropertySymbol property ||
-                !TryGetAvaloniaPropertyField(property, out var field))
+            var rewrittenExpression = RewritePropertyArgument(
+                semanticModel,
+                argument.Expression);
+            if (rewrittenExpression.IsEquivalentTo(argument.Expression))
             {
                 continue;
             }
 
-            var fieldExpression = CSharpSyntaxFactory.ParseExpression(
-                field.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
-                "." +
-                field.Name);
             rewritten = rewritten.Replace(
                 argument,
-                argument.WithExpression(fieldExpression));
+                argument.WithExpression(rewrittenExpression));
         }
 
         return rewritten == arguments
             ? invocation
             : invocation.WithArgumentList(invocation.ArgumentList.WithArguments(rewritten));
+    }
+
+    private static CSharp.ExpressionSyntax RewritePropertyArgument(
+        Microsoft.CodeAnalysis.SemanticModel semanticModel,
+        CSharp.ExpressionSyntax expression)
+    {
+        if (TryRewritePropertyExpression(
+                semanticModel,
+                expression,
+                out var rewrittenExpression))
+        {
+            return rewrittenExpression;
+        }
+
+        if (expression is CSharp.CollectionExpressionSyntax collection)
+        {
+            return (CSharp.ExpressionSyntax)new AvaloniaPropertyCollectionRewriter(
+                semanticModel).Visit(collection)!;
+        }
+
+        return expression;
+    }
+
+    private static bool TryRewritePropertyExpression(
+        Microsoft.CodeAnalysis.SemanticModel semanticModel,
+        CSharp.ExpressionSyntax expression,
+        out CSharp.ExpressionSyntax rewrittenExpression)
+    {
+        if (semanticModel.GetSymbolInfo(expression).Symbol is IPropertySymbol property &&
+            TryGetAvaloniaPropertyField(property, out var field))
+        {
+            rewrittenExpression = CSharpSyntaxFactory.ParseExpression(
+                    field.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                    "." +
+                    field.Name)
+                .WithTriviaFrom(expression);
+            return true;
+        }
+
+        rewrittenExpression = expression;
+        return false;
+    }
+
+    private sealed class AvaloniaPropertyCollectionRewriter : CSharpSyntaxRewriter
+    {
+        private readonly Microsoft.CodeAnalysis.SemanticModel _semanticModel;
+
+        public AvaloniaPropertyCollectionRewriter(
+            Microsoft.CodeAnalysis.SemanticModel semanticModel)
+        {
+            _semanticModel = semanticModel;
+        }
+
+        public override SyntaxNode? VisitIdentifierName(CSharp.IdentifierNameSyntax node)
+        {
+            return TryRewritePropertyExpression(_semanticModel, node, out var rewritten)
+                ? rewritten
+                : base.VisitIdentifierName(node);
+        }
+
+        public override SyntaxNode? VisitMemberAccessExpression(
+            CSharp.MemberAccessExpressionSyntax node)
+        {
+            return TryRewritePropertyExpression(_semanticModel, node, out var rewritten)
+                ? rewritten
+                : base.VisitMemberAccessExpression(node);
+        }
     }
 
     private static bool TryGetAvaloniaPropertyField(

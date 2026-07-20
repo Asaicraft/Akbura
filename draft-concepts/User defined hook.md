@@ -84,6 +84,58 @@ Without dependencies, an effect runs after every render. With `[]`, it runs afte
 
 Effect callbacks support synchronous and asynchronous forms, an optional `CancellationToken`, and cleanup returned as `Action` or `IDisposable`. A custom `IUseHookDependenciesComparer` can compare dependency lists as a whole.
 
+Avalonia property changes do not request a component render. Use the render overload of `useAvaloniaProperty` when an effect must react directly to them:
+
+```akbura
+useAvaloniaProperty(cancel =>
+{
+    Console.WriteLine($"Size: {Width} x {Height}");
+    return () => Console.WriteLine("cleanup");
+}, [Width, Height]);
+```
+
+It participates in the same stable hook frame as `useEffect`, subscribes to each `AvaloniaProperty`, and performs cancellation and cleanup before restarting the callback.
+
+## Custom Runtime State
+
+A third-party render hook can own persistent state through the same primitive used by the built-in hooks. Adding one does not require a new method or a new slot type in `AkburaControl`:
+
+```csharp
+public static class CounterHooks
+{
+    private static readonly UseHookKey s_key = new();
+
+    [UseHook]
+    public static void useRenderCount(
+        [Self] AkburaControl control,
+        Action<int> rendered)
+    {
+        control.UseHook(
+            s_key,
+            rendered,
+            static _ => new CounterState(),
+            static (state, callback) => callback(++state.Count),
+            static state => state.Detach());
+    }
+
+    private sealed class CounterState
+    {
+        public int Count { get; set; }
+
+        public void Detach()
+        {
+        }
+    }
+}
+```
+
+`UseHookKey` uses reference identity. Keep one static key for each logical hook contract;
+overloads that share the same runtime state and behavior may share that key.
+
+`createState` runs once for that call position. `apply` receives the latest frame arguments after every completed render. The optional `detach` callback releases subscriptions or other resources. On the next attached frame the same state is applied again.
+
+All calls registered through `UseHook` share one frame counter. Changing the number, order, key, or runtime state type causes `AkburaUseHooksFrameChangedException`, including for hooks defined in another assembly.
+
 ## Stable Hook Frames
 
 Render hooks must be called in the same number and order on every render. Calls inside `if`, loops, nested expressions, or callbacks are rejected by semantic analysis. The runtime also verifies every completed frame and fails fast if generated or external code violates the contract.

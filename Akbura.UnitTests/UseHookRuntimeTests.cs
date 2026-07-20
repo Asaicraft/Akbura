@@ -1,3 +1,4 @@
+using Akbura.CompilerAnotations;
 using Akbura.ComponentTree;
 using Akbura.Engine;
 using Akbura.Hooks;
@@ -257,6 +258,144 @@ public sealed class UseHookRuntimeTests
     }
 
     [Fact]
+    public void UseAvaloniaPropertyEffect_RunsOnChangesWithoutRenderAndCleansUpInOrder()
+    {
+        var run = 0;
+        var component = new HookComponent
+        {
+            RenderFrame = control => AvaloniaPropertyHooks.useAvaloniaProperty(
+                control,
+                (Func<CancellationToken, Action?>)(cancellationToken =>
+                {
+                    var currentRun = ++run;
+                    control.Events.Add($"run:{currentRun}");
+                    return () => control.Events.Add(
+                        $"cleanup:{currentRun}:{cancellationToken.IsCancellationRequested}");
+                }),
+                [Control.WidthProperty, Control.HeightProperty]),
+        };
+
+        component.InitializeForTest();
+
+        Assert.Equal(1, component.UpdateCount);
+        Assert.Equal(1, run);
+
+        component.Width = 120;
+
+        Assert.Equal(1, component.UpdateCount);
+        Assert.Equal(2, run);
+        Assert.Equal(
+            ["run:1", "cleanup:1:True", "run:2"],
+            component.Events);
+
+        component.Width = 120;
+        Assert.Equal(2, run);
+
+        component.Height = 80;
+
+        Assert.Equal(1, component.UpdateCount);
+        Assert.Equal(3, run);
+        Assert.Equal(
+            [
+                "run:1",
+                "cleanup:1:True",
+                "run:2",
+                "cleanup:2:True",
+                "run:3",
+            ],
+            component.Events);
+    }
+
+    [Fact]
+    public void UseAvaloniaPropertyEffect_UsesCallbackFromLatestRender()
+    {
+        var component = new HookComponent
+        {
+            Dependency = 1,
+            RenderFrame = control =>
+            {
+                var version = control.Dependency;
+                AvaloniaPropertyHooks.useAvaloniaProperty(
+                    control,
+                    (Action)(() => control.Events.Add($"run:{version}")),
+                    [Control.WidthProperty]);
+            },
+        };
+
+        component.InitializeForTest();
+        component.Dependency = 2;
+        component.RenderAgain();
+
+        Assert.Equal(["run:1"], component.Events);
+
+        component.Width = 64;
+
+        Assert.Equal(["run:1", "run:2"], component.Events);
+        Assert.Equal(2, component.UpdateCount);
+    }
+
+    [Fact]
+    public void UseAvaloniaPropertyEffect_ParticipatesInHookFrameCount()
+    {
+        var component = new HookComponent
+        {
+            RenderFrame = control =>
+            {
+                AvaloniaPropertyHooks.useAvaloniaProperty(
+                    control,
+                    (Action)(() => { }),
+                    [Control.WidthProperty]);
+                if (control.IncludeSecondHook)
+                {
+                    AvaloniaPropertyHooks.useAvaloniaProperty(
+                        control,
+                        (Action)(() => { }),
+                        [Control.HeightProperty]);
+                }
+            },
+        };
+        component.InitializeForTest();
+        component.IncludeSecondHook = true;
+
+        var exception = Assert.Throws<AkburaUseHooksFrameChangedException>(
+            component.RenderAgain);
+
+        Assert.Equal(1, exception.ExpectedCount);
+        Assert.Equal(2, exception.ActualCount);
+    }
+
+    [Fact]
+    public void CustomUseHook_OwnsPersistentStateAndParticipatesInFrameCount()
+    {
+        var component = new HookComponent
+        {
+            RenderFrame = control =>
+            {
+                CustomHooks.useCounter(control);
+                if (control.IncludeSecondHook)
+                {
+                    CustomHooks.useCounter(control);
+                }
+            },
+        };
+
+        component.InitializeForTest();
+        component.RenderAgain();
+
+        Assert.Equal(1, component.CustomHookStateCreations);
+        Assert.Equal(2, component.CustomHookApplications);
+
+        component.IncludeSecondHook = true;
+        var exception = Assert.Throws<AkburaUseHooksFrameChangedException>(
+            component.RenderAgain);
+
+        Assert.Equal(1, exception.ExpectedCount);
+        Assert.Equal(2, exception.ActualCount);
+        Assert.Equal(1, component.CustomHookStateCreations);
+        Assert.Equal(2, component.CustomHookApplications);
+    }
+
+    [Fact]
     public void StopForDetach_CancelsAndCleansUpBeforeTheNextFrameRestartsTheEffect()
     {
         var component = new HookComponent();
@@ -264,7 +403,7 @@ public sealed class UseHookRuntimeTests
         var events = new List<string>();
         var run = 0;
         var registration = new UseEffectRegistration(
-            new UseHookKey(typeof(UseHookRuntimeTests), 1),
+            new UseHookKey(),
             cancellationToken =>
             {
                 var currentRun = ++run;
@@ -291,7 +430,7 @@ public sealed class UseHookRuntimeTests
     [Fact]
     public async Task CleanupFromStaleAsyncRun_IsDisposedImmediately()
     {
-        var key = new UseHookKey(typeof(UseHookRuntimeTests), 2);
+        var key = new UseHookKey();
         var slot = new UseEffectSlot(key);
         var firstCompletion = new TaskCompletionSource<IDisposable?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -333,7 +472,13 @@ public sealed class UseHookRuntimeTests
         UseEffectRegistration registration)
     {
         runtime.BeginFrame();
-        runtime.Register(registration);
+        runtime.Register(
+            new DelegateUseHookRegistration<UseEffectSlot, UseEffectRegistration>(
+                registration.Key,
+                registration,
+                static current => new UseEffectSlot(current.Key),
+                static (slot, current) => slot.Apply(current),
+                static slot => slot.StopForDetach()));
         runtime.CompleteFrame();
     }
 
@@ -385,6 +530,10 @@ public sealed class UseHookRuntimeTests
         public int FirstRenderCount { get; set; }
 
         public int EffectRuns { get; set; }
+
+        public int CustomHookStateCreations { get; set; }
+
+        public int CustomHookApplications { get; set; }
 
         public List<string> Events { get; } = [];
 
@@ -502,6 +651,35 @@ public sealed class UseHookRuntimeTests
 
             return _states;
         }
+    }
+
+    private sealed class CustomHooks
+    {
+        private static readonly UseHookKey s_counterKey = new();
+
+        [UseHook]
+        public static void useCounter([Self] AkburaControl control)
+        {
+            var component = (HookComponent)control;
+            control.UseHook(
+                s_counterKey,
+                component,
+                static current =>
+                {
+                    current.CustomHookStateCreations++;
+                    return new CustomCounterState();
+                },
+                static (state, current) =>
+                {
+                    state.ApplicationCount++;
+                    current.CustomHookApplications = state.ApplicationCount;
+                });
+        }
+    }
+
+    private sealed class CustomCounterState
+    {
+        public int ApplicationCount { get; set; }
     }
 
     private sealed class ParityDependenciesComparer : IUseHookDependenciesComparer

@@ -253,19 +253,35 @@ public abstract class AkburaControl : Control, IComponentTree
 		RequestUpdate();
 	}
 
-	internal void RegisterUseEffect(
+	/// <summary>
+	/// Registers one invocation of a render use hook in the current frame.
+	/// </summary>
+	/// <typeparam name="TState">The persistent runtime state owned by this hook slot.</typeparam>
+	/// <typeparam name="TArguments">The arguments captured for the current frame.</typeparam>
+	/// <param name="key">The reference identity of the logical hook contract.</param>
+	/// <param name="arguments">The arguments for the current frame.</param>
+	/// <param name="createState">Creates the slot state on the first completed frame.</param>
+	/// <param name="apply">Applies the current arguments after each completed frame.</param>
+	/// <param name="detach">Stops resources owned by the slot when the component detaches.</param>
+	/// <remarks>
+	/// Hook calls must remain in the same order and count between completed render frames.
+	/// Methods marked with <see cref="CompilerAnotations.UseHookAttribute"/> can use this
+	/// primitive to implement custom persistent render hooks without compiler changes.
+	/// </remarks>
+	public void UseHook<TState, TArguments>(
 		UseHookKey key,
-		UseEffectCallback callback,
-		bool hasDependencies,
-		ReadOnlySpan<object?> dependencies,
-		IUseHookDependenciesComparer? comparer)
+		TArguments arguments,
+		Func<TArguments, TState> createState,
+		Action<TState, TArguments> apply,
+		Action<TState>? detach = null)
+		where TState : class
 	{
-		_useHooks.Register(new UseEffectRegistration(
+		_useHooks.Register(new DelegateUseHookRegistration<TState, TArguments>(
 			key,
-			callback,
-			hasDependencies,
-			dependencies,
-			comparer));
+			arguments,
+			createState,
+			apply,
+			detach));
 	}
 
 	internal void BeginStateNotification()

@@ -383,6 +383,17 @@ useEffect(cancel =>
 
 Without dependencies the callback runs after every render. With `[]` it runs after the first render only. With dependencies it runs initially and when a value changes. Before restarting, Akbura cancels the previous token and then invokes the previous cleanup.
 
+An Avalonia property does not request an Akbura render when it changes, so placing `Width` or `Height` in `useEffect` dependencies is not sufficient. The render overload of `useAvaloniaProperty` subscribes to the properties directly:
+
+```akbura
+useAvaloniaProperty(() =>
+{
+    Console.WriteLine($"Size: {Width} x {Height}");
+}, [Width, Height]);
+```
+
+The callback supports the same cancellation, asynchronous execution, and cleanup forms as `useEffect`. The hook runs initially and restarts whenever one of the observed properties changes, without requiring `Update()` first.
+
 ## Conditional Rendering
 
 Akbura supports normal top-level C# control flow. A top-level `if` block can contain C# statements and markup siblings:
@@ -460,6 +471,8 @@ public static class NameHooks
 ```
 
 A state hook returns `State<T>`. A render hook returns `void` and is called as a standalone top-level C# statement. Their order must remain stable between renders.
+
+Custom render hooks use the public `AkburaControl.UseHook<TState, TArguments>` primitive to create one persistent runtime state per call position. The same runtime validates built-in and third-party hook keys, state types, order, and count after every completed render frame.
 
 ## AKCSS
 

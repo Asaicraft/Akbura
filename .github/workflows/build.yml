@@ -1,0 +1,86 @@
+name: Build
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    if: startsWith(github.event.head_commit.message, 'docs:')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        working-directory: ./AkburaDocs
+        run: dotnet build .
+
+      - name: Assign default GitHub URL base path
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+        run: |
+          custom_domain=$(gh api "/repos/${{ github.repository }}/pages" | jq -r '.cname // empty')
+          echo "CNAME config detected: $custom_domain"
+
+          repo_name=$(echo "${{ github.repository }}" | cut -d '/' -f 2)
+          org_name=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+
+          if [ ! -f "./AkburaDocs/wwwroot/CNAME" ] && [ -z "$custom_domain" ]; then
+            echo "ssg_base_href=https://$org_name.github.io/$repo_name/" >> "$GITHUB_ENV"
+          elif [ -n "$custom_domain" ]; then
+            echo "Persist CNAME '$custom_domain' to ./AkburaDocs/wwwroot/CNAME"
+            echo "$custom_domain" > ./AkburaDocs/wwwroot/CNAME
+            echo "custom_domain=$custom_domain" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install Tailwind CSS
+        run: |
+          mkdir -p /home/runner/.local/bin
+          curl -o "/home/runner/.local/bin/tailwindcss" \
+            -L "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64"
+          chmod +x /home/runner/.local/bin/tailwindcss
+
+      - name: Build Tailwind
+        working-directory: ./AkburaDocs
+        run: npm run build
+
+      - name: Prerender
+        working-directory: ./AkburaDocs
+        run: |
+          site_base_href="${{ env.ssg_base_href }}"
+
+          if [ -n "$site_base_href" ]; then
+            echo "Prerendering for deployment to $site_base_href"
+            dotnet run \
+              --no-launch-profile \
+              --AppTasks=prerender \
+              --configuration Release \
+              --environment Production \
+              --BaseHref "$site_base_href"
+          else
+            echo "Prerendering for deployment to $(cat ./wwwroot/CNAME)"
+            dotnet run \
+              --no-launch-profile \
+              --AppTasks=prerender \
+              --configuration Release \
+              --environment Production
+          fi
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GH_PAGES_TOKEN }}
+          publish_dir: ./AkburaDocs/dist
+          user_name: GitHub Action
+          user_email: action@github.com

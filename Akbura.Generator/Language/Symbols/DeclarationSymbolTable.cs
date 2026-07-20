@@ -108,8 +108,6 @@ internal sealed class DeclarationSymbolTable
             DeclarationKind.Parameter or
             DeclarationKind.InjectedService or
             DeclarationKind.Command or
-            DeclarationKind.UseEffect or
-            DeclarationKind.UserHook or
             DeclarationKind.AkcssModule or
             DeclarationKind.AkcssStyle or
             DeclarationKind.AkcssUtility;

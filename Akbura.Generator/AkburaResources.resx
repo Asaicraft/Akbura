@@ -270,8 +270,14 @@
   <data name="AKBURA_SEMANTIC_StateBindingTargetNotWritable" xml:space="preserve">
     <value>State binding target '{0}' must be a writable property or field.</value>
   </data>
-  <data name="AKBURA_SEMANTIC_UserHookMustBeTopLevel" xml:space="preserve">
-    <value>User hook '{0}' must be called only from a top-level state initializer.</value>
+  <data name="AKBURA_SEMANTIC_UseHookMustBeTopLevel" xml:space="preserve">
+    <value>Use hook '{0}' must be the root of a state initializer or a standalone render statement.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_UseHookInvalidDeclaration" xml:space="preserve">
+    <value>Use hook '{0}' has an invalid declaration: {1}.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_UseHookInvalidContext" xml:space="preserve">
+    <value>Use hook '{0}' is not valid in this context. State hooks must return State&lt;T&gt;; render hooks must return void.</value>
   </data>
   <data name="WRN_ErrorOverride" xml:space="preserve">
     <value>Error '{0}' was reported as a warning.</value>

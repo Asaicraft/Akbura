@@ -163,8 +163,8 @@ internal sealed class BlockBinder : Binder
                 ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         }
 
-        var probeBinder = new CSharpProbeBinder(SemanticModel, this, Flags);
-        var boundStatement = probeBinder.BindStatement(statement, parsedStatement);
+        var useHookBinder = new UseHookBinder(SemanticModel, this, Flags);
+        var boundStatement = useHookBinder.BindStatement(statement, parsedStatement);
         if (statement.Body != null && boundStatement.Kind == BoundKind.CSharpStatement)
         {
             var csharpStatement = Unsafe.As<BoundCSharpStatement>(boundStatement);

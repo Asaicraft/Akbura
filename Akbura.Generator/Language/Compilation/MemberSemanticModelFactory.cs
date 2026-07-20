@@ -99,8 +99,6 @@ internal sealed class MemberSemanticModelFactory
                 case AkburaSyntaxKind.ParamDeclarationSyntax:
                 case AkburaSyntaxKind.InjectDeclarationSyntax:
                 case AkburaSyntaxKind.CommandDeclarationSyntax:
-                case AkburaSyntaxKind.UseEffectDeclarationSyntax:
-                case AkburaSyntaxKind.UserHook:
                     return MemberSemanticModelKind.Component;
             }
         }

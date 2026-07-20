@@ -51,7 +51,7 @@ partial class GreenSyntaxList
             for (var i = 0; i < n; i++)
             {
                 childOffsets[i] = offset;
-                offset += children[i].Value.Width;
+                offset += children[i].Value.FullWidth;
             }
             return childOffsets;
         }

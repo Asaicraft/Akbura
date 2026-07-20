@@ -36,13 +36,14 @@ public sealed class SemanticCoverageArchitectureTests : SemanticArchitectureTest
         const string code =
             """
             using Avalonia.Controls;
+            using Akbura.Hooks;
 
             state int count = 0;
             param string Title = "Dashboard";
 
-            useEffect(count) {
-                <TextBlock Text={Title}/>
-            }
+            useEffect(() => {
+                System.Console.WriteLine(Title);
+            }, [count]);
 
             @akcss {
                 Button.card {
@@ -73,31 +74,33 @@ public sealed class SemanticCoverageArchitectureTests : SemanticArchitectureTest
             model.BindingSession.BindSemanticSyntax(root));
         Assert.Contains(component.Children, child => child.Kind == BoundKind.StateDeclaration);
         Assert.Contains(component.Children, child => child.Kind == BoundKind.ParamDeclaration);
-        Assert.Contains(component.Children, child => child.Kind == BoundKind.UseEffectDeclaration);
+        Assert.True(
+            component.Children.Any(child => child.Kind == BoundKind.UseHookStatement),
+            string.Join(Environment.NewLine, component.Children.SelectMany(static child => child.Diagnostics)
+                .Select(static diagnostic => diagnostic.Message)));
         Assert.Contains(component.Children, child => child.Kind == BoundKind.AkcssModule);
         Assert.Contains(component.Children, child => child.Kind == BoundKind.MarkupRoot);
 
-        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[1]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
         var boundState = Assert.IsType<BoundStateDeclaration>(
             model.BindingSession.BindSemanticSyntax(state));
         Assert.Single(boundState.Children);
         Assert.IsType<BoundStateInitializer>(boundState.Children[0]);
 
-        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[2]);
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[3]);
         var boundParam = Assert.IsType<BoundParamDeclaration>(
             model.BindingSession.BindSemanticSyntax(param));
         Assert.Single(boundParam.Children);
         Assert.IsType<BoundParamDefaultValue>(boundParam.Children[0]);
 
-        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[3]);
-        var boundUseEffect = Assert.IsType<BoundUseEffectDeclaration>(
+        var useEffect = Assert.IsType<CSharpStatementSyntax>(root.Members[4]);
+        var boundUseEffect = Assert.IsType<BoundUseHookStatement>(
             model.BindingSession.BindSemanticSyntax(useEffect));
-        Assert.Contains(boundUseEffect.Children, child => child.Kind == BoundKind.UseEffectDependency);
-        var body = Assert.IsType<BoundUseEffectBody>(
-            Assert.Single(boundUseEffect.Children, child => child.Kind == BoundKind.UseEffectBody));
-        Assert.Contains(body.Children, child => child.Kind == BoundKind.MarkupRoot);
+        Assert.Equal(BoundKind.UseHookInvocation, boundUseEffect.Invocation.Kind);
+        Assert.IsAssignableFrom<IUseHookSymbol>(model.GetSymbolInfo(useEffect).Symbol);
+        Assert.IsAssignableFrom<IUseHookOperation>(model.GetOperation(useEffect));
 
-        var akcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[4]);
+        var akcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[5]);
         var boundModule = Assert.IsType<BoundAkcssModule>(
             model.BindingSession.BindSemanticSyntax(akcss));
         Assert.Contains(boundModule.Children, child => child.Kind == BoundKind.AkcssStyle);
@@ -113,7 +116,7 @@ public sealed class SemanticCoverageArchitectureTests : SemanticArchitectureTest
             Assert.Single(boundModule.Children, child => child.Kind == BoundKind.AkcssUtility));
         Assert.Contains(utility.Children, child => child.Kind == BoundKind.AkcssPropertySetter);
 
-        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[5]);
+        var markup = Assert.IsType<MarkupRootSyntax>(root.Members[6]);
         var boundMarkupRoot = Assert.IsType<BoundMarkupRoot>(
             model.BindingSession.BindSemanticSyntax(markup));
         var boundMarkupComponent = Assert.IsType<BoundMarkupComponent>(
@@ -131,6 +134,7 @@ public sealed class SemanticCoverageArchitectureTests : SemanticArchitectureTest
         const string dashboardCode =
             """
             using Avalonia.Controls;
+            using Akbura.Hooks;
             using Demo.Components;
 
             namespace Demo.Pages;
@@ -164,9 +168,9 @@ public sealed class SemanticCoverageArchitectureTests : SemanticArchitectureTest
             state int count = 0;
             command int Refresh(int id);
 
-            useEffect(count, Refresh.IsExecuting) {
-                <TextBlock Text={Title}/>
-            }
+            useEffect(() => {
+                System.Console.WriteLine(Title);
+            }, [count, Refresh.IsExecuting]);
 
             <StackPanel>
                 <TextBlock Text={Title} w-30 {count > 0}:hidden/>
@@ -235,8 +239,10 @@ public sealed class SemanticCoverageArchitectureTests : SemanticArchitectureTest
         AssertSemanticBound<BoundStateDeclaration>(root.Members.OfType<StateDeclarationSyntax>().Single());
         AssertSymbol<ICommandSymbol>(root.Members.OfType<CommandDeclarationSyntax>().Single());
         AssertSemanticBound<BoundCommandDeclaration>(root.Members.OfType<CommandDeclarationSyntax>().Single());
-        AssertSymbol<IUseEffectSymbol>(root.Members.OfType<UseEffectDeclarationSyntax>().Single());
-        AssertSemanticBound<BoundUseEffectDeclaration>(root.Members.OfType<UseEffectDeclarationSyntax>().Single());
+        var useEffect = root.Members.OfType<CSharpStatementSyntax>().Single();
+        AssertSymbol<IUseHookSymbol>(useEffect);
+        AssertSemanticBound<BoundUseHookStatement>(useEffect);
+        AssertOperation<BoundUseHookStatement, IUseHookOperation>(useEffect);
 
         AssertSymbol<IAkcssModuleSymbol>(inlineAkcss);
         AssertSemanticBound<BoundAkcssModule>(inlineAkcss);

@@ -67,6 +67,20 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node.Update(locals, initializers);
     }
 
+    public override BoundNode? VisitUseHookStatement(BoundUseHookStatement node)
+    {
+        var invocation = (BoundUseHookInvocation)Visit(node.Invocation)!;
+        return node.Update(invocation);
+    }
+
+    public override BoundNode? VisitUseHookInvocation(BoundUseHookInvocation node)
+    {
+        var hook = (IUseHookSymbol)VisitSymbol(node.Hook)!;
+        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
+        var arguments = VisitExpressionList(node.EffectiveArguments);
+        return node.Update(hook, bindingResult, arguments);
+    }
+
     public override BoundNode? VisitDeclaration(BoundDeclaration node)
     {
         var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
@@ -77,27 +91,15 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
     public override BoundNode? VisitStateInitializer(BoundStateInitializer node)
     {
         var bindingResult = VisitCSharpBindingResult(node.BindingResult);
-        var userHook = (IUserHookSymbol?)VisitSymbol(node.UserHook);
-        return node.Update(bindingResult, node.BindingKind, userHook);
+        var useHook = (IUseHookSymbol?)VisitSymbol(node.UseHook);
+        var invocation = (BoundUseHookInvocation?)Visit(node.UseHookInvocation);
+        return node.Update(bindingResult, node.BindingKind, useHook, invocation);
     }
 
     public override BoundNode? VisitParamDefaultValue(BoundParamDefaultValue node)
     {
         var bindingResult = VisitCSharpBindingResult(node.BindingResult);
         return node.Update(bindingResult);
-    }
-
-    public override BoundNode? VisitUseEffectDependency(BoundUseEffectDependency node)
-    {
-        var dependency = VisitUseEffectDependencyValue(node.Dependency);
-        var bindingResult = VisitCSharpBindingResult(node.BindingResult);
-        return node.Update(dependency, bindingResult);
-    }
-
-    public override BoundNode? VisitUseEffectBody(BoundUseEffectBody node)
-    {
-        var children = VisitList(node.Children);
-        return node.Update(children);
     }
 
     public override BoundNode? VisitMarkupRoot(BoundMarkupRoot node)
@@ -465,10 +467,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 return VisitInjectSymbol((IInjectSymbol)symbol);
             case AkburaSymbolKind.Command:
                 return VisitCommandSymbol((ICommandSymbol)symbol);
-            case AkburaSymbolKind.UseEffect:
-                return VisitUseEffectSymbol((IUseEffectSymbol)symbol);
-            case AkburaSymbolKind.UserHook:
-                return VisitUserHookSymbol((IUserHookSymbol)symbol);
+            case AkburaSymbolKind.UseHook:
+                return VisitUseHookSymbol((IUseHookSymbol)symbol);
             case AkburaSymbolKind.Property:
                 return VisitPropertySymbol((Akbura.Language.Symbols.IPropertySymbol)symbol);
             case AkburaSymbolKind.Event:
@@ -542,9 +542,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
     protected virtual AkburaSymbol VisitCommandParameterSymbol(ICommandParameterSymbol symbol) =>
         DefaultVisitSymbol(symbol);
 
-    protected virtual AkburaSymbol VisitUseEffectSymbol(IUseEffectSymbol symbol) => DefaultVisitSymbol(symbol);
-
-    protected virtual AkburaSymbol VisitUserHookSymbol(IUserHookSymbol symbol) => DefaultVisitSymbol(symbol);
+    protected virtual AkburaSymbol VisitUseHookSymbol(IUseHookSymbol symbol) => DefaultVisitSymbol(symbol);
 
     protected virtual AkburaSymbol VisitPropertySymbol(Akbura.Language.Symbols.IPropertySymbol symbol) =>
         DefaultVisitSymbol(symbol);
@@ -679,23 +677,6 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             sourceType,
             targetType,
             conversion.CSharpConversion);
-    }
-
-    protected virtual UseEffectDependency VisitUseEffectDependencyValue(UseEffectDependency dependency)
-    {
-        var akburaSymbol = VisitSymbol(dependency.AkburaSymbol);
-        var csharpDefinition = VisitCSharpSymbolDefinition(dependency.CSharpDefinition);
-
-        if (ReferenceEquals(akburaSymbol, dependency.AkburaSymbol) &&
-            csharpDefinition.Equals(dependency.CSharpDefinition))
-        {
-            return dependency;
-        }
-
-        return new UseEffectDependency(
-            dependency.ExpressionText,
-            akburaSymbol,
-            csharpDefinition);
     }
 
     protected virtual MarkupChildContent VisitMarkupChildContent(MarkupChildContent content)

@@ -26,8 +26,6 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         ImmutableArray<IParamSymbol> parameters,
         ImmutableArray<IInjectSymbol> injectedServices,
         ImmutableArray<ICommandSymbol> commands,
-        ImmutableArray<IUseEffectSymbol> useEffects,
-        ImmutableArray<UserHookSyntax> userHooks,
         ImmutableArray<IAkcssModuleSymbol> akcssModules,
         ISymbol? containingSymbol = null,
         ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
@@ -68,12 +66,6 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         Commands = commands.IsDefault
             ? ImmutableArray<ICommandSymbol>.Empty
             : commands;
-        UseEffects = useEffects.IsDefault
-            ? ImmutableArray<IUseEffectSymbol>.Empty
-            : useEffects;
-        UserHooks = userHooks.IsDefault
-            ? ImmutableArray<UserHookSyntax>.Empty
-            : userHooks;
         AkcssModules = akcssModules.IsDefault
             ? ImmutableArray<IAkcssModuleSymbol>.Empty
             : akcssModules;
@@ -129,10 +121,6 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
     public ImmutableArray<IInjectSymbol> InjectedServices { get; }
 
     public ImmutableArray<ICommandSymbol> Commands { get; }
-
-    public ImmutableArray<IUseEffectSymbol> UseEffects { get; }
-
-    public ImmutableArray<UserHookSyntax> UserHooks { get; }
 
     public ImmutableArray<IAkcssModuleSymbol> AkcssModules { get; private set; }
 

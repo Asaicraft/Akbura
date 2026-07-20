@@ -195,7 +195,7 @@ public class SemanticSnapshotLazyBenchmarks
             AkburaSyntaxKind.ParamDeclarationSyntax or
             AkburaSyntaxKind.InjectDeclarationSyntax or
             AkburaSyntaxKind.CommandDeclarationSyntax or
-            AkburaSyntaxKind.UseEffectDeclarationSyntax or
+            AkburaSyntaxKind.CSharpStatementSyntax or
             AkburaSyntaxKind.InlineAkcssBlockSyntax or
             AkburaSyntaxKind.AkcssStyleRuleSyntax or
             AkburaSyntaxKind.AkcssUtilityDeclarationSyntax or
@@ -216,7 +216,8 @@ public class SemanticSnapshotLazyBenchmarks
             AkburaSyntaxKind.AkcssAssignmentSyntax or
             AkburaSyntaxKind.AkcssIfDirectiveSyntax or
             AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
-            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax;
+            AkburaSyntaxKind.AkcssInterceptDirectiveSyntax or
+            AkburaSyntaxKind.CSharpStatementSyntax;
     }
 
     private static CSharpCompilation CreateCSharpCompilation(params string[] sources)
@@ -320,6 +321,7 @@ public class SemanticSnapshotLazyBenchmarks
     private static readonly string DashboardCode =
         """
         using Avalonia.Controls;
+        using Akbura.Hooks;
         using Demo.Components;
         using Demo.Logging;
         using Demo.Models;
@@ -370,15 +372,9 @@ public class SemanticSnapshotLazyBenchmarks
 
         command int Refresh(int userId);
 
-        useEffect(UserId, isBusy, viewModel.IsBusy, Refresh.IsExecuting) {
-            logger.LogInformation("Loading {0}", UserId);
-        }
-        cancel {
-            logger.LogInformation("Cancelled");
-        }
-        finally {
-            logger.LogInformation("Done");
-        }
+        useEffect(
+            cancel => logger.LogInformation("Loading {0}", UserId),
+            [UserId, isBusy, viewModel.IsBusy, Refresh.IsExecuting]);
 
         if(isOpen)
         {
@@ -471,20 +467,48 @@ public class SemanticSnapshotLazyBenchmarks
     private static readonly string ProjectCSharpCode =
         """
         using Akbura.CompilerAnotations;
+        using Akbura.ComponentTree;
         using System;
         using System.ComponentModel;
 
         namespace Akbura.CompilerAnotations
         {
-            [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
-            public sealed class UserHookAttribute : Attribute { }
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class UseHookAttribute : Attribute { }
+
+            [AttributeUsage(AttributeTargets.Parameter)]
+            public sealed class SelfAttribute : Attribute { }
+        }
+
+        namespace Akbura.ComponentTree
+        {
+            public sealed class State<T>
+            {
+                public State(T value) { }
+            }
         }
 
         namespace Akbura
         {
+            public abstract class AkburaControl : Avalonia.Controls.ContentControl { }
+
             public static class Amx
             {
                 public static T DynamicResource<T>(object? key) => default!;
+            }
+        }
+
+        namespace Akbura.Hooks
+        {
+            using Akbura.CompilerAnotations;
+
+            public static class EffectHooks
+            {
+                [UseHook]
+                public static void useEffect(
+                    [Self] AkburaControl control,
+                    Action<System.Threading.CancellationToken> effect,
+                    ReadOnlySpan<object?> dependencies) { }
             }
         }
 
@@ -552,10 +576,11 @@ public class SemanticSnapshotLazyBenchmarks
 
         namespace Hooks
         {
-            [UserHook]
-            public struct UseNameHook
+            public static class NameHooks
             {
-                public string UseHook<T>(object component, T state) => "state-name";
+                [UseHook]
+                public static State<string> useName<T>([Self] object component, T state) =>
+                    new("state-name");
             }
         }
         """;

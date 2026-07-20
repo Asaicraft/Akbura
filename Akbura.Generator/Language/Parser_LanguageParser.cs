@@ -177,7 +177,6 @@ partial class Parser
 			SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
 			SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
 			SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
-			SyntaxKind.UseEffectKeyword => ParseUseEffectDeclarationSyntax(),
 			SyntaxKind.LessThanToken => ParseMarkupRootSyntax(),
 			_ => ParseCSharpStatementSyntax()
 		};
@@ -1125,70 +1124,6 @@ partial class Parser
 
 	#endregion
 
-	#region UseEffectDeclarationSyntax
-
-	internal GreenUseEffectDeclarationSyntax ParseUseEffectDeclarationSyntax()
-	{
-		var useEffectKeyword = EatToken(SyntaxKind.UseEffectKeyword);
-
-		var arguments = ParseCSharpArgumentList();
-
-		var block = ParseCSharpBlock();
-
-		var tails = _pool.Allocate<GreenUseEffectTailBlockSyntax>();
-		try
-		{
-			// first tail
-			if (CurrentToken.Kind is SyntaxKind.CancelKeyword or SyntaxKind.FinallyKeyword)
-			{
-				var tail = ParseUseEffectTailBlockSyntax();
-				tails.Add(tail);
-			}
-
-			// second tail
-			if (CurrentToken.Kind is SyntaxKind.CancelKeyword or SyntaxKind.FinallyKeyword)
-			{
-				var tail = ParseUseEffectTailBlockSyntax();
-				tails.Add(tail);
-			}
-
-			return GreenSyntaxFactory.UseEffectDeclarationSyntax(
-				useEffectKeyword,
-				arguments,
-				block,
-				tails.ToList());
-		}
-		finally
-		{
-			_pool.Free(tails);
-		}
-	}
-
-	private GreenUseEffectTailBlockSyntax ParseUseEffectTailBlockSyntax()
-	{
-		return CurrentToken.Kind switch
-		{
-			SyntaxKind.CancelKeyword => ParseEffectCancelBlockSyntax(),
-			SyntaxKind.FinallyKeyword => ParseEffectFinallyBlockSyntax(),
-			_ => throw new UnreachableException("Unexpected token kind in use effect tail block."),
-		};
-	}
-
-	private GreenEffectCancelBlockSyntax ParseEffectCancelBlockSyntax()
-	{
-		var cancelKeyword = EatToken(SyntaxKind.CancelKeyword);
-		var body = ParseCSharpBlock();
-		return GreenSyntaxFactory.EffectCancelBlockSyntax(cancelKeyword, body);
-	}
-
-	private GreenEffectFinallyBlockSyntax ParseEffectFinallyBlockSyntax()
-	{
-		var finallyKeyword = EatToken(SyntaxKind.FinallyKeyword);
-		var body = ParseCSharpBlock();
-		return GreenSyntaxFactory.EffectFinallyBlockSyntax(finallyKeyword, body);
-	}
-
-	#endregion
 
 	#region MarkupRootSyntax
 

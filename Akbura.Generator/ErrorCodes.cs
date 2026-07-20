@@ -56,6 +56,8 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_StateBindingExpressionExpected = nameof(AKBURA_SEMANTIC_StateBindingExpressionExpected);
     public const string AKBURA_SEMANTIC_StateBindingSourceNotObservable = nameof(AKBURA_SEMANTIC_StateBindingSourceNotObservable);
     public const string AKBURA_SEMANTIC_StateBindingTargetNotWritable = nameof(AKBURA_SEMANTIC_StateBindingTargetNotWritable);
-    public const string AKBURA_SEMANTIC_UserHookMustBeTopLevel = nameof(AKBURA_SEMANTIC_UserHookMustBeTopLevel);
+    public const string AKBURA_SEMANTIC_UseHookMustBeTopLevel = nameof(AKBURA_SEMANTIC_UseHookMustBeTopLevel);
+    public const string AKBURA_SEMANTIC_UseHookInvalidDeclaration = nameof(AKBURA_SEMANTIC_UseHookInvalidDeclaration);
+    public const string AKBURA_SEMANTIC_UseHookInvalidContext = nameof(AKBURA_SEMANTIC_UseHookInvalidContext);
     public const string WRN_ErrorOverride = nameof(WRN_ErrorOverride);
 }

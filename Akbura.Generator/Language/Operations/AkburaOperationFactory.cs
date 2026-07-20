@@ -41,6 +41,9 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             BoundKind.AkcssIf => CreateAkcssIfOperation((BoundAkcssIf)boundNode),
             BoundKind.AkcssApply => CreateAkcssApplyOperation((BoundAkcssApply)boundNode),
             BoundKind.AkcssIntercept => CreateAkcssInterceptOperation((BoundAkcssIntercept)boundNode),
+            BoundKind.UseHookInvocation => CreateUseHookOperation((BoundUseHookInvocation)boundNode),
+            BoundKind.UseHookStatement => CreateUseHookOperation(((BoundUseHookStatement)boundNode).Invocation),
+            BoundKind.StateInitializer => CreateStateInitializerOperation((BoundStateInitializer)boundNode),
             BoundKind.CSharpStatement => CreateCSharpStatementOperation((BoundCSharpStatement)boundNode),
             BoundKind.LocalDeclarationStatement => CreateCSharpStatementOperation((BoundLocalDeclarationStatement)boundNode),
             _ => null,
@@ -412,6 +415,33 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         IAkcssSymbol? containingAkcssSymbol)
     {
         return _createCSharpOperationSymbolMapper(syntax, containingAkcssSymbol);
+    }
+
+    private IUseHookOperation? CreateStateInitializerOperation(BoundStateInitializer boundNode)
+    {
+        return boundNode.UseHookInvocation == null
+            ? null
+            : CreateUseHookOperation(boundNode.UseHookInvocation);
+    }
+
+    private IUseHookOperation CreateUseHookOperation(BoundUseHookInvocation boundNode)
+    {
+        var csharpOperation = CreateCSharpOperationTree(
+            boundNode.Syntax,
+            boundNode.BindingResult.OperationDefinition,
+            CreateCSharpOperationSymbolMapper(
+                boundNode.Syntax,
+                containingAkcssSymbol: null));
+        return new UseHookOperation(
+            boundNode.Syntax,
+            boundNode.Hook,
+            boundNode.OriginalInvocation,
+            boundNode.EffectiveInvocation,
+            boundNode.BindingResult.OperationDefinition,
+            boundNode.HasSyntheticSelf,
+            boundNode.HasPropertyArgumentSubstitution,
+            boundNode.HasErrors,
+            csharpOperation);
     }
 
     private ICSharpOperation? CreateCSharpStatementOperation(BoundCSharpStatement boundNode)

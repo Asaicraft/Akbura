@@ -82,9 +82,9 @@ public class FullComponentSyntaxParseTests
 		const string code =
 			"inject ILogger<MyComponent> logger;\n" +
 			"\n" +
-			"useEffect() {\n" +
+			"useEffect(() => {\n" +
 			"\tlogger.LogInformation(\"MyComponent mounted\");\n" +
-			"}\n" +
+			"});\n" +
 			"\n" +
 			"<Text>\n" +
 			"\tHello world!\n" +
@@ -95,7 +95,7 @@ public class FullComponentSyntaxParseTests
 
 		Assert.Equal(3, syntax.Members.Count);
 		Assert.IsType<GreenInjectDeclarationSyntax>(syntax.Members[0]);
-		Assert.IsType<GreenUseEffectDeclarationSyntax>(syntax.Members[1]);
+		Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[1]);
 		Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[2]);
 	}
 
@@ -107,9 +107,9 @@ public class FullComponentSyntaxParseTests
 			"\n" +
 			"state int clicked = 0;\n" +
 			"\n" +
-			"useEffect(CustomClick.IsExecuting) {\n" +
+			"useEffect(() => {\n" +
 			"\tConsole.WriteLine(\"Command is executing\");\n" +
-			"}\n" +
+			"}, [CustomClick.IsExecuting]);\n" +
 			"\n" +
 			"<Block p-4 {CustomClick.IsExecuting}:disabled>\n" +
 			"\t<Button Click={() => {\n" +
@@ -125,7 +125,7 @@ public class FullComponentSyntaxParseTests
 		Assert.Equal(4, syntax.Members.Count);
 		Assert.IsType<GreenCommandDeclarationSyntax>(syntax.Members[0]);
 		Assert.IsType<GreenStateDeclarationSyntax>(syntax.Members[1]);
-		Assert.IsType<GreenUseEffectDeclarationSyntax>(syntax.Members[2]);
+		Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[2]);
 		Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[3]);
 		Assert.Equal(code.Length, syntax.FullWidth);
 		Assert.Equal(code, syntax.ToFullString());
@@ -250,19 +250,13 @@ public class FullComponentSyntaxParseTests
 			"state bool isBusy = bind viewModel.IsBusy;\n" +
 			"state ReactList tasks = bind viewModel.Tasks;\n" +
 			"\n" +
-			"useEffect(UserId, Search) {\n" +
+			"useEffect(() => {\n" +
 			"    log.LogInformation(\"Loading user\");\n" +
 			"\n" +
 			"    if(UserId < 0) {\n" +
 			"        return;\n" +
 			"    }\n" +
-			"}\n" +
-			"cancel {\n" +
-			"    log.LogInformation(\"Cancelled\");\n" +
-			"}\n" +
-			"finally {\n" +
-			"    log.LogInformation(\"Done\");\n" +
-			"}\n" +
+			"}, [UserId, Search]);\n" +
 			"\n" +
 			"command void Refresh(int userId);\n" +
 			"\n" +
@@ -307,7 +301,7 @@ public class FullComponentSyntaxParseTests
 		Assert.IsType<GreenStateDeclarationSyntax>(syntax.Members[9]);
 		Assert.IsType<GreenStateDeclarationSyntax>(syntax.Members[10]);
 		Assert.IsType<GreenStateDeclarationSyntax>(syntax.Members[11]);
-		Assert.IsType<GreenUseEffectDeclarationSyntax>(syntax.Members[12]);
+		Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[12]);
 		Assert.IsType<GreenCommandDeclarationSyntax>(syntax.Members[13]);
 
 		var conditional = Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[14]);

@@ -37,9 +37,7 @@ internal abstract class SymbolVisitor<TParameter, TResult>
         TParameter parameter) =>
         DefaultVisit(symbol, parameter);
 
-    public virtual TResult VisitUseEffect(IUseEffectSymbol symbol, TParameter parameter) => DefaultVisit(symbol, parameter);
-
-    public virtual TResult VisitUserHook(IUserHookSymbol symbol, TParameter parameter) => DefaultVisit(symbol, parameter);
+    public virtual TResult VisitUseHook(IUseHookSymbol symbol, TParameter parameter) => DefaultVisit(symbol, parameter);
 
     public virtual TResult VisitProperty(IPropertySymbol symbol, TParameter parameter) => DefaultVisit(symbol, parameter);
 

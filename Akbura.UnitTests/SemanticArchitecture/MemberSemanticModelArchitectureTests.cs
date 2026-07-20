@@ -100,20 +100,21 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
     {
         const string code =
             "using Avalonia.Controls;\n" +
+            "using Akbura.Hooks;\n" +
             "param int UserId = 1;\n" +
             "state int count = 0;\n" +
-            "useEffect(count) { Console.WriteLine(count); }\n" +
+            "useEffect(() => Console.WriteLine(count), [count]);\n" +
             "<TextBlock Text={count.ToString()} />\n" +
             "@akcss { .card { Width: 10; } }";
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var model = CreateCompilation(tree).GetSemanticModel(tree);
         var root = tree.GetRoot();
-        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[1]);
-        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
-        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[3]);
-        var markupRoot = Assert.IsType<MarkupRootSyntax>(root.Members[4]);
+        var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[2]);
+        var state = Assert.IsType<StateDeclarationSyntax>(root.Members[3]);
+        var useEffect = Assert.IsType<CSharpStatementSyntax>(root.Members[4]);
+        var markupRoot = Assert.IsType<MarkupRootSyntax>(root.Members[5]);
         var attribute = Assert.Single(markupRoot.Element.StartTag!.Attributes);
-        var akcssBlock = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[5]);
+        var akcssBlock = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[6]);
         var style = Assert.IsType<AkcssStyleRuleSyntax>(akcssBlock.Members[0]);
         var assignment = Assert.IsType<AkcssAssignmentSyntax>(style.Members[0]);
 
@@ -122,7 +123,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
         Assert.IsType<ComponentMemberSemanticModel>(model.GetMemberSemanticModel(param));
         Assert.IsType<InitializerMemberSemanticModel>(model.GetMemberSemanticModel(state.Initializer));
         Assert.IsType<InitializerMemberSemanticModel>(model.GetMemberSemanticModel(param.DefaultValue!));
-        Assert.IsType<ExecutableMemberSemanticModel>(model.GetMemberSemanticModel(useEffect.Body));
+        Assert.IsType<ExecutableMemberSemanticModel>(model.GetMemberSemanticModel(useEffect));
         Assert.IsType<MarkupMemberSemanticModel>(model.GetMemberSemanticModel(markupRoot));
         Assert.IsType<MarkupMemberSemanticModel>(model.GetMemberSemanticModel(markupRoot.Element));
         Assert.IsType<MarkupMemberSemanticModel>(model.GetMemberSemanticModel(attribute));
@@ -196,6 +197,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
     {
         const string code =
             "using Avalonia.Controls;\n" +
+            "using Akbura.Hooks;\n" +
             "namespace Demo.Pages;\n" +
             "\n" +
             "@akcss { .card { Background: White; } }\n" +
@@ -203,7 +205,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
             "param bind string Text = \"Hello\";\n" +
             "state int count = 0;\n" +
             "command int Refresh(int id);\n" +
-            "useEffect(Text, count, service, Refresh.IsExecuting) { }\n" +
+            "useEffect(() => { }, [Text, count, service, Refresh.IsExecuting]);\n" +
             "<TextBlock Text={Text} />";
         var tree = AkburaSyntaxTree.ParseText(code, "Pages/Counter.akbura");
         var model = CreateCompilation(tree).GetSemanticModel(tree);
@@ -215,7 +217,8 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
         var parameter = Assert.Single(component.Parameters);
         var injectedService = Assert.Single(component.InjectedServices);
         var command = Assert.Single(component.Commands);
-        var useEffect = Assert.Single(component.UseEffects);
+        var useEffect = root.Members.OfType<CSharpStatementSyntax>().Single();
+        var hookOperation = Assert.IsAssignableFrom<IUseHookOperation>(model.GetOperation(useEffect));
 
         Assert.Same(component, model.GetSymbolInfo(root).Symbol);
         Assert.Equal("Counter", component.Name);
@@ -227,7 +230,7 @@ public sealed class MemberSemanticModelArchitectureTests : SemanticArchitectureT
         Assert.Equal("service", injectedService.Name);
         Assert.Equal("Refresh", command.Name);
         Assert.Equal("Int32", command.ResultType.Name);
-        Assert.Equal(4, useEffect.Dependencies.Length);
+        Assert.Equal("useEffect", hookOperation.Method.Name);
         Assert.Single(component.MarkupRoots);
         Assert.Single(component.AkcssModules);
     }

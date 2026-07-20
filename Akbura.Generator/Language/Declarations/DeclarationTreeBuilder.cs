@@ -348,7 +348,6 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             AkburaSyntaxKind.ParamDeclarationSyntax => ((ParamDeclarationSyntax)member).Name.ToFullString().Trim(),
             AkburaSyntaxKind.InjectDeclarationSyntax => ((InjectDeclarationSyntax)member).Name.ToFullString().Trim(),
             AkburaSyntaxKind.CommandDeclarationSyntax => ((CommandDeclarationSyntax)member).Name.ToFullString().Trim(),
-            AkburaSyntaxKind.UserHook => ((UserHookSyntax)member).Name.ToFullString().Trim(),
             AkburaSyntaxKind.InlineAkcssBlockSyntax => "@akcss",
             _ => string.Empty,
         };
@@ -595,19 +594,6 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             Add(DeclarationKind.Command, node.Name.ToFullString().Trim(), node);
         }
 
-        public override void VisitUseEffectDeclarationSyntax(UseEffectDeclarationSyntax node)
-        {
-            Add(DeclarationKind.UseEffect, "useEffect", node, CollectUseEffectChildren(node));
-        }
-
-        public override void VisitUserHookSyntax(UserHookSyntax node)
-        {
-            Add(
-                DeclarationKind.UserHook,
-                node.Name.ToFullString().Trim(),
-                node,
-                CollectExecutableMarkupDeclarations(node.Body));
-        }
 
         public override void VisitCSharpStatementSyntax(CSharpStatementSyntax node)
         {
@@ -680,18 +666,6 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             }
         }
 
-        private ImmutableArray<Declaration> CollectUseEffectChildren(UseEffectDeclarationSyntax node)
-        {
-            using var builder = ImmutableArrayBuilder<Declaration>.Rent();
-            builder.AddRange(CollectExecutableMarkupDeclarations(node.Body));
-
-            foreach (var tail in node.Tails)
-            {
-                builder.AddRange(CollectExecutableMarkupDeclarations(tail.Body));
-            }
-
-            return builder.ToImmutable();
-        }
 
         private ImmutableArray<Declaration> CollectExecutableMarkupDeclarations(CSharpBlockSyntax block)
         {

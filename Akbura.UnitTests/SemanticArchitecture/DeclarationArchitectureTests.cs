@@ -63,7 +63,7 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             "param int UserId = 1;\n" +
             "state int count = 0;\n" +
             "command int Refresh(int id);\n" +
-            "useEffect(UserId) { logger.LogInformation(\"load\"); }\n" +
+            "useEffect(() => logger.LogInformation(\"load\"), [UserId]);\n" +
             "<TextBlock Text=\"Hello\" />\n";
         const string akcss =
             "@using Demo.Theme;\n" +
@@ -85,7 +85,6 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.Parameter);
         Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.State);
         Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.Command);
-        Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.UseEffect);
         Assert.Contains(component.Children, declaration => declaration.Kind == DeclarationKind.MarkupRoot);
 
         var inlineAkcss = Assert.Single(component.Children, declaration => declaration.Kind == DeclarationKind.AkcssModule);
@@ -529,7 +528,7 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             "param int UserId = 1;\n" +
             "state int count = 0;\n" +
             "command int Refresh(int id);\n" +
-            "useEffect(count) { }";
+            "useEffect(() => { });";
         var tree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
         var compilation = CreateCompilation(tree);
         var model = compilation.GetSemanticModel(tree);
@@ -541,15 +540,14 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             DeclarationKind.State,
             DeclarationKind.Parameter,
             DeclarationKind.InjectedService,
-            DeclarationKind.Command,
-            DeclarationKind.UseEffect);
+            DeclarationKind.Command);
         var binder = Assert.IsType<ComponentBinder>(model.GetBinder(root));
 
         Assert.Contains(declaredSymbols, symbol => symbol is IInjectSymbol { Name: "service" });
         Assert.Contains(declaredSymbols, symbol => symbol is IParamSymbol { Name: "UserId" });
         Assert.Contains(declaredSymbols, symbol => symbol is IStateSymbol { Name: "count" });
         Assert.Contains(declaredSymbols, symbol => symbol is ICommandSymbol { Name: "Refresh" });
-        Assert.Contains(declaredSymbols, symbol => symbol is IUseEffectSymbol);
+        Assert.DoesNotContain(declaredSymbols, symbol => symbol is IUseHookSymbol);
         var binderSymbols = binder.GetDeclaredSymbolsForScope(root);
         Assert.Equal(
             declaredSymbols.Select(symbol => (symbol.Kind, symbol.Name)),
@@ -565,7 +563,7 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
             "param int UserId = 1;\n" +
             "state int count = 0;\n" +
             "command int Refresh(int id);\n" +
-            "useEffect(count) { }\n" +
+            "useEffect(() => { });\n" +
             "@akcss {\n" +
             "    .card { Background: White; }\n" +
             "    @utilities { .w-(double value) { Width: value; } }\n" +
@@ -578,7 +576,7 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         var param = Assert.IsType<ParamDeclarationSyntax>(root.Members[1]);
         var state = Assert.IsType<StateDeclarationSyntax>(root.Members[2]);
         var command = Assert.IsType<CommandDeclarationSyntax>(root.Members[3]);
-        var useEffect = Assert.IsType<UseEffectDeclarationSyntax>(root.Members[4]);
+        var useEffect = Assert.IsType<CSharpStatementSyntax>(root.Members[4]);
         var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(root.Members[5]);
         var style = Assert.IsType<AkcssStyleRuleSyntax>(inlineAkcss.Members[0]);
         var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(inlineAkcss.Members[1]);
@@ -590,7 +588,7 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.IsAssignableFrom<IParamSymbol>(model.GetDeclaredSymbol(param));
         Assert.IsAssignableFrom<IStateSymbol>(model.GetDeclaredSymbol(state));
         Assert.IsAssignableFrom<ICommandSymbol>(model.GetDeclaredSymbol(command));
-        Assert.IsAssignableFrom<IUseEffectSymbol>(model.GetDeclaredSymbol(useEffect));
+        Assert.Null(model.GetDeclaredSymbol(useEffect));
         Assert.IsAssignableFrom<IAkcssModuleSymbol>(model.GetDeclaredSymbol(inlineAkcss));
         Assert.IsAssignableFrom<IAkcssSymbol>(model.GetDeclaredSymbol(style));
         Assert.IsAssignableFrom<ITailwindUtilitySymbol>(model.GetDeclaredSymbol(utility));

@@ -98,6 +98,7 @@ An Akbura component can contain these top-level members:
 ```akbura
 using System;
 using Avalonia.Controls;
+using Akbura.Hooks;
 using Demo.Styles.Shared.akcss;
 
 namespace Demo.Pages;
@@ -120,9 +121,9 @@ state TaskItem selectedTask = out vm.SelectedTask;
 
 command int Refresh(int userId);
 
-useEffect(UserId, isBusy, Refresh.IsExecuting) {
-    logger.LogInformation("Refreshing {0}", UserId);
-}
+useEffect(
+    () => logger.LogInformation("Refreshing {0}", UserId),
+    [UserId, isBusy, Refresh.IsExecuting]);
 
 if(isOpen)
 {
@@ -316,13 +317,15 @@ Commands expose interaction points from a component:
 
 ```akbura
 // CustomButton.akbura
+using Akbura.Hooks;
+
 command int Click(int value);
 
 state int clicked = 0;
 
-useEffect(Click.IsExecuting) {
-    Console.WriteLine("Command is executing");
-}
+useEffect(
+    () => Console.WriteLine("Command is executing"),
+    [Click.IsExecuting]);
 
 <Button Click={async () => {
     var result = await Click.Execute(clicked++);
@@ -361,26 +364,24 @@ Parent components can bind to child commands:
 
 ## useEffect
 
-`useEffect` declares effect code that reacts to dependencies:
+`useEffect` is an ordinary C# call recognized by the semantic model. Import `Akbura.Hooks`, pass a callback, and optionally pass a dependency collection:
 
 ```akbura
+using Akbura.Hooks;
+
 param int UserId = 1;
 state int count = 0;
 inject IDataService service;
 command void Refresh(int userId);
 
-useEffect(UserId, count, service.Value, Refresh.IsExecuting) {
+useEffect(cancel =>
+{
     Console.WriteLine(count);
-}
-cancel {
-    Console.WriteLine("cancel");
-}
-finally {
-    Console.WriteLine("done");
-}
+    return () => Console.WriteLine("cleanup");
+}, [UserId, count, service.Value, Refresh.IsExecuting]);
 ```
 
-`useEffect` dependencies can reference parameters, state, injected members, and command facade state.
+Without dependencies the callback runs after every render. With `[]` it runs after the first render only. With dependencies it runs initially and when a value changes. Before restarting, Akbura cancels the previous token and then invokes the previous cleanup.
 
 ## Conditional Rendering
 
@@ -421,14 +422,16 @@ state bool isBoxVisible = true;
 
 ## User Hooks
 
-User hooks are experimental. Hook calls are allowed only from top-level state initializers:
+State hooks are ordinary C# calls at the root of a state initializer:
 
 ```akbura
+using Hooks;
+
 state string query = "";
 state string name = useName(query);
 ```
 
-Hooks cannot be called from conditional or loop bodies:
+Hook calls cannot be nested or placed in conditional and loop bodies:
 
 ```akbura
 if(query.Length > 0)
@@ -437,18 +440,26 @@ if(query.Length > 0)
 }
 ```
 
-The C# hook type is expected to be annotated and to provide a `UseHook` method:
+A hook is a public static method marked with `[UseHook]`. An optional first `[Self]` parameter may be supplied explicitly or inserted by the binder:
 
 ```csharp
-[UserHook]
-public struct UseNameHook
+using Akbura;
+using Akbura.CompilerAnotations;
+using Akbura.ComponentTree;
+
+namespace Hooks;
+
+public static class NameHooks
 {
-    public string UseHook<T>(AkburaComponent component, StateInfo<T> state)
-    {
-        return state.FieldName ?? "Unnamed State";
-    }
+    [UseHook]
+    public static State<string> useName<TControl>(
+        [Self] TControl control,
+        string value)
+        where TControl : AkburaControl => new(value);
 }
 ```
+
+A state hook returns `State<T>`. A render hook returns `void` and is called as a standalone top-level C# statement. Their order must remain stable between renders.
 
 ## AKCSS
 

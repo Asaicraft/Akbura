@@ -14,8 +14,6 @@ internal enum DeclarationKind : byte
     Parameter,
     InjectedService,
     Command,
-    UseEffect,
-    UserHook,
     MarkupRoot,
     MarkupElement,
     AkcssModule,

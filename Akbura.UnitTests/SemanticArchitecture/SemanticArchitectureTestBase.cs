@@ -43,17 +43,9 @@ public abstract class SemanticArchitectureTestBase
 
     private protected static CSharpCompilation CreateCSharpCompilation()
     {
-        var references = new[]
-        {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Avalonia.Controls.Button).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Avalonia.Media.Color).Assembly.Location),
-        };
-
         return CSharpCompilation.Create(
             "SemanticArchitectureTests",
-            references: references,
+            references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 

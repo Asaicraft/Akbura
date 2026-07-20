@@ -30,6 +30,7 @@ public sealed class SystemKitchenSinkSemanticTests
             using System.Xml.Linq;
 
             using Avalonia.Controls;
+            using Akbura.Hooks;
 
             using Microsoft.Extensions.Logging;
 
@@ -49,7 +50,7 @@ public sealed class SystemKitchenSinkSemanticTests
             state Dictionary<string, string> metadata = new Dictionary<string, string>();
             state List<string> history = new List<string>();
 
-            useEffect(UserId, Search) {
+            useEffect(() => {
                 effectRuns++;
 
                 var query = Search ?? string.Empty;
@@ -96,7 +97,7 @@ public sealed class SystemKitchenSinkSemanticTests
 
                 logs.Insert(0, json);
                 logger.LogInformation("Created {Count}", numbers.Length);
-            }
+            }, [UserId, Search]);
 
             if(showSystemInfo)
             {
@@ -119,8 +120,9 @@ public sealed class SystemKitchenSinkSemanticTests
         AssertStateType(semanticModel, root, "metadata", "System.Collections.Generic.Dictionary<string, string>");
         AssertStateType(semanticModel, root, "history", "System.Collections.Generic.List<string>");
 
-        var useEffect = root.Members.OfType<UseEffectDeclarationSyntax>().Single();
-        var effectStatements = useEffect.Body.Tokens.OfType<CSharpStatementSyntax>().ToArray();
+        var useEffect = root.Members.OfType<CSharpStatementSyntax>()
+            .Single(static statement => statement.Tokens.ToFullString().TrimStart().StartsWith("useEffect", StringComparison.Ordinal));
+        CSharpStatementSyntax[] effectStatements = [useEffect];
 
         var numbersReferences = GetReferences(semanticModel, effectStatements, "var numbers = Enumerable");
         AssertNamedType(numbersReferences, "Enumerable", "System.Linq.Enumerable");
@@ -161,7 +163,8 @@ public sealed class SystemKitchenSinkSemanticTests
         AssertMethod(logReferences, "LogInformation", "Microsoft.Extensions.Logging.ILogger<Demo.Pages.SystemKitchenSink>", "LogInformation");
         AssertLocal(logReferences, "numbers");
 
-        var conditional = root.Members.OfType<CSharpStatementSyntax>().Single();
+        var conditional = root.Members.OfType<CSharpStatementSyntax>()
+            .Single(static statement => statement.Tokens.ToFullString().TrimStart().StartsWith("if", StringComparison.Ordinal));
         var conditionalStatements = conditional.Body!.Tokens.OfType<CSharpStatementSyntax>().ToArray();
 
         var startupReferences = GetReferences(semanticModel, conditionalStatements, "var startupMessage");
@@ -211,9 +214,10 @@ public sealed class SystemKitchenSinkSemanticTests
         string name)
         where TSymbol : AkburaSymbol
     {
-        var reference = Assert.Single(references, reference => reference.Name == name);
-        Assert.IsAssignableFrom<TSymbol>(reference.AkburaSymbol);
-        Assert.NotNull(reference.CSharpDefinition.Symbol);
+        Assert.Contains(references, reference =>
+            reference.Name == name &&
+            reference.AkburaSymbol is TSymbol &&
+            reference.CSharpDefinition.Symbol != null);
     }
 
     private static void AssertNamedType(
@@ -281,7 +285,7 @@ public sealed class SystemKitchenSinkSemanticTests
         ImmutableArray<CSharpSymbolReference> references,
         string name)
     {
-        Assert.Single(references, reference =>
+        Assert.Contains(references, reference =>
             reference.Name == name &&
             reference.CSharpDefinition.Symbol is ILocalSymbol local &&
             local.Name == name);
@@ -317,6 +321,7 @@ public sealed class SystemKitchenSinkSemanticTests
         var references = trustedPlatformAssemblies
             .Concat([
                 MetadataReference.CreateFromFile(typeof(Avalonia.Controls.TextBlock).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Akbura.AkburaControl).Assembly.Location),
             ])
             .GroupBy(static reference => reference.Display, StringComparer.OrdinalIgnoreCase)
             .Select(static group => group.First())

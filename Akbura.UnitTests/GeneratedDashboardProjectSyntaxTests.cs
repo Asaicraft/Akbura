@@ -41,7 +41,8 @@ public sealed class GeneratedDashboardProjectSyntaxTests
         var conditionals = new List<GreenCSharpStatementSyntax>();
         for (var index = 0; index < syntax.Members.Count; index++)
         {
-            if (syntax.Members[index] is GreenCSharpStatementSyntax conditional)
+            if (syntax.Members[index] is GreenCSharpStatementSyntax { Body: not null }
+                conditional)
             {
                 conditionals.Add(conditional);
             }
@@ -116,9 +117,9 @@ public sealed class GeneratedDashboardProjectSyntaxTests
             }
         }
 
-        useEffect(currentTab, sidebarOpen) {
+        useEffect(() => {
             logger.LogInformation("Dashboard state changed: Tab={0}, Sidebar={1}", currentTab, sidebarOpen);
-        }
+        }, [currentTab, sidebarOpen]);
 
         if (currentTab == "counter") {
             <Counter InitialValue={10} />
@@ -157,9 +158,9 @@ public sealed class GeneratedDashboardProjectSyntaxTests
 
         state int count = bind Value;
 
-        useEffect(count) {
+        useEffect(() => {
             Console.WriteLine($"Counter changed to {count}");
-        }
+        }, [count]);
 
         <StackPanel class="card" w-30>
             <TextBlock Text={$"Count: {count}"} />
@@ -185,15 +186,15 @@ public sealed class GeneratedDashboardProjectSyntaxTests
         command void AddItem(string text);
         command void RemoveItem(int index);
 
-        useEffect(AddItem.IsExecuting) {
+        useEffect(() => {
             if (string.IsNullOrWhiteSpace(newItem)) return;
             items.Add(newItem);
             newItem = "";
-        }
+        }, [AddItem.IsExecuting]);
 
-        useEffect(RemoveItem.IsExecuting) {
+        useEffect(() => {
             logger.LogInformation("Remove command executing");
-        }
+        }, [RemoveItem.IsExecuting]);
 
         <StackPanel>
             <StackPanel Orientation="Horizontal">
@@ -246,9 +247,9 @@ public sealed class GeneratedDashboardProjectSyntaxTests
 
         state int clicked = 0;
 
-        useEffect(Click.IsExecuting) {
+        useEffect(() => {
             Console.WriteLine($"Command executing with value = {clicked}");
-        }
+        }, [Click.IsExecuting]);
 
         <Button Click={async () => {
             int res = await Click.Execute(clicked++);

@@ -258,6 +258,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives = default)
     {
         var componentName = SemanticModel.SyntaxTree.ComponentName;
+        var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
+            CSharpCompilation,
+            SemanticModel.GetAkburaComponentMetadataName(SemanticModel.SyntaxTree));
         CSharp.ClassDeclarationSyntax probeType;
         if (string.IsNullOrWhiteSpace(componentName))
         {
@@ -266,9 +269,6 @@ internal sealed partial class CSharpProbeBinder : Binder
         }
         else
         {
-            var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
-                CSharpCompilation,
-                SemanticModel.GetAkburaComponentMetadataName(SemanticModel.SyntaxTree));
             probeType = CSharpSyntaxFactory.ClassDeclaration(ToCSharpIdentifier(componentName))
                 .WithModifiers(CSharpSyntaxFactory.TokenList(
                     CSharpSyntaxFactory.Token(CSharpSyntaxKind.PartialKeyword)))
@@ -283,6 +283,18 @@ internal sealed partial class CSharpProbeBinder : Binder
                     CSharpSyntaxFactory.SingletonSeparatedList<CSharp.BaseTypeSyntax>(
                         CSharpSyntaxFactory.SimpleBaseType(baseType))));
             }
+        }
+
+        if (string.IsNullOrWhiteSpace(componentName) &&
+            componentTypeInfo.ShouldDeclareAkburaControlBase &&
+            componentTypeInfo.AkburaControlType != null)
+        {
+            var baseType = CSharpSyntaxFactory.ParseTypeName(
+                componentTypeInfo.AkburaControlType.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat));
+            probeType = probeType.WithBaseList(CSharpSyntaxFactory.BaseList(
+                CSharpSyntaxFactory.SingletonSeparatedList<CSharp.BaseTypeSyntax>(
+                    CSharpSyntaxFactory.SimpleBaseType(baseType))));
         }
 
         var compilationUnit = CSharpSyntaxFactory.CompilationUnit()
@@ -374,16 +386,6 @@ internal sealed partial class CSharpProbeBinder : Binder
         AkburaSyntax syntax,
         CSharpBindingResult bindingResult)
     {
-        if (syntax.Kind == Akbura.Language.Syntax.SyntaxKind.CSharpStatementSyntax)
-        {
-            var statement = Unsafe.As<CSharpStatementSyntax>(syntax);
-            var userHookDiagnostics = SemanticModel.CreateCSharpStatementUserHookDiagnostics(statement);
-            if (!userHookDiagnostics.IsDefaultOrEmpty)
-            {
-                return userHookDiagnostics;
-            }
-        }
-
         using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
         AkburaSemanticModel.AddCSharpBindingDiagnostics(
             syntax,
@@ -533,8 +535,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var diagnostic in semanticModel.GetDiagnostics(syntax.Span))
         {
-            if (diagnostic.Severity != DiagnosticSeverity.Error ||
-                diagnostic.Id == "CS0012")
+            if (diagnostic.Severity != DiagnosticSeverity.Error)
             {
                 continue;
             }

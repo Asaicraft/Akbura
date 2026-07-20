@@ -734,47 +734,13 @@ public class AkburaSyntaxFactoryTests
         ).WithTrailingTrivia(doubleNl);
 
         //
-        // useEffect(UserId, tasks) { }
-        // cancel { }
-        // finally { }
+        // useEffect(() => { }, [UserId, tasks]);
         //
-        var useEffectBody = CSharpBlockSyntax(
-            openBrace: Token(SyntaxKind.OpenBraceToken)
-                .WithLeadingTrivia(space)
-                .WithTrailingTrivia(nl),
-            tokens: List<AkTopLevelMemberSyntax>(),
-            closeBrace: Token(SyntaxKind.CloseBraceToken)
-                .WithTrailingTrivia(nl)
-        );
-
-        var cancelBody = CSharpBlockSyntax(
-            openBrace: Token(SyntaxKind.OpenBraceToken)
-                .WithTrailingTrivia(nl),
-            tokens: List<AkTopLevelMemberSyntax>(),
-            closeBrace: Token(SyntaxKind.CloseBraceToken)
-                .WithTrailingTrivia(nl)
-        );
-
-        var finallyBody = CSharpBlockSyntax(
-            openBrace: Token(SyntaxKind.OpenBraceToken)
-                .WithTrailingTrivia(nl),
-            tokens: List<AkTopLevelMemberSyntax>(),
-            closeBrace: Token(SyntaxKind.CloseBraceToken)
-                .WithTrailingTrivia(nl)
-        );
-
-        var useEffect = UseEffectDeclarationSyntax(
-            useEffectKeyword: Token(SyntaxKind.UseEffectKeyword),
-            arguments: "(UserId, tasks)",
-            body: useEffectBody,
-            EffectCancelBlockSyntax(
-                cancelKeyword: Token(SyntaxKind.CancelKeyword),
-                body: cancelBody
+        var useEffect = CSharpStatementSyntax(
+            tokens: TokenList(
+                CSharpRawToken("useEffect(() => { }, [UserId, tasks]);")
             ),
-            EffectFinallyBlockSyntax(
-                finallyKeyword: Token(SyntaxKind.FinallyKeyword),
-                body: finallyBody
-            )
+            body: null
         ).WithTrailingTrivia(doubleNl);
 
         //
@@ -795,35 +761,13 @@ public class AkburaSyntaxFactoryTests
         ).WithTrailingTrivia(doubleNl);
 
         //
-        // onMounted(UserId, tasks) { }
+        // onMounted(UserId, tasks);
         //
-        var hookBody = CSharpBlockSyntax(
-            openBrace: Token(SyntaxKind.OpenBraceToken)
-                .WithTrailingTrivia(nl),
-            tokens: List<AkTopLevelMemberSyntax>(),
-            closeBrace: Token(SyntaxKind.CloseBraceToken)
-                .WithTrailingTrivia(nl)
-        );
-
-        var hook = UserHook(
-            name: IdentifierName("onMounted"),
-            openParen: Token(SyntaxKind.OpenParenToken),
-            parameters: SeparatedList(
-                [
-                    CSharpExpressionSyntax(
-                        TokenList(
-                            Identifier("UserId")
-                        )
-                    ),
-                    CSharpExpressionSyntax(
-                        TokenList(
-                            Identifier("tasks")
-                        )
-                    )
-                ]
+        var hook = CSharpStatementSyntax(
+            tokens: TokenList(
+                CSharpRawToken("onMounted(UserId, tasks);")
             ),
-            closeParen: Token(SyntaxKind.CloseParenToken),
-            body: hookBody
+            body: null
         ).WithTrailingTrivia(doubleNl);
 
         //
@@ -1111,17 +1055,11 @@ public class AkburaSyntaxFactoryTests
         state count = 0;
         state ReactList tasks = bind viewModel.Tasks;
 
-        useEffect(UserId, tasks) {
-        }
-        cancel{
-        }
-        finally{
-        }
+        useEffect(() => { }, [UserId, tasks]);
 
         command int CustomClick(int a);
 
-        onMounted(UserId, tasks){
-        }
+        onMounted(UserId, tasks);
 
         Console.WriteLine("Hello from Akbura");
 

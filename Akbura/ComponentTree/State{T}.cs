@@ -6,6 +6,7 @@ public sealed class State<T> : State
 {
     private Action<T>? _subscribers;
     private T _value;
+    private List<IDisposable>? _retainedSubscriptions;
 
     public State(T initialValue)
     {
@@ -43,6 +44,13 @@ public sealed class State<T> : State
 
         _subscribers += subscriber;
         return new Subscription(this, subscriber);
+    }
+
+    internal void RetainSubscription(IDisposable subscription)
+    {
+        ArgumentNullException.ThrowIfNull(subscription);
+
+        (_retainedSubscriptions ??= []).Add(subscription);
     }
 
     private void Unsubscribe(Action<T> subscriber)

@@ -1459,7 +1459,6 @@ internal sealed partial class Parser
             SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
             SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
             SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
-            SyntaxKind.UseEffectKeyword => ParseUseEffectDeclarationSyntax(),
             SyntaxKind.LessThanToken => ParseMarkupRootSyntax(),
             _ => ParseCSharpStatementSyntax()
         };
@@ -1475,7 +1474,6 @@ internal sealed partial class Parser
             SyntaxKind.ParamKeyword or
             SyntaxKind.InjectKeyword or
             SyntaxKind.CommandKeyword or
-            SyntaxKind.UseEffectKeyword or
             SyntaxKind.LessThanToken)
         {
             return false;

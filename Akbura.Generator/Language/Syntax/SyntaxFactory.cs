@@ -533,29 +533,6 @@ internal static partial class SyntaxFactory
         return (CSharpArgumentListSyntax)greenNode.CreateRed();
     }
 
-    public static UseEffectDeclarationSyntax UseEffectDeclarationSyntax(SyntaxToken useEffectKeyword, string arguments, CSharpBlockSyntax body, UseEffectTailBlockSyntax? tail1 = null, UseEffectTailBlockSyntax? tail2 = null)
-    {
-        var argumentsSyntax = CSharpArgumentListSyntax(arguments);
-
-        var tails = new SyntaxListBuilder<UseEffectTailBlockSyntax>(2);
-
-        if (tail1 != null)
-        {
-            tails.Add(tail1);
-        }
-
-        if (tail2 != null)
-        {
-            tails.Add(tail2);
-        }
-
-        return SyntaxFactory.UseEffectDeclarationSyntax(
-            useEffectKeyword,
-            argumentsSyntax,
-            body,
-            tails.ToList()
-        );
-    }
 
     public static MarkupStartTagSyntax MarkupStartTagSyntax(SyntaxToken lessToken, IdentifierNameSyntax name, SyntaxList<MarkupAttributeSyntax> attributes, SyntaxToken closeToken)
     {

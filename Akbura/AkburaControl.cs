@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Akbura.Akcss;
+using Akbura.Hooks;
 using Akbura.ComponentTree;
 using Akbura.Engine;
 using Avalonia.Collections;
@@ -106,6 +107,7 @@ public abstract class AkburaControl : Control, IComponentTree
 	private bool _isUpdating;
 	private bool _updatePending;
 	private int _updateSuppressionDepth;
+	private readonly UseHookRuntime _useHooks;
 
 	public AkburaControl(): this(AkburaEngine.Singletone)
 	{
@@ -115,6 +117,7 @@ public abstract class AkburaControl : Control, IComponentTree
 	public AkburaControl(AkburaEngine akburaEngine)
 	{
 		_engine = akburaEngine;
+		_useHooks = new UseHookRuntime(this);
 	}
 
 	IComponentTree? IComponentTree.ComponentParent
@@ -250,6 +253,21 @@ public abstract class AkburaControl : Control, IComponentTree
 		RequestUpdate();
 	}
 
+	internal void RegisterUseEffect(
+		UseHookKey key,
+		UseEffectCallback callback,
+		bool hasDependencies,
+		ReadOnlySpan<object?> dependencies,
+		IUseHookDependenciesComparer? comparer)
+	{
+		_useHooks.Register(new UseEffectRegistration(
+			key,
+			callback,
+			hasDependencies,
+			dependencies,
+			comparer));
+	}
+
 	internal void BeginStateNotification()
 	{
 		_updatePending = true;
@@ -280,9 +298,16 @@ public abstract class AkburaControl : Control, IComponentTree
 		{
 			_updatePending = false;
 			_isUpdating = true;
+			_useHooks.BeginFrame();
 			try
 			{
 				Child = Update();
+				_useHooks.CompleteFrame();
+			}
+			catch
+			{
+				_useHooks.AbortFrame();
+				throw;
 			}
 			finally
 			{
@@ -331,11 +356,16 @@ public abstract class AkburaControl : Control, IComponentTree
 	{
 		base.OnAttachedToVisualTree(e);
 		SetComponentParent(FindComponentParent());
+		if (_useHooks.NeedsRestart)
+		{
+			RequestUpdate();
+		}
 	}
 
 	protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
 	{
 		base.OnDetachedFromVisualTree(e);
+		_useHooks.StopForDetach();
 		SetComponentParent(null);
 	}
 

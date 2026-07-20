@@ -292,7 +292,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
             "param int UserId = 1;\n" +
             "state int count = 0;\n" +
             "command int Refresh(int id);\n" +
-            "useEffect(count) { }\n" +
+            "useEffect(() => { });\n" +
             "@akcss {\n" +
             "    .card { Background: White; }\n" +
             "    @utilities { .w-(double value) { Width: value; } }\n" +
@@ -313,7 +313,7 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         Assert.Contains(componentSymbols, symbol => symbol is IParamSymbol { Name: "UserId" });
         Assert.Contains(componentSymbols, symbol => symbol is IStateSymbol { Name: "count" });
         Assert.Contains(componentSymbols, symbol => symbol is ICommandSymbol { Name: "Refresh" });
-        Assert.Contains(componentSymbols, symbol => symbol is IUseEffectSymbol);
+        Assert.DoesNotContain(componentSymbols, symbol => symbol is IUseHookSymbol);
 
         var akcssModuleBinder = Assert.IsType<AkcssModuleBinder>(model.GetBinder(inlineAkcss, BinderUsage.Akcss));
         var akcssSymbols = akcssModuleBinder.GetDeclaredSymbolsForScope(inlineAkcss);

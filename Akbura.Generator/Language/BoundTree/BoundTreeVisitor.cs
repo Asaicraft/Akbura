@@ -21,6 +21,8 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitLocalDeclarationStatement(BoundLocalDeclarationStatement node) => VisitStatement(node);
 
+    public virtual void VisitUseHookStatement(BoundUseHookStatement node) => VisitStatement(node);
+
     public virtual void VisitDeclaration(BoundDeclaration node) => DefaultVisit(node);
 
     public virtual void VisitComponentDeclaration(BoundComponentDeclaration node) => VisitDeclaration(node);
@@ -33,15 +35,9 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitCommandDeclaration(BoundCommandDeclaration node) => VisitDeclaration(node);
 
-    public virtual void VisitUseEffectDeclaration(BoundUseEffectDeclaration node) => VisitDeclaration(node);
-
     public virtual void VisitStateInitializer(BoundStateInitializer node) => DefaultVisit(node);
 
     public virtual void VisitParamDefaultValue(BoundParamDefaultValue node) => DefaultVisit(node);
-
-    public virtual void VisitUseEffectDependency(BoundUseEffectDependency node) => DefaultVisit(node);
-
-    public virtual void VisitUseEffectBody(BoundUseEffectBody node) => DefaultVisit(node);
 
     public virtual void VisitMarkupRoot(BoundMarkupRoot node) => DefaultVisit(node);
 
@@ -74,6 +70,8 @@ internal abstract class BoundTreeVisitor
     public virtual void VisitAkcssIntercept(BoundAkcssIntercept node) => DefaultVisit(node);
 
     public virtual void VisitExpression(BoundExpression node) => DefaultVisit(node);
+
+    public virtual void VisitUseHookInvocation(BoundUseHookInvocation node) => VisitExpression(node);
 
     public virtual void VisitCSharpExpression(BoundCSharpExpression node) => VisitExpression(node);
 
@@ -115,6 +113,8 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitLocalDeclarationStatement(BoundLocalDeclarationStatement node) =>
         VisitStatement(node);
 
+    public virtual TResult? VisitUseHookStatement(BoundUseHookStatement node) => VisitStatement(node);
+
     public virtual TResult? VisitDeclaration(BoundDeclaration node) => DefaultVisit(node);
 
     public virtual TResult? VisitComponentDeclaration(BoundComponentDeclaration node) => VisitDeclaration(node);
@@ -127,15 +127,9 @@ internal abstract class BoundTreeVisitor<TResult>
 
     public virtual TResult? VisitCommandDeclaration(BoundCommandDeclaration node) => VisitDeclaration(node);
 
-    public virtual TResult? VisitUseEffectDeclaration(BoundUseEffectDeclaration node) => VisitDeclaration(node);
-
     public virtual TResult? VisitStateInitializer(BoundStateInitializer node) => DefaultVisit(node);
 
     public virtual TResult? VisitParamDefaultValue(BoundParamDefaultValue node) => DefaultVisit(node);
-
-    public virtual TResult? VisitUseEffectDependency(BoundUseEffectDependency node) => DefaultVisit(node);
-
-    public virtual TResult? VisitUseEffectBody(BoundUseEffectBody node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupRoot(BoundMarkupRoot node) => DefaultVisit(node);
 
@@ -168,6 +162,8 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitAkcssIntercept(BoundAkcssIntercept node) => DefaultVisit(node);
 
     public virtual TResult? VisitExpression(BoundExpression node) => DefaultVisit(node);
+
+    public virtual TResult? VisitUseHookInvocation(BoundUseHookInvocation node) => VisitExpression(node);
 
     public virtual TResult? VisitCSharpExpression(BoundCSharpExpression node) => VisitExpression(node);
 
@@ -215,6 +211,9 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         TParameter parameter) =>
         VisitStatement(node, parameter);
 
+    public virtual TResult? VisitUseHookStatement(BoundUseHookStatement node, TParameter parameter) =>
+        VisitStatement(node, parameter);
+
     public virtual TResult? VisitDeclaration(BoundDeclaration node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
@@ -233,19 +232,10 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
     public virtual TResult? VisitCommandDeclaration(BoundCommandDeclaration node, TParameter parameter) =>
         VisitDeclaration(node, parameter);
 
-    public virtual TResult? VisitUseEffectDeclaration(BoundUseEffectDeclaration node, TParameter parameter) =>
-        VisitDeclaration(node, parameter);
-
     public virtual TResult? VisitStateInitializer(BoundStateInitializer node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitParamDefaultValue(BoundParamDefaultValue node, TParameter parameter) =>
-        DefaultVisit(node, parameter);
-
-    public virtual TResult? VisitUseEffectDependency(BoundUseEffectDependency node, TParameter parameter) =>
-        DefaultVisit(node, parameter);
-
-    public virtual TResult? VisitUseEffectBody(BoundUseEffectBody node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupRoot(BoundMarkupRoot node, TParameter parameter) =>
@@ -295,6 +285,9 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
 
     public virtual TResult? VisitExpression(BoundExpression node, TParameter parameter) =>
         DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitUseHookInvocation(BoundUseHookInvocation node, TParameter parameter) =>
+        VisitExpression(node, parameter);
 
     public virtual TResult? VisitCSharpExpression(BoundCSharpExpression node, TParameter parameter) =>
         VisitExpression(node, parameter);

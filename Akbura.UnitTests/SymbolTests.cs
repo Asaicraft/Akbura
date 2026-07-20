@@ -42,17 +42,23 @@ public class SymbolTests
 
     internal static MetadataReference[] CreateAvaloniaReferences()
     {
-        var avaloniaControlsAssembly = typeof(Akbura.AkburaControl).BaseType!.Assembly;
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var trustedPlatformAssemblies =
+            AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string
+            ?? throw new InvalidOperationException(
+                "Trusted platform assemblies are unavailable.");
+        foreach (var path in trustedPlatformAssemblies.Split(Path.PathSeparator))
+        {
+            paths.Add(path);
+        }
 
-        return
-        [
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(System.Console).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(System.ComponentModel.INotifyPropertyChanged).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(System.Collections.Immutable.ImmutableArray<>).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Avalonia.AvaloniaObject).Assembly.Location),
-            MetadataReference.CreateFromFile(avaloniaControlsAssembly.Location),
-            MetadataReference.CreateFromFile(typeof(Akbura.AkburaControl).Assembly.Location),
-        ];
+        var avaloniaControlsAssembly = typeof(Akbura.AkburaControl).BaseType!.Assembly;
+        paths.Add(typeof(Avalonia.AvaloniaObject).Assembly.Location);
+        paths.Add(avaloniaControlsAssembly.Location);
+        paths.Add(typeof(Akbura.AkburaControl).Assembly.Location);
+
+        return paths
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .ToArray();
     }
 }

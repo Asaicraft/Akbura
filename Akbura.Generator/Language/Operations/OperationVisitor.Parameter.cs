@@ -19,6 +19,11 @@ internal abstract class OperationVisitor<TParameter, TResult>
         TParameter parameter) =>
         DefaultVisit(operation, parameter);
 
+    public virtual TResult? VisitUseHook(
+        IUseHookOperation operation,
+        TParameter parameter) =>
+        DefaultVisit(operation, parameter);
+
     public virtual TResult? VisitAkcssPropertySetter(
         IAkcssPropertySetterOperation operation,
         TParameter parameter) =>

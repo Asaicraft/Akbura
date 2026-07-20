@@ -28,9 +28,5 @@ internal interface IAkburaComponentSymbol : IMarkupComponentSymbol
 
     ImmutableArray<ICommandSymbol> Commands { get; }
 
-    ImmutableArray<IUseEffectSymbol> UseEffects { get; }
-
-    ImmutableArray<UserHookSyntax> UserHooks { get; }
-
     ImmutableArray<IAkcssModuleSymbol> AkcssModules { get; }
 }

@@ -125,10 +125,6 @@ internal sealed class ModuleAkburaComponentSymbol : Symbol, IAkburaComponentSymb
 
     public ImmutableArray<ICommandSymbol> Commands => [];
 
-    public ImmutableArray<IUseEffectSymbol> UseEffects => [];
-
-    public ImmutableArray<UserHookSyntax> UserHooks => [];
-
     public ImmutableArray<IAkcssModuleSymbol> AkcssModules => [];
 
     public override void Accept(SymbolVisitor visitor)

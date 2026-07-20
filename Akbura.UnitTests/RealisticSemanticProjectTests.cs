@@ -41,7 +41,6 @@ public sealed class RealisticSemanticProjectTests
         Assert.Equal(3, component.Parameters.Length);
         Assert.Equal(6, component.States.Length);
         Assert.Single(component.Commands);
-        Assert.Single(component.UseEffects);
         Assert.Single(component.AkcssModules);
         Assert.Equal(2, component.MarkupRoots.Length);
 
@@ -49,7 +48,6 @@ public sealed class RealisticSemanticProjectTests
         AssertRootInjectedServices(component);
         AssertRootStates(component);
         AssertRootCommand(component);
-        AssertRootUseEffect(component);
         AssertRootInlineAkcssModule(component, semanticModel);
 
         var stackPanel = GetRootMarkupElement(root, "StackPanel");
@@ -117,8 +115,9 @@ public sealed class RealisticSemanticProjectTests
         var project = CreateProject();
         var semanticModel = project.Compilation.GetSemanticModel(project.DashboardTree);
         var root = project.DashboardTree.GetRoot();
-        var useEffect = root.Members.OfType<UseEffectDeclarationSyntax>().Single();
-        var effectStatement = Assert.IsType<CSharpStatementSyntax>(Assert.Single(useEffect.Body.Tokens));
+        var effectStatement = root.Members
+            .OfType<CSharpStatementSyntax>()
+            .Single(static statement => statement.Tokens.ToFullString().TrimStart().StartsWith("useEffect", StringComparison.Ordinal));
 
         var references = semanticModel.GetCSharpSymbolReferences(effectStatement);
 
@@ -134,7 +133,9 @@ public sealed class RealisticSemanticProjectTests
         Assert.IsAssignableFrom<IMethodSymbol>(methodReference.CSharpDefinition.Symbol);
         Assert.Null(methodReference.AkburaSymbol);
 
-        var conditional = root.Members.OfType<CSharpStatementSyntax>().Single();
+        var conditional = root.Members
+            .OfType<CSharpStatementSyntax>()
+            .Single(static statement => statement.Tokens.ToFullString().TrimStart().StartsWith("if", StringComparison.Ordinal));
         var conditionalStatement = Assert.IsType<CSharpStatementSyntax>(
             conditional.Body!.Tokens.Single(member => member is CSharpStatementSyntax));
         var conditionalReferences = semanticModel.GetCSharpSymbolReferences(conditionalStatement);
@@ -144,16 +145,23 @@ public sealed class RealisticSemanticProjectTests
         Assert.IsAssignableFrom<IParamSymbol>(
             Assert.Single(conditionalReferences, reference => reference.Name == "Search").AkburaSymbol);
 
-        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
-            semanticModel.GetSymbolInfo(root).Symbol);
-        var refresh = Assert.Single(component.Commands);
-        var effect = Assert.Single(component.UseEffects);
+        var operation = Assert.IsAssignableFrom<IUseHookOperation>(
+            semanticModel.GetOperation(effectStatement));
+        Assert.Equal(Akbura.Language.Operations.OperationKind.UseHook, operation.Kind);
+        Assert.Equal("useEffect", operation.Hook.InvocationName);
+        Assert.Equal("useEffect", operation.Method.Name);
+        Assert.True(operation.HasSyntheticSelf);
+        Assert.Equal(UseHookSelfKind.Implicit, operation.SelfKind);
+        Assert.NotNull(operation.InvocationOperation);
 
-        Assert.Same(refresh, effect.Dependencies.Single(dependency => dependency.ExpressionText == "Refresh.IsExecuting").AkburaSymbol);
-        Assert.Same(component.Parameters.Single(parameter => parameter.Name == "UserId"),
-            effect.Dependencies.Single(dependency => dependency.ExpressionText == "UserId").AkburaSymbol);
-        Assert.Same(component.States.Single(state => state.Name == "isBusy"),
-            effect.Dependencies.Single(dependency => dependency.ExpressionText == "isBusy").AkburaSymbol);
+        Assert.IsAssignableFrom<IInjectSymbol>(
+            Assert.Single(references, reference => reference.Name == "viewModel").AkburaSymbol);
+        Assert.IsAssignableFrom<IParamSymbol>(
+            Assert.Single(references, reference => reference.Name == "UserId").AkburaSymbol);
+        Assert.IsAssignableFrom<IStateSymbol>(
+            Assert.Single(references, reference => reference.Name == "isBusy").AkburaSymbol);
+        Assert.IsAssignableFrom<ICommandSymbol>(
+            Assert.Single(references, reference => reference.Name == "Refresh").AkburaSymbol);
     }
 
     [Fact]
@@ -250,10 +258,6 @@ public sealed class RealisticSemanticProjectTests
                         BoundKind.CommandDeclaration);
                     break;
 
-                case UseEffectDeclarationSyntax useEffect:
-                    AssertUseEffectBoundCoverage(semanticModel, useEffect);
-                    break;
-
                 case InlineAkcssBlockSyntax inlineAkcss:
                     AssertAkcssModuleBoundCoverage(semanticModel, inlineAkcss);
                     break;
@@ -263,6 +267,17 @@ public sealed class RealisticSemanticProjectTests
                     break;
 
                 case CSharpStatementSyntax statement:
+                    if (statement.Tokens.ToFullString().TrimStart().StartsWith("useEffect", StringComparison.Ordinal))
+                    {
+                        var boundStatement = AssertBoundSemantic<BoundUseHookStatement>(
+                            semanticModel,
+                            statement,
+                            BoundKind.UseHookStatement);
+                        Assert.Equal(BoundKind.UseHookInvocation, boundStatement.Invocation.Kind);
+                        Assert.IsAssignableFrom<IUseHookOperation>(semanticModel.GetOperation(statement));
+                        break;
+                    }
+
                     foreach (var markup in EnumerateMarkupRoots(statement.Body))
                     {
                         AssertMarkupRootBoundCoverage(semanticModel, markup);
@@ -304,46 +319,6 @@ public sealed class RealisticSemanticProjectTests
         var defaultValue = Assert.IsType<BoundParamDefaultValue>(Assert.Single(boundParam.Children));
         Assert.Same(param.DefaultValue, defaultValue.Syntax);
         Assert.Same(defaultValue, semanticModel.BindingSession.BindSemanticSyntax(param.DefaultValue));
-    }
-
-    private static void AssertUseEffectBoundCoverage(
-        AkburaSemanticModel semanticModel,
-        UseEffectDeclarationSyntax useEffect)
-    {
-        var boundUseEffect = AssertBoundSemantic<BoundUseEffectDeclaration>(
-            semanticModel,
-            useEffect,
-            BoundKind.UseEffectDeclaration);
-        Assert.Contains(boundUseEffect.Children, child => child.Kind == BoundKind.UseEffectDependency);
-
-        var bodies = boundUseEffect.Children
-            .Where(static child => child.Kind == BoundKind.UseEffectBody)
-            .Cast<BoundUseEffectBody>()
-            .ToArray();
-        Assert.Equal(1 + useEffect.Tails.Count, bodies.Length);
-        Assert.Same(bodies[0], semanticModel.BindingSession.BindSemanticSyntax(useEffect.Body));
-        AssertUseEffectBodyMarkupCoverage(semanticModel, bodies[0]);
-
-        for (var index = 0; index < useEffect.Tails.Count; index++)
-        {
-            var tailBody = useEffect.Tails[index].Body;
-            var boundBody = bodies[index + 1];
-            Assert.Same(boundBody, semanticModel.BindingSession.BindSemanticSyntax(tailBody));
-            AssertUseEffectBodyMarkupCoverage(semanticModel, boundBody);
-        }
-    }
-
-    private static void AssertUseEffectBodyMarkupCoverage(
-        AkburaSemanticModel semanticModel,
-        BoundUseEffectBody body)
-    {
-        foreach (var child in body.Children)
-        {
-            if (child.Kind == BoundKind.MarkupRoot)
-            {
-                AssertMarkupRootBoundCoverage(semanticModel, (MarkupRootSyntax)child.Syntax);
-            }
-        }
     }
 
     private static void AssertMarkupRootBoundCoverage(
@@ -636,8 +611,8 @@ public sealed class RealisticSemanticProjectTests
         Assert.Equal("TaskItem", component.States[3].Type.Name);
         Assert.Equal("TaskItem", component.States[4].Type.Name);
         Assert.Equal("String", component.States[5].Type.Name);
-        Assert.NotNull(component.States[5].UserHook);
-        Assert.Equal("useName", component.States[5].UserHook!.InvocationName);
+        Assert.NotNull(component.States[5].UseHook);
+        Assert.Equal("useName", component.States[5].UseHook!.InvocationName);
     }
 
     private static void AssertRootCommand(IAkburaComponentSymbol component)
@@ -653,22 +628,6 @@ public sealed class RealisticSemanticProjectTests
         var parameter = Assert.Single(command.Parameters);
         Assert.Equal("userId", parameter.Name);
         Assert.Equal("Int32", parameter.Type.Name);
-    }
-
-    private static void AssertRootUseEffect(IAkburaComponentSymbol component)
-    {
-        var effect = Assert.Single(component.UseEffects);
-
-        Assert.True(effect.HasCancelBlock);
-        Assert.True(effect.HasFinallyBlock);
-        Assert.Equal(
-            ["UserId", "isBusy", "viewModel.IsBusy", "Refresh.IsExecuting"],
-            effect.Dependencies.Select(static dependency => dependency.ExpressionText));
-        Assert.IsAssignableFrom<IParamSymbol>(effect.Dependencies[0].AkburaSymbol);
-        Assert.IsAssignableFrom<IStateSymbol>(effect.Dependencies[1].AkburaSymbol);
-        Assert.IsAssignableFrom<IInjectSymbol>(effect.Dependencies[2].AkburaSymbol);
-        Assert.IsAssignableFrom<ICommandSymbol>(effect.Dependencies[3].AkburaSymbol);
-        Assert.True(effect.Dependencies.All(static dependency => dependency.IsResolved));
     }
 
     private static void AssertRootInlineAkcssModule(
@@ -934,6 +893,7 @@ public sealed class RealisticSemanticProjectTests
     private static readonly string DashboardCode =
         """
     using Avalonia.Controls;
+    using Akbura.Hooks;
     using Demo.Components;
     using Demo.Logging;
     using Demo.Models;
@@ -984,15 +944,9 @@ public sealed class RealisticSemanticProjectTests
 
     command int Refresh(int userId);
 
-    useEffect(UserId, isBusy, viewModel.IsBusy, Refresh.IsExecuting) {
-        logger.LogInformation("Loading {0}", UserId);
-    }
-    cancel {
-        logger.LogInformation("Cancelled");
-    }
-    finally {
-        logger.LogInformation("Done");
-    }
+    useEffect(
+        () => logger.LogInformation("Loading"),
+        [UserId, isBusy, viewModel.IsBusy, Refresh.IsExecuting]);
 
     if(isOpen)
     {
@@ -1143,10 +1097,12 @@ public sealed class RealisticSemanticProjectTests
 
     namespace Hooks
     {
-        [UserHook]
-        public struct UseNameHook
+        public static class NameHooks
         {
-            public string UseHook<T>(object component, T state) => "state-name";
+            [Akbura.CompilerAnotations.UseHook]
+            public static Akbura.ComponentTree.State<string> useName<T>(
+                [Akbura.CompilerAnotations.Self] object component,
+                T state) => null!;
         }
     }
     """;

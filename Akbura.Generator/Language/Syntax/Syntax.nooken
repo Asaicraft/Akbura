@@ -7,9 +7,7 @@
 token InjectKeyword      = "inject";
 token ParamKeyword       = "param";
 token StateKeyword       = "state";
-token UseEffectKeyword   = "useEffect";
 token SuppressKeyword    = "suppress";
-token CancelKeyword      = "cancel";
 token FinallyKeyword     = "finally";
 token AsyncKeyword       = "async";
 token VoidKeyword        = "void";
@@ -283,35 +281,8 @@ node BindableStateInitializer: StateInitializer
 }
 
 // ─────────────────────────────────────────────────────────────
-// useEffect DECLARATION (+ cancel / finally blocks)
 // ─────────────────────────────────────────────────────────────
 
-/// <summary>
-/// useEffect($cancel, UserId, tasks) { ... }
-/// cancel { ... }
-/// finally { ... }
-/// </summary>
-node UseEffectDeclarationSyntax : AkTopLevelMember {
-	UseEffectKeyword : UseEffectKeyword;
-	// Dependency list: e.g., $cancel, UserId, tasks
-	Arguments        : CSharpArgumentListSyntax;
-	Body             : CSharpBlockSyntax;
-	Tails            : syntaxlist<UseEffectTailBlockSyntax>; // only 2 variants
-}
-
-abstract node UseEffectTailBlockSyntax {
-	Body : CSharpBlockSyntax;
-}
-
-node EffectCancelBlockSyntax : UseEffectTailBlockSyntax {
-	CancelKeyword : CancelKeyword;
-	Body          : CSharpBlockSyntax;
-}
-
-node EffectFinallyBlockSyntax : UseEffectTailBlockSyntax {
-	FinallyKeyword : FinallyKeyword;
-	Body           : CSharpBlockSyntax;
-}
 
 /// <summary>
 /// Component-level command contract:
@@ -346,17 +317,8 @@ node CSharpArgumentListSyntax {
 
 
 // ─────────────────────────────────────────────────────────────
-// User hooks
 // ─────────────────────────────────────────────────────────────
 
-node UserHook : AkTopLevelMember
-{
-	Name       : SimpleName;
-	OpenParen  : OpenParenToken;
-	Parameters : syntaxlist<CSharpExpressionSyntax, CommaToken>;
-	CloseParen : CloseParenToken;
-	Body       : CSharpBlockSyntax;
-}
 
 // ─────────────────────────────────────────────────────────────
 // MARKUP TREE (Razor-style component markup)

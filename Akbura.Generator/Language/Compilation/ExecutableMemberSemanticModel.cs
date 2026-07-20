@@ -48,7 +48,7 @@ internal sealed class ExecutableMemberSemanticModel : BinderBackedMemberSemantic
         }
 
         var boundNode = BindingSession
-            .GetCSharpProbeBinder(statement, BinderUsage.Expression)
+            .GetUseHookBinder(statement, BinderUsage.Expression)
             .BindStatement(statement, csharpStatement);
         if (statement.Body != null && boundNode.Kind == BoundKind.CSharpStatement)
         {

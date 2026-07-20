@@ -13,6 +13,8 @@ internal abstract class OperationVisitor
 
     public virtual void VisitCSharpOperation(ICSharpOperation operation) => DefaultVisit(operation);
 
+    public virtual void VisitUseHook(IUseHookOperation operation) => DefaultVisit(operation);
+
     public virtual void VisitAkcssPropertySetter(IAkcssPropertySetterOperation operation) => DefaultVisit(operation);
 
     public virtual void VisitAkcssIf(IAkcssIfOperation operation) => DefaultVisit(operation);

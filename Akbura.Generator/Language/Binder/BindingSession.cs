@@ -100,6 +100,20 @@ internal sealed class BindingSession
         return new CSharpProbeBinder(_semanticModel, next);
     }
 
+    public UseHookBinder GetUseHookBinder(
+        AkburaSyntax syntax,
+        BinderUsage usage = BinderUsage.Expression)
+    {
+        var next = GetBinder(syntax, usage);
+        if (IsCurrentSemanticModelSyntax(syntax) &&
+            _semanticModel.GetMemberSemanticModel(syntax) is ExecutableMemberSemanticModel executableModel)
+        {
+            next = executableModel.CreateIncrementalBinder(next);
+        }
+
+        return new UseHookBinder(_semanticModel, next);
+    }
+
     public BoundNode BindOperationSyntax(AkburaSyntax syntax)
     {
         if (syntax == null)

@@ -91,7 +91,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 AkburaSyntaxKind.ParamDeclarationSyntax or
                 AkburaSyntaxKind.InjectDeclarationSyntax or
                 AkburaSyntaxKind.CommandDeclarationSyntax or
-                AkburaSyntaxKind.UseEffectDeclarationSyntax or
                 AkburaSyntaxKind.InlineAkcssBlockSyntax or
                 AkburaSyntaxKind.AkcssStyleRuleSyntax or
                 AkburaSyntaxKind.AkcssUtilityDeclarationSyntax => GetDeclarationSymbolInfo(syntax),
@@ -101,6 +100,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => ResolveMarkupProperty(Unsafe.As<MarkupAttributeSyntax>(syntax)),
+            AkburaSyntaxKind.CSharpStatementSyntax =>
+                BindingSession.BindSemanticSyntax(syntax).SymbolInfo,
             AkburaSyntaxKind.AkcssAssignmentSyntax =>
                 BindingSession.BindOperationSyntax(syntax).SymbolInfo,
             _ => AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax),
@@ -148,7 +149,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             AkburaSyntaxKind.ParamDeclarationSyntax or
             AkburaSyntaxKind.InjectDeclarationSyntax or
             AkburaSyntaxKind.CommandDeclarationSyntax or
-            AkburaSyntaxKind.UseEffectDeclarationSyntax or
             AkburaSyntaxKind.MarkupRootSyntax or
             AkburaSyntaxKind.MarkupElementSyntax or
             AkburaSyntaxKind.MarkupElementContentSyntax or
@@ -180,13 +180,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         if (syntax.Kind == AkburaSyntaxKind.CSharpStatementSyntax)
         {
-            var csharpStatement = Unsafe.As<CSharpStatementSyntax>(syntax);
-            var bag = BindingDiagnosticBag.GetInstance();
-            AddBoundTreeDiagnostics(
-                BindingSession.BindSemanticSyntax(csharpStatement),
-                bag);
-            bag.AddRange(CreateCSharpStatementUserHookDiagnostics(csharpStatement));
-            return SetSemanticDiagnostics(csharpStatement, bag);
+            return CreateSemanticDiagnosticsFromBoundTree(
+                BindingSession.BindSemanticSyntax(syntax),
+                GetCachedSemanticDiagnostics(syntax));
         }
 
         return _bindingCache.TryGetDiagnostics(syntax, out var diagnostics)
@@ -393,8 +389,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 DeclarationKind.State or
                 DeclarationKind.Parameter or
                 DeclarationKind.InjectedService or
-                DeclarationKind.Command or
-                DeclarationKind.UseEffect =>
+                DeclarationKind.Command =>
                 GetMemberSemanticModel(syntax).GetSymbolInfo(syntax),
             DeclarationKind.AkcssModule when syntax.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax =>
                 ResolveInlineAkcssModule(Unsafe.As<InlineAkcssBlockSyntax>(syntax)),
@@ -2069,257 +2064,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return argumentListSyntax.GetRawCSharpArgumentList();
     }
 
-    internal static bool TryGetUseEffectDependencyRootName(
-        CSharp.ExpressionSyntax expression,
-        out string rootName)
-    {
-        expression = UnwrapUseEffectDependencyExpression(expression);
-        switch (expression)
-        {
-            case CSharp.IdentifierNameSyntax identifierName:
-                rootName = identifierName.Identifier.ValueText;
-                return !string.IsNullOrWhiteSpace(rootName);
-
-            case CSharp.MemberAccessExpressionSyntax memberAccess:
-                return TryGetUseEffectDependencyRootName(memberAccess.Expression, out rootName);
-
-            case CSharp.ConditionalAccessExpressionSyntax conditionalAccess:
-                return TryGetUseEffectDependencyRootName(conditionalAccess.Expression, out rootName);
-
-            case CSharp.ElementAccessExpressionSyntax elementAccess:
-                return TryGetUseEffectDependencyRootName(elementAccess.Expression, out rootName);
-
-            case CSharp.InvocationExpressionSyntax invocation:
-                return TryGetUseEffectDependencyRootName(invocation.Expression, out rootName);
-
-            default:
-                rootName = string.Empty;
-                return false;
-        }
-    }
-
-    private static CSharp.ExpressionSyntax UnwrapUseEffectDependencyExpression(
-        CSharp.ExpressionSyntax expression)
-    {
-        while (expression is CSharp.ParenthesizedExpressionSyntax parenthesized)
-        {
-            expression = parenthesized.Expression;
-        }
-
-        return expression;
-    }
-
-    internal IUserHookSymbol? ResolveUserHookInvocation(string invocationName)
-    {
-        var candidates = GetUserHookTypeNameCandidates(invocationName);
-        foreach (var candidate in candidates)
-        {
-            foreach (var metadataName in GetUserHookMetadataNameCandidates(candidate))
-            {
-                var type = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
-                if (type != null &&
-                    TryCreateUserHookSymbol(invocationName, type, out var symbol))
-                {
-                    return symbol;
-                }
-            }
-        }
-
-        foreach (var type in GetAllNamedTypes(Compilation.CSharpCompilation.Assembly.GlobalNamespace))
-        {
-            if (candidates.Contains(type.Name, StringComparer.Ordinal) &&
-                TryCreateUserHookSymbol(invocationName, type, out var symbol))
-            {
-                return symbol;
-            }
-        }
-
-        return null;
-    }
-
-    internal ImmutableArray<AkburaSemanticDiagnostic> CreateCSharpStatementUserHookDiagnostics(
-        CSharpStatementSyntax statement)
-    {
-        using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-        var rawNode = TryParseCSharpRawNode(statement.Tokens.ToFullString());
-        if (rawNode == null)
-        {
-            return ImmutableArray<AkburaSemanticDiagnostic>.Empty;
-        }
-
-        foreach (var invocation in rawNode.DescendantNodesAndSelf().OfType<CSharp.InvocationExpressionSyntax>())
-        {
-            if (TryGetUserHookInvocationName(invocation, out var invocationName) &&
-                ResolveUserHookInvocation(invocationName) != null)
-            {
-                builder.Add(CreateUserHookMustBeTopLevelDiagnostic(statement, invocationName));
-            }
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private static Microsoft.CodeAnalysis.SyntaxNode? TryParseCSharpRawNode(string text)
-    {
-        try
-        {
-            return CSharpSyntaxFactory.ParseStatement(text);
-        }
-        catch (ArgumentException)
-        {
-            try
-            {
-                return CSharpSyntaxFactory.ParseExpression(text);
-            }
-            catch (ArgumentException)
-            {
-                return null;
-            }
-        }
-    }
-
-    internal static bool TryGetStateUserHookInvocation(
-        StateDeclarationSyntax stateDeclaration,
-        out string invocationName)
-    {
-        invocationName = string.Empty;
-        CSharp.ExpressionSyntax expression;
-        try
-        {
-            expression = CSharpSyntaxFactory.ParseExpression(
-                stateDeclaration.Initializer.Expression.ToFullString());
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        if (expression is not CSharp.InvocationExpressionSyntax invocation ||
-            !TryGetUserHookInvocationName(invocation, out invocationName))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryGetUserHookInvocationName(
-        CSharp.InvocationExpressionSyntax invocation,
-        out string invocationName)
-    {
-        invocationName = invocation.Expression is CSharp.IdentifierNameSyntax identifier
-            ? identifier.Identifier.ValueText
-            : string.Empty;
-        return invocationName.StartsWith("use", StringComparison.Ordinal) &&
-            invocationName.Length > 3;
-    }
-
-    private static ImmutableArray<string> GetUserHookTypeNameCandidates(string invocationName)
-    {
-        var suffix = invocationName.StartsWith("use", StringComparison.Ordinal)
-            ? invocationName[3..]
-            : invocationName;
-        if (suffix.Length == 0)
-        {
-            return ImmutableArray<string>.Empty;
-        }
-
-        var typeStem = "Use" + char.ToUpperInvariant(suffix[0]) + suffix[1..];
-        return ImmutableArray.Create(typeStem + "Hook", typeStem);
-    }
-
-    private IEnumerable<string> GetUserHookMetadataNameCandidates(string typeName)
-    {
-        foreach (var @namespace in GetAkburaUsingNamespaces())
-        {
-            yield return @namespace + "." + typeName;
-        }
-
-        var currentNamespace = GetAkburaNamespaceText(SyntaxTree.GetRoot(), SyntaxTree);
-        if (currentNamespace.Length > 0)
-        {
-            yield return currentNamespace + "." + typeName;
-        }
-
-        yield return typeName;
-    }
-
-    private static IEnumerable<INamedTypeSymbol> GetAllNamedTypes(INamespaceSymbol @namespace)
-    {
-        foreach (var type in @namespace.GetTypeMembers())
-        {
-            foreach (var nestedType in GetAllNamedTypes(type))
-            {
-                yield return nestedType;
-            }
-        }
-
-        foreach (var nestedNamespace in @namespace.GetNamespaceMembers())
-        {
-            foreach (var type in GetAllNamedTypes(nestedNamespace))
-            {
-                yield return type;
-            }
-        }
-    }
-
-    private static IEnumerable<INamedTypeSymbol> GetAllNamedTypes(INamedTypeSymbol type)
-    {
-        yield return type;
-        foreach (var nestedType in type.GetTypeMembers())
-        {
-            foreach (var candidate in GetAllNamedTypes(nestedType))
-            {
-                yield return candidate;
-            }
-        }
-    }
-
-    private static bool TryCreateUserHookSymbol(
-        string invocationName,
-        INamedTypeSymbol type,
-        out IUserHookSymbol symbol)
-    {
-        symbol = null!;
-        if (!type.Name.StartsWith("Use", StringComparison.Ordinal) ||
-            !HasUserHookAttribute(type))
-        {
-            return false;
-        }
-
-        var useHookMethod = type.GetMembers("UseHook")
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(static method =>
-                method.DeclaredAccessibility == Accessibility.Public &&
-                method.MethodKind == MethodKind.Ordinary);
-        if (useHookMethod == null)
-        {
-            return false;
-        }
-
-        symbol = new UserHookSymbol(invocationName, type, useHookMethod);
-        return true;
-    }
-
-    private static bool HasUserHookAttribute(INamedTypeSymbol type)
-    {
-        foreach (var attribute in type.GetAttributes())
-        {
-            var attributeClass = attribute.AttributeClass;
-            if (attributeClass == null)
-            {
-                continue;
-            }
-
-            if (attributeClass.Name is "UserHook" or "UserHookAttribute")
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     internal static StateBindingKind GetStateBindingKind(StateInitializerSyntax initializer)
     {
         if (initializer.Kind != AkburaSyntaxKind.BindableStateInitializer)
@@ -2541,17 +2285,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             stateDeclaration,
             ErrorCodes.AKBURA_SEMANTIC_StateBindingTargetNotWritable,
             [targetText],
-            AkburaDiagnosticSeverity.Error);
-    }
-
-    private AkburaSemanticDiagnostic CreateUserHookMustBeTopLevelDiagnostic(
-        CSharpStatementSyntax statement,
-        string invocationName)
-    {
-        return new AkburaSemanticDiagnostic(
-            statement,
-            ErrorCodes.AKBURA_SEMANTIC_UserHookMustBeTopLevel,
-            [invocationName],
             AkburaDiagnosticSeverity.Error);
     }
 
@@ -4788,8 +4521,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass, usingDirectives);
 
-        return BindingSession
-            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Type)
+        return new CSharpProbeBinder(this, BindingSession.RootBinder)
             .BindFieldType(compilationUnit);
     }
 

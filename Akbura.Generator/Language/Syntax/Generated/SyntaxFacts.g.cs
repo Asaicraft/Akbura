@@ -62,9 +62,7 @@ namespace Akbura.Language.Syntax
 				SyntaxKind.InjectKeyword => "inject",
 				SyntaxKind.ParamKeyword => "param",
 				SyntaxKind.StateKeyword => "state",
-				SyntaxKind.UseEffectKeyword => "useEffect",
 				SyntaxKind.SuppressKeyword => "suppress",
-				SyntaxKind.CancelKeyword => "cancel",
 				SyntaxKind.FinallyKeyword => "finally",
 				SyntaxKind.AsyncKeyword => "async",
 				SyntaxKind.VoidKeyword => "void",
@@ -148,9 +146,7 @@ namespace Akbura.Language.Syntax
 				case "inject": return SyntaxKind.InjectKeyword;
 				case "param": return SyntaxKind.ParamKeyword;
 				case "state": return SyntaxKind.StateKeyword;
-				case "useEffect": return SyntaxKind.UseEffectKeyword;
 				case "suppress": return SyntaxKind.SuppressKeyword;
-				case "cancel": return SyntaxKind.CancelKeyword;
 				case "finally": return SyntaxKind.FinallyKeyword;
 				case "async": return SyntaxKind.AsyncKeyword;
 				case "void": return SyntaxKind.VoidKeyword;
@@ -215,9 +211,7 @@ namespace Akbura.Language.Syntax
 				case SyntaxKind.InjectKeyword:
 				case SyntaxKind.ParamKeyword:
 				case SyntaxKind.StateKeyword:
-				case SyntaxKind.UseEffectKeyword:
 				case SyntaxKind.SuppressKeyword:
-				case SyntaxKind.CancelKeyword:
 				case SyntaxKind.FinallyKeyword:
 				case SyntaxKind.AsyncKeyword:
 				case SyntaxKind.VoidKeyword:

@@ -77,22 +77,29 @@ internal sealed class BoundStateInitializer : BoundNode
         BinderType binder,
         CSharpBindingResult bindingResult,
         StateBindingKind bindingKind,
-        IUserHookSymbol? userHook,
+        IUseHookSymbol? useHook,
+        BoundUseHookInvocation? useHookInvocation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
         bool hasErrors = false)
         : base(
             BoundKind.StateInitializer,
             syntax,
             binder,
-            bindingResult.Symbol == null
+            useHook != null
+                ? AkburaSymbolInfo.Success(useHook)
+                : bindingResult.Symbol == null
                 ? AkburaSymbolInfo.None(bindingResult.CandidateReason)
                 : AkburaSymbolInfo.None(CandidateReason.UnsupportedSyntax),
             diagnostics,
-            hasErrors: hasErrors)
+            useHookInvocation == null
+                ? ImmutableArray<BoundNode>.Empty
+                : ImmutableArray.Create<BoundNode>(useHookInvocation),
+            hasErrors: hasErrors || useHookInvocation?.HasErrors == true)
     {
         BindingResult = bindingResult;
         BindingKind = bindingKind;
-        UserHook = userHook;
+        UseHook = useHook;
+        UseHookInvocation = useHookInvocation;
     }
 
     public new StateInitializerSyntax Syntax => (StateInitializerSyntax)base.Syntax;
@@ -101,16 +108,20 @@ internal sealed class BoundStateInitializer : BoundNode
 
     public StateBindingKind BindingKind { get; }
 
-    public IUserHookSymbol? UserHook { get; }
+    public IUseHookSymbol? UseHook { get; }
+
+    public BoundUseHookInvocation? UseHookInvocation { get; }
 
     public BoundStateInitializer Update(
         CSharpBindingResult bindingResult,
         StateBindingKind bindingKind,
-        IUserHookSymbol? userHook)
+        IUseHookSymbol? useHook,
+        BoundUseHookInvocation? useHookInvocation)
     {
         if (bindingResult.Equals(BindingResult) &&
             bindingKind == BindingKind &&
-            ReferenceEquals(userHook, UserHook))
+            ReferenceEquals(useHook, UseHook) &&
+            ReferenceEquals(useHookInvocation, UseHookInvocation))
         {
             return this;
         }
@@ -120,7 +131,8 @@ internal sealed class BoundStateInitializer : BoundNode
             Binder,
             bindingResult,
             bindingKind,
-            userHook,
+            useHook,
+            useHookInvocation,
             Diagnostics,
             HasErrors);
     }
@@ -262,137 +274,4 @@ internal sealed class BoundCommandDeclaration : BoundNamedDeclaration
         TParameter parameter)
         where TResult : default =>
         visitor.VisitCommandDeclaration(this, parameter);
-}
-
-internal sealed class BoundUseEffectDeclaration : BoundNamedDeclaration
-{
-    public BoundUseEffectDeclaration(
-        UseEffectDeclarationSyntax syntax,
-        BinderType binder,
-        AkburaSymbolInfo symbolInfo,
-        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        ImmutableArray<BoundNode> children = default)
-        : base(BoundKind.UseEffectDeclaration, syntax, binder, symbolInfo, diagnostics, children)
-    {
-    }
-
-    public override void Accept(BoundTreeVisitor visitor) => visitor.VisitUseEffectDeclaration(this);
-
-    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
-        where TResult : default =>
-        visitor.VisitUseEffectDeclaration(this);
-
-    public override TResult? Accept<TParameter, TResult>(
-        BoundTreeVisitor<TParameter, TResult> visitor,
-        TParameter parameter)
-        where TResult : default =>
-        visitor.VisitUseEffectDeclaration(this, parameter);
-}
-
-internal sealed class BoundUseEffectDependency : BoundNode
-{
-    public BoundUseEffectDependency(
-        CSharpArgumentListSyntax syntax,
-        BinderType binder,
-        UseEffectDependency dependency,
-        CSharpBindingResult bindingResult,
-        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        bool hasErrors = false)
-        : base(
-            BoundKind.UseEffectDependency,
-            syntax,
-            binder,
-            dependency.AkburaSymbol == null
-                ? AkburaSymbolInfo.None(bindingResult.CandidateReason)
-                : AkburaSymbolInfo.Success(dependency.AkburaSymbol),
-            diagnostics,
-            hasErrors: hasErrors)
-    {
-        Dependency = dependency;
-        BindingResult = bindingResult;
-    }
-
-    public new CSharpArgumentListSyntax Syntax => (CSharpArgumentListSyntax)base.Syntax;
-
-    public UseEffectDependency Dependency { get; }
-
-    public CSharpBindingResult BindingResult { get; }
-
-    public BoundUseEffectDependency Update(
-        UseEffectDependency dependency,
-        CSharpBindingResult bindingResult)
-    {
-        if (dependency.Equals(Dependency) &&
-            bindingResult.Equals(BindingResult))
-        {
-            return this;
-        }
-
-        return new BoundUseEffectDependency(
-            Syntax,
-            Binder,
-            dependency,
-            bindingResult,
-            Diagnostics,
-            HasErrors);
-    }
-
-    public override void Accept(BoundTreeVisitor visitor) => visitor.VisitUseEffectDependency(this);
-
-    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
-        where TResult : default =>
-        visitor.VisitUseEffectDependency(this);
-
-    public override TResult? Accept<TParameter, TResult>(
-        BoundTreeVisitor<TParameter, TResult> visitor,
-        TParameter parameter)
-        where TResult : default =>
-        visitor.VisitUseEffectDependency(this, parameter);
-}
-
-internal sealed class BoundUseEffectBody : BoundNode
-{
-    public BoundUseEffectBody(
-        AkburaSyntax syntax,
-        BinderType binder,
-        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        ImmutableArray<BoundNode> children = default,
-        bool hasErrors = false)
-        : base(
-            BoundKind.UseEffectBody,
-            syntax,
-            binder,
-            AkburaSymbolInfo.None(CandidateReason.None),
-            diagnostics,
-            children,
-            hasErrors)
-    {
-    }
-
-    public BoundUseEffectBody Update(ImmutableArray<BoundNode> children)
-    {
-        if (children == Children)
-        {
-            return this;
-        }
-
-        return new BoundUseEffectBody(
-            Syntax,
-            Binder,
-            Diagnostics,
-            children,
-            HasErrors);
-    }
-
-    public override void Accept(BoundTreeVisitor visitor) => visitor.VisitUseEffectBody(this);
-
-    public override TResult? Accept<TResult>(BoundTreeVisitor<TResult> visitor)
-        where TResult : default =>
-        visitor.VisitUseEffectBody(this);
-
-    public override TResult? Accept<TParameter, TResult>(
-        BoundTreeVisitor<TParameter, TResult> visitor,
-        TParameter parameter)
-        where TResult : default =>
-        visitor.VisitUseEffectBody(this, parameter);
 }

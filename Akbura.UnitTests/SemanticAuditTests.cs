@@ -206,6 +206,7 @@ public sealed class SemanticAuditTests
         const string code =
             """
             using Avalonia.Controls;
+            using Akbura.Hooks;
             using Demo;
 
             inject System.IServiceProvider services;
@@ -213,9 +214,9 @@ public sealed class SemanticAuditTests
             state int count = 0;
             command int Save(int value);
 
-            useEffect(count) {
+            useEffect(() => {
                 var snapshot = count;
-            }
+            }, [count]);
 
             @akcss {
                 Button.card {
@@ -267,13 +268,12 @@ public sealed class SemanticAuditTests
 
         AssertSemanticNode<BoundCommandDeclaration>(model, root.Members.OfType<CommandDeclarationSyntax>().Single(), true, false);
 
-        var effect = root.Members.OfType<UseEffectDeclarationSyntax>().Single();
-        var boundEffect = AssertSemanticNode<BoundUseEffectDeclaration>(model, effect, true, false);
-        Assert.Contains(boundEffect.Children, static child => child.Kind == BoundKind.UseEffectDependency);
-        Assert.Contains(boundEffect.Children, static child => child.Kind == BoundKind.UseEffectBody);
-        var statement = effect.Body.Tokens.OfType<CSharpStatementSyntax>().Single();
-        Assert.IsType<BoundLocalDeclarationStatement>(model.BindingSession.BindSemanticSyntax(statement));
-        Assert.IsAssignableFrom<ICSharpOperation>(model.GetOperation(statement));
+        var effect = root.Members.OfType<CSharpStatementSyntax>().Single();
+        var boundEffect = AssertSemanticNode<BoundUseHookStatement>(model, effect, true, true);
+        Assert.Equal(BoundKind.UseHookInvocation, boundEffect.Invocation.Kind);
+        Assert.Equal("useEffect", boundEffect.Invocation.Hook.InvocationName);
+        Assert.IsAssignableFrom<IUseHookOperation>(model.GetOperation(effect));
+        Assert.Contains(model.GetCSharpSymbolReferences(effect), static reference => reference.Name == "count");
 
         var inlineAkcss = root.Members.OfType<InlineAkcssBlockSyntax>().Single();
         AssertSemanticNode<BoundAkcssModule>(model, inlineAkcss, true, false);
@@ -454,17 +454,14 @@ public sealed class SemanticAuditTests
     {
         const string code =
             """
-            useEffect() {
+            using Akbura.Hooks;
+            useEffect(() => {
                 var value = missing + 1;
-            }
+            });
             """;
         var (tree, model) = CreateModel(code);
-        var effect = tree.GetRoot().Members.OfType<UseEffectDeclarationSyntax>().Single();
-        var statement = effect.Body.Tokens.OfType<CSharpStatementSyntax>().Single();
-
-        var exception = Record.Exception(() => model.GetSemanticDiagnostics(statement));
-        Assert.Null(exception);
-        AssertDiagnostic(model, statement, ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError, "missing");
+        var effect = tree.GetRoot().Members.OfType<CSharpStatementSyntax>().Single();
+        AssertDiagnostic(model, effect, ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError, "missing");
         Assert.Contains(
             model.GetSemanticDiagnostics(tree.GetRoot()),
             diagnostic =>

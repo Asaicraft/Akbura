@@ -114,6 +114,41 @@ public sealed class BlenderReaderTests
     }
 
     [Fact]
+    public void ReadToken_AfterInsertionInsideStatement_ResumesOldTokens()
+    {
+        const string oldCode =
+            "state int count = 0;\n" +
+            "useEffect(() => Console.WriteLine(count));\n" +
+            "<TextBlock Text={count} />";
+        const string inserted = " + 1";
+        var insertion = oldCode.IndexOf("count));", StringComparison.Ordinal) + "count".Length;
+        var newCode = oldCode.Insert(insertion, inserted);
+
+        using var lexer = new Lexer(SourceText.From(newCode));
+        var oldTree = ParseRoot(oldCode);
+        var change = new TextChangeRange(new TextSpan(insertion, 0), inserted.Length);
+        var blender = new Blender(lexer, oldTree, [change]);
+        var text = new System.Text.StringBuilder();
+        var kinds = new List<SyntaxKind>();
+
+        while (true)
+        {
+            var current = blender.ReadToken(Lexer.LexerMode.TopLevel);
+            text.Append(current.Token.ToFullString());
+            kinds.Add(current.Token.Kind);
+            blender = current.Blender;
+
+            if (current.Token.Kind == SyntaxKind.EndOfFileToken)
+            {
+                break;
+            }
+        }
+
+        Assert.Equal(newCode, text.ToString());
+        Assert.Contains(SyntaxKind.CloseParenToken, kinds);
+    }
+
+    [Fact]
     public void ReadNode_AfterInsertedMember_ReusesRightNode()
     {
         const string oldCode =

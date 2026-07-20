@@ -96,13 +96,10 @@ node ParamDeclarationSyntax : AkTopLevelMember {
 ```
 
 ```nooken
-node UserHook : AkTopLevelMember
-{
-    Name       : SimpleName;
-    OpenParen  : OpenParenToken;
-    Parameters : syntaxlist<CSharpExpressionSyntax, CommaToken>;
-    CloseParen : CloseParenToken;
-    Body       : CSharpBlockSyntax;
+node MarkupExtensionPropertyArgumentSyntax : MarkupExtensionArgumentSyntax {
+    Name        : SimpleName;
+    EqualsToken : EqualsToken;
+    Value       : MarkupExtensionValueSyntax;
 }
 ```
 
@@ -406,7 +403,6 @@ return CurrentToken.Kind switch
     SyntaxKind.ParamKeyword => ParseParamDeclarationSyntax(),
     SyntaxKind.InjectKeyword => ParseInjectDeclarationSyntax(),
     SyntaxKind.CommandKeyword => ParseCommandDeclarationSyntax(),
-    SyntaxKind.UseEffectKeyword => ParseUseEffectDeclarationSyntax(),
     SyntaxKind.YourKeyword => ParseYourNewSyntax(),
     _ => ParseCSharpStatementSyntax(),
 };
@@ -818,8 +814,6 @@ internal enum DeclarationKind : byte
     Parameter,
     InjectedService,
     Command,
-    UseEffect,
-    UserHook,
     MarkupRoot,
     MarkupElement,
     AkcssModule,
@@ -1010,7 +1004,10 @@ internal enum BoundKind : byte
     ParamDeclaration,
     InjectDeclaration,
     CommandDeclaration,
-    UseEffectDeclaration,
+    StateInitializer,
+    ParamDefaultValue,
+    UseHookInvocation,
+    UseHookStatement,
     MarkupRoot,
     MarkupComponent,
     MarkupContent,
@@ -1026,6 +1023,11 @@ internal enum BoundKind : byte
     AkcssIf,
     AkcssApply,
     AkcssIntercept,
+    Block,
+    CSharpStatement,
+    BadStatement,
+    LocalDeclarationStatement,
+    Expression,
     CSharpExpression,
     ConversionExpression,
 }

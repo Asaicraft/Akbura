@@ -1,98 +1,114 @@
+
+
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8"/>
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/svg" href="/img/logo.svg">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
     <title>What&#x27;s New</title>
-    <base href="/Akbura/"/>
+
     <script>
-    if (location.search === "?dark") localStorage.setItem('color-scheme','dark') 
-    if (location.search === "?light") localStorage.removeItem('color-scheme') 
-    const cls = document.querySelector('html').classList
-    if (localStorage.getItem('color-scheme') === 'dark')
-        cls.add('dark')
-    else
-        cls.remove('dark')
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
     </script>
-    <link rel="stylesheet" href="/css/app.css">
+
+    <link rel="stylesheet" href="css/app.css">
+
     <script type="importmap">
 {
     "imports": {
-        "app.mjs": "/mjs/app.mjs",
-        "vue": "/lib/mjs/vue.min.mjs",
-        "@servicestack/client": "/lib/mjs/servicestack-client.min.mjs",
-        "@servicestack/vue": "/lib/mjs/servicestack-vue.min.mjs"
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
     }
 }
 </script>
 </head>
-<body class="bg-white dark:bg-black dark:text-white">
-<header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
-  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
-    <div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
-      <div class="flex h-16 justify-between">
-        <div class="flex">
-          <div class="flex flex-shrink-0 items-center">
-            <a class="mr-2 lg:mr-8 flex items-center" href="/">
-                <svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
-                <span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
-            </a>
-          </div>
-            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
-                <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
-                        <a href="/whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
-                            What's New
-                        </a>
-                        <a href="/vue/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
-                            Vue
-                        </a>
-                        <a href="/creatorkit/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
-                            Creator Kit
-                        </a>
-                        <a href="/videos" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
-                            Videos
-                        </a>
-            </div>
-        </div>
-        <div class="hidden sm:ml-6 sm:flex sm:items-center">
-            <dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
-        </div>
-        <div class="-mr-2 flex items-center sm:hidden">
-          <!-- Mobile menu button -->
-          <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
-            <span class="sr-only">Open main menu</span>
-            <!-- Menu open: "hidden", Menu closed: "block" -->
-            <svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-            <!-- Menu open: "block", Menu closed: "hidden" -->
-            <svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
 
-    <!-- Mobile menu, show/hide based on menu state. -->
-    <div v-cloak v-if="open" class="sm:hidden">
-        <div class="space-y-1 pb-3 pt-2">
-            <!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
-                    <a href="/whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
-                        What's New
-                    </a>
-                    <a href="/vue/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
-                        Vue
-                    </a>
-                    <a href="/creatorkit/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
-                        Creator Kit
-                    </a>
-                    <a href="/videos" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
-                        Videos
-                    </a>
-        </div>
-    </div>
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+	<div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+	  <div class="flex h-16 justify-between">
+		<div class="flex">
+		  <div class="flex flex-shrink-0 items-center">
+			<a class="mr-2 lg:mr-8 flex items-center" href="./">
+				<svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+				<span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+			</a>
+		  </div>
+			<div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+				<!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+						<a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							What's New
+						</a>
+						<a href="vue/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							Vue
+						</a>
+						<a href="creatorkit/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							Creator Kit
+						</a>
+						<a href="videos" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							Videos
+						</a>
+			</div>
+		</div>
+		<div class="hidden sm:ml-6 sm:flex sm:items-center">
+			<dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+		</div>
+		<div class="-mr-2 flex items-center sm:hidden">
+		  <!-- Mobile menu button -->
+		  <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+			<span class="sr-only">Open main menu</span>
+			<!-- Menu open: "hidden", Menu closed: "block" -->
+			<svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+			</svg>
+			<!-- Menu open: "block", Menu closed: "hidden" -->
+			<svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+			</svg>
+		  </button>
+		</div>
+	  </div>
+	</div>
+
+	<!-- Mobile menu, show/hide based on menu state. -->
+	<div v-cloak v-if="open" class="sm:hidden">
+		<div class="space-y-1 pb-3 pt-2">
+			<!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+					<a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						What's New
+					</a>
+					<a href="vue/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						Vue
+					</a>
+					<a href="creatorkit/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						Creator Kit
+					</a>
+					<a href="videos" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						Videos
+					</a>
+		</div>
+	</div>
   </nav>
 </header>
 
@@ -101,18 +117,18 @@ import { ref } from "vue"
 import { mount } from "app.mjs"
 
 const Header = {
-    setup() {
-        const open = ref(false)
-        return { open }
-    }
+	setup() {
+		const open = ref(false)
+		return { open }
+	}
 }
 mount('#header', Header)
 </script>
 
 
-<div class="min-h-screen">
-    <main role="main" class="pt-16 pb-3">
-        <link rel="stylesheet" href="css/typography.css">
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            <link rel="stylesheet" href="css/typography.css">
 <style>
 .prose a {
     --tw-text-opacity: 1;color: rgba(59, 130, 246, var(--tw-text-opacity)); /*text-blue-500*/
@@ -226,17 +242,16 @@ complex animations that would otherwise be time-consuming and challenging to bui
             </div>        
     </div>
 </div>
-    </main>
-</div>
+        </main>
+    </div>
 
+    
 
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
 
-<script type="module">
-import { init } from "app.mjs"
-init()
-</script>
-
-
-
+    
 </body>
 </html>

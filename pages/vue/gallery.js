@@ -15,7 +15,7 @@ export function createApp(App, props) {
     const { loadMetadata } = useMetadata()
     loadMetadata({ 
         olderThan: 24 * 60 * 60 * 1000, //1day
-        resolvePath: '/pages/vue/metadata.json'
+        resolvePath: 'pages/vue/metadata.json'
     })
     
     return app

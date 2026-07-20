@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg" href="/img/logo.svg">
+    <title>Typesense Real-Time Search</title>
+    <script>
+    if (location.search === "?dark") localStorage.setItem('color-scheme','dark') 
+    if (location.search === "?light") localStorage.removeItem('color-scheme') 
+    const cls = document.querySelector('html').classList
+    if (localStorage.getItem('color-scheme') === 'dark')
+        cls.add('dark')
+    else
+        cls.remove('dark')
+    </script>
+    <link rel="stylesheet" href="/css/app.css">
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "/mjs/app.mjs",
+        "vue": "/lib/mjs/vue.min.mjs",
+        "@servicestack/client": "/lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "/lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+<body class="bg-white dark:bg-black dark:text-white">
+<header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+    <div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+      <div class="flex h-16 justify-between">
+        <div class="flex">
+          <div class="flex flex-shrink-0 items-center">
+            <a class="mr-2 lg:mr-8 flex items-center" href="/">
+                <svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+                <span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+            </a>
+          </div>
+            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+                <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+                        <a href="/whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            What's New
+                        </a>
+                        <a href="/vue/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Vue
+                        </a>
+                        <a href="/creatorkit/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Creator Kit
+                        </a>
+                        <a href="/videos" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Videos
+                        </a>
+            </div>
+        </div>
+        <div class="hidden sm:ml-6 sm:flex sm:items-center">
+            <dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+        </div>
+        <div class="-mr-2 flex items-center sm:hidden">
+          <!-- Mobile menu button -->
+          <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+            <span class="sr-only">Open main menu</span>
+            <!-- Menu open: "hidden", Menu closed: "block" -->
+            <svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+            <!-- Menu open: "block", Menu closed: "hidden" -->
+            <svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile menu, show/hide based on menu state. -->
+    <div v-cloak v-if="open" class="sm:hidden">
+        <div class="space-y-1 pb-3 pt-2">
+            <!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+                    <a href="/whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        What's New
+                    </a>
+                    <a href="/vue/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Vue
+                    </a>
+                    <a href="/creatorkit/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Creator Kit
+                    </a>
+                    <a href="/videos" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Videos
+                    </a>
+        </div>
+    </div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+    setup() {
+        const open = ref(false)
+        return { open }
+    }
+}
+mount('#header', Header)
+</script>
+
+
+<div class="min-h-screen">
+    <main role="main" class="pt-16 pb-3">
+        
+
+
+
+<style>
+.active {
+    color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="/css/highlight.css">
+<link rel="stylesheet" href="/css/typography.css">
+<link rel="stylesheet" href="/css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+    <div class="flex flex-wrap">
+        <div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+            <button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+            </button>
+            <div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+                <nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+                    <close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+                                <a href="/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>                                    <span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+Introduction                                    </span>
+                                </a>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/what-is-razor-press" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        What is Razor Press?
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/structure" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Structure
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/ssg" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Static Site Generation
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/deployments" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Deployments
+                                    </a>
+                                </li>
+                        </ul>
+                                <h2 class="font-display font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                                    Markdown
+                                </h2>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/syntax" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Markdown Syntax
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/containers" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Markdown Containers
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue-in-markdown" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Using Vue in Markdown
+                                    </a>
+                                </li>
+                        </ul>
+                                <h2 class="font-display font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                                    Features
+                                </h2>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/sidebars" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Sidebars
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/redirects" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Redirects
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/typesense" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+                                        Typesense Real-Time Search
+                                    </a>
+                                </li>
+                        </ul>
+                </nav>
+            </div>
+        </div>
+        <div id="doc" class="mx-auto flex">
+            <div class="mt-8 mx-auto prose lg:prose-lg">
+                
+                    <section class="not-prose mb-16 md:mb-12">
+                        <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+                            Typesense Real-Time Search
+                        </h1>
+                    </section>
+
+                <div class="not-prose"></div>
+
+                <div class="content">
+                    <p>Many popular Open Source products use <a href="https://docsearch.algolia.com">Algolia DocSearch</a> to power their real-time search
+features, however, it's a less appealing product for commercial products which is a paid service with a per request
+pricing model that made it difficult to determine what costs would be in the long run.</p>
+<a class="flex flex-col items-center my-8" href="https://typesense.org">
+    <svg fill="none" height="56" viewBox="0 0 250 56" width="250" xmlns="http://www.w3.org/2000/svg">
+        <g fill="#1035bc"><path d="m15.0736 15.8466c.1105.5522.1657 1.0859.1657 1.6013 0 .4785-.0552.9938-.1657 1.546l-7.01225-.0552v18.5521c0 1.546.71779 2.319 2.15335 2.319h4.1963c.2577.6258.3865 1.2516.3865 1.8773 0 .6258-.0368 1.0123-.1104 1.1595-1.6932.2209-3.4417.3313-5.24538.3313-3.57055 0-5.35583-1.5276-5.35583-4.5828v-19.6564l-3.920246.0552c-.1104293-.5522-.165644-1.0675-.165644-1.546 0-.5154.0552147-1.0491.165644-1.6013l3.920246.0552v-5.7975c0-.99387.14724-1.69325.44172-2.09816.29448-.44172.86503-.66258 1.71165-.66258h1.4908l.33129.33129v8.28225z"/><path d="m41.7915 16.1227-7.5644 25.8957c-1.3988 4.7485-2.8896 8.0982-4.4724 10.0491s-3.9571 2.9264-7.1227 2.9264c-1.6196 0-3.1104-.2393-4.4724-.7178-.1104-1.0307.1841-2.0246.8834-2.9816 1.1411.4049 2.3559.6073 3.6442.6073 1.9509 0 3.4417-.6625 4.4724-1.9877 1.0307-1.3251 1.9693-3.3865 2.816-6.184l.1656-.5522c-.9571-.0736-1.6932-.2945-2.2086-.6626-.4785-.3681-.8834-1.049-1.2147-2.0429l-7.7301-24.2945c1.1411-.4785 1.9509-.7178 2.4295-.7178 1.0675 0 1.7853.6442 2.1534 1.9325l4.3619 13.8589c.1473.4418.9939 3.3129 2.5399 8.6135.0736.2577.2577.3865.5521.3865l6.7362-24.4049c.4786-.1472 1.1043-.2208 1.8773-.2208.8099 0 1.4908.1104 2.043.3313z"/><path d="m52.4009 41.135v10.9325c0 .9938-.1472 1.6932-.4417 2.0981-.2945.4418-.8834.6626-1.7669.6626h-1.4908l-.3312-.3313v-38.4846l.3312-.3313h1.4356c.8835 0 1.4724.2392 1.7669.7178.3313.4417.4969 1.1779.4969 2.2086v.276c2.2086-2.4662 4.8405-3.6994 7.8957-3.6994 3.1289 0 5.4847 1.27 7.0675 3.8099 1.5828 2.503 2.3743 5.9816 2.3743 10.4356 0 2.1717-.2945 4.1226-.8835 5.8527-.5521 1.7301-1.3067 3.2025-2.2638 4.4172-.9202 1.1779-1.9877 2.0981-3.2024 2.7607-1.2148.6258-2.4663.9387-3.7546.9387-2.5399 0-4.951-.7546-7.2332-2.2638zm0-17.9448v14.1902c2.2454 1.6564 4.362 2.4846 6.3497 2.4846 1.9878 0 3.6258-.8834 4.9141-2.6503 1.2884-1.7668 1.9326-4.4356 1.9326-8.0061 0-1.7669-.1657-3.2945-.497-4.5828-.2945-1.3252-.6994-2.4111-1.2147-3.2577-.5153-.8834-1.1227-1.5276-1.8221-1.9325-.6626-.4417-1.3804-.6626-2.1534-.6626-1.4724 0-2.8711.3865-4.1963 1.1595-1.3251.773-2.4294 1.8589-3.3129 3.2577z"/><path d="m97.6973 30.6442h-17.1166c.1841 6.2576 2.5583 9.3865 7.1227 9.3865 2.5031 0 5.1718-.773 8.0061-2.319.8099.7361 1.3068 1.6748 1.4909 2.8159-3.0184 2.0614-6.405 3.092-10.1596 3.092-1.9141 0-3.5521-.3497-4.9141-1.049-1.3619-.7362-2.4846-1.7301-3.3681-2.9816-.8466-1.2884-1.4724-2.7976-1.8773-4.5277-.4049-1.73-.6073-3.6257-.6073-5.6871 0-2.0981.2392-4.0122.7178-5.7423.5153-1.7301 1.2515-3.2209 2.2085-4.4724.9571-1.2515 2.0982-2.227 3.4234-2.9264 1.3619-.6994 2.9079-1.0491 4.638-1.0491 1.6932 0 3.2025.3129 4.5276.9387 1.362.589 2.4847 1.4172 3.3681 2.4847.9203 1.0306 1.6196 2.2822 2.0982 3.7546.4785 1.4355.7178 2.9816.7178 4.638 0 .6626-.0369 1.3067-.1105 1.9325-.0368.589-.092 1.1595-.1656 1.7117zm-17.1166-3.1473h13.2516v-.7178c0-2.5398-.5338-4.5828-1.6013-6.1288s-2.6687-2.319-4.8037-2.319c-2.0981 0-3.7362.8282-4.9141 2.4847-1.1411 1.6564-1.7852 3.8834-1.9325 6.6809z"/><path d="m103.381 41.0245c.036-.8098.257-1.6932.662-2.6503.442-.9938.939-1.7668 1.491-2.319 2.908 1.5828 5.466 2.3743 7.675 2.3743 1.214 0 2.19-.2393 2.926-.7178.773-.4786 1.16-1.1227 1.16-1.9326 0-1.2883-.994-2.319-2.982-3.092l-3.092-1.1595c-4.638-1.6932-6.957-4.3988-6.957-8.1166 0-1.3251.239-2.503.718-3.5337.515-1.0675 1.214-1.9693 2.098-2.7055.92-.773 2.006-1.362 3.258-1.7669 1.251-.4049 2.65-.6074 4.196-.6074.699 0 1.472.0553 2.319.1657.883.1104 1.767.2761 2.65.4969.884.1841 1.73.4049 2.54.6626s1.509.5337 2.098.8282c0 .9203-.184 1.8773-.552 2.8712s-.865 1.73-1.491 2.2086c-2.908-1.2884-5.429-1.9325-7.564-1.9325-.957 0-1.712.2392-2.264.7178-.552.4417-.828 1.0306-.828 1.7668 0 1.1411.92 2.043 2.761 2.7055l3.368 1.2148c2.429.8466 4.233 2.0061 5.411 3.4785s1.767 3.184 1.767 5.135c0 2.6135-.976 4.7116-2.927 6.2944-1.951 1.5461-4.748 2.3191-8.392 2.3191-3.571 0-6.921-.9019-10.049-2.7056z"/><path d="m151.772 31.5828h-15.239c.111 2.0246.571 3.6258 1.38 4.8037.847 1.1411 2.301 1.7117 4.362 1.7117 2.135 0 4.583-.6258 7.344-1.8773 1.067 1.1042 1.748 2.5582 2.043 4.3619-2.945 2.0982-6.479 3.1473-10.601 3.1473-3.902 0-6.865-1.1964-8.89-3.589-1.988-2.4294-2.981-6.0184-2.981-10.7669 0-2.2086.257-4.1963.773-5.9632.515-1.8036 1.269-3.3312 2.263-4.5828.994-1.2883 2.209-2.2822 3.644-2.9816 1.436-.6994 3.074-1.0491 4.915-1.0491 1.877 0 3.533.2945 4.969.8835 1.436.5521 2.65 1.3619 3.644 2.4294.994 1.0307 1.73 2.2638 2.209 3.6994.515 1.4356.773 3 .773 4.6933 0 .9202-.056 1.8036-.166 2.6503-.11.8098-.258 1.6196-.442 2.4294zm-10.656-11.5951c-2.871 0-4.417 2.1718-4.638 6.5154h9.165v-.6626c0-1.7669-.368-3.1841-1.104-4.2515-.736-1.0675-1.877-1.6013-3.423-1.6013z"/><path d="m182.033 24.5153v12.0368c0 2.3559.386 4.1043 1.159 5.2454-1.178 1.0307-2.595 1.5461-4.251 1.5461-1.583 0-2.669-.3497-3.258-1.0491-.589-.7362-.884-1.8773-.884-3.4233v-12.8651c0-1.6564-.202-2.8159-.607-3.4785s-1.159-.9939-2.264-.9939c-1.951 0-3.773.8835-5.466 2.6504v18.773c-.552.1104-1.141.184-1.767.2208-.589.0368-1.196.0552-1.822.0552s-1.251-.0184-1.877-.0552c-.589-.0368-1.16-.1104-1.712-.2208v-27.3313l.331-.3865h2.761c2.062 0 3.35 1.1043 3.865 3.3128 2.687-2.319 5.356-3.4785 8.006-3.4785 2.651 0 4.602.8651 5.853 2.5951 1.288 1.6933 1.933 3.9755 1.933 6.8466z"/><path d="m187.825 41.0245c.036-.8098.257-1.6932.662-2.6503.442-.9938.939-1.7668 1.491-2.319 2.908 1.5828 5.466 2.3743 7.675 2.3743 1.214 0 2.19-.2393 2.926-.7178.773-.4786 1.16-1.1227 1.16-1.9326 0-1.2883-.994-2.319-2.982-3.092l-3.092-1.1595c-4.638-1.6932-6.957-4.3988-6.957-8.1166 0-1.3251.239-2.503.718-3.5337.515-1.0675 1.214-1.9693 2.098-2.7055.92-.773 2.006-1.362 3.258-1.7669 1.251-.4049 2.65-.6074 4.196-.6074.699 0 1.472.0553 2.319.1657.883.1104 1.767.2761 2.65.4969.884.1841 1.73.4049 2.54.6626s1.509.5337 2.098.8282c0 .9203-.184 1.8773-.552 2.8712s-.865 1.73-1.491 2.2086c-2.908-1.2884-5.429-1.9325-7.564-1.9325-.957 0-1.712.2392-2.264.7178-.552.4417-.828 1.0306-.828 1.7668 0 1.1411.92 2.043 2.761 2.7055l3.368 1.2148c2.429.8466 4.233 2.0061 5.411 3.4785s1.767 3.184 1.767 5.135c0 2.6135-.976 4.7116-2.927 6.2944-1.951 1.5461-4.748 2.3191-8.392 2.3191-3.571 0-6.921-.9019-10.049-2.7056z"/><path d="m236.216 31.5828h-15.239c.111 2.0246.571 3.6258 1.38 4.8037.847 1.1411 2.301 1.7117 4.362 1.7117 2.135 0 4.583-.6258 7.344-1.8773 1.067 1.1042 1.748 2.5582 2.043 4.3619-2.945 2.0982-6.479 3.1473-10.601 3.1473-3.902 0-6.865-1.1964-8.89-3.589-1.988-2.4294-2.981-6.0184-2.981-10.7669 0-2.2086.257-4.1963.773-5.9632.515-1.8036 1.269-3.3312 2.263-4.5828.994-1.2883 2.209-2.2822 3.645-2.9816 1.435-.6994 3.073-1.0491 4.914-1.0491 1.877 0 3.533.2945 4.969.8835 1.436.5521 2.65 1.3619 3.644 2.4294.994 1.0307 1.73 2.2638 2.209 3.6994.515 1.4356.773 3 .773 4.6933 0 .9202-.055 1.8036-.166 2.6503-.11.8098-.258 1.6196-.442 2.4294zm-10.656-11.5951c-2.871 0-4.417 2.1718-4.638 6.5154h9.166v-.6626c0-1.7669-.369-3.1841-1.105-4.2515-.736-1.0675-1.877-1.6013-3.423-1.6013z"/><path d="m244.777 50.6871v-50.521455c.552-.1104299 1.178-.165645 1.878-.165645.736 0 1.417.0552151 2.042.165645v50.521455c-.625.1104-1.306.1657-2.042.1657-.7 0-1.326-.0553-1.878-.1657z"/></g>
+    </svg>
+</a>
+<p>We discovered <a href="https://typesense.org">Typesense</a> as an appealing alternative which offers <a href="https://cloud.typesense.org">simple cost-effective cloud hosting</a>
+but even better, they also have an easy to use open source option for self-hosting or evaluation. Given its effortless integration,
+simplicity-focus and end-user UX, it quickly became our preferred way to navigate <a href="https://docs.servicestack.net">docs.servicestack.net</a>.</p>
+<p>To make it easier to adopt Typesense's amazing OSS Search product we've documented the approach we use to create and
+deploy an index of our site automatically using GitHub Actions that you could also utilize in your Razor Press websites.</p>
+<p>Documentation search is a common use case which Typesense caters for with their
+<a href="https://github.com/typesense/typesense-docsearch-scraper">typesense-docsearch-scraper</a> - a utility designed to easily
+scrape a website and post the results to a Typesense server to create a fast searchable index.</p>
+<h2 id="self-hosting-option">Self hosting option<a class="header-anchor" href="javascript:;" onclick="location.hash='#self-hosting-option'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>We recommend using running their <a href="https://hub.docker.com/r/typesense/typesense/">easy to use Docker image</a> to run
+an instance of their Typesense server, which you can run in a <strong>t2.small</strong> AWS EC2 instance or in a
+<a href="https://www.hetzner.com/cloud">Hetzner Cloud</a> VM for a more cost effective option.</p>
+<p>Trying it locally, we used the following commands to spin up a local Typesense server ready to scrape out docs site.</p>
+<pre><code class="language-sh">mkdir /tmp/typesense-data
+docker run -p 8108:8108 -v/tmp/data:/data typesense/typesense:0.21.0 \
+    --data-dir /data --api-key=&lt;temp-admin-api-key&gt; --enable-cors
+</code></pre>
+<p>To check that the server is running, we can open a browser at <code>/health</code> and we get back 200 OK with <code>ok: true</code>.</p>
+<p>The Typesense server has a <a href="https://typesense.org/docs/0.21.0/api">REST API</a> which can be used to manage the indexes you create.
+Or if you use their cloud offering, you can use their web dashboard to monitor and manage your index data.</p>
+<h2 id="populating-the-index">Populating the index<a class="header-anchor" href="javascript:;" onclick="location.hash='#populating-the-index'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>With your local server is running, you can scrape your docs site using the
+<a href="https://github.com/typesense/typesense-docsearch-scraper">typesense-docsearch-scraper</a>.
+This needs some configuration to tell the scraper:</p>
+<ul>
+<li>Where the Typesense server is</li>
+<li>How to authenticate with the Typesense server</li>
+<li>Where the docs website is</li>
+<li>Rules for the scraper to follow extracting information from the docs website</li>
+</ul>
+<p>These <a href="https://github.com/ServiceStack/docs/tree/master/search-server/typesense-scraper">pieces of configuration come from 2 sources</a>.
+A <a href="https://github.com/ServiceStack/docs/blob/master/search-server/typesense-scraper/typesense-scraper.env">.env</a> file
+related to the Typesense server information and
+a <a href="https://github.com/ServiceStack/docs/blob/master/search-server/typesense-scraper/typesense-scraper-config.json">.json</a>
+file related to what site will be getting scraped.</p>
+<p>With a Typesense running locally on port <strong>8108</strong>, we configure the <code>.env</code> file with the following information:</p>
+<pre><code>TYPESENSE_API_KEY=${TYPESENSE_API_KEY}
+TYPESENSE_HOST=localhost
+TYPESENSE_PORT=8108
+TYPESENSE_PROTOCOL=http
+</code></pre>
+<p>Next, we have to configure the <code>.json</code> config for the scraper.
+The <strong>typesense-docsearch-scraper</strong> has <a href="https://github.com/typesense/typesense-docsearch-scraper/blob/master/configs/public/typesense_docs.json">an example of this</a>
+config in their repository.</p>
+<p>The default selectors will need to match the your websites HTML, which for Razor Press sites can start with the configuration,
+updated with your website domains:</p>
+<pre><code class="language-json">{
+  &quot;index_name&quot;: &quot;typesense_docs&quot;,
+  &quot;allowed_domains&quot;: [&quot;docs.servicestack.net&quot;],
+  &quot;start_urls&quot;: [
+    {
+      &quot;url&quot;: &quot;https://docs.servicestack.net/&quot;
+    }
+  ],
+  &quot;selectors&quot;: {
+    &quot;default&quot;: {
+      &quot;lvl0&quot;: &quot;h1&quot;,
+      &quot;lvl1&quot;: &quot;.content h2&quot;,
+      &quot;lvl2&quot;: &quot;.content h3&quot;,
+      &quot;lvl3&quot;: &quot;.content h4&quot;,
+      &quot;lvl4&quot;: &quot;.content h5&quot;,
+      &quot;text&quot;: &quot;.content p, .content ul li, .content table tbody tr&quot;
+    }
+  },
+  &quot;scrape_start_urls&quot;: false,
+  &quot;strip_chars&quot;: &quot; .,;:#&quot;
+}
+</code></pre>
+<p>With both the configuration files ready to use, we can run the scraper itself. The scraper is also available using the
+docker image <code>typesense/docsearch-scraper</code> which we can pass our configuration to, using the following command:</p>
+<pre><code class="language-sh">docker run -it --env-file typesense-scraper.env \
+    -e &quot;CONFIG=$(cat typesense-scraper-config.json | jq -r tostring)&quot; \
+    typesense/docsearch-scraper
+</code></pre>
+<p>Here <code>-i</code> is used to reference a local <code>--env-file</code> and use <code>cat</code> and <code>jq</code> used to populate the <code>CONFIG</code> environment variable
+with the <code>.json</code> config file.</p>
+<h2 id="docker-networking">Docker networking<a class="header-anchor" href="javascript:;" onclick="location.hash='#docker-networking'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>We had a slight issue here since the scraper itself is running in Docker via WSL and <code>localhost</code> doesn't resolve to our
+host machine to find the Typesense server also running in Docker.
+Instead we need to point the scraper to the Typesense server using the Docker local IP address space of <code>172.17.0.0/16</code>
+for it to resolve without additional configuration.</p>
+<p>We can see in the output of the Typesense server that it is running using <code>172.17.0.2</code>. We can swap the <code>localhost</code>
+with this IP address after which we see the communication between the servers flowing:</p>
+<pre><code>DEBUG:typesense.api_call:Making post /collections/typesense_docs_1635392168/documents/import
+DEBUG:typesense.api_call:Try 1 to node 172.17.0.2:8108 -- healthy? True
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): 172.17.0.2:8108
+DEBUG:urllib3.connectionpool:http://172.17.0.2:8108 &quot;POST /collections/typesense_docs_1635392168/documents/import HTTP/1.1&quot; 200 None
+DEBUG:typesense.api_call:172.17.0.2:8108 is healthy. Status code: 200
+&gt; DocSearch: https://docs.servicestack.net/azure 22 records)
+DEBUG:typesense.api_call:Making post /collections/typesense_docs_1635392168/documents/import
+DEBUG:typesense.api_call:Try 1 to node 172.17.0.2:8108 -- healthy? True
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): 172.17.0.2:8108
+DEBUG:urllib3.connectionpool:http://172.17.0.2:8108 &quot;POST /collections/typesense_docs_1635392168/documents/import HTTP/1.1&quot; 200 None
+</code></pre>
+<p>The scraper crawls the docs site following all the links in the same domain to get a full picture of all the content of our docs site.
+This takes a minute or so, and in the end we can see in the Typesense sever output that we now have <strong>committed_index: 443</strong>.</p>
+<pre><code>_index: 443, applying_index: 0, pending_index: 0, disk_index: 443, pending_queue_size: 0, local_sequence: 44671
+I20211028 03:39:40.402626   328 raft_server.h:58] Peer refresh succeeded!
+</code></pre>
+<h2 id="searching-content">Searching content<a class="header-anchor" href="javascript:;" onclick="location.hash='#searching-content'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>After you have a Typesense server with an index full of content, you'll want to be able to use it to search your docs site.
+You can query the index using <code>curl</code> which needs to known 3 key pieces of information:</p>
+<ul>
+<li>Collection name, eg <code>typesense_docs</code></li>
+<li>Query term, <code>?q=test</code></li>
+<li>What to query, <code>&amp;query_by=content</code></li>
+</ul>
+<pre><code class="language-sh">curl -H 'x-typesense-api-key: &lt;apikey&gt;' \
+    'http://localhost:8108/collections/typesense_docs/documents/search?q=test&amp;query_by=content'
+</code></pre>
+<p>The collection name and <code>query_by</code> come from how the scraper was configured. The scraper was posting data to the
+<code>typesense_docs</code> collection and populating various fields, eg <code>content</code>.</p>
+<p>Which as it returns JSON can be easily queried in JavaScript using <strong>fetch</strong>:</p>
+<pre><code class="language-js">fetch('http://localhost:8108/collections/typesense_docs/documents/search?q='
+    + encodeURIComponent(query) + '&amp;query_by=content', {
+    headers: {
+        // Search only API key for Typesense.
+        'x-typesense-api-key': 'TYPESENSE_SEARCH_ONLY_API_KEY'
+    }
+})
+</code></pre>
+<p>In the above we have also used a different name for the API key token, this is important since the <code>--api-key</code> specified to the running Typesense server is the admin API key. You don't want to expose this to a browser client since they will have the ability to create,update and delete your collections or documents.</p>
+<p>Instead we want to generate a &quot;Search only&quot; API key that is safe to share on a browser client. This can be done using the Admin API key and the following REST API call to the Typesense server.</p>
+<pre><code class="language-bash">curl 'http://localhost:8108/keys' -X POST \
+  -H &quot;X-TYPESENSE-API-KEY: ${TYPESENSE_API_KEY}&quot; \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;description&quot;: &quot;Search only&quot;,&quot;actions&quot;: [&quot;documents:search&quot;],&quot;collections&quot;:[&quot;*&quot;]}'
+</code></pre>
+<p>Now we can share this generated key safely to be used with any of our browser clients.</p>
+<h2 id="keeping-the-index-updated">Keeping the index updated<a class="header-anchor" href="javascript:;" onclick="location.hash='#keeping-the-index-updated'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A problem that becomes apparent when running the scraper is that it increases the size of the index since it currently
+doesn't detect and update existing documents. It wasn't clear if this is possible to configure from the current scraper,
+but we needed a way to achieve the following goals:</p>
+<ul>
+<li>Update the search index automatically soon after docs have been changed</li>
+<li>Don't let the index grow too big to avoid manual intervention</li>
+<li>Have high uptime so documentation search is always available</li>
+</ul>
+<p>Typesense server itself performs extremely well, so a full update from the scraper doesn't generate an amount of load.
+However, every additional scrape uses additional disk space and memory that will eventually require periodically
+resetting and repopulating the index.</p>
+<p>One option is to switch to a new collection everytime the documentation is updated and delete the old collection,
+adopting a workflow that looks something like:</p>
+<ol>
+<li>Docs are updated</li>
+<li>Publish updated docs</li>
+<li>Create new collection, store new and old names</li>
+<li>Scrape updated docs</li>
+<li>Update client with new collection</li>
+<li>Delete old collection</li>
+</ol>
+<p>However this would require orchestration across a number of GitHub Action workflows which we anticipated would be
+fragile and non-deterministic as to how long it will take to scrape, update, and deploy our changes.</p>
+<h2 id="read-only-docker-container">Read-only Docker container<a class="header-anchor" href="javascript:;" onclick="location.hash='#read-only-docker-container'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The approach we ended up adopting was to develop and deploy read only Typesense Docker images containing an immutable copy
+of the index data in it as part of the GitHub Action deployments.</p>
+<p>In the case of Typesense, when it starts up, it reads from its <code>data</code> directory from disk to populate the index in
+memory and since our index is small and only updates when our documentation is updated, we can simplify the management
+of the index data by <strong>baking it into the docker image</strong>.</p>
+<p>This has several key advantages.</p>
+<ul>
+<li>Disaster recovery doesn't need any additional data management.</li>
+<li>Shipping an updated index is a normal ECS deployment.</li>
+<li>Zero down time deployments.</li>
+<li>Index is of a fixed size once deployed.</li>
+</ul>
+<h2 id="typesense-performance">Typesense Performance<a class="header-anchor" href="javascript:;" onclick="location.hash='#typesense-performance'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Search on our documentation site is a very light workload for Typesense. Running as an ECS service on a 2 vCPU instance,
+the service struggled to get close to <strong>1%</strong> whilst serving constant typeahead searching.</p>
+<p><img src="https://servicestack.net/img/posts/typesense/typesense-cpu-utilization.png" alt="" /></p>
+<p>Since our docs site index is small (500 pages), the memory footprint is also tiny and stable at <strong>~50MB</strong> or <strong>~10%</strong> of the the
+service's soft memory limit.</p>
+<p><img src="https://servicestack.net/img/posts/typesense/typesense-memory-utilization.png" alt="" /></p>
+<p>This means we will be able to host this using a single EC2 instance among various other or the ServiceStack hosted
+example applications and use the same deployment patterns we've shared in our
+<a href="https://docs.servicestack.net/mix-github-actions-aws-ecs">GitHub Actions templates</a>.</p>
+<p><a href="https://docs.servicestack.net/mix-github-actions-aws-ecs"><img src="https://raw.githubusercontent.com/ServiceStack/docs/master/docs/images/mix/cloudcraft-host-digram-release-ecr-aws.png" alt="" /></a></p>
+<p>Whilst this approach of shipping an index along with the Docker image isn't practical for large or 'living' indexes,
+many small to medium-sized documentation sites would likely benefit from the simplified approach of deploying readonly
+Docker images.</p>
+<h2 id="github-actions-workflow">GitHub Actions Workflow<a class="header-anchor" href="javascript:;" onclick="location.hash='#github-actions-workflow'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>To create our own Docker image for our search server we need to perform the following tasks in our GitHub Action:</p>
+<ol>
+<li>Run a local Typesense server in the GitHub Action using Docker</li>
+<li>Scrape our hosted docs populating the local Typesense server</li>
+<li>Copy the <code>data</code> folder of our local Typesense server during <code>docker build</code></li>
+</ol>
+<p>Which is done with:</p>
+<pre><code class="language-sh">mkdir -p ${GITHUB_WORKSPACE}/typesense-data
+cp ./search-server/typesense-server/Dockerfile ${GITHUB_WORKSPACE}/typesense-data/Dockerfile
+cp ./search-server/typesense-scraper/typesense-scraper-config.json typesense-scraper-config.json
+envsubst &lt; &quot;./search-server/typesense-scraper/typesense-scraper.env&quot; &gt; &quot;typesense-scraper-updated.env&quot;
+docker run -d -p 8108:8108 -v ${GITHUB_WORKSPACE}/typesense-data/data:/data \
+    typesense/typesense:0.21.0 --data-dir /data --api-key=${TYPESENSE_API_KEY} --enable-cors &amp;
+# wait for typesense initialization
+sleep 5
+docker run -i --env-file typesense-scraper-updated.env \
+    -e &quot;CONFIG=$(cat typesense-scraper-config.json | jq -r tostring)&quot; typesense/docsearch-scraper
+</code></pre>
+<p>Our <code>Dockerfile</code> then takes this data from the <code>data</code> folder during build.</p>
+<pre><code class="language-Dockerfile">FROM typesense/typesense:0.21.0
+
+COPY ./data /data
+</code></pre>
+<p>To avoid updating our search client between updates we also want to use the same <strong>search-only API Key</strong> everytime
+a new server is created. This can be achieved by specifying <code>value</code> in the <code>POST</code> command sent to the local Typesense server:</p>
+<pre><code class="language-sh">curl 'http://172.17.0.2:8108/keys' -X POST \
+  -H &quot;X-TYPESENSE-API-KEY: ${TYPESENSE_API_KEY}&quot; \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;value&quot;:&lt;search-api-key&gt;,&quot;description&quot;:&quot;Search only&quot;,&quot;actions&quot;:[&quot;documents:search&quot;],&quot;collections&quot;:[&quot;*&quot;]}'
+</code></pre>
+<p>If you're interested in adopting a similar approach you can find the whole GitHub Action workflow in our
+<a href="https://github.com/ServiceStack/docs/blob/master/.github/workflows/search-index-update.yml">search-index-update.yml</a>
+workflow.</p>
+<h2 id="search-ui-dialog">Search UI Dialog<a class="header-anchor" href="javascript:;" onclick="location.hash='#search-ui-dialog'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>After docs are indexed the only thing left to do is display the results. We set out to create a comparable UX to
+Algolia's doc search dialog which we've implemented in the
+<a href="https://github.com/ServiceStack/docs.servicestack.net/blob/main/AkburaDocs/wwwroot/mjs/components/Typesense.mjs">Typesense.mjs</a>
+Vue component which you can register as a global component in your
+<a href="https://github.com/ServiceStack/docs.servicestack.net/blob/main/AkburaDocs/wwwroot/mjs/app.mjs">app.mjs</a>:</p>
+<pre><code class="language-js">import Typesense from &quot;./components/Typesense.mjs&quot;
+
+const Components = {
+    //...
+    Typesense,
+}
+</code></pre>
+<p>Which renders as a <strong>Search Button</strong> that we've added next to our <strong>Dark Mode Toggle</strong> button in our
+<a href="https://github.com/ServiceStack/docs.servicestack.net/blob/main/AkburaDocs/Pages/Shared/Header.cshtml">Header.cshtml</a>:</p>
+<pre><code class="language-html">&lt;div class=&quot;hidden sm:ml-6 sm:flex sm:items-center&quot;&gt;
+    &lt;typesense&gt;&lt;/typesense&gt;
+    &lt;dark-mode-toggle class=&quot;ml-2 w-10&quot;&gt;&lt;/dark-mode-toggle&gt;
+&lt;/div&gt;
+</code></pre>
+<p><img src="https://servicestack.net/img/posts/typesense/typesense-header.png" alt="" /></p>
+<p>The button also encapsulates the dialog component which uses Typesense REST API to query to our typesense instance:</p>
+<pre><code class="language-js">fetch('https://search.docs.servicestack.net/collections/typesense_docs/documents/search?q='
+  + encodeURIComponent(query.value)
+  + '&amp;query_by=content,hierarchy.lvl0,hierarchy.lvl1,hierarchy.lvl2,hierarchy.lvl3&amp;group_by=hierarchy.lvl0', {
+    headers: {
+      // Search only API key for Typesense.
+      'x-typesense-api-key': 'TYPESENSE_SEARCH_ONLY_API_KEY'
+    }
+})
+</code></pre>
+<p>This instructs Typesense to search through each documents content and h1-3 headings, grouping results by its page title.
+Refer to the <a href="https://typesense.org/docs/0.21.0/api/documents.html#search">Typesense API Search Reference</a> to learn how
+to further fine-tune search results for your use-case.</p>
+<h2 id="search-results">Search Results<a class="header-anchor" href="javascript:;" onclick="location.hash='#search-results'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><img src="https://servicestack.net/img/posts/typesense/typesense-dart.gif" alt="" /></p>
+<p>The results are <strong>excellent</strong>, <a href="https://docs.servicestack.net">see for yourself</a> by using the search at the top right or
+using <code>Ctrl+K</code> shortcut key on <a href="https://docs.servicestack.net">docs.servicestack.net</a>.</p>
+<p>It also does a great job handling typos and has quickly become the fastest way to navigate our extensive documentation
+that we hope also serves useful for implementing Typesense real-time search in your own documentation websites.</p>
+
+                </div>
+
+                <div class="not-prose"></div>
+                
+                    <div class="not-prose py-8">
+                        <a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/main/AkburaDocs/_pages/typesense.md" target="_blank" rel="noopener noreferrer">
+                            Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+                        </a>
+                    </div>
+
+                    <div class="not-prose my-20">
+                                <nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+                                    <div class="-mt-px flex w-0 flex-1">
+                                            <a href="/redirects" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+                                                <!-- Heroicon name: mini/arrow-long-left -->
+                                                <svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+                                                </svg>
+                                                Redirects
+                                            </a>
+                                    </div>
+                                    <div class="hidden md:-mt-px md:flex"></div>
+                                    <div class="-mt-px flex w-0 flex-1 justify-end">
+                                    </div>
+                                </nav>
+                    </div>
+            </div>
+                
+                <div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+                    <div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+                        <div>
+                            <h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+                                On This Page
+                            </h5>
+                            <ul class="text-slate-700 text-sm leading-6">
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#self-hosting-option'" data-id="self-hosting-option" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Self hosting option
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#populating-the-index'" data-id="populating-the-index" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Populating the index
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#docker-networking'" data-id="docker-networking" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Docker networking
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#searching-content'" data-id="searching-content" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Searching content
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#keeping-the-index-updated'" data-id="keeping-the-index-updated" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Keeping the index updated
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#read-only-docker-container'" data-id="read-only-docker-container" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Read-only Docker container
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#typesense-performance'" data-id="typesense-performance" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Typesense Performance
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#github-actions-workflow'" data-id="github-actions-workflow" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            GitHub Actions Workflow
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#search-ui-dialog'" data-id="search-ui-dialog" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Search UI Dialog
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#search-results'" data-id="search-results" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Search Results
+                                        </span>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+        </div>
+    </div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+    const el = document.querySelector('#doc section h1') 
+    if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+    const App = {
+        setup() {
+            function nav(url) {
+                window.open(url)
+            }
+            return { nav }
+        }
+    }
+    
+const Sidebar = {
+    setup() {
+        const open = ref(true)
+        return { open }
+    }
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="/lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="/lib/js/lite-yt-embed.js"></script>
+<script src="/mjs/docs.mjs" type="module"></script>
+
+
+    </main>
+</div>
+
+
+
+<script type="module">
+import { init } from "app.mjs"
+init()
+</script>
+
+
+
+</body>
+</html>

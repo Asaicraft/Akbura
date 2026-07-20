@@ -1,0 +1,45 @@
+# Razor Press
+
+## Docs
+
+Introduction
+ - [What is Razor Press?](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/what-is-razor-press.md)
+ - [Structure](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/structure.md)
+ - [Static Site Generation](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/ssg.md): Static Site Generation (SSG)
+ - [Deployments](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/deployments.md)
+
+Markdown
+ - [Markdown Syntax](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/syntax.md)
+ - [Markdown Containers](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/containers.md): Custom Markdown Containers
+ - [Using Vue in Markdown](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue-in-markdown.md)
+
+Features
+ - [Sidebars](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/sidebars.md)
+ - [Redirects](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/redirects.md)
+ - [Typesense Real-Time Search](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/typesense.md)
+
+Vue
+ - [Install](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/install.md): Installation
+
+Component Gallery
+ - [AutoQueryGrid](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/autoquerygrid.md): AutoQueryGrid Component
+ - [DataGrid](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/datagrid.md): DataGrid Component
+ - [Auto Forms](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/autoform.md): Auto Form Components
+ - [Form Inputs](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/form-inputs.md): Form Inputs Components
+ - [FileInput](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/fileinput.md): FileInput Component
+ - [TagInput](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/taginput.md): TagInput Component
+ - [Combobox](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/combobox.md): Combobox Component
+ - [Autocomplete](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/autocomplete.md): Autocomplete Component
+ - [Modals](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/modals.md): Modal Components
+ - [Navigation](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/navigation.md): Navigation Components
+ - [Alerts](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/alerts.md): Alert Components
+ - [Formats](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/formats.md): Format Examples
+
+Library
+ - [useMetadata](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/use-metadata.md): App Metadata
+ - [useClient](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/use-client.md): JSON API Client Features
+ - [useAuth](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/use-auth.md): Auth Features
+ - [useFormatters](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/use-formatters.md): Formatting Functions and Methods
+ - [useFiles](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/use-files.md): File Utils
+ - [useConfig](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/use-config.md): Vue Tailwind Global Configuration
+ - [useUtils](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/main/AkburaDocs/_pages/vue/use-utils.md): General Utils

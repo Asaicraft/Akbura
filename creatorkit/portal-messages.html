@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg" href="/img/logo.svg">
+    <title>Messages</title>
+    <script>
+    if (location.search === "?dark") localStorage.setItem('color-scheme','dark') 
+    if (location.search === "?light") localStorage.removeItem('color-scheme') 
+    const cls = document.querySelector('html').classList
+    if (localStorage.getItem('color-scheme') === 'dark')
+        cls.add('dark')
+    else
+        cls.remove('dark')
+    </script>
+    <link rel="stylesheet" href="/css/app.css">
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "/mjs/app.mjs",
+        "vue": "/lib/mjs/vue.min.mjs",
+        "@servicestack/client": "/lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "/lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+<body class="bg-white dark:bg-black dark:text-white">
+<header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+    <div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+      <div class="flex h-16 justify-between">
+        <div class="flex">
+          <div class="flex flex-shrink-0 items-center">
+            <a class="mr-2 lg:mr-8 flex items-center" href="/">
+                <svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+                <span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+            </a>
+          </div>
+            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+                <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+                        <a href="/whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            What's New
+                        </a>
+                        <a href="/vue/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Vue
+                        </a>
+                        <a href="/creatorkit/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+                            Creator Kit
+                        </a>
+                        <a href="/videos" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Videos
+                        </a>
+            </div>
+        </div>
+        <div class="hidden sm:ml-6 sm:flex sm:items-center">
+            <dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+        </div>
+        <div class="-mr-2 flex items-center sm:hidden">
+          <!-- Mobile menu button -->
+          <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+            <span class="sr-only">Open main menu</span>
+            <!-- Menu open: "hidden", Menu closed: "block" -->
+            <svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+            <!-- Menu open: "block", Menu closed: "hidden" -->
+            <svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile menu, show/hide based on menu state. -->
+    <div v-cloak v-if="open" class="sm:hidden">
+        <div class="space-y-1 pb-3 pt-2">
+            <!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+                    <a href="/whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        What's New
+                    </a>
+                    <a href="/vue/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Vue
+                    </a>
+                    <a href="/creatorkit/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+                        Creator Kit
+                    </a>
+                    <a href="/videos" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Videos
+                    </a>
+        </div>
+    </div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+    setup() {
+        const open = ref(false)
+        return { open }
+    }
+}
+mount('#header', Header)
+</script>
+
+
+<div class="min-h-screen">
+    <main role="main" class="pt-16 pb-3">
+        
+
+
+
+<style>
+.active {
+    color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="/css/highlight.css">
+<link rel="stylesheet" href="/css/typography.css">
+<link rel="stylesheet" href="/css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+    <div class="flex flex-wrap">
+        <div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+            <button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+            </button>
+            <div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+                <nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+                    <close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+                                <a href="/creatorkit/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>                                    <span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+Creator Kit                                    </span>
+                                </a>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/creatorkit/about" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        About
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/creatorkit/install" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Install
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/creatorkit/customize" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Customize
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/creatorkit/components" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Components
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/creatorkit/integrations" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Integrations
+                                    </a>
+                                </li>
+                        </ul>
+                                <h2 class="font-display font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                                    Portal
+                                </h2>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/creatorkit/portal-overview" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Overview
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/creatorkit/portal-messages" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+                                        Messages
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/creatorkit/portal-mailruns" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Mail Runs
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/creatorkit/portal-posts" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Posts
+                                    </a>
+                                </li>
+                        </ul>
+                </nav>
+            </div>
+        </div>
+        <div id="doc" class="mx-auto flex">
+            <div class="mt-8 mx-auto prose lg:prose-lg">
+                
+                    <section class="not-prose mb-16 md:mb-12">
+                        <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+                            Messages
+                        </h1>
+                    </section>
+
+                <div class="not-prose"></div>
+
+                <div class="content">
+                    <h3 id="sending-single-plain-text-emails">Sending Single plain-text Emails<a class="header-anchor" href="javascript:;" onclick="location.hash='#sending-single-plain-text-emails'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p><strong>Messages</strong> lets you craft and send emails to a single contact which can be sent immediately or saved as a draft so
+you can review the HTML rendered email and send later.</p>
+<p><img src="https://servicestack.net/img/pages/creatorkit/portal-messages.png" alt="" /></p>
+<p>It also lists all available emails that can be sent which are any APIs that inherit the <code>CreateEmailBase</code> base class
+which contains the minimum contact fields required in each email:</p>
+<pre><code class="language-csharp">public abstract class CreateEmailBase
+{
+    [ValidateNotEmpty]
+    [Input(Type=&quot;EmailInput&quot;)]
+    public string Email { get; set; }
+    [ValidateNotEmpty]
+    [FieldCss(Field = &quot;col-span-6 lg:col-span-3&quot;)]
+    public string FirstName { get; set; }
+    [ValidateNotEmpty]
+    [FieldCss(Field = &quot;col-span-6 lg:col-span-3&quot;)]
+    public string LastName { get; set; }
+}
+</code></pre>
+<p>Plain text emails can be sent with the <code>SimpleTextEmail</code> API:</p>
+<pre><code class="language-csharp">[Renderer(typeof(RenderSimpleText))]
+[Tag(Tag.Mail), ValidateIsAdmin]
+[Description(&quot;Simple Text Email&quot;)]
+public class SimpleTextEmail : CreateEmailBase, IPost, IReturn&lt;MailMessage&gt;
+{
+    [ValidateNotEmpty]
+    [FieldCss(Field = &quot;col-span-12&quot;)]
+    public string Subject { get; set; }
+
+    [ValidateNotEmpty]
+    [Input(Type = &quot;textarea&quot;), FieldCss(Field = &quot;col-span-12&quot;, Input = &quot;h-36&quot;)]
+    public string Body { get; set; }
+    public bool? Draft { get; set; }
+}
+</code></pre>
+<h3 id="email-ui">Email UI<a class="header-anchor" href="javascript:;" onclick="location.hash='#email-ui'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Which are rendered using the <a href="https://docs.servicestack.net/vue/gallery/autoform">Vue AutoForm component</a> from the API
+definition where the <code>SimpleTextEmail</code> Request DTO renders the new Email UI:</p>
+<p><img src="https://servicestack.net/img/pages/creatorkit/portal-messages-simple.png" alt="" /></p>
+<p>Which uses the custom <code>EmailInput</code> component to search for contacts and populates their Email, First and Last name fields.</p>
+<p>The implementation for sending single emails are defined in
+<a href="https://github.com/NetCoreApps/CreatorKit/blob/main/CreatorKit.ServiceInterface/EmailServices.cs">EmailServices.cs</a>
+which uses <a href="https://github.com/NetCoreApps/CreatorKit/blob/main/CreatorKit.ServiceInterface/EmailRenderer.cs">EmailRenderer.cs</a>
+to save and send non draft emails which follow the pattern below:</p>
+<pre><code class="language-csharp">public EmailRenderer Renderer { get; set; }
+
+public async Task&lt;object&gt; Any(SimpleTextEmail request)
+{
+    var contact = await Db.GetOrCreateContact(request);
+    var viewRequest = request.ConvertTo&lt;RenderSimpleText&gt;().FromContact(contact);
+    var bodyText = (string) await Gateway.SendAsync(typeof(string), viewRequest);
+    
+    var email = await Renderer.CreateMessageAsync(Db, new MailMessage
+    {
+        Draft = request.Draft ?? false,
+        Message = new EmailMessage
+        {
+            To = contact.ToMailTos(),
+            Subject = request.Subject,
+            Body = request.Body,
+            BodyText = bodyText,
+        },
+    }.FromRequest(request));
+    return email;
+}
+</code></pre>
+<p>Live previews are generated and Emails rendered with renderer APIs that inherit <code>RenderEmailBase</code> e.g:</p>
+<pre><code class="language-csharp">[Tag(Tag.Mail), ValidateIsAdmin, ExcludeMetadata]
+public class RenderSimpleText : RenderEmailBase, IGet, IReturn&lt;string&gt;
+{
+    public string Body { get; set; }
+}
+</code></pre>
+<p>Which renders the Request DTO inside a <a href="https://sharpscript.net">#Script</a> email context:</p>
+<pre><code class="language-csharp">public async Task&lt;object&gt; Any(RenderSimpleText request)
+{
+    var ctx = Renderer.CreateScriptContext();
+    return await ctx.RenderScriptAsync(request.Body,request.ToObjectDictionary());
+}
+</code></pre>
+<h3 id="sending-custom-html-emails">Sending Custom HTML Emails<a class="header-anchor" href="javascript:;" onclick="location.hash='#sending-custom-html-emails'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p><code>CustomHtmlEmail</code> is a configurable API for sending HTML emails utilizing custom Email Layout and Templates
+from populated dropdowns configured with available Templates in <code>/emails</code>:</p>
+<pre><code class="language-csharp">[Renderer(typeof(RenderCustomHtml))]
+[Tag(Tag.Mail), ValidateIsAdmin]
+[Icon(Svg = Icons.RichHtml)]
+[Description(&quot;Custom HTML Email&quot;)]
+public class CustomHtmlEmail : CreateEmailBase, IPost, IReturn&lt;MailMessage&gt;
+{
+    [ValidateNotEmpty]
+    [Input(Type = &quot;combobox&quot;, EvalAllowableValues = &quot;AppData.EmailLayoutOptions&quot;)]
+    public string Layout { get; set; }
+    
+    [ValidateNotEmpty]
+    [Input(Type = &quot;combobox&quot;, EvalAllowableValues = &quot;AppData.EmailTemplateOptions&quot;)]
+    public string Template { get; set; }
+    
+    [ValidateNotEmpty]
+    [FieldCss(Field = &quot;col-span-12&quot;)]
+    public string Subject { get; set; }
+
+    [Input(Type = &quot;MarkdownEmailInput&quot;, Label = &quot;&quot;), FieldCss(Field = &quot;col-span-12&quot;, Input = &quot;h-56&quot;)]
+    public string? Body { get; set; }
+    public bool? Draft { get; set; }
+}
+</code></pre>
+<p><img src="https://servicestack.net/img/pages/creatorkit/portal-messages-custom.png" alt="" /></p>
+<h4 id="custom-html-implementation">Custom HTML Implementation<a class="header-anchor" href="javascript:;" onclick="location.hash='#custom-html-implementation'" aria-label="Permalink">&ZeroWidthSpace;</a></h4>
+<p>It follows the same pattern as other email implementations where it uses the <code>EmailRenderer</code> to create and send emails:</p>
+<pre><code class="language-csharp">public async Task&lt;object&gt; Any(CustomHtmlEmail request)
+{
+    var contact = await Db.GetOrCreateContact(request);
+    var viewRequest = request.ConvertTo&lt;RenderCustomHtml&gt;().FromContact(contact);
+    var bodyHtml = (string) await Gateway.SendAsync(typeof(string), viewRequest);
+
+    var email = await Renderer.CreateMessageAsync(Db, new MailMessage
+    {
+        Draft = request.Draft ?? false,
+        Message = new EmailMessage
+        {
+            To = contact.ToMailTos(),
+            Subject = request.Subject,
+            Body = request.Body,
+            BodyHtml = bodyHtml,
+        },
+    }.FromRequest(viewRequest));
+    return email;
+}
+</code></pre>
+<p>Which uses the <code>RenderCustomHtml</code> to render the HTML and Live Previews which executes the populated Request DTO with
+the Email <strong>#Script</strong> context configured to use the selected Email Layout and Template:</p>
+<pre><code class="language-csharp">public async Task&lt;object&gt; Any(RenderCustomHtml request)
+{
+    var context = Renderer.CreateMailContext(layout:request.Layout, page:request.Template);
+    var evalBody = !string.IsNullOrEmpty(request.Body) 
+        ? await context.RenderScriptAsync(request.Body, request.ToObjectDictionary())
+        : string.Empty;
+
+    return await Renderer.RenderToHtmlResultAsync(Db, context, request, 
+        args:new() {
+            [&quot;body&quot;] = evalBody,
+        });
+}
+</code></pre>
+<h2 id="creatorkit.extensions">CreatorKit.Extensions<a class="header-anchor" href="javascript:;" onclick="location.hash='#creatorkit.extensions'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Any additional services should be maintained in <a href="https://github.com/NetCoreApps/CreatorKit/tree/main/CreatorKit.Extensions">CreatorKit.Extensions</a>
+project with any custom email implementations added to
+<a href="https://github.com/NetCoreApps/CreatorKit/blob/main/CreatorKit.Extensions/CustomEmailServices.cs">CustomEmailServices.cs</a>.</p>
+<h3 id="sending-html-markdown-emails">Sending HTML Markdown Emails<a class="header-anchor" href="javascript:;" onclick="location.hash='#sending-html-markdown-emails'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p><a href="https://github.com/NetCoreApps/CreatorKit/blob/main/CreatorKit.Extensions.ServiceModel/MarkdownEmail.cs">MarkdownEmail.cs</a>
+is an example of a more user-friendly custom HTML Email you may want to send, which is pre-configured to use the
+<a href="https://github.com/NetCoreApps/CreatorKit/blob/main/CreatorKit/emails/layouts/basic.html">basic.html</a>
+Layout and the
+<a href="https://github.com/NetCoreApps/CreatorKit/blob/main/CreatorKit/emails/empty.html">empty.html</a>
+Email Template to allow sending plain HTML Emails with a custom Markdown Email body:</p>
+<pre><code class="language-csharp">[Renderer(typeof(RenderCustomHtml), Layout = &quot;basic&quot;, Template=&quot;empty&quot;)]
+[Tag(Tag.Mail), ValidateIsAdmin]
+[Icon(Svg = Icons.TextMarkup)]
+[Description(&quot;Markdown Email&quot;)]
+public class MarkdownEmail : CreateEmailBase, IPost, IReturn&lt;MailMessage&gt;
+{
+    [ValidateNotEmpty]
+    [FieldCss(Field = &quot;col-span-12&quot;)]
+    public string Subject { get; set; }
+
+    [ValidateNotEmpty]
+    [Input(Type=&quot;MarkdownEmailInput&quot;,Label=&quot;&quot;), FieldCss(Field=&quot;col-span-12&quot;,Input=&quot;h-56&quot;)]
+    public string? Body { get; set; }
+    public bool? Draft { get; set; }
+}
+</code></pre>
+<p>As defined, this DTO renders the form utilizing a custom <code>MarkdownEmailInput</code> rich text editor which provides an optimal UX
+for authoring Markdown content with icons to assist with discovery of Markdown's different formatting syntax.</p>
+<h4 id="template-variables">Template Variables<a class="header-anchor" href="javascript:;" onclick="location.hash='#template-variables'" aria-label="Permalink">&ZeroWidthSpace;</a></h4>
+<p>The editor also includes a dropdown to provide convenient access to your <a href="creatorkit/customize#template-variables">Template Variables</a>:</p>
+<p><img src="https://servicestack.net/img/pages/creatorkit/portal-messages-markdown.png" alt="" /></p>
+<p>The implementation of <code>MarkdownEmail</code> just sends a Custom HTML Email configured to use the <strong>basic</strong> Layout with the <strong>empty</strong> Email Template:</p>
+<pre><code class="language-csharp">public async Task&lt;object&gt; Any(MarkdownEmail request)
+{
+    var contact = await Db.GetOrCreateContact(request);
+    var viewRequest = request.ConvertTo&lt;RenderCustomHtml&gt;().FromContact(contact);
+    viewRequest.Layout = &quot;basic&quot;;
+    viewRequest.Template = &quot;empty&quot;;
+    var bodyHtml = (string) await Gateway.SendAsync(typeof(string), viewRequest);
+
+    var email = await Renderer.CreateMessageAsync(Db, new MailMessage
+    {
+        Draft = request.Draft ?? false,
+        Message = new EmailMessage
+        {
+            To = contact.ToMailTos(),
+            Subject = request.Subject,
+            Body = request.Body,
+            BodyHtml = bodyHtml,
+        },
+    }.FromRequest(viewRequest));
+    return email;
+}
+</code></pre>
+
+                </div>
+
+                <div class="not-prose"></div>
+                
+                    <div class="not-prose py-8">
+                        <a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/main/AkburaDocs/_pages/creatorkit/portal-messages.md" target="_blank" rel="noopener noreferrer">
+                            Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+                        </a>
+                    </div>
+
+                    <div class="not-prose my-20">
+                                <nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+                                    <div class="-mt-px flex w-0 flex-1">
+                                            <a href="/creatorkit/portal-overview" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+                                                <!-- Heroicon name: mini/arrow-long-left -->
+                                                <svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+                                                </svg>
+                                                Overview
+                                            </a>
+                                    </div>
+                                    <div class="hidden md:-mt-px md:flex"></div>
+                                    <div class="-mt-px flex w-0 flex-1 justify-end">
+                                            <a href="/creatorkit/portal-mailruns" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+                                                Mail Runs
+                                                <!-- Heroicon name: mini/arrow-long-right -->
+                                                <svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+                                                </svg>
+                                            </a>
+                                    </div>
+                                </nav>
+                    </div>
+            </div>
+                
+                <div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+                    <div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+                        <div>
+                            <h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+                                On This Page
+                            </h5>
+                            <ul class="text-slate-700 text-sm leading-6">
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#creatorkit.extensions'" data-id="creatorkit.extensions" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            CreatorKit.Extensions
+                                        </span>
+                                            <ul class="ml-4">
+                                                    <li data-id="sending-html-markdown-emails" class="text-gray-500 hover:text-gray-900">
+                                                        <span v-hash="'#sending-html-markdown-emails'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+                                                            <svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                                                            Sending HTML Markdown Emails
+                                                        </span>
+                                                    </li>
+                                            </ul>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+        </div>
+    </div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+    const el = document.querySelector('#doc section h1') 
+    if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+    const App = {
+        setup() {
+            function nav(url) {
+                window.open(url)
+            }
+            return { nav }
+        }
+    }
+    
+const Sidebar = {
+    setup() {
+        const open = ref(true)
+        return { open }
+    }
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="/lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="/lib/js/lite-yt-embed.js"></script>
+<script src="/mjs/docs.mjs" type="module"></script>
+
+
+    </main>
+</div>
+
+
+
+<script type="module">
+import { init } from "app.mjs"
+init()
+</script>
+
+
+
+</body>
+</html>

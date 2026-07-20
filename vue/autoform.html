@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg" href="/img/logo.svg">
+    <title>Auto Form Components</title>
+    <script>
+    if (location.search === "?dark") localStorage.setItem('color-scheme','dark') 
+    if (location.search === "?light") localStorage.removeItem('color-scheme') 
+    const cls = document.querySelector('html').classList
+    if (localStorage.getItem('color-scheme') === 'dark')
+        cls.add('dark')
+    else
+        cls.remove('dark')
+    </script>
+    <link rel="stylesheet" href="/css/app.css">
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "/mjs/app.mjs",
+        "vue": "/lib/mjs/vue.min.mjs",
+        "@servicestack/client": "/lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "/lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+<body class="bg-white dark:bg-black dark:text-white">
+<header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+    <div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+      <div class="flex h-16 justify-between">
+        <div class="flex">
+          <div class="flex flex-shrink-0 items-center">
+            <a class="mr-2 lg:mr-8 flex items-center" href="/">
+                <svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+                <span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+            </a>
+          </div>
+            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+                <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+                        <a href="/whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            What's New
+                        </a>
+                        <a href="/vue/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+                            Vue
+                        </a>
+                        <a href="/creatorkit/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Creator Kit
+                        </a>
+                        <a href="/videos" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Videos
+                        </a>
+            </div>
+        </div>
+        <div class="hidden sm:ml-6 sm:flex sm:items-center">
+            <dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+        </div>
+        <div class="-mr-2 flex items-center sm:hidden">
+          <!-- Mobile menu button -->
+          <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+            <span class="sr-only">Open main menu</span>
+            <!-- Menu open: "hidden", Menu closed: "block" -->
+            <svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+            <!-- Menu open: "block", Menu closed: "hidden" -->
+            <svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile menu, show/hide based on menu state. -->
+    <div v-cloak v-if="open" class="sm:hidden">
+        <div class="space-y-1 pb-3 pt-2">
+            <!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+                    <a href="/whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        What's New
+                    </a>
+                    <a href="/vue/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+                        Vue
+                    </a>
+                    <a href="/creatorkit/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Creator Kit
+                    </a>
+                    <a href="/videos" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Videos
+                    </a>
+        </div>
+    </div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+    setup() {
+        const open = ref(false)
+        return { open }
+    }
+}
+mount('#header', Header)
+</script>
+
+
+<div class="min-h-screen">
+    <main role="main" class="pt-16 pb-3">
+        
+
+
+
+<style>
+.active {
+    color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="/css/highlight.css">
+<link rel="stylesheet" href="/css/typography.css">
+<link rel="stylesheet" href="/css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+    <div class="flex flex-wrap">
+        <div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+            <button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+            </button>
+            <div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+                <nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+                    <close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+                                <a href="/vue" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>                                    <span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+Vue                                    </span>
+                                </a>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/vue/install" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Install
+                                    </a>
+                                </li>
+                        </ul>
+                                <h2 class="font-display font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                                    Component Gallery
+                                </h2>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/vue/autoquerygrid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        AutoQueryGrid
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/datagrid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        DataGrid
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/autoform" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+                                        Auto Forms
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/form-inputs" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Form Inputs
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/fileinput" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        FileInput
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/taginput" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        TagInput
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/combobox" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Combobox
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/autocomplete" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Autocomplete
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/modals" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Modals
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/navigation" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Navigation
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/alerts" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Alerts
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/formats" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Formats
+                                    </a>
+                                </li>
+                        </ul>
+                                <h2 class="font-display font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                                    Library
+                                </h2>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/vue/use-metadata" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useMetadata
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-client" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useClient
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-auth" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useAuth
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-formatters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useFormatters
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-files" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useFiles
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-config" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useConfig
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-utils" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useUtils
+                                    </a>
+                                </li>
+                        </ul>
+                </nav>
+            </div>
+        </div>
+        <div id="doc" class="mx-auto flex">
+            <div class="mt-8 mx-auto prose lg:prose-lg">
+                
+                    <section class="not-prose mb-16 md:mb-12">
+                        <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+                            Auto Form Components
+                        </h1>
+                    </section>
+
+                <div class="not-prose"></div>
+
+                <div class="content">
+                    <p><api-reference Component="AutoForm"></api-reference></p>
+<h2 id="autoform">AutoForm<a class="header-anchor" href="javascript:;" onclick="location.hash='#autoform'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The <code>AutoForm</code> component is a generic form component that can be used to create and wire a traditional Form for any Request DTO definition
+where successful responses can be handled the <code>@success</code> event, e.g:</p>
+<pre><code class="language-html">&lt;AutoForm type=&quot;QueryBookings&quot; @success=&quot;onSuccess&quot; /&gt;
+&lt;div v-if=&quot;results&quot;&gt;
+    &lt;h3 class=&quot;py-4 text-2xl&quot;&gt;Results&lt;/h3&gt;
+    &lt;HtmlFormat :value=&quot;results&quot; /&gt;
+&lt;/div&gt;
+
+&lt;script setup&gt;
+const results = ref([])
+const onSuccess = response =&gt; results.value = response.results
+&lt;/script&gt;
+</code></pre>
+<div class="py-8 not-prose">
+    <auto-form class="mx-auto max-w-3xl" type="QueryBookings" @success="onSuccess"></auto-form>
+    <div v-if="results">
+        <h3 class="py-4 text-2xl">Results</h3>
+        <html-format :value="results"></html-format>
+    </div>
+</div>
+<p>These Auto Form components are customizable with the <a href="/locode/declarative#ui-metadata-attributes">declarative C# UI Attributes</a> where you can
+override the form's <strong>heading</strong> with <code>[Description]</code> and include a <strong>subHeading</strong> with <code>[Notes]</code> which supports rich HTML markup.</p>
+<p><strong>AutoForm Properties</strong></p>
+<p>Alternatively they can be specified in the components properties:</p>
+<pre><code class="language-ts">defineProps&lt;{
+    type: string|InstanceType&lt;any&gt;|Function
+    modelValue?: ApiRequest|any
+    heading?: string
+    subHeading?: string
+    showLoading?: boolean
+    jsconfig?: string         //= eccn,edv
+    configureField?: (field:InputProp) =&gt; void
+
+    /* Default Styles */
+    formClass?: string        //= shadow sm:rounded-md
+    innerFormClass?: string
+    bodyClass?: string
+    headerClass?: string      //= p-6
+    buttonsClass?: string     //= mt-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 sm:px-6 flex justify-between
+    headingClass?: string     //= text-lg font-medium leading-6 text-gray-900 dark:text-gray-100
+    subHeadingClass?: string
+    submitLabel?: string      //= Submit
+}&gt;()
+</code></pre>
+<p>Both <code>@success</code> and <code>@error</code> events are fired after each API call, although built-in validation binding means it's typically unnecessary to manually
+handle error responses.</p>
+<pre><code class="language-ts">defineEmits&lt;{
+    (e:'success', response:any): void
+    (e:'error', error:ResponseStatus): void
+    (e:'update:modelValue', model:any): void
+}&gt;()
+</code></pre>
+<p><strong>Model Binding</strong></p>
+<p>Forms can be bound to a Request DTO model where it can be used to pre-populate the Forms default values and Request DTO whereby specifying a <strong>type</strong>
+is no longer necessary:</p>
+<pre><code class="language-ts">&lt;AutoForm v-model=&quot;request&quot; /&gt;
+
+&lt;script setup&gt;
+const request = ref(new QueryBookings({ skip:1, take:2, orderBy:'Name' }))
+&lt;/script&gt;
+</code></pre>
+<div class="not-prose">
+    <auto-form class="mx-auto max-w-3xl not-prose" v-model="request" type="QueryBookings"></auto-form>
+</div>
+<p><api-reference Component="AutoCreateForm"></api-reference></p>
+<h2 id="create-form">Create Form<a class="header-anchor" href="javascript:;" onclick="location.hash='#create-form'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>AutoCreateForm</code> can be used to create an automated form based on a <a href="/autoquery/crud">AutoQuery CRUD</a> Create Request DTO definition which can be rendered in a traditional inline Form with <strong>card</strong> formStyle option, e.g:</p>
+<pre><code class="language-html">&lt;AutoCreateForm type=&quot;CreateBooking&quot; formStyle=&quot;card&quot; /&gt;
+</code></pre>
+<div class="not-prose py-8">
+    <auto-create-form class="mx-auto max-w-3xl" type="CreateBooking" form-style="card"></auto-create-form>
+</div>
+<p>By default Auto Forms are rendered in a <code>SlideOver</code> dialog:</p>
+<pre><code class="language-html">&lt;AutoCreateForm type=&quot;CreateBooking&quot; /&gt;
+</code></pre>
+<iframe src="/pages/vue/autoform/new.html" class="border-none h-[45em] w-[1330px] -ml-40 mb-4 relative z-20"></iframe>
+<p>These Auto Forms are powered by the rich <a href="/vue/use-metadata">App Metadata</a> surrounding your APIs,
+which contain all the necessary metadata to invoke the API and bind any contextual validation errors adjacent to the invalid field inputs.</p>
+<p><api-reference id="edit-form" component="AutoEditForm"></api-reference></p>
+<h2 id="edit-form">Edit Form<a class="header-anchor" href="javascript:;" onclick="location.hash='#edit-form'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>AutoEditForm</code> can be used to render an automated form based on Update and Delete
+<a href="/autoquery/crud">AutoQuery CRUD</a> APIs which also makes use of <strong>heading</strong> and <strong>sub-heading</strong> customization options:</p>
+<pre><code class="language-html">&lt;AutoEditForm v-model=&quot;booking&quot; type=&quot;UpdateBooking&quot; deleteType=&quot;DeleteBooking&quot; 
+    heading=&quot;Change an existing Room Booking&quot; sub-heading=&quot;Manage reservations for AkburaDocs hotels.&quot; /&gt;
+</code></pre>
+<iframe src="/pages/vue/autoform/edit.html" class="border-none h-[46em] w-[1330px] -ml-40 mb-4 relative z-20"></iframe>
+<p>The same form rendered in a traditional inline form with a <strong>card</strong> formStyle with some more advanced
+customization examples using rich markup in custom <code>&lt;template #heading&gt;</code> and <code>&lt;template #sub-heading&gt;</code> slots:</p>
+<pre><code class="language-html">&lt;AutoEditForm v-model=&quot;booking&quot; formStyle=&quot;card&quot; type=&quot;UpdateBooking&quot; deleteType=&quot;DeleteBooking&quot;&gt;
+  &lt;template #heading&gt;
+    &lt;h3 class=&quot;text-xl font-semibold text-green-600&quot;&gt;Change an existing Room Booking&lt;/h3&gt;
+  &lt;/template&gt;
+  &lt;template #sub-heading&gt;
+    &lt;p&gt;
+      Here are some 
+      &lt;TextLink href=&quot;https://youtu.be/rSFiikDjGos&quot;&gt;good tips on making room reservations 
+        &lt;Icon class='inline-block' icon=&quot;lucide:external-link&quot; /&gt;
+      &lt;/TextLink&gt;
+    &lt;/p&gt;
+  &lt;/template&gt;
+&lt;/AutoEditForm&gt;
+</code></pre>
+<div class="not-prose">
+    <auto-edit-form class="mx-auto max-w-3xl mb-4" v-model="booking" form-style="card" type="UpdateBooking" deleteType="DeleteBooking">
+        <template #heading>
+            <h3 class="text-xl font-semibold text-green-600">Change an existing Room Booking</h3>
+        </template>
+        <template #sub-heading>
+            <p>
+                Here are some <text-link href="https://youtu.be/rSFiikDjGos">good tips on making room reservations 
+                    <svg class="inline-block" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-11 5L21 3"/></svg>
+                </text-link>
+            </p>
+        </template>
+    </auto-edit-form>
+</div>
+<p>The forms behavior and appearance is further customizable with the
+<a href="/locode/declarative#annotate-apis">API annotation</a>, declarative <a href="/locode/declarative#type-validation-attributes">validation</a>
+and the custom <a href="/locode/declarative#custom-fields-and-inputs">Field and Input</a> attributes, e.g:</p>
+<pre><code class="language-csharp">[Description(&quot;Update an existing Booking&quot;)]
+[Notes(&quot;Find out how to create a &lt;a href='https://youtu.be/rSFiikDjGos'&gt;C# Bookings App from Scratch&lt;/a&gt;&quot;)]
+[Route(&quot;/booking/{Id}&quot;, &quot;PATCH&quot;)]
+[ValidateHasRole(&quot;Employee&quot;)]
+[AutoApply(Behavior.AuditModify)]
+public class UpdateBooking : IPatchDb&lt;Booking&gt;, IReturn&lt;IdResponse&gt;
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public RoomType? RoomType { get; set; }
+    [ValidateGreaterThan(0)]
+    public int? RoomNumber { get; set; }
+    [ValidateGreaterThan(0)]
+    public decimal? Cost { get; set; }
+    public DateTime? BookingStartDate { get; set; }
+    public DateTime? BookingEndDate { get; set; }
+    [Input(Type = &quot;textarea&quot;)]
+    public string? Notes { get; set; }
+    public string? CouponId { get; set; }
+    public bool? Cancelled { get; set; }
+}
+</code></pre>
+<p>Where they can be used to customize Auto Form's appearance from annotations on C# Server DTOs:</p>
+<pre><code class="language-html">&lt;AutoEditForm v-model=&quot;booking&quot; formStyle=&quot;card&quot; type=&quot;UpdateBooking&quot; deleteType=&quot;DeleteBooking&quot; /&gt;
+</code></pre>
+<div class="not-prose">
+<auto-edit-form class="mx-auto max-w-3xl" v-model="booking" form-style="card" type="UpdateBooking" deleteType="DeleteBooking"></auto-edit-form>
+</div>
+<p><api-reference component="AutoFormFields"></api-reference></p>
+<h2 id="form-fields">Form Fields<a class="header-anchor" href="javascript:;" onclick="location.hash='#form-fields'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For more advanced customization of a Forms appearance and behavior, <code>AutoFormFields</code> can be used to just render the Form's fields (with validation binding) inside a custom Form which can submit the data-bound populated Request DTO to invoke the API, e.g:</p>
+<pre><code class="language-html">&lt;template&gt;
+&lt;form v-if=&quot;request&quot; @submit.prevent=&quot;submit&quot;&gt;
+    &lt;div class=&quot;shadow sm:overflow-hidden sm:rounded-md&quot;&gt;
+        &lt;div class=&quot;space-y-6 py-6 px-4 sm:p-6 bg-white dark:bg-black&quot;&gt;
+            &lt;div&gt;
+                &lt;h3 class=&quot;text-lg font-medium leading-6 text-gray-900 dark:text-gray-100&quot;&gt;
+                    Change an existing Room Booking
+                &lt;/h3&gt;
+                &lt;p class=&quot;notes mt-1 text-sm text-gray-500 dark:text-gray-400&quot;&gt;
+                    Find out how to quickly create a 
+                    &lt;a class='svg-external' target='_blank' href='https://youtu.be/rSFiikDjGos'&gt;
+                        C# Bookings App from Scratch
+                    &lt;/a&gt;
+                &lt;/p&gt;
+            &lt;/div&gt;
+
+            &lt;AutoFormFields v-model=&quot;request&quot; :api=&quot;api&quot; /&gt;
+
+        &lt;/div&gt;
+        &lt;div class=&quot;bg-gray-50 dark:bg-gray-800 px-4 py-3 text-right sm:px-12&quot;&gt;
+            &lt;PrimaryButton&gt;Save&lt;/PrimaryButton&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/form&gt;
+&lt;/template&gt;
+
+&lt;script setup lang=&quot;ts&quot;&gt;
+import { onMounted, ref } from 'vue'
+import { ApiResponse } from '@servicestack/client'
+import { useClient, useMetadata } from '@servicestack/vue'
+import { QueryBookings, UpdateBooking } from '../dtos'
+
+const { toFormValues } = useMetadata()
+const client = useClient()
+
+let api = ref&lt;ApiResponse&gt;()
+let request = ref&lt;UpdateBooking&gt;()
+
+async function submit(e:Event) {
+    api.value = await client.api(request.value!)
+}
+
+onMounted(async () =&gt; {
+    let api = await client.api(new QueryBookings({ id: 1 }))
+    if (api.succeeded) {
+        request.value = new UpdateBooking(toFormValues(api.response!.results[0]))
+    }
+})
+&lt;/script&gt;
+</code></pre>
+<div class="not-prose">
+    <fields class="my-4 mx-auto max-w-screen-md"></fields>
+</div>
+<p><code>toFormValues</code> is used when updating the data bound <code>request</code> DTO to convert API response values into the required format that HTML Inputs expect.</p>
+
+                </div>
+
+                <div class="not-prose"></div>
+                
+                    <div class="not-prose py-8">
+                        <a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/main/AkburaDocs/_pages/vue/autoform.md" target="_blank" rel="noopener noreferrer">
+                            Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+                        </a>
+                    </div>
+
+                    <div class="not-prose my-20">
+                                <nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+                                    <div class="-mt-px flex w-0 flex-1">
+                                            <a href="/vue/datagrid" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+                                                <!-- Heroicon name: mini/arrow-long-left -->
+                                                <svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+                                                </svg>
+                                                DataGrid
+                                            </a>
+                                    </div>
+                                    <div class="hidden md:-mt-px md:flex"></div>
+                                    <div class="-mt-px flex w-0 flex-1 justify-end">
+                                            <a href="/vue/form-inputs" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+                                                Form Inputs
+                                                <!-- Heroicon name: mini/arrow-long-right -->
+                                                <svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+                                                </svg>
+                                            </a>
+                                    </div>
+                                </nav>
+                    </div>
+            </div>
+                
+                <div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+                    <div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+                        <div>
+                            <h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+                                On This Page
+                            </h5>
+                            <ul class="text-slate-700 text-sm leading-6">
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#autoform'" data-id="autoform" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            AutoForm
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#create-form'" data-id="create-form" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Create Form
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#edit-form'" data-id="edit-form" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Edit Form
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#form-fields'" data-id="form-fields" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Form Fields
+                                        </span>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+        </div>
+    </div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+    const el = document.querySelector('#doc section h1') 
+    if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+        import App from "/pages/vue/autoform.mjs" 
+    
+const Sidebar = {
+    setup() {
+        const open = ref(true)
+        return { open }
+    }
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="/lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="/lib/js/lite-yt-embed.js"></script>
+<script src="/mjs/docs.mjs" type="module"></script>
+
+
+<script type="module">
+import { setMetadata } from "/pages/vue/data.mjs"
+setMetadata()
+</script>
+    </main>
+</div>
+
+
+
+<script type="module">
+import { init } from "app.mjs"
+init()
+</script>
+
+
+
+</body>
+</html>

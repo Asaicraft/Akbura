@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg" href="/img/logo.svg">
+    <title>JSON API Client Features</title>
+    <script>
+    if (location.search === "?dark") localStorage.setItem('color-scheme','dark') 
+    if (location.search === "?light") localStorage.removeItem('color-scheme') 
+    const cls = document.querySelector('html').classList
+    if (localStorage.getItem('color-scheme') === 'dark')
+        cls.add('dark')
+    else
+        cls.remove('dark')
+    </script>
+    <link rel="stylesheet" href="/css/app.css">
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "/mjs/app.mjs",
+        "vue": "/lib/mjs/vue.min.mjs",
+        "@servicestack/client": "/lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "/lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+<body class="bg-white dark:bg-black dark:text-white">
+<header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+    <div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+      <div class="flex h-16 justify-between">
+        <div class="flex">
+          <div class="flex flex-shrink-0 items-center">
+            <a class="mr-2 lg:mr-8 flex items-center" href="/">
+                <svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+                <span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+            </a>
+          </div>
+            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+                <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+                        <a href="/whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            What's New
+                        </a>
+                        <a href="/vue/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+                            Vue
+                        </a>
+                        <a href="/creatorkit/" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Creator Kit
+                        </a>
+                        <a href="/videos" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                            Videos
+                        </a>
+            </div>
+        </div>
+        <div class="hidden sm:ml-6 sm:flex sm:items-center">
+            <dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+        </div>
+        <div class="-mr-2 flex items-center sm:hidden">
+          <!-- Mobile menu button -->
+          <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+            <span class="sr-only">Open main menu</span>
+            <!-- Menu open: "hidden", Menu closed: "block" -->
+            <svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+            <!-- Menu open: "block", Menu closed: "hidden" -->
+            <svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile menu, show/hide based on menu state. -->
+    <div v-cloak v-if="open" class="sm:hidden">
+        <div class="space-y-1 pb-3 pt-2">
+            <!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+                    <a href="/whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        What's New
+                    </a>
+                    <a href="/vue/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+                        Vue
+                    </a>
+                    <a href="/creatorkit/" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Creator Kit
+                    </a>
+                    <a href="/videos" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        Videos
+                    </a>
+        </div>
+    </div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+    setup() {
+        const open = ref(false)
+        return { open }
+    }
+}
+mount('#header', Header)
+</script>
+
+
+<div class="min-h-screen">
+    <main role="main" class="pt-16 pb-3">
+        
+
+
+
+<style>
+.active {
+    color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="/css/highlight.css">
+<link rel="stylesheet" href="/css/typography.css">
+<link rel="stylesheet" href="/css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+    <div class="flex flex-wrap">
+        <div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+            <button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+            </button>
+            <div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+                <nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+                    <close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+                                <a href="/vue" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>                                    <span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+Vue                                    </span>
+                                </a>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/vue/install" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Install
+                                    </a>
+                                </li>
+                        </ul>
+                                <h2 class="font-display font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                                    Component Gallery
+                                </h2>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/vue/autoquerygrid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        AutoQueryGrid
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/datagrid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        DataGrid
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/autoform" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Auto Forms
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/form-inputs" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Form Inputs
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/fileinput" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        FileInput
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/taginput" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        TagInput
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/combobox" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Combobox
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/autocomplete" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Autocomplete
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/modals" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Modals
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/navigation" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Navigation
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/alerts" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Alerts
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/formats" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        Formats
+                                    </a>
+                                </li>
+                        </ul>
+                                <h2 class="font-display font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                                    Library
+                                </h2>
+                        <ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+                                <li class="relative">
+                                    <a href="/vue/use-metadata" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useMetadata
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-client" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+                                        useClient
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-auth" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useAuth
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-formatters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useFormatters
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-files" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useFiles
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-config" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useConfig
+                                    </a>
+                                </li>
+                                <li class="relative">
+                                    <a href="/vue/use-utils" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+                                        useUtils
+                                    </a>
+                                </li>
+                        </ul>
+                </nav>
+            </div>
+        </div>
+        <div id="doc" class="mx-auto flex">
+            <div class="mt-8 mx-auto prose lg:prose-lg">
+                
+                    <section class="not-prose mb-16 md:mb-12">
+                        <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+                            JSON API Client Features
+                        </h1>
+                    </section>
+
+                <div class="not-prose"></div>
+
+                <div class="content">
+                    <p><a href="https://github.com/ServiceStack/servicestack-vue/blob/main/src/api.ts">useClient()</a> provides managed APIs around the <code>JsonServiceClient</code>
+instance registered in Vue App's with:</p>
+<pre><code class="language-js">app.provide('client', client)
+</code></pre>
+<p>Which maintains contextual information around your API calls like <strong>loading</strong> and <strong>error</strong> states, used by <code>@servicestack/vue</code> components to
+enable its auto validation binding. Other functionality in this provider include:</p>
+<pre><code class="language-js">let { 
+    api,            // Send a typed API request and return results in an ApiResult&lt;TResponse&gt;
+    apiVoid,        // Send a typed API request and return empty response in a void ApiResult
+    apiForm,        // Send a FormData API request and return results in an ApiResult&lt;TResponse&gt;
+    apiFormVoid,    // Send a FormData API request and return empty response in a void ApiResult
+    loading,        // Maintain loading state whilst API Request is in transit
+    error,          // Maintain API Error response in reactive Ref&lt;ResponseStatus&gt;
+    setError,       // Set API error state with summary or field validation error
+    addFieldError,  // Add field error to API error state
+    unRefs          // Returns a dto with all Refs unwrapped
+} = useClient()
+</code></pre>
+<p>Typically you would need to unwrap <code>ref</code> values when calling APIs, i.e:</p>
+<pre><code class="language-js">let client = new JsonServiceClient()
+let api = await client.api(new Hello({ name:name.value }))
+</code></pre>
+<h3 id="api">api<a class="header-anchor" href="javascript:;" onclick="location.hash='#api'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>This is unnecessary in useClient <code>api*</code> methods which automatically unwraps ref values, allowing for the more pleasant API call:</p>
+<pre><code class="language-js">let api = await client.api(new Hello({ name }))
+</code></pre>
+<h3 id="unrefs">unRefs<a class="header-anchor" href="javascript:;" onclick="location.hash='#unrefs'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>But as DTOs are typed, passing reference values will report a type annotation warning in IDEs with type-checking enabled,
+which can be avoided by explicitly unwrapping DTO ref values with <code>unRefs</code>:</p>
+<pre><code class="language-js">let api = await client.api(new Hello(unRefs({ name })))
+</code></pre>
+<h3 id="seterror">setError<a class="header-anchor" href="javascript:;" onclick="location.hash='#seterror'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p><code>setError</code> can be used to populate client-side validation errors which the
+<a href="https://github.com/NetCoreTemplates/vue-mjs/blob/main/AkburaDocs/wwwroot/Pages/SignUp.mjs">SignUp.mjs</a>
+component uses to report an invalid submissions when passwords don't match:</p>
+<pre><code class="language-js">const { api, setError } = useClient()
+async function onSubmit() {
+    if (password.value !== confirmPassword.value) {
+        setError({ fieldName:'confirmPassword', message:'Passwords do not match' })
+        return
+    }
+    //...
+}
+</code></pre>
+<h2 id="form-validation">Form Validation<a class="header-anchor" href="javascript:;" onclick="location.hash='#form-validation'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>All <code>@servicestack/vue</code> Input Components support contextual validation binding that's typically populated from API
+<a href="/error-handling">Error Response DTOs</a> but can also be populated from client-side validation
+as done above.</p>
+<h3 id="explicit-error-handling">Explicit Error Handling<a class="header-anchor" href="javascript:;" onclick="location.hash='#explicit-error-handling'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>This populated <code>ResponseStatus</code> DTO can either be manually passed into each component's <strong>status</strong> property as done in <a href="https://vue-mjs.web-templates.io/TodoMvc">/Todos</a>:</p>
+<pre><code class="language-html">&lt;template id=&quot;TodoMvc-template&quot;&gt;
+    &lt;div class=&quot;mb-3&quot;&gt;
+        &lt;text-input :status=&quot;store.error&quot; id=&quot;text&quot; label=&quot;&quot; placeholder=&quot;What needs to be done?&quot;
+                    v-model=&quot;store.newTodo&quot; v-on:keyup.enter.stop=&quot;store.addTodo()&quot;&gt;&lt;/text-input&gt;
+    &lt;/div&gt;
+    &lt;!-- ... --&gt;
+&lt;/template&gt;
+</code></pre>
+<p>Where if you try adding an empty Todo the <code>CreateTodo</code> API will fail and populate its <code>store.error</code> reactive property with the
+APIs Error Response DTO which the <code>&lt;TextInput /&gt;</code> component checks for to display any field validation errors matching the
+field in <code>id</code> adjacent to the HTML Input:</p>
+<pre><code class="language-js">let store = {
+    /** @type {Todo[]} */
+    todos: [],
+    newTodo:'',
+    error:null,
+    async refreshTodos(errorStatus) {
+        this.error = errorStatus
+        let api = await client.api(new QueryTodos())
+        if (api.succeeded)
+            this.todos = api.response.results
+    },
+    async addTodo() {
+        this.todos.push(new Todo({ text:this.newTodo }))
+        let api = await client.api(new CreateTodo({ text:this.newTodo }))
+        if (api.succeeded)
+            this.newTodo = ''
+        return this.refreshTodos(api.error)
+    },
+    //...
+}
+</code></pre>
+<h3 id="implicit-error-handling">Implicit Error Handling<a class="header-anchor" href="javascript:;" onclick="location.hash='#implicit-error-handling'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>More often you'll want to take advantage of the implicit validation support in <code>useClient()</code> which makes its state available to child
+components, alleviating the need to explicitly pass it in each component as seen in razor-tailwind's
+<a href="https://github.com/NetCoreTemplates/razor-tailwind/blob/main/AkburaDocs/wwwroot/Pages/Contacts.mjs">Contacts.mjs</a> <code>Edit</code> component for its
+<a href="https://vue-mjs.web-templates.io/Contacts">/Contacts</a> page which doesn't do any manual error handling:</p>
+<pre><code class="language-js">const Edit = {
+    template:/*html*/`&lt;SlideOver @done=&quot;close&quot; title=&quot;Edit Contact&quot;&gt;
+    &lt;form @submit.prevent=&quot;submit&quot;&gt;
+      &lt;input type=&quot;submit&quot; class=&quot;hidden&quot;&gt;
+      &lt;fieldset&gt;
+        &lt;ErrorSummary except=&quot;title,name,color,filmGenres,age,agree&quot; class=&quot;mb-4&quot; /&gt;
+        &lt;div class=&quot;grid grid-cols-6 gap-6&quot;&gt;
+          &lt;div class=&quot;col-span-6 sm:col-span-3&quot;&gt;
+            &lt;SelectInput id=&quot;title&quot; v-model=&quot;request.title&quot; :options=&quot;enumOptions('Title')&quot; /&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;col-span-6 sm:col-span-3&quot;&gt;
+            &lt;TextInput id=&quot;name&quot; v-model=&quot;request.name&quot; required placeholder=&quot;Contact Name&quot; /&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;col-span-6 sm:col-span-3&quot;&gt;
+            &lt;SelectInput id=&quot;color&quot; v-model=&quot;request.color&quot; :options=&quot;colorOptions&quot; /&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;col-span-6 sm:col-span-3&quot;&gt;
+            &lt;SelectInput id=&quot;favoriteGenre&quot; v-model=&quot;request.favoriteGenre&quot; :options=&quot;enumOptions('FilmGenre')&quot; /&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;col-span-6 sm:col-span-3&quot;&gt;
+            &lt;TextInput type=&quot;number&quot; id=&quot;age&quot; v-model=&quot;request.age&quot; /&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/fieldset&gt;
+    &lt;/form&gt;
+    &lt;template #footer&gt;
+      &lt;div class=&quot;flex justify-between space-x-3&quot;&gt;
+        &lt;div&gt;&lt;ConfirmDelete @delete=&quot;onDelete&quot;&gt;Delete&lt;/ConfirmDelete&gt;&lt;/div&gt;
+        &lt;div&gt;&lt;PrimaryButton @click=&quot;submit&quot;&gt;Update Contact&lt;/PrimaryButton&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/template&gt;
+  &lt;/SlideOver&gt;`,
+    props:['contact'],
+    emits:['done'],
+    setup(props, { emit }) {
+        const client = useClient()
+        const request = ref(new UpdateContact(props.contact))
+        const colorOptions = propertyOptions(getProperty('UpdateContact','Color'))
+
+        async function submit() {
+            const api = await client.api(request.value)
+            if (api.succeeded) close()
+        }
+        
+        async function onDelete () {
+            const api = await client.apiVoid(new DeleteContact({ id:props.id }))
+            if (api.succeeded) close()
+        }
+
+        const close = () =&gt; emit('done')
+        
+        return { request, enumOptions, colorOptions, submit, onDelete, close }
+    }
+}
+</code></pre>
+<p>This effectively makes form validation binding a transparent detail where all <code>@servicestack/vue</code>
+Input Components are able to automatically apply contextual validation errors next to the fields they apply to:</p>
+<div class="my-8">
+  <img class="mx-auto max-w-2xl" src="https://servicestack.net/img/pages/scripts/edit-contact-validation.png">
+</div>
+<h2 id="example-using-apiform">Example using apiForm<a class="header-anchor" href="javascript:;" onclick="location.hash='#example-using-apiform'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>An alternative method of invoking APIs is to submit a HTML Form Post which can be achieved with Ajax by sending a populated <code>FormData</code>
+with <code>client.apiForm()</code> as done in vue-mjs's
+<a href="https://github.com/NetCoreTemplates/vue-mjs/blob/main/AkburaDocs/wwwroot/Pages/SignUp.mjs">SignUp.mjs</a> for its
+<a href="https://vue-mjs.web-templates.io/signup">/signup</a> page:</p>
+<pre><code class="language-js">import { ref } from &quot;vue&quot;
+import { leftPart, rightPart, toPascalCase } from &quot;@servicestack/client&quot;
+import { useClient } from &quot;@servicestack/vue&quot;
+import { Register } from &quot;../mjs/dtos.mjs&quot;
+
+export default {
+    template:/*html*/`    
+    &lt;form @submit.prevent=&quot;submit&quot;&gt;
+      &lt;div class=&quot;shadow overflow-hidden sm:rounded-md&quot;&gt;
+        &lt;ErrorSummary except=&quot;displayName,userName,password,confirmPassword,autoLogin&quot; /&gt;
+        &lt;div class=&quot;px-4 py-5 bg-white dark:bg-black space-y-6 sm:p-6&quot;&gt;
+          &lt;div class=&quot;flex flex-col gap-y-4&quot;&gt;
+            &lt;TextInput id=&quot;displayName&quot; help=&quot;Your first and last name&quot; v-model=&quot;request.displayName&quot; /&gt;
+            &lt;TextInput id=&quot;userName&quot; label=&quot;Email&quot; placeholder=&quot;Email&quot; help=&quot;&quot; v-model=&quot;request.userName&quot; /&gt;
+            &lt;TextInput id=&quot;password&quot; type=&quot;password&quot; help=&quot;6 characters max&quot; v-model=&quot;request.password &quot;/&gt;
+            &lt;TextInput id=&quot;confirmPassword&quot; type=&quot;password&quot; v-model=&quot;request.confirmPassword&quot; /&gt;
+            &lt;CheckboxInput id=&quot;autoLogin&quot; v-model=&quot;request.autoLogin&quot; /&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;pt-5 px-4 py-3 bg-gray-50 dark:bg-gray-900 text-right sm:px-6&quot;&gt;
+          &lt;div class=&quot;flex justify-end&quot;&gt;
+            &lt;FormLoading v-if=&quot;loading&quot; class=&quot;flex-1&quot; /&gt;
+            &lt;PrimaryButton :disabled=&quot;loading&quot; class=&quot;ml-3&quot;&gt;Sign Up&lt;/PrimaryButton&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/form&gt;`,
+    props: { returnUrl:String },
+    setup(props) {
+        const client = useClient()
+        const { setError, loading } = client
+        const request = ref(new Register({ autoLogin:true }))
+
+        /** @param email {string} */
+        function setUser(email) {
+            let first = leftPart(email, '@')
+            let last = rightPart(leftPart(email, '.'), '@')
+            const dto = request.value
+            dto.displayName = toPascalCase(first) + ' ' + toPascalCase(last)
+            dto.userName = email
+            dto.confirmPassword = dto.password = 'p@55wOrd'
+        }
+        
+        /** @param {Event} e */
+        async function submit(e) {
+            if (request.value.password !== request.value.confirmPassword) {
+                setError({ fieldName: 'confirmPassword', message: 'Passwords do not match' })
+                return
+            }
+            
+            // Example using client.apiForm()
+            const api = await client.apiForm(new Register(), new FormData(e.target))
+            if (api.succeeded) {
+                location.href = props.returnUrl || '/signin'
+            }
+        }
+        
+        return { loading, request, setUser, submit }
+    }
+}
+</code></pre>
+<p>Which method to use is largely a matter of preference except if your form needs to upload a file in which case using <code>apiForm</code> is required.</p>
+<h2 id="autoform-components">AutoForm Components<a class="header-anchor" href="javascript:;" onclick="location.hash='#autoform-components'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>We can elevate our productivity even further with <a href="/vue/autoform">Auto Form Components</a> that can automatically generate an
+instant API-enabled form with validation binding by just specifying the Request DTO to create the form for, e.g:</p>
+<pre><code class="language-html">&lt;AutoCreateForm type=&quot;CreateBooking&quot; formStyle=&quot;card&quot; /&gt;
+</code></pre>
+<div class="mb-4 not-prose">
+<auto-create-form type="CreateBooking" form-style="card"></auto-create-form>
+</div>
+<p>The AutoForm components are powered by your <a href="/vue/use-metadata">App Metadata</a> which allows creating
+highly customized UIs from <a href="/locode/declarative">declarative C# attributes</a> whose customizations are
+reused across all ServiceStack Auto UIs.</p>
+<h2 id="typescript-definition">TypeScript Definition<a class="header-anchor" href="javascript:;" onclick="location.hash='#typescript-definition'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>TypeScript definition of the API surface area and type information for correct usage of <code>useClient()</code></p>
+<pre><code class="language-ts">/** Maintain loading state whilst API Request is in transit */
+const loading: Ref&lt;boolean&gt;
+
+/** Maintain API Error in reactive Ref&lt;ResponseStatus&gt; */
+const error: Ref&lt;ResponseStatus&gt;
+
+/** Set error state with summary or field validation error */
+function setError({ message, errorCode, fieldName, errors }: IResponseStatus);
+
+/** Add field error to API error state */
+function addFieldError({ fieldName, message, errorCode }: IResponseError);
+
+/** Send a typed API request and return results in an ApiResult&lt;TResponse&gt; */
+async function api&lt;TResponse&gt;(request:IReturn&lt;TResponse&gt; | ApiRequest, args?:any, method?:string);
+
+/** Send a typed API request and return empty response in a void ApiResult */
+async function apiVoid(request:IReturnVoid | ApiRequest, args?:any, method?:string);
+
+/** Send a FormData API request and return results in an ApiResult&lt;TResponse&gt; */
+async function apiForm&lt;TResponse&gt;(request:IReturn&lt;TResponse&gt; | ApiRequest, body:FormData, args?:any, method?:string);
+
+/** Send a FormData API request and return empty response in a void ApiResult */
+async function apiFormVoid(request: IReturnVoid | ApiRequest, body: FormData, args?: any, method?: string);
+</code></pre>
+
+                </div>
+
+                <div class="not-prose"></div>
+                
+                    <div class="not-prose py-8">
+                        <a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/main/AkburaDocs/_pages/vue/use-client.md" target="_blank" rel="noopener noreferrer">
+                            Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+                        </a>
+                    </div>
+
+                    <div class="not-prose my-20">
+                                <nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+                                    <div class="-mt-px flex w-0 flex-1">
+                                            <a href="/vue/use-metadata" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+                                                <!-- Heroicon name: mini/arrow-long-left -->
+                                                <svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+                                                </svg>
+                                                useMetadata
+                                            </a>
+                                    </div>
+                                    <div class="hidden md:-mt-px md:flex"></div>
+                                    <div class="-mt-px flex w-0 flex-1 justify-end">
+                                            <a href="/vue/use-auth" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+                                                useAuth
+                                                <!-- Heroicon name: mini/arrow-long-right -->
+                                                <svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+                                                </svg>
+                                            </a>
+                                    </div>
+                                </nav>
+                    </div>
+            </div>
+                
+                <div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+                    <div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+                        <div>
+                            <h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+                                On This Page
+                            </h5>
+                            <ul class="text-slate-700 text-sm leading-6">
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#form-validation'" data-id="form-validation" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Form Validation
+                                        </span>
+                                            <ul class="ml-4">
+                                                    <li data-id="explicit-error-handling" class="text-gray-500 hover:text-gray-900">
+                                                        <span v-hash="'#explicit-error-handling'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+                                                            <svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                                                            Explicit Error Handling
+                                                        </span>
+                                                    </li>
+                                                    <li data-id="implicit-error-handling" class="text-gray-500 hover:text-gray-900">
+                                                        <span v-hash="'#implicit-error-handling'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+                                                            <svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                                                            Implicit Error Handling
+                                                        </span>
+                                                    </li>
+                                            </ul>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#example-using-apiform'" data-id="example-using-apiform" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            Example using apiForm
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#autoform-components'" data-id="autoform-components" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            AutoForm Components
+                                        </span>
+                                    </li>
+                                    <li class="group text-gray-800 hover:text-gray-900">
+                                        <span v-hash="'#typescript-definition'" data-id="typescript-definition" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+                                            TypeScript Definition
+                                        </span>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+        </div>
+    </div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+    const el = document.querySelector('#doc section h1') 
+    if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+    const App = {
+        setup() {
+            function nav(url) {
+                window.open(url)
+            }
+            return { nav }
+        }
+    }
+    
+const Sidebar = {
+    setup() {
+        const open = ref(true)
+        return { open }
+    }
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="/lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="/lib/js/lite-yt-embed.js"></script>
+<script src="/mjs/docs.mjs" type="module"></script>
+
+
+<script type="module">
+import { setMetadata } from "/pages/vue/data.mjs"
+setMetadata()
+</script>
+    </main>
+</div>
+
+
+
+<script type="module">
+import { init } from "app.mjs"
+init()
+</script>
+
+
+
+</body>
+</html>

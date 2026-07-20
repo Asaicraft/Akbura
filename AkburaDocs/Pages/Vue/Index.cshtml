@@ -5,7 +5,7 @@
     ViewData["Brand"] = "ServiceStack Vue";
 }
 
-<link rel="stylesheet" href="/css/typography.css">
+<link rel="stylesheet" href="css/typography.css">
 @await Html.PartialAsync("VideoIncludes")
 @await Html.PartialAsync("HighlightIncludes")
 
@@ -589,6 +589,6 @@ mount('#app', App)
 </div>
 
 <script type="module">
-import { setMetadata } from "/pages/vue/data.mjs"
+import { setMetadata } from "pages/vue/data.mjs"
 setMetadata()
 </script>

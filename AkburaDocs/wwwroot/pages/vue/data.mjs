@@ -3,10 +3,10 @@ import { useFiles, useMetadata } from "@servicestack/vue"
 const { getMimeType } = useFiles()
 
 export async function fetchBookings() {
-    return await (await fetch('/pages/vue/bookings.json')).json()
+    return await (await fetch('pages/vue/bookings.json')).json()
 }
 export async function fetchMetadata() {
-    return await (await fetch('/pages/vue/metadata.json')).json()
+    return await (await fetch('pages/vue/metadata.json')).json()
 }
 export async function setMetadata() {
     const { setMetadata } = useMetadata()

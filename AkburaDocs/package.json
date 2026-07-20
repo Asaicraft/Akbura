@@ -8,5 +8,8 @@
         "ui:build": "tailwindcss -i ./tailwind.input.css -o ./wwwroot/css/app.css --minify",
         "build": "npm run ui:build",
         "prerender": "npm run build && dotnet run --AppTasks=prerender --environment Production"
+    },
+    "devDependencies": {
+        "eslint": "^10.7.0"
     }
 }

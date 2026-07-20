@@ -27,5 +27,7 @@
   <Project Path="AkburaDocs/AkburaDocs.csproj">
     <BuildType Solution="DebugStats|*" Project="Debug" />
     <BuildType Solution="ReleaseStats|*" Project="Release" />
+    <Build Solution="DebugStats|*" Project="false" />
+    <Build Solution="Debug|*" Project="false" />
   </Project>
 </Solution>

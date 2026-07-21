@@ -1,6 +1,4 @@
 using Akbura.CompilerAnotations;
-using Avalonia;
-using Avalonia.Controls;
 using System;
 
 namespace Akbura.Akcss;
@@ -49,32 +47,26 @@ public abstract class AkcssStyle
     protected bool? IsInlinedCore { get; set; }
 
     /// <summary>
-    /// Returns a signal that this style should be applied again.
-    /// Emitted values are always <see cref="AvaloniaProperty.UnsetValue"/> and should be ignored.
+    /// Removes values previously written by this style.
     /// </summary>
-    public virtual IObservable<object?> Watch(object target)
+    /// <remarks>
+    /// Generated styles override this method and clear their values in reverse cascade order.
+    /// Hand-written interceptors only need to override it when they retain values between updates.
+    /// </remarks>
+    public virtual void Reset(object target)
     {
         ArgumentNullException.ThrowIfNull(target);
-        return EmptyStyleSignal.Instance;
     }
 
-    private sealed class EmptyStyleSignal : IObservable<object?>
+    /// <summary>
+    /// Returns a signal that this style should be applied again.
+    /// </summary>
+    /// <remarks>
+    /// The default implementation observes properties declared with
+    /// <see cref="ObservesPropertyAttribute"/>. Emitted values are signals only.
+    /// </remarks>
+    public virtual IObservable<object?> Watch(object target)
     {
-        public static readonly EmptyStyleSignal Instance = new();
-
-        public IDisposable Subscribe(IObserver<object?> observer)
-        {
-            ArgumentNullException.ThrowIfNull(observer);
-            return EmptyDisposable.Instance;
-        }
-    }
-
-    private sealed class EmptyDisposable : IDisposable
-    {
-        public static readonly EmptyDisposable Instance = new();
-
-        public void Dispose()
-        {
-        }
+        return AkcssObservedPropertySignal.Create(GetType(), target);
     }
 }

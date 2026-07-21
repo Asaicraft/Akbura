@@ -1,57 +1,65 @@
 [
   {
-    "text": "Introduction",
+    "text": "Akbura",
     "link": "/",
     "children": [
       {
-        "text": "What is Razor Press?",
-        "link": "/what-is-razor-press"
+        "text": "Quick Start",
+        "link": "/#quick-start"
       },
       {
-        "text": "Structure",
-        "link": "/structure"
+        "text": "How Akbura Works",
+        "link": "/#how-akbura-works"
       },
       {
-        "text": "Static Site Generation",
-        "link": "/ssg"
-      },
-      {
-        "text": "Deployments",
-        "link": "/deployments"
+        "text": "Core Concepts",
+        "link": "/#core-concepts"
       }
     ]
   },
   {
-    "text": "Markdown",
+    "text": "Language",
     "children": [
       {
-        "text": "Markdown Syntax",
-        "link": "/syntax"
+        "text": "Components and Markup",
+        "link": "/#components-and-markup"
       },
       {
-        "text": "Markdown Containers",
-        "link": "/containers"
+        "text": "Reactive State",
+        "link": "/#reactive-state"
       },
       {
-        "text": "Using Vue in Markdown",
-        "link": "/vue-in-markdown"
+        "text": "Parameters and Data Flow",
+        "link": "/#parameters-and-data-flow"
+      },
+      {
+        "text": "Effects and Hooks",
+        "link": "/#effects-and-hooks"
+      },
+      {
+        "text": "Commands",
+        "link": "/#commands"
+      },
+      {
+        "text": "AKCSS",
+        "link": "/#akcss"
       }
     ]
   },
   {
-    "text": "Features",
+    "text": "Project",
     "children": [
       {
-        "text": "Sidebars",
-        "link": "/sidebars"
+        "text": "Status and Limitations",
+        "link": "/#project-status"
       },
       {
-        "text": "Redirects",
-        "link": "/redirects"
+        "text": "Community and Feedback",
+        "link": "/#community-and-feedback"
       },
       {
-        "text": "Typesense Real-Time Search",
-        "link": "/typesense"
+        "text": "GitHub",
+        "link": "https://github.com/Asaicraft/Akbura"
       }
     ]
   }

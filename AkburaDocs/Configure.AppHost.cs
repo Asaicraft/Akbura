@@ -13,9 +13,3 @@ public class AppHost() : AppHostBase("AkburaDocs"), IHostingStartup
     {
     }
 }
-
-public class Hello : IGet, IReturn<StringResponse> {}
-public class MyServices : Service
-{
-    public object Any(Hello request) => new StringResponse { Result = $"Hello, World!" };
-}

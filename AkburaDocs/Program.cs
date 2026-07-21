@@ -8,7 +8,7 @@ if (builder.Environment.IsDevelopment())
     mvcBuilder.AddRazorRuntimeCompilation();
 }
 
-services.AddServiceStack(typeof(MyServices).Assembly);
+services.AddServiceStack(typeof(AppHost).Assembly);
 
 var app = builder.Build();
 

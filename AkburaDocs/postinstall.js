@@ -29,7 +29,6 @@ const hostFiles = [
     'Markdown.Meta.cs',
     'Markdown.Pages.cs',
     'Markdown.WhatsNew.cs',
-    'Markdown.Videos.cs',
     'MarkdownPagesBase.cs',
     'MarkdownTagHelper.cs',
 ]

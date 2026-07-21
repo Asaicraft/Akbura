@@ -20,7 +20,6 @@ public class ConfigureSsg : IHostingStartup
             services.AddSingleton<MarkdownIncludes>();
             services.AddSingleton<MarkdownPages>();
             services.AddSingleton<MarkdownWhatsNew>();
-            services.AddSingleton<MarkdownVideos>();
             services.AddSingleton<MarkdownMeta>();
         })
         .ConfigureAppHost(
@@ -45,15 +44,13 @@ public class ConfigureSsg : IHostingStartup
                 var includes = appHost.Resolve<MarkdownIncludes>();
                 var pages = appHost.Resolve<MarkdownPages>();
                 var whatsNew = appHost.Resolve<MarkdownWhatsNew>();
-                var videos = appHost.Resolve<MarkdownVideos>();
                 var meta = appHost.Resolve<MarkdownMeta>();
 
-                meta.Features = [pages, whatsNew, videos];
+                meta.Features = [pages, whatsNew];
                 
                 includes.LoadFrom("_includes");
                 pages.LoadFrom("_pages");
                 whatsNew.LoadFrom("_whatsnew");
-                videos.LoadFrom("_videos");
                 AppConfig.Instance.Init(appHost.ContentRootDirectory);
             },
             afterAppHostInit: appHost =>
@@ -107,8 +104,8 @@ public class AppConfig
             if (pos >= 0)
             {
                 var url = txt[(pos + "url = ".Length)..].LeftPart(".git").LeftPart('\n').Trim();
-                GitPagesBaseUrl = url.CombineWith($"blob/main/{srcDir.Name}");
-                GitPagesRawBaseUrl = url.Replace("github.com","raw.githubusercontent.com").CombineWith($"refs/heads/main/{srcDir.Name}");
+                GitPagesBaseUrl = url.CombineWith($"blob/master/{srcDir.Name}");
+                GitPagesRawBaseUrl = url.Replace("github.com","raw.githubusercontent.com").CombineWith($"refs/heads/master/{srcDir.Name}");
             }
         }
     }

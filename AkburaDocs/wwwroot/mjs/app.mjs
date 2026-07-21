@@ -1,11 +1,7 @@
 import { createApp, reactive, ref } from "vue"
 import { JsonApiClient, $1, $$ } from "@servicestack/client"
 import ServiceStackVue from "@servicestack/vue"
-import HelloApi from "./components/HelloApi.mjs"
-import GettingStarted from "./components/GettingStarted.mjs"
 import ShellCommand from "./components/ShellCommand.mjs"
-import VueComponentGallery from "./components/VueComponentGallery.mjs"
-import VueComponentLibrary from "./components/VueComponentLibrary.mjs"
 import { PagingNav, FileLayout } from './components/Docs.mjs'
 
 let client = null, Apps = []

@@ -25,10 +25,10 @@ public abstract class AkburaControl : Control, IComponentTree
 	public static readonly StyledProperty<Thickness> PaddingProperty =
 		Decorator.PaddingProperty.AddOwner<AkburaControl>();
 
-	public static readonly AttachedProperty<ImmutableArray<TailwindUtilityActivator>> TailwindUtilitiesProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, ImmutableArray<TailwindUtilityActivator>>(
-			"TailwindUtilities",
-			coerce: CoerceTailwindUtilities);
+	public static readonly AttachedProperty<ImmutableArray<AkcssStyleActivator>> AkcssStylesProperty =
+		AvaloniaProperty.RegisterAttached<AkburaControl, Control, ImmutableArray<AkcssStyleActivator>>(
+			"AkcssStyles",
+			coerce: CoerceAkcssStyles);
 
 	/// <summary>
 	/// Initializes static members of the <see cref="Decorator"/> class.
@@ -38,6 +38,7 @@ public abstract class AkburaControl : Control, IComponentTree
 		AffectsMeasure<AkburaControl>(ChildProperty, PaddingProperty);
 		ChildProperty.Changed.AddClassHandler<AkburaControl>((x, e) => x.ChildChanged(e));
 		InitializeExplicitThickness();
+		AkcssStylesProperty.Changed.AddClassHandler<Control>(OnAkcssStylesChanged);
 	}
 
 	public Control? Child
@@ -54,52 +55,79 @@ public abstract class AkburaControl : Control, IComponentTree
 		set => SetValue(PaddingProperty, value);
 	}
 
-	public static ImmutableArray<TailwindUtilityActivator> GetTailwindUtilities(Control control)
+	/// <summary>
+	/// Gets the ordered AKCSS applications attached to a control.
+	/// </summary>
+	public static ImmutableArray<AkcssStyleActivator> GetAkcssStyles(Control control)
 	{
 		ArgumentNullException.ThrowIfNull(control);
 
-		var utilities = control.GetValue(TailwindUtilitiesProperty);
-		return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
+		var styles = control.GetValue(AkcssStylesProperty);
+		return styles.IsDefault ? ImmutableArray<AkcssStyleActivator>.Empty : styles;
 	}
 
-	public static void SetTailwindUtilities(
+	/// <summary>
+	/// Attaches the complete ordered AKCSS cascade to a control.
+	/// </summary>
+	public static void SetAkcssStyles(
 		Control control,
-		ImmutableArray<TailwindUtilityActivator> utilities)
+		ImmutableArray<AkcssStyleActivator> styles)
 	{
 		ArgumentNullException.ThrowIfNull(control);
 
-		if (control.IsSet(TailwindUtilitiesProperty))
+		if (control.IsSet(AkcssStylesProperty))
 		{
-			throw new InvalidOperationException("TailwindUtilities has already been set.");
+			throw new InvalidOperationException("AkcssStyles has already been set.");
 		}
 
 		control.SetValue(
-			TailwindUtilitiesProperty,
-			utilities.IsDefault ? [] : utilities);
+			AkcssStylesProperty,
+			ValidateAkcssStyles(styles));
 	}
 
-	public static void ExecuteTailwindUtilities(Control control)
+	/// <summary>
+	/// Reapplies the complete AKCSS cascade attached to a control.
+	/// </summary>
+	public static void ExecuteAkcssStyles(Control control)
 	{
-		foreach (var utility in GetTailwindUtilities(control))
+		ArgumentNullException.ThrowIfNull(control);
+		AkcssRuntime.Refresh(control);
+	}
+
+	private static ImmutableArray<AkcssStyleActivator> CoerceAkcssStyles(
+		AvaloniaObject sender,
+		ImmutableArray<AkcssStyleActivator> styles)
+		=> ValidateAkcssStyles(styles);
+
+	private static ImmutableArray<AkcssStyleActivator> ValidateAkcssStyles(
+		ImmutableArray<AkcssStyleActivator> styles)
+	{
+		if (styles.IsDefault)
 		{
-			if (utility.Condition)
+			return [];
+		}
+
+		for (var index = 0; index < styles.Length; index++)
+		{
+			if (styles[index] == null)
 			{
-				utility.Execute(control);
+				throw new ArgumentException(
+					$"AKCSS style activator at index {index} is null.",
+					nameof(styles));
 			}
 		}
+
+		return styles;
 	}
 
-	private static ImmutableArray<TailwindUtilityActivator> CoerceTailwindUtilities(
-		AvaloniaObject sender,
-		ImmutableArray<TailwindUtilityActivator> utilities)
+	private static void OnAkcssStylesChanged(
+		Control control,
+		AvaloniaPropertyChangedEventArgs args)
 	{
-		if (TailwindUtilitiesProperty != null &&
-			sender.IsSet(TailwindUtilitiesProperty))
-		{
-			throw new InvalidOperationException("TailwindUtilities has already been set.");
-		}
-
-		return utilities.IsDefault ? ImmutableArray<TailwindUtilityActivator>.Empty : utilities;
+		var styles = args.NewValue is ImmutableArray<AkcssStyleActivator> value
+			? value
+			: ImmutableArray<AkcssStyleActivator>.Empty;
+		AkcssRuntime.SetStyles(control, styles);
 	}
 
 	private readonly AkburaEngine _engine;

@@ -10,6 +10,10 @@
       {
         "text": "Custom Class Styles",
         "link": "/akcss/custom-classes"
+      },
+      {
+        "text": "Inline AKCSS",
+        "link": "/akcss/inline-akcss"
       }
     ]
   }

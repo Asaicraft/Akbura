@@ -1,0 +1,29 @@
+﻿@page "/akcss/{Slug}"
+@model AkburaDocs.Page
+@inject MarkdownPages Markdown
+
+@implements IRenderStatic<AkburaDocs.Page>
+
+@functions {
+    public List<Page> GetStaticProps(RenderContext ctx) =>
+        ctx.Resolve<MarkdownPages>()
+            .GetVisiblePages("akcss")
+            .Where(page => page.Slug != "akcss/index")
+            .Map(page => new Page
+            {
+                Slug = page.Slug.RightPart('/')
+            });
+}
+
+@await Html.PartialAsync("DocsPage", new Shared.DocsPage
+{
+    Brand = "AKCSS",
+    Slug = Model.Slug,
+    Folder = "akcss",
+    DefaultMenu = new MarkdownMenu
+    {
+        Icon = Markdown.DefaultMenuIcon,
+        Text = "AKCSS",
+        Link = "/akcss/",
+    },
+}.Init(this, Markdown))

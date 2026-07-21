@@ -1,0 +1,143 @@
+# AKCSS Styles for Custom Classes
+Source: Akbura/akcss/custom-classes
+
+AKCSS declarations can target ordinary C# classes as well as Avalonia controls. This is useful when markup creates or configures data objects alongside the visual tree.
+
+## Define a custom class
+
+`MyClass.cs`:
+
+```csharp
+namespace Data;
+
+public class MyClass
+{
+    public int Age { get; set; }
+}
+```
+
+Import its namespace and declare type-only, typed-class, and mixed styles.
+
+`Styles.akcss`:
+
+```akcss
+@using Data;
+
+MyClass {
+    Age: 1;
+}
+
+MyClass.anotherStyle {
+    Age: 10;
+}
+
+.myStyle {
+    MyClass.Age: 10;
+    Padding: 10;
+}
+```
+
+Use the styles from markup:
+
+`Styles.akbura`:
+
+```akbura
+using Data;
+
+<StackPanel>
+    <Button class="myStyle">Hello world!</Button>
+
+    <Button>
+        <MyClass class="myStyle"/>
+    </Button>
+
+    <Button>
+        <MyClass/>
+    </Button>
+</StackPanel>
+```
+
+## Properties are applied by target compatibility
+
+AKCSS binds every declaration against the object that receives the style. A declaration is applied only when its property belongs to that target type.
+
+For `.myStyle`:
+
+```akcss
+.myStyle {
+    MyClass.Age: 10;
+    Padding: 10;
+}
+```
+
+the result depends on the target:
+
+| Target | Applied | Ignored |
+| --- | --- | --- |
+| `Button` | `Padding: 10` | `MyClass.Age: 10` |
+| `MyClass` | `MyClass.Age: 10` | `Padding: 10` |
+
+`MyClass.Age` does not belong to `Button`, so it is skipped when `.myStyle` is placed on a button. Conversely, `MyClass` has no `Padding` property, so that declaration is skipped when the same style is placed on `MyClass`.
+
+This allows a shared class selector to contain declarations for several compatible target types without writing separate class names for each one.
+
+## Typed selectors
+
+A target type can be combined with an optional class name:
+
+```akcss
+MyClass {
+    Age: 1;
+}
+
+MyClass.anotherStyle {
+    Age: 10;
+}
+```
+
+- `MyClass` is a type-only selector and applies its declarations to that type.
+- `MyClass.anotherStyle` also requires `class="anotherStyle"`.
+
+Use a parenthesized or globally qualified selector when the type name is nested or ambiguous:
+
+```akcss
+(Data.MyClass) { }
+(global::Data.MyClass).anotherStyle { }
+```
+
+## Reactive custom properties
+
+Expressions over custom objects follow the same observation rules as control styles. If the owning object implements `INotifyPropertyChanged`, AKCSS can reapply a style when a referenced property changes:
+
+```csharp
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace Data;
+
+public class MyClass : INotifyPropertyChanged
+{
+    private int _age;
+
+    public int Age
+    {
+        get => _age;
+        set
+        {
+            if (_age == value)
+            {
+                return;
+            }
+
+            _age = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Age)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+```
+
+Without `INotifyPropertyChanged` or another supported observable source, the initial style value is still applied, but later property changes do not automatically trigger reevaluation.
+
+

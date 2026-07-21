@@ -19,3 +19,7 @@ Project
  - [Status and Limitations](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
  - [Community and Feedback](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
  - [GitHub](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/https://github.com/Asaicraft/Akbura.md)
+
+AKCSS
+ - [Getting Started](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/akcss/.md)
+ - [Custom Class Styles](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/akcss/custom-classes.md): AKCSS Styles for Custom Classes

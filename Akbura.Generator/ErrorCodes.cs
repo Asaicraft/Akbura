@@ -34,6 +34,9 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_MarkupPropertyNotFound = nameof(AKBURA_SEMANTIC_MarkupPropertyNotFound);
     public const string AKBURA_SEMANTIC_MarkupRequiredParameterNotSet = nameof(AKBURA_SEMANTIC_MarkupRequiredParameterNotSet);
     public const string AKBURA_SEMANTIC_MarkupExpressionError = nameof(AKBURA_SEMANTIC_MarkupExpressionError);
+    public const string AKBURA_SEMANTIC_MarkupNameInvalid = nameof(AKBURA_SEMANTIC_MarkupNameInvalid);
+    public const string AKBURA_SEMANTIC_MarkupNameDuplicate = nameof(AKBURA_SEMANTIC_MarkupNameDuplicate);
+    public const string AKBURA_SEMANTIC_MarkupNameInsideTemplateContent = nameof(AKBURA_SEMANTIC_MarkupNameInsideTemplateContent);
     public const string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert = nameof(AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert);
     public const string AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed = nameof(AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed);
     public const string AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported = nameof(AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported);

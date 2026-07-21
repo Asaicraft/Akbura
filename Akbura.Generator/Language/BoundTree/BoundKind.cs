@@ -17,6 +17,7 @@ internal enum BoundKind : byte
     MarkupComponent,
     MarkupContent,
     MarkupContentSetter,
+    MarkupNameAssignment,
     MarkupPropertySetter,
     MarkupCommandBinding,
     MarkupRoutedEventBinding,

@@ -1561,6 +1561,11 @@ internal partial class AkburaSemanticModel
         return IsMarkupDirective(markupAttribute, "ItemName");
     }
 
+    internal static bool IsMarkupNameDirective(MarkupAttributeSyntax markupAttribute)
+    {
+        return IsMarkupDirective(markupAttribute, "Name");
+    }
+
     private static bool IsMarkupDirective(
         MarkupAttributeSyntax markupAttribute,
         string name)

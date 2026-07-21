@@ -33,6 +33,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         {
             BoundKind.MarkupComponent => CreateMarkupContentOperation((BoundMarkupComponent)boundNode),
             BoundKind.MarkupContentSetter => CreateMarkupContentOperation((BoundMarkupContentSetter)boundNode),
+            BoundKind.MarkupNameAssignment => CreateMarkupNameAssignmentOperation((BoundMarkupNameAssignment)boundNode),
             BoundKind.MarkupPropertySetter => CreateMarkupPropertySetterOperation((BoundMarkupPropertySetter)boundNode),
             BoundKind.MarkupCommandBinding => CreateMarkupCommandBindingOperation((BoundMarkupCommandBinding)boundNode),
             BoundKind.MarkupRoutedEventBinding => CreateMarkupRoutedEventBindingOperation((BoundMarkupRoutedEventBinding)boundNode),
@@ -223,6 +224,16 @@ internal sealed class AkburaOperationFactory : IOperationFactory
                 boundNode.Syntax,
                 boundNode.ValueOperation,
                 CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
+    }
+
+    private static MarkupNameAssignmentOperation CreateMarkupNameAssignmentOperation(
+        BoundMarkupNameAssignment boundNode)
+    {
+        return new MarkupNameAssignmentOperation(
+            boundNode.Syntax,
+            boundNode.ContainingComponent,
+            boundNode.NameSymbol,
+            boundNode.HasErrors);
     }
 
     private MarkupPropertySetterOperation CreateMarkupPropertySetterOperation(

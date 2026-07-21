@@ -1,7 +1,9 @@
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
@@ -9,6 +11,7 @@ namespace Akbura.Language.Binder;
 internal sealed class ComponentBinder : Binder
 {
     private ImmutableArray<ISymbol> _lazyDeclaredSymbols;
+    private ImmutableArray<ISymbol> _lazyMarkupNameSymbols;
 
     public ComponentBinder(
         AkburaSemanticModel semanticModel,
@@ -34,7 +37,31 @@ internal sealed class ComponentBinder : Binder
             return base.GetDeclaredSymbolsForScope(scopeDesignator);
         }
 
-        return GetDeclaredSymbols();
+        var declaredSymbols = GetDeclaredSymbols();
+        var markupNameSymbols = GetDeclaredMarkupNameSymbols();
+        if (declaredSymbols.IsEmpty)
+        {
+            return markupNameSymbols;
+        }
+
+        if (markupNameSymbols.IsEmpty)
+        {
+            return declaredSymbols;
+        }
+
+        using var builder = ImmutableArrayBuilder<ISymbol>.Rent(
+            declaredSymbols.Length + markupNameSymbols.Length);
+        foreach (var symbol in declaredSymbols)
+        {
+            builder.Add(symbol);
+        }
+
+        foreach (var symbol in markupNameSymbols)
+        {
+            builder.Add(symbol);
+        }
+
+        return builder.ToImmutable();
     }
 
     public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
@@ -78,6 +105,12 @@ internal sealed class ComponentBinder : Binder
             result.SetSymbol(symbol);
             return;
         }
+
+        var markupName = FindDeclaredSymbol(GetDeclaredMarkupNameSymbols(), name);
+        if (markupName != null)
+        {
+            result.SetSymbol(markupName);
+        }
     }
 
     private static bool IsComponentMemberDeclaration(DeclarationKind kind)
@@ -111,6 +144,44 @@ internal sealed class ComponentBinder : Binder
         }
 
         return true;
+    }
+
+    internal ImmutableArray<ISymbol> GetDeclaredMarkupNameSymbols()
+    {
+        if (!_lazyMarkupNameSymbols.IsDefault)
+        {
+            return _lazyMarkupNameSymbols;
+        }
+
+        if (ScopeDesignator?.Kind != AkburaSyntaxKind.AkburaDocumentSyntax)
+        {
+            ImmutableInterlocked.InterlockedInitialize(
+                ref _lazyMarkupNameSymbols,
+                ImmutableArray<ISymbol>.Empty);
+            return _lazyMarkupNameSymbols;
+        }
+
+        var document = Unsafe.As<AkburaDocumentSyntax>(ScopeDesignator);
+        using var builder = ImmutableArrayBuilder<ISymbol>.Rent();
+        foreach (var member in document.Members)
+        {
+            if (member.Kind != AkburaSyntaxKind.MarkupRootSyntax)
+            {
+                continue;
+            }
+
+            var scope = SemanticModel.BindingSession.GetMarkupNameScope(
+                Unsafe.As<MarkupRootSyntax>(member));
+            foreach (var symbol in scope.GetDeclaredSymbols(SemanticModel))
+            {
+                builder.Add(symbol);
+            }
+        }
+
+        ImmutableInterlocked.InterlockedInitialize(
+            ref _lazyMarkupNameSymbols,
+            builder.ToImmutable());
+        return _lazyMarkupNameSymbols;
     }
 
     private ImmutableArray<ISymbol> GetDeclaredSymbols()

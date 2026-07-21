@@ -48,13 +48,33 @@ internal sealed partial class MarkupBinder : Binder
 
     public override ImmutableArray<ISymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
     {
-        if (!OwnsScope(scopeDesignator) ||
-            GetDeclaredItemSymbol() is not { } itemSymbol)
+        if (!OwnsScope(scopeDesignator))
         {
             return base.GetDeclaredSymbolsForScope(scopeDesignator);
         }
 
-        return ImmutableArray.Create<ISymbol>(itemSymbol);
+        var itemSymbol = GetDeclaredItemSymbol();
+        var nameSymbols = GetDeclaredNameSymbols();
+        if (itemSymbol == null)
+        {
+            return nameSymbols.IsEmpty
+                ? base.GetDeclaredSymbolsForScope(scopeDesignator)
+                : nameSymbols;
+        }
+
+        if (nameSymbols.IsEmpty)
+        {
+            return ImmutableArray.Create<ISymbol>(itemSymbol);
+        }
+
+        using var builder = ImmutableArrayBuilder<ISymbol>.Rent(nameSymbols.Length + 1);
+        builder.Add(itemSymbol);
+        foreach (var nameSymbol in nameSymbols)
+        {
+            builder.Add(nameSymbol);
+        }
+
+        return builder.ToImmutable();
     }
 
     protected override void LookupSymbolsInSingleBinder(
@@ -71,6 +91,15 @@ internal sealed partial class MarkupBinder : Binder
             string.Equals(itemSymbol.Name, name, System.StringComparison.Ordinal))
         {
             result.SetSymbol(itemSymbol);
+        }
+
+        if (!result.IsComplete)
+        {
+            var nameSymbol = FindDeclaredSymbol(GetDeclaredNameSymbols(), name);
+            if (nameSymbol != null)
+            {
+                result.SetSymbol(nameSymbol);
+            }
         }
     }
 
@@ -96,6 +125,37 @@ internal sealed partial class MarkupBinder : Binder
 
         Volatile.Write(ref _itemSymbolInitialized, 1);
         return _lazyItemSymbol;
+    }
+
+    internal ImmutableArray<ISymbol> GetDeclaredNameSymbols()
+    {
+        var scope = GetNameScope();
+        return scope?.GetDeclaredSymbols(SemanticModel) ?? ImmutableArray<ISymbol>.Empty;
+    }
+
+    internal bool TryGetDeclaredNameDeclaration(
+        MarkupAttachedPropertyAttributeSyntax attribute,
+        out MarkupNameDeclaration declaration)
+    {
+        var scope = GetNameScope();
+        if (scope != null)
+        {
+            return scope.TryGetDeclaration(attribute, out declaration);
+        }
+
+        declaration = null!;
+        return false;
+    }
+
+    private MarkupNameScope? GetNameScope()
+    {
+        if (ScopeDesignator?.Kind != AkburaSyntaxKind.MarkupRootSyntax)
+        {
+            return null;
+        }
+
+        return SemanticModel.BindingSession.GetMarkupNameScope(
+            Unsafe.As<MarkupRootSyntax>(ScopeDesignator));
     }
 
     public override BoundNode BindOperationSyntax(AkburaSyntax syntax)
@@ -464,9 +524,30 @@ internal sealed partial class MarkupBinder : Binder
 
     private BoundNode BindMarkupPropertyOrEvent(MarkupAttributeSyntax markupAttribute)
     {
+        if (AkburaSemanticModel.IsMarkupNameDirective(markupAttribute))
+        {
+            return BindMarkupNameAssignment(
+                Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute));
+        }
+
         return SemanticModel.GetSymbolInfo(markupAttribute).Symbol is IRoutedEventSymbol routedEvent
             ? BindMarkupRoutedEvent(markupAttribute, routedEvent)
             : BindMarkupPropertySetter(markupAttribute);
+    }
+
+    private BoundMarkupNameAssignment BindMarkupNameAssignment(
+        MarkupAttachedPropertyAttributeSyntax markupAttribute)
+    {
+        var symbolInfo = SemanticModel.GetSymbolInfo(markupAttribute);
+        var containingComponent = SemanticModel.GetContainingMarkupComponentSymbol(markupAttribute);
+        var diagnostics = SemanticModel.GetCachedSemanticDiagnostics(markupAttribute);
+        return new BoundMarkupNameAssignment(
+            markupAttribute,
+            this,
+            symbolInfo,
+            containingComponent,
+            diagnostics,
+            symbolInfo.Symbol is not IMarkupNameSymbol || diagnostics.Length > 0);
     }
 
     private BoundNode BindMarkupPropertySetter(MarkupAttributeSyntax markupAttribute)

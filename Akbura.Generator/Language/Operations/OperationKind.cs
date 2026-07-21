@@ -12,6 +12,7 @@ internal enum OperationKind
     MarkupAttribute,
     MarkupText,
     InlineExpression,
+    MarkupNameAssignment,
     StateDeclaration,
     StateInitializer,
     ParamDeclaration,

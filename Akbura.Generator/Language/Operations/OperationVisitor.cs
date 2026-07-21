@@ -25,6 +25,8 @@ internal abstract class OperationVisitor
 
     public virtual void VisitMarkupContent(IMarkupContentOperation operation) => DefaultVisit(operation);
 
+    public virtual void VisitMarkupNameAssignment(IMarkupNameAssignmentOperation operation) => DefaultVisit(operation);
+
     public virtual void VisitMarkupPropertySetter(IMarkupPropertySetterOperation operation) => DefaultVisit(operation);
 
     public virtual void VisitMarkupCommandBinding(IMarkupCommandBindingOperation operation) => DefaultVisit(operation);

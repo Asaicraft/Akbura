@@ -17,12 +17,15 @@ internal sealed class BindingSession
     private readonly AkburaSemanticModel _semanticModel;
     private readonly BinderFactory _binderFactory;
     private readonly ConcurrentCache<BinderCacheKey, Binder> _blockBinderCache;
+    private ImmutableDictionary<MarkupRootSyntax, MarkupNameScope> _markupNameScopes =
+        ImmutableDictionary<MarkupRootSyntax, MarkupNameScope>.Empty;
 
     public BindingSession(AkburaSemanticModel semanticModel)
     {
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         RootBinder = new CompilationBinder(semanticModel);
         MarkupDataTypes = new MarkupDataTypeResolver(semanticModel);
+        MarkupTemplateContent = new MarkupTemplateContentResolver(semanticModel);
         _binderFactory = new BinderFactory(semanticModel, this);
         _blockBinderCache = new ConcurrentCache<BinderCacheKey, Binder>(32);
     }
@@ -31,7 +34,20 @@ internal sealed class BindingSession
 
     public MarkupDataTypeResolver MarkupDataTypes { get; }
 
+    public MarkupTemplateContentResolver MarkupTemplateContent { get; }
+
     public int CachedBinderCount => _binderFactory.CachedBinderCount;
+
+    internal MarkupNameScope GetMarkupNameScope(MarkupRootSyntax root)
+    {
+        return ImmutableInterlocked.GetOrAdd(
+            ref _markupNameScopes,
+            root,
+            static (markupRoot, resolver) => MarkupNameScope.Create(
+                markupRoot,
+                resolver),
+            MarkupTemplateContent);
+    }
 
     public Binder GetBinder(AkburaSyntax syntax, BinderUsage usage = BinderUsage.Default)
     {

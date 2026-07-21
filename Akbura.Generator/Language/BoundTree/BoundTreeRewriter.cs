@@ -209,6 +209,14 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             children);
     }
 
+    public override BoundNode? VisitMarkupNameAssignment(BoundMarkupNameAssignment node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+
+        return node.Update(symbolInfo, containingComponent);
+    }
+
     public override BoundNode? VisitMarkupPropertySetter(BoundMarkupPropertySetter node)
     {
         var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
@@ -463,6 +471,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
                 return VisitTailwindUtilityParameterSymbol((ITailwindUtilityParameterSymbol)symbol);
             case AkburaSymbolKind.MarkupItem:
                 return VisitMarkupItemSymbol((IMarkupItemSymbol)symbol);
+            case AkburaSymbolKind.MarkupName:
+                return VisitMarkupNameSymbol((IMarkupNameSymbol)symbol);
             case AkburaSymbolKind.InjectedService:
                 return VisitInjectSymbol((IInjectSymbol)symbol);
             case AkburaSymbolKind.Command:
@@ -560,6 +570,9 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         DefaultVisitSymbol(symbol);
 
     protected virtual AkburaSymbol VisitMarkupItemSymbol(IMarkupItemSymbol symbol) =>
+        DefaultVisitSymbol(symbol);
+
+    protected virtual AkburaSymbol VisitMarkupNameSymbol(IMarkupNameSymbol symbol) =>
         DefaultVisitSymbol(symbol);
 
     protected virtual RoslynSymbol DefaultVisitSymbol(RoslynSymbol symbol) => symbol;

@@ -215,6 +215,13 @@ internal sealed partial class CSharpProbeBinder
                 break;
             }
 
+            case AkburaSymbolKind.MarkupName:
+            {
+                var markupName = (IMarkupNameSymbol)symbol;
+                AddProbeLocal(localStatements, markupName.IdentifierText, markupName.Type);
+                break;
+            }
+
             case AkburaSymbolKind.InjectedService:
             {
                 var inject = (IInjectSymbol)symbol;

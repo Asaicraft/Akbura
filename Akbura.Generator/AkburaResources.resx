@@ -204,6 +204,15 @@
   <data name="AKBURA_SEMANTIC_MarkupExpressionError" xml:space="preserve">
     <value>Markup expression '{0}' is not valid C#: {1}</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupNameInvalid" xml:space="preserve">
+    <value>x.Name value '{0}' must be a non-empty C# identifier literal.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupNameDuplicate" xml:space="preserve">
+    <value>Markup name '{0}' is already declared in this markup scope.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupNameInsideTemplateContent" xml:space="preserve">
+    <value>x.Name '{0}' cannot be declared inside a property marked with TemplateContentAttribute.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert" xml:space="preserve">
     <value>Markup attribute value for '{0}' cannot be converted from '{1}' to '{2}'.</value>
   </data>

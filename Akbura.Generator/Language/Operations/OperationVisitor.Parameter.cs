@@ -49,6 +49,11 @@ internal abstract class OperationVisitor<TParameter, TResult>
         TParameter parameter) =>
         DefaultVisit(operation, parameter);
 
+    public virtual TResult? VisitMarkupNameAssignment(
+        IMarkupNameAssignmentOperation operation,
+        TParameter parameter) =>
+        DefaultVisit(operation, parameter);
+
     public virtual TResult? VisitMarkupPropertySetter(
         IMarkupPropertySetterOperation operation,
         TParameter parameter) =>

@@ -121,6 +121,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         ValidateSyntaxTreeOwnership(syntax);
+        if (syntax is MarkupAttributeSyntax markupAttribute &&
+            IsMarkupNameDirective(markupAttribute))
+        {
+            return GetSymbolInfo(markupAttribute).Symbol;
+        }
+
         return null;
     }
 
@@ -2641,7 +2647,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return null;
     }
 
-    private static bool IsMarkupPropertyElementOwner(
+    internal static bool IsMarkupPropertyElementOwner(
         INamedTypeSymbol componentType,
         string ownerName)
     {
@@ -2965,6 +2971,54 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return Path.GetDirectoryName(filePath) ?? string.Empty;
     }
 
+    internal bool TryGetMarkupElementReferenceType(
+        MarkupElementSyntax markupElement,
+        out CSharpSymbolDefinition type)
+    {
+        if (TryGetCachedSymbolInfo(markupElement, out var cachedSymbolInfo) &&
+            cachedSymbolInfo.Symbol is IMarkupComponentSymbol cachedComponent &&
+            !cachedComponent.CSharpDefinition.IsDefault)
+        {
+            type = cachedComponent.CSharpDefinition;
+            return true;
+        }
+
+        var startTag = markupElement.StartTag;
+        if (startTag == null)
+        {
+            type = default;
+            return false;
+        }
+
+        var componentNameText = startTag.Name.ToFullString().Trim();
+        if (componentNameText.Length > 0 &&
+            TryResolveAkburaMarkupComponent(
+                markupElement,
+                componentNameText,
+                out var akburaComponent) &&
+            !akburaComponent.CSharpDefinition.IsDefault)
+        {
+            type = akburaComponent.CSharpDefinition;
+            return true;
+        }
+
+        try
+        {
+            var binding = BindCSharpType(startTag.Name.ToCSharp());
+            if (binding.TypeSymbol is INamedTypeSymbol { TypeKind: not TypeKind.Error } namedType)
+            {
+                type = new CSharpSymbolDefinition(namedType);
+                return true;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        type = default;
+        return false;
+    }
+
     private static void AddNamespaceSegments(
         ImmutableArrayBuilder<string> builder,
         string namespaceText)
@@ -2993,6 +3047,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         if (string.IsNullOrWhiteSpace(propertyName))
         {
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        if (IsMarkupNameDirective(markupAttribute))
+        {
+            return ResolveMarkupNameDirective(Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute));
         }
 
         if (IsMarkupDataTypeDirective(markupAttribute))
@@ -3119,6 +3178,55 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             parameter: parameter,
             command: command,
             containingSymbol: componentSymbol));
+    }
+
+    private AkburaSymbolInfo ResolveMarkupNameDirective(
+        MarkupAttachedPropertyAttributeSyntax markupAttribute)
+    {
+        MarkupNameDeclaration? declaration = null;
+        for (var binder = BindingSession.GetOperationBinder(markupAttribute);
+             binder != null;
+             binder = binder.Next)
+        {
+            if (binder is MarkupBinder markupBinder &&
+                markupBinder.TryGetDeclaredNameDeclaration(markupAttribute, out declaration))
+            {
+                break;
+            }
+        }
+
+        if (declaration == null)
+        {
+            SetSemanticDiagnostics(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var diagnostic = declaration.CreateDiagnostic();
+        SetSemanticDiagnostics(
+            markupAttribute,
+            diagnostic == null
+                ? ImmutableArray<AkburaSemanticDiagnostic>.Empty
+                : ImmutableArray.Create(diagnostic));
+
+        if (declaration.Failure == MarkupNameDeclarationFailure.Duplicate)
+        {
+            var originalSymbol = declaration.OriginalDeclaration?.GetOrCreateSymbol(this);
+            return originalSymbol == null
+                ? AkburaSymbolInfo.None(AkburaCandidateReason.Ambiguous)
+                : AkburaSymbolInfo.Candidates(
+                    ImmutableArray.Create<AkburaSymbol>(originalSymbol),
+                    AkburaCandidateReason.Ambiguous);
+        }
+
+        if (!declaration.IsValid)
+        {
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        var symbol = declaration.GetOrCreateSymbol(this);
+        return symbol == null
+            ? AkburaSymbolInfo.None(AkburaCandidateReason.NotFound)
+            : AkburaSymbolInfo.Success(symbol);
     }
 
     private bool TryResolveMarkupAttachedProperty(

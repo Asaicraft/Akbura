@@ -566,16 +566,48 @@ internal partial class AkburaSemanticModel
         }
 
         var scope = GetMarkupBindingScope(scopeSyntax);
+        var mappedMarkupNames = new HashSet<string>(StringComparer.Ordinal);
         for (var binder = BindingSession.GetSemanticBinder(scope); binder != null; binder = binder.Next)
         {
-            if (binder is not MarkupBinder markupBinder ||
-                markupBinder.GetDeclaredItemSymbol() is not { } itemSymbol)
+            if (binder is MarkupBinder markupBinder)
+            {
+                if (markupBinder.GetDeclaredItemSymbol() is { } itemSymbol &&
+                    mappedMarkupNames.Add(itemSymbol.Name))
+                {
+                    akburaSymbolsByName[itemSymbol.Name] = itemSymbol;
+                }
+
+                AddMarkupNameSymbolMappings(
+                    markupBinder.GetDeclaredNameSymbols(),
+                    akburaSymbolsByName,
+                    mappedMarkupNames);
+                continue;
+            }
+
+            if (binder is ComponentBinder componentBinder)
+            {
+                AddMarkupNameSymbolMappings(
+                    componentBinder.GetDeclaredMarkupNameSymbols(),
+                    akburaSymbolsByName,
+                    mappedMarkupNames);
+            }
+        }
+    }
+
+    private static void AddMarkupNameSymbolMappings(
+        ImmutableArray<AkburaSymbol> symbols,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
+        HashSet<string> mappedMarkupNames)
+    {
+        foreach (var symbol in symbols)
+        {
+            if (symbol is not IMarkupNameSymbol markupName ||
+                !mappedMarkupNames.Add(markupName.Name))
             {
                 continue;
             }
 
-            akburaSymbolsByName[itemSymbol.Name] = itemSymbol;
-            return;
+            akburaSymbolsByName[markupName.Name] = markupName;
         }
     }
 
@@ -754,6 +786,7 @@ internal partial class AkburaSemanticModel
             }
         }
 
+        AddCSharpProbeMarkupNameLocals(scope, builder, akburaSymbolsByName);
         return builder.ToImmutable();
     }
 
@@ -782,7 +815,8 @@ internal partial class AkburaSemanticModel
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
         string name,
         CSharp.TypeSyntax? type,
-        AkburaSymbol? symbol)
+        AkburaSymbol? symbol,
+        string? identifierText = null)
     {
         if (string.IsNullOrWhiteSpace(name) ||
             type == null ||
@@ -794,10 +828,48 @@ internal partial class AkburaSemanticModel
         builder.Add(CSharpSyntaxFactory.LocalDeclarationStatement(
             CSharpSyntaxFactory.VariableDeclaration(type)
                 .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
-                    CSharpSyntaxFactory.VariableDeclarator(CSharpSyntaxFactory.Identifier(name))
+                    CSharpSyntaxFactory.VariableDeclarator(CSharpSyntaxFactory.Identifier(
+                            identifierText ?? name))
                         .WithInitializer(CSharpSyntaxFactory.EqualsValueClause(
                             CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))))));
         akburaSymbolsByName[name] = symbol;
+    }
+
+    private void AddCSharpProbeMarkupNameLocals(
+        AkburaSyntax scope,
+        ImmutableArrayBuilder<CSharp.StatementSyntax> builder,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByName)
+    {
+        for (var binder = BindingSession.GetBinder(scope, BinderUsage.Expression);
+             binder != null;
+             binder = binder.Next)
+        {
+            if (binder is not ComponentBinder componentBinder)
+            {
+                continue;
+            }
+
+            foreach (var symbol in componentBinder.GetDeclaredMarkupNameSymbols())
+            {
+                if (symbol is not IMarkupNameSymbol markupName ||
+                    markupName.Type.Symbol is not ITypeSymbol type ||
+                    akburaSymbolsByName.ContainsKey(markupName.Name))
+                {
+                    continue;
+                }
+
+                AddCSharpProbeLocal(
+                    builder,
+                    akburaSymbolsByName,
+                    markupName.Name,
+                    CSharpSyntaxFactory.ParseTypeName(
+                        type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
+                    markupName,
+                    markupName.IdentifierText);
+            }
+
+            return;
+        }
     }
 
     private CSharp.TypeSyntax? GetParamProbeType(ParamDeclarationSyntax paramDeclaration)

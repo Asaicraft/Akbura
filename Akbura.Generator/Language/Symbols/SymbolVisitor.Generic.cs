@@ -44,5 +44,7 @@ internal abstract class SymbolVisitor<TResult>
 
     public virtual TResult VisitMarkupItem(IMarkupItemSymbol symbol) => DefaultVisit(symbol);
 
+    public virtual TResult VisitMarkupName(IMarkupNameSymbol symbol) => DefaultVisit(symbol);
+
     public virtual TResult VisitCSharpSymbol(CSharpLocalSymbol symbol) => DefaultVisit(symbol);
 }

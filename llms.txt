@@ -24,3 +24,4 @@ AKCSS
  - [Getting Started](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/akcss/.md)
  - [Custom Class Styles](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/akcss/custom-classes.md): AKCSS Styles for Custom Classes
  - [Inline AKCSS](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/akcss/inline-akcss.md)
+ - [Utilities](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/akcss/utilities.md): AKCSS Utilities

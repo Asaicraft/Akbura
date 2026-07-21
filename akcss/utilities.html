@@ -1,0 +1,686 @@
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+    <title>AKCSS Utilities</title>
+
+    <script>
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
+    </script>
+
+    <link rel="stylesheet" href="css/app.css">
+
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+	<div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+	  <div class="flex h-16 justify-between">
+		<div class="flex">
+		  <div class="flex flex-shrink-0 items-center">
+			<a class="mr-2 lg:mr-8 flex items-center" href="./">
+				<svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+				<span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+			</a>
+		  </div>
+			<div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+				<!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+						<a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+							Akcss
+						</a>
+						<a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							What's New
+						</a>
+			</div>
+		</div>
+		<div class="hidden sm:ml-6 sm:flex sm:items-center">
+			<dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+		</div>
+		<div class="-mr-2 flex items-center sm:hidden">
+		  <!-- Mobile menu button -->
+		  <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+			<span class="sr-only">Open main menu</span>
+			<!-- Menu open: "hidden", Menu closed: "block" -->
+			<svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+			</svg>
+			<!-- Menu open: "block", Menu closed: "hidden" -->
+			<svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+			</svg>
+		  </button>
+		</div>
+	  </div>
+	</div>
+
+	<!-- Mobile menu, show/hide based on menu state. -->
+	<div v-cloak v-if="open" class="sm:hidden">
+		<div class="space-y-1 pb-3 pt-2">
+			<!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+					<a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+						Akcss
+					</a>
+					<a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						What's New
+					</a>
+		</div>
+	</div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+	setup() {
+		const open = ref(false)
+		return { open }
+	}
+}
+mount('#header', Header)
+</script>
+
+
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            
+
+
+
+
+<style>
+.active {
+	color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="css/highlight.css">
+<link rel="stylesheet" href="css/typography.css">
+<link rel="stylesheet" href="css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+	<div class="flex flex-wrap">
+		<div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+			<button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+				<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+			</button>
+			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+								<a href="https://asaicraft.github.io/Akbura/akcss/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+AKCSS									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Getting Started
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Custom Class Styles
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/inline-akcss" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Inline AKCSS
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/utilities" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Utilities
+									</a>
+								</li>
+						</ul>
+				</nav>
+			</div>
+		</div>
+		<div id="doc" class="mx-auto flex">
+			<div class="mt-8 mx-auto prose lg:prose-lg">
+				
+					<section class="not-prose mb-16 md:mb-12">
+						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+							AKCSS Utilities
+						</h1>
+					</section>
+
+				<div class="not-prose"></div>
+
+				<div class="content">
+					<h2 id="akcss-utilities">AKCSS Utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#akcss-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Utilities are small reusable styles that can be applied directly as markup attributes.</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Akbura.Styles.akcss;
+
+&lt;Button w-40 h-10 px-4 bg-blue-500 text-white rounded-md&gt;
+    Continue
+&lt;/Button&gt;
+</code></pre>
+<p>Unlike regular AKCSS classes, utilities do not use the <code>class</code> attribute:</p>
+<pre><code class="language-akbura">&lt;Button class=&quot;primary&quot; w-40 /&gt;
+</code></pre>
+<p>Here:</p>
+<ul>
+<li><code>primary</code> is an AKCSS class.</li>
+<li><code>w-40</code> is an AKCSS utility.</li>
+</ul>
+<h2 id="declaring-utilities">Declaring utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#declaring-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Custom utilities are declared inside an <code>@utilities</code> section:</p>
+<pre><code class="language-akcss">@using Avalonia.Controls;
+
+@utilities {
+    Control.inactive {
+        Opacity: 0.5;
+        IsHitTestVisible: false;
+    }
+}
+</code></pre>
+<p>The utility is then used as a flag-style attribute:</p>
+<pre><code class="language-akbura">&lt;Button inactive&gt;
+    Disabled action
+&lt;/Button&gt;
+</code></pre>
+<p>A utility without parameters uses its complete selector name. Names may contain multiple segments:</p>
+<pre><code class="language-akcss">@utilities {
+    Control.self-start {
+        HorizontalAlignment: Left;
+        VerticalAlignment: Top;
+    }
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Button self-start&gt;
+    Aligned to start
+&lt;/Button&gt;
+</code></pre>
+<h2 id="parameterized-utilities">Parameterized utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#parameterized-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Parameters are declared after the utility name:</p>
+<pre><code class="language-akcss">@using Avalonia.Controls;
+
+@utilities {
+    Control.square-(double size) {
+        Width: size;
+        Height: size;
+    }
+}
+</code></pre>
+<p>Pass the argument as another segment of the markup attribute:</p>
+<pre><code class="language-akbura">&lt;Button square-48&gt;
+    Square button
+&lt;/Button&gt;
+</code></pre>
+<p>In this example, <code>48</code> is converted to the <code>double size</code> parameter.</p>
+<p>A utility can have multiple parameters:</p>
+<pre><code class="language-akcss">@using Akbura;
+@using Avalonia.Controls;
+@using Avalonia.Media;
+
+@utilities {
+    Border.frame-(string color)-(int shade) {
+        BorderBrush:
+            Amx.DynamicResource&lt;IBrush&gt;(
+                &quot;--color-&quot; + color + &quot;-&quot; + shade);
+    }
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Border frame-blue-500&gt;
+    Content
+&lt;/Border&gt;
+</code></pre>
+<p>The arguments are resolved as:</p>
+<pre><code class="language-text">color = &quot;blue&quot;
+shade = 500
+</code></pre>
+<p>Utility parameters are typed. AKCSS supports regular C# types, including:</p>
+<ul>
+<li><code>double</code></li>
+<li><code>int</code></li>
+<li><code>string</code></li>
+<li>enums</li>
+<li>custom types</li>
+</ul>
+<p>An incompatible argument produces a compiler diagnostic.</p>
+<h2 id="expression-arguments">Expression arguments<a class="header-anchor" href="javascript:;" onclick="location.hash='#expression-arguments'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>{...}</code> when a utility argument comes from a C# expression:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+
+@akcss {
+    @utilities {
+        Control.square-(double size) {
+            Width: size;
+            Height: size;
+        }
+    }
+}
+
+state double buttonSize = 48;
+
+&lt;Button square-{buttonSize}&gt;
+    Dynamic size
+&lt;/Button&gt;
+</code></pre>
+<p>Expressions are bound in the current component scope and can reference states, parameters, local variables, and other C# expressions.</p>
+<pre><code class="language-akbura">state double width = 20;
+state double scale = 2;
+
+&lt;Button square-{width * scale} /&gt;
+</code></pre>
+<h2 id="conditional-utilities">Conditional utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A utility can be applied conditionally with an expression prefix:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Akbura.Styles.akcss;
+
+state bool isBusy = false;
+
+&lt;Button {isBusy}:opacity-50&gt;
+    Save
+&lt;/Button&gt;
+</code></pre>
+<p>The <code>opacity-50</code> utility is applied only while <code>isBusy</code> is <code>true</code>.</p>
+<p>Another common example is conditional visibility:</p>
+<pre><code class="language-akbura">&lt;TextBlock {isBusy}:hidden&gt;
+    Content is ready
+&lt;/TextBlock&gt;
+</code></pre>
+<p>The condition must be a valid boolean expression:</p>
+<pre><code class="language-akbura">&lt;Button {count &gt; 10}:hidden /&gt;
+&lt;Button {user.IsAdmin}:visible /&gt;
+</code></pre>
+<h2 id="conditional-declarations-inside-utilities">Conditional declarations inside utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-declarations-inside-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Utilities may also contain reactive <code>@if</code> declarations:</p>
+<pre><code class="language-akcss">@using Avalonia.Controls;
+
+@utilities {
+    Control.interactive {
+        Opacity: 0.8;
+
+        @if(IsPointerOver) {
+            Opacity: 1;
+        }
+    }
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Button interactive&gt;
+    Hover over me
+&lt;/Button&gt;
+</code></pre>
+<p>The utility observes <code>IsPointerOver</code> and reevaluates when the property changes.</p>
+<p>Declarations inside <code>@if</code> use <code>BindingPriority.StyleTrigger</code>, giving them priority over regular utility declarations using <code>BindingPriority.Style</code>.</p>
+<h2 id="enum-parameters">Enum parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#enum-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Enum members can be passed as utility segments:</p>
+<pre><code class="language-akcss">@using Avalonia;
+@using Avalonia.Controls;
+
+@utilities {
+    Control.align-(HorizontalAlignment alignment) {
+        HorizontalAlignment: alignment;
+    }
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Button align-Center /&gt;
+&lt;Button align-Right /&gt;
+</code></pre>
+<p>Enum member names are resolved using the declared parameter type.</p>
+<p>An expression can also be used:</p>
+<pre><code class="language-akbura">state HorizontalAlignment alignment =
+    HorizontalAlignment.Center;
+
+&lt;Button align-{alignment} /&gt;
+</code></pre>
+<h2 id="type-specific-utilities">Type-specific utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#type-specific-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A utility can restrict itself to a particular control type:</p>
+<pre><code class="language-akcss">@using Avalonia.Controls;
+
+@utilities {
+    StackPanel.gap-(double value) {
+        Spacing: value;
+    }
+
+    Grid.gap-(double value) {
+        ColumnSpacing: value;
+        RowSpacing: value;
+    }
+}
+</code></pre>
+<p>The compiler selects the utility compatible with the target control:</p>
+<pre><code class="language-akbura">&lt;StackPanel gap-12 /&gt;
+
+&lt;Grid gap-12 /&gt;
+</code></pre>
+<p>A type-specific utility can also be used on derived controls.</p>
+<p>Applying it to an incompatible type produces a utility-not-found diagnostic:</p>
+<pre><code class="language-akbura">&lt;!-- StackPanel.gap cannot be applied to TextBlock --&gt;
+&lt;TextBlock gap-12 /&gt;
+</code></pre>
+<p>Parenthesized and fully qualified types are supported:</p>
+<pre><code class="language-akcss">@utilities {
+    (Demo.Controls.Card).compact {
+        Padding: 4;
+    }
+
+    (global::Demo.Controls.SpecialButton).wide {
+        Width: 200;
+    }
+}
+</code></pre>
+<h2 id="using-utilities-with-apply">Using utilities with <code>@apply</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#using-utilities-with-apply'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Utilities can be composed into a regular AKCSS class with <code>@apply</code>:</p>
+<pre><code class="language-akcss">@using Akbura.Styles.akcss;
+
+.card {
+    @apply w-full p-4 bg-slate-100 rounded-md shadow-sm;
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Border class=&quot;card&quot;&gt;
+    Card content
+&lt;/Border&gt;
+</code></pre>
+<p><code>@apply</code> can combine both styles and utilities:</p>
+<pre><code class="language-akcss">@using Demo.Styles.Shared.akcss;
+@using Akbura.Styles.akcss;
+
+.panel {
+    @apply surface w-full p-4 rounded-lg;
+}
+</code></pre>
+<h2 id="where-utilities-are-resolved-from">Where utilities are resolved from<a class="header-anchor" href="javascript:;" onclick="location.hash='#where-utilities-are-resolved-from'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>When a utility is used in markup, Akbura searches in this order:</p>
+<ol>
+<li>Utilities declared in an inline <code>@akcss</code> block.</li>
+<li>Utilities from the component's companion <code>.akcss</code> file.</li>
+<li>Imported <code>.akcss</code> modules, in <code>using</code> order.</li>
+</ol>
+<p>For example, <code>Counter.akbura</code> automatically sees utilities from <code>Counter.akcss</code>:</p>
+<pre><code class="language-text">Counter.akbura
+Counter.akcss
+</code></pre>
+<p>Shared utilities are imported explicitly:</p>
+<pre><code class="language-akbura">using Demo.Styles.Utilities.akcss;
+</code></pre>
+<pre><code class="language-akbura">&lt;Button custom-utility /&gt;
+</code></pre>
+<p>If the same selector is declared more than once in the same resolution layer, the compiler reports an ambiguous utility diagnostic.</p>
+<h2 id="built-in-utilities">Built-in utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#built-in-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura provides Tailwind-inspired built-in utilities through:</p>
+<pre><code class="language-akbura">using Akbura.Styles.akcss;
+</code></pre>
+<p>Common categories include:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Size</td>
+<td><code>w-10</code>, <code>h-8</code>, <code>size-12</code>, <code>w-full</code>, <code>h-auto</code></td>
+</tr>
+<tr>
+<td>Min/max size</td>
+<td><code>min-w-10</code>, <code>max-h-40</code></td>
+</tr>
+<tr>
+<td>Margin</td>
+<td><code>m-4</code>, <code>mx-2</code>, <code>mt-6</code>, <code>mb-4</code></td>
+</tr>
+<tr>
+<td>Padding</td>
+<td><code>p-4</code>, <code>px-3</code>, <code>py-2</code>, <code>pl-4</code></td>
+</tr>
+<tr>
+<td>Layout</td>
+<td><code>hidden</code>, <code>visible</code>, <code>self-center</code></td>
+</tr>
+<tr>
+<td>Grid</td>
+<td><code>col-1</code>, <code>row-2</code>, <code>col-span-2</code></td>
+</tr>
+<tr>
+<td>Spacing</td>
+<td><code>gap-4</code>, <code>gap-x-2</code>, <code>gap-y-3</code></td>
+</tr>
+<tr>
+<td>Opacity</td>
+<td><code>opacity-50</code>, <code>opacity-100</code></td>
+</tr>
+<tr>
+<td>Colors</td>
+<td><code>bg-blue-500</code>, <code>text-white</code></td>
+</tr>
+<tr>
+<td>Typography</td>
+<td><code>text-lg</code>, <code>font-bold</code>, <code>text-center</code></td>
+</tr>
+<tr>
+<td>Borders</td>
+<td><code>border-1</code>, <code>border-slate-300</code></td>
+</tr>
+<tr>
+<td>Radius</td>
+<td><code>rounded-md</code>, <code>rounded-full</code></td>
+</tr>
+<tr>
+<td>Shadows</td>
+<td><code>shadow</code>, <code>shadow-lg</code>, <code>shadow-2xl</code></td>
+</tr>
+</tbody>
+</table>
+<p>Utilities are type-aware. For example:</p>
+<ul>
+<li><code>gap-4</code> works differently for <code>StackPanel</code> and <code>Grid</code>.</li>
+<li><code>rounded-md</code> is available for controls supporting <code>CornerRadius</code>.</li>
+<li><code>text-center</code> is available for text controls.</li>
+<li><code>bg-blue-500</code> is resolved for controls supporting <code>Background</code>.</li>
+</ul>
+<h2 id="spacing-scale">Spacing scale<a class="header-anchor" href="javascript:;" onclick="location.hash='#spacing-scale'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Built-in numeric sizing and spacing utilities use the shared <code>--spacing</code> resource.</p>
+<p>The default value is <code>4</code>:</p>
+<pre><code class="language-text">w-10 → Width = 10 × 4 = 40
+p-3  → Padding = 3 × 4 = 12
+gap-4 → Spacing = 4 × 4 = 16
+</code></pre>
+<p>Built-in colors, radii, font sizes, weights, and shadows also use dynamic Avalonia resources:</p>
+<pre><code class="language-text">--color-blue-500
+--radius-md
+--text-lg
+--font-weight-bold
+--shadow-lg
+</code></pre>
+<p>Because these are dynamic resources, applications can customize the theme without redefining every utility.</p>
+
+				</div>
+
+				<div class="not-prose"></div>
+				
+					<div class="not-prose py-8">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/utilities.md" target="_blank" rel="noopener noreferrer">
+							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+						</a>
+					</div>
+
+					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akcss/" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												AKCSS
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+											<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Custom Class Styles
+												<!-- Heroicon name: mini/arrow-long-right -->
+												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+												</svg>
+											</a>
+									</div>
+								</nav>
+					</div>
+			</div>
+				
+				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+						<div>
+							<h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+								On This Page
+							</h5>
+							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#akcss-utilities'" data-id="akcss-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											AKCSS Utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#declaring-utilities'" data-id="declaring-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Declaring utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#parameterized-utilities'" data-id="parameterized-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Parameterized utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#expression-arguments'" data-id="expression-arguments" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Expression arguments
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#conditional-utilities'" data-id="conditional-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Conditional utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#conditional-declarations-inside-utilities'" data-id="conditional-declarations-inside-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Conditional declarations inside utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#enum-parameters'" data-id="enum-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Enum parameters
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#type-specific-utilities'" data-id="type-specific-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Type-specific utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#using-utilities-with-apply'" data-id="using-utilities-with-apply" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Using utilities with 
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#where-utilities-are-resolved-from'" data-id="where-utilities-are-resolved-from" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Where utilities are resolved from
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#built-in-utilities'" data-id="built-in-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Built-in utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#spacing-scale'" data-id="spacing-scale" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Spacing scale
+										</span>
+									</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				
+		</div>
+	</div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+	const el = document.querySelector('#doc section h1') 
+	if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+	const App = {
+		setup() {
+			function nav(url) {
+				window.open(url)
+			}
+			return { nav }
+		}
+	}
+	
+const Sidebar = {
+	setup() {
+		const open = ref(true)
+		return { open }
+	}
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="lib/js/lite-yt-embed.js"></script>
+<script src="mjs/docs.mjs" type="module"></script>
+
+        </main>
+    </div>
+
+    
+
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
+
+    
+</body>
+</html>

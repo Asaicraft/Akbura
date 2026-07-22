@@ -103,6 +103,11 @@ public sealed class AkburaBuildTargetsTests
                     <TargetFramework>net10.0</TargetFramework>
                   </PropertyGroup>
                   <Import Project="{{targetsPath}}" />
+                  <Target Name="CaptureAkburaAdditionalFiles" BeforeTargets="CoreCompile">
+                    <WriteLinesToFile File="$(BaseIntermediateOutputPath)AkburaAdditionalFiles.txt"
+                                      Lines="@(AdditionalFiles)"
+                                      Overwrite="true" />
+                  </Target>
                 </Project>
                 """);
             await File.WriteAllTextAsync(
@@ -176,6 +181,21 @@ public sealed class AkburaBuildTargetsTests
 
             var result = await BuildProjectAsync(projectPath);
             Assert.True(result.ExitCode == 0, result.Output);
+
+            var additionalFiles = (await File.ReadAllLinesAsync(Path.Combine(
+                    projectPath,
+                    "obj",
+                    "AkburaAdditionalFiles.txt")))
+                .Select(static path => path.Replace('\\', '/'))
+                .ToArray();
+
+            Assert.Contains("Views/Counter.akbura", additionalFiles);
+            Assert.Contains("Views/DefaultCounter.akbura", additionalFiles);
+            Assert.Contains("Views/PlainCounter.akbura", additionalFiles);
+            Assert.Contains("Styles/Theme.akcss", additionalFiles);
+            Assert.DoesNotContain(
+                additionalFiles,
+                static path => path.EndsWith("obj/Ignored.akbura", StringComparison.Ordinal));
 
             var assemblyPath = Path.Combine(
                 projectPath,

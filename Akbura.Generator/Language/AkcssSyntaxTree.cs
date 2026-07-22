@@ -20,7 +20,7 @@ internal sealed class AkcssSyntaxTree : AkburaSyntaxTree
         : base(text, filePath)
     {
         LogicalName = string.IsNullOrWhiteSpace(logicalName)
-            ? GetDefaultLogicalName(filePath)
+            ? GetLogicalName(filePath)
             : logicalName;
         GreenRoot = greenRoot;
     }
@@ -56,6 +56,14 @@ internal sealed class AkcssSyntaxTree : AkburaSyntaxTree
     public new static AkcssSyntaxTree ParseText(SourceText text, CancellationToken cancellationToken = default)
     {
         return ParseText(text, filePath: string.Empty, logicalName: string.Empty, cancellationToken);
+    }
+
+    public new static AkcssSyntaxTree ParseText(
+        SourceText text,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        return ParseText(text, filePath: path, logicalName: GetLogicalName(path), cancellationToken);
     }
 
     public static AkcssSyntaxTree ParseText(
@@ -105,7 +113,7 @@ internal sealed class AkcssSyntaxTree : AkburaSyntaxTree
         return GetRoot();
     }
 
-    private static string GetDefaultLogicalName(string filePath)
+    private static string GetLogicalName(string filePath)
     {
         return string.IsNullOrWhiteSpace(filePath)
             ? string.Empty

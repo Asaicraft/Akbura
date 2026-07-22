@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Furioso": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\Akbura\\Akbura.csproj"
+    }
+  }
+}

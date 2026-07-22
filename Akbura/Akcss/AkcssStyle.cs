@@ -1,10 +1,14 @@
 using Akbura.CompilerAnotations;
 using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Akbura.Akcss;
 
 public abstract class AkcssStyle
 {
+    private readonly ConditionalWeakTable<object, SubscriptionCollection> _subscriptions = new();
+
     public string Name
     {
         get
@@ -56,6 +60,35 @@ public abstract class AkcssStyle
     public virtual void Reset(object target)
     {
         ArgumentNullException.ThrowIfNull(target);
+
+        SubscriptionCollection? subscriptions;
+        lock (_subscriptions)
+        {
+            if (!_subscriptions.TryGetValue(target, out subscriptions))
+            {
+                return;
+            }
+
+            _subscriptions.Remove(target);
+        }
+
+        subscriptions.Dispose();
+    }
+
+    /// <summary>
+    /// Retains a generated style subscription until the style is reset for the target.
+    /// </summary>
+    protected void TrackSubscription(object target, IDisposable subscription)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(subscription);
+
+        lock (_subscriptions)
+        {
+            _subscriptions.GetValue(
+                target,
+                static _ => new SubscriptionCollection()).Add(subscription);
+        }
     }
 
     /// <summary>
@@ -68,5 +101,25 @@ public abstract class AkcssStyle
     public virtual IObservable<object?> Watch(object target)
     {
         return AkcssObservedPropertySignal.Create(GetType(), target);
+    }
+
+    private sealed class SubscriptionCollection : IDisposable
+    {
+        private readonly List<IDisposable> _subscriptions = [];
+
+        public void Add(IDisposable subscription)
+        {
+            _subscriptions.Add(subscription);
+        }
+
+        public void Dispose()
+        {
+            for (var index = _subscriptions.Count - 1; index >= 0; index--)
+            {
+                _subscriptions[index].Dispose();
+            }
+
+            _subscriptions.Clear();
+        }
     }
 }

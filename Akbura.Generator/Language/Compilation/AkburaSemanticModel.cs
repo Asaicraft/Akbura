@@ -1558,6 +1558,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         out object? thickness,
         out bool isThicknessTuple)
     {
+        if (TryParseAkcssDouble(expression, out var uniformValue))
+        {
+            thickness = new AkcssThicknessValue(
+                uniformValue,
+                uniformValue,
+                uniformValue,
+                uniformValue);
+            isThicknessTuple = false;
+            return true;
+        }
+
         if (expression is CSharp.TupleExpressionSyntax tupleExpression)
         {
             isThicknessTuple = true;

@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Akbura.Build.Tasks\Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="..\Akbura.Furioso\Akbura.Furioso.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
   </ItemGroup>
 
   <ItemGroup>

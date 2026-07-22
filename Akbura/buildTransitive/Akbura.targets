@@ -7,18 +7,27 @@
     <AkburaBuildTasksAssembly Condition="'$(AkburaBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tools\net10.0\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
   </PropertyGroup>
 
+  <!-- Keep the task isolated from long-lived MSBuild nodes so its assemblies remain rebuildable. -->
   <UsingTask TaskName="Akbura.Build.GenerateAkburaModuleManifest"
              AssemblyFile="$(AkburaBuildTasksAssembly)"
+             Runtime="NET"
+             Architecture="CurrentArchitecture"
+             TaskFactory="TaskHostFactory"
              Condition="'$(AkburaEmbedSourceFiles)' == 'true'" />
 
-  <ItemGroup Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
-    <None Remove="**\*.akbura;**\*.akcss" />
-    <EmbeddedResource Remove="**\*.akbura;**\*.akcss" />
-
+  <ItemGroup>
     <_AkburaModuleSource Include="**\*.akbura;**\*.akcss"
                          Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)">
       <LogicalName>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</LogicalName>
     </_AkburaModuleSource>
+
+    <AdditionalFiles Include="@(_AkburaModuleSource)"
+                     Exclude="@(AdditionalFiles)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
+    <None Remove="**\*.akbura;**\*.akcss" />
+    <EmbeddedResource Remove="**\*.akbura;**\*.akcss" />
 
     <EmbeddedResource Include="$(AkburaModuleManifestPath)">
       <LogicalName>!Akbura</LogicalName>

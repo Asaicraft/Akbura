@@ -1,0 +1,502 @@
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+    <title>Using Akbura Components in AXAML</title>
+
+    <script>
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
+    </script>
+
+    <link rel="stylesheet" href="css/app.css">
+
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+	<div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+	  <div class="flex h-16 justify-between">
+		<div class="flex">
+		  <div class="flex flex-shrink-0 items-center">
+			<a class="mr-2 lg:mr-8 flex items-center" href="./">
+				<svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+				<span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+			</a>
+		  </div>
+			<div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+				<!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+						<a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+							Akbura
+						</a>
+						<a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							Akcss
+						</a>
+						<a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							What's New
+						</a>
+			</div>
+		</div>
+		<div class="hidden sm:ml-6 sm:flex sm:items-center">
+			<dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+		</div>
+		<div class="-mr-2 flex items-center sm:hidden">
+		  <!-- Mobile menu button -->
+		  <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+			<span class="sr-only">Open main menu</span>
+			<!-- Menu open: "hidden", Menu closed: "block" -->
+			<svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+			</svg>
+			<!-- Menu open: "block", Menu closed: "hidden" -->
+			<svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+			</svg>
+		  </button>
+		</div>
+	  </div>
+	</div>
+
+	<!-- Mobile menu, show/hide based on menu state. -->
+	<div v-cloak v-if="open" class="sm:hidden">
+		<div class="space-y-1 pb-3 pt-2">
+			<!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+					<a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+						Akbura
+					</a>
+					<a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						Akcss
+					</a>
+					<a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						What's New
+					</a>
+		</div>
+	</div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+	setup() {
+		const open = ref(false)
+		return { open }
+	}
+}
+mount('#header', Header)
+</script>
+
+
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            
+
+
+<style>
+.active {
+	color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="css/highlight.css">
+<link rel="stylesheet" href="css/typography.css">
+<link rel="stylesheet" href="css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+	<div class="flex flex-wrap">
+		<div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+			<button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+				<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+			</button>
+			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+								<a href="https://asaicraft.github.io/Akbura/akbura/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+AKBURA									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Using Akbura Components in AXAML
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Grid
+									</a>
+								</li>
+						</ul>
+				</nav>
+			</div>
+		</div>
+		<div id="doc" class="mx-auto flex">
+			<div class="mt-8 mx-auto prose lg:prose-lg">
+				
+					<section class="not-prose mb-16 md:mb-12">
+						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+							Using Akbura Components in AXAML
+						</h1>
+					</section>
+
+				<div class="not-prose"></div>
+
+				<div class="content">
+					<p>Akbura components can be used directly inside regular Avalonia AXAML.</p>
+<p>A separate host control is not required. Every generated Akbura component is an Avalonia control, so it can be referenced through an XML namespace and placed in the visual tree like any other custom control.</p>
+<h2 id="basic-usage">Basic usage<a class="header-anchor" href="javascript:;" onclick="location.hash='#basic-usage'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Suppose the project contains the following component:</p>
+<pre><code class="language-akbura">// Counter.akbura
+
+namespace MyControls;
+
+state int count = 0;
+
+&lt;Button Click={count++}&gt;
+    Count: {count}
+&lt;/Button&gt;
+</code></pre>
+<p>Import its namespace in AXAML:</p>
+<pre><code class="language-xml">&lt;UserControl
+    xmlns=&quot;https://github.com/avaloniaui&quot;
+    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+    xmlns:myControls=&quot;using:MyControls&quot;&gt;
+
+    &lt;myControls:Counter /&gt;
+
+&lt;/UserControl&gt;
+</code></pre>
+<p>The XML namespace points to the C# namespace declared by the <code>.akbura</code> component:</p>
+<pre><code class="language-xml">xmlns:myControls=&quot;using:MyControls&quot;
+</code></pre>
+<p>The component can then be created directly:</p>
+<pre><code class="language-xml">&lt;myControls:Counter /&gt;
+</code></pre>
+<h2 id="passing-parameters">Passing parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#passing-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura parameters are exposed as Avalonia properties and can be assigned through AXAML attributes.</p>
+<p>Consider this component:</p>
+<pre><code class="language-akbura">// AkParams.akbura
+
+namespace MyControls;
+
+param int Count = 1;
+param int B;
+
+&lt;StackPanel&gt;
+    &lt;TextBlock Text={$&quot;Count: {Count}&quot;} /&gt;
+    &lt;TextBlock Text={$&quot;B: {B}&quot;} /&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The component declares two parameters:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Required</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Count</code></td>
+<td>No</td>
+<td>It has the default value <code>1</code></td>
+</tr>
+<tr>
+<td><code>B</code></td>
+<td>Yes</td>
+<td>It has no default value</td>
+</tr>
+</tbody>
+</table>
+<p>You can use the component from AXAML:</p>
+<pre><code class="language-xml">&lt;UserControl
+    xmlns=&quot;https://github.com/avaloniaui&quot;
+    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+    xmlns:myControls=&quot;using:MyControls&quot;&gt;
+
+    &lt;StackPanel&gt;
+        &lt;myControls:AkParams Count=&quot;10&quot; /&gt;
+
+        &lt;myControls:AkParams B=&quot;10&quot; /&gt;
+
+        &lt;myControls:AkParams
+            Count=&quot;1&quot;
+            B=&quot;10&quot; /&gt;
+    &lt;/StackPanel&gt;
+
+&lt;/UserControl&gt;
+</code></pre>
+<p>The first component is invalid:</p>
+<pre><code class="language-xml">&lt;myControls:AkParams Count=&quot;10&quot; /&gt;
+</code></pre>
+<p>Although <code>Count</code> is set, the required <code>B</code> parameter is missing.</p>
+<p>When the component is initialized, Akbura throws:</p>
+<pre><code class="language-text">AkburaParameterNotSettedException
+</code></pre>
+<p>The following component is valid:</p>
+<pre><code class="language-xml">&lt;myControls:AkParams B=&quot;10&quot; /&gt;
+</code></pre>
+<p><code>B</code> is explicitly set, while <code>Count</code> uses its default value of <code>1</code>.</p>
+<p>Both parameters may also be set explicitly:</p>
+<pre><code class="language-xml">&lt;myControls:AkParams
+    Count=&quot;10&quot;
+    B=&quot;20&quot; /&gt;
+</code></pre>
+<h2 id="binding-parameters">Binding parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#binding-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Because parameters are Avalonia properties, normal AXAML bindings can be used:</p>
+<pre><code class="language-xml">&lt;myControls:AkParams
+    Count=&quot;{Binding CurrentCount}&quot;
+    B=&quot;{Binding RequiredValue}&quot; /&gt;
+</code></pre>
+<p>The binding result must be compatible with the parameter type.</p>
+<p>For example, the view model may expose:</p>
+<pre><code class="language-csharp">public sealed class MyViewModel
+{
+    public int CurrentCount { get; set; }
+
+    public int RequiredValue { get; set; }
+}
+</code></pre>
+<h2 id="passing-injected-services">Passing injected services<a class="header-anchor" href="javascript:;" onclick="location.hash='#passing-injected-services'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Services declared with <code>inject</code> are also exposed as Avalonia properties.</p>
+<p>Consider the following component:</p>
+<pre><code class="language-akbura">// Counter.akbura
+
+namespace MyControls;
+
+inject ILogger&lt;Counter&gt; Logger;
+
+state int count = 0;
+
+useEffect(() =&gt;
+{
+    Logger.LogInformation(&quot;Count changed to {Count}&quot;, count);
+}, [count]);
+
+&lt;Button Click={count++}&gt;
+    Count: {count}
+&lt;/Button&gt;
+</code></pre>
+<p>Normally, Akbura attempts to resolve <code>Logger</code> through its service provider.</p>
+<p>The service may instead be passed directly from AXAML:</p>
+<pre><code class="language-xml">&lt;UserControl
+    xmlns=&quot;https://github.com/avaloniaui&quot;
+    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+    xmlns:myControls=&quot;using:MyControls&quot;&gt;
+
+    &lt;myControls:Counter
+        Logger=&quot;{Binding Logger}&quot; /&gt;
+
+&lt;/UserControl&gt;
+</code></pre>
+<p>The AXAML view model must expose a compatible service:</p>
+<pre><code class="language-csharp">public sealed class MyViewModel
+{
+    public ILogger&lt;Counter&gt; Logger { get; }
+
+    public MyViewModel(ILogger&lt;Counter&gt; logger)
+    {
+        Logger = logger;
+    }
+}
+</code></pre>
+<p>When an injected service property already contains a value, Akbura keeps that value and does not replace it through dependency injection.</p>
+<p>This makes it possible to provide services through:</p>
+<ul>
+<li>an AXAML binding;</li>
+<li>a property assignment in C#;</li>
+<li>Akbura's configured service provider.</li>
+</ul>
+<h2 id="setting-services-from-code">Setting services from code<a class="header-anchor" href="javascript:;" onclick="location.hash='#setting-services-from-code'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>An injected service can also be assigned when creating the component from C#:</p>
+<pre><code class="language-csharp">var counter = new Counter
+{
+    Logger = logger
+};
+</code></pre>
+<p>The explicitly assigned service is used when the component initializes.</p>
+<h2 id="complete-example">Complete example<a class="header-anchor" href="javascript:;" onclick="location.hash='#complete-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura component:</p>
+<pre><code class="language-akbura">// UserCard.akbura
+
+namespace MyControls;
+
+param int UserId;
+param string Title = &quot;User&quot;;
+
+inject IUserService UserService;
+
+state string userName = &quot;&quot;;
+
+useEffect(async () =&gt;
+{
+    var user = await UserService.GetUser(UserId);
+    userName = user.Name;
+}, [UserId]);
+
+&lt;StackPanel&gt;
+    &lt;TextBlock Text={Title} /&gt;
+    &lt;TextBlock Text={userName} /&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>Avalonia view:</p>
+<pre><code class="language-xml">&lt;UserControl
+    xmlns=&quot;https://github.com/avaloniaui&quot;
+    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+    xmlns:myControls=&quot;using:MyControls&quot;&gt;
+
+    &lt;StackPanel&gt;
+        &lt;myControls:UserCard
+            UserId=&quot;{Binding SelectedUserId}&quot;
+            Title=&quot;Profile&quot;
+            UserService=&quot;{Binding UserService}&quot; /&gt;
+    &lt;/StackPanel&gt;
+
+&lt;/UserControl&gt;
+</code></pre>
+<p>Akbura components therefore integrate into existing Avalonia applications without a wrapper or a separate hosting element.</p>
+
+				</div>
+
+				<div class="not-prose"></div>
+				
+					<div class="not-prose py-8">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akbura/index.md" target="_blank" rel="noopener noreferrer">
+							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+						</a>
+					</div>
+
+					<div class="not-prose my-20">
+					</div>
+			</div>
+				
+				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+						<div>
+							<h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+								On This Page
+							</h5>
+							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#basic-usage'" data-id="basic-usage" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Basic usage
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#passing-parameters'" data-id="passing-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Passing parameters
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#binding-parameters'" data-id="binding-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Binding parameters
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#passing-injected-services'" data-id="passing-injected-services" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Passing injected services
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#setting-services-from-code'" data-id="setting-services-from-code" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Setting services from code
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#complete-example'" data-id="complete-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Complete example
+										</span>
+									</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				
+		</div>
+	</div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+	const el = document.querySelector('#doc section h1') 
+	if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+	const App = {
+		setup() {
+			function nav(url) {
+				window.open(url)
+			}
+			return { nav }
+		}
+	}
+	
+const Sidebar = {
+	setup() {
+		const open = ref(true)
+		return { open }
+	}
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="lib/js/lite-yt-embed.js"></script>
+<script src="mjs/docs.mjs" type="module"></script>
+
+        </main>
+    </div>
+
+    
+
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
+
+    
+</body>
+</html>

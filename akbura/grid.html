@@ -1,0 +1,485 @@
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+    <title>Grid</title>
+
+    <script>
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
+    </script>
+
+    <link rel="stylesheet" href="css/app.css">
+
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+	<div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+	  <div class="flex h-16 justify-between">
+		<div class="flex">
+		  <div class="flex flex-shrink-0 items-center">
+			<a class="mr-2 lg:mr-8 flex items-center" href="./">
+				<svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+				<span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+			</a>
+		  </div>
+			<div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+				<!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+						<a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+							Akbura
+						</a>
+						<a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							Akcss
+						</a>
+						<a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							What's New
+						</a>
+			</div>
+		</div>
+		<div class="hidden sm:ml-6 sm:flex sm:items-center">
+			<dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+		</div>
+		<div class="-mr-2 flex items-center sm:hidden">
+		  <!-- Mobile menu button -->
+		  <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+			<span class="sr-only">Open main menu</span>
+			<!-- Menu open: "hidden", Menu closed: "block" -->
+			<svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+			</svg>
+			<!-- Menu open: "block", Menu closed: "hidden" -->
+			<svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+			</svg>
+		  </button>
+		</div>
+	  </div>
+	</div>
+
+	<!-- Mobile menu, show/hide based on menu state. -->
+	<div v-cloak v-if="open" class="sm:hidden">
+		<div class="space-y-1 pb-3 pt-2">
+			<!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+					<a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+						Akbura
+					</a>
+					<a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						Akcss
+					</a>
+					<a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						What's New
+					</a>
+		</div>
+	</div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+	setup() {
+		const open = ref(false)
+		return { open }
+	}
+}
+mount('#header', Header)
+</script>
+
+
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            
+
+
+
+
+<style>
+.active {
+	color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="css/highlight.css">
+<link rel="stylesheet" href="css/typography.css">
+<link rel="stylesheet" href="css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+	<div class="flex flex-wrap">
+		<div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+			<button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+				<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+			</button>
+			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+								<a href="https://asaicraft.github.io/Akbura/akbura/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+AKBURA									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Using Akbura Components in AXAML
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Grid
+									</a>
+								</li>
+						</ul>
+				</nav>
+			</div>
+		</div>
+		<div id="doc" class="mx-auto flex">
+			<div class="mt-8 mx-auto prose lg:prose-lg">
+				
+					<section class="not-prose mb-16 md:mb-12">
+						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+							Grid
+						</h1>
+					</section>
+
+				<div class="not-prose"></div>
+
+				<div class="content">
+					<p>Avalonia's <code>Grid</code> arranges child controls into rows and columns.</p>
+<p>In <code>.akbura</code> markup, the <code>RowDefinitions</code> and <code>ColumnDefinitions</code> properties support a compact literal syntax:</p>
+<pre><code class="language-akbura">&lt;Grid
+    ColumnDefinitions=&quot;*, 100, Auto&quot;
+    RowDefinitions=&quot;Auto 2* 48&quot;&gt;
+    &lt;!-- content --&gt;
+&lt;/Grid&gt;
+</code></pre>
+<p>This syntax creates the corresponding Avalonia row and column definitions without requiring each definition to be declared separately.</p>
+<div class="info custom-block">
+            <p class="custom-block-title">INFO</p><p>Grid definition literals are available in <code>.akbura</code> markup attributes.</p>
+</div>
+<p>They are not currently supported as a special AKCSS assignment value.</p>
+<h2 id="grid-lengths">Grid lengths<a class="header-anchor" href="javascript:;" onclick="location.hash='#grid-lengths'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Each definition contains a Grid length.</p>
+<p>The following forms are supported:</p>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Auto</code></td>
+<td>Size the row or column to its content</td>
+</tr>
+<tr>
+<td><code>100</code></td>
+<td>Use <code>100</code> device-independent pixels</td>
+</tr>
+<tr>
+<td><code>*</code></td>
+<td>Use one proportional star unit</td>
+</tr>
+<tr>
+<td><code>2*</code></td>
+<td>Use two proportional star units</td>
+</tr>
+</tbody>
+</table>
+<p>For example:</p>
+<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;Auto, *, 2*, 100&quot; /&gt;
+</code></pre>
+<p>This creates four columns:</p>
+<ol>
+<li>An automatically sized column.</li>
+<li>A column using one share of the available space.</li>
+<li>A column using two shares of the available space.</li>
+<li>A fixed-width column of <code>100</code> device-independent pixels.</li>
+</ol>
+<h2 id="separating-definitions">Separating definitions<a class="header-anchor" href="javascript:;" onclick="location.hash='#separating-definitions'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Definitions may be separated either by commas or by whitespace.</p>
+<p>Using commas:</p>
+<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;*, 100, Auto&quot; /&gt;
+</code></pre>
+<p>Using whitespace:</p>
+<pre><code class="language-akbura">&lt;Grid RowDefinitions=&quot;Auto * 2* 48&quot; /&gt;
+</code></pre>
+<p>Use one separator style within the same value.</p>
+<p>When the value contains top-level commas, those commas delimit the definitions. Otherwise, the definitions are separated by whitespace.</p>
+<h2 id="minimum-and-maximum-sizes">Minimum and maximum sizes<a class="header-anchor" href="javascript:;" onclick="location.hash='#minimum-and-maximum-sizes'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Grid definitions may include minimum and maximum constraints.</p>
+<pre><code class="language-akbura">&lt;Grid
+    ColumnDefinitions=&quot;
+        min(100),
+        max(300),
+        min-max(100, 300),
+        min-max(100, *, 300),
+        min-max(0, Auto, 100)&quot; /&gt;
+</code></pre>
+<h3 id="minimum-size">Minimum size<a class="header-anchor" href="javascript:;" onclick="location.hash='#minimum-size'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Use <code>min(...)</code> to create a star-sized definition with a minimum size:</p>
+<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;min(100)&quot; /&gt;
+</code></pre>
+<p>This is equivalent to a <code>*</code> column whose minimum width is <code>100</code>.</p>
+<h3 id="maximum-size">Maximum size<a class="header-anchor" href="javascript:;" onclick="location.hash='#maximum-size'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Use <code>max(...)</code> to create a star-sized definition with a maximum size:</p>
+<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;max(300)&quot; /&gt;
+</code></pre>
+<p>This is equivalent to a <code>*</code> column whose maximum width is <code>300</code>.</p>
+<h3 id="minimum-and-maximum-size">Minimum and maximum size<a class="header-anchor" href="javascript:;" onclick="location.hash='#minimum-and-maximum-size'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Use <code>min-max(...)</code> to specify both constraints:</p>
+<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;min-max(100, 300)&quot; /&gt;
+</code></pre>
+<p>The two-argument form uses <code>*</code> as the Grid length.</p>
+<p>You may also provide the Grid length explicitly:</p>
+<pre><code class="language-akbura">&lt;Grid
+    ColumnDefinitions=&quot;
+        min-max(100, 2*, 300),
+        min-max(0, Auto, 100)&quot; /&gt;
+</code></pre>
+<p>Supported forms include:</p>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>min(100)</code></td>
+<td><code>*</code> with a minimum of <code>100</code></td>
+</tr>
+<tr>
+<td><code>max(300)</code></td>
+<td><code>*</code> with a maximum of <code>300</code></td>
+</tr>
+<tr>
+<td><code>min-max(100, 300)</code></td>
+<td><code>*</code> constrained to <code>100...300</code></td>
+</tr>
+<tr>
+<td><code>min-max(100, *, 300)</code></td>
+<td><code>*</code> constrained to <code>100...300</code></td>
+</tr>
+<tr>
+<td><code>min-max(100, 2*, 300)</code></td>
+<td><code>2*</code> constrained to <code>100...300</code></td>
+</tr>
+<tr>
+<td><code>min-max(0, Auto, 100)</code></td>
+<td><code>Auto</code> constrained to <code>0...100</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="validation-rules">Validation rules<a class="header-anchor" href="javascript:;" onclick="location.hash='#validation-rules'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Grid definition values are validated by the Akbura compiler.</p>
+<p>The following rules apply:</p>
+<ul>
+<li>Pixel values must be non-negative.</li>
+<li>Minimum values must be non-negative.</li>
+<li>Maximum values must be non-negative.</li>
+<li>In <code>min-max(...)</code>, the minimum value cannot be greater than the maximum value.</li>
+</ul>
+<p>Invalid definitions produce a compiler diagnostic instead of being deferred until runtime.</p>
+<h2 id="complete-example">Complete example<a class="header-anchor" href="javascript:;" onclick="location.hash='#complete-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<pre><code class="language-akbura">&lt;Grid
+    ColumnDefinitions=&quot;Auto, min-max(120, *, 320), 2*&quot;
+    RowDefinitions=&quot;Auto * 48&quot;&gt;
+
+    &lt;!-- Grid content --&gt;
+&lt;/Grid&gt;
+</code></pre>
+<p>This Grid contains:</p>
+<ul>
+<li><p>Three columns:</p>
+<ul>
+<li>an automatically sized column;</li>
+<li>a star-sized column constrained to <code>120...320</code>;</li>
+<li>a column receiving two proportional shares of the remaining space;</li>
+</ul>
+</li>
+<li><p>Three rows:</p>
+<ul>
+<li>an automatically sized row;</li>
+<li>a row filling the remaining space;</li>
+<li>a fixed row with a height of <code>48</code>.</li>
+</ul>
+</li>
+</ul>
+<p>Для файла хорошо подойдёт путь:</p>
+<pre><code class="language-text">AkburaDocs/_pages/akbura/grid.md
+</code></pre>
+
+				</div>
+
+				<div class="not-prose"></div>
+				
+					<div class="not-prose py-8">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akbura/grid.md" target="_blank" rel="noopener noreferrer">
+							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+						</a>
+					</div>
+
+					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												Using Akbura Components in AXAML
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+									</div>
+								</nav>
+					</div>
+			</div>
+				
+				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+						<div>
+							<h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+								On This Page
+							</h5>
+							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#grid-lengths'" data-id="grid-lengths" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Grid lengths
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#separating-definitions'" data-id="separating-definitions" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Separating definitions
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#minimum-and-maximum-sizes'" data-id="minimum-and-maximum-sizes" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Minimum and maximum sizes
+										</span>
+											<ul class="ml-4">
+													<li data-id="minimum-size" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#minimum-size'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Minimum size
+														</span>
+													</li>
+													<li data-id="maximum-size" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#maximum-size'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Maximum size
+														</span>
+													</li>
+													<li data-id="minimum-and-maximum-size" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#minimum-and-maximum-size'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Minimum and maximum size
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#validation-rules'" data-id="validation-rules" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Validation rules
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#complete-example'" data-id="complete-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Complete example
+										</span>
+									</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				
+		</div>
+	</div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+	const el = document.querySelector('#doc section h1') 
+	if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+	const App = {
+		setup() {
+			function nav(url) {
+				window.open(url)
+			}
+			return { nav }
+		}
+	}
+	
+const Sidebar = {
+	setup() {
+		const open = ref(true)
+		return { open }
+	}
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="lib/js/lite-yt-embed.js"></script>
+<script src="mjs/docs.mjs" type="module"></script>
+
+        </main>
+    </div>
+
+    
+
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
+
+    
+</body>
+</html>

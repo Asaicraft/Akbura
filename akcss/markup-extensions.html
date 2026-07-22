@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>AKCSS Getting Started</title>
+    <title>Markup Extensions</title>
 
     <script>
             if (location.search === "?dark") {
@@ -125,6 +125,8 @@ mount('#header', Header)
             
 
 
+
+
 <style>
 .active {
 	color: #0ea5e9 !important;
@@ -154,7 +156,7 @@ AKCSS									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/markup-extensions" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akcss/markup-extensions" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
 										Markup Extensions
 									</a>
 								</li>
@@ -193,191 +195,162 @@ Built-in Styles									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							AKCSS Getting Started
+							Markup Extensions
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>AKCSS is Akbura's typed styling language. It complements Avalonia styles with C# expressions, reactive dependencies, typed property binding, and component-local style files.</p>
-<h2 id="your-first-reactive-style">Your first reactive style<a class="header-anchor" href="javascript:;" onclick="location.hash='#your-first-reactive-style'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Create a companion style file next to the component. A component named <code>Counter.akbura</code> automatically discovers <code>Counter.akcss</code> in the same directory.</p>
-<p><code>Counter.akcss</code>:</p>
-<pre><code class="language-akcss">.style {
-    @if(Background == Brushes.Red) {
-        Padding: 15;
-    }
-
-    Padding: 10;
-}
+					<div class="warning custom-block">
+            <p class="custom-block-title">WARNING</p><p>Akbura does not currently support general Avalonia <code>MarkupExtension</code> types. Custom markup extensions cannot yet be instantiated and evaluated from Akbura markup or AKCSS.</p>
+</div>
+<p>AKCSS currently provides two compiler-supported resource extensions:</p>
+<pre><code class="language-csharp">Amx.StaticResource&lt;T&gt;(object? key);
+Amx.DynamicResource&lt;T&gt;(object? key);
 </code></pre>
-<p><code>Counter.akbura</code>:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
-using Avalonia.Media;
-
-state IBrush bg = Brushes.Aqua;
-
-&lt;Button class=&quot;style&quot;
-        Background={bg}
-        Click={() =&gt; bg = bg == Brushes.Aqua ? Brushes.Red : Brushes.Aqua}&gt;
-    Current bg is {bg == Brushes.Aqua ? &quot;Aqua&quot; : &quot;Red&quot;}
-&lt;/Button&gt;
-</code></pre>
-<p>Clicking the button changes <code>bg</code>, which updates the button's <code>Background</code>. The <code>.style</code> rule observes the <code>Background</code> expression and runs its cascade again:</p>
-<ul>
-<li>with an aqua background, <code>Padding</code> is <code>10</code>;</li>
-<li>with a red background, the declaration inside <code>@if</code> sets <code>Padding</code> to <code>15</code>;</li>
-<li>changing back to aqua removes the conditional value and exposes the <code>Padding: 10</code> fallback again.</li>
-</ul>
-<h2 id="conditional-priority">Conditional priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>AKCSS maps declarations to Avalonia binding priorities:</p>
+<p>They provide typed access to resources from AKCSS expressions.</p>
 <table>
 <thead>
 <tr>
-<th>Declaration</th>
-<th>Avalonia priority</th>
+<th>Method</th>
+<th>Behavior</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>A normal style declaration</td>
-<td><code>BindingPriority.Style</code></td>
+<td><code>Amx.StaticResource&lt;T&gt;(key)</code></td>
+<td>Resolves the resource as <code>T</code> without creating a dynamic resource binding.</td>
 </tr>
 <tr>
-<td>A declaration inside an active <code>@if</code></td>
-<td><code>BindingPriority.StyleTrigger</code></td>
+<td><code>Amx.DynamicResource&lt;T&gt;(key)</code></td>
+<td>Observes the resource and updates the target property when its value changes.</td>
 </tr>
 </tbody>
 </table>
-<p><code>StyleTrigger</code> has a higher priority than <code>Style</code>. This is why the conditional <code>Padding: 15</code> wins even though <code>Padding: 10</code> appears later in the file. When the condition becomes false, AKCSS clears the trigger value and the normal style value becomes visible again.</p>
-<h2 id="how-reactive-dependencies-are-observed">How reactive dependencies are observed<a class="header-anchor" href="javascript:;" onclick="location.hash='#how-reactive-dependencies-are-observed'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>AKCSS collects property references from every bound expression in a style, including conditions and property values. For each dependency it uses the best observation mechanism available:</p>
-<ol>
-<li><strong>Avalonia property</strong> - subscribes directly to the registered <code>AvaloniaProperty</code> observable.</li>
-<li><strong><code>INotifyPropertyChanged</code> object</strong> - subscribes to <code>PropertyChanged</code> on the object that owns the referenced property.</li>
-<li><strong>Non-observable property</strong> - applies the value, but does not create an automatic subscription for that dependency.</li>
-</ol>
-<p>When any observed dependency changes, AKCSS resets the values written by the style and evaluates the ordered cascade again.</p>
-<h3 id="expressions-are-reactive-too">Expressions are reactive too<a class="header-anchor" href="javascript:;" onclick="location.hash='#expressions-are-reactive-too'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Observation is not limited to <code>@if</code>. Any property reference inside an expression can become a dependency:</p>
-<pre><code class="language-akcss">.sameSize {
-    Width: Height;
-}
-</code></pre>
-<p>Here <code>Height</code> is observed. Whenever the target's height changes, <code>.sameSize</code> is evaluated again and writes the new value to <code>Width</code>.</p>
-<p>The same rule applies to larger expressions:</p>
-<pre><code class="language-akcss">.card {
-    Width: Height * 2;
+<h2 id="compiler-intercepted-methods">Compiler-intercepted methods<a class="header-anchor" href="javascript:;" onclick="location.hash='#compiler-intercepted-methods'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The methods are declared by the <code>Amx</code> class:</p>
+<pre><code class="language-csharp">/// &lt;summary&gt;
+/// All methods in this class shoud be intercepted
+/// &lt;/summary&gt;
+public static class Amx
+{
+    public static object? Extend&lt;T&gt;(params object[] args)
+    {
+        throw new InvalidOperationException(&quot;This method shoud be intercepted!&quot;);
+    }
 
-    @if(IsEnabled &amp;&amp; Opacity &gt; 0.5) {
-        Padding: 20;
+    public static T StaticResource&lt;T&gt;(object? key)
+    {
+        throw new InvalidOperationException(&quot;This method shoud be intercepted!&quot;);
+    }
+
+    public static T DynamicResource&lt;T&gt;(object? key)
+    {
+        throw new InvalidOperationException(&quot;This method shoud be intercepted!&quot;);
     }
 }
 </code></pre>
-<p>Each resolvable property reference is tracked independently.</p>
-<h2 id="selectors">Selectors<a class="header-anchor" href="javascript:;" onclick="location.hash='#selectors'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>AKCSS supports untyped, typed, type-only, nested-type, and globally qualified selectors:</p>
-<pre><code class="language-akcss">.selector { }
-Button.selector { }
-(MyNamespace.Button) { }
-(MyNamespace.Button.Nested).selector { }
-(global::MyNs.Button) { }
-(global::MyNs.Button).selector { }
-</code></pre>
-<table>
-<thead>
-<tr>
-<th>Form</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>.selector</code></td>
-<td>A named style that can contribute compatible properties to its target.</td>
-</tr>
-<tr>
-<td><code>Button.selector</code></td>
-<td>A named style restricted to <code>Button</code> and compatible derived controls.</td>
-</tr>
-<tr>
-<td><code>(MyNamespace.Button)</code></td>
-<td>A type-only selector.</td>
-</tr>
-<tr>
-<td><code>(MyNamespace.Button.Nested).selector</code></td>
-<td>A named style for a nested target type.</td>
-</tr>
-<tr>
-<td><code>(global::MyNs.Button)</code></td>
-<td>A type-only selector resolved from the global namespace.</td>
-</tr>
-<tr>
-<td><code>(global::MyNs.Button).selector</code></td>
-<td>A globally qualified typed class selector.</td>
-</tr>
-</tbody>
-</table>
-<p>Common Avalonia control names such as <code>Button</code> can be used directly. Parenthesized selectors are useful for fully qualified, generic, or nested C# type names.</p>
-<h2 id="using-namespaces">Using namespaces<a class="header-anchor" href="javascript:;" onclick="location.hash='#using-namespaces'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>A standalone <code>.akcss</code> file uses <code>@using</code> for C# namespaces:</p>
-<pre><code class="language-akcss">@using MyApplication.Controls;
-@using MyApplication.Models;
+<p>These methods must not execute at runtime. The AKCSS compiler recognizes their invocations and replaces them with generated Avalonia resource lookup or binding code. Calling them directly from ordinary C# code throws <code>InvalidOperationException</code>.</p>
+<p><code>Amx.Extend&lt;T&gt;</code> is an interception placeholder for general markup extensions. It is not currently supported for use in AKCSS; only <code>StaticResource&lt;T&gt;</code> and <code>DynamicResource&lt;T&gt;</code> are available.</p>
+<h2 id="static-resources">Static resources<a class="header-anchor" href="javascript:;" onclick="location.hash='#static-resources'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>StaticResource&lt;T&gt;</code> when the resource does not need to update the target after it has been resolved:</p>
+<pre><code class="language-akcss">@using Avalonia.Media;
 
-(DashboardCard).highlighted {
-    Opacity: 1;
+Button.brand {
+    Background: Amx.StaticResource&lt;IBrush&gt;(&quot;BrandBrush&quot;);
 }
 </code></pre>
-<p>AKCSS also provides these implicit namespaces:</p>
-<pre><code class="language-text">Avalonia
-Avalonia.Layout
-Avalonia.Media
-Akbura
+<p>The generic type argument tells the compiler which type the resource value must have.</p>
+<h2 id="dynamic-resources">Dynamic resources<a class="header-anchor" href="javascript:;" onclick="location.hash='#dynamic-resources'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>DynamicResource&lt;T&gt;</code> when changing the resource should update the styled property:</p>
+<pre><code class="language-akcss">Control.w-(double width) {
+    Width: width * Amx.DynamicResource&lt;double&gt;(&quot;--spacing&quot;);
+}
 </code></pre>
-<p>In addition, short Avalonia control names are resolved from <code>Avalonia.Controls</code>, so selectors such as <code>Button.primary</code> do not require a fully qualified name.</p>
-<p>Use <code>global::</code> when a local namespace or type name would otherwise be ambiguous.</p>
-<h2 id="loading-and-importing-styles">Loading and importing styles<a class="header-anchor" href="javascript:;" onclick="location.hash='#loading-and-importing-styles'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<h3 id="companion-styles">Companion styles<a class="header-anchor" href="javascript:;" onclick="location.hash='#companion-styles'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>AKCSS first searches the component's local styles. For <code>Counter.akbura</code>, the companion file is <code>Counter.akcss</code> in the same directory:</p>
-<pre><code class="language-text">Pages/
-  Counter.akbura
-  Counter.akcss
-</code></pre>
-<p>No import is required for the companion file. Inline <code>@akcss</code> blocks are local to the component as well.</p>
-<h3 id="importing-an-akcss-module">Importing an AKCSS module<a class="header-anchor" href="javascript:;" onclick="location.hash='#importing-an-akcss-module'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Import shared styles in an <code>.akbura</code> component with a normal <code>using</code> whose logical name ends in <code>.akcss</code>:</p>
-<p><code>Counter.akbura</code>:</p>
 <pre><code class="language-akbura">using Akbura.Styles.akcss;
 
-&lt;Button class=&quot;myclass&quot;&gt;Hello&lt;/Button&gt;
+&lt;Button w-10&gt;
+    Continue
+&lt;/Button&gt;
 </code></pre>
-<p>The compiler searches local styles before imported modules. Imported modules are considered in <code>using</code> order.</p>
-<p>One AKCSS file can import another with <code>@using</code>:</p>
-<pre><code class="language-akcss">@using Akbura.Styles.akcss;
+<p>With the default <code>--spacing</code> value of <code>4</code>, <code>w-10</code> produces a width of <code>40</code>. If <code>--spacing</code> changes, the <code>Width</code> property is recalculated automatically.</p>
+<p>The resource invocation may be part of a larger expression. In this example, the generated converter captures the <code>width</code> utility parameter and multiplies it by every new resource value.</p>
+<h2 id="generated-code">Generated code<a class="header-anchor" href="javascript:;" onclick="location.hash='#generated-code'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The <code>w-</code> utility above generates code equivalent to:</p>
+<pre><code class="language-csharp">[global::Akbura.CompilerAnotations.StyleNameAttribute(&quot;w&quot;)] 
+private sealed class Style_0 : global::Akbura.Akcss.AkcssUtility&lt;double&gt;
+{
+    public override void Update(object __target, double width)
+    {
+        global::System.ArgumentNullException.ThrowIfNull(__target);
+        if (__target is global::Avalonia.Layout.Layoutable &amp;&amp; __target is global::Avalonia.Controls.IResourceHost)
+        {
+            #line 11 &quot;D:\\Repos\\Akbura\\Akbura\\Styles.akcss&quot;
+            TrackSubscription(__target, ((global::Avalonia.AvaloniaObject)__target).Bind(global::Avalonia.Layout.Layoutable.WidthProperty, global::Avalonia.Controls.ResourceNodeExtensions.GetResourceObservable((global::Avalonia.Controls.IResourceHost)__target, &quot;--spacing&quot;, converter: __resourceValue =&gt; global::System.Object.ReferenceEquals(__resourceValue, global::Avalonia.AvaloniaProperty.UnsetValue) ? global::Avalonia.AvaloniaProperty.UnsetValue : (object?)(width * (double)__resourceValue!))));
+            #line default
+        }
+    }
+
+    public override void Reset(object __target)
+    {
+        global::System.ArgumentNullException.ThrowIfNull(__target);
+        base.Reset(__target);
+        if (__target is global::Avalonia.AvaloniaObject &amp;&amp; __target is global::Avalonia.Layout.Layoutable)
+        {
+            ((global::Avalonia.AvaloniaObject)__target).ClearValue(global::Avalonia.Layout.Layoutable.WidthProperty);
+        }
+    }
+}
 </code></pre>
-<p>An import name is the module's logical name, normally derived from the project's root namespace and file path.</p>
-<h2 id="akcss-and-avalonia-styles-together">AKCSS and Avalonia styles together<a class="header-anchor" href="javascript:;" onclick="location.hash='#akcss-and-avalonia-styles-together'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>AKCSS is not a replacement for Avalonia's standard styling system. Both can be used on the same control:</p>
-<pre><code class="language-akbura">&lt;Border Classes=&quot;avalonia-card selected&quot; class=&quot;akcssCard&quot; /&gt;
-</code></pre>
+<p>The generated utility:</p>
+<ol>
+<li>Checks that the target supports the property and implements <code>IResourceHost</code>.</li>
+<li>Obtains an observable for the <code>--spacing</code> resource.</li>
+<li>Converts every resource value using the original AKCSS expression.</li>
+<li>Binds the result to <code>Width</code> and tracks the subscription.</li>
+<li>Disposes the tracked binding and clears the property when the utility is reset.</li>
+</ol>
+<h2 id="current-limitations">Current limitations<a class="header-anchor" href="javascript:;" onclick="location.hash='#current-limitations'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <ul>
-<li><code>Classes</code> contains standard Avalonia style classes.</li>
-<li><code>class</code> contains AKCSS styles resolved by the Akbura compiler.</li>
+<li>Custom Avalonia <code>MarkupExtension</code> implementations are not supported yet.</li>
+<li><code>Amx.Extend&lt;T&gt;</code> is not available for application code.</li>
+<li>Resource methods are supported only where the Akbura compiler can intercept the expression.</li>
+<li>The target must be an Avalonia resource host for dynamic resource observation.</li>
 </ul>
-<p>Use Avalonia styles for the existing Avalonia styling ecosystem and AKCSS where typed properties, C# expressions, reactive rules, or component-local styling are useful.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/index.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/markup-extensions.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
 
 					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akcss/getting-started" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												Getting Started
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+											<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Custom Class Styles
+												<!-- Heroicon name: mini/arrow-long-right -->
+												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+												</svg>
+											</a>
+									</div>
+								</nav>
 					</div>
 			</div>
 				
@@ -389,60 +362,28 @@ Akbura
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#your-first-reactive-style'" data-id="your-first-reactive-style" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Your first reactive style
+										<span v-hash="'#compiler-intercepted-methods'" data-id="compiler-intercepted-methods" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Compiler-intercepted methods
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#conditional-priority'" data-id="conditional-priority" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Conditional priority
+										<span v-hash="'#static-resources'" data-id="static-resources" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Static resources
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#how-reactive-dependencies-are-observed'" data-id="how-reactive-dependencies-are-observed" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											How reactive dependencies are observed
-										</span>
-											<ul class="ml-4">
-													<li data-id="expressions-are-reactive-too" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#expressions-are-reactive-too'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Expressions are reactive too
-														</span>
-													</li>
-											</ul>
-									</li>
-									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#selectors'" data-id="selectors" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Selectors
+										<span v-hash="'#dynamic-resources'" data-id="dynamic-resources" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Dynamic resources
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#using-namespaces'" data-id="using-namespaces" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Using namespaces
+										<span v-hash="'#generated-code'" data-id="generated-code" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Generated code
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#loading-and-importing-styles'" data-id="loading-and-importing-styles" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Loading and importing styles
-										</span>
-											<ul class="ml-4">
-													<li data-id="companion-styles" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#companion-styles'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Companion styles
-														</span>
-													</li>
-													<li data-id="importing-an-akcss-module" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#importing-an-akcss-module'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Importing an AKCSS module
-														</span>
-													</li>
-											</ul>
-									</li>
-									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#akcss-and-avalonia-styles-together'" data-id="akcss-and-avalonia-styles-together" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											AKCSS and Avalonia styles together
+										<span v-hash="'#current-limitations'" data-id="current-limitations" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Current limitations
 										</span>
 									</li>
 							</ul>

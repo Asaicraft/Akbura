@@ -175,15 +175,18 @@ internal static class AkburaModuleManifestBuilder
         AkcssSyntaxTree syntaxTree)
     {
         var declaration = DeclarationTreeBuilder.ForSyntaxDeclaration(syntaxTree);
+        var generatedModule = new AkburaModuleAkcssModule(
+            AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(sourceCodePath));
         return new AkburaModuleSource(
             sourceCodePath,
             AkburaModuleSourceKind.Akcss,
-            [CreateAkcssDeclaration(declaration, syntaxTree.LogicalName)]);
+            [CreateAkcssDeclaration(declaration, syntaxTree.LogicalName, generatedModule)]);
     }
 
     private static AkburaModuleDeclaration CreateAkcssDeclaration(
         Declaration declaration,
-        string? metadataName = null)
+        string? metadataName = null,
+        AkburaModuleAkcssModule? akcssModule = null)
     {
         var syntax = DeclarationFacts.GetSyntax(declaration);
         using var children = ImmutableArrayBuilder<AkburaModuleDeclaration>.Rent();
@@ -203,7 +206,8 @@ internal static class AkburaModuleManifestBuilder
             syntax.FullSpan.Start,
             syntax.FullSpan.Length,
             children.ToImmutable(),
-            akcssUtility);
+            akcssUtility: akcssUtility,
+            akcssModule: akcssModule);
     }
 
     private static AkburaModuleAkcssUtility CreateAkcssUtility(

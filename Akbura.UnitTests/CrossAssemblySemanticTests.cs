@@ -164,9 +164,14 @@ public sealed class CrossAssemblySemanticTests
             var referencedAkcssSource = Assert.Single(
                 referencedModule.Manifest.Sources,
                 static source => source.SourceCodePath == "Styles/Theme.akcss");
+            var referencedAkcssDeclaration = Assert.Single(referencedAkcssSource.Declarations);
             Assert.Equal(
                 "Library.Styles.Theme.akcss",
-                Assert.Single(referencedAkcssSource.Declarations).MetadataName);
+                referencedAkcssDeclaration.MetadataName);
+            Assert.Equal(
+                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName("Styles/Theme.akcss"),
+                Assert.IsType<AkburaModuleAkcssModule>(
+                    referencedAkcssDeclaration.AkcssModule).TypeName);
 
             var updatedCSharpCompilation = consumerCSharpCompilation.AddSyntaxTrees(
                 CSharpSyntaxTree.ParseText("internal sealed class AddedType { }"));

@@ -8,7 +8,7 @@ namespace Akbura.Language;
 internal sealed class AkburaModuleManifest
 {
     public const string ResourceName = "!Akbura";
-    public const int CurrentFormatVersion = 2;
+    public const int CurrentFormatVersion = 3;
 
     public AkburaModuleManifest(
         int formatVersion,
@@ -76,7 +76,8 @@ internal sealed class AkburaModuleDeclaration
         int sourceLength,
         ImmutableArray<AkburaModuleDeclaration> children,
         AkburaModuleAkcssUtility? akcssUtility = null,
-        AkburaModuleComponent? component = null)
+        AkburaModuleComponent? component = null,
+        AkburaModuleAkcssModule? akcssModule = null)
     {
         if (sourceStart < 0)
         {
@@ -100,6 +101,12 @@ internal sealed class AkburaModuleDeclaration
                 "Component declarations must have exactly one component signature.", nameof(component));
         }
 
+        if (akcssModule != null && kind != DeclarationKind.AkcssModule)
+        {
+            throw new ArgumentException(
+                "Only AKCSS module declarations can have generated module metadata.", nameof(akcssModule));
+        }
+
         Kind = kind;
         Name = name ?? string.Empty;
         MetadataName = string.IsNullOrWhiteSpace(metadataName)
@@ -112,6 +119,7 @@ internal sealed class AkburaModuleDeclaration
             : children;
         AkcssUtility = akcssUtility;
         Component = component;
+        AkcssModule = akcssModule;
     }
 
     public DeclarationKind Kind { get; }
@@ -129,6 +137,24 @@ internal sealed class AkburaModuleDeclaration
     public AkburaModuleAkcssUtility? AkcssUtility { get; }
 
     public AkburaModuleComponent? Component { get; }
+
+    public AkburaModuleAkcssModule? AkcssModule { get; }
+}
+
+internal sealed class AkburaModuleAkcssModule
+{
+    public AkburaModuleAkcssModule(string typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            throw new ArgumentException(
+                "Generated AKCSS module type name cannot be empty.", nameof(typeName));
+        }
+
+        TypeName = typeName;
+    }
+
+    public string TypeName { get; }
 }
 
 internal sealed class AkburaModuleComponent

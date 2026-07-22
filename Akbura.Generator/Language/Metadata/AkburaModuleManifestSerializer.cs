@@ -16,6 +16,7 @@ internal static class AkburaModuleManifestSerializer
     private const string SourceElementName = "source";
     private const string DeclarationElementName = "declaration";
     private const string ComponentElementName = "component";
+    private const string AkcssModuleElementName = "akcssModule";
     private const string AkcssUtilityElementName = "akcssUtility";
     private const string ParameterElementName = "parameter";
     private const string InjectElementName = "inject";
@@ -191,6 +192,11 @@ internal static class AkburaModuleManifestSerializer
             "length",
             declaration.SourceLength.ToString(CultureInfo.InvariantCulture));
 
+        if (declaration.AkcssModule != null)
+        {
+            WriteAkcssModule(writer, declaration.AkcssModule);
+        }
+
         if (declaration.AkcssUtility != null)
         {
             WriteAkcssUtility(writer, declaration.AkcssUtility);
@@ -206,6 +212,15 @@ internal static class AkburaModuleManifestSerializer
             WriteDeclaration(writer, child);
         }
 
+        writer.WriteEndElement();
+    }
+
+    private static void WriteAkcssModule(
+        XmlWriter writer,
+        AkburaModuleAkcssModule module)
+    {
+        writer.WriteStartElement(AkcssModuleElementName);
+        writer.WriteAttributeString("type", module.TypeName);
         writer.WriteEndElement();
     }
 
@@ -358,6 +373,7 @@ internal static class AkburaModuleManifestSerializer
         var sourceStart = ReadRequiredInt32(reader, "start");
         var sourceLength = ReadRequiredInt32(reader, "length");
         using var children = ImmutableArrayBuilder<AkburaModuleDeclaration>.Rent();
+        AkburaModuleAkcssModule? akcssModule = null;
         AkburaModuleAkcssUtility? akcssUtility = null;
         AkburaModuleComponent? component = null;
 
@@ -373,6 +389,16 @@ internal static class AkburaModuleManifestSerializer
                 if (reader.Name == DeclarationElementName)
                 {
                     children.Add(ReadDeclaration(reader));
+                }
+                else if (reader.Name == AkcssModuleElementName)
+                {
+                    if (akcssModule != null)
+                    {
+                        throw new InvalidDataException(
+                            "An AKCSS module declaration contains more than one generated module reference.");
+                    }
+
+                    akcssModule = ReadAkcssModule(reader);
                 }
                 else if (reader.Name == AkcssUtilityElementName)
                 {
@@ -411,7 +437,8 @@ internal static class AkburaModuleManifestSerializer
             sourceLength,
             children.ToImmutable(),
             akcssUtility,
-            component);
+            component,
+            akcssModule);
     }
 
     private static AkburaModuleComponent ReadComponent(XmlReader reader)
@@ -529,6 +556,13 @@ internal static class AkburaModuleManifestSerializer
             isOptional,
             sourceStart,
             sourceLength);
+    }
+
+    private static AkburaModuleAkcssModule ReadAkcssModule(XmlReader reader)
+    {
+        var typeName = ReadRequiredAttribute(reader, "type");
+        reader.Skip();
+        return new AkburaModuleAkcssModule(typeName);
     }
 
     private static AkburaModuleAkcssUtility ReadAkcssUtility(

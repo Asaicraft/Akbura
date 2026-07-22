@@ -2,6 +2,7 @@ using Akbura.Language;
 using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 
@@ -31,6 +32,17 @@ public sealed class AkburaBuildTargetsTests
         var module = Assert.Single(source.Declarations);
         Assert.Equal(DeclarationKind.AkcssModule, module.Kind);
         Assert.Equal("Akbura.Styles.akcss", module.MetadataName);
+        Assert.NotNull(module.AkcssModule);
+        var generatedTypeName = module.AkcssModule!.TypeName;
+        Assert.StartsWith("global::", generatedTypeName, StringComparison.Ordinal);
+        var generatedType = assembly.GetType(generatedTypeName["global::".Length..]);
+        Assert.NotNull(generatedType);
+        Assert.True(generatedType.IsPublic);
+        var generatedSourcePath = generatedType.GetField(
+            "SourcePath",
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(generatedSourcePath);
+        Assert.Equal(source.SourceCodePath, generatedSourcePath.GetRawConstantValue());
         var widthUtility = Assert.Single(
             module.Children,
             static declaration => declaration.Kind == DeclarationKind.AkcssUtility &&
@@ -286,6 +298,10 @@ public sealed class AkburaBuildTargetsTests
                 manifest.Sources,
                 static source => source.SourceCodePath == "Styles/Theme.akcss");
             var akcssModule = Assert.Single(akcssSource.Declarations);
+            Assert.NotNull(akcssModule.AkcssModule);
+            Assert.Equal(
+                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName("Styles/Theme.akcss"),
+                akcssModule.AkcssModule!.TypeName);
             Assert.Contains(
                 akcssModule.Children,
                 static declaration => declaration.Kind == DeclarationKind.AkcssStyle &&

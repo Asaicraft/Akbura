@@ -99,15 +99,17 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             },
             index =>
             {
-                var root = akcssSyntaxTrees[index].GetRootSyntax();
+                var syntaxTree = akcssSyntaxTrees[index];
+                var root = syntaxTree.GetRootSyntax();
                 if (semanticModel.GetDeclaredSymbol(root) is not IAkcssModuleSymbol symbol)
                 {
                     return;
                 }
 
-                var source = AkcssGenerator.Generate(symbol, sourceMap);
+                var sourcePath = GetSourcePath(syntaxTree, projectOptions.ProjectDirectory);
+                var source = AkcssGenerator.Generate(symbol, sourceMap, sourcePath);
                 results[index] = new GeneratedSource(
-                    AkcssGenerator.GetHintName(symbol),
+                    AkcssGenerator.GetHintName(symbol, sourcePath),
                     SourceText.From(source, Encoding.UTF8));
             });
 
@@ -128,6 +130,33 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             ? "__AkburaGeneratorHost.akbura"
             : Path.Combine(projectDirectory, "__AkburaGeneratorHost.akbura");
         return ComponentSyntaxTree.ParseText(SourceText.From(string.Empty), path, cancellationToken);
+    }
+
+    private static string GetSourcePath(
+        AkcssSyntaxTree syntaxTree,
+        string projectDirectory)
+    {
+        if (!string.IsNullOrWhiteSpace(projectDirectory) &&
+            !string.IsNullOrWhiteSpace(syntaxTree.FilePath))
+        {
+            var projectPath = Path.GetFullPath(projectDirectory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var sourcePath = Path.GetFullPath(syntaxTree.FilePath);
+            var projectPrefix = projectPath + Path.DirectorySeparatorChar;
+            if (sourcePath.StartsWith(projectPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return AkcssGeneratedModuleNames.NormalizeSourcePath(
+                    sourcePath.Substring(projectPrefix.Length));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(syntaxTree.LogicalName))
+        {
+            return AkcssGeneratedModuleNames.NormalizeSourcePath(syntaxTree.LogicalName);
+        }
+
+        return AkcssGeneratedModuleNames.NormalizeSourcePath(
+            Path.GetFileName(syntaxTree.FilePath));
     }
 
     private static bool IsAkburaSourcePath(string path)

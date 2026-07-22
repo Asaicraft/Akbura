@@ -1,10 +1,12 @@
 using Akbura.Akcss;
+using Akbura.CompilerAnotations;
 using Akbura.Furioso;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
+using System.ComponentModel;
 using System.Reflection;
 
 namespace Akbura.UnitTests;
@@ -21,7 +23,9 @@ public sealed class AkburaCsGeneratorTests
             "\n" +
             "@utilities {\n" +
             "    Control.w-(double width) {\n" +
-            "        Width: width * Amx.DynamicResource<double>(\"--spacing\");\n" +
+            "        Width: width < 100\n" +
+            "            ? width * Amx.DynamicResource<double>(\"--spacing\")\n" +
+            "            : 100;\n" +
             "    }\n" +
             "}\n" +
             "\n" +
@@ -63,17 +67,34 @@ public sealed class AkburaCsGeneratorTests
         Assert.Contains("global::Avalonia.Layout.Layoutable.WidthProperty", text, StringComparison.Ordinal);
         Assert.Contains("global::Avalonia.Controls.Grid.SetColumn", text, StringComparison.Ordinal);
         Assert.Contains("ClearValue", text, StringComparison.Ordinal);
-        var widthLineDirective = $"#line 6 {SymbolDisplay.FormatLiteral(sourcePath, quote: true)}";
         var guardIndex = text.IndexOf("if (__target is", StringComparison.Ordinal);
-        var lineDirectiveIndex = text.IndexOf(widthLineDirective, StringComparison.Ordinal);
+        var lineDirectiveIndex = AssertEnhancedLineDirective(
+            text,
+            "(6,16)-(8,18)",
+            sourcePath);
         var bindingIndex = text.IndexOf("TrackSubscription(__target", StringComparison.Ordinal);
         Assert.True(guardIndex >= 0);
-        Assert.True(lineDirectiveIndex >= 0);
         Assert.True(bindingIndex >= 0);
         var lineDefaultIndex = text.IndexOf("#line default", bindingIndex, StringComparison.Ordinal);
         Assert.True(guardIndex < lineDirectiveIndex);
         Assert.True(lineDirectiveIndex < bindingIndex);
         Assert.True(bindingIndex < lineDefaultIndex);
+
+        var mappedStatementTokens = generatedSource.SyntaxTree.GetRoot()
+            .DescendantTokens()
+            .Where(token => token.SpanStart >= bindingIndex &&
+                            token.Span.End <= lineDefaultIndex)
+            .ToArray();
+        AssertMappedLocation(
+            mappedStatementTokens.First(static token => token.ValueText == "width"),
+            sourcePath,
+            new LinePosition(5, 15),
+            new LinePosition(5, 20));
+        AssertMappedLocation(
+            mappedStatementTokens.Last(static token => token.ValueText == "100"),
+            sourcePath,
+            new LinePosition(7, 14),
+            new LinePosition(7, 17));
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
@@ -87,6 +108,7 @@ public sealed class AkburaCsGeneratorTests
         var moduleType = assembly.GetType(
             "Akbura.Generated.__AkburaAkcssModule_6f172a6a");
         Assert.NotNull(moduleType);
+        AssertGeneratedModuleContract(moduleType, "Styles.akcss");
         var utilityType = moduleType.GetNestedType(
             "Style_0",
             BindingFlags.NonPublic);
@@ -159,9 +181,8 @@ public sealed class AkburaCsGeneratorTests
         var text = generatedSource.SourceText.ToString();
         Assert.Contains("__target is global::Data.MyClass", text, StringComparison.Ordinal);
         Assert.Contains("__target is global::Avalonia.AvaloniaObject", text, StringComparison.Ordinal);
-        var escapedSourcePath = SymbolDisplay.FormatLiteral(sourcePath, quote: true);
-        Assert.Contains($"#line 5 {escapedSourcePath}", text, StringComparison.Ordinal);
-        Assert.Contains($"#line 6 {escapedSourcePath}", text, StringComparison.Ordinal);
+        AssertEnhancedLineDirective(text, "(5,18)-(5,20)", sourcePath);
+        AssertEnhancedLineDirective(text, "(6,14)-(6,16)", sourcePath);
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
@@ -206,6 +227,87 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Equal(0d, button.Padding.Top);
             },
             CancellationToken.None);
+    }
+
+    private static int AssertEnhancedLineDirective(
+        string generatedSource,
+        string sourceSpan,
+        string sourcePath)
+    {
+        var prefix = $"#line {sourceSpan} ";
+        var directiveIndex = generatedSource.IndexOf(prefix, StringComparison.Ordinal);
+        Assert.True(directiveIndex >= 0);
+
+        var lineEnd = generatedSource.IndexOf('\n', directiveIndex);
+        Assert.True(lineEnd >= 0);
+        var directive = generatedSource
+            .Substring(directiveIndex, lineEnd - directiveIndex)
+            .TrimEnd('\r');
+        var pathSuffix = " \"" + sourcePath + "\"";
+        Assert.EndsWith(pathSuffix, directive, StringComparison.Ordinal);
+
+        var offsetStart = prefix.Length;
+        var offsetLength = directive.Length - prefix.Length - pathSuffix.Length;
+        Assert.True(offsetLength > 0);
+        Assert.True(int.TryParse(
+            directive.Substring(offsetStart, offsetLength),
+            out var characterOffset));
+        Assert.True(characterOffset >= 0);
+        return directiveIndex;
+    }
+
+    private static void AssertMappedLocation(
+        SyntaxToken token,
+        string sourcePath,
+        LinePosition expectedStart,
+        LinePosition expectedEnd)
+    {
+        var mappedSpan = token.GetLocation().GetMappedLineSpan();
+        Assert.Equal(sourcePath, mappedSpan.Path);
+        Assert.Equal(expectedStart, mappedSpan.StartLinePosition);
+        Assert.Equal(expectedEnd, mappedSpan.EndLinePosition);
+    }
+
+    private static void AssertGeneratedModuleContract(Type moduleType, string sourcePath)
+    {
+        Assert.True(moduleType.IsPublic);
+        AssertHiddenFromEditor(moduleType);
+        var moduleAttribute = Assert.IsType<AkcssModuleAttribute>(
+            moduleType.GetCustomAttribute<AkcssModuleAttribute>());
+        Assert.Equal(sourcePath, moduleAttribute.Path);
+
+        var metadataNameField = moduleType.GetField(
+            "MetadataName",
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(metadataNameField);
+        Assert.True(metadataNameField.IsLiteral);
+        Assert.Equal("Styles.akcss", metadataNameField.GetRawConstantValue());
+        AssertHiddenFromEditor(metadataNameField);
+
+        var sourcePathField = moduleType.GetField(
+            "SourcePath",
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(sourcePathField);
+        Assert.True(sourcePathField.IsLiteral);
+        Assert.Equal(sourcePath, sourcePathField.GetRawConstantValue());
+        AssertHiddenFromEditor(sourcePathField);
+
+        var stylesField = moduleType.GetField(
+            "Styles",
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(stylesField);
+        Assert.True(stylesField.IsInitOnly);
+        AssertHiddenFromEditor(stylesField);
+    }
+
+    private static void AssertHiddenFromEditor(MemberInfo member)
+    {
+        var editorBrowsable = Assert.IsType<EditorBrowsableAttribute>(
+            member.GetCustomAttribute<EditorBrowsableAttribute>());
+        Assert.Equal(EditorBrowsableState.Never, editorBrowsable.State);
+        var browsable = Assert.IsType<BrowsableAttribute>(
+            member.GetCustomAttribute<BrowsableAttribute>());
+        Assert.False(browsable.Browsable);
     }
 
     private sealed class TestAdditionalText : AdditionalText

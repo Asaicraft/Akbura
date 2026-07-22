@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>AKCSS Styles for Custom Classes</title>
+    <title>Margin and Padding</title>
 
     <script>
             if (location.search === "?dark") {
@@ -150,7 +150,7 @@ AKCSS									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+									<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Custom Class Styles
 									</a>
 								</li>
@@ -171,7 +171,7 @@ Built-in Styles									</span>
 								</a>
 						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/spacing" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akcss/spacing" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
 										Margin and Padding
 									</a>
 								</li>
@@ -184,143 +184,188 @@ Built-in Styles									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							AKCSS Styles for Custom Classes
+							Margin and Padding
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>AKCSS declarations can target ordinary C# classes as well as Avalonia controls. This is useful when markup creates or configures data objects alongside the visual tree.</p>
-<h2 id="define-a-custom-class">Define a custom class<a class="header-anchor" href="javascript:;" onclick="location.hash='#define-a-custom-class'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p><code>MyClass.cs</code>:</p>
-<pre><code class="language-csharp">namespace Data;
-
-public class MyClass
-{
-    public int Age { get; set; }
-}
+					<p>Import Akbura's built-in styles before using spacing utilities:</p>
+<pre><code class="language-akbura">using Akbura.Styles.akcss;
 </code></pre>
-<p>Import its namespace and declare type-only, typed-class, and mixed styles.</p>
-<p><code>Styles.akcss</code>:</p>
-<pre><code class="language-akcss">@using Data;
-
-MyClass {
-    Age: 1;
-}
-
-MyClass.anotherStyle {
-    Age: 10;
-}
-
-.myStyle {
-    MyClass.Age: 10;
-    Padding: 10;
-}
-</code></pre>
-<p>Use the styles from markup:</p>
-<p><code>Styles.akbura</code>:</p>
-<pre><code class="language-akbura">using Data;
-
-&lt;StackPanel&gt;
-    &lt;Button class=&quot;myStyle&quot;&gt;Hello world!&lt;/Button&gt;
-
-    &lt;Button&gt;
-        &lt;MyClass class=&quot;myStyle&quot;/&gt;
-    &lt;/Button&gt;
-
-    &lt;Button&gt;
-        &lt;MyClass/&gt;
-    &lt;/Button&gt;
-&lt;/StackPanel&gt;
-</code></pre>
-<h2 id="properties-are-applied-by-target-compatibility">Properties are applied by target compatibility<a class="header-anchor" href="javascript:;" onclick="location.hash='#properties-are-applied-by-target-compatibility'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>AKCSS binds every declaration against the object that receives the style. A declaration is applied only when its property belongs to that target type.</p>
-<p>For <code>.myStyle</code>:</p>
-<pre><code class="language-akcss">.myStyle {
-    MyClass.Age: 10;
-    Padding: 10;
-}
-</code></pre>
-<p>the result depends on the target:</p>
+<h2 id="spacing-scale">Spacing scale<a class="header-anchor" href="javascript:;" onclick="location.hash='#spacing-scale'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Margin and padding values use the dynamic <code>--spacing</code> resource. Its default value is <code>4</code>:</p>
 <table>
 <thead>
 <tr>
-<th>Target</th>
-<th>Applied</th>
-<th>Ignored</th>
+<th>Utility value</th>
+<th style="text-align: right;">Avalonia value</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>Button</code></td>
-<td><code>Padding: 10</code></td>
-<td><code>MyClass.Age: 10</code></td>
+<td><code>1</code></td>
+<td style="text-align: right;"><code>4</code></td>
 </tr>
 <tr>
-<td><code>MyClass</code></td>
-<td><code>MyClass.Age: 10</code></td>
-<td><code>Padding: 10</code></td>
+<td><code>2</code></td>
+<td style="text-align: right;"><code>8</code></td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td style="text-align: right;"><code>12</code></td>
+</tr>
+<tr>
+<td><code>4</code></td>
+<td style="text-align: right;"><code>16</code></td>
 </tr>
 </tbody>
 </table>
-<p><code>MyClass.Age</code> does not belong to <code>Button</code>, so it is skipped when <code>.myStyle</code> is placed on a button. Conversely, <code>MyClass</code> has no <code>Padding</code> property, so that declaration is skipped when the same style is placed on <code>MyClass</code>.</p>
-<p>This allows a shared class selector to contain declarations for several compatible target types without writing separate class names for each one.</p>
-<h2 id="typed-selectors">Typed selectors<a class="header-anchor" href="javascript:;" onclick="location.hash='#typed-selectors'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>A target type can be combined with an optional class name:</p>
-<pre><code class="language-akcss">MyClass {
-    Age: 1;
+<p>For example:</p>
+<pre><code class="language-akbura">&lt;Border m-4 p-3 /&gt;
+</code></pre>
+<p>This produces a margin of <code>16</code> and padding of <code>12</code> on every side.</p>
+<h2 id="margin">Margin<a class="header-anchor" href="javascript:;" onclick="location.hash='#margin'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Margin utilities are available on every Avalonia <code>Control</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Utility</th>
+<th>Sides</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>m-{value}</code></td>
+<td>all sides</td>
+</tr>
+<tr>
+<td><code>mx-{value}</code></td>
+<td>left and right</td>
+</tr>
+<tr>
+<td><code>my-{value}</code></td>
+<td>top and bottom</td>
+</tr>
+<tr>
+<td><code>mt-{value}</code></td>
+<td>top</td>
+</tr>
+<tr>
+<td><code>mr-{value}</code></td>
+<td>right</td>
+</tr>
+<tr>
+<td><code>mb-{value}</code></td>
+<td>bottom</td>
+</tr>
+<tr>
+<td><code>ml-{value}</code></td>
+<td>left</td>
+</tr>
+</tbody>
+</table>
+<p>Utilities can be composed:</p>
+<pre><code class="language-akbura">&lt;Border m-4 mx-2 mt-1 /&gt;
+</code></pre>
+<p>With the default spacing scale, the resulting margin is:</p>
+<pre><code class="language-text">Left   = 8
+Top    = 4
+Right  = 8
+Bottom = 16
+</code></pre>
+<h2 id="padding">Padding<a class="header-anchor" href="javascript:;" onclick="location.hash='#padding'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Padding utilities are available for <code>TemplatedControl</code>, <code>Decorator</code>, and <code>AkburaControl</code>, including controls such as <code>Button</code> and <code>Border</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Utility</th>
+<th>Sides</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>p-{value}</code></td>
+<td>all sides</td>
+</tr>
+<tr>
+<td><code>px-{value}</code></td>
+<td>left and right</td>
+</tr>
+<tr>
+<td><code>py-{value}</code></td>
+<td>top and bottom</td>
+</tr>
+<tr>
+<td><code>pt-{value}</code></td>
+<td>top</td>
+</tr>
+<tr>
+<td><code>pr-{value}</code></td>
+<td>right</td>
+</tr>
+<tr>
+<td><code>pb-{value}</code></td>
+<td>bottom</td>
+</tr>
+<tr>
+<td><code>pl-{value}</code></td>
+<td>left</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-akbura">&lt;Button px-4 py-2&gt;
+    Save
+&lt;/Button&gt;
+</code></pre>
+<h2 id="per-side-utilities-compose-correctly">Per-side utilities compose correctly<a class="header-anchor" href="javascript:;" onclick="location.hash='#per-side-utilities-compose-correctly'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Avalonia represents padding as one <code>Thickness</code> value. If <code>p-3</code> and <code>pt-2</code> were implemented as ordinary <code>Padding</code> setters, the second setter would need to replace the entire value:</p>
+<pre><code class="language-text">p-3  -&gt; Padding = 12,12,12,12
+pt-2 -&gt; Padding = 0,8,0,0
+</code></pre>
+<p>The final result would incorrectly lose the left, right, and bottom padding.</p>
+<p>Akbura's built-in styles avoid this problem:</p>
+<pre><code class="language-akbura">&lt;Border p-3 pt-2 /&gt;
+</code></pre>
+<p>The result is:</p>
+<pre><code class="language-text">Left   = 12
+Top    = 8
+Right  = 12
+Bottom = 12
+</code></pre>
+<p>In spacing units, <code>pt-2</code> overrides only the top side of <code>p-3</code>; the other three sides remain at <code>3</code>.</p>
+<h2 id="how-it-works">How it works<a class="header-anchor" href="javascript:;" onclick="location.hash='#how-it-works'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Built-in spacing utilities write independent attached properties instead of replacing <code>Padding</code> or <code>Margin</code> directly:</p>
+<pre><code class="language-akcss">TemplatedControl.p-(double value) {
+    AkburaControl.ExplicitLeftPadding:
+        value * Amx.DynamicResource&lt;double&gt;(&quot;--spacing&quot;);
+    AkburaControl.ExplicitTopPadding:
+        value * Amx.DynamicResource&lt;double&gt;(&quot;--spacing&quot;);
+    AkburaControl.ExplicitRightPadding:
+        value * Amx.DynamicResource&lt;double&gt;(&quot;--spacing&quot;);
+    AkburaControl.ExplicitBottomPadding:
+        value * Amx.DynamicResource&lt;double&gt;(&quot;--spacing&quot;);
 }
 
-MyClass.anotherStyle {
-    Age: 10;
+TemplatedControl.pt-(double value) {
+    AkburaControl.ExplicitTopPadding:
+        value * Amx.DynamicResource&lt;double&gt;(&quot;--spacing&quot;);
 }
 </code></pre>
-<ul>
-<li><code>MyClass</code> is a type-only selector and applies its declarations to that type.</li>
-<li><code>MyClass.anotherStyle</code> also requires <code>class=&quot;anotherStyle&quot;</code>.</li>
-</ul>
-<p>Use a parenthesized or globally qualified selector when the type name is nested or ambiguous:</p>
-<pre><code class="language-akcss">(Data.MyClass) { }
-(global::Data.MyClass).anotherStyle { }
+<p>At runtime, <code>AkburaControl</code> combines the four nullable side values into the control's real <code>Thickness</code>. A side without an explicit value falls back to the corresponding side from the original <code>Padding</code> or <code>Margin</code> value.</p>
+<p>This also preserves values assigned through regular Avalonia properties:</p>
+<pre><code class="language-akbura">&lt;Border Padding=&quot;1,2,3,4&quot; pt-2 /&gt;
 </code></pre>
-<h2 id="reactive-custom-properties">Reactive custom properties<a class="header-anchor" href="javascript:;" onclick="location.hash='#reactive-custom-properties'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Expressions over custom objects follow the same observation rules as control styles. If the owning object implements <code>INotifyPropertyChanged</code>, AKCSS can reapply a style when a referenced property changes:</p>
-<pre><code class="language-csharp">using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace Data;
-
-public class MyClass : INotifyPropertyChanged
-{
-    private int _age;
-
-    public int Age
-    {
-        get =&gt; _age;
-        set
-        {
-            if (_age == value)
-            {
-                return;
-            }
-
-            _age = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Age)));
-        }
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-}
-</code></pre>
-<p>Without <code>INotifyPropertyChanged</code> or another supported observable source, the initial style value is still applied, but later property changes do not automatically trigger reevaluation.</p>
+<p>With the default spacing scale, only the top becomes <code>8</code>; the left, right, and bottom retain their original values.</p>
+<p>The implementation is available in <a href="https://github.com/Asaicraft/Akbura/blob/7ef47054b6221fa1dd4a0af9751150be1c668e4a/Akbura/AkburaControl.cs#L482"><code>AkburaControl</code></a>.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/custom-classes.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/spacing.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -358,23 +403,28 @@ public class MyClass : INotifyPropertyChanged
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#define-a-custom-class'" data-id="define-a-custom-class" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Define a custom class
+										<span v-hash="'#spacing-scale'" data-id="spacing-scale" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Spacing scale
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#properties-are-applied-by-target-compatibility'" data-id="properties-are-applied-by-target-compatibility" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Properties are applied by target compatibility
+										<span v-hash="'#margin'" data-id="margin" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Margin
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#typed-selectors'" data-id="typed-selectors" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Typed selectors
+										<span v-hash="'#padding'" data-id="padding" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Padding
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#reactive-custom-properties'" data-id="reactive-custom-properties" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Reactive custom properties
+										<span v-hash="'#per-side-utilities-compose-correctly'" data-id="per-side-utilities-compose-correctly" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Per-side utilities compose correctly
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#how-it-works'" data-id="how-it-works" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											How it works
 										</span>
 									</li>
 							</ul>

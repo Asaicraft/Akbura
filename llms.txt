@@ -4,13 +4,14 @@
 
 Akbura
  - [Quick Start](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
- - [How Akbura Works](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
- - [Core Concepts](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
+ - [What Akbura Is](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
 
 Language
  - [Components and Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
  - [Reactive State](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
- - [Parameters and Data Flow](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
+ - [Parameters](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
+ - [Binding](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
+ - [Markup Extensions](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
  - [Effects and Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
  - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)
  - [AKCSS](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/AkburaDocs/_pages/.md)

@@ -154,13 +154,8 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/#how-akbura-works" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										How Akbura Works
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/#core-concepts" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Core Concepts
+									<a href="https://asaicraft.github.io/Akbura/#what-akbura-is" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										What Akbura Is
 									</a>
 								</li>
 						</ul>
@@ -179,8 +174,18 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/#parameters-and-data-flow" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Parameters and Data Flow
+									<a href="https://asaicraft.github.io/Akbura/#parameters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Parameters
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#binding" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Binding
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#markup-extensions" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Markup Extensions
 									</a>
 								</li>
 								<li class="relative">
@@ -332,9 +337,9 @@ state int count = 0;
 				<div class="content">
 					<h2 id="quick-start">Quick Start<a class="header-anchor" href="javascript:;" onclick="location.hash='#quick-start'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <div class="warning custom-block">
-            <p class="custom-block-title">Experimental</p><p>Akbura is under active development. Syntax, semantic rules, generated code, and runtime APIs may change between releases.</p>
+            <p class="custom-block-title">Experimental</p><p>Akbura is under active development. Syntax, generated code, and runtime APIs may change between releases.</p>
 </div>
-<p>Install the package in your .NET project:</p>
+<p>Install the package:</p>
 <div class="sh mb-4"><div class="not-prose group relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" onclick="shellCopy(this)">
                 <!-- Background pattern -->
                 <div class="absolute inset-0 bg-grid-slate-100 dark:bg-grid-slate-800 opacity-50" style="background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px); background-size: 16px 16px;"></div>
@@ -359,7 +364,7 @@ state int count = 0;
                     </div>
                 </div>
 </div>
-<p>Create a component named <code>Counter.akbura</code>:</p>
+<p>Create <code>Counter.akbura</code>:</p>
 <pre><code class="language-akbura">using Avalonia.Controls;
 
 namespace Demo.Pages;
@@ -371,29 +376,26 @@ state int count = 0;
     &lt;Button Click={count++}&gt;Increment&lt;/Button&gt;
 &lt;/StackPanel&gt;
 </code></pre>
-<p>Run the component from a host application:</p>
-<pre><code class="language-csharp">using Akbura;
+<p>Use the generated component directly inside an Avalonia AXAML view:</p>
+<pre><code class="language-xml">&lt;UserControl
+    xmlns=&quot;https://github.com/avaloniaui&quot;
+    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+    xmlns:pages=&quot;using:Demo.Pages&quot;&gt;
 
-AkburaRoot.Run&lt;Demo.Pages.Counter&gt;();
+    &lt;pages:Counter /&gt;
+
+&lt;/UserControl&gt;
 </code></pre>
-<p>An existing Avalonia application can host the same component directly:</p>
-<pre><code class="language-xml">&lt;akbura:AkburaAvaloniaHost Component=&quot;{x:Type local:Counter}&quot; /&gt;
-</code></pre>
-<h2 id="how-akbura-works">How Akbura Works<a class="header-anchor" href="javascript:;" onclick="location.hash='#how-akbura-works'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Akbura combines a dedicated UI language with normal C# and Avalonia APIs:</p>
-<ol>
-<li>You describe a component in an <code>.akbura</code> file.</li>
-<li>The compiler parses Akbura markup together with embedded C#.</li>
-<li>Semantic analysis resolves controls, properties, events, bindings, hooks, and AKCSS.</li>
-<li>Akbura generates a typed C# component that renders native Avalonia controls.</li>
-</ol>
-<p>An <code>.akbura</code> file declares one component. Its default component name comes from the file name:</p>
+<p>Akbura components are Avalonia controls, so no separate host control is required.</p>
+<h2 id="what-akbura-is">What Akbura Is<a class="header-anchor" href="javascript:;" onclick="location.hash='#what-akbura-is'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura is a library and compiler for Avalonia, not a replacement framework.</p>
+<p>It adds a declarative component language, reactive state, typed expressions, hooks, commands, and AKCSS while continuing to use native Avalonia controls and APIs.</p>
+<p>An <code>.akbura</code> file declares one component:</p>
 <pre><code class="language-text">Pages/Counter.akbura -&gt; Demo.Pages.Counter
 </code></pre>
-<p>Generated components are partial, so regular C# files can extend them when needed.</p>
-<h2 id="core-concepts">Core Concepts<a class="header-anchor" href="javascript:;" onclick="location.hash='#core-concepts'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<h3 id="components-and-markup">Components and Markup<a class="header-anchor" href="javascript:;" onclick="location.hash='#components-and-markup'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Markup uses Avalonia controls directly. Plain attributes set properties, expressions read C# values, and routed events accept expressions or delegates:</p>
+<p>Generated components are partial and can be extended with regular C#.</p>
+<h2 id="components-and-markup">Components and Markup<a class="header-anchor" href="javascript:;" onclick="location.hash='#components-and-markup'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura markup uses Avalonia controls directly:</p>
 <pre><code class="language-akbura">state string title = &quot;Dashboard&quot;;
 state bool isOpen = false;
 
@@ -403,29 +405,60 @@ state bool isOpen = false;
     &lt;Border IsVisible={isOpen}/&gt;
 &lt;/StackPanel&gt;
 </code></pre>
-<p>Component names can be short, fully qualified, global, aliased, or generic.</p>
-<h3 id="reactive-state">Reactive State<a class="header-anchor" href="javascript:;" onclick="location.hash='#reactive-state'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Declare local state with <code>state</code> and use it directly from markup:</p>
+<p>Attributes may contain literals, C# expressions, bindings, and markup extensions.</p>
+<h2 id="reactive-state">Reactive State<a class="header-anchor" href="javascript:;" onclick="location.hash='#reactive-state'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Declare local reactive values with <code>state</code>:</p>
 <pre><code class="language-akbura">state int selectedIndex = 0;
 state string query = &quot;&quot;;
 </code></pre>
-<p>State can also connect to a view model through <code>bind</code>, <code>in</code>, and <code>out</code> binding modes:</p>
+<p>State may also connect to object properties:</p>
 <pre><code class="language-akbura">state MyViewModel vm = new MyViewModel();
 
 state string name = bind vm.Name;
 state string fullName = out vm.FullName;
 state string surname = in vm.Surname;
 </code></pre>
-<h3 id="parameters-and-data-flow">Parameters and Data Flow<a class="header-anchor" href="javascript:;" onclick="location.hash='#parameters-and-data-flow'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Parameters define a component's public inputs and outputs:</p>
+<h2 id="parameters">Parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Parameters define a component's public API:</p>
 <pre><code class="language-akbura">param int UserId = 1;
 param string Title;
 param bind string Search = &quot;&quot;;
 param out TaskItem SelectedTask;
 </code></pre>
-<p>Use <code>bind:</code> for two-way component property flow and <code>out:</code> when a child publishes a value to its parent.</p>
-<h3 id="effects-and-hooks">Effects and Hooks<a class="header-anchor" href="javascript:;" onclick="location.hash='#effects-and-hooks'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p><code>useEffect</code> runs work after rendering and can react to a dependency collection:</p>
+<p>Parameters without default values are required. <code>bind</code> enables two-way flow, while <code>out</code> publishes a value to the parent.</p>
+<h2 id="binding">Binding<a class="header-anchor" href="javascript:;" onclick="location.hash='#binding'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura supports Avalonia bindings directly in markup:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding Title} /&gt;
+&lt;TextBox Text=${Binding Search, Mode=TwoWay} /&gt;
+</code></pre>
+<p>Bindings are resolved against the expected property type and may be compiled when a data type is known.</p>
+<p>Inside item templates, Akbura can infer the item type from <code>ItemsSource</code>. A template must contain a single root control, so multiple child controls should be wrapped in a panel:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;StackPanel Spacing=&quot;6&quot;&gt;
+            &lt;TextBlock Text=${Binding Title} /&gt;
+
+            &lt;Button Click={() =&gt; Open(item)}&gt;
+                Open {item.Id.ToString(&quot;D&quot;)} — {item.Title}
+            &lt;/Button&gt;
+        &lt;/StackPanel&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p><code>x.ItemName</code> exposes the current item as a typed variable. The item can participate in property expressions, event handlers, method calls, and inline content expressions.</p>
+<p>Use <code>x.DataType</code> when the item type cannot be inferred automatically.</p>
+<h2 id="markup-extensions">Markup Extensions<a class="header-anchor" href="javascript:;" onclick="location.hash='#markup-extensions'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura does not restrict markup attributes to a special binding-only syntax. Regular markup extensions can be used directly alongside C# expressions and literals:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding Title} /&gt;
+&lt;Border Background=${StaticResource CardBackground} /&gt;
+&lt;Border BorderBrush=${DynamicResource AccentBrush} /&gt;
+</code></pre>
+<p>Custom markup extensions are also supported when they expose a compatible constructor and <code>ProvideValue</code> method:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Format 1, Value={count}‎} /&gt;
+</code></pre>
+<p>The compiler resolves the extension type, constructor arguments, properties, <code>ProvideValue</code>, and the conversion to the target Avalonia property type.</p>
+<h2 id="effects-and-hooks">Effects and Hooks<a class="header-anchor" href="javascript:;" onclick="location.hash='#effects-and-hooks'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>useEffect</code> runs after rendering and can react to dependencies:</p>
 <pre><code class="language-akbura">using Akbura.Hooks;
 
 state int count = 0;
@@ -434,9 +467,9 @@ useEffect(
     () =&gt; Console.WriteLine(count),
     [count]);
 </code></pre>
-<p>Akbura also supports <code>useAvaloniaProperty</code> for observing Avalonia properties and experimental user-defined hooks.</p>
-<h3 id="commands">Commands<a class="header-anchor" href="javascript:;" onclick="location.hash='#commands'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Commands expose typed interaction points with reactive execution state:</p>
+<p>Akbura also supports Avalonia-property hooks and experimental user-defined hooks.</p>
+<h2 id="commands">Commands<a class="header-anchor" href="javascript:;" onclick="location.hash='#commands'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Commands expose typed operations with reactive execution state:</p>
 <pre><code class="language-akbura">command int Refresh(int userId);
 
 &lt;Button Click={async () =&gt; {
@@ -447,8 +480,8 @@ useEffect(
 &lt;/Button&gt;
 </code></pre>
 <p>Command facades provide <code>Execute</code>, <code>CanExecute</code>, and <code>IsExecuting</code>.</p>
-<h3 id="akcss">AKCSS<a class="header-anchor" href="javascript:;" onclick="location.hash='#akcss'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>AKCSS is Akbura's typed styling language. Styles can live inline or in standalone <code>.akcss</code> files:</p>
+<h2 id="akcss">AKCSS<a class="header-anchor" href="javascript:;" onclick="location.hash='#akcss'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>AKCSS is Akbura's typed styling language:</p>
 <pre><code class="language-akbura">@akcss {
     .card {
         Padding: (10, 20);
@@ -458,22 +491,19 @@ useEffect(
 
 &lt;Border class=&quot;card&quot;/&gt;
 </code></pre>
-<p>Property values are bound against the actual Avalonia property type. AKCSS also supports reusable utilities, <code>@apply</code>, conditional rules, imports, dynamic resources, and C# interceptors.</p>
+<p>AKCSS supports reusable classes, utilities, <code>@apply</code>, conditional rules, resources, imports, and C# interceptors.</p>
 <h2 id="project-status">Project Status<a class="header-anchor" href="javascript:;" onclick="location.hash='#project-status'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Akbura is currently experimental and is not yet a stable production framework. The compiler already supports a growing syntax and semantic model, while parts of rendering, code generation, tooling, and runtime optimization are still evolving.</p>
+<p>Akbura is experimental and is not yet intended as a stable production library.</p>
 <p>Current limitations include:</p>
 <ul>
-<li>Markup-internal <code>@if</code>, <code>@else</code>, <code>@for</code>, and <code>@foreach</code> are not supported.</li>
-<li>Full code generation for top-level conditional branches is still evolving.</li>
-<li>User hooks are experimental and must keep a stable top-level call order.</li>
-<li>AKCSS code generation and runtime optimization are still being refined.</li>
+<li>markup-level <code>@if</code>, <code>@else</code>, <code>@for</code>, and <code>@foreach</code> are not supported;</li>
+<li>some APIs and generated code may change without backward compatibility.</li>
 </ul>
-<p>Use the project today to experiment, follow development, report issues, and help shape the language.</p>
 <h2 id="community-and-feedback">Community and Feedback<a class="header-anchor" href="javascript:;" onclick="location.hash='#community-and-feedback'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <ul>
-<li><a href="https://github.com/Asaicraft/Akbura">GitHub repository</a> — source code, issues, and development history.</li>
-<li><a href="https://discord.gg/zMj4MmJ9U5">Discord</a> — discuss the compiler and share feedback.</li>
-<li><a href="https://t.me/akburaui">Telegram</a> — follow updates and talk with the community.</li>
+<li><a href="https://github.com/Asaicraft/Akbura">GitHub repository</a></li>
+<li><a href="https://discord.gg/zMj4MmJ9U5">Discord</a></li>
+<li><a href="https://t.me/akburaui">Telegram</a></li>
 </ul>
 <p>Ideas, bug reports, documentation improvements, and focused pull requests are welcome.</p>
 

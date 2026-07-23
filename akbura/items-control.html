@@ -1,0 +1,827 @@
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+    <title>ItemsControl</title>
+
+    <script>
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
+    </script>
+
+    <link rel="stylesheet" href="css/app.css">
+
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+	<div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+	  <div class="flex h-16 justify-between">
+		<div class="flex">
+		  <div class="flex flex-shrink-0 items-center">
+			<a class="mr-2 lg:mr-8 flex items-center" href="./">
+				<svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+				<span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+			</a>
+		  </div>
+			<div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+				<!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+						<a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+							Akbura
+						</a>
+						<a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							Akcss
+						</a>
+						<a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							What's New
+						</a>
+			</div>
+		</div>
+		<div class="hidden sm:ml-6 sm:flex sm:items-center">
+			<dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+		</div>
+		<div class="-mr-2 flex items-center sm:hidden">
+		  <!-- Mobile menu button -->
+		  <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+			<span class="sr-only">Open main menu</span>
+			<!-- Menu open: "hidden", Menu closed: "block" -->
+			<svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+			</svg>
+			<!-- Menu open: "block", Menu closed: "hidden" -->
+			<svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+			</svg>
+		  </button>
+		</div>
+	  </div>
+	</div>
+
+	<!-- Mobile menu, show/hide based on menu state. -->
+	<div v-cloak v-if="open" class="sm:hidden">
+		<div class="space-y-1 pb-3 pt-2">
+			<!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+					<a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+						Akbura
+					</a>
+					<a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						Akcss
+					</a>
+					<a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						What's New
+					</a>
+		</div>
+	</div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+	setup() {
+		const open = ref(false)
+		return { open }
+	}
+}
+mount('#header', Header)
+</script>
+
+
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            
+
+
+
+
+<style>
+.active {
+	color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="css/highlight.css">
+<link rel="stylesheet" href="css/typography.css">
+<link rel="stylesheet" href="css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+	<div class="flex flex-wrap">
+		<div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+			<button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+				<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+			</button>
+			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+								<a href="https://asaicraft.github.io/Akbura/akbura/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+AKBURA									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Using Akbura Components in AXAML
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Grid
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/items-control" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										ItemsControl
+									</a>
+								</li>
+						</ul>
+				</nav>
+			</div>
+		</div>
+		<div id="doc" class="mx-auto flex">
+			<div class="mt-8 mx-auto prose lg:prose-lg">
+				
+					<section class="not-prose mb-16 md:mb-12">
+						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+							ItemsControl
+						</h1>
+					</section>
+
+				<div class="not-prose"></div>
+
+				<div class="content">
+					<p>Avalonia's <code>ItemsControl</code> renders a collection by creating template content for every item.</p>
+<p>In Akbura, assign a collection to <code>ItemsSource</code> and declare the item template through the <code>ItemsControl.ItemTemplate</code> property element:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate&gt;
+        &lt;TextBlock Text=${Binding Name} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>For every object in <code>Vm.Items</code>, Avalonia creates one <code>TextBlock</code>.</p>
+<p>Akbura provides two ways to access the current item inside a template:</p>
+<ol>
+<li>A compiled binding such as <code>${Binding Name}</code>.</li>
+<li>A typed C# variable declared with <code>x.ItemName</code>.</li>
+</ol>
+<p>Both approaches can use a type inferred automatically from <code>ItemsSource</code> or provided explicitly through <code>x.DataType</code>.</p>
+<h2 id="example-model">Example model<a class="header-anchor" href="javascript:;" onclick="location.hash='#example-model'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The examples on this page use the following types:</p>
+<pre><code class="language-csharp">namespace Demo.Models;
+
+public sealed class TaskItem
+{
+    public int Id { get; init; }
+
+    public string Title { get; init; } = &quot;&quot;;
+
+    public string Description { get; init; } = &quot;&quot;;
+
+    public bool IsCompleted { get; init; }
+}
+</code></pre>
+<pre><code class="language-csharp">namespace Demo.ViewModels;
+
+public sealed class TasksViewModel
+{
+    public IReadOnlyList&lt;TaskItem&gt; Items { get; init; } = [];
+}
+</code></pre>
+<p>The view model can be injected or stored in state:</p>
+<pre><code class="language-akbura">using Demo.ViewModels;
+
+inject TasksViewModel Vm;
+</code></pre>
+<h2 id="basic-item-template">Basic item template<a class="header-anchor" href="javascript:;" onclick="location.hash='#basic-item-template'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The shortest form uses a compiled binding:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate&gt;
+        &lt;TextBlock Text=${Binding Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>Inside <code>ItemTemplate</code>, the binding source is the current item rather than the component itself.</p>
+<p>Therefore:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding Title} /&gt;
+</code></pre>
+<p>reads <code>Title</code> from the current <code>TaskItem</code>.</p>
+<p>Conceptually, this template is applied once for every item:</p>
+<pre><code class="language-text">Vm.Items[0] -&gt; TextBlock
+Vm.Items[1] -&gt; TextBlock
+Vm.Items[2] -&gt; TextBlock
+</code></pre>
+<h2 id="automatic-item-type-inference">Automatic item type inference<a class="header-anchor" href="javascript:;" onclick="location.hash='#automatic-item-type-inference'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura attempts to determine the item type from <code>ItemsSource</code>.</p>
+<p>In this example:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate&gt;
+        &lt;TextBlock Text=${Binding Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p><code>Vm.Items</code> has the type:</p>
+<pre><code class="language-csharp">IReadOnlyList&lt;TaskItem&gt;
+</code></pre>
+<p>Because that type implements <code>IEnumerable&lt;TaskItem&gt;</code>, Akbura infers that the template data type is <code>TaskItem</code>.</p>
+<p>The compiled binding is therefore checked as though its source were a <code>TaskItem</code>:</p>
+<pre><code class="language-csharp">TaskItem item;
+var value = item.Title;
+</code></pre>
+<p>This provides compile-time validation of the binding path.</p>
+<p>For example, this is valid:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding Title} /&gt;
+</code></pre>
+<p>This produces a compiler diagnostic because <code>TaskItem</code> has no <code>FullName</code> property:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding FullName} /&gt;
+</code></pre>
+<p>Akbura can infer item types from:</p>
+<ul>
+<li>arrays such as <code>TaskItem[]</code>;</li>
+<li><code>IEnumerable&lt;T&gt;</code>;</li>
+<li>types implementing <code>IEnumerable&lt;T&gt;</code>;</li>
+<li>typed C# expressions assigned to <code>ItemsSource</code>;</li>
+<li>typed binding expressions whose result type is known.</li>
+</ul>
+<h2 id="compiled-bindings">Compiled bindings<a class="header-anchor" href="javascript:;" onclick="location.hash='#compiled-bindings'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The <code>${Binding ...}</code> syntax accesses the current template item through an Avalonia binding.</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate&gt;
+        &lt;StackPanel&gt;
+            &lt;TextBlock Text=${Binding Title} /&gt;
+            &lt;TextBlock Text=${Binding Description} /&gt;
+        &lt;/StackPanel&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>Binding paths may contain nested properties:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding Author.DisplayName} /&gt;
+</code></pre>
+<p>They may also contain supported indexers:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding History[0].Title} /&gt;
+</code></pre>
+<p>The compiler resolves every path segment against the inferred or explicitly provided item type.</p>
+<p>A compiled binding is useful when the value should continue to follow the item's property through Avalonia's binding system.</p>
+<h2 id="x.itemname"><code>x.ItemName</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#x.itemname'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>x.ItemName</code> when the template needs a direct typed C# reference to the current item:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;TextBlock Text={item.Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>The value of <code>x.ItemName</code> becomes a local variable inside the template.</p>
+<p>In this example, Akbura effectively introduces:</p>
+<pre><code class="language-csharp">TaskItem item;
+</code></pre>
+<p>The variable is available to expressions inside the template:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;StackPanel&gt;
+            &lt;TextBlock Text={item.Title} /&gt;
+
+            &lt;TextBlock
+                Text={item.IsCompleted
+                    ? &quot;Completed&quot;
+                    : &quot;Not completed&quot;} /&gt;
+        &lt;/StackPanel&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>Because <code>item</code> is a typed C# value, normal C# syntax can be used:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text={item.Title.ToUpperInvariant()} /&gt;
+</code></pre>
+<pre><code class="language-akbura">&lt;TextBlock Text={$&quot;Task #{item.Id}: {item.Title}&quot;} /&gt;
+</code></pre>
+<pre><code class="language-akbura">&lt;Border IsVisible={!item.IsCompleted} /&gt;
+</code></pre>
+<h3 id="event-handlers">Event handlers<a class="header-anchor" href="javascript:;" onclick="location.hash='#event-handlers'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>The item variable can also be captured by an event handler:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;Button Click={() =&gt; OpenTask(item.Id)}&gt;
+            {item.Title}
+        &lt;/Button&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>The expression is type-checked using the actual item type.</p>
+<p>For example, if <code>Id</code> is an <code>int</code>, the compiler knows that:</p>
+<pre><code class="language-akbura">OpenTask(item.Id)
+</code></pre>
+<p>passes an <code>int</code>.</p>
+<h3 id="item-name-rules">Item name rules<a class="header-anchor" href="javascript:;" onclick="location.hash='#item-name-rules'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>The value of <code>x.ItemName</code> must be a valid C# identifier.</p>
+<p>Valid names include:</p>
+<pre><code class="language-akbura">x.ItemName=&quot;item&quot;
+x.ItemName=&quot;task&quot;
+x.ItemName=&quot;user&quot;
+x.ItemName=&quot;currentItem&quot;
+</code></pre>
+<p>Invalid names include:</p>
+<pre><code class="language-akbura">x.ItemName=&quot;current-item&quot;
+x.ItemName=&quot;1item&quot;
+x.ItemName=&quot;current item&quot;
+</code></pre>
+<p><code>x.ItemName</code> is a compile-time directive. It does not set an Avalonia property and does not assign a name to the generated control.</p>
+<h2 id="x.itemname-and-x.name"><code>x.ItemName</code> and <code>x.Name</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#x.itemname-and-x.name'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>x.ItemName</code> and <code>x.Name</code> serve different purposes.</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;Button
+            x.Name=&quot;itemButton&quot;
+            Content={item.Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>Here:</p>
+<ul>
+<li><code>item</code> refers to the current object from <code>ItemsSource</code>;</li>
+<li><code>itemButton</code> refers to the generated <code>Button</code>.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Directive</th>
+<th>Refers to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>x.ItemName</code></td>
+<td>The current template data item</td>
+</tr>
+<tr>
+<td><code>x.Name</code></td>
+<td>A control created by markup</td>
+</tr>
+<tr>
+<td><code>x.DataType</code></td>
+<td>The compile-time type of the template item</td>
+</tr>
+</tbody>
+</table>
+<h2 id="x.datatype"><code>x.DataType</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#x.datatype'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>x.DataType</code> to specify the template item type explicitly:</p>
+<pre><code class="language-akbura">using Demo.Models;
+
+&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate
+        x.DataType=&quot;TaskItem&quot;&gt;
+        &lt;TextBlock Text=${Binding Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p><code>x.DataType</code> is especially useful when Akbura cannot infer the type from <code>ItemsSource</code>.</p>
+<p>It may also be combined with <code>x.ItemName</code>:</p>
+<pre><code class="language-akbura">using Demo.Models;
+
+&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate
+        x.DataType=&quot;TaskItem&quot;
+        x.ItemName=&quot;item&quot;&gt;
+
+        &lt;TextBlock Text={item.Title} /&gt;
+
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>The declared item variable now has the explicit type:</p>
+<pre><code class="language-csharp">TaskItem item;
+</code></pre>
+<h3 id="qualified-type-names">Qualified type names<a class="header-anchor" href="javascript:;" onclick="location.hash='#qualified-type-names'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>A type imported through <code>using</code> can be written using its short name:</p>
+<pre><code class="language-akbura">using Demo.Models;
+
+&lt;ItemsControl.ItemTemplate x.DataType=&quot;TaskItem&quot;&gt;
+</code></pre>
+<p>A fully qualified type name may also be used:</p>
+<pre><code class="language-akbura">&lt;ItemsControl.ItemTemplate
+    x.DataType=&quot;Demo.Models.TaskItem&quot;&gt;
+</code></pre>
+<p>The global namespace qualifier can be used when necessary:</p>
+<pre><code class="language-akbura">&lt;ItemsControl.ItemTemplate
+    x.DataType=&quot;global::Demo.Models.TaskItem&quot;&gt;
+</code></pre>
+<h2 id="when-x.datatype-is-required">When <code>x.DataType</code> is required<a class="header-anchor" href="javascript:;" onclick="location.hash='#when-x.datatype-is-required'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Automatic inference works only when the compiler can obtain a concrete generic item type.</p>
+<p>For example, inference works here:</p>
+<pre><code class="language-akbura">state IReadOnlyList&lt;TaskItem&gt; tasks = [];
+
+&lt;ItemsControl ItemsSource={tasks}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;TextBlock Text={item.Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>The compiler can see <code>IEnumerable&lt;TaskItem&gt;</code> and infer <code>TaskItem</code>.</p>
+<p>Inference may not work when <code>ItemsSource</code> is typed as <code>object</code>:</p>
+<pre><code class="language-akbura">state object tasks = GetTasks();
+</code></pre>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={tasks}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;TextBlock Text={item.Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>The static type of <code>tasks</code> does not expose <code>IEnumerable&lt;T&gt;</code>, so Akbura cannot determine the type of <code>item</code>.</p>
+<p>Provide it explicitly:</p>
+<pre><code class="language-akbura">using Demo.Models;
+
+&lt;ItemsControl ItemsSource={tasks}&gt;
+    &lt;ItemsControl.ItemTemplate
+        x.DataType=&quot;TaskItem&quot;
+        x.ItemName=&quot;item&quot;&gt;
+
+        &lt;TextBlock Text={item.Title} /&gt;
+
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>The same applies to a non-generic collection whose element type is unknown at compile time.</p>
+<div class="info custom-block">
+            <p class="custom-block-title">INFO</p><p>Akbura uses the static compile-time type of <code>ItemsSource</code>.</p>
+<p>The objects stored in the collection at runtime do not affect compile-time type inference.</p>
+<h2 id="explicit-type-takes-priority">Explicit type takes priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#explicit-type-takes-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>When <code>x.DataType</code> is present, it takes priority over automatic inference.</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate
+        x.DataType=&quot;TaskItem&quot;
+        x.ItemName=&quot;item&quot;&gt;
+
+        &lt;TextBlock Text={item.Title} /&gt;
+
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>Even when <code>Vm.Items</code> already exposes <code>IEnumerable&lt;TaskItem&gt;</code>, the explicitly declared <code>TaskItem</code> type is used as the template data type.</p>
+<p>This can make template contracts clearer, but an incorrect explicit type may cause bindings or expressions to be checked against the wrong type.</p>
+<h2 id="choosing-between-bindings-and-x.itemname">Choosing between bindings and <code>x.ItemName</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#choosing-between-bindings-and-x.itemname'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use a compiled binding for direct property access:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding Title} /&gt;
+</code></pre>
+<p>Use <code>x.ItemName</code> when you need a C# expression:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text={item.Title.ToUpperInvariant()} /&gt;
+</code></pre>
+<p>Use <code>x.ItemName</code> for conditions:</p>
+<pre><code class="language-akbura">&lt;TextBlock
+    Text={item.IsCompleted ? &quot;Completed&quot; : &quot;Pending&quot;} /&gt;
+</code></pre>
+<p>Use <code>x.ItemName</code> in event handlers:</p>
+<pre><code class="language-akbura">&lt;Button Click={() =&gt; DeleteTask(item.Id)}&gt;
+    Delete
+&lt;/Button&gt;
+</code></pre>
+<p>Both approaches may be used inside the same template:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;StackPanel&gt;
+            &lt;TextBlock Text=${Binding Title} /&gt;
+
+            &lt;TextBlock
+                Text={$&quot;Identifier: {item.Id}&quot;} /&gt;
+
+            &lt;Button Click={() =&gt; OpenTask(item)}&gt;
+                Open
+            &lt;/Button&gt;
+        &lt;/StackPanel&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<h2 id="complex-item-layouts">Complex item layouts<a class="header-anchor" href="javascript:;" onclick="location.hash='#complex-item-layouts'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The template may contain a complete control tree:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;Border
+            Padding=&quot;12&quot;
+            Margin=&quot;0,0,0,8&quot;&gt;
+
+            &lt;Grid ColumnDefinitions=&quot;*, Auto&quot;&gt;
+                &lt;StackPanel&gt;
+                    &lt;TextBlock Text={item.Title} /&gt;
+                    &lt;TextBlock Text={item.Description} /&gt;
+                &lt;/StackPanel&gt;
+
+                &lt;TextBlock
+                    Grid.Column=&quot;1&quot;
+                    Text={item.IsCompleted ? &quot;Done&quot; : &quot;Pending&quot;} /&gt;
+            &lt;/Grid&gt;
+
+        &lt;/Border&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>If one item requires several sibling controls, place them inside a panel such as:</p>
+<ul>
+<li><code>StackPanel</code>;</li>
+<li><code>Grid</code>;</li>
+<li><code>DockPanel</code>;</li>
+<li>another suitable Avalonia control.</li>
+</ul>
+<h2 id="bindings-in-itemssource">Bindings in <code>ItemsSource</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#bindings-in-itemssource'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>ItemsSource</code> may itself use an Avalonia binding:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource=${Binding Items}&gt;
+    &lt;ItemsControl.ItemTemplate&gt;
+        &lt;TextBlock Text=${Binding Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>When the result type of the outer binding is known, Akbura can use it to infer the template item type.</p>
+<p>For example, if <code>Items</code> has the type:</p>
+<pre><code class="language-csharp">IReadOnlyList&lt;TaskItem&gt;
+</code></pre>
+<p>the template data type is inferred as <code>TaskItem</code>.</p>
+<p>When the outer binding does not expose a concrete generic collection type, provide <code>x.DataType</code> explicitly.</p>
+<h2 id="nested-itemscontrol">Nested <code>ItemsControl</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#nested-itemscontrol'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Each item template has its own item scope.</p>
+<p>Suppose a group contains a collection of tasks:</p>
+<pre><code class="language-csharp">public sealed class TaskGroup
+{
+    public string Name { get; init; } = &quot;&quot;;
+
+    public IReadOnlyList&lt;TaskItem&gt; Tasks { get; init; } = [];
+}
+</code></pre>
+<p>Nested collections can use separate item names:</p>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Groups}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;group&quot;&gt;
+        &lt;StackPanel&gt;
+            &lt;TextBlock Text={group.Name} /&gt;
+
+            &lt;ItemsControl ItemsSource={group.Tasks}&gt;
+                &lt;ItemsControl.ItemTemplate x.ItemName=&quot;task&quot;&gt;
+                    &lt;TextBlock Text={task.Title} /&gt;
+                &lt;/ItemsControl.ItemTemplate&gt;
+            &lt;/ItemsControl&gt;
+        &lt;/StackPanel&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>Inside the inner template:</p>
+<ul>
+<li><code>task</code> refers to the current <code>TaskItem</code>;</li>
+<li><code>group</code> remains the outer template item.</li>
+</ul>
+<p>Using distinct item names makes nested template expressions easier to understand.</p>
+<h2 id="common-errors">Common errors<a class="header-anchor" href="javascript:;" onclick="location.hash='#common-errors'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<h3 id="the-item-variable-is-not-found">The item variable is not found<a class="header-anchor" href="javascript:;" onclick="location.hash='#the-item-variable-is-not-found'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-akbura">&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate&gt;
+        &lt;TextBlock Text={item.Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p><code>item</code> was never declared.</p>
+<p>Add <code>x.ItemName</code>:</p>
+<pre><code class="language-akbura">&lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+</code></pre>
+<h3 id="the-compiler-cannot-determine-the-item-type">The compiler cannot determine the item type<a class="header-anchor" href="javascript:;" onclick="location.hash='#the-compiler-cannot-determine-the-item-type'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-akbura">state object items = GetItems();
+
+&lt;ItemsControl ItemsSource={items}&gt;
+    &lt;ItemsControl.ItemTemplate x.ItemName=&quot;item&quot;&gt;
+        &lt;TextBlock Text={item.Title} /&gt;
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>The static type of <code>items</code> is <code>object</code>.</p>
+<p>Add <code>x.DataType</code>:</p>
+<pre><code class="language-akbura">&lt;ItemsControl.ItemTemplate
+    x.DataType=&quot;TaskItem&quot;
+    x.ItemName=&quot;item&quot;&gt;
+</code></pre>
+<h3 id="the-compiled-binding-property-is-not-found">The compiled binding property is not found<a class="header-anchor" href="javascript:;" onclick="location.hash='#the-compiled-binding-property-is-not-found'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding FullName} /&gt;
+</code></pre>
+<p>If the item type has no <code>FullName</code> property, Akbura reports an invalid compiled binding path.</p>
+<p>Use an existing property:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text=${Binding Title} /&gt;
+</code></pre>
+<h3 id="x.itemname-contains-an-invalid-identifier"><code>x.ItemName</code> contains an invalid identifier<a class="header-anchor" href="javascript:;" onclick="location.hash='#x.itemname-contains-an-invalid-identifier'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-akbura">&lt;ItemsControl.ItemTemplate x.ItemName=&quot;current-item&quot;&gt;
+</code></pre>
+<p>Use a valid C# identifier:</p>
+<pre><code class="language-akbura">&lt;ItemsControl.ItemTemplate x.ItemName=&quot;currentItem&quot;&gt;
+</code></pre>
+<h2 id="complete-example">Complete example<a class="header-anchor" href="javascript:;" onclick="location.hash='#complete-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Demo.Models;
+using Demo.ViewModels;
+
+inject TasksViewModel Vm;
+
+void OpenTask(TaskItem task)
+{
+    Console.WriteLine($&quot;Opening task {task.Id}&quot;);
+}
+
+&lt;ItemsControl ItemsSource={Vm.Items}&gt;
+    &lt;ItemsControl.ItemTemplate
+        x.DataType=&quot;TaskItem&quot;
+        x.ItemName=&quot;task&quot;&gt;
+
+        &lt;Border
+            Padding=&quot;12&quot;
+            Margin=&quot;0,0,0,8&quot;&gt;
+
+            &lt;Grid ColumnDefinitions=&quot;*, Auto&quot;&gt;
+                &lt;StackPanel&gt;
+                    &lt;TextBlock Text=${Binding Title} /&gt;
+
+                    &lt;TextBlock
+                        Text={task.Description} /&gt;
+                &lt;/StackPanel&gt;
+
+                &lt;Button
+                    Grid.Column=&quot;1&quot;
+                    Click={() =&gt; OpenTask(task)}&gt;
+                    Open
+                &lt;/Button&gt;
+            &lt;/Grid&gt;
+
+        &lt;/Border&gt;
+
+    &lt;/ItemsControl.ItemTemplate&gt;
+&lt;/ItemsControl&gt;
+</code></pre>
+<p>In this example:</p>
+<ol>
+<li><code>Vm.Items</code> supplies the collection.</li>
+<li><code>x.DataType=&quot;TaskItem&quot;</code> explicitly declares the item type.</li>
+<li><code>x.ItemName=&quot;task&quot;</code> creates a typed C# variable.</li>
+<li><code>${Binding Title}</code> reads the current item through a compiled binding.</li>
+<li><code>{task.Description}</code> uses a direct C# expression.</li>
+<li>The button event captures the current <code>task</code>.</li>
+</ol>
+</div>
+
+				</div>
+
+				<div class="not-prose"></div>
+				
+					<div class="not-prose py-8">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akbura/items-control.md" target="_blank" rel="noopener noreferrer">
+							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+						</a>
+					</div>
+
+					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												Grid
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+									</div>
+								</nav>
+					</div>
+			</div>
+				
+				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+						<div>
+							<h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+								On This Page
+							</h5>
+							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#example-model'" data-id="example-model" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Example model
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#basic-item-template'" data-id="basic-item-template" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Basic item template
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#automatic-item-type-inference'" data-id="automatic-item-type-inference" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Automatic item type inference
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#compiled-bindings'" data-id="compiled-bindings" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Compiled bindings
+										</span>
+											<ul class="ml-4">
+													<li data-id="event-handlers" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#event-handlers'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Event handlers
+														</span>
+													</li>
+													<li data-id="item-name-rules" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#item-name-rules'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Item name rules
+														</span>
+													</li>
+													<li data-id="qualified-type-names" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#qualified-type-names'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Qualified type names
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#when-x.datatype-is-required'" data-id="when-x.datatype-is-required" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											When 
+										</span>
+									</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				
+		</div>
+	</div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+	const el = document.querySelector('#doc section h1') 
+	if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+	const App = {
+		setup() {
+			function nav(url) {
+				window.open(url)
+			}
+			return { nav }
+		}
+	}
+	
+const Sidebar = {
+	setup() {
+		const open = ref(true)
+		return { open }
+	}
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="lib/js/lite-yt-embed.js"></script>
+<script src="mjs/docs.mjs" type="module"></script>
+
+        </main>
+    </div>
+
+    
+
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
+
+    
+</body>
+</html>

@@ -5,6 +5,30 @@
     <BuildType Name="Release" />
     <BuildType Name="ReleaseStats" />
   </Configurations>
+  <Folder Name="/Akbura.FeatureGallery/">
+    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.Android/Akbura.FeatureGallery.Android.csproj" Id="7e04b4ea-3f3d-4ccf-a861-bc2f966f5bbb">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+      <Deploy />
+    </Project>
+    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.Browser/Akbura.FeatureGallery.Browser.csproj" Id="bbd207de-ea63-42f3-8731-93b79988dee3">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.Desktop/Akbura.FeatureGallery.Desktop.csproj" Id="b08a3d26-04af-47f3-bf06-9b688c6bdc0e">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.iOS/Akbura.FeatureGallery.iOS.csproj" Id="ff971912-4b75-4a03-aae9-a06e39da2b71">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+      <Deploy />
+    </Project>
+    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery/Akbura.FeatureGallery.csproj" Id="715ad655-2825-4130-b148-45d5a392e758">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/draft-concepts/">
     <File Path="draft-concepts/Dependecy Injection.md" />
     <File Path="draft-concepts/User defined hook.md" />
@@ -18,6 +42,7 @@
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
+    <File Path="Directory.Packages.props" />
     <File Path="README.md" />
   </Folder>
   <Project Path="Akbura.AotTest/Akbura.AotTest.csproj" />

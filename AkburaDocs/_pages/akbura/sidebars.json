@@ -6,5 +6,9 @@
   {
     "text": "Grid",
     "link": "/akbura/grid"
+  },
+  {
+    "text": "ItemsControl",
+    "link": "/akbura/items-control"
   }
 ]

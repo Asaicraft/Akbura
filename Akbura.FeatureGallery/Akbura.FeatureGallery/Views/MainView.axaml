@@ -5,6 +5,10 @@
              xmlns:vm="using:Akbura.FeatureGallery.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Akbura.FeatureGallery.Views.MainView"
+             xmlns:component="using:Akbura.FeatureGallery.Components"
+
+             HorizontalContentAlignment="Center"
+             VerticalContentAlignment="Center"
              x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <!-- This only sets the DataContext for the previewer in an IDE,
@@ -12,5 +16,6 @@
     <vm:MainViewModel />
   </Design.DataContext>
 
-  <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <component:Counter/>
+
 </UserControl>

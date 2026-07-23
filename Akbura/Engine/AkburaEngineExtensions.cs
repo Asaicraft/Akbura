@@ -7,6 +7,8 @@ public static class AkburaEngineExtensions
 {
     extension(AppBuilder builder)
     {
+        public AppBuilder UseAkbura() => UseAkbura(builder, _ => { });
+
         public AppBuilder UseAkbura(Action<AkburaEngineBuilder> withAkburaEngineBuilder)
         {
             return builder.AfterPlatformServicesSetup(platformBuilder =>

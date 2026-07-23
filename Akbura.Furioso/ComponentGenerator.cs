@@ -1810,28 +1810,39 @@ internal static class ComponentGenerator
             return result.Append('"').ToString();
         }
 
-        private static string GetHandlerExpression(IMarkupRoutedEventBindingOperation operation)
+        private static string GetHandlerExpression(
+            IMarkupRoutedEventBindingOperation operation)
         {
             var expression = operation.ValueSyntax is MarkupDynamicAttributeValueSyntax dynamicValue
-                ? dynamicValue.Expression.Expression.GetRawCSharpExpression()?.ToFullString().Trim()
+                ? dynamicValue.Expression.Expression
+                    .GetRawCSharpExpression()?
+                    .ToFullString()
+                    .Trim()
                 : null;
+
             if (string.IsNullOrWhiteSpace(expression))
             {
                 return "static (_, _) => { }";
             }
 
-            if (operation.HandlerKind is MarkupCommandHandlerKind.Lambda or MarkupCommandHandlerKind.DirectReference)
+            if (operation.HandlerKind is
+                MarkupCommandHandlerKind.Lambda or
+                MarkupCommandHandlerKind.DirectReference)
             {
                 return expression!;
             }
 
             var parameters = operation.HandlerParameterCount switch
             {
-                0 => "()",
-                1 => "__argument",
+                0 => "(_, _)",
+                1 => "(_, __argument)",
                 _ => "(__sender, __args)",
             };
-            var asyncPrefix = operation.IsAsync ? "async " : string.Empty;
+
+            var asyncPrefix = operation.IsAsync
+                ? "async "
+                : string.Empty;
+
             return $"{asyncPrefix}{parameters} => {{ {expression}; }}";
         }
 

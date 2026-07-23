@@ -1,4 +1,5 @@
-﻿using Avalonia;
+﻿using Akbura.Engine;
+using Avalonia;
 using System;
 
 namespace Akbura.FeatureGallery.Desktop;
@@ -16,6 +17,7 @@ internal sealed class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .UseAkbura()
             .WithInterFont()
             .LogToTrace();
 }

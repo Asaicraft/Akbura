@@ -476,29 +476,46 @@ public abstract class AkburaControl : Control, IComponentTree
 		return LayoutHelper.ArrangeChild(Child, finalSize, Padding);
 	}
 
-	/// <summary>
-	/// Called when the <see cref="Child"/> property changes.
-	/// </summary>
-	/// <param name="e">The event args.</param>
-	private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
-	{
-		var oldChild = (Control?)e.OldValue;
-		var newChild = (Control?)e.NewValue;
+    /// <summary>
+    /// Called when the <see cref="Child"/> property changes.
+    /// </summary>
+    /// <param name="e">The event args.</param>
+    private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        var oldChild = (Control?)e.OldValue;
+        var newChild = (Control?)e.NewValue;
 
-		if (oldChild != null)
-		{
-			VisualChildren.Remove(oldChild);
-		}
+        if (oldChild != null)
+        {
+            VisualChildren.Remove(oldChild);
+            ((ISetInheritanceParent)oldChild).SetParent(null);
+        }
 
-		if (newChild != null)
-		{
-			VisualChildren.Add(newChild);
-		}
-	}
+        if (newChild != null)
+        {
+            ((ISetInheritanceParent)newChild).SetParent(this);
 
-	#region Explicit Thickness
+            ApplyStylesToVisualTree(newChild);
 
-	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_paddingStates = new();
+            VisualChildren.Add(newChild);
+        }
+    }
+
+
+    private static void ApplyStylesToVisualTree(Control root)
+    {
+        foreach (var visual in root.GetSelfAndVisualDescendants())
+        {
+            if (visual is StyledElement element)
+            {
+                element.ApplyStyling();
+            }
+        }
+    }
+
+    #region Explicit Thickness
+
+    private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_paddingStates = new();
 	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_marginStates = new();
 	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_borderThicknessStates = new();
 

@@ -8,12 +8,8 @@
         "link": "/#quick-start"
       },
       {
-        "text": "How Akbura Works",
-        "link": "/#how-akbura-works"
-      },
-      {
-        "text": "Core Concepts",
-        "link": "/#core-concepts"
+        "text": "What Akbura Is",
+        "link": "/#what-akbura-is"
       }
     ]
   },
@@ -29,8 +25,16 @@
         "link": "/#reactive-state"
       },
       {
-        "text": "Parameters and Data Flow",
-        "link": "/#parameters-and-data-flow"
+        "text": "Parameters",
+        "link": "/#parameters"
+      },
+      {
+        "text": "Binding",
+        "link": "/#binding"
+      },
+      {
+        "text": "Markup Extensions",
+        "link": "/#markup-extensions"
       },
       {
         "text": "Effects and Hooks",

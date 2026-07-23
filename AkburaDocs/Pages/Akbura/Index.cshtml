@@ -1,0 +1,16 @@
+﻿@page "/akbura/"
+@attribute [RenderStatic]
+@inject MarkdownPages Markdown
+
+@await Html.PartialAsync("DocsPage", new Shared.DocsPage
+{
+    Brand = "AKBURA",
+    Folder = "akbura",
+    Slug = "index",
+    DefaultMenu = new MarkdownMenu
+    {
+        Icon = Markdown.DefaultMenuIcon,
+        Text = "AKBURA",
+        Link = "/akbura/",
+    },
+}.Init(this, Markdown))

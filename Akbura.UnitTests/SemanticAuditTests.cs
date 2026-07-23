@@ -302,7 +302,7 @@ public sealed class SemanticAuditTests
 
         var markupRoot = root.Members.OfType<MarkupRootSyntax>().Single();
         AssertSemanticNode<BoundMarkupRoot>(model, markupRoot, false, false);
-        AssertSemanticNode<BoundMarkupComponent>(model, markupRoot.Element, true, false);
+        AssertSemanticNode<BoundMarkupComponent>(model, markupRoot.Element, true, true);
         var childContent = Assert.IsType<MarkupElementContentSyntax>(Assert.Single(markupRoot.Element.Body));
         AssertSemanticNode<BoundMarkupContent>(model, childContent, false, false);
         AssertSemanticNode<BoundMarkupComponent>(model, childContent.Element, true, false);

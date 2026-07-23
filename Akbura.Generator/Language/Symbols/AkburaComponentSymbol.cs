@@ -10,6 +10,8 @@ namespace Akbura.Language.Symbols;
 internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
 {
     private readonly CSharpSymbolDefinition _csharpDefinition;
+    private ImmutableArray<MarkupChildContent> _children;
+    private ImmutableArray<IMarkupComponentSymbol> _markupRoots;
 
     public AkburaComponentSymbol(
         AkburaSyntaxTree syntaxTree,
@@ -27,6 +29,7 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         ImmutableArray<IInjectSymbol> injectedServices,
         ImmutableArray<ICommandSymbol> commands,
         ImmutableArray<IAkcssModuleSymbol> akcssModules,
+        bool deferMarkupInitialization = false,
         ISymbol? containingSymbol = null,
         ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -48,12 +51,16 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         BaseType = baseType;
         HasExplicitBaseType = hasExplicitBaseType;
         ContentModel = contentModel;
-        Children = children.IsDefault
-            ? ImmutableArray<MarkupChildContent>.Empty
-            : children;
-        MarkupRoots = markupRoots.IsDefault
-            ? ImmutableArray<IMarkupComponentSymbol>.Empty
-            : markupRoots;
+        _children = deferMarkupInitialization
+            ? default
+            : children.IsDefault
+                ? ImmutableArray<MarkupChildContent>.Empty
+                : children;
+        _markupRoots = deferMarkupInitialization
+            ? default
+            : markupRoots.IsDefault
+                ? ImmutableArray<IMarkupComponentSymbol>.Empty
+                : markupRoots;
         States = states.IsDefault
             ? ImmutableArray<IStateSymbol>.Empty
             : states;
@@ -94,7 +101,9 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
 
     public MarkupContentModel ContentModel { get; }
 
-    public ImmutableArray<MarkupChildContent> Children { get; }
+    public ImmutableArray<MarkupChildContent> Children => _children.IsDefault
+        ? ImmutableArray<MarkupChildContent>.Empty
+        : _children;
 
     public ImmutableArray<IMarkupAttributeOperation> AttributeOperations => ImmutableArray<IMarkupAttributeOperation>.Empty;
 
@@ -112,7 +121,9 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
 
     public ImmutableArray<INamedTypeSymbol> PartialTypes { get; }
 
-    public ImmutableArray<IMarkupComponentSymbol> MarkupRoots { get; }
+    public ImmutableArray<IMarkupComponentSymbol> MarkupRoots => _markupRoots.IsDefault
+        ? ImmutableArray<IMarkupComponentSymbol>.Empty
+        : _markupRoots;
 
     public ImmutableArray<IStateSymbol> States { get; }
 
@@ -129,6 +140,18 @@ internal sealed class AkburaComponentSymbol : Symbol, IAkburaComponentSymbol
         AkcssModules = akcssModules.IsDefault
             ? ImmutableArray<IAkcssModuleSymbol>.Empty
             : akcssModules;
+    }
+
+    internal void SetMarkupContract(
+        ImmutableArray<MarkupChildContent> children,
+        ImmutableArray<IMarkupComponentSymbol> markupRoots)
+    {
+        ImmutableInterlocked.InterlockedInitialize(
+            ref _children,
+            children.IsDefault ? ImmutableArray<MarkupChildContent>.Empty : children);
+        ImmutableInterlocked.InterlockedInitialize(
+            ref _markupRoots,
+            markupRoots.IsDefault ? ImmutableArray<IMarkupComponentSymbol>.Empty : markupRoots);
     }
 
     public override void Accept(SymbolVisitor visitor)

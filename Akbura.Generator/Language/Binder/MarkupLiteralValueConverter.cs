@@ -93,7 +93,58 @@ internal static class MarkupLiteralValueConverter
             return MarkupLiteralConversionStatus.Success;
         }
 
+        var converterType = GetTypeConverter(namedType);
+        if (converterType != null)
+        {
+            value = new MarkupLiteralValue(
+                text,
+                new CSharpSymbolDefinition(targetType),
+                MarkupLiteralConverterKind.TypeConverter,
+                new CSharpSymbolDefinition(converterType));
+            return MarkupLiteralConversionStatus.Success;
+        }
+
         return MarkupLiteralConversionStatus.Unsupported;
+    }
+
+    private static INamedTypeSymbol? GetTypeConverter(INamedTypeSymbol targetType)
+    {
+        foreach (var attribute in targetType.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString() !=
+                    "System.ComponentModel.TypeConverterAttribute" ||
+                attribute.ConstructorArguments.Length != 1 ||
+                attribute.ConstructorArguments[0].Value is not INamedTypeSymbol converterType ||
+                !HasPublicParameterlessConstructor(converterType) ||
+                !IsTypeConverter(converterType))
+            {
+                continue;
+            }
+
+            return converterType;
+        }
+
+        return null;
+    }
+
+    private static bool HasPublicParameterlessConstructor(INamedTypeSymbol type)
+    {
+        return type.InstanceConstructors.Any(constructor =>
+            constructor.DeclaredAccessibility == Accessibility.Public &&
+            constructor.Parameters.Length == 0);
+    }
+
+    private static bool IsTypeConverter(INamedTypeSymbol type)
+    {
+        for (var current = type; current != null; current = current.BaseType)
+        {
+            if (current.ToDisplayString() == "System.ComponentModel.TypeConverter")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static ITypeSymbol GetEffectiveType(ITypeSymbol type)

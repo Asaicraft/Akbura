@@ -1,0 +1,13 @@
+<Window
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Akbura.Diagnostics"
+    x:Class="Akbura.Diagnostics.DiagnosticsWindow"
+    Title="Akbura Diagnostics"
+    Width="1040"
+    Height="700"
+    MinWidth="720"
+    MinHeight="480"
+    WindowStartupLocation="CenterOwner">
+  <local:DiagnosticsRoot />
+</Window>

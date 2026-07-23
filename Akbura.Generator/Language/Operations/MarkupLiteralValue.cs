@@ -7,6 +7,7 @@ internal enum MarkupLiteralConverterKind : byte
 {
     ParseMethod,
     StringConstructor,
+    TypeConverter,
 }
 
 internal sealed class MarkupLiteralValue

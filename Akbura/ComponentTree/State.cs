@@ -4,6 +4,8 @@ public abstract class State
 {
     private AkburaControl? _owner;
 
+    internal event Action<State>? ValueChanged;
+
     internal State()
     {
     }
@@ -19,6 +21,10 @@ public abstract class State
     {
         get;
     }
+
+    internal abstract object? BoxedInitialValue { get; }
+
+    internal abstract object? BoxedValue { get; set; }
 
     internal void Attach(AkburaControl owner, StateInfo info)
     {
@@ -56,6 +62,7 @@ public abstract class State
         try
         {
             subscribers?.Invoke(value);
+            ValueChanged?.Invoke(this);
         }
         finally
         {

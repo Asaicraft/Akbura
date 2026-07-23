@@ -2307,6 +2307,16 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     internal AkburaPropertySymbol? CreateMarkupContentPropertySymbol(IMarkupComponentSymbol componentSymbol)
     {
+        if (componentSymbol.ContentModel.ContentParameter is { } contentParameter)
+        {
+            return new PropertySymbol(
+                contentParameter.Name,
+                contentParameter.Type,
+                parameter: contentParameter,
+                containingSymbol: componentSymbol,
+                isImplicitlyDeclared: true);
+        }
+
         if (componentSymbol.ContentModel.ContentProperty.Symbol is not RoslynPropertySymbol contentProperty)
         {
             return null;
@@ -2537,19 +2547,19 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             namedType.TypeKind != TypeKind.Error)
         {
             var contentModel = CreateMarkupContentModel(namedType, markupElement);
+            var symbol = new MarkupComponentSymbol(
+                componentNameText,
+                new CSharpSymbolDefinition(namedType),
+                contentModel);
+            SetCachedSymbolInfo(markupElement, AkburaSymbolInfo.Success(symbol));
+
             var children = CreateMarkupChildren(
                 markupElement,
                 contentModel,
                 out var diagnostics,
                 namedType);
             SetSemanticDiagnostics(markupElement, diagnostics);
-
-            var symbol = new MarkupComponentSymbol(
-                componentNameText,
-                new CSharpSymbolDefinition(namedType),
-                contentModel,
-                children);
-            SetCachedSymbolInfo(markupElement, AkburaSymbolInfo.Success(symbol));
+            symbol.SetChildren(children);
             symbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
 
             return AkburaSymbolInfo.Success(symbol);
@@ -2579,14 +2589,51 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         var containingElement = GetParentMarkupElement(markupElement);
         if (containingElement == null ||
-            GetSymbolInfo(containingElement).Symbol is not IMarkupComponentSymbol containingComponent ||
-            containingComponent.ComponentType is not { } componentType ||
-            !IsMarkupPropertyElementOwner(componentType, elementName[..separator]))
+            GetSymbolInfo(containingElement).Symbol is not IMarkupComponentSymbol containingComponent)
         {
             return false;
         }
 
+        var ownerName = elementName[..separator];
         var propertyName = elementName[(separator + 1)..].Trim();
+        if (containingComponent.AkburaComponent is { } akburaComponent &&
+            IsMarkupPropertyElementOwner(akburaComponent, ownerName))
+        {
+            var parameter = FindComponentParameter(containingComponent, propertyName);
+            if (parameter != null)
+            {
+                var parameterProperty = new PropertySymbol(
+                    propertyName,
+                    parameter.Type,
+                    parameter: parameter,
+                    containingSymbol: containingComponent);
+                SetSemanticDiagnosticsIfAbsent(
+                    markupElement,
+                    ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+                symbolInfo = AkburaSymbolInfo.Success(parameterProperty);
+                return true;
+            }
+
+            if (containingComponent.ComponentType == null)
+            {
+                SetSemanticDiagnostics(
+                    markupElement,
+                    ImmutableArray.Create(
+                        CreateMarkupPropertyNotFoundDiagnostic(
+                            markupElement,
+                            propertyName,
+                            containingComponent)));
+                symbolInfo = AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+                return true;
+            }
+        }
+
+        if (containingComponent.ComponentType is not { } componentType ||
+            !IsMarkupPropertyElementOwner(componentType, ownerName))
+        {
+            return false;
+        }
+
         var clrProperty = FindPublicClrProperty(componentType, propertyName);
         var avaloniaProperty = FindAvaloniaPropertyField(componentType, propertyName);
         if (clrProperty == null && avaloniaProperty == null)
@@ -2623,9 +2670,25 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     internal MarkupContentModel CreateMarkupPropertyElementContentModel(
         AkburaPropertySymbol property)
     {
+        if (property.Parameter is { } parameter)
+        {
+            return CreateAkburaParameterContentModel(parameter);
+        }
+
         if (property.Type.Symbol is not ITypeSymbol propertyType)
         {
             return default;
+        }
+
+        if (property.ClrPropertyDefinition.Symbol is RoslynPropertySymbol clrProperty &&
+            BindingSession.MarkupTemplateContent.IsTemplateContentProperty(clrProperty) &&
+            Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Controls.Control") is { } controlType)
+        {
+            return new MarkupContentModel(
+                property.CSharpDefinition,
+                new CSharpSymbolDefinition(controlType),
+                isCollection: false,
+                allowsText: false);
         }
 
         if (TryGetIListElementType(propertyType, out var elementType))
@@ -2662,24 +2725,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         INamedTypeSymbol componentType,
         string ownerName)
     {
-        var simpleName = ownerName.Trim();
-        var aliasSeparator = simpleName.LastIndexOf("::", StringComparison.Ordinal);
-        if (aliasSeparator >= 0)
-        {
-            simpleName = simpleName[(aliasSeparator + 2)..];
-        }
-
-        var namespaceSeparator = simpleName.LastIndexOf('.');
-        if (namespaceSeparator >= 0)
-        {
-            simpleName = simpleName[(namespaceSeparator + 1)..];
-        }
-
-        var genericStart = simpleName.IndexOfAny(['{', '<']);
-        if (genericStart >= 0)
-        {
-            simpleName = simpleName[..genericStart];
-        }
+        var simpleName = GetSimpleMarkupPropertyElementOwnerName(ownerName);
 
         for (var current = componentType; current != null; current = current.BaseType)
         {
@@ -2698,6 +2744,37 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return false;
+    }
+
+    private static bool IsMarkupPropertyElementOwner(
+        IAkburaComponentSymbol component,
+        string ownerName)
+    {
+        return string.Equals(
+            component.Name,
+            GetSimpleMarkupPropertyElementOwnerName(ownerName),
+            StringComparison.Ordinal);
+    }
+
+    private static string GetSimpleMarkupPropertyElementOwnerName(string ownerName)
+    {
+        var simpleName = ownerName.Trim();
+        var aliasSeparator = simpleName.LastIndexOf("::", StringComparison.Ordinal);
+        if (aliasSeparator >= 0)
+        {
+            simpleName = simpleName[(aliasSeparator + 2)..];
+        }
+
+        var namespaceSeparator = simpleName.LastIndexOf('.');
+        if (namespaceSeparator >= 0)
+        {
+            simpleName = simpleName[(namespaceSeparator + 1)..];
+        }
+
+        var genericStart = simpleName.IndexOfAny(['{', '<']);
+        return genericStart < 0
+            ? simpleName
+            : simpleName[..genericStart];
     }
 
     private bool TryResolveAkburaMarkupComponent(
@@ -2754,10 +2831,15 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         string componentNameText,
         IAkburaComponentSymbol componentSymbol)
     {
-        SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var contentModel = componentSymbol.ComponentType is { } componentType
             ? CreateMarkupContentModel(componentType, markupElement)
-            : componentSymbol.ContentModel;
+            : default;
+        if (contentModel.IsDefault)
+        {
+            contentModel = componentSymbol.ContentModel.IsDefault
+                ? CreateAkburaParameterContentModel(componentSymbol.Parameters)
+                : componentSymbol.ContentModel;
+        }
         var usageSymbol = new MarkupComponentSymbol(
             componentNameText,
             componentSymbol.CSharpDefinition,
@@ -2765,6 +2847,13 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             children: ImmutableArray<MarkupChildContent>.Empty,
             akburaComponent: componentSymbol);
         SetCachedSymbolInfo(markupElement, AkburaSymbolInfo.Success(usageSymbol));
+        var children = CreateMarkupChildren(
+            markupElement,
+            contentModel,
+            out var diagnostics,
+            componentSymbol.ComponentType);
+        SetSemanticDiagnostics(markupElement, diagnostics);
+        usageSymbol.SetChildren(children);
         usageSymbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
 
         return usageSymbol;
@@ -3517,6 +3606,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         string propertyName,
         IMarkupComponentSymbol componentSymbol)
     {
+        return CreateMarkupPropertyNotFoundDiagnostic(
+            (AkburaSyntax)syntax,
+            propertyName,
+            componentSymbol);
+    }
+
+    private AkburaSemanticDiagnostic CreateMarkupPropertyNotFoundDiagnostic(
+        AkburaSyntax syntax,
+        string propertyName,
+        IMarkupComponentSymbol componentSymbol)
+    {
         var componentName = componentSymbol.CSharpDefinition.IsDefault
             ? componentSymbol.Name
             : componentSymbol.CSharpDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -4193,6 +4293,45 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return default;
     }
 
+    internal MarkupContentModel CreateAkburaParameterContentModel(
+        ImmutableArray<IParamSymbol> parameters)
+    {
+        foreach (var parameter in parameters)
+        {
+            if (string.Equals(parameter.Name, "Content", StringComparison.Ordinal))
+            {
+                return CreateAkburaParameterContentModel(parameter);
+            }
+        }
+
+        return default;
+    }
+
+    private MarkupContentModel CreateAkburaParameterContentModel(IParamSymbol parameter)
+    {
+        if (parameter.Type.Symbol is not ITypeSymbol parameterType)
+        {
+            return default;
+        }
+
+        if (TryGetIListElementType(parameterType, out var elementType))
+        {
+            return new MarkupContentModel(
+                contentProperty: default,
+                allowedChildType: new CSharpSymbolDefinition(elementType),
+                isCollection: true,
+                allowsText: AllowsTextContent(elementType),
+                contentParameter: parameter);
+        }
+
+        return new MarkupContentModel(
+            contentProperty: default,
+            allowedChildType: parameter.Type,
+            isCollection: false,
+            allowsText: AllowsTextContent(parameterType),
+            contentParameter: parameter);
+    }
+
     private bool TryCreateTextBlockTextContentModel(
         INamedTypeSymbol componentType,
         MarkupElementSyntax? markupElement,
@@ -4350,13 +4489,22 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         MarkupContentSyntax content,
         INamedTypeSymbol? containingType)
     {
-        if (containingType == null ||
-            content.Kind != AkburaSyntaxKind.MarkupElementContentSyntax)
+        if (content.Kind != AkburaSyntaxKind.MarkupElementContentSyntax)
         {
             return false;
         }
 
         var propertyElement = Unsafe.As<MarkupElementContentSyntax>(content).Element;
+        if (GetSyntaxTreeSymbolInfo(propertyElement).Symbol is AkburaPropertySymbol)
+        {
+            return true;
+        }
+
+        if (containingType == null)
+        {
+            return false;
+        }
+
         var elementName = propertyElement.StartTag?.Name.ToFullString().Trim();
         if (string.IsNullOrEmpty(elementName))
         {
@@ -4576,6 +4724,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             }
         }
 
+        if (IsNonGenericIList(type) ||
+            type.AllInterfaces.Any(IsNonGenericIList))
+        {
+            elementType = Compilation.CSharpCompilation.GetSpecialType(
+                SpecialType.System_Object);
+            return true;
+        }
+
         elementType = null!;
         return false;
     }
@@ -4586,6 +4742,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return original.Name == "IList" &&
             original.Arity == 1 &&
             original.ContainingNamespace.ToDisplayString() == "System.Collections.Generic";
+    }
+
+    private static bool IsNonGenericIList(ITypeSymbol type)
+    {
+        return type is INamedTypeSymbol namedType &&
+            namedType.Name == "IList" &&
+            namedType.Arity == 0 &&
+            namedType.ContainingNamespace.ToDisplayString() == "System.Collections";
     }
 
     internal static bool IsAssignableTo(ITypeSymbol source, ITypeSymbol target)

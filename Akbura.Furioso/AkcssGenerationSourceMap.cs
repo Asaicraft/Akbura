@@ -2,24 +2,22 @@ using Akbura.Language;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 
 namespace Akbura.Furioso;
 
 internal sealed class AkcssGenerationSourceMap
 {
-    private readonly Dictionary<AkburaSyntax, AkcssSyntaxTree> _syntaxTreesByRoot = new();
+    private readonly Dictionary<AkburaSyntax, AkburaSyntaxTree> _syntaxTreesByRoot = new();
 
-    public AkcssGenerationSourceMap(ImmutableArray<AkcssSyntaxTree> syntaxTrees)
+    public AkcssGenerationSourceMap(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
-        if (syntaxTrees.IsDefaultOrEmpty)
-        {
-            return;
-        }
-
         foreach (var syntaxTree in syntaxTrees)
         {
-            _syntaxTreesByRoot.Add(syntaxTree.GetRootSyntax(), syntaxTree);
+            var root = syntaxTree.GetRootSyntax();
+            if (!_syntaxTreesByRoot.ContainsKey(root))
+            {
+                _syntaxTreesByRoot.Add(root, syntaxTree);
+            }
         }
     }
 
@@ -35,9 +33,11 @@ internal sealed class AkcssGenerationSourceMap
             return false;
         }
 
-        path = string.IsNullOrWhiteSpace(syntaxTree.FilePath)
-            ? syntaxTree.LogicalName
-            : syntaxTree.FilePath;
+        path = syntaxTree switch
+        {
+            AkcssSyntaxTree { FilePath.Length: 0 } akcssTree => akcssTree.LogicalName,
+            _ => syntaxTree.FilePath,
+        };
         var span = syntax.Span;
         if (string.IsNullOrWhiteSpace(path) ||
             path.IndexOf('"') >= 0 ||

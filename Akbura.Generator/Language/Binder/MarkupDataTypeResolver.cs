@@ -60,6 +60,24 @@ internal sealed class MarkupDataTypeResolver
         return false;
     }
 
+    public bool TryGetDataType(
+        MarkupElementSyntax scope,
+        out INamedTypeSymbol dataType)
+    {
+        if (TryGetExplicitDataType(scope, out dataType) ||
+            TryGetInheritedDataType(
+                scope,
+                out dataType,
+                out _,
+                out _))
+        {
+            return true;
+        }
+
+        dataType = null!;
+        return false;
+    }
+
     public bool TryCreateItemSymbol(
         MarkupElementSyntax scope,
         out IMarkupItemSymbol? itemSymbol)
@@ -86,6 +104,11 @@ internal sealed class MarkupDataTypeResolver
             declarationSyntax,
             containingSymbol);
         return true;
+    }
+
+    public static bool HasItemNameDirective(MarkupElementSyntax scope)
+    {
+        return TryGetItemName(scope, out _, out _);
     }
 
     private bool TryGetExplicitDataType(

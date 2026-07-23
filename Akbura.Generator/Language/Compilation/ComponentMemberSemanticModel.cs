@@ -134,20 +134,11 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     inlineAkcssBuilder);
             }
 
-            var children = markupRootsBuilder.Count == 1
-                ? CreateMarkupChildren(
-                    markupRootsBuilder.WrittenSpan[0].Element,
-                    contentModel,
-                    out _,
-                    partialTypes.Length == 0 ? null : partialTypes[0])
-                : ImmutableArray<MarkupChildContent>.Empty;
-
-            foreach (var markupRoot in markupRootsBuilder.WrittenSpan)
+            var parameters = parametersBuilder.ToImmutable();
+            var parameterContentModel = CreateAkburaParameterContentModel(parameters);
+            if (!parameterContentModel.IsDefault)
             {
-                if (GetSyntaxTreeSymbolInfo(markupRoot.Element).Symbol is IMarkupComponentSymbol markupComponentSymbol)
-                {
-                    markupRootSymbolsBuilder.Add(markupComponentSymbol);
-                }
+                contentModel = parameterContentModel;
             }
 
             var componentSymbol = new AkburaComponentSymbol(
@@ -161,15 +152,36 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     : new CSharpSymbolDefinition(componentTypeInfo.BaseType),
                 componentTypeInfo.HasExplicitBaseType,
                 contentModel,
-                children,
-                markupRootSymbolsBuilder.ToImmutable(),
+                default,
+                default,
                 statesBuilder.ToImmutable(),
-                parametersBuilder.ToImmutable(),
+                parameters,
                 injectedServicesBuilder.ToImmutable(),
                 commandsBuilder.ToImmutable(),
-                akcssModules: ImmutableArray<IAkcssModuleSymbol>.Empty);
+                akcssModules: ImmutableArray<IAkcssModuleSymbol>.Empty,
+                deferMarkupInitialization: true);
             var symbolInfo = AkburaSymbolInfo.Success(componentSymbol);
             SetCachedSymbolInfo(document, symbolInfo);
+
+            foreach (var markupRoot in markupRootsBuilder.WrittenSpan)
+            {
+                if (GetSyntaxTreeSymbolInfo(markupRoot.Element).Symbol is IMarkupComponentSymbol markupComponentSymbol)
+                {
+                    markupRootSymbolsBuilder.Add(markupComponentSymbol);
+                }
+            }
+
+            var children = markupRootsBuilder.Count == 1
+                ? CreateMarkupChildren(
+                    markupRootsBuilder.WrittenSpan[0].Element,
+                    contentModel,
+                    out _,
+                    partialTypes.Length == 0 ? null : partialTypes[0])
+                : ImmutableArray<MarkupChildContent>.Empty;
+
+            componentSymbol.SetMarkupContract(
+                children,
+                markupRootSymbolsBuilder.ToImmutable());
 
             componentSymbol.SetAkcssModules(CreateInlineAkcssModuleSymbols(
                 inlineAkcssBuilder.WrittenSpan,

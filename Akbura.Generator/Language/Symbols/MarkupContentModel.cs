@@ -6,12 +6,14 @@ internal readonly struct MarkupContentModel
         CSharpSymbolDefinition contentProperty,
         CSharpSymbolDefinition allowedChildType,
         bool isCollection,
-        bool allowsText)
+        bool allowsText,
+        IParamSymbol? contentParameter = null)
     {
         ContentProperty = contentProperty;
         AllowedChildType = allowedChildType;
         IsCollection = isCollection;
         AllowsText = allowsText;
+        ContentParameter = contentParameter;
     }
 
     public CSharpSymbolDefinition ContentProperty { get; }
@@ -22,7 +24,12 @@ internal readonly struct MarkupContentModel
 
     public bool AllowsText { get; }
 
+    public IParamSymbol? ContentParameter { get; }
+
     public bool AllowsChildren => !AllowedChildType.IsDefault;
 
-    public bool IsDefault => ContentProperty.IsDefault && AllowedChildType.IsDefault;
+    public bool IsDefault =>
+        ContentProperty.IsDefault &&
+        ContentParameter == null &&
+        AllowedChildType.IsDefault;
 }

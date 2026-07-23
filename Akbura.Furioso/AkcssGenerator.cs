@@ -38,21 +38,25 @@ internal static class AkcssGenerator
     private const string EditorBrowsableAttribute = "global::System.ComponentModel.EditorBrowsableAttribute";
     private const string BrowsableAttribute = "global::System.ComponentModel.BrowsableAttribute";
 
-    public static string GetHintName(IAkcssModuleSymbol symbol, string sourcePath)
+    public static string GetHintName(
+        IAkcssModuleSymbol symbol,
+        string sourcePath,
+        string? moduleIdentity = null)
     {
         if (symbol == null)
         {
             throw new ArgumentNullException(nameof(symbol));
         }
 
-        var identity = GetModuleIdentity(symbol, sourcePath);
+        var identity = GetModuleIdentity(symbol, moduleIdentity ?? sourcePath);
         return $"Akbura.Akcss.{SanitizeHintPart(identity)}.{AkcssGeneratedModuleNames.GetStableHash(identity):x8}.g.cs";
     }
 
     public static string Generate(
         IAkcssModuleSymbol symbol,
         AkcssGenerationSourceMap sourceMap,
-        string sourcePath)
+        string sourcePath,
+        string? moduleIdentity = null)
     {
         if (symbol == null)
         {
@@ -64,7 +68,10 @@ internal static class AkcssGenerator
             throw new ArgumentNullException(nameof(sourceMap));
         }
 
-        var identity = GetModuleIdentity(symbol, sourcePath);
+        var identity = GetModuleIdentity(symbol, moduleIdentity ?? sourcePath);
+        var mappedSourcePath = string.IsNullOrWhiteSpace(sourcePath)
+            ? identity
+            : AkcssGeneratedModuleNames.NormalizeSourcePath(sourcePath);
         var moduleTypeName = AkcssGeneratedModuleNames.GetTypeName(identity);
         var source = new StringBuilder();
 
@@ -84,7 +91,7 @@ internal static class AkcssGenerator
             .AppendLine(";");
         AppendHiddenApiAttributes(source, 2);
         source.Append("        public const string SourcePath = ")
-            .Append(ToStringLiteral(identity))
+            .Append(ToStringLiteral(mappedSourcePath))
             .AppendLine(";");
 
         AppendStyleCollection(source, symbol);

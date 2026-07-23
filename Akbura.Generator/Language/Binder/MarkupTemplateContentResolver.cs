@@ -57,7 +57,20 @@ internal sealed class MarkupTemplateContentResolver
 
         var propertyName = nameText[(separator + 1)..].Trim();
         var property = AkburaSemanticModel.FindPublicClrProperty(containingType, propertyName);
-        return property != null && HasTemplateContentAttribute(property);
+        return property != null && IsTemplateContentProperty(property);
+    }
+
+    internal bool IsTemplateContentProperty(IPropertySymbol property)
+    {
+        if (HasTemplateContentAttribute(property))
+        {
+            return true;
+        }
+
+        var dataTemplateType = _semanticModel.Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.Controls.Templates.IDataTemplate");
+        return dataTemplateType != null &&
+            AkburaSemanticModel.IsAssignableTo(property.Type, dataTemplateType);
     }
 
     private static bool HasTemplateContentAttribute(IPropertySymbol property)

@@ -32,6 +32,11 @@ public sealed class ComponentTreeTests
                 var window = new Window { Content = parent };
                 window.Show();
 
+                var attachedComponents = AkburaComponentRegistry.GetAttachedComponents();
+                Assert.Contains(parent, attachedComponents);
+                Assert.Contains(firstChild, attachedComponents);
+                Assert.Contains(secondChild, attachedComponents);
+
                 var parentTree = (IComponentTree)parent;
                 var firstChildTree = (IComponentTree)firstChild;
                 var secondChildTree = (IComponentTree)secondChild;
@@ -49,6 +54,10 @@ public sealed class ComponentTreeTests
                 Assert.Empty(parentTree.ComponentChildren);
                 Assert.Null(firstChildTree.ComponentParent);
                 Assert.Null(secondChildTree.ComponentParent);
+                attachedComponents = AkburaComponentRegistry.GetAttachedComponents();
+                Assert.DoesNotContain(parent, attachedComponents);
+                Assert.DoesNotContain(firstChild, attachedComponents);
+                Assert.DoesNotContain(secondChild, attachedComponents);
 
                 window.Close();
             },

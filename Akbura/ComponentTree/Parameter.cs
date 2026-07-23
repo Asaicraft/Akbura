@@ -7,17 +7,20 @@ public abstract class Parameter
 {
     private readonly object? _defaultValue;
     private readonly bool _hasDefaultValue;
+    private readonly bool _isAlwaysSet;
 
     internal Parameter(
         AvaloniaProperty avaloniaProperty,
         ParameterBinding binding,
         object? defaultValue,
-        bool hasDefaultValue)
+        bool hasDefaultValue,
+        bool isAlwaysSet)
     {
         Binding = binding;
         AvaloniaProperty = avaloniaProperty;
         _defaultValue = defaultValue;
         _hasDefaultValue = hasDefaultValue;
+        _isAlwaysSet = isAlwaysSet;
     }
 
     public string Name => AvaloniaProperty.Name;
@@ -49,6 +52,7 @@ public abstract class Parameter
         ArgumentNullException.ThrowIfNull(control);
 
         return Binding == ParameterBinding.Out ||
+            _isAlwaysSet ||
             HasDefaultValue ||
             control.IsSet(AvaloniaProperty);
     }
@@ -66,11 +70,15 @@ public abstract class Parameter
     /// <param name="name">The parameter and styled property name.</param>
     /// <param name="defaultValue">The optional default value.</param>
     /// <param name="parameterBinding">The direction in which the parameter is bound.</param>
+    /// <param name="changed">
+    /// An optional callback invoked before the component update is requested.
+    /// </param>
     /// <returns>The parameter descriptor. The caller should cache this instance.</returns>
     public static Parameter<TOwner, TValue> Create<TOwner, TValue>(
         string name,
         Optional<TValue> defaultValue = default,
-        ParameterBinding parameterBinding = ParameterBinding.In)
+        ParameterBinding parameterBinding = ParameterBinding.In,
+        Action<TOwner, AvaloniaPropertyChangedEventArgs>? changed = null)
         where TOwner : AkburaControl
     {
         var bindingMode = parameterBinding.ToBindingMode();
@@ -81,9 +89,37 @@ public abstract class Parameter
             defaultBindingMode: bindingMode);
 #pragma warning restore AVP1001 // The same AvaloniaProperty should not be registered twice
 
-        property.Changed.AddClassHandler<TOwner>(
-            static (owner, _) => owner.OnParameterChanged());
+        property.Changed.AddClassHandler<TOwner>((owner, args) =>
+        {
+            changed?.Invoke(owner, args);
+            owner.OnParameterChanged();
+        });
 
         return new(property, parameterBinding, defaultValue);
+    }
+
+    /// <summary>
+    /// Creates a readonly component parameter backed by an Avalonia direct property.
+    /// </summary>
+    /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
+    /// <typeparam name="TValue">The parameter value type.</typeparam>
+    /// <param name="name">The parameter and direct property name.</param>
+    /// <param name="getter">Reads the per-component value.</param>
+    /// <returns>The readonly parameter descriptor. The caller should cache this instance.</returns>
+    public static ReadOnlyParameter<TOwner, TValue> CreateReadOnly<TOwner, TValue>(
+        string name,
+        Func<TOwner, TValue> getter)
+        where TOwner : AkburaControl
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(getter);
+
+#pragma warning disable AVP1001 // The same AvaloniaProperty should not be registered twice
+        var property = AvaloniaProperty.RegisterDirect<TOwner, TValue>(
+            name,
+            getter);
+#pragma warning restore AVP1001 // The same AvaloniaProperty should not be registered twice
+
+        return new ReadOnlyParameter<TOwner, TValue>(property);
     }
 }

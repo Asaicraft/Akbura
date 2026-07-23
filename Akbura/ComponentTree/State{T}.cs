@@ -38,6 +38,22 @@ public sealed class State<T> : State
 
     public override Type ValueType => typeof(T);
 
+    internal override object? BoxedInitialValue => InitialValue;
+
+    internal override object? BoxedValue
+    {
+        get => Value;
+        set
+        {
+            if (value == null && default(T) is not null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            Value = (T)value!;
+        }
+    }
+
     public IDisposable Subscribe(Action<T> subscriber)
     {
         ArgumentNullException.ThrowIfNull(subscriber);

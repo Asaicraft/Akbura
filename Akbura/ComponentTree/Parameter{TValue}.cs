@@ -8,12 +8,14 @@ public abstract class Parameter<TValue> : Parameter
     internal Parameter(
         AvaloniaProperty<TValue> avaloniaProperty,
         ParameterBinding parameterBinding,
-        Optional<TValue> defaultValue)
+        Optional<TValue> defaultValue,
+        bool isAlwaysSet = false)
         : base(
             avaloniaProperty,
             parameterBinding,
             defaultValue.HasValue ? defaultValue.Value : default,
-            defaultValue.HasValue)
+            defaultValue.HasValue,
+            isAlwaysSet)
     {
     }
 

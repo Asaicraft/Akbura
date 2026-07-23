@@ -529,10 +529,15 @@ public class SemanticPipelineTests
         var element = GetOnlyMarkupElement(syntaxTree);
 
         var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var operation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(element));
 
         Assert.True(semanticModel.GetSemanticDiagnostics(element).IsEmpty);
         Assert.Equal("Inlines", symbol.ContentModel.ContentProperty.Name);
-        Assert.Null(semanticModel.GetOperation(element));
+        Assert.Equal("Inlines", operation.Property?.Name);
+        Assert.Single(operation.Content);
+        Assert.False(operation.IsSynthesizedString);
+        Assert.False(operation.HasErrors);
     }
 
     [Fact]

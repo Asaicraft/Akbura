@@ -7,6 +7,8 @@ namespace Akbura.Language.Symbols;
 
 internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 {
+    private ImmutableArray<MarkupChildContent> _children;
+
     public MarkupComponentSymbol(
         string name,
         CSharpSymbolDefinition csharpDefinition,
@@ -33,7 +35,7 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
         Name = name;
         CSharpDefinition = csharpDefinition;
         ContentModel = contentModel;
-        Children = children.IsDefault
+        _children = children.IsDefault
             ? ImmutableArray<MarkupChildContent>.Empty
             : children;
         AttributeOperations = attributeOperations.IsDefault
@@ -59,7 +61,7 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
 
     public MarkupContentModel ContentModel { get; }
 
-    public ImmutableArray<MarkupChildContent> Children { get; }
+    public ImmutableArray<MarkupChildContent> Children => _children;
 
     public ImmutableArray<IMarkupAttributeOperation> AttributeOperations { get; private set; }
 
@@ -70,6 +72,13 @@ internal sealed class MarkupComponentSymbol : Symbol, IMarkupComponentSymbol
         AttributeOperations = attributeOperations.IsDefault
             ? ImmutableArray<IMarkupAttributeOperation>.Empty
             : attributeOperations;
+    }
+
+    internal void SetChildren(ImmutableArray<MarkupChildContent> children)
+    {
+        _children = children.IsDefault
+            ? ImmutableArray<MarkupChildContent>.Empty
+            : children;
     }
 
     public override void Accept(SymbolVisitor visitor)

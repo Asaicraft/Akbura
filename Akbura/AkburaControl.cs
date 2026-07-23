@@ -276,6 +276,21 @@ public abstract class AkburaControl : Control, IComponentTree
 	/// <returns>The component states.</returns>
 	protected abstract ImmutableArray<State> GetStates();
 
+	internal ImmutableArray<Parameter> GetDiagnosticParameters()
+	{
+		return GetParameters();
+	}
+
+	internal ImmutableArray<InjectService> GetDiagnosticServices()
+	{
+		return GetServices();
+	}
+
+	internal ImmutableArray<State> GetDiagnosticStates()
+	{
+		return GetStates();
+	}
+
 	internal void OnParameterChanged()
 	{
 		RequestUpdate();
@@ -400,6 +415,7 @@ public abstract class AkburaControl : Control, IComponentTree
 	{
 		base.OnAttachedToVisualTree(e);
 		SetComponentParent(FindComponentParent());
+		AkburaComponentRegistry.Attach(this);
 		if (_useHooks.NeedsRestart)
 		{
 			RequestUpdate();
@@ -411,6 +427,7 @@ public abstract class AkburaControl : Control, IComponentTree
 		base.OnDetachedFromVisualTree(e);
 		_useHooks.StopForDetach();
 		SetComponentParent(null);
+		AkburaComponentRegistry.Detach(this);
 	}
 
 	private IComponentTree? FindComponentParent()

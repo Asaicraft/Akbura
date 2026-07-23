@@ -113,17 +113,22 @@ internal sealed partial class MarkupBinder : Binder
         IMarkupItemSymbol? itemSymbol = null;
         if (ScopeDesignator?.Kind == AkburaSyntaxKind.MarkupElementSyntax)
         {
-            SemanticModel.BindingSession.MarkupDataTypes.TryCreateItemSymbol(
-                Unsafe.As<MarkupElementSyntax>(ScopeDesignator),
-                out itemSymbol);
+            var scope = Unsafe.As<MarkupElementSyntax>(ScopeDesignator);
+            if (!MarkupDataTypeResolver.HasItemNameDirective(scope))
+            {
+                Volatile.Write(ref _itemSymbolInitialized, 1);
+                return null;
+            }
+
+            SemanticModel.BindingSession.MarkupDataTypes.TryCreateItemSymbol(scope, out itemSymbol);
         }
 
         if (itemSymbol != null)
         {
             Interlocked.CompareExchange(ref _lazyItemSymbol, itemSymbol, comparand: null);
+            Volatile.Write(ref _itemSymbolInitialized, 1);
         }
 
-        Volatile.Write(ref _itemSymbolInitialized, 1);
         return _lazyItemSymbol;
     }
 
@@ -331,6 +336,50 @@ internal sealed partial class MarkupBinder : Binder
             }
         }
 
+        foreach (var content in markupElement.Body)
+        {
+            if (content is MarkupElementContentSyntax elementContent &&
+                SemanticModel.GetSymbolInfo(elementContent.Element).Symbol is IPropertySymbol
+                {
+                    Parameter: { } setParameter
+                } &&
+                ReferenceEquals(setParameter, parameter))
+            {
+                return true;
+            }
+        }
+
+        var component =
+            SemanticModel.GetSymbolInfo(markupElement).Symbol as IMarkupComponentSymbol;
+        var componentContentParameter = component?.ContentModel.ContentParameter;
+        if (componentContentParameter == null ||
+            !string.Equals(
+                componentContentParameter.Name,
+                parameter.Name,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (component?.ContentModel.IsCollection == true)
+        {
+            return true;
+        }
+
+        foreach (var content in markupElement.Body)
+        {
+            switch (content)
+            {
+                case MarkupElementContentSyntax elementContent
+                    when SemanticModel.GetSymbolInfo(elementContent.Element).Symbol is not IPropertySymbol:
+                case MarkupInlineExpressionSyntax:
+                    return true;
+                case MarkupTextLiteralSyntax text
+                    when !string.IsNullOrWhiteSpace(text.ToFullString()):
+                    return true;
+            }
+        }
+
         return false;
     }
 
@@ -391,9 +440,45 @@ internal sealed partial class MarkupBinder : Binder
         IMarkupComponentSymbol? componentSymbol)
     {
         if (componentSymbol == null ||
-            componentSymbol.ContentModel.IsDefault ||
-            AkburaSemanticModel.HasElementContent(markupElement) ||
-            !AkburaSemanticModel.TryCreateMarkupContentValueExpression(
+            componentSymbol.ContentModel.IsDefault)
+        {
+            return null;
+        }
+
+        if (AkburaSemanticModel.HasElementContent(markupElement))
+        {
+            if (componentSymbol.Children.IsDefaultOrEmpty)
+            {
+                return null;
+            }
+
+            var elementProperty = SemanticModel.CreateMarkupContentPropertySymbol(componentSymbol);
+            var elementDiagnostics = SemanticModel.GetCachedSemanticDiagnostics(markupElement);
+            var elementValueType = componentSymbol.Children.Length == 1
+                ? componentSymbol.Children[0].Type
+                : componentSymbol.ContentModel.AllowedChildType;
+            var elementConversion = componentSymbol.Children.Length == 1
+                ? Conversions.ClassifyConversion(
+                    componentSymbol.Children[0].Type.Symbol as CSharpTypeSymbol,
+                    componentSymbol.ContentModel.AllowedChildType.Symbol as CSharpTypeSymbol)
+                : default;
+            return new BoundMarkupContentSetter(
+                markupElement,
+                this,
+                componentSymbol,
+                elementProperty,
+                componentSymbol.ContentModel,
+                componentSymbol.Children,
+                elementValueType,
+                valueOperation: default,
+                elementConversion,
+                literalValue: null,
+                isSynthesizedString: false,
+                elementDiagnostics,
+                elementProperty == null || elementDiagnostics.Length > 0);
+        }
+
+        if (!AkburaSemanticModel.TryCreateMarkupContentValueExpression(
                 markupElement,
                 out var expression,
                 out var literalValue,

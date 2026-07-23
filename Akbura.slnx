@@ -23,6 +23,7 @@
   <Project Path="Akbura.AotTest/Akbura.AotTest.csproj" />
   <Project Path="Akbura.Benchmarks/Akbura.Benchmarks.csproj" />
   <Project Path="Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />
+  <Project Path="Akbura.Diagnostics/Akbura.Diagnostics.csproj" />
   <Project Path="Akbura.Furioso/Akbura.Furioso.csproj" Id="3ee5ad67-1b8f-4c3b-b023-626bc70e7a00">
     <BuildType Solution="ReleaseStats|*" Project="Release" />
     <Build Solution="DebugStats|*" Project="false" />

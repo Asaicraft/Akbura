@@ -18,16 +18,26 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var syntaxTrees = context.AdditionalTextsProvider
-            .Where(static file => IsAkburaSourcePath(file.Path))
-            .Select(static (file, cancellationToken) =>
-                new AkburaAndAkcssFile(file.GetText(cancellationToken), file.Path))
-            .Where(static file => file.SourceText != null)
-            .Select(static (file, cancellationToken) => file.ToSyntaxTree(cancellationToken))
-            .Collect();
+        var projectOptions =
+            context.AnalyzerConfigOptionsProvider
+                .Select(static (provider, _) =>
+                    GeneratorProjectOptions.Create(
+                        provider.GlobalOptions));
 
-        var projectOptions = context.AnalyzerConfigOptionsProvider
-            .Select(static (provider, _) => GeneratorProjectOptions.Create(provider.GlobalOptions));
+        var syntaxTrees = context.AdditionalTextsProvider
+            .Where(static file =>
+                IsAkburaSourcePath(file.Path))
+            .Combine(projectOptions)
+            .Select(static (input, cancellationToken) =>
+                ParseSyntaxTree(
+                    input.Left,
+                    input.Right,
+                    cancellationToken))
+            .Where(static syntaxTree =>
+                syntaxTree != null)
+            .Select(static (syntaxTree, _) =>
+                syntaxTree!)
+            .Collect();
 
         var generationInput = syntaxTrees
             .Combine(context.CompilationProvider)
@@ -35,11 +45,91 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(
             generationInput,
-            static (context, snapshot) => GenerateSources(
-                context,
-                snapshot.Left.Left,
-                snapshot.Left.Right,
-                snapshot.Right));
+            static (context, snapshot) =>
+                GenerateSources(
+                    context,
+                    snapshot.Left.Left,
+                    snapshot.Left.Right,
+                    snapshot.Right));
+    }
+
+    private static AkburaSyntaxTree? ParseSyntaxTree(
+        AdditionalText file,
+        GeneratorProjectOptions projectOptions,
+        CancellationToken cancellationToken)
+    {
+        var sourceText = file.GetText(cancellationToken);
+        if (sourceText == null)
+        {
+            return null;
+        }
+
+        var extension = Path.GetExtension(file.Path);
+
+        if (extension.Equals(
+            ".akcss",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            var sourcePath = GetProjectRelativeSourcePath(
+                file.Path,
+                projectOptions.ProjectDirectory);
+
+            var logicalName =
+                AkcssGeneratedModuleNames.GetMetadataName(
+                    projectOptions.RootNamespace,
+                    sourcePath);
+
+            return AkcssSyntaxTree.ParseText(
+                sourceText,
+                file.Path,
+                logicalName,
+                cancellationToken);
+        }
+
+        if (extension.Equals(
+            ".akbura",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return ComponentSyntaxTree.ParseText(
+                sourceText,
+                file.Path,
+                cancellationToken);
+        }
+
+        return null;
+    }
+
+    private static string GetProjectRelativeSourcePath(
+        string filePath,
+        string projectDirectory)
+    {
+        if (!string.IsNullOrWhiteSpace(projectDirectory) &&
+            !string.IsNullOrWhiteSpace(filePath))
+        {
+            var projectPath = Path
+                .GetFullPath(projectDirectory)
+                .TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+
+            var fullSourcePath = Path.GetFullPath(filePath);
+            var projectPrefix =
+                projectPath + Path.DirectorySeparatorChar;
+
+            if (fullSourcePath.StartsWith(
+                projectPrefix,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return AkcssGeneratedModuleNames
+                    .NormalizeSourcePath(
+                        fullSourcePath[
+                            projectPrefix.Length..]);
+            }
+        }
+
+        return AkcssGeneratedModuleNames
+            .NormalizeSourcePath(
+                Path.GetFileName(filePath));
     }
 
     private static void GenerateSources(

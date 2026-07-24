@@ -898,6 +898,31 @@ public sealed class AkburaCsGeneratorTests
             CancellationToken.None);
     }
 
+    [Fact]
+    public void Generator_DoesNotEmitAkcssImportAsCSharpUsingDirective()
+    {
+        const string component =
+            """
+            using Akbura.Styles.akcss;
+            using Avalonia.Controls;
+
+            <Button />
+            """;
+
+        var generatedSource =
+            GenerateWhitespaceComponent(component);
+
+        Assert.DoesNotContain(
+            "using Akbura.Styles.akcss;",
+            generatedSource,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "using Avalonia.Controls;",
+            generatedSource,
+            StringComparison.Ordinal);
+    }
+
     private static string GenerateWhitespaceComponent(string component)
     {
         var parseOptions = CSharpParseOptions.Default

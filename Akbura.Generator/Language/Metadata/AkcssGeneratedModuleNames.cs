@@ -8,6 +8,29 @@ internal static class AkcssGeneratedModuleNames
 
     private const string TypeNamePrefix = "__AkburaAkcssModule_";
 
+    public static string GetMetadataName(
+        string rootNamespace,
+        string sourcePath)
+    {
+        var normalizedPath = NormalizeSourcePath(sourcePath)
+            .TrimStart('/');
+
+        var pathWithoutExtension = normalizedPath.EndsWith(
+            ".akcss",
+            StringComparison.OrdinalIgnoreCase)
+            ? normalizedPath[..^".akcss".Length]
+            : normalizedPath;
+
+        var name = pathWithoutExtension
+            .Replace('/', '.')
+            .Replace('\\', '.')
+            .Trim('.');
+
+        return string.IsNullOrWhiteSpace(rootNamespace)
+            ? name + ".akcss"
+            : rootNamespace.Trim('.') + "." + name + ".akcss";
+    }
+
     public static string GetTypeName(string sourcePath)
     {
         return TypeNamePrefix + GetStableHash(NormalizeSourcePath(sourcePath)).ToString("x8");

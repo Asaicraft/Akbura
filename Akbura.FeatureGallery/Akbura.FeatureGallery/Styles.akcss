@@ -1,0 +1,718 @@
+@using System;
+@using Akbura;
+@using Avalonia;
+@using Avalonia.Controls;
+@using Avalonia.Controls.Primitives;
+@using Avalonia.Media;
+
+@utilities {
+	// Sizing. Numeric values use the shared Tailwind spacing scale.
+	Control.w-(double width) {
+		Width: width * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.w-auto {
+		Width: double.NaN;
+	}
+
+	Control.w-full {
+		Width: double.NaN;
+		HorizontalAlignment: Stretch;
+	}
+
+	Control.w-px {
+		Width: 1d;
+	}
+
+	Control.h-(double height) {
+		Height: height * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.h-auto {
+		Height: double.NaN;
+	}
+
+	Control.h-full {
+		Height: double.NaN;
+		VerticalAlignment: Stretch;
+	}
+
+	Control.h-px {
+		Height: 1d;
+	}
+
+	Control.size-(double size) {
+		Width: size * Amx.DynamicResource<double>("--spacing");
+		Height: size * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.size-auto {
+		Width: double.NaN;
+		Height: double.NaN;
+	}
+
+	Control.size-full {
+		Width: double.NaN;
+		Height: double.NaN;
+		HorizontalAlignment: Stretch;
+		VerticalAlignment: Stretch;
+	}
+
+	Control.size-px {
+		Width: 1d;
+		Height: 1d;
+	}
+
+	Control.min-w-(double value) {
+		MinWidth: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.min-h-(double value) {
+		MinHeight: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.max-w-(double value) {
+		MaxWidth: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.max-h-(double value) {
+		MaxHeight: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	// Margin.
+	Control.m-(double value) {
+		AkburaControl.ExplicitLeftMargin: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitTopMargin: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightMargin: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomMargin: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.mx-(double value) {
+		AkburaControl.ExplicitLeftMargin: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightMargin: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.my-(double value) {
+		AkburaControl.ExplicitTopMargin: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomMargin: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.mt-(double value) {
+		AkburaControl.ExplicitTopMargin: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.mr-(double value) {
+		AkburaControl.ExplicitRightMargin: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.mb-(double value) {
+		AkburaControl.ExplicitBottomMargin: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Control.ml-(double value) {
+		AkburaControl.ExplicitLeftMargin: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	// Padding for controls and decorators.
+	TemplatedControl.p-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	TemplatedControl.px-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	TemplatedControl.py-(double value) {
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	TemplatedControl.pt-(double value) {
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	TemplatedControl.pr-(double value) {
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	TemplatedControl.pb-(double value) {
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	TemplatedControl.pl-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Decorator.p-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Decorator.px-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Decorator.py-(double value) {
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Decorator.pt-(double value) {
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Decorator.pr-(double value) {
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Decorator.pb-(double value) {
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Decorator.pl-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	AkburaControl.p-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	AkburaControl.px-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	AkburaControl.py-(double value) {
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	AkburaControl.pt-(double value) {
+		AkburaControl.ExplicitTopPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	AkburaControl.pr-(double value) {
+		AkburaControl.ExplicitRightPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	AkburaControl.pb-(double value) {
+		AkburaControl.ExplicitBottomPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	AkburaControl.pl-(double value) {
+		AkburaControl.ExplicitLeftPadding: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	// Panel spacing.
+	StackPanel.gap-(double value) {
+		Spacing: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Grid.gap-(double value) {
+		ColumnSpacing: value * Amx.DynamicResource<double>("--spacing");
+		RowSpacing: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Grid.gap-x-(double value) {
+		ColumnSpacing: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Grid.gap-y-(double value) {
+		RowSpacing: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	// Layout and interaction.
+	Control.hidden {
+		IsVisible: false;
+	}
+
+	Control.visible {
+		IsVisible: true;
+	}
+
+	Control.opacity-(double percentage) {
+		Opacity: Math.Clamp(percentage / 100d, 0d, 1d);
+	}
+
+	Control.z-(int index) {
+		ZIndex: index;
+	}
+
+	Control.overflow-hidden {
+		ClipToBounds: true;
+	}
+
+	Control.overflow-visible {
+		ClipToBounds: false;
+	}
+
+	Control.pointer-events-none {
+		IsHitTestVisible: false;
+	}
+
+	Control.pointer-events-auto {
+		IsHitTestVisible: true;
+	}
+
+	Control.self-start {
+		HorizontalAlignment: Left;
+		VerticalAlignment: Top;
+	}
+
+	Control.self-center {
+		HorizontalAlignment: Center;
+		VerticalAlignment: Center;
+	}
+
+	Control.self-end {
+		HorizontalAlignment: Right;
+		VerticalAlignment: Bottom;
+	}
+
+	Control.self-auto {
+		HorizontalAlignment: Stretch;
+		VerticalAlignment: Stretch;
+	}
+
+	Control.self-stretch {
+		HorizontalAlignment: Stretch;
+		VerticalAlignment: Stretch;
+	}
+
+	// Grid placement.
+	Control.col-(int column) {
+		Grid.Column: column;
+	}
+
+	Control.row-(int row) {
+		Grid.Row: row;
+	}
+
+	Control.col-span-(int value) {
+		Grid.ColumnSpan: value;
+	}
+
+	Control.row-span-(int value) {
+		Grid.RowSpan: value;
+	}
+
+	// Background colors use Tailwind-compatible --color-* resource keys.
+	Panel.bg-(string color) {
+		Background: Amx.DynamicResource<IBrush>("--color-" + color);
+	}
+
+	Panel.bg-(string color)-(int shade) {
+		Background: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
+	}
+
+	Border.bg-(string color) {
+		Background: Amx.DynamicResource<IBrush>("--color-" + color);
+	}
+
+	Border.bg-(string color)-(int shade) {
+		Background: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
+	}
+
+	TemplatedControl.bg-(string color) {
+		Background: Amx.DynamicResource<IBrush>("--color-" + color);
+	}
+
+	TemplatedControl.bg-(string color)-(int shade) {
+		Background: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
+	}
+
+	// Typography for text and templated controls.
+	TextBlock.text-left {
+		TextAlignment: Left;
+	}
+
+	TextBlock.text-center {
+		TextAlignment: Center;
+	}
+
+	TextBlock.text-right {
+		TextAlignment: Right;
+	}
+
+	TextBlock.text-justify {
+		TextAlignment: Justify;
+	}
+
+	TextBlock.text-start {
+		TextAlignment: Start;
+	}
+
+	TextBlock.text-end {
+		TextAlignment: End;
+	}
+
+	TextBlock.text-xs {
+		FontSize: Amx.DynamicResource<double>("--text-xs");
+	}
+
+	TextBlock.text-sm {
+		FontSize: Amx.DynamicResource<double>("--text-sm");
+	}
+
+	TextBlock.text-base {
+		FontSize: Amx.DynamicResource<double>("--text-base");
+	}
+
+	TextBlock.text-lg {
+		FontSize: Amx.DynamicResource<double>("--text-lg");
+	}
+
+	TextBlock.text-xl {
+		FontSize: Amx.DynamicResource<double>("--text-xl");
+	}
+
+	TextBlock.text-2xl {
+		FontSize: Amx.DynamicResource<double>("--text-2xl");
+	}
+
+	TextBlock.text-3xl {
+		FontSize: Amx.DynamicResource<double>("--text-3xl");
+	}
+
+	TextBlock.text-4xl {
+		FontSize: Amx.DynamicResource<double>("--text-4xl");
+	}
+
+	TextBlock.text-5xl {
+		FontSize: Amx.DynamicResource<double>("--text-5xl");
+	}
+
+	TextBlock.text-6xl {
+		FontSize: Amx.DynamicResource<double>("--text-6xl");
+	}
+
+	TextBlock.text-7xl {
+		FontSize: Amx.DynamicResource<double>("--text-7xl");
+	}
+
+	TextBlock.text-8xl {
+		FontSize: Amx.DynamicResource<double>("--text-8xl");
+	}
+
+	TextBlock.text-9xl {
+		FontSize: Amx.DynamicResource<double>("--text-9xl");
+	}
+
+	TextBlock.text-(string color) {
+		Foreground: Amx.DynamicResource<IBrush>("--color-" + color);
+	}
+
+	TextBlock.text-(string color)-(int shade) {
+		Foreground: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
+	}
+
+	TemplatedControl.text-xs {
+		FontSize: Amx.DynamicResource<double>("--text-xs");
+	}
+
+	TemplatedControl.text-sm {
+		FontSize: Amx.DynamicResource<double>("--text-sm");
+	}
+
+	TemplatedControl.text-base {
+		FontSize: Amx.DynamicResource<double>("--text-base");
+	}
+
+	TemplatedControl.text-lg {
+		FontSize: Amx.DynamicResource<double>("--text-lg");
+	}
+
+	TemplatedControl.text-xl {
+		FontSize: Amx.DynamicResource<double>("--text-xl");
+	}
+
+	TemplatedControl.text-2xl {
+		FontSize: Amx.DynamicResource<double>("--text-2xl");
+	}
+
+	TemplatedControl.text-3xl {
+		FontSize: Amx.DynamicResource<double>("--text-3xl");
+	}
+
+	TemplatedControl.text-4xl {
+		FontSize: Amx.DynamicResource<double>("--text-4xl");
+	}
+
+	TemplatedControl.text-5xl {
+		FontSize: Amx.DynamicResource<double>("--text-5xl");
+	}
+
+	TemplatedControl.text-6xl {
+		FontSize: Amx.DynamicResource<double>("--text-6xl");
+	}
+
+	TemplatedControl.text-7xl {
+		FontSize: Amx.DynamicResource<double>("--text-7xl");
+	}
+
+	TemplatedControl.text-8xl {
+		FontSize: Amx.DynamicResource<double>("--text-8xl");
+	}
+
+	TemplatedControl.text-9xl {
+		FontSize: Amx.DynamicResource<double>("--text-9xl");
+	}
+
+	TemplatedControl.text-(string color) {
+		Foreground: Amx.DynamicResource<IBrush>("--color-" + color);
+	}
+
+	TemplatedControl.text-(string color)-(int shade) {
+		Foreground: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
+	}
+
+	TextBlock.font-thin {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-thin");
+	}
+
+	TextBlock.font-extralight {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-extralight");
+	}
+
+	TextBlock.font-light {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-light");
+	}
+
+	TextBlock.font-normal {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-normal");
+	}
+
+	TextBlock.font-medium {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-medium");
+	}
+
+	TextBlock.font-semibold {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-semibold");
+	}
+
+	TextBlock.font-bold {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-bold");
+	}
+
+	TextBlock.font-extrabold {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-extrabold");
+	}
+
+	TextBlock.font-black {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-black");
+	}
+
+	TextBlock.font-(string family) {
+		FontFamily: Amx.DynamicResource<FontFamily>("--font-" + family);
+	}
+
+	TemplatedControl.font-thin {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-thin");
+	}
+
+	TemplatedControl.font-extralight {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-extralight");
+	}
+
+	TemplatedControl.font-light {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-light");
+	}
+
+	TemplatedControl.font-normal {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-normal");
+	}
+
+	TemplatedControl.font-medium {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-medium");
+	}
+
+	TemplatedControl.font-semibold {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-semibold");
+	}
+
+	TemplatedControl.font-bold {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-bold");
+	}
+
+	TemplatedControl.font-extrabold {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-extrabold");
+	}
+
+	TemplatedControl.font-black {
+		FontWeight: Amx.DynamicResource<FontWeight>("--font-weight-black");
+	}
+
+	TemplatedControl.font-(string family) {
+		FontFamily: Amx.DynamicResource<FontFamily>("--font-" + family);
+	}
+
+	TextBlock.whitespace-nowrap {
+		TextWrapping: NoWrap;
+	}
+
+	TextBlock.whitespace-normal {
+		TextWrapping: Wrap;
+	}
+
+	TextBlock.truncate {
+		TextWrapping: NoWrap;
+		TextTrimming: CharacterEllipsis;
+	}
+
+	// Borders, radii, and shadows.
+	Border.border-(double width) {
+		AkburaControl.ExplicitLeftBorderThickness: width;
+		AkburaControl.ExplicitTopBorderThickness: width;
+		AkburaControl.ExplicitRightBorderThickness: width;
+		AkburaControl.ExplicitBottomBorderThickness: width;
+	}
+
+	Border.border-(string color)-(int shade) {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
+	}
+
+	Border.rounded-none {
+		CornerRadius: new CornerRadius(0);
+	}
+
+	Border.rounded-xs {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-xs");
+	}
+
+	Border.rounded-sm {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-sm");
+	}
+
+	Border.rounded-md {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-md");
+	}
+
+	Border.rounded-lg {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-lg");
+	}
+
+	Border.rounded-xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-xl");
+	}
+
+	Border.rounded-2xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-2xl");
+	}
+
+	Border.rounded-3xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-3xl");
+	}
+
+	Border.rounded-4xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-4xl");
+	}
+
+	Border.rounded-full {
+		CornerRadius: new CornerRadius(9999);
+	}
+
+	Border.rounded-(string radius) {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-" + radius);
+	}
+
+	TemplatedControl.border-(double width) {
+		AkburaControl.ExplicitLeftBorderThickness: width;
+		AkburaControl.ExplicitTopBorderThickness: width;
+		AkburaControl.ExplicitRightBorderThickness: width;
+		AkburaControl.ExplicitBottomBorderThickness: width;
+	}
+
+	TemplatedControl.border-(string color)-(int shade) {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
+	}
+
+	TemplatedControl.rounded-none {
+		CornerRadius: new CornerRadius(0);
+	}
+
+	TemplatedControl.rounded-xs {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-xs");
+	}
+
+	TemplatedControl.rounded-sm {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-sm");
+	}
+
+	TemplatedControl.rounded-md {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-md");
+	}
+
+	TemplatedControl.rounded-lg {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-lg");
+	}
+
+	TemplatedControl.rounded-xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-xl");
+	}
+
+	TemplatedControl.rounded-2xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-2xl");
+	}
+
+	TemplatedControl.rounded-3xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-3xl");
+	}
+
+	TemplatedControl.rounded-4xl {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-4xl");
+	}
+
+	TemplatedControl.rounded-full {
+		CornerRadius: new CornerRadius(9999);
+	}
+
+	TemplatedControl.rounded-(string radius) {
+		CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-" + radius);
+	}
+
+	Border.shadow {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-sm");
+	}
+
+	Border.shadow-2xs {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-2xs");
+	}
+
+	Border.shadow-xs {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-xs");
+	}
+
+	Border.shadow-sm {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-sm");
+	}
+
+	Border.shadow-md {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-md");
+	}
+
+	Border.shadow-lg {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-lg");
+	}
+
+	Border.shadow-xl {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-xl");
+	}
+
+	Border.shadow-2xl {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-2xl");
+	}
+
+	Border.shadow-(string size) {
+		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-" + size);
+	}
+}

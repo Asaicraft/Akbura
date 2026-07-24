@@ -1,8 +1,9 @@
+using Akbura.FeatureGallery.Styles.akcss;
 using Avalonia.Controls;
 
 state int count = 0;
 
-<StackPanel Spacing="12">
+<StackPanel Spacing="12" bg-blue-100>
     <TextBlock Text={$"Count: {count}"}/>
     <Button Click={count++}>
         Increment to {count+1}

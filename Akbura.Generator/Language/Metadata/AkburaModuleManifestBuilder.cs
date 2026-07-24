@@ -54,7 +54,10 @@ internal static class AkburaModuleManifestBuilder
             }
             else if (extension.Equals(".akcss", StringComparison.OrdinalIgnoreCase))
             {
-                var logicalName = GetAkcssMetadataName(rootNamespace, sourceCodePath);
+                var logicalName =
+                    AkcssGeneratedModuleNames.GetMetadataName(
+                        rootNamespace,
+                        sourceCodePath);
                 akcssTrees.Add(
                     sourceCodePath,
                     AkcssSyntaxTree.ParseText(source.Text, sourceCodePath, logicalName));
@@ -230,25 +233,6 @@ internal static class AkburaModuleManifestBuilder
         return new AkburaModuleAkcssUtility(
             selector.TargetType?.ToCSharp().ToString(),
             parameters.ToImmutable());
-    }
-
-    private static string GetAkcssMetadataName(
-        string rootNamespace,
-        string sourceCodePath)
-    {
-        var pathWithoutExtension = sourceCodePath.EndsWith(
-            ".akcss",
-            StringComparison.OrdinalIgnoreCase)
-            ? sourceCodePath[..^".akcss".Length]
-            : sourceCodePath;
-        var name = pathWithoutExtension
-            .Replace('/', '.')
-            .Replace('\\', '.')
-            .Trim('.');
-
-        return string.IsNullOrWhiteSpace(rootNamespace)
-            ? name + ".akcss"
-            : rootNamespace.Trim('.') + "." + name + ".akcss";
     }
 
     private static string NormalizeSourceCodePath(string path)

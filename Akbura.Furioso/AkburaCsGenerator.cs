@@ -210,7 +210,9 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                 var module = symbol.AkcssModules[moduleIndex];
                 var moduleIdentity = GetInlineAkcssModuleIdentity(sourcePath, moduleIndex);
                 akcssModuleTypeNames[module.DeclaringSyntax] =
-                    AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(moduleIdentity);
+                    AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                        projectOptions.RootNamespace,
+                        moduleIdentity);
                 inlineAkcssInputs.Add(new AkcssGenerationInput(
                     module,
                     sourcePath,
@@ -232,8 +234,11 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                 symbol,
                 sourcePath,
                 sourcePath);
+
             akcssModuleTypeNames[symbol.DeclaringSyntax] =
-                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(sourcePath);
+                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                    projectOptions.RootNamespace,
+                    sourcePath);
         }
 
         var componentResults = new GeneratedSource?[sourceComponents.Length];
@@ -284,7 +289,9 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     input.Symbol,
                     sourceMap,
                     input.SourcePath,
+                    projectOptions.RootNamespace,
                     input.ModuleIdentity);
+
                 akcssResults[index] = new GeneratedSource(
                     AkcssGenerator.GetHintName(
                         input.Symbol,
@@ -308,6 +315,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     input.Symbol,
                     sourceMap,
                     input.SourcePath,
+                    projectOptions.RootNamespace,
                     input.ModuleIdentity);
                 inlineAkcssResults[index] = new GeneratedSource(
                     AkcssGenerator.GetHintName(

@@ -300,7 +300,7 @@ public sealed class AkburaBuildTargetsTests
             var akcssModule = Assert.Single(akcssSource.Declarations);
             Assert.NotNull(akcssModule.AkcssModule);
             Assert.Equal(
-                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName("Styles/Theme.akcss"),
+                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName("AkburaTargetConsumer", "Styles/Theme.akcss"),
                 akcssModule.AkcssModule!.TypeName);
             Assert.Contains(
                 akcssModule.Children,

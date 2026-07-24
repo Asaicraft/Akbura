@@ -80,9 +80,18 @@ internal static class AkburaModuleManifestBuilder
         foreach (var source in orderedSources)
         {
             var sourceCodePath = NormalizeSourceCodePath(source.SourceCodePath);
-            builder.Add(componentTrees.TryGetValue(sourceCodePath, out var componentTree)
-                ? BuildComponentSource(sourceCodePath, componentTree, compilation)
-                : BuildAkcssSource(sourceCodePath, akcssTrees[sourceCodePath]));
+
+            builder.Add(componentTrees.TryGetValue(
+                sourceCodePath,
+                out var componentTree)
+            ? BuildComponentSource(
+                sourceCodePath,
+                componentTree,
+                compilation)
+            : BuildAkcssSource(
+                sourceCodePath,
+                akcssTrees[sourceCodePath],
+                rootNamespace));
         }
 
         return new AkburaModuleManifest(
@@ -175,15 +184,26 @@ internal static class AkburaModuleManifestBuilder
 
     private static AkburaModuleSource BuildAkcssSource(
         string sourceCodePath,
-        AkcssSyntaxTree syntaxTree)
+        AkcssSyntaxTree syntaxTree,
+        string rootNamespace)
     {
-        var declaration = DeclarationTreeBuilder.ForSyntaxDeclaration(syntaxTree);
+        var declaration =
+            DeclarationTreeBuilder.ForSyntaxDeclaration(syntaxTree);
+
         var generatedModule = new AkburaModuleAkcssModule(
-            AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(sourceCodePath));
+            AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                rootNamespace,
+                sourceCodePath));
+
         return new AkburaModuleSource(
             sourceCodePath,
             AkburaModuleSourceKind.Akcss,
-            [CreateAkcssDeclaration(declaration, syntaxTree.LogicalName, generatedModule)]);
+            [
+                CreateAkcssDeclaration(
+                declaration,
+                syntaxTree.LogicalName,
+                generatedModule),
+            ]);
     }
 
     private static AkburaModuleDeclaration CreateAkcssDeclaration(

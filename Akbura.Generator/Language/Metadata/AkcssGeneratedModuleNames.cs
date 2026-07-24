@@ -4,9 +4,18 @@ namespace Akbura.Language;
 
 internal static class AkcssGeneratedModuleNames
 {
-    public const string NamespaceName = "Akbura.Generated";
-
+    private const string DefaultNamespaceName = "Akbura.Generated";
     private const string TypeNamePrefix = "__AkburaAkcssModule_";
+
+    public static string GetNamespaceName(string rootNamespace)
+    {
+        if (string.IsNullOrWhiteSpace(rootNamespace))
+        {
+            return DefaultNamespaceName;
+        }
+
+        return rootNamespace.Trim().Trim('.') + ".Generated";
+    }
 
     public static string GetMetadataName(
         string rootNamespace,
@@ -33,12 +42,23 @@ internal static class AkcssGeneratedModuleNames
 
     public static string GetTypeName(string sourcePath)
     {
-        return TypeNamePrefix + GetStableHash(NormalizeSourcePath(sourcePath)).ToString("x8");
+        return TypeNamePrefix +
+               GetStableHash(NormalizeSourcePath(sourcePath)).ToString("x8");
+    }
+
+    public static string GetFullyQualifiedTypeName(
+        string rootNamespace,
+        string sourcePath)
+    {
+        return "global::" +
+               GetNamespaceName(rootNamespace) +
+               "." +
+               GetTypeName(sourcePath);
     }
 
     public static string GetFullyQualifiedTypeName(string sourcePath)
     {
-        return "global::" + NamespaceName + "." + GetTypeName(sourcePath);
+        return GetFullyQualifiedTypeName(string.Empty, sourcePath);
     }
 
     public static uint GetStableHash(string value)
@@ -46,6 +66,7 @@ internal static class AkcssGeneratedModuleNames
         unchecked
         {
             var hash = 2166136261u;
+
             foreach (var character in value)
             {
                 hash ^= character;
@@ -60,10 +81,13 @@ internal static class AkcssGeneratedModuleNames
     {
         if (string.IsNullOrWhiteSpace(sourcePath))
         {
-            throw new ArgumentException("AKCSS source path cannot be empty.", nameof(sourcePath));
+            throw new ArgumentException(
+                "AKCSS source path cannot be empty.",
+                nameof(sourcePath));
         }
 
         var normalized = sourcePath.Replace('\\', '/').Trim();
+
         while (normalized.StartsWith("./", StringComparison.Ordinal))
         {
             normalized = normalized[2..];

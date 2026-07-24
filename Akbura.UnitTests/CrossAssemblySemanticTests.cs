@@ -169,7 +169,9 @@ public sealed class CrossAssemblySemanticTests
                 "Library.Styles.Theme.akcss",
                 referencedAkcssDeclaration.MetadataName);
             Assert.Equal(
-                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName("Styles/Theme.akcss"),
+                AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                    "Library",
+                    "Styles/Theme.akcss"),
                 Assert.IsType<AkburaModuleAkcssModule>(
                     referencedAkcssDeclaration.AkcssModule).TypeName);
 

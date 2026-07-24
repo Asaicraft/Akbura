@@ -151,6 +151,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             valueType,
             valueOperation,
             valueConversion,
+            node.WhitespaceMode,
             node.LiteralValue,
             node.IsSynthesizedString);
     }
@@ -285,6 +286,19 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             node.IsAsync,
             node.ContainsAwait,
             handlerOperation);
+    }
+
+    public override BoundNode? VisitMarkupWhitespaceDirective(BoundMarkupWhitespaceDirective node)
+    {
+        var symbolInfo = VisitSymbolInfo(node.SymbolInfo);
+        var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+
+        return node.Update(
+            symbolInfo,
+            containingComponent,
+            node.RawValue,
+            node.DeclaredMode,
+            node.EffectiveMode);
     }
 
     public override BoundNode? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node)
@@ -455,43 +469,26 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             return null;
         }
 
-        switch (symbol.Kind)
+        return symbol.Kind switch
         {
-            case AkburaSymbolKind.AkburaComponent:
-                return VisitAkburaComponentSymbol((IAkburaComponentSymbol)symbol);
-            case AkburaSymbolKind.MarkupComponent:
-                return VisitMarkupComponentSymbol((IMarkupComponentSymbol)symbol);
-            case AkburaSymbolKind.State:
-                return VisitStateSymbol((IStateSymbol)symbol);
-            case AkburaSymbolKind.Parameter:
-                return VisitParameterSymbol((IParamSymbol)symbol);
-            case AkburaSymbolKind.CommandParameter:
-                return VisitCommandParameterSymbol((ICommandParameterSymbol)symbol);
-            case AkburaSymbolKind.TailwindUtilityParameter:
-                return VisitTailwindUtilityParameterSymbol((ITailwindUtilityParameterSymbol)symbol);
-            case AkburaSymbolKind.MarkupItem:
-                return VisitMarkupItemSymbol((IMarkupItemSymbol)symbol);
-            case AkburaSymbolKind.MarkupName:
-                return VisitMarkupNameSymbol((IMarkupNameSymbol)symbol);
-            case AkburaSymbolKind.InjectedService:
-                return VisitInjectSymbol((IInjectSymbol)symbol);
-            case AkburaSymbolKind.Command:
-                return VisitCommandSymbol((ICommandSymbol)symbol);
-            case AkburaSymbolKind.UseHook:
-                return VisitUseHookSymbol((IUseHookSymbol)symbol);
-            case AkburaSymbolKind.Property:
-                return VisitPropertySymbol((Akbura.Language.Symbols.IPropertySymbol)symbol);
-            case AkburaSymbolKind.Event:
-                return VisitRoutedEventSymbol((IRoutedEventSymbol)symbol);
-            case AkburaSymbolKind.AkcssModule:
-                return VisitAkcssModuleSymbol((IAkcssModuleSymbol)symbol);
-            case AkburaSymbolKind.AkcssUtility:
-                return VisitTailwindUtilitySymbol((ITailwindUtilitySymbol)symbol);
-            case AkburaSymbolKind.AkcssClass:
-                return VisitAkcssSymbol((IAkcssSymbol)symbol);
-            default:
-                return DefaultVisitSymbol(symbol);
-        }
+            AkburaSymbolKind.AkburaComponent => VisitAkburaComponentSymbol((IAkburaComponentSymbol)symbol),
+            AkburaSymbolKind.MarkupComponent => VisitMarkupComponentSymbol((IMarkupComponentSymbol)symbol),
+            AkburaSymbolKind.State => VisitStateSymbol((IStateSymbol)symbol),
+            AkburaSymbolKind.Parameter => VisitParameterSymbol((IParamSymbol)symbol),
+            AkburaSymbolKind.CommandParameter => VisitCommandParameterSymbol((ICommandParameterSymbol)symbol),
+            AkburaSymbolKind.TailwindUtilityParameter => VisitTailwindUtilityParameterSymbol((ITailwindUtilityParameterSymbol)symbol),
+            AkburaSymbolKind.MarkupItem => VisitMarkupItemSymbol((IMarkupItemSymbol)symbol),
+            AkburaSymbolKind.MarkupName => VisitMarkupNameSymbol((IMarkupNameSymbol)symbol),
+            AkburaSymbolKind.InjectedService => VisitInjectSymbol((IInjectSymbol)symbol),
+            AkburaSymbolKind.Command => VisitCommandSymbol((ICommandSymbol)symbol),
+            AkburaSymbolKind.UseHook => VisitUseHookSymbol((IUseHookSymbol)symbol),
+            AkburaSymbolKind.Property => VisitPropertySymbol((Akbura.Language.Symbols.IPropertySymbol)symbol),
+            AkburaSymbolKind.Event => VisitRoutedEventSymbol((IRoutedEventSymbol)symbol),
+            AkburaSymbolKind.AkcssModule => VisitAkcssModuleSymbol((IAkcssModuleSymbol)symbol),
+            AkburaSymbolKind.AkcssUtility => VisitTailwindUtilitySymbol((ITailwindUtilitySymbol)symbol),
+            AkburaSymbolKind.AkcssClass => VisitAkcssSymbol((IAkcssSymbol)symbol),
+            _ => DefaultVisitSymbol(symbol),
+        };
     }
 
     [return: NotNullIfNotNull(nameof(symbol))]
@@ -692,13 +689,16 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             conversion.CSharpConversion);
     }
 
-    protected virtual MarkupChildContent VisitMarkupChildContent(MarkupChildContent content)
+    protected virtual MarkupChildContent VisitMarkupChildContent(
+        MarkupChildContent content)
     {
         var type = VisitCSharpSymbolDefinition(content.Type);
         var componentSymbol = (IMarkupComponentSymbol?)VisitSymbol(content.ComponentSymbol);
 
         if (type.Equals(content.Type) &&
-            ReferenceEquals(componentSymbol, content.ComponentSymbol))
+            ReferenceEquals(
+                componentSymbol,
+                content.ComponentSymbol))
         {
             return content;
         }
@@ -708,7 +708,9 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             content.Kind,
             type,
             componentSymbol,
-            content.Text);
+            text: content.Text,
+            rawText: content.RawText,
+            whitespaceMode: content.WhitespaceMode);
     }
 
     protected virtual BoundTailwindUtilityArgument VisitTailwindUtilityArgument(

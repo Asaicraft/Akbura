@@ -3149,6 +3149,192 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MarkupContent_DefaultWhitespace_NormalizesIndentedText()
+    {
+        const string code =
+            """
+        using Avalonia.Controls;
+
+        state int count = 0;
+
+        <Button>
+            Increment to {count+1}
+        </Button>
+        """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var button = GetOnlyMarkupElement(syntaxTree);
+
+        var operation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(button));
+
+        Assert.True(operation.IsSynthesizedString);
+        Assert.False(operation.HasErrors);
+        Assert.Equal(2, operation.Content.Length);
+
+        var text = Assert.Single(
+            operation.Content,
+            static content => content.Kind == MarkupChildKind.Text);
+
+        var expression = Assert.Single(
+            operation.Content,
+            static content => content.Kind == MarkupChildKind.Expression);
+
+        Assert.Equal("Increment to ", text.Text);
+        Assert.NotEqual(text.RawText, text.Text);
+        Assert.Equal(
+            MarkupWhitespaceMode.Default,
+            text.WhitespaceMode);
+
+        Assert.IsType<MarkupInlineExpressionSyntax>(
+            expression.Syntax);
+
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(button).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupContent_PreserveWhitespace_KeepsIndentedText()
+    {
+        const string code =
+            """
+        using Avalonia.Controls;
+
+        state int count = 0;
+
+        <Button xml.space="preserve">
+            Increment to {count+1}
+        </Button>
+        """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var button = GetOnlyMarkupElement(syntaxTree);
+
+        var attribute =
+            Assert.IsType<MarkupAttachedPropertyAttributeSyntax>(
+                Assert.Single(button.StartTag!.Attributes));
+
+        var directiveOperation =
+            Assert.IsAssignableFrom<IMarkupWhitespaceDirectiveOperation>(
+                semanticModel.GetOperation(attribute));
+
+        var contentOperation =
+            Assert.IsAssignableFrom<IMarkupContentOperation>(
+                semanticModel.GetOperation(button));
+
+        var text = Assert.Single(
+            contentOperation.Content,
+            static content => content.Kind == MarkupChildKind.Text);
+
+        Assert.False(directiveOperation.HasErrors);
+        Assert.False(contentOperation.HasErrors);
+
+        Assert.Equal(text.RawText, text.Text);
+        Assert.StartsWith(
+            "    Increment to ",
+            text.Text,
+            StringComparison.Ordinal);
+
+        Assert.Equal(
+            MarkupWhitespaceMode.Preserve,
+            text.WhitespaceMode);
+
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupWhitespaceDirective_InheritsAndAllowsOverride()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <StackPanel xml.space="preserve">
+                <Button>Inherited</Button>
+                <Button xml.space="default">Overridden</Button>
+            </StackPanel>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var stackPanel = GetOnlyMarkupElement(syntaxTree);
+
+        var buttons = stackPanel.Body
+            .OfType<MarkupElementContentSyntax>()
+            .Select(static content => content.Element)
+            .ToArray();
+
+        Assert.Collection(
+            buttons,
+            button => Assert.Equal(
+                "Button",
+                button.StartTag!.Name.ToFullString().Trim()),
+            button => Assert.Equal(
+                "Button",
+                button.StartTag!.Name.ToFullString().Trim()));
+
+        var resolver = semanticModel.BindingSession.MarkupWhitespace;
+
+        Assert.Equal(
+            MarkupWhitespaceMode.Preserve,
+            resolver.GetEffectiveMode(buttons[0]));
+
+        Assert.Equal(
+            MarkupWhitespaceMode.Default,
+            resolver.GetEffectiveMode(buttons[1]));
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupWhitespaceDirective_InvalidValueProducesDiagnostic()
+    {
+        const string code =
+            """
+        using Avalonia.Controls;
+
+        <Button xml.space="invalid">
+            Hello
+        </Button>
+        """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var button = GetOnlyMarkupElement(syntaxTree);
+
+        var attribute =
+            Assert.IsType<MarkupAttachedPropertyAttributeSyntax>(
+                Assert.Single(button.StartTag!.Attributes));
+
+        var operation =
+            Assert.IsAssignableFrom<IMarkupWhitespaceDirectiveOperation>(
+                semanticModel.GetOperation(attribute));
+
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(attribute),
+            static diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes
+                    .AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid);
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(
+            Language.Operations.OperationKind.MarkupWhitespaceDirective,
+            operation.Kind);
+
+        Assert.Contains(
+            "default",
+            diagnostic.Message,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "preserve",
+            diagnostic.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SemanticModel_ResolvesAvaloniaAttachedPropertySymbol()
     {
         const string code =

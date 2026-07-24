@@ -61,6 +61,8 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node) => DefaultVisit(node);
 
+    public virtual void VisitMarkupWhitespaceDirective(BoundMarkupWhitespaceDirective node) => DefaultVisit(node);
+
     public virtual void VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node) => DefaultVisit(node);
 
     public virtual void VisitAkcssPropertySetter(BoundAkcssPropertySetter node) => DefaultVisit(node);
@@ -154,6 +156,8 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitMarkupCommandBinding(BoundMarkupCommandBinding node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupWhitespaceDirective(BoundMarkupWhitespaceDirective node) => DefaultVisit(node);
 
     public virtual TResult? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node) => DefaultVisit(node);
 
@@ -273,6 +277,9 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupWhitespaceDirective(BoundMarkupWhitespaceDirective node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitTailwindUtilityAttribute(BoundTailwindUtilityAttribute node, TParameter parameter) =>

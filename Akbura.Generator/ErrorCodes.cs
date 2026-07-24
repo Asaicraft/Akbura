@@ -62,5 +62,7 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_UseHookMustBeTopLevel = nameof(AKBURA_SEMANTIC_UseHookMustBeTopLevel);
     public const string AKBURA_SEMANTIC_UseHookInvalidDeclaration = nameof(AKBURA_SEMANTIC_UseHookInvalidDeclaration);
     public const string AKBURA_SEMANTIC_UseHookInvalidContext = nameof(AKBURA_SEMANTIC_UseHookInvalidContext);
+    public const string AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid = nameof(AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid);
+    public const string AKBURA_SEMANTIC_MarkupWhitespaceDuplicate = nameof(AKBURA_SEMANTIC_MarkupWhitespaceDuplicate);
     public const string WRN_ErrorOverride = nameof(WRN_ErrorOverride);
 }

@@ -21,6 +21,7 @@ internal enum BoundKind : byte
     MarkupPropertySetter,
     MarkupCommandBinding,
     MarkupRoutedEventBinding,
+    MarkupWhitespaceDirective,
     TailwindUtilityAttribute,
     AkcssModule,
     AkcssStyle,

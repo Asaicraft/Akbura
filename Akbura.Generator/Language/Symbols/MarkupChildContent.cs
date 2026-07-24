@@ -10,13 +10,21 @@ internal readonly struct MarkupChildContent
         MarkupChildKind kind,
         CSharpSymbolDefinition type,
         IMarkupComponentSymbol? componentSymbol = null,
-        string text = "")
+        string text = "",
+        string? rawText = null,
+        MarkupWhitespaceMode whitespaceMode =
+            MarkupWhitespaceMode.Default)
     {
-        Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
+        Syntax = syntax ??
+            throw new ArgumentNullException(nameof(syntax));
+
         Kind = kind;
         Type = type;
         ComponentSymbol = componentSymbol;
+
         Text = text ?? string.Empty;
+        RawText = rawText ?? Text;
+        WhitespaceMode = whitespaceMode;
     }
 
     public MarkupContentSyntax Syntax { get; }
@@ -28,4 +36,8 @@ internal readonly struct MarkupChildContent
     public IMarkupComponentSymbol? ComponentSymbol { get; }
 
     public string Text { get; }
+
+    public string RawText { get; }
+
+    public MarkupWhitespaceMode WhitespaceMode { get; }
 }

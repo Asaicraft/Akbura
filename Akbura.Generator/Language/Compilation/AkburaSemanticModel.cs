@@ -662,39 +662,39 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         switch (syntax.Kind)
         {
             case AkburaSyntaxKind.AkcssStyleRuleSyntax:
-            {
-                var selector = Unsafe.As<AkcssStyleRuleSyntax>(syntax).Selector.ToFullString().Trim();
-                if (selector.Length == 0)
                 {
-                    key = string.Empty;
-                    displayName = string.Empty;
-                    return false;
-                }
+                    var selector = Unsafe.As<AkcssStyleRuleSyntax>(syntax).Selector.ToFullString().Trim();
+                    if (selector.Length == 0)
+                    {
+                        key = string.Empty;
+                        displayName = string.Empty;
+                        return false;
+                    }
 
-                key = "style:" + selector;
-                displayName = selector;
-                return true;
-            }
+                    key = "style:" + selector;
+                    displayName = selector;
+                    return true;
+                }
 
             case AkburaSyntaxKind.AkcssUtilityDeclarationSyntax:
-            {
-                var utility = Unsafe.As<AkcssUtilityDeclarationSyntax>(syntax);
-                var name = utility.Selector.Name.Identifier.ValueText;
-                if (string.IsNullOrWhiteSpace(name))
                 {
-                    key = string.Empty;
-                    displayName = string.Empty;
-                    return false;
-                }
+                    var utility = Unsafe.As<AkcssUtilityDeclarationSyntax>(syntax);
+                    var name = utility.Selector.Name.Identifier.ValueText;
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        key = string.Empty;
+                        displayName = string.Empty;
+                        return false;
+                    }
 
-                var targetType = utility.Selector.TargetType?.ToFullString().Trim() ?? string.Empty;
-                var arity = utility.Selector.Parameters.Count;
-                key = "utility:" + targetType + ":" + name + "/" + arity;
-                displayName = targetType.Length == 0
-                    ? name + "/" + arity
-                    : targetType + "." + name + "/" + arity;
-                return true;
-            }
+                    var targetType = utility.Selector.TargetType?.ToFullString().Trim() ?? string.Empty;
+                    var arity = utility.Selector.Parameters.Count;
+                    key = "utility:" + targetType + ":" + name + "/" + arity;
+                    displayName = targetType.Length == 0
+                        ? name + "/" + arity
+                        : targetType + "." + name + "/" + arity;
+                    return true;
+                }
 
             default:
                 key = string.Empty;
@@ -2358,6 +2358,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     internal static bool TryCreateMarkupContentValueExpression(
         MarkupElementSyntax markupElement,
+        MarkupWhitespaceMode whitespaceMode,
         out CSharp.ExpressionSyntax expression,
         out string? literalValue,
         out bool isSynthesizedString,
@@ -2370,40 +2371,58 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         hasText = false;
         diagnosticSyntax = null!;
 
+        var normalizer = new MarkupWhitespaceNormalizer(whitespaceMode);
+
         CSharp.ExpressionSyntax? singleExpression = null;
         var expressionCount = 0;
-        var literalBuilder = new System.Text.StringBuilder();
-        var interpolatedBuilder = new System.Text.StringBuilder();
 
         foreach (var content in markupElement.Body)
         {
-            if (content.Kind == AkburaSyntaxKind.MarkupTextLiteralSyntax)
+            switch (content.Kind)
             {
-                var textLiteral = Unsafe.As<MarkupTextLiteralSyntax>(content);
-                var text = textLiteral.ToFullString();
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    continue;
-                }
+                case AkburaSyntaxKind.MarkupTextLiteralSyntax:
+                    {
+                        var textLiteral =
+                            Unsafe.As<MarkupTextLiteralSyntax>(content);
 
-                diagnosticSyntax ??= textLiteral;
-                hasText = true;
-                literalBuilder.Append(text);
-                interpolatedBuilder.Append(EscapeInterpolatedStringText(text));
-            }
-            else if (content.Kind == AkburaSyntaxKind.MarkupInlineExpressionSyntax)
-            {
-                var inlineExpression = Unsafe.As<MarkupInlineExpressionSyntax>(content);
-                var parsedExpression = ParseInlineExpression(inlineExpression.Expression);
-                var expressionText = parsedExpression?.ToFullString() ??
-                    inlineExpression.Expression.Expression.ToFullString();
+                        normalizer.AppendText(
+                            textLiteral.ToFullString());
 
-                diagnosticSyntax ??= inlineExpression;
-                expressionCount++;
-                singleExpression ??= parsedExpression ?? CSharpSyntaxFactory.ParseExpression(expressionText);
-                interpolatedBuilder.Append('{').Append(expressionText).Append('}');
+                        if (normalizer.HasText)
+                        {
+                            diagnosticSyntax ??= textLiteral;
+                        }
+
+                        break;
+                    }
+
+                case AkburaSyntaxKind.MarkupInlineExpressionSyntax:
+                    {
+                        var inlineExpression =
+                            Unsafe.As<MarkupInlineExpressionSyntax>(content);
+
+                        var parsedExpression =
+                            ParseInlineExpression(inlineExpression.Expression);
+
+                        var expressionText =
+                            parsedExpression?.ToFullString() ??
+                            inlineExpression.Expression.Expression
+                                .ToFullString();
+
+                        diagnosticSyntax ??= inlineExpression;
+                        expressionCount++;
+                        singleExpression ??=
+                            parsedExpression ??
+                            CSharpSyntaxFactory.ParseExpression(
+                                expressionText);
+
+                        normalizer.AppendExpression(expressionText);
+                        break;
+                    }
             }
         }
+
+        hasText = normalizer.HasText;
 
         if (diagnosticSyntax == null)
         {
@@ -2418,15 +2437,28 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         if (expressionCount == 0)
         {
-            literalValue = literalBuilder.ToString();
+            literalValue = normalizer.LiteralText;
+
+            if (literalValue.Length == 0)
+            {
+                return false;
+            }
+
             expression = CSharpSyntaxFactory.LiteralExpression(
-                Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralExpression,
+                Microsoft.CodeAnalysis.CSharp.SyntaxKind
+                    .StringLiteralExpression,
                 CSharpSyntaxFactory.Literal(literalValue));
+
             return true;
         }
 
         isSynthesizedString = true;
-        expression = CSharpSyntaxFactory.ParseExpression("$@\"" + interpolatedBuilder + "\"");
+
+        expression = CSharpSyntaxFactory.ParseExpression(
+            "$@\"" +
+            normalizer.InterpolatedText +
+            "\"");
+
         return true;
     }
 
@@ -3171,6 +3203,22 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                     Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_String))));
         }
 
+        if (IsMarkupWhitespaceDirective(markupAttribute))
+        {
+            var stringType = Compilation.CSharpCompilation.GetSpecialType(
+                SpecialType.System_String);
+
+            SetSemanticDiagnosticsIfAbsent(
+                markupAttribute,
+                []);
+
+            return AkburaSymbolInfo.Success(
+                new PropertySymbol(
+                    "space",
+                    new CSharpSymbolDefinition(stringType),
+                    isImplicitlyDeclared: true));
+        }
+
         var markupElement = GetContainingMarkupElement(markupAttribute);
         if (markupElement == null)
         {
@@ -3546,7 +3594,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         };
     }
 
-    private static MarkupElementSyntax? GetContainingMarkupElement(MarkupAttributeSyntax markupAttribute)
+    internal static MarkupElementSyntax? GetContainingMarkupElement(MarkupAttributeSyntax markupAttribute)
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
         {
@@ -4386,76 +4434,257 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return false;
     }
 
+    private static string NormalizeTextFragment(
+        string text,
+        MarkupWhitespaceMode mode,
+        bool trimStart,
+        bool trimEnd)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        if (mode == MarkupWhitespaceMode.Preserve)
+        {
+            return text;
+        }
+
+        var builder = new System.Text.StringBuilder(text.Length);
+        var hasPendingWhitespace = false;
+
+        foreach (var character in text)
+        {
+            if (IsMarkupWhitespace(character))
+            {
+                hasPendingWhitespace = true;
+                continue;
+            }
+
+            if (hasPendingWhitespace)
+            {
+                if (builder.Length > 0 || !trimStart)
+                {
+                    builder.Append(' ');
+                }
+
+                hasPendingWhitespace = false;
+            }
+
+            builder.Append(character);
+        }
+
+        if (hasPendingWhitespace &&
+            !trimEnd &&
+            (builder.Length > 0 || !trimStart))
+        {
+            builder.Append(' ');
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool IsMarkupWhitespace(char character)
+    {
+        return character is ' ' or '\t' or '\r' or '\n';
+    }
+
+    private static bool IsMarkupValueContent(
+        MarkupContentSyntax content)
+    {
+        return content.Kind is
+            AkburaSyntaxKind.MarkupElementContentSyntax or
+            AkburaSyntaxKind.MarkupTextLiteralSyntax or
+            AkburaSyntaxKind.MarkupInlineExpressionSyntax;
+    }
+
+    private static bool ContainsOnlyMarkupWhitespace(string text)
+    {
+        foreach (var character in text)
+        {
+            if (!IsMarkupWhitespace(character))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string GetEffectiveTextFragment(
+        MarkupTextLiteralSyntax textLiteral,
+        MarkupContentModel contentModel,
+        MarkupWhitespaceMode mode,
+        bool trimStart,
+        bool trimEnd)
+    {
+        var rawText = textLiteral.ToFullString();
+
+        if (mode == MarkupWhitespaceMode.Default &&
+            !contentModel.AllowsText &&
+            ContainsOnlyMarkupWhitespace(rawText))
+        {
+            return string.Empty;
+        }
+
+        return NormalizeTextFragment(
+            rawText,
+            mode,
+            trimStart,
+            trimEnd);
+    }
+
     internal ImmutableArray<MarkupChildContent> CreateMarkupChildren(
         MarkupElementSyntax markupElement,
         MarkupContentModel contentModel,
         out ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         INamedTypeSymbol? containingType = null)
     {
-        using var childrenBuilder = ImmutableArrayBuilder<MarkupChildContent>.Rent();
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-        var hasValueText = false;
-        var hasValueElement = false;
-        var inlineExpressionCount = 0;
+        using var childrenBuilder =
+            ImmutableArrayBuilder<MarkupChildContent>.Rent();
+
+        using var diagnosticsBuilder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
+        var whitespaceMode = BindingSession.MarkupWhitespace
+            .GetEffectiveMode(markupElement);
+
+        var valueContentCount = 0;
 
         foreach (var childSyntax in markupElement.Body)
         {
-            if (IsMarkupPropertyElementContent(childSyntax, containingType))
+            if (IsMarkupPropertyElementContent(
+                    childSyntax,
+                    containingType))
             {
                 continue;
             }
 
-            if (childSyntax.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)
+            if (IsMarkupValueContent(childSyntax))
             {
-                hasValueElement = true;
-            }
-            else if (childSyntax.Kind == AkburaSyntaxKind.MarkupTextLiteralSyntax &&
-                !string.IsNullOrWhiteSpace(childSyntax.ToFullString()))
-            {
-                hasValueText = true;
-            }
-            else if (childSyntax.Kind == AkburaSyntaxKind.MarkupInlineExpressionSyntax)
-            {
-                inlineExpressionCount++;
+                valueContentCount++;
             }
         }
 
-        var validateInlineExpressionContent = !hasValueText && inlineExpressionCount == 1;
+        var hasValueText = false;
+        var hasValueElement = false;
+        var inlineExpressionCount = 0;
+        var valueContentIndex = 0;
 
         foreach (var childSyntax in markupElement.Body)
         {
-            if (IsMarkupPropertyElementContent(childSyntax, containingType))
+            if (IsMarkupPropertyElementContent(
+                    childSyntax,
+                    containingType))
             {
                 continue;
             }
+
+            if (!IsMarkupValueContent(childSyntax))
+            {
+                continue;
+            }
+
+            var trimStart = valueContentIndex == 0;
+            var trimEnd =
+                valueContentIndex == valueContentCount - 1;
+
+            switch (childSyntax.Kind)
+            {
+                case AkburaSyntaxKind.MarkupElementContentSyntax:
+                    hasValueElement = true;
+                    break;
+
+                case AkburaSyntaxKind.MarkupTextLiteralSyntax:
+                    {
+                        var textLiteral =
+                            Unsafe.As<MarkupTextLiteralSyntax>(
+                                childSyntax);
+
+                        var effectiveText = GetEffectiveTextFragment(
+                            textLiteral,
+                            contentModel,
+                            whitespaceMode,
+                            trimStart,
+                            trimEnd);
+
+                        if (effectiveText.Length > 0)
+                        {
+                            hasValueText = true;
+                        }
+
+                        break;
+                    }
+
+                case AkburaSyntaxKind.MarkupInlineExpressionSyntax:
+                    inlineExpressionCount++;
+                    break;
+            }
+
+            valueContentIndex++;
+        }
+
+        var validateInlineExpressionContent =
+            !hasValueText &&
+            inlineExpressionCount == 1;
+
+        valueContentIndex = 0;
+
+        foreach (var childSyntax in markupElement.Body)
+        {
+            if (IsMarkupPropertyElementContent(
+                    childSyntax,
+                    containingType))
+            {
+                continue;
+            }
+
+            if (!IsMarkupValueContent(childSyntax))
+            {
+                continue;
+            }
+
+            var trimStart = valueContentIndex == 0;
+            var trimEnd =
+                valueContentIndex == valueContentCount - 1;
 
             switch (childSyntax.Kind)
             {
                 case AkburaSyntaxKind.MarkupElementContentSyntax:
                     AddElementChild(
-                        Unsafe.As<MarkupElementContentSyntax>(childSyntax),
+                        Unsafe.As<MarkupElementContentSyntax>(
+                            childSyntax),
                         contentModel,
+                        whitespaceMode,
                         childrenBuilder,
                         diagnosticsBuilder);
                     break;
 
                 case AkburaSyntaxKind.MarkupTextLiteralSyntax:
                     AddTextChild(
-                        Unsafe.As<MarkupTextLiteralSyntax>(childSyntax),
+                        Unsafe.As<MarkupTextLiteralSyntax>(
+                            childSyntax),
                         contentModel,
+                        whitespaceMode,
+                        trimStart,
+                        trimEnd,
                         childrenBuilder,
                         diagnosticsBuilder);
                     break;
 
                 case AkburaSyntaxKind.MarkupInlineExpressionSyntax:
                     AddExpressionChild(
-                        Unsafe.As<MarkupInlineExpressionSyntax>(childSyntax),
+                        Unsafe.As<MarkupInlineExpressionSyntax>(
+                            childSyntax),
                         contentModel,
+                        whitespaceMode,
                         validateInlineExpressionContent,
                         childrenBuilder,
                         diagnosticsBuilder);
                     break;
             }
+
+            valueContentIndex++;
         }
 
         if (!hasValueText &&
@@ -4463,6 +4692,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             !hasValueElement &&
             TryCreateMarkupContentValueExpression(
                 markupElement,
+                whitespaceMode,
                 out var expression,
                 out _,
                 out _,
@@ -4473,6 +4703,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 diagnosticSyntax,
                 expression,
                 GetMarkupContentTargetType(contentModel));
+
             AddMarkupContentValueDiagnostics(
                 diagnosticSyntax,
                 contentModel,
@@ -4522,8 +4753,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private void AddElementChild(
         MarkupElementContentSyntax elementContent,
         MarkupContentModel contentModel,
+        MarkupWhitespaceMode whitespaceMode,
         ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
+        diagnosticsBuilder)
     {
         var symbolInfo = GetSyntaxTreeSymbolInfo(elementContent.Element);
         var componentSymbol = symbolInfo.Symbol as IMarkupComponentSymbol;
@@ -4533,7 +4766,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             elementContent,
             MarkupChildKind.Element,
             childType,
-            componentSymbol));
+            componentSymbol,
+            whitespaceMode: whitespaceMode));
 
         if (componentSymbol?.ComponentType == null)
         {
@@ -4552,38 +4786,60 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private void AddTextChild(
         MarkupTextLiteralSyntax textLiteral,
         MarkupContentModel contentModel,
+        MarkupWhitespaceMode whitespaceMode,
+        bool trimStart,
+        bool trimEnd,
         ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
+        diagnosticsBuilder)
     {
-        var text = textLiteral.ToFullString();
-        if (string.IsNullOrWhiteSpace(text))
+        var rawText = textLiteral.ToFullString();
+
+        var text = GetEffectiveTextFragment(
+            textLiteral,
+            contentModel,
+            whitespaceMode,
+            trimStart,
+            trimEnd);
+
+        if (text.Length == 0)
         {
             return;
         }
 
-        var stringType = Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_String);
-        var textType = new CSharpSymbolDefinition(stringType);
-        childrenBuilder.Add(new MarkupChildContent(
-            textLiteral,
-            MarkupChildKind.Text,
-            textType,
-            text: text));
+        var stringType = Compilation.CSharpCompilation
+            .GetSpecialType(SpecialType.System_String);
+
+        var textType =
+            new CSharpSymbolDefinition(stringType);
+
+        childrenBuilder.Add(
+            new MarkupChildContent(
+                textLiteral,
+                MarkupChildKind.Text,
+                textType,
+                text: text,
+                rawText: rawText,
+                whitespaceMode: whitespaceMode));
 
         if (!contentModel.AllowsText)
         {
-            diagnosticsBuilder.Add(CreateInvalidMarkupChildDiagnostic(
-                textLiteral,
-                textType,
-                contentModel));
+            diagnosticsBuilder.Add(
+                CreateInvalidMarkupChildDiagnostic(
+                    textLiteral,
+                    textType,
+                    contentModel));
         }
     }
 
     private void AddExpressionChild(
         MarkupInlineExpressionSyntax inlineExpression,
         MarkupContentModel contentModel,
+        MarkupWhitespaceMode whitespaceMode,
         bool validateContentType,
         ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
+        diagnosticsBuilder)
     {
         var expression = ParseInlineExpression(inlineExpression.Expression);
         var binding = CSharpBindingResult.Empty;
@@ -4606,7 +4862,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         childrenBuilder.Add(new MarkupChildContent(
             inlineExpression,
             MarkupChildKind.Expression,
-            expressionType));
+            expressionType,
+            whitespaceMode: whitespaceMode));
 
         if (expression != null)
         {

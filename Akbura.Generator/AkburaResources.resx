@@ -291,4 +291,10 @@
   <data name="WRN_ErrorOverride" xml:space="preserve">
     <value>Error '{0}' was reported as a warning.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid" xml:space="preserve">
+    <value>The xml.space directive must have the literal value 'default' or 'preserve'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupWhitespaceDuplicate" xml:space="preserve">
+    <value>The xml.space directive is specified more than once on this element.</value>
+  </data>
 </root>

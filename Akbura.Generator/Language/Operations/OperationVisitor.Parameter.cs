@@ -69,6 +69,11 @@ internal abstract class OperationVisitor<TParameter, TResult>
         TParameter parameter) =>
         DefaultVisit(operation, parameter);
 
+    public virtual TResult? VisitMarkupWhitespaceDirective(
+        IMarkupWhitespaceDirectiveOperation operation,
+        TParameter parameter) =>
+        DefaultVisit(operation, parameter);
+
     public virtual TResult? VisitTailwindUtilityAttribute(
         ITailwindUtilityAttributeOperation operation,
         TParameter parameter) =>

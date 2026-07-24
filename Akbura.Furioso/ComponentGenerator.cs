@@ -1790,19 +1790,31 @@ internal static class ComponentGenerator
         {
             if (!operation.IsSynthesizedString)
             {
-                return operation.LiteralValue == null ? null : ToStringLiteral(operation.LiteralValue);
+                return operation.LiteralValue != null
+                    ? ToStringLiteral(operation.LiteralValue)
+                    : operation.ValueOperation.Syntax?.ToString();
             }
 
             var result = new StringBuilder("$\"");
-            foreach (var content in operation.Syntax.Body)
+
+            foreach (var content in operation.Content)
             {
-                switch (content)
+                switch (content.Kind)
                 {
-                    case MarkupTextLiteralSyntax text:
-                        result.Append(EscapeInterpolatedText(text.ToFullString()));
+                    case MarkupChildKind.Text:
+                        result.Append(
+                            EscapeInterpolatedText(content.Text));
                         break;
-                    case MarkupInlineExpressionSyntax expression:
-                        result.Append('{').Append(GetExpression(expression.Expression.Expression)).Append('}');
+
+                    case MarkupChildKind.Expression
+                        when content.Syntax
+                            is MarkupInlineExpressionSyntax expression:
+                        result
+                            .Append('{')
+                            .Append(
+                                GetExpression(
+                                    expression.Expression.Expression))
+                            .Append('}');
                         break;
                 }
             }

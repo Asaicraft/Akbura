@@ -4,5 +4,7 @@ state int count = 0;
 
 <StackPanel Spacing="12">
     <TextBlock Text={$"Count: {count}"}/>
-    <Button Click={count++}>Increment to {count+1}</Button>
+    <Button Click={count++}>
+        Increment to {count+1}
+    </Button>
 </StackPanel>

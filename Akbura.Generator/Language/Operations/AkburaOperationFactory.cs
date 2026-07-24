@@ -37,6 +37,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             BoundKind.MarkupPropertySetter => CreateMarkupPropertySetterOperation((BoundMarkupPropertySetter)boundNode),
             BoundKind.MarkupCommandBinding => CreateMarkupCommandBindingOperation((BoundMarkupCommandBinding)boundNode),
             BoundKind.MarkupRoutedEventBinding => CreateMarkupRoutedEventBindingOperation((BoundMarkupRoutedEventBinding)boundNode),
+            BoundKind.MarkupWhitespaceDirective => CreateMarkupWhitespaceDirectiveOperation((BoundMarkupWhitespaceDirective)boundNode),
             BoundKind.TailwindUtilityAttribute => CreateTailwindUtilityAttributeOperation((BoundTailwindUtilityAttribute)boundNode),
             BoundKind.AkcssPropertySetter => CreateAkcssPropertySetterOperation((BoundAkcssPropertySetter)boundNode),
             BoundKind.AkcssIf => CreateAkcssIfOperation((BoundAkcssIf)boundNode),
@@ -307,6 +308,19 @@ internal sealed class AkburaOperationFactory : IOperationFactory
                 boundNode.Syntax,
                 boundNode.HandlerOperation,
                 CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
+    }
+
+    private static MarkupWhitespaceDirectiveOperation CreateMarkupWhitespaceDirectiveOperation(BoundMarkupWhitespaceDirective boundNode)
+    {
+        return new MarkupWhitespaceDirectiveOperation(
+            boundNode.Syntax,
+            boundNode.ContainingComponent,
+            boundNode.SymbolInfo.Symbol as
+                Akbura.Language.Symbols.IPropertySymbol,
+            boundNode.RawValue,
+            boundNode.DeclaredMode,
+            boundNode.EffectiveMode,
+            boundNode.HasErrors);
     }
 
     private TailwindUtilityAttributeOperation CreateTailwindUtilityAttributeOperation(

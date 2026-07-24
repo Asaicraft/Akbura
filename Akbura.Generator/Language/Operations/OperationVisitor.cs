@@ -33,5 +33,8 @@ internal abstract class OperationVisitor
 
     public virtual void VisitMarkupRoutedEventBinding(IMarkupRoutedEventBindingOperation operation) => DefaultVisit(operation);
 
+    public virtual void VisitMarkupWhitespaceDirective(IMarkupWhitespaceDirectiveOperation operation) => DefaultVisit(operation);
+
     public virtual void VisitTailwindUtilityAttribute(ITailwindUtilityAttributeOperation operation) => DefaultVisit(operation);
+
 }

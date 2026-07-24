@@ -441,6 +441,56 @@ internal partial class AkburaSemanticModel
         }
     }
 
+    internal static bool IsMarkupWhitespaceDirective(
+    MarkupAttributeSyntax attribute)
+    {
+        if (attribute is not MarkupAttachedPropertyAttributeSyntax attached)
+        {
+            return false;
+        }
+
+        return string.Equals(
+                   attached.OwnerType.ToFullString().Trim(),
+                   "xml",
+                   StringComparison.Ordinal) &&
+               string.Equals(
+                   attached.Name.Identifier.ValueText,
+                   "space",
+                   StringComparison.Ordinal);
+    }
+
+    internal static bool TryGetMarkupWhitespaceMode(
+        MarkupAttributeSyntax attribute,
+        out MarkupWhitespaceMode mode,
+        out string rawValue)
+    {
+        mode = MarkupWhitespaceMode.Default;
+        rawValue = string.Empty;
+
+        if (!IsMarkupWhitespaceDirective(attribute) ||
+            GetMarkupAttributeValue(attribute) is not
+                MarkupLiteralAttributeValueSyntax literal)
+        {
+            return false;
+        }
+
+        rawValue = GetMarkupLiteralAttributeValueText(literal);
+
+        switch (rawValue)
+        {
+            case "default":
+                mode = MarkupWhitespaceMode.Default;
+                return true;
+
+            case "preserve":
+                mode = MarkupWhitespaceMode.Preserve;
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
     private Microsoft.CodeAnalysis.IPropertySymbol? FindMarkupExtensionSettableProperty(
         INamedTypeSymbol extensionType,
         string name,
@@ -484,6 +534,8 @@ internal partial class AkburaSemanticModel
 
         return null;
     }
+
+
 
     private static bool IsMarkupExtensionProvideValueMethod(
         IMethodSymbol method,
@@ -3551,6 +3603,16 @@ internal partial class AkburaSemanticModel
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError,
             ["${" + expressionText + "}", message]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateMarkupWhitespaceValueInvalidDiagnostic(
+        MarkupAttributeSyntax syntax,
+        string rawValue)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid,
+            [rawValue]);
     }
 
     private static AkburaSemanticDiagnostic CreateMarkupCommandHandlerSignatureMismatchDiagnostic(

@@ -65,6 +65,55 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public void Generator_NormalizesIndentedInterpolatedContent()
+    {
+        const string component =
+            """
+        using Avalonia.Controls;
+
+        state int count = 0;
+
+        <Button>
+            Increment to {count+1}
+        </Button>
+        """;
+
+        var generatedSource = GenerateWhitespaceComponent(component);
+
+        Assert.Contains(
+            "$\"Increment to {count+1}\"",
+            generatedSource,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain(
+            "$\"    Increment to {count+1}\"",
+            generatedSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generator_PreservesIndentedInterpolatedContent_WhenXmlSpaceIsPreserve()
+    {
+        const string component =
+            """
+        using Avalonia.Controls;
+
+        state int count = 0;
+
+        <Button xml.space="preserve">
+            Increment to {count+1}
+        </Button>
+        """;
+
+        var generatedSource = GenerateWhitespaceComponent(component);
+
+        Assert.Contains(
+            "$\"    Increment to {count+1}\"",
+            generatedSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Generator_UsesContentParameterAsLogicalContent()
     {
         const string wrapper =
@@ -847,6 +896,58 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Equal(0d, button.Padding.Top);
             },
             CancellationToken.None);
+    }
+
+    private static string GenerateWhitespaceComponent(string component)
+    {
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+
+        var compilation = CSharpCompilation.Create(
+            "AkburaWhitespaceGeneratorTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "WhitespaceComponent.akbura");
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                sourcePath,
+                SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var result = Assert.Single(driver.GetRunResult().Results);
+
+        Assert.Null(result.Exception);
+
+        var generated = Assert.Single(result.GeneratedSources);
+
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        return generated.SourceText.ToString();
     }
 
     private static int AssertEnhancedLineDirective(

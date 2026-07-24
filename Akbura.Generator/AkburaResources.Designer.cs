@@ -61,6 +61,402 @@ namespace Akbura {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to AKCSS apply item &apos;{0}&apos; is ambiguous..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssApplyItemAmbiguous {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssApplyItemAmbiguous", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS apply item &apos;{0}&apos; was not found..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssApplyItemNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssApplyItemNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS expression &apos;{0}&apos; is not valid C#: {1}.
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssExpressionError {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssExpressionError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS import &apos;{0}&apos; was not found..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssImportNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssImportNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS member &apos;{0}&apos; is ignored because &apos;{1}&apos; is intercepted by &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssInterceptIgnoresMember {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInterceptIgnoresMember", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS intercept type &apos;{0}&apos; must inherit from {1}..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssInterceptTypeInvalid {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInterceptTypeInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS intercept type &apos;{0}&apos; was not found..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssInterceptTypeNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInterceptTypeNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS color value &apos;{0}&apos; is not valid for property &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssInvalidColor {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInvalidColor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS thickness tuple &apos;{0}&apos; is not valid for property &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssInvalidThickness {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInvalidThickness", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS property &apos;{0}&apos; was not found on style target &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssPropertyNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssPropertyNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS selector target type &apos;{0}&apos; was not found..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssSelectorTargetNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssSelectorTargetNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS value for property &apos;{0}&apos; cannot be converted from &apos;{1}&apos; to &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssValueCannotConvert {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssValueCannotConvert", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Component &apos;{0}&apos; base type &apos;{1}&apos; must derive from &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_ComponentBaseTypeInvalid {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_ComponentBaseTypeInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to C# expression &apos;{0}&apos; is not valid: {1}.
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_CSharpExpressionError {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_CSharpExpressionError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AKCSS symbol &apos;{0}&apos; is already declared in this module..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_DuplicateAkcssSymbol {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_DuplicateAkcssSymbol", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Command parameter &apos;{0}&apos; is already declared..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_DuplicateCommandParameter {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_DuplicateCommandParameter", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Component member &apos;{0}&apos; is already declared as &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_DuplicateComponentMember {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_DuplicateComponentMember", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Member &apos;{0}&apos; exists on &apos;{1}&apos; but is not publicly accessible..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_InaccessibleMember {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_InaccessibleMember", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup child &apos;{0}&apos; is not assignable to expected content type &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_InvalidMarkupChild {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_InvalidMarkupChild", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup attribute binding &apos;{0}&apos; is not allowed for parameter &apos;{1}&apos; declared as &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup attribute value for &apos;{0}&apos; cannot be converted from &apos;{1}&apos; to &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup command &apos;{0}&apos; does not support &apos;{1}&apos; binding. Use a normal command handler expression..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup command &apos;{0}&apos; expects handler &apos;{1}&apos;, but received &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup property &apos;{0}&apos; already has a setter on this element..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupDuplicatePropertySetter {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupDuplicatePropertySetter", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup event &apos;{0}&apos; does not support &apos;{1}&apos; binding. Use a normal event handler expression..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupEventBindingNotAllowed {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupEventBindingNotAllowed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup event &apos;{0}&apos; expects handler &apos;{1}&apos;, but received &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup expression &apos;{0}&apos; is not valid C#: {1}.
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupExpressionError {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupExpressionError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup name &apos;{0}&apos; is already declared in this markup scope..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupNameDuplicate {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupNameDuplicate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to x.Name &apos;{0}&apos; cannot be declared inside a property marked with TemplateContentAttribute..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupNameInsideTemplateContent {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupNameInsideTemplateContent", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to x.Name value &apos;{0}&apos; must be a non-empty C# identifier literal..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupNameInvalid {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupNameInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Markup property &apos;{0}&apos; does not provide the {1} required by &apos;{2}&apos; binding..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Property &apos;{0}&apos; was not found on component &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupPropertyNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupPropertyNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Required parameter &apos;{0}&apos; must be set on component &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupRequiredParameterNotSet {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupRequiredParameterNotSet", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The xml.space directive is specified more than once on this element..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupWhitespaceDuplicate {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupWhitespaceDuplicate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The xml.space directive must have the literal value &apos;default&apos; or &apos;preserve&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to State binding expression &apos;{0}&apos; must be a binding path such as &apos;vm&apos;, &apos;vm.Name&apos;, or &apos;vm.Items[0].Name&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_StateBindingExpressionExpected {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingExpressionExpected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to State binding source &apos;{0}&apos; cannot be observed as &apos;{1}&apos;. Use IObservable&lt;{1}&gt; or implement INotifyPropertyChanged on &apos;{2}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_StateBindingSourceNotObservable {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingSourceNotObservable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to State binding target &apos;{0}&apos; must be a writable property or field..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_StateBindingTargetNotWritable {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingTargetNotWritable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; is ambiguous for component &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_TailwindUtilityAmbiguous {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityAmbiguous", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; expects {1} argument(s), but {2} were provided..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; was not found for component &apos;{1}&apos;..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_TailwindUtilityNotFound {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Use hook &apos;{0}&apos; is not valid in this context. State hooks must return State&lt;T&gt;; render hooks must return void..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_UseHookInvalidContext {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_UseHookInvalidContext", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Use hook &apos;{0}&apos; has an invalid declaration: {1}..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_UseHookInvalidDeclaration {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_UseHookInvalidDeclaration", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Use hook &apos;{0}&apos; must be the root of a state initializer or a standalone render statement..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_UseHookMustBeTopLevel {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_UseHookMustBeTopLevel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to &apos;)&apos; expected..
         /// </summary>
         internal static string ERR_CloseParenExpected {
@@ -192,177 +588,6 @@ namespace Akbura {
         internal static string ERR_UnexpectedCharacter {
             get {
                 return ResourceManager.GetString("ERR_UnexpectedCharacter", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Markup child &apos;{0}&apos; is not assignable to expected content type &apos;{1}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_InvalidMarkupChild {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_InvalidMarkupChild", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to AKCSS color value &apos;{0}&apos; is not valid for property &apos;{1}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_AkcssInvalidColor {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInvalidColor", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to AKCSS thickness tuple &apos;{0}&apos; is not valid for property &apos;{1}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_AkcssInvalidThickness {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssInvalidThickness", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to AKCSS property &apos;{0}&apos; was not found on style target &apos;{1}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_AkcssPropertyNotFound {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssPropertyNotFound", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Property &apos;{0}&apos; was not found on component &apos;{1}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupPropertyNotFound {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupPropertyNotFound", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Required parameter '{0}' must be set on component '{1}'..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupRequiredParameterNotSet {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupRequiredParameterNotSet", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Markup attribute value for &apos;{0}&apos; cannot be converted from &apos;{1}&apos; to &apos;{2}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Markup attribute binding &apos;{0}&apos; is not allowed for parameter &apos;{1}&apos; declared as &apos;{2}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Markup property '{0}' does not provide the {1} required by '{2}' binding..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Markup property &apos;{0}&apos; already has a setter on this element..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupDuplicatePropertySetter {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupDuplicatePropertySetter", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Markup event &apos;{0}&apos; does not support &apos;{1}&apos; binding. Use a normal event handler expression..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupEventBindingNotAllowed {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupEventBindingNotAllowed", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Markup event &apos;{0}&apos; expects handler &apos;{1}&apos;, but received &apos;{2}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupEventHandlerSignatureMismatch", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; was not found for component &apos;{1}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_TailwindUtilityNotFound {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityNotFound", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; is ambiguous for component &apos;{1}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_TailwindUtilityAmbiguous {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityAmbiguous", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Tailwind utility &apos;{0}&apos; expects {1} argument(s), but {2} were provided..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to AKCSS import &apos;{0}&apos; was not found..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_AkcssImportNotFound {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssImportNotFound", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to State binding expression &apos;{0}&apos; must be a binding path such as &apos;vm&apos;, &apos;vm.Name&apos;, or &apos;vm.Items[0].Name&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_StateBindingExpressionExpected {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingExpressionExpected", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to State binding source &apos;{0}&apos; cannot be observed as &apos;{1}&apos;. Use IObservable&lt;{1}&gt; or implement INotifyPropertyChanged on &apos;{2}&apos;..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_StateBindingSourceNotObservable {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingSourceNotObservable", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to State binding target &apos;{0}&apos; must be a writable property or field..
-        /// </summary>
-        internal static string AKBURA_SEMANTIC_StateBindingTargetNotWritable {
-            get {
-                return ResourceManager.GetString("AKBURA_SEMANTIC_StateBindingTargetNotWritable", resourceCulture);
             }
         }
         

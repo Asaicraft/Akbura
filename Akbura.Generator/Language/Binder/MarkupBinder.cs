@@ -237,6 +237,10 @@ internal sealed partial class MarkupBinder : Binder
         var symbolInfo = SemanticModel.GetSymbolInfo(markupElement);
         var componentSymbol = symbolInfo.Symbol as IMarkupComponentSymbol;
         var propertySymbol = symbolInfo.Symbol as IPropertySymbol;
+        var whitespaceMode =
+            SemanticModel.BindingSession.MarkupWhitespace
+                .GetEffectiveMode(markupElement);
+
         using var childrenBuilder = ImmutableArrayBuilder<BoundNode>.Rent();
 
         if (markupElement.StartTag != null)
@@ -253,7 +257,7 @@ internal sealed partial class MarkupBinder : Binder
         }
 
         var contentSetter = propertySymbol == null
-            ? BindMarkupContentSetter(markupElement, componentSymbol)
+            ? BindMarkupContentSetter(markupElement, whitespaceMode, componentSymbol)
             : BindMarkupPropertyElementSetter(markupElement, propertySymbol);
         if (contentSetter != null)
         {
@@ -387,57 +391,79 @@ internal sealed partial class MarkupBinder : Binder
         MarkupElementSyntax markupElement,
         IPropertySymbol property)
     {
-        var containingElement = AkburaSemanticModel.GetParentMarkupElement(markupElement);
+        var containingElement =
+            AkburaSemanticModel.GetParentMarkupElement(markupElement);
+
         var containingComponent = containingElement == null
             ? null
-            : SemanticModel.GetSymbolInfo(containingElement).Symbol as IMarkupComponentSymbol;
-        var contentModel = SemanticModel.CreateMarkupPropertyElementContentModel(property);
+            : SemanticModel.GetSymbolInfo(containingElement).Symbol
+                as IMarkupComponentSymbol;
+
+        var contentModel =
+            SemanticModel.CreateMarkupPropertyElementContentModel(property);
+
+        var whitespaceMode =
+            SemanticModel.BindingSession.MarkupWhitespace
+                .GetEffectiveMode(markupElement);
+
         var content = SemanticModel.CreateMarkupChildren(
             markupElement,
             contentModel,
             out var contentDiagnostics);
 
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        using var diagnosticsBuilder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
         diagnosticsBuilder.AddRange(contentDiagnostics);
+
         if (!contentModel.IsCollection && !property.CanWrite)
         {
-            diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
-                markupElement,
-                ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported,
-                [property.Name, "public setter", "node"]));
+            diagnosticsBuilder.Add(
+                new AkburaSemanticDiagnostic(
+                    markupElement,
+                    ErrorCodes
+                        .AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported,
+                    [property.Name, "public setter", "node"]));
         }
 
         var diagnostics = diagnosticsBuilder.ToImmutable();
-        SemanticModel.SetSemanticDiagnostics(markupElement, diagnostics);
+
+        SemanticModel.SetSemanticDiagnostics(
+            markupElement,
+            diagnostics);
 
         var valueType = content.Length == 1
             ? content[0].Type
             : property.Type;
+
         var valueConversion = content.Length == 1
             ? Conversions.ClassifyConversion(
                 content[0].Type.Symbol as CSharpTypeSymbol,
-                contentModel.AllowedChildType.Symbol as CSharpTypeSymbol)
+                contentModel.AllowedChildType.Symbol
+                    as CSharpTypeSymbol)
             : default;
 
         return new BoundMarkupContentSetter(
-            markupElement,
-            this,
-            containingComponent,
-            property,
-            contentModel,
-            content,
-            valueType,
+            syntax: markupElement,
+            binder: this,
+            containingComponent: containingComponent,
+            property: property,
+            contentModel: contentModel,
+            content: content,
+            valueType: valueType,
             valueOperation: default,
-            valueConversion,
+            valueConversion: valueConversion,
+            markupWhitespaceMode: whitespaceMode,
             literalValue: null,
             isSynthesizedString: false,
-            diagnostics,
-            diagnostics.Length > 0);
+            diagnostics: diagnostics,
+            hasErrors: diagnostics.Length > 0);
     }
 
     private BoundMarkupContentSetter? BindMarkupContentSetter(
-        MarkupElementSyntax markupElement,
-        IMarkupComponentSymbol? componentSymbol)
+    MarkupElementSyntax markupElement,
+    MarkupWhitespaceMode whitespaceMode,
+    IMarkupComponentSymbol? componentSymbol)
     {
         if (componentSymbol == null ||
             componentSymbol.ContentModel.IsDefault)
@@ -452,34 +478,51 @@ internal sealed partial class MarkupBinder : Binder
                 return null;
             }
 
-            var elementProperty = SemanticModel.CreateMarkupContentPropertySymbol(componentSymbol);
-            var elementDiagnostics = SemanticModel.GetCachedSemanticDiagnostics(markupElement);
-            var elementValueType = componentSymbol.Children.Length == 1
-                ? componentSymbol.Children[0].Type
-                : componentSymbol.ContentModel.AllowedChildType;
-            var elementConversion = componentSymbol.Children.Length == 1
-                ? Conversions.ClassifyConversion(
-                    componentSymbol.Children[0].Type.Symbol as CSharpTypeSymbol,
-                    componentSymbol.ContentModel.AllowedChildType.Symbol as CSharpTypeSymbol)
-                : default;
+            var elementProperty =
+                SemanticModel.CreateMarkupContentPropertySymbol(
+                    componentSymbol);
+
+            var elementDiagnostics =
+                SemanticModel.GetCachedSemanticDiagnostics(
+                    markupElement);
+
+            var elementValueType =
+                componentSymbol.Children.Length == 1
+                    ? componentSymbol.Children[0].Type
+                    : componentSymbol.ContentModel.AllowedChildType;
+
+            var elementConversion =
+                componentSymbol.Children.Length == 1
+                    ? Conversions.ClassifyConversion(
+                        componentSymbol.Children[0].Type.Symbol
+                            as CSharpTypeSymbol,
+                        componentSymbol.ContentModel
+                            .AllowedChildType.Symbol
+                            as CSharpTypeSymbol)
+                    : default;
+
             return new BoundMarkupContentSetter(
-                markupElement,
-                this,
-                componentSymbol,
-                elementProperty,
-                componentSymbol.ContentModel,
-                componentSymbol.Children,
-                elementValueType,
+                syntax: markupElement,
+                binder: this,
+                containingComponent: componentSymbol,
+                property: elementProperty,
+                contentModel: componentSymbol.ContentModel,
+                content: componentSymbol.Children,
+                valueType: elementValueType,
                 valueOperation: default,
-                elementConversion,
+                valueConversion: elementConversion,
+                markupWhitespaceMode: whitespaceMode,
                 literalValue: null,
                 isSynthesizedString: false,
-                elementDiagnostics,
-                elementProperty == null || elementDiagnostics.Length > 0);
+                diagnostics: elementDiagnostics,
+                hasErrors:
+                    elementProperty == null ||
+                    elementDiagnostics.Length > 0);
         }
 
         if (!AkburaSemanticModel.TryCreateMarkupContentValueExpression(
                 markupElement,
+                whitespaceMode,
                 out var expression,
                 out var literalValue,
                 out var isSynthesizedString,
@@ -489,21 +532,38 @@ internal sealed partial class MarkupBinder : Binder
             return null;
         }
 
-        var property = SemanticModel.CreateMarkupContentPropertySymbol(componentSymbol);
-        var targetType = AkburaSemanticModel.GetMarkupContentTargetType(componentSymbol.ContentModel);
-        var binding = SemanticModel.BindMarkupAttributeExpression(diagnosticSyntax, expression, targetType);
-        var valueTypeSymbol = binding.TypeSymbol ??
+        var property =
+            SemanticModel.CreateMarkupContentPropertySymbol(
+                componentSymbol);
+
+        var targetType =
+            AkburaSemanticModel.GetMarkupContentTargetType(
+                componentSymbol.ContentModel);
+
+        var binding =
+            SemanticModel.BindMarkupAttributeExpression(
+                diagnosticSyntax,
+                expression,
+                targetType);
+
+        var valueTypeSymbol =
+            binding.TypeSymbol ??
             binding.Conversion.SourceType ??
             binding.OperationDefinition.Type;
+
         if (valueTypeSymbol == null &&
             !isSynthesizedString &&
             !hasText &&
-            diagnosticSyntax.Kind == AkburaSyntaxKind.MarkupInlineExpressionSyntax)
+            diagnosticSyntax.Kind ==
+                AkburaSyntaxKind.MarkupInlineExpressionSyntax)
         {
-            var directBinding = SemanticModel.BindMarkupAttributeExpression(
-                diagnosticSyntax,
-                expression);
-            valueTypeSymbol = directBinding.TypeSymbol ??
+            var directBinding =
+                SemanticModel.BindMarkupAttributeExpression(
+                    diagnosticSyntax,
+                    expression);
+
+            valueTypeSymbol =
+                directBinding.TypeSymbol ??
                 directBinding.OperationDefinition.Type;
         }
 
@@ -511,34 +571,41 @@ internal sealed partial class MarkupBinder : Binder
             ? default
             : new CSharpSymbolDefinition(valueTypeSymbol);
 
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        using var diagnosticsBuilder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
         SemanticModel.AddMarkupExpressionDiagnostics(
             markupElement,
             expression.ToFullString(),
             binding,
             diagnosticsBuilder);
+
         SemanticModel.AddMarkupContentValueDiagnostics(
             diagnosticSyntax,
             componentSymbol.ContentModel,
             binding,
             hasText,
             diagnosticsBuilder);
+
         var diagnostics = diagnosticsBuilder.ToImmutable();
 
         return new BoundMarkupContentSetter(
-            markupElement,
-            this,
-            componentSymbol,
-            property,
-            componentSymbol.ContentModel,
-            componentSymbol.Children,
-            valueType,
-            binding.OperationDefinition,
-            binding.Conversion,
-            literalValue,
-            isSynthesizedString,
-            diagnostics,
-            property == null || diagnostics.Length > 0);
+            syntax: markupElement,
+            binder: this,
+            containingComponent: componentSymbol,
+            property: property,
+            contentModel: componentSymbol.ContentModel,
+            content: componentSymbol.Children,
+            valueType: valueType,
+            valueOperation: binding.OperationDefinition,
+            valueConversion: binding.Conversion,
+            markupWhitespaceMode: whitespaceMode,
+            literalValue: literalValue,
+            isSynthesizedString: isSynthesizedString,
+            diagnostics: diagnostics,
+            hasErrors:
+                property == null ||
+                diagnostics.Length > 0);
     }
 
     private BoundMarkupContent BindMarkupContent(MarkupContentSyntax content)
@@ -609,6 +676,12 @@ internal sealed partial class MarkupBinder : Binder
 
     private BoundNode BindMarkupPropertyOrEvent(MarkupAttributeSyntax markupAttribute)
     {
+        if (AkburaSemanticModel.IsMarkupWhitespaceDirective(markupAttribute))
+        {
+            return BindMarkupWhitespaceDirective(
+                Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute));
+        }
+
         if (AkburaSemanticModel.IsMarkupNameDirective(markupAttribute))
         {
             return BindMarkupNameAssignment(
@@ -618,6 +691,55 @@ internal sealed partial class MarkupBinder : Binder
         return SemanticModel.GetSymbolInfo(markupAttribute).Symbol is IRoutedEventSymbol routedEvent
             ? BindMarkupRoutedEvent(markupAttribute, routedEvent)
             : BindMarkupPropertySetter(markupAttribute);
+    }
+
+    private BoundMarkupWhitespaceDirective BindMarkupWhitespaceDirective(
+        MarkupAttachedPropertyAttributeSyntax attribute)
+    {
+        var containingComponent =
+            SemanticModel.GetContainingMarkupComponentSymbol(attribute);
+
+        var containingElement = AkburaSemanticModel.GetContainingMarkupElement(attribute)!;
+        var inheritedMode = SemanticModel.BindingSession.MarkupWhitespace
+            .GetInheritedMode(containingElement);
+
+        var diagnosticsBuilder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
+        MarkupWhitespaceMode? declaredMode = null;
+        var rawValue = string.Empty;
+
+        if (AkburaSemanticModel.TryGetMarkupWhitespaceMode(
+                attribute,
+                out var parsedMode,
+                out rawValue))
+        {
+            declaredMode = parsedMode;
+        }
+        else
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateMarkupWhitespaceValueInvalidDiagnostic(
+                    attribute,
+                    rawValue));
+        }
+
+        var effectiveMode = declaredMode ?? inheritedMode;
+        var diagnostics = diagnosticsBuilder.ToImmutable();
+        diagnosticsBuilder.Dispose();
+
+        SemanticModel.SetSemanticDiagnostics(attribute, diagnostics);
+
+        return new BoundMarkupWhitespaceDirective(
+            attribute,
+            this,
+            SemanticModel.GetSymbolInfo(attribute),
+            containingComponent,
+            rawValue,
+            declaredMode,
+            effectiveMode,
+            diagnostics,
+            diagnostics.Length > 0);
     }
 
     private BoundMarkupNameAssignment BindMarkupNameAssignment(

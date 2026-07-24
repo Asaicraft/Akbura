@@ -26,6 +26,8 @@ internal sealed class BindingSession
         RootBinder = new CompilationBinder(semanticModel);
         MarkupDataTypes = new MarkupDataTypeResolver(semanticModel);
         MarkupTemplateContent = new MarkupTemplateContentResolver(semanticModel);
+        MarkupWhitespace = new MarkupWhitespaceResolver(semanticModel);
+
         _binderFactory = new BinderFactory(semanticModel, this);
         _blockBinderCache = new ConcurrentCache<BinderCacheKey, Binder>(32);
     }
@@ -33,6 +35,8 @@ internal sealed class BindingSession
     public CompilationBinder RootBinder { get; }
 
     public MarkupDataTypeResolver MarkupDataTypes { get; }
+
+    public MarkupWhitespaceResolver MarkupWhitespace { get; }
 
     public MarkupTemplateContentResolver MarkupTemplateContent { get; }
 

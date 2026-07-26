@@ -4,8 +4,8 @@ using Avalonia.Controls;
 state int count = 0;
 
 <StackPanel Spacing="12" bg-blue-100>
-    <TextBlock Text={$"Count: {count}"}/>
-    <Button Click={count++}>
+    <TextBlock Text={$"Count: {count}"} Background=${StaticResource bg-red-700}/>
+    <Button Click={count++} Background=${DynamicResource bg-red-500}>
         Increment to {count+1}
     </Button>
 </StackPanel>

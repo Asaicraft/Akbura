@@ -122,6 +122,7 @@ internal static class ComponentGenerator
             AppendCommandMembers(source, classIndentation + 1);
             AppendStateMembers(source, classIndentation + 1);
             AppendElementFields(source, classIndentation + 1);
+            AppendMarkupContextMembers(source, classIndentation + 1);
             AppendUserMembers(source, document, classIndentation + 1);
             AppendLifecycleMembers(source, roots, classIndentation + 1);
             AppendDescriptorArrays(source, classIndentation + 1);
@@ -187,6 +188,7 @@ internal static class ComponentGenerator
                 {
                     if (TryBuildElement(childSyntax, out var child))
                     {
+                        child.Parent = plan;
                         plan.Children.Add(child);
                     }
 
@@ -210,6 +212,7 @@ internal static class ComponentGenerator
                 {
                     if (TryBuildElement(propertyContent.Element, out var child))
                     {
+                        child.Parent = plan;
                         propertyElement.Children.Add(child);
                     }
                 }
@@ -565,6 +568,28 @@ internal static class ComponentGenerator
             }
         }
 
+        private void AppendMarkupContextMembers(
+            StringBuilder source,
+            int indentation)
+        {
+            var normalizedPath = _sourcePath
+                .Replace('\\', '/')
+                .TrimStart('/');
+
+            AppendIndented(source, indentation)
+                .AppendLine(
+                    "private static readonly global::System.Uri __akburaBaseUri =");
+
+            AppendIndented(source, indentation + 1)
+                .Append("new global::System.Uri(\"avares://\" + typeof(")
+                .Append(EscapeIdentifier(_symbol.Name))
+                .Append(").Assembly.GetName().Name + \"/")
+                .Append(normalizedPath.Replace("\"", "\\\""))
+                .AppendLine("\", global::System.UriKind.Absolute);");
+
+            source.AppendLine();
+        }
+
         private void AppendUserMembers(
             StringBuilder source,
             AkburaDocumentSyntax document,
@@ -770,7 +795,7 @@ internal static class ComponentGenerator
                         AppendCommandBinding(source, element, command, indentation);
                         break;
                     case IMarkupPropertySetterOperation setter when IsFirstUpdateValue(setter):
-                        AppendPropertySetter(source, element.FieldName, setter, indentation);
+                        AppendPropertySetter(source, element, setter, indentation);
                         break;
                 }
             }
@@ -782,7 +807,7 @@ internal static class ComponentGenerator
             {
                 if (!operation.HasErrors && !IsFirstUpdateValue(operation))
                 {
-                    AppendPropertySetter(source, element.FieldName, operation, indentation);
+                    AppendPropertySetter(source, element, operation, indentation);
                 }
             }
         }
@@ -949,6 +974,40 @@ internal static class ComponentGenerator
                 templateName,
                 indentation,
                 plan.Syntax);
+        }
+
+        private bool IsBindingBaseType(ITypeSymbol type)
+        {
+            var bindingBaseType =
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetTypeByMetadataName("Avalonia.Data.BindingBase");
+
+            if (bindingBaseType == null)
+            {
+                return false;
+            }
+
+            return _semanticModel.Compilation.CSharpCompilation
+                .ClassifyConversion(type, bindingBaseType)
+                .IsImplicit;
+        }
+
+        private static bool IsObjectResultType(ITypeSymbol type)
+        {
+            return type.SpecialType == SpecialType.System_Object ||
+                   type.TypeKind == TypeKind.Dynamic;
+        }
+
+        private bool IsUnsetValueType(ITypeSymbol type)
+        {
+            var unsetValueType =
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetTypeByMetadataName("Avalonia.UnsetValueType");
+
+            return unsetValueType != null &&
+                   SymbolEqualityComparer.Default.Equals(
+                       type,
+                       unsetValueType);
         }
 
         private bool IsTemplateContentProperty(AkburaPropertySymbol property)
@@ -1241,7 +1300,7 @@ internal static class ComponentGenerator
 
         private void AppendPropertySetter(
             StringBuilder source,
-            string target,
+            ElementPlan element,
             IMarkupPropertySetterOperation operation,
             int indentation)
         {
@@ -1255,26 +1314,172 @@ internal static class ComponentGenerator
                 return;
             }
 
-            if (operation.ConvertedValue is MarkupExtensionValue
-                {
-                    Binding: not null,
-                } bindingExtension &&
-                GetAvaloniaPropertyReference(operation.Property) is { } bindingProperty)
+            if (operation.ConvertedValue is MarkupExtensionValue extension &&
+                GetAvaloniaPropertyReference(operation.Property)
+                    is { } avaloniaProperty)
             {
-                var binding = GetMarkupExtensionExpression(bindingExtension);
-                var statement =
-                    $"((global::Avalonia.AvaloniaObject){target}).Bind({bindingProperty}, {binding});";
-                AppendLineDirective(
+                AppendMarkupExtensionAssignment(
                     source,
+                    element,
+                    operation.Property,
+                    extension,
+                    avaloniaProperty,
                     indentation,
-                    operation.Syntax,
-                    statement,
-                    Math.Max(0, statement.IndexOf(binding, StringComparison.Ordinal)));
+                    operation.Syntax);
+
                 return;
             }
 
-            var value = GetPropertyValue(operation);
-            AppendPropertyWrite(source, target, operation.Property, value, indentation, operation.Syntax);
+            var value = GetPropertyValue(
+                operation,
+                element);
+
+            AppendPropertyWrite(
+                source,
+                element.FieldName,
+                operation.Property,
+                value,
+                indentation,
+                operation.Syntax);
+        }
+
+        private void AppendMarkupExtensionAssignment(
+            StringBuilder source,
+            ElementPlan element,
+            AkburaPropertySymbol property,
+            MarkupExtensionValue extension,
+            string avaloniaProperty,
+            int indentation,
+            AkburaSyntax syntax)
+        {
+            var target = element.FieldName;
+
+            var valueExpression = GetMarkupExtensionExpression(
+                extension,
+                element,
+                property);
+
+            if (extension.ResultType.Symbol is not ITypeSymbol resultType)
+            {
+                AppendRuntimeMarkupExtensionAssignment(
+                    source,
+                    target,
+                    avaloniaProperty,
+                    valueExpression,
+                    indentation,
+                    syntax);
+
+                return;
+            }
+
+            // ProvideValue returns BindingBase or a derived type.
+            //
+            // Examples:
+            // - DynamicResourceExtension.ProvideValue
+            // - Binding
+            // - ReflectionBinding
+            // - CompiledBinding
+            if (IsBindingBaseType(resultType))
+            {
+                var statement =
+                    $"((global::Avalonia.AvaloniaObject){target})" +
+                    $".Bind({avaloniaProperty}, {valueExpression});";
+
+                AppendLineDirective(
+                    source,
+                    indentation,
+                    syntax,
+                    statement,
+                    Math.Max(
+                        0,
+                        statement.IndexOf(
+                            valueExpression,
+                            StringComparison.Ordinal)));
+
+                return;
+            }
+
+            // ProvideValue returns object/dynamic.
+            //
+            // The actual runtime result can be:
+            // - BindingBase
+            // - AvaloniaProperty.UnsetValue
+            // - an ordinary property value
+            if (IsObjectResultType(resultType))
+            {
+                AppendRuntimeMarkupExtensionAssignment(
+                    source,
+                    target,
+                    avaloniaProperty,
+                    valueExpression,
+                    indentation,
+                    syntax);
+
+                return;
+            }
+
+            // Support a custom extension which explicitly declares:
+            //
+            // public UnsetValueType ProvideValue(...)
+            //
+            // Most standard extensions return it through object,
+            // but the special typed case is valid too.
+            if (IsUnsetValueType(resultType))
+            {
+                AppendRuntimeMarkupExtensionAssignment(
+                    source,
+                    target,
+                    avaloniaProperty,
+                    valueExpression,
+                    indentation,
+                    syntax);
+
+                return;
+            }
+
+            // ProvideValue has a concrete normal return type.
+            //
+            // Examples:
+            // - IBrush
+            // - Color
+            // - Thickness
+            // - string
+            //
+            // Use the normal property writer so that AvaloniaProperty,
+            // attached and CLR properties keep their existing behavior.
+            AppendPropertyWrite(
+                source,
+                target,
+                property,
+                valueExpression,
+                indentation,
+                syntax);
+        }
+
+        private void AppendRuntimeMarkupExtensionAssignment(
+            StringBuilder source,
+            string target,
+            string avaloniaProperty,
+            string valueExpression,
+            int indentation,
+            AkburaSyntax syntax)
+        {
+            var statement =
+                "ApplyMarkupExtensionResult(" +
+                $"(global::Avalonia.AvaloniaObject){target}, " +
+                $"{avaloniaProperty}, " +
+                $"{valueExpression});";
+
+            AppendLineDirective(
+                source,
+                indentation,
+                syntax,
+                statement,
+                Math.Max(
+                    0,
+                    statement.IndexOf(
+                        valueExpression,
+                        StringComparison.Ordinal)));
         }
 
         private static string? GetAvaloniaPropertyReference(AkburaPropertySymbol property)
@@ -1466,7 +1671,9 @@ internal static class ComponentGenerator
             AppendIndentedLine(source, indentation + 1, "];");
         }
 
-        private string GetPropertyValue(IMarkupPropertySetterOperation operation)
+        private string GetPropertyValue(
+            IMarkupPropertySetterOperation operation,
+            ElementPlan element)
         {
             if (operation.ValueKind == MarkupAttributeValueKind.DynamicExpression &&
                 operation.ValueSyntax is MarkupDynamicAttributeValueSyntax dynamicValue)
@@ -1474,9 +1681,13 @@ internal static class ComponentGenerator
                 return dynamicValue.Expression.Expression.GetRawCSharpExpression()?.ToFullString().Trim() ?? "default";
             }
 
-            if (operation.ConvertedValue is MarkupExtensionValue extension)
+            if (operation.ConvertedValue is MarkupExtensionValue extension &&
+                operation.Property is { } property)
             {
-                return GetMarkupExtensionExpression(extension);
+                return GetMarkupExtensionExpression(
+                    extension,
+                    element,
+                    property);
             }
 
             if (operation.ConvertedValue is GridDefinitionListValue definitions)
@@ -1523,20 +1734,39 @@ internal static class ComponentGenerator
             };
         }
 
-        private string GetMarkupExtensionExpression(MarkupExtensionValue extension)
+        private string GetMarkupExtensionExpression(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            AkburaPropertySymbol targetProperty)
         {
             if (extension.Binding is { } binding)
             {
-                return GetBindingExpression(extension, binding);
+                return GetBindingExpression(extension, binding, element, targetProperty);
             }
 
             var type = GetTypeName(extension.ExtensionType.Symbol);
-            var arguments = string.Join(", ", extension.Arguments.Select(GetMarkupExtensionArgument));
-            var creation = new StringBuilder("new ").Append(type).Append('(').Append(arguments).Append(')');
+
+            var arguments = string.Join(
+                ", ",
+                extension.Arguments.Select(argument =>
+                    GetMarkupExtensionArgument(
+                        argument,
+                        element,
+                        targetProperty)));
+
+            var creation = new StringBuilder("new ")
+                .Append(type)
+                .Append('(')
+                .Append(arguments)
+                .Append(')');
+
             if (!extension.Properties.IsEmpty)
             {
                 creation.Append(" { ");
-                for (var index = 0; index < extension.Properties.Length; index++)
+
+                for (var index = 0;
+                     index < extension.Properties.Length;
+                     index++)
                 {
                     if (index > 0)
                     {
@@ -1544,20 +1774,52 @@ internal static class ComponentGenerator
                     }
 
                     var property = extension.Properties[index];
-                    creation.Append(EscapeIdentifier(property.Name)).Append(" = ")
-                        .Append(GetMarkupExtensionProperty(property));
+
+                    creation
+                        .Append(EscapeIdentifier(property.Name))
+                        .Append(" = ")
+                        .Append(GetMarkupExtensionProperty(
+                            property,
+                            element,
+                            targetProperty));
                 }
 
                 creation.Append(" }");
             }
 
-            if (extension.ProvideValueMethod.Symbol is RoslynMethodSymbol provideValue)
+            if (extension.ProvideValueMethod.Symbol
+                is RoslynMethodSymbol provideValue)
             {
                 creation.Insert(0, '(').Append(')');
-                creation.Append('.').Append(EscapeIdentifier(provideValue.Name)).Append('(');
+
+                creation
+                    .Append('.')
+                    .Append(EscapeIdentifier(provideValue.Name))
+                    .Append('(');
+
                 if (provideValue.Parameters.Length == 1)
                 {
-                    creation.Append("null!");
+                    var propertyExpression =
+                        GetProvideValueTargetPropertyExpression(targetProperty);
+
+                    var parentStackExpression =
+                        GetDirectParentsStackExpression(element);
+
+                    // Outside templates the component itself is both roots.
+                    var intermediateRoot = "this";
+
+                    creation
+                        .Append("CreateMarkupServiceProvider(")
+                        .Append("targetObject: ")
+                        .Append(element.FieldName)
+                        .Append(", targetProperty: ")
+                        .Append(propertyExpression)
+                        .Append(", intermediateRootObject: ")
+                        .Append(intermediateRoot)
+                        .Append(", baseUri: __akburaBaseUri")
+                        .Append(", directParentsStack: ")
+                        .Append(parentStackExpression)
+                        .Append(')');
                 }
 
                 creation.Append(')');
@@ -1566,26 +1828,47 @@ internal static class ComponentGenerator
             return creation.ToString();
         }
 
-        private string GetBindingExpression(MarkupExtensionValue extension, MarkupBindingValue binding)
+        private string GetBindingExpression(
+            MarkupExtensionValue extension,
+            MarkupBindingValue binding,
+            ElementPlan element,
+            AkburaPropertySymbol targetProperty)
         {
             if (binding.Kind == MarkupBindingKind.Compiled &&
                 TryGetCompiledBindingPathExpression(binding, out var pathExpression))
             {
                 var sourceType = GetTypeName(binding.SourceType.Symbol);
                 var resultType = GetTypeName(binding.ResultType.Symbol);
-                var compiledResult = new StringBuilder("global::Avalonia.Data.CompiledBinding.Create<")
-                    .Append(sourceType).Append(", ").Append(resultType)
-                    .Append(">(static __source => ").Append(pathExpression);
-                AppendCompiledBindingArguments(compiledResult, extension.Properties);
+
+                var compiledResult = new StringBuilder(
+                        "global::Avalonia.Data.CompiledBinding.Create<")
+                    .Append(sourceType)
+                    .Append(", ")
+                    .Append(resultType)
+                    .Append(">(static __source => ")
+                    .Append(pathExpression);
+
+                AppendCompiledBindingArguments(
+                    compiledResult,
+                    extension.Properties,
+                    element,
+                    targetProperty);
+
                 return compiledResult.Append(')').ToString();
             }
 
             var type = GetTypeName(binding.BindingType.Symbol);
-            var result = new StringBuilder("new ").Append(type).Append('(')
-                .Append(ToStringLiteral(binding.Path)).Append(')');
+
+            var result = new StringBuilder("new ")
+                .Append(type)
+                .Append('(')
+                .Append(ToStringLiteral(binding.Path))
+                .Append(')');
+
             if (!extension.Properties.IsEmpty)
             {
                 result.Append(" { ");
+
                 for (var index = 0; index < extension.Properties.Length; index++)
                 {
                     if (index > 0)
@@ -1594,8 +1877,14 @@ internal static class ComponentGenerator
                     }
 
                     var property = extension.Properties[index];
-                    result.Append(EscapeIdentifier(property.Name)).Append(" = ")
-                        .Append(GetMarkupExtensionProperty(property));
+
+                    result
+                        .Append(EscapeIdentifier(property.Name))
+                        .Append(" = ")
+                        .Append(GetMarkupExtensionProperty(
+                            property,
+                            element,
+                            targetProperty));
                 }
 
                 result.Append(" }");
@@ -1670,7 +1959,9 @@ internal static class ComponentGenerator
 
         private void AppendCompiledBindingArguments(
             StringBuilder result,
-            ImmutableArray<MarkupExtensionPropertyValue> properties)
+            ImmutableArray<MarkupExtensionPropertyValue> properties,
+            ElementPlan element,
+            AkburaPropertySymbol targetProperty)
         {
             foreach (var property in properties)
             {
@@ -1689,49 +1980,76 @@ internal static class ComponentGenerator
                     "UpdateSourceTrigger" => "updateSourceTrigger",
                     _ => null,
                 };
+
                 if (parameterName != null)
                 {
-                    result.Append(", ").Append(parameterName).Append(": ")
-                        .Append(GetMarkupExtensionProperty(property));
+                    result
+                        .Append(", ")
+                        .Append(parameterName)
+                        .Append(": ")
+                        .Append(GetMarkupExtensionProperty(
+                            property,
+                            element,
+                            targetProperty));
                 }
             }
         }
 
-        private string GetMarkupExtensionArgument(MarkupExtensionArgumentValue argument)
+        private string GetMarkupExtensionArgument(
+            MarkupExtensionArgumentValue argument,
+            ElementPlan element,
+            AkburaPropertySymbol targetProperty)
         {
             if (argument.NestedValue != null)
             {
-                return GetMarkupExtensionExpression(argument.NestedValue);
+                return GetMarkupExtensionExpression(
+                    argument.NestedValue,
+                    element,
+                    targetProperty);
             }
 
             if (!argument.Operation.IsDefault)
             {
-                return argument.Operation.Syntax?.ToString() ?? argument.Text;
+                return argument.Operation.Syntax?.ToString() ??
+                       argument.Text;
             }
 
             return argument.ConvertedValue != null
-                ? FormatConstant(argument.ConvertedValue, argument.Type.Symbol)
-                : ToStringLiteral(argument.Text.Trim('\'', '"'));
+                ? FormatConstant(
+                    argument.ConvertedValue,
+                    argument.Type.Symbol)
+                : ToStringLiteral(
+                    argument.Text.Trim('\'', '"'));
         }
 
-        private string GetMarkupExtensionProperty(MarkupExtensionPropertyValue property)
+        private string GetMarkupExtensionProperty(
+            MarkupExtensionPropertyValue property,
+            ElementPlan element,
+            AkburaPropertySymbol targetProperty)
         {
             if (property.NestedValue != null)
             {
-                return GetMarkupExtensionExpression(property.NestedValue);
+                return GetMarkupExtensionExpression(
+                    property.NestedValue,
+                    element,
+                    targetProperty);
             }
 
             if (property.ConvertedValue != null)
             {
-                return FormatConstant(property.ConvertedValue, property.Type.Symbol);
+                return FormatConstant(
+                    property.ConvertedValue,
+                    property.Type.Symbol);
             }
 
             if (!property.Operation.IsDefault)
             {
-                return property.Operation.Syntax?.ToString() ?? property.Value;
+                return property.Operation.Syntax?.ToString() ??
+                       property.Value;
             }
 
-            return ToStringLiteral(property.Value.Trim('\'', '"'));
+            return ToStringLiteral(
+                property.Value.Trim('\'', '"'));
         }
 
         private static string GetGridDefinitionsExpression(
@@ -1920,6 +2238,59 @@ internal static class ComponentGenerator
             return syntax?.GetRawCSharpExpression()?.ToFullString().Trim() ?? "default";
         }
 
+        private static string GetDirectParentsStackExpression(
+            ElementPlan element)
+        {
+            var hierarchy = new List<ElementPlan>();
+
+            for (var current = element;
+                 current is not null;
+                 current = current.Parent)
+            {
+                hierarchy.Add(current);
+            }
+
+            hierarchy.Reverse();
+
+            var result = new StringBuilder(
+                "new global::System.Object[] { this");
+
+            foreach (var parent in hierarchy)
+            {
+                result
+                    .Append(", ")
+                    .Append(parent.FieldName);
+            }
+
+            return result.Append(" }").ToString();
+        }
+
+        private static string GetProvideValueTargetPropertyExpression(
+            AkburaPropertySymbol property)
+        {
+            if (GetAvaloniaPropertyReference(property) is { } avaloniaProperty)
+            {
+                return avaloniaProperty;
+            }
+
+            var clrProperty =
+                property.ClrPropertyDefinition.Symbol as RoslynPropertySymbol ??
+                property.WriteDefinition.Symbol as RoslynPropertySymbol ??
+                property.ReadDefinition.Symbol as RoslynPropertySymbol;
+
+            if (clrProperty is not null)
+            {
+                return
+                    $"typeof({GetTypeName(clrProperty.ContainingType)})." +
+                    $"GetProperty({ToStringLiteral(clrProperty.Name)}, " +
+                    "global::System.Reflection.BindingFlags.Instance | " +
+                    "global::System.Reflection.BindingFlags.Public | " +
+                    "global::System.Reflection.BindingFlags.NonPublic)!";
+            }
+
+            return ToStringLiteral(property.Name);
+        }
+
         private static string GetComponentTypeName(IMarkupComponentSymbol symbol)
         {
             if (symbol.ComponentType != null)
@@ -2070,6 +2441,8 @@ internal static class ComponentGenerator
         public IMarkupNameAssignmentOperation? NameOperation { get; }
 
         public MarkupElementSyntax? TemplateOwner { get; }
+
+        public ElementPlan? Parent { get; set; }
 
         public List<ElementPlan> Children { get; } = [];
 

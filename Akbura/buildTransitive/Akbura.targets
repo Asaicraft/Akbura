@@ -1,63 +1,71 @@
 <Project>
 
-  <PropertyGroup>
-    <AkburaEmbedSourceFiles Condition="'$(AkburaEmbedSourceFiles)' == ''">true</AkburaEmbedSourceFiles>
-    <AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Akbura.module.xml</AkburaModuleManifestPath>
-    <AkburaEmbeddedSourcesPath Condition="'$(AkburaEmbeddedSourcesPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Sources</AkburaEmbeddedSourcesPath>
-    <AkburaBuildTasksAssembly Condition="'$(AkburaBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tools\net10.0\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
-  </PropertyGroup>
+	<PropertyGroup>
+		<AkburaEmbedSourceFiles Condition="'$(AkburaEmbedSourceFiles)' == ''">true</AkburaEmbedSourceFiles>
+		<AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Akbura.module.xml</AkburaModuleManifestPath>
+		<AkburaEmbeddedSourcesPath Condition="'$(AkburaEmbeddedSourcesPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Sources</AkburaEmbeddedSourcesPath>
+		<AkburaBuildTasksAssembly Condition="'$(AkburaBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tools\net10.0\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
+	</PropertyGroup>
 
-  <!-- Keep the task isolated from long-lived MSBuild nodes so its assemblies remain rebuildable. -->
-  <UsingTask TaskName="Akbura.Build.GenerateAkburaModuleManifest"
-             AssemblyFile="$(AkburaBuildTasksAssembly)"
-             Runtime="NET"
-             Architecture="CurrentArchitecture"
-             TaskFactory="TaskHostFactory"
-             Condition="'$(AkburaEmbedSourceFiles)' == 'true'" />
+	<!-- Keep the task isolated from long-lived MSBuild nodes so its assemblies remain rebuildable. -->
+	<UsingTask TaskName="Akbura.Build.GenerateAkburaModuleManifest"
+			   AssemblyFile="$(AkburaBuildTasksAssembly)"
+			   Runtime="NET"
+			   Architecture="CurrentArchitecture"
+			   TaskFactory="TaskHostFactory"
+			   Condition="'$(AkburaEmbedSourceFiles)' == 'true'" />
 
-  <ItemGroup>
-    <_AkburaModuleSource Include="**\*.akbura;**\*.akcss"
-                         Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)">
-      <LogicalName>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</LogicalName>
-    </_AkburaModuleSource>
+	<ItemGroup>
+		<_AkburaModuleSource Include="**\*.akbura;**\*.akcss"
+							 Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)">
+			<LogicalName>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</LogicalName>
+		</_AkburaModuleSource>
 
-    <AdditionalFiles Include="@(_AkburaModuleSource)"
-                     Exclude="@(AdditionalFiles)" />
-  </ItemGroup>
+		<AdditionalFiles Include="@(_AkburaModuleSource)"
+						 Exclude="@(AdditionalFiles)" />
+	</ItemGroup>
 
-  <ItemGroup Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
-    <None Remove="**\*.akbura;**\*.akcss" />
-    <EmbeddedResource Remove="**\*.akbura;**\*.akcss" />
+	<ItemGroup Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
+		<None Remove="**\*.akbura;**\*.akcss" />
+		<EmbeddedResource Remove="**\*.akbura;**\*.akcss" />
 
-    <EmbeddedResource Include="$(AkburaModuleManifestPath)">
-      <LogicalName>!Akbura</LogicalName>
-    </EmbeddedResource>
-  </ItemGroup>
+		<EmbeddedResource Include="$(AkburaModuleManifestPath)">
+			<LogicalName>!Akbura</LogicalName>
+		</EmbeddedResource>
+	</ItemGroup>
 
-  <Target Name="GenerateAkburaModuleManifest"
-          BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="FindReferenceAssembliesForReferences"
-          Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
-    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(AkburaModuleManifestPath)'))" />
+	<Target Name="GenerateAkburaModuleManifest"
+		  BeforeTargets="AssignTargetPaths"
+		  DependsOnTargets="FindReferenceAssembliesForReferences"
+		  Condition="'$(AkburaEmbedSourceFiles)' == 'true'
+				   and '$(BuildingProject)' == 'true'
+				   and '$(DesignTimeBuild)' != 'true'">
 
-    <GenerateAkburaModuleManifest Sources="@(_AkburaModuleSource)"
-                                  CSharpSources="@(Compile)"
-                                  References="@(ReferencePathWithRefAssemblies)"
-                                  OutputPath="$(AkburaModuleManifestPath)"
-                                  EmbeddedSourcesDirectory="$(AkburaEmbeddedSourcesPath)"
-                                  AssemblyName="$(AssemblyName)"
-                                  RootNamespace="$(RootNamespace)"
-                                  ProjectDirectory="$(MSBuildProjectDirectory)"
-                                  DefineConstants="$(DefineConstants)"
-                                  LanguageVersion="$(LangVersion)"
-                                  Nullable="$(Nullable)"
-                                  AllowUnsafeBlocks="$(AllowUnsafeBlocks)">
-      <Output TaskParameter="EmbeddedSources" ItemName="_AkburaEmbeddedSource" />
-    </GenerateAkburaModuleManifest>
+		<MakeDir
+			Directories="$([System.IO.Path]::GetDirectoryName('$(AkburaModuleManifestPath)'))" />
 
-    <ItemGroup>
-      <EmbeddedResource Include="@(_AkburaEmbeddedSource)" />
-    </ItemGroup>
-  </Target>
+		<GenerateAkburaModuleManifest
+			Sources="@(_AkburaModuleSource)"
+			CSharpSources="@(Compile)"
+			References="@(ReferencePathWithRefAssemblies)"
+			OutputPath="$(AkburaModuleManifestPath)"
+			EmbeddedSourcesDirectory="$(AkburaEmbeddedSourcesPath)"
+			AssemblyName="$(AssemblyName)"
+			RootNamespace="$(RootNamespace)"
+			ProjectDirectory="$(MSBuildProjectDirectory)"
+			DefineConstants="$(DefineConstants)"
+			LanguageVersion="$(LangVersion)"
+			Nullable="$(Nullable)"
+			AllowUnsafeBlocks="$(AllowUnsafeBlocks)">
+
+			<Output
+				TaskParameter="EmbeddedSources"
+				ItemName="_AkburaEmbeddedSource" />
+		</GenerateAkburaModuleManifest>
+
+		<ItemGroup>
+			<EmbeddedResource Include="@(_AkburaEmbeddedSource)" />
+		</ItemGroup>
+	</Target>
 
 </Project>

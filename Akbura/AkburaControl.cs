@@ -1,15 +1,19 @@
-﻿using Avalonia;
-using Akbura.Akcss;
-using Akbura.Hooks;
+﻿using Akbura.Akcss;
 using Akbura.ComponentTree;
 using Akbura.Engine;
+using Akbura.Hooks;
+using Akbura.Markup;
+using Avalonia;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Layout;
+using Avalonia.Markup.Xaml.XamlIl.Runtime;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace Akbura;
@@ -276,7 +280,70 @@ public abstract class AkburaControl : Control, IComponentTree
 	/// <returns>The component states.</returns>
 	protected abstract ImmutableArray<State> GetStates();
 
-	internal ImmutableArray<Parameter> GetDiagnosticParameters()
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	[Browsable(false)]
+    protected IServiceProvider CreateMarkupServiceProvider(
+		object targetObject,
+		object targetProperty,
+		object intermediateRootObject,
+		Uri baseUri,
+		IReadOnlyList<object> directParentsStack,
+		IServiceProvider? fallbackServiceProvider = null,
+		IReadOnlyDictionary<string, Type>? knownTypes = null)
+    {
+        IAvaloniaXamlIlEagerParentStackProvider? applicationProvider = null;
+
+        if (Application.Current is { } application)
+        {
+            applicationProvider =
+                new AkburaApplicationParentStackProvider(application);
+        }
+
+        return new AkburaMarkupServiceProvider(
+            targetObject: targetObject,
+            targetProperty: targetProperty,
+            rootObject: this,
+            intermediateRootObject: intermediateRootObject,
+            baseUri: baseUri,
+            directParentsStack: directParentsStack,
+            parentProvider: applicationProvider,
+            fallbackServiceProvider: fallbackServiceProvider,
+            knownTypes: knownTypes);
+    }
+
+    /// <summary>
+    /// Applies a markup extension result whose concrete runtime type
+    /// is not known by the generated code.
+    /// </summary>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected static void ApplyMarkupExtensionResult(
+        AvaloniaObject target,
+        AvaloniaProperty property,
+        object? value)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(property);
+
+        if (value is BindingBase binding)
+        {
+            target.Bind(property, binding);
+            return;
+        }
+
+        if (ReferenceEquals(value, AvaloniaProperty.UnsetValue))
+        {
+            // This clears the local value. It does not mean "do nothing".
+            target.SetValue(property, AvaloniaProperty.UnsetValue);
+            return;
+        }
+
+        // This also correctly handles Avalonia's DoNothing marker:
+        // AvaloniaObject.SetValue ignores it.
+        target.SetValue(property, value);
+    }
+
+    internal ImmutableArray<Parameter> GetDiagnosticParameters()
 	{
 		return GetParameters();
 	}

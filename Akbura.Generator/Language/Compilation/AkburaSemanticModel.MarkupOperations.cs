@@ -71,18 +71,27 @@ internal partial class AkburaSemanticModel
         MarkupExtensionSyntax extensionSyntax,
         Symbols.IPropertySymbol? property)
     {
-        using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        using var diagnosticsBuilder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
+        var allowAvaloniaSpecialResults =
+            SupportsAvaloniaSpecialMarkupExtensionResults(property);
 
         var result = BindMarkupExtensionSyntax(
             markupAttribute,
             extensionSyntax,
             property?.Type.Symbol as ITypeSymbol,
-            diagnosticsBuilder);
+            diagnosticsBuilder,
+            allowAvaloniaSpecialResults);
 
         if (property?.Type.Symbol is ITypeSymbol targetType &&
-            result.Value?.ProvideValueMethod.Symbol is IMethodSymbol provideValueMethod &&
+            result.Value?.ProvideValueMethod.Symbol
+                is IMethodSymbol provideValueMethod &&
             result.Value.Binding == null &&
-            !CanMarkupExtensionResultConvertToTarget(provideValueMethod.ReturnType, targetType))
+            !CanMarkupExtensionResultConvertToTarget(
+                provideValueMethod.ReturnType,
+                targetType,
+                allowAvaloniaSpecialResults))
         {
             AddMarkupAttributeCannotConvertDiagnostic(
                 markupAttribute,
@@ -99,11 +108,24 @@ internal partial class AkburaSemanticModel
             result.Conversion);
     }
 
+    private static bool SupportsAvaloniaSpecialMarkupExtensionResults(Symbols.IPropertySymbol? property)
+    {
+        if (property == null)
+        {
+            return false;
+        }
+
+        return property.IsAvaloniaProperty ||
+               property.AvaloniaPropertyDefinition.Symbol is not null ||
+               property.AttachedPropertyDefinition.Symbol is not null;
+    }
+
     private MarkupExtensionBindingResult BindMarkupExtensionSyntax(
         MarkupAttributeSyntax markupAttribute,
         MarkupExtensionSyntax extensionSyntax,
         ITypeSymbol? targetType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        bool allowAvaloniaSpecialResults = false)
     {
         var rawText = extensionSyntax.ToFullString();
         var extensionName = GetMarkupExtensionTypeName(extensionSyntax.Type);
@@ -245,7 +267,10 @@ internal partial class AkburaSemanticModel
             propertiesBuilder.ToImmutable());
 
         if (targetType != null &&
-            !CanMarkupExtensionResultConvertToTarget(provideValueMethod.ReturnType, targetType))
+            !CanMarkupExtensionResultConvertToTarget(
+                provideValueMethod.ReturnType,
+                targetType,
+                allowAvaloniaSpecialResults))
         {
             AddMarkupExtensionValueConversionDiagnostic(
                 extensionSyntax,
@@ -255,11 +280,28 @@ internal partial class AkburaSemanticModel
                 diagnosticsBuilder);
         }
 
-        var conversion = targetType == null
-            ? default
-            : GetBinder(markupAttribute).Conversions.ClassifyConversion(
-                provideValueMethod.ReturnType,
-                targetType);
+        var usesAvaloniaSpecialApplication =
+            targetType != null &&
+            allowAvaloniaSpecialResults &&
+            (
+                provideValueMethod.ReturnType.TypeKind ==
+                    TypeKind.Dynamic ||
+                provideValueMethod.ReturnType.SpecialType ==
+                    SpecialType.System_Object ||
+                IsAvaloniaSpecialMarkupExtensionResult(
+                    provideValueMethod.ReturnType)
+            );
+
+        var conversion =
+            targetType == null ||
+            usesAvaloniaSpecialApplication
+                ? default
+                : GetBinder(markupAttribute)
+                    .Conversions
+                    .ClassifyConversion(
+                        provideValueMethod.ReturnType,
+                        targetType);
+
         return new MarkupExtensionBindingResult(
             value,
             resultType,
@@ -571,18 +613,61 @@ internal partial class AkburaSemanticModel
 
     private bool CanMarkupExtensionResultConvertToTarget(
         ITypeSymbol sourceType,
-        ITypeSymbol targetType)
+        ITypeSymbol targetType,
+        bool allowAvaloniaSpecialResults = false)
     {
         if (sourceType.TypeKind == TypeKind.Error ||
             targetType.TypeKind == TypeKind.Error ||
+            sourceType.TypeKind == TypeKind.Dynamic ||
             sourceType.SpecialType == SpecialType.System_Object ||
             targetType.SpecialType == SpecialType.System_Object)
         {
             return true;
         }
 
-        return Compilation.CSharpCompilation.ClassifyConversion(sourceType, targetType).IsImplicit ||
-            IsAssignableTo(sourceType, targetType);
+        if (allowAvaloniaSpecialResults &&
+            IsAvaloniaSpecialMarkupExtensionResult(sourceType))
+        {
+            return true;
+        }
+
+        return Compilation.CSharpCompilation
+                   .ClassifyConversion(
+                       sourceType,
+                       targetType)
+                   .IsImplicit ||
+               IsAssignableTo(
+                   sourceType,
+                   targetType);
+    }
+
+    private bool IsAvaloniaSpecialMarkupExtensionResult(
+        ITypeSymbol sourceType)
+    {
+        var bindingBaseType =
+            Compilation.CSharpCompilation
+                .GetTypeByMetadataName(
+                    "Avalonia.Data.BindingBase");
+
+        if (bindingBaseType != null &&
+            Compilation.CSharpCompilation
+                .ClassifyConversion(
+                    sourceType,
+                    bindingBaseType)
+                .IsImplicit)
+        {
+            return true;
+        }
+
+        var unsetValueType =
+            Compilation.CSharpCompilation
+                .GetTypeByMetadataName(
+                    "Avalonia.UnsetValueType");
+
+        return unsetValueType != null &&
+               SymbolEqualityComparer.Default.Equals(
+                   sourceType,
+                   unsetValueType);
     }
 
     private static string NormalizeMarkupExtensionTypeName(string name)

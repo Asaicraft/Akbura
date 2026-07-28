@@ -56,11 +56,65 @@ internal sealed partial class CSharpProbeBinder
                 symbol,
                 memberDeclarations,
                 localStatements);
+            if (symbol == null)
+            {
+                AddComponentMethodProbeMembers(
+                    name,
+                    memberDeclarations);
+            }
         }
 
         return new CSharpProbeScope(
             memberDeclarations.ToImmutable(),
             localStatements.ToImmutable());
+    }
+
+    private void AddComponentMethodProbeMembers(
+        string name,
+        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> memberDeclarations)
+    {
+        foreach (var member in SemanticModel.SyntaxTree.GetRoot().Members)
+        {
+            if (member is CSharpStatementSyntax statement &&
+                TryCreateComponentMethodProbe(statement, out var method) &&
+                string.Equals(
+                    method.Identifier.ValueText,
+                    name,
+                    StringComparison.Ordinal))
+            {
+                memberDeclarations.Add(method);
+            }
+        }
+    }
+
+    internal static bool TryCreateComponentMethodProbe(
+        CSharpStatementSyntax statement,
+        out CSharp.MethodDeclarationSyntax method)
+    {
+        method = null!;
+        if (statement.GetRawCSharpStatement() is not
+            CSharp.LocalFunctionStatementSyntax)
+        {
+            return false;
+        }
+
+        try
+        {
+            var parsedMethod = CSharpSyntaxFactory.ParseMemberDeclaration(
+                statement.Tokens.ToFullString() + "{}") as
+                CSharp.MethodDeclarationSyntax;
+            if (parsedMethod == null)
+            {
+                return false;
+            }
+
+            method = parsedMethod;
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static ImmutableArray<string> CollectIdentifierNames(
@@ -153,7 +207,19 @@ internal sealed partial class CSharpProbeBinder
         ImmutableArray<CSharp.StatementSyntax> localStatements,
         CSharp.StatementSyntax statement)
     {
-        if (localStatements.IsDefaultOrEmpty)
+        return CreateProbeBlock(
+            localStatements,
+            ImmutableArray<CSharp.StatementSyntax>.Empty,
+            statement);
+    }
+
+    private static CSharp.BlockSyntax CreateProbeBlock(
+        ImmutableArray<CSharp.StatementSyntax> localStatements,
+        ImmutableArray<CSharp.StatementSyntax> precedingStatements,
+        CSharp.StatementSyntax statement)
+    {
+        if (localStatements.IsDefaultOrEmpty &&
+            precedingStatements.IsDefaultOrEmpty)
         {
             return CSharpSyntaxFactory.Block(statement);
         }
@@ -162,6 +228,11 @@ internal sealed partial class CSharpProbeBinder
         foreach (var localStatement in localStatements)
         {
             builder.Add(localStatement);
+        }
+
+        foreach (var precedingStatement in precedingStatements)
+        {
+            builder.Add(precedingStatement);
         }
 
         builder.Add(statement);

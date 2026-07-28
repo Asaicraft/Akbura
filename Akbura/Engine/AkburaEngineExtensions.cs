@@ -26,6 +26,21 @@ public static class AkburaEngineExtensions
     public sealed class AkburaEngineBuilder
     {
         private readonly List<IAkburaServiceProvider> _serviceProviders = [];
+        private int _maxUpdatesPerBatch = AkburaEngine.DefaultMaxUpdatesPerBatch;
+
+        public AkburaEngineBuilder WithMaxUpdatesPerBatch(int maxUpdatesPerBatch)
+        {
+            if (maxUpdatesPerBatch < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maxUpdatesPerBatch),
+                    maxUpdatesPerBatch,
+                    "The maximum update count must be greater than zero.");
+            }
+
+            _maxUpdatesPerBatch = maxUpdatesPerBatch;
+            return this;
+        }
 
         public AkburaEngineBuilder WithServiceProvider(IServiceProvider serviceProvider)
         {
@@ -87,7 +102,10 @@ public static class AkburaEngineExtensions
         {
             var list = LinkedAkburaServiceProvider.Build(CollectionsMarshal.AsSpan(_serviceProviders));
 
-            return new AkburaEngine(list);
+            return new AkburaEngine(list)
+            {
+                MaxUpdatesPerBatch = _maxUpdatesPerBatch,
+            };
         }
     }
 }

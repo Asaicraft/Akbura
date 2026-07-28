@@ -178,12 +178,18 @@ internal sealed partial class SyntaxAndDeclarationManager
         var builder = Akbura.Language.DeclarationTable.Empty.ToBuilder();
         foreach (var tree in syntaxTrees)
         {
-            builder.AddRootDeclaration(rootNamespaces[tree]);
+            if (!GlobalUsings.IsComponentFile(tree))
+            {
+                builder.AddRootDeclaration(rootNamespaces[tree]);
+            }
         }
 
         foreach (var tree in akcssSyntaxTrees)
         {
-            builder.AddRootDeclaration(akcssRootNamespaces[tree]);
+            if (!GlobalUsings.IsAkcssFile(tree))
+            {
+                builder.AddRootDeclaration(akcssRootNamespaces[tree]);
+            }
         }
 
         return builder.ToDeclarationTableAndFree();

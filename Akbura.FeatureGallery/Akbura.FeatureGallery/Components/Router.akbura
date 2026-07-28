@@ -1,0 +1,28 @@
+using Akbura.Hooks;
+
+param Control Content = null;
+param IList<Page> Pages;
+param bind string Url = ""; 
+param IDataTemplate NotFound;
+
+state Control? content = null;
+
+useEffect(() =>
+{
+    var page = Pages.FirstOrDefault(page =>
+        string.Equals(
+            page.Url,
+            Url,
+            StringComparison.OrdinalIgnoreCase));
+
+    content = page == null
+        ? NotFound.Build(Url)
+        : TemplateContent
+            .Load<Control>(page.Content)
+            .Result;
+
+}, [Url, Pages, NotFound]);
+
+Content = content;
+
+<ContentPresenter Content={Content}/>

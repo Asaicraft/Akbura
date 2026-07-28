@@ -2301,7 +2301,8 @@ internal partial class AkburaSemanticModel
         }
 
         var expectedParameterTypes = GetEventHandlerParameterTypes(routedEvent);
-        if (expectedParameterTypes.IsDefaultOrEmpty ||
+        if (parameterTypes.IsEmpty ||
+            expectedParameterTypes.IsDefaultOrEmpty ||
             HasCompatibleEventHandlerParameters(expectedParameterTypes, parameterTypes))
         {
             return;
@@ -3219,7 +3220,13 @@ internal partial class AkburaSemanticModel
         {
             CSharp.ClassDeclarationSyntax classDeclaration => "class:" + classDeclaration.Identifier.ValueText,
             CSharp.StructDeclarationSyntax structDeclaration => "struct:" + structDeclaration.Identifier.ValueText,
-            CSharp.MethodDeclarationSyntax methodDeclaration => "method:" + methodDeclaration.Identifier.ValueText,
+            CSharp.MethodDeclarationSyntax methodDeclaration =>
+                "method:" +
+                methodDeclaration.Identifier.ValueText +
+                ":" +
+                methodDeclaration.TypeParameterList?.Parameters.Count +
+                ":" +
+                methodDeclaration.ParameterList.ToString(),
             CSharp.FieldDeclarationSyntax fieldDeclaration when fieldDeclaration.Declaration.Variables.Count == 1 =>
                 "field:" + fieldDeclaration.Declaration.Variables[0].Identifier.ValueText,
             _ => null,

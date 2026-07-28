@@ -1,16 +1,19 @@
 using Akbura.Akcss;
 using Akbura.CompilerAnotations;
 using Akbura.Furioso;
+using Akbura.Language;
 using Akbura.Language.Operations;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.LogicalTree;
+using Avalonia.VisualTree;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.UnitTests;
 
@@ -23,13 +26,18 @@ public sealed class AkburaCsGeneratorTests
         const string component =
             "using Avalonia.Controls;\n" +
             "\n" +
-            "param int Initial = 2;\n" +
-            "state int count = 0;\n" +
-            "\n" +
-            "<StackPanel x.Name=\"layout\">\n" +
-            "    <TextBlock x.Name=\"label\" Text={$\"Count: {count}\"} />\n" +
-            "    <Button Click={(sender, args) => count++}>+</Button>\n" +
-            "</StackPanel>\n";
+             "param int Initial = 2;\n" +
+             "state int count = 0;\n" +
+             "\n" +
+             "void Increment(int delta)\n" +
+             "{\n" +
+             "    count += delta;\n" +
+             "}\n" +
+             "\n" +
+             "<StackPanel x.Name=\"layout\">\n" +
+             "    <TextBlock x.Name=\"label\" Text={$\"Count: {count}\"} />\n" +
+             "    <Button Click={() => Increment(1)}>+</Button>\n" +
+             "</StackPanel>\n";
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         var compilation = CSharpCompilation.Create(
             "AkburaGeneratedComponentTests",
@@ -57,9 +65,12 @@ public sealed class AkburaCsGeneratorTests
         Assert.Contains("partial class Counter : global::Akbura.AkburaControl", text, StringComparison.Ordinal);
         Assert.Contains("Parameter<Counter, int> InitialProperty", text, StringComparison.Ordinal);
         Assert.Contains("StateInfo<int> s_stateInfo_count", text, StringComparison.Ordinal);
+        Assert.Contains("void Increment(int delta)", text, StringComparison.Ordinal);
         Assert.Contains("private global::Avalonia.Controls.TextBlock label", text, StringComparison.Ordinal);
         Assert.Contains("protected override global::Avalonia.Controls.Control FirstUpdate()", text, StringComparison.Ordinal);
         Assert.Contains("protected override global::Avalonia.Controls.Control Update()", text, StringComparison.Ordinal);
+        Assert.Contains("__eventArgument0", text, StringComparison.Ordinal);
+        Assert.Contains("__eventArgument1", text, StringComparison.Ordinal);
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
@@ -341,6 +352,471 @@ public sealed class AkburaCsGeneratorTests
             CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Generator_UsesObservableCollectionForNamedIListParameter()
+    {
+        const string owner =
+            """
+            using System.Collections.Generic;
+            using Demo;
+
+            param IList<TestPage> Pages;
+
+            <Avalonia.Controls.StackPanel />
+            """;
+        const string consumer =
+            """
+            using Demo;
+
+            <NamedCollectionOwner>
+                <NamedCollectionOwner.Pages>
+                    <TestPage />
+                    <TestPage />
+                </NamedCollectionOwner.Pages>
+            </NamedCollectionOwner>
+            """;
+        const string csharp =
+            """
+            namespace Demo
+            {
+                public sealed class TestPage : global::Avalonia.Controls.Control
+                {
+                }
+            }
+
+            public partial class NamedCollectionOwner
+            {
+                public NamedCollectionOwner()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+
+            public partial class NamedCollectionConsumer
+            {
+                public NamedCollectionConsumer()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedNamedCollectionParameterTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var ownerPath = Path.Combine(
+            Environment.CurrentDirectory,
+            "NamedCollectionOwner.akbura");
+        var consumerPath = Path.Combine(
+            Environment.CurrentDirectory,
+            "NamedCollectionConsumer.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    ownerPath,
+                    SourceText.From(owner)),
+                new TestAdditionalText(
+                    consumerPath,
+                    SourceText.From(consumer)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedSources = Assert.Single(
+            driver.GetRunResult().Results).GeneratedSources;
+        var ownerSource = Assert.Single(
+            generatedSources,
+            static source => source.HintName.Contains(
+                "NamedCollectionOwner.akbura",
+                StringComparison.Ordinal));
+        var ownerText = ownerSource.SourceText.ToString();
+        Assert.Contains(
+            "ReadOnlyParameter<NamedCollectionOwner, global::System.Collections.Generic.IList<global::Demo.TestPage>>",
+            ownerText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private readonly global::System.Collections.ObjectModel.ObservableCollection<global::Demo.TestPage> __collection_Pages = [];",
+            ownerText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "[global::Avalonia.Metadata.Content]",
+            ownerText,
+            StringComparison.Ordinal);
+
+        var consumerSource = Assert.Single(
+            generatedSources,
+            static source => source.HintName.Contains(
+                "NamedCollectionConsumer.akbura",
+                StringComparison.Ordinal));
+        Assert.Contains(
+            "__element0.__AkburaAddCollection_Pages(",
+            consumerSource.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var consumerControl = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(
+                        assembly.GetType("NamedCollectionConsumer")!));
+                var window = new Window
+                {
+                    Content = consumerControl,
+                };
+
+                window.Show();
+
+                var ownerControl = Assert.IsAssignableFrom<AkburaControl>(
+                    consumerControl.Child);
+                var pagesProperty = ownerControl.GetType().GetProperty("Pages")!;
+                Assert.False(pagesProperty.CanWrite);
+                var pages = Assert.IsAssignableFrom<System.Collections.IList>(
+                    pagesProperty.GetValue(ownerControl));
+                Assert.Equal(2, pages.Count);
+                Assert.Equal(
+                    "ObservableCollection`1",
+                    pages.GetType().Name);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_EmitsQualifiedUseEffectAndStabilizesAfterStateChange()
+    {
+        const string component =
+            """
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+            using Avalonia.Controls.Presenters;
+
+            param Control? Content = null;
+
+            state Control? content = null;
+
+            useEffect(() =>
+            {
+                content = new Border();
+            }, []);
+
+            Content = content;
+
+            <ContentPresenter Content={Content} />
+            """;
+        const string csharp =
+            """
+            public partial class EffectView
+            {
+                public EffectView()
+                    : base(
+                        new global::Akbura.Engine.AkburaEngineExtensions
+                            .AkburaEngineBuilder()
+                            .WithMaxUpdatesPerBatch(3)
+                            .Build())
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedUseEffectTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "EffectView.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        Assert.Contains(
+            "global::Akbura.Hooks.EffectHooks.useEffect(",
+            generated.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "__element0.UpdateChild();",
+            generated.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentControl = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(
+                        assembly.GetType("EffectView")!));
+                var window = new Window
+                {
+                    Content = componentControl,
+                };
+
+                window.Show();
+
+                var presenter = Assert.IsType<
+                    Avalonia.Controls.Presenters.ContentPresenter>(
+                    componentControl.Child);
+                var border = Assert.IsType<Border>(presenter.Content);
+                Assert.Same(
+                    presenter,
+                    border.GetVisualParent());
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_DeferredComponentBecomesContentPresenterVisualChild()
+    {
+        const string child =
+            """
+            using Avalonia.Controls;
+
+            <Border Width="100" Height="40">
+                <TextBlock Text="Visible child" />
+            </Border>
+            """;
+        const string router =
+            """
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+            using Avalonia.Controls.Presenters;
+            using Avalonia.Markup.Xaml.Templates;
+            using System.Collections.Generic;
+
+            param IList<DeferredPage> Pages;
+
+            state Control? content = null;
+
+            useEffect(() =>
+            {
+                content = TemplateContent
+                    .Load<Control>(Pages[0].Content)
+                    .Result;
+            }, [Pages]);
+
+            <ContentPresenter Content={content} />
+            """;
+        const string host =
+            """
+            <DeferredRouter>
+                <DeferredRouter.Pages>
+                    <DeferredPage>
+                        <DeferredChild />
+                    </DeferredPage>
+                </DeferredRouter.Pages>
+            </DeferredRouter>
+            """;
+        const string csharp =
+            """
+            using Avalonia.Metadata;
+
+            public sealed class DeferredPage
+            {
+                [Content]
+                [TemplateContent]
+                public object Content { get; set; } = null!;
+            }
+
+            public partial class DeferredChild : global::Akbura.AkburaControl
+            {
+                public DeferredChild()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+
+            public partial class DeferredRouter : global::Akbura.AkburaControl
+            {
+                public DeferredRouter()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+
+            public partial class DeferredHost : global::Akbura.AkburaControl
+            {
+                public DeferredHost()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaDeferredComponentPresenterTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    csharp,
+                    parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(
+                        Environment.CurrentDirectory,
+                        "DeferredChild.akbura"),
+                    SourceText.From(child)),
+                new TestAdditionalText(
+                    Path.Combine(
+                        Environment.CurrentDirectory,
+                        "DeferredRouter.akbura"),
+                    SourceText.From(router)),
+                new TestAdditionalText(
+                    Path.Combine(
+                        Environment.CurrentDirectory,
+                        "DeferredHost.akbura"),
+                    SourceText.From(host)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult =
+            updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly =
+            Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var hostControl =
+                    Assert.IsAssignableFrom<AkburaControl>(
+                        Activator.CreateInstance(
+                            assembly.GetType(
+                                "DeferredHost")!));
+                var window = new Window
+                {
+                    Width = 300,
+                    Height = 200,
+                    Content = hostControl,
+                };
+                window.Show();
+
+                var routerControl =
+                    Assert.IsAssignableFrom<AkburaControl>(
+                        hostControl.Child);
+                var presenter = Assert.IsType<
+                    Avalonia.Controls.Presenters.ContentPresenter>(
+                    routerControl.Child);
+                var childControl =
+                    Assert.IsAssignableFrom<AkburaControl>(
+                        presenter.Content);
+                Assert.Same(
+                    presenter,
+                    childControl.GetVisualParent());
+                Assert.IsType<Border>(
+                    childControl.Child);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
     [Theory]
     [InlineData(
         "System.Collections.IList",
@@ -348,6 +824,10 @@ public sealed class AkburaCsGeneratorTests
         true)]
     [InlineData(
         "System.Collections.Generic.IList<Avalonia.Controls.Control>",
+        "ObservableCollection<global::Avalonia.Controls.Control>",
+        true)]
+    [InlineData(
+        "System.Collections.Generic.ICollection<Avalonia.Controls.Control>",
         "ObservableCollection<global::Avalonia.Controls.Control>",
         true)]
     [InlineData(
@@ -589,6 +1069,89 @@ public sealed class AkburaCsGeneratorTests
                 window.Close();
             },
             CancellationToken.None);
+    }
+
+    [Fact]
+    public void Generator_EmitsFuncDataTemplateForAkburaDataTemplateParameter()
+    {
+        const string router =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Controls.Templates;
+
+            param IDataTemplate NotFound;
+
+            <ContentControl />
+            """;
+        const string app =
+            """
+            using Avalonia.Controls;
+
+            <Router>
+                <Router.NotFound x.DataType="string" x.ItemName="url">
+                    <TextBlock Text={$"Page '{url}' not found"} />
+                </Router.NotFound>
+            </Router>
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaDataTemplateParameterGeneratorTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var projectDirectory = Environment.CurrentDirectory;
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        "Router.akbura"),
+                    SourceText.From(router)),
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        "App.akbura"),
+                    SourceText.From(app)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Null(result.Exception);
+        var appSource = Assert.Single(
+            result.GeneratedSources,
+            static generated =>
+                generated.SourceText.ToString().Contains(
+                    "partial class App",
+                    StringComparison.Ordinal))
+            .SourceText
+            .ToString();
+        Assert.Contains(
+            "FuncDataTemplate<",
+            appSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "(url, __nameScope) =>",
+            appSource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -890,6 +1453,236 @@ public sealed class AkburaCsGeneratorTests
             "DataTemplate",
             generatorDiagnostic.GetMessage(),
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generator_ReportsUnknownDeclaredTypeAndMissingContentPresenterUsing()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            param MissingType Content;
+            state MissingStateType? content = null;
+
+            <ContentPresenter Content={Content} />
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaInvalidRouterDiagnosticsTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "InvalidRouter.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.Contains(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Id ==
+                    ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError &&
+                diagnostic.GetMessage().Contains(
+                    "MissingType",
+                    StringComparison.Ordinal));
+        Assert.Contains(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Id ==
+                    ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError &&
+                diagnostic.GetMessage().Contains(
+                    "MissingStateType",
+                    StringComparison.Ordinal));
+        Assert.Contains(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Id ==
+                    ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound &&
+                diagnostic.GetMessage().Contains(
+                    "ContentPresenter",
+                    StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Id == "CS0246");
+    }
+
+    [Fact]
+    public void ModuleManifestBuilder_RecoversUntilSemanticDiagnosticsAreReported()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            param MissingType Content;
+
+            <Control />
+            """;
+        var compilation = CSharpCompilation.Create(
+            "AkburaInvalidManifestRecoveryTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        var manifest = Akbura.Language.AkburaModuleManifestBuilder.Build(
+            "AkburaInvalidManifestRecoveryTests",
+            string.Empty,
+            [
+                new Akbura.Language.AkburaModuleSourceText(
+                    "InvalidManifest.akbura",
+                    SourceText.From(component)),
+            ],
+            compilation);
+
+        var source = Assert.Single(manifest.Sources);
+        var declaration = Assert.Single(source.Declarations);
+        Assert.NotNull(declaration.Component);
+        var parameter = Assert.Single(
+            declaration.Component.Parameters);
+        Assert.Equal(
+            "global::System.Object",
+            parameter.TypeName);
+    }
+
+    [Fact]
+    public void Generator_EmitsExecutableTopLevelStatementsInsideUpdate()
+    {
+        const string component =
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            using Avalonia.Controls;
+            using Avalonia.Controls.Presenters;
+            using Avalonia.Controls.Templates;
+
+            param Control? Content = null;
+            param IList<Page> Pages;
+            param bind string Url = "";
+            param IDataTemplate NotFound;
+
+            state Control? content = null;
+
+            void ClearContent()
+            {
+                content = null;
+            }
+
+            var page = Pages.FirstOrDefault(page =>
+                string.Equals(
+                    page.Uri,
+                    Url,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (content == null)
+            {
+                content = NotFound.Build(page);
+            }
+
+            Content = content;
+
+            <ContentPresenter Content={Content} />
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var pageSyntaxTree = CSharpSyntaxTree.ParseText(
+            """
+            public sealed class Page
+            {
+                public string Uri { get; } = string.Empty;
+            }
+            """,
+            parseOptions);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedRouterTests",
+            syntaxTrees:
+            [
+                pageSyntaxTree,
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "Router.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Null(result.Exception);
+        var generated = Assert.Single(result.GeneratedSources);
+        var generatedTree = CSharpSyntaxTree.ParseText(
+            generated.SourceText,
+            parseOptions);
+        var generatedRoot = generatedTree.GetCompilationUnitRoot();
+        var generatedClass = Assert.Single(
+            generatedRoot.DescendantNodes()
+                .OfType<CSharp.ClassDeclarationSyntax>());
+        Assert.Contains(
+            generatedClass.Members.OfType<CSharp.MethodDeclarationSyntax>(),
+            static method =>
+                method.Identifier.ValueText == "ClearContent");
+
+        var update = Assert.Single(
+            generatedClass.Members
+                .OfType<CSharp.MethodDeclarationSyntax>(),
+            static method =>
+                method.Identifier.ValueText == "Update");
+        Assert.NotNull(update.Body);
+        Assert.IsType<CSharp.LocalDeclarationStatementSyntax>(
+            update.Body.Statements[0]);
+        Assert.IsType<CSharp.IfStatementSyntax>(
+            update.Body.Statements[1]);
+        var assignment = Assert.IsType<CSharp.ExpressionStatementSyntax>(
+            update.Body.Statements[2]);
+        Assert.Equal(
+            "Content = content",
+            assignment.Expression.ToString());
+        Assert.DoesNotContain(
+            generatedTree.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -1224,6 +2017,251 @@ public sealed class AkburaCsGeneratorTests
             "using Avalonia.Controls;",
             generatedSource,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generator_GlobalAkburaUsingsAreAppliedWithoutGeneratingAComponent()
+    {
+        const string globalUsings =
+            """
+            using System.Text;
+            using Avalonia.Controls.Presenters;
+            """;
+        const string component =
+            """
+            state StringBuilder text = new();
+
+            <ContentPresenter />
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGlobalUsingsGeneratorTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var projectDirectory = Environment.CurrentDirectory;
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        "Configuration",
+                        GlobalUsings.ComponentFileName),
+                    SourceText.From(globalUsings)),
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        "Views",
+                        "Counter.akbura"),
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Null(result.Exception);
+        var generated = Assert.Single(result.GeneratedSources);
+        var generatedText = generated.SourceText.ToString();
+        Assert.Contains(
+            "using System.Text;",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "using Avalonia.Controls.Presenters;",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "class GlobalUsings",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Generator_GlobalAkcssUsingsAreAppliedWithoutGeneratingAModule()
+    {
+        const string globalUsings =
+            "@using Avalonia.Controls;";
+        const string styles =
+            """
+            Control.example {
+                Width: 10;
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGlobalAkcssUsingsGeneratorTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var projectDirectory = Environment.CurrentDirectory;
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        "Configuration",
+                        GlobalUsings.AkcssFileName),
+                    SourceText.From(globalUsings)),
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        "Styles.akcss"),
+                    SourceText.From(styles)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Null(result.Exception);
+        var generated = Assert.Single(result.GeneratedSources);
+        Assert.Contains(
+            "using Avalonia.Controls;",
+            generated.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Generator_GlobalUsingsFilesRejectNonUsingMembers()
+    {
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaInvalidGlobalUsingsGeneratorTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var projectDirectory = Environment.CurrentDirectory;
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        GlobalUsings.ComponentFileName),
+                    SourceText.From(
+                        """
+                        using System;
+                        <object />
+                        """)),
+                new TestAdditionalText(
+                    Path.Combine(
+                        projectDirectory,
+                        GlobalUsings.AkcssFileName),
+                    SourceText.From(".invalid { }")),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out _,
+            out var generatorDiagnostics);
+
+        Assert.Equal(
+            2,
+            generatorDiagnostics.Count(
+                static diagnostic =>
+                    diagnostic.Id ==
+                    ErrorCodes
+                        .AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing));
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Null(result.Exception);
+        Assert.Empty(result.GeneratedSources);
+    }
+
+    [Fact]
+    public void ModuleManifest_GlobalUsingsAffectSignaturesButAreNotExported()
+    {
+        var compilation = CSharpCompilation.Create(
+            "AkburaGlobalUsingsManifestTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var manifest = AkburaModuleManifestBuilder.Build(
+            "AkburaGlobalUsingsManifestTests",
+            string.Empty,
+            [
+                new AkburaModuleSourceText(
+                    Path.Combine(
+                        "Configuration",
+                        GlobalUsings.ComponentFileName),
+                    SourceText.From("using System.Text;")),
+                new AkburaModuleSourceText(
+                    "Counter.akbura",
+                    SourceText.From(
+                        """
+                        param StringBuilder Text;
+
+                        <object />
+                        """)),
+                new AkburaModuleSourceText(
+                    Path.Combine(
+                        "Configuration",
+                        GlobalUsings.AkcssFileName),
+                    SourceText.From("@using Avalonia.Controls;")),
+                new AkburaModuleSourceText(
+                    "Styles.akcss",
+                    SourceText.From(".example { }")),
+            ],
+            compilation);
+
+        Assert.Equal(2, manifest.Sources.Length);
+        var componentSource = Assert.Single(
+            manifest.Sources,
+            static source =>
+                source.Kind == AkburaModuleSourceKind.Component);
+        var component = Assert.Single(
+            componentSource.Declarations).Component;
+        Assert.NotNull(component);
+        Assert.Equal(
+            "global::System.Text.StringBuilder",
+            Assert.Single(component.Parameters).TypeName);
+        Assert.DoesNotContain(
+            manifest.Sources,
+            static source =>
+                Path.GetFileName(source.SourceCodePath)
+                    .StartsWith(
+                        "GlobalUsings.",
+                        StringComparison.OrdinalIgnoreCase));
     }
 
     private static string GenerateWhitespaceComponent(string component)

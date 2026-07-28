@@ -11,8 +11,11 @@ namespace Akbura.Engine;
 /// </summary>
 public sealed class AkburaEngine
 {
+    public const int DefaultMaxUpdatesPerBatch = 100;
+
     public static readonly AkburaEngine Empty = new(EmptyServiceProvider.Instance);
 
+    private int _maxUpdatesPerBatch = DefaultMaxUpdatesPerBatch;
 
     /// <summary>
     /// Gets or initializes the fallback engine instance used when an
@@ -43,6 +46,31 @@ public sealed class AkburaEngine
     }
 
     private readonly IAkburaServiceProvider _serviceProvider;
+
+    /// <summary>
+    /// Gets or sets the maximum number of consecutive <c>Update()</c> passes
+    /// that one component can execute in a single synchronous batch.
+    /// </summary>
+    /// <remarks>
+    /// The limit prevents a component that changes its own state or parameters
+    /// on every pass from keeping the application in an infinite update loop.
+    /// </remarks>
+    public int MaxUpdatesPerBatch
+    {
+        get => _maxUpdatesPerBatch;
+        set
+        {
+            if (value < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "The maximum update count must be greater than zero.");
+            }
+
+            _maxUpdatesPerBatch = value;
+        }
+    }
 
     public AkburaEngine(IAkburaServiceProvider serviceProvider)
     {

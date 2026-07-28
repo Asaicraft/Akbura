@@ -1322,7 +1322,8 @@ internal sealed partial class Parser
                     parenDepth == 0 &&
                     bracketDepth == 0 &&
                     braceDepth == 0 &&
-                    canHaveBlockBody)
+                    (canHaveBlockBody ||
+                     IsCSharpLocalFunctionHeader(tokens)))
                 {
                     var body = ParseIncrementalCSharpBlockSyntaxCore();
                     return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body);

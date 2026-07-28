@@ -1,8 +1,5 @@
 using Akbura.FeatureGallery.Styles.akcss;
 using System.Collections.Immutable;
-using Avalonia.Controls;
-using Avalonia.Data;
-using Avalonia.Markup.Xaml.Templates;
 
 state ImmutableArray<(string Name, int Age)> persons =
 [

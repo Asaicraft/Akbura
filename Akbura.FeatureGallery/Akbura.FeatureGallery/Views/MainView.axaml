@@ -6,9 +6,8 @@
 			 mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
 			 x:Class="Akbura.FeatureGallery.Views.MainView"
 			 xmlns:component="using:Akbura.FeatureGallery.Components"
-
-			 HorizontalContentAlignment="Center"
-			 VerticalContentAlignment="Center"
+			 HorizontalContentAlignment="Stretch"
+			 VerticalContentAlignment="Stretch"
 			 x:DataType="vm:MainViewModel">
 	<Design.DataContext>
 		<!-- This only sets the DataContext for the previewer in an IDE,
@@ -16,12 +15,6 @@
 		<vm:MainViewModel />
 	</Design.DataContext>
 
-	<StackPanel Spacing="12" Orientation="Horizontal">
-		
-		<component:Counter/>
-
-		<component:DataTemplates/>
-
-	</StackPanel>
+	<component:App/>
 
 </UserControl>

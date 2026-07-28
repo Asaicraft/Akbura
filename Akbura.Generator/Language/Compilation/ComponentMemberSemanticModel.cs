@@ -304,9 +304,10 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             }
 
             var hasExplicitType = stateDeclaration.Type != null;
-            var explicitType = hasExplicitType
-                ? ResolveExplicitStateType(stateDeclaration)
-                : default;
+            var explicitTypeBinding = hasExplicitType
+                ? BindDeclaredType(stateDeclaration.Type!)
+                : CSharpBindingResult.Empty;
+            var explicitType = GetBoundType(explicitTypeBinding);
             var useHookBinding = BindStateUseHook(stateDeclaration);
             var bindingKind = AkburaSemanticModel.GetStateBindingKind(stateDeclaration.Initializer);
             var initializerBinding = useHookBinding.Invocation?.BindingResult ??
@@ -332,6 +333,10 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddDuplicateComponentMemberDiagnostics(stateDeclaration, name, diagnosticsBuilder);
+                AddDeclaredTypeDiagnostics(
+                    stateDeclaration.Type,
+                    explicitTypeBinding,
+                    diagnosticsBuilder);
                 if (!useHookBinding.WasRecognized)
                 {
                     AkburaSemanticModel.AddCSharpBindingDiagnostics(
@@ -371,9 +376,10 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             }
 
             var hasExplicitType = paramDeclaration.Type != null;
-            var explicitType = hasExplicitType
-                ? ResolveExplicitParamType(paramDeclaration)
-                : default;
+            var explicitTypeBinding = hasExplicitType
+                ? BindDeclaredType(paramDeclaration.Type!)
+                : CSharpBindingResult.Empty;
+            var explicitType = GetBoundType(explicitTypeBinding);
             var defaultValueBinding = BindParamDefaultValueExpression(
                 paramDeclaration,
                 explicitType.Symbol as ITypeSymbol);
@@ -389,6 +395,10 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddDuplicateComponentMemberDiagnostics(paramDeclaration, name, diagnosticsBuilder);
+                AddDeclaredTypeDiagnostics(
+                    paramDeclaration.Type,
+                    explicitTypeBinding,
+                    diagnosticsBuilder);
                 if (paramDeclaration.DefaultValue != null)
                 {
                     AkburaSemanticModel.AddCSharpBindingDiagnostics(
@@ -425,12 +435,17 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
             }
 
-            var type = ResolveInjectType(injectDeclaration);
+            var typeBinding = BindDeclaredType(injectDeclaration.Type);
+            var type = GetBoundType(typeBinding);
 
             var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddDuplicateComponentMemberDiagnostics(injectDeclaration, name, diagnosticsBuilder);
+                AddDeclaredTypeDiagnostics(
+                    injectDeclaration.Type,
+                    typeBinding,
+                    diagnosticsBuilder);
                 diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
             var diagnostics = SetSemanticDiagnostics(injectDeclaration, diagnosticsBag);
@@ -452,7 +467,8 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
             }
 
-            var returnType = ResolveCommandReturnType(commandDeclaration);
+            var returnTypeBinding = BindDeclaredType(commandDeclaration.ReturnType);
+            var returnType = GetBoundType(returnTypeBinding);
             var parameters = CreateCommandParameters(commandDeclaration);
             var isVoid = returnType.Symbol is ITypeSymbol { SpecialType: SpecialType.System_Void };
             var isAsyncLike = true;
@@ -464,6 +480,11 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddDuplicateComponentMemberDiagnostics(commandDeclaration, name, diagnosticsBuilder);
                 AddDuplicateCommandParameterDiagnostics(commandDeclaration, diagnosticsBuilder);
+                AddDeclaredTypeDiagnostics(
+                    commandDeclaration.ReturnType,
+                    returnTypeBinding,
+                    diagnosticsBuilder,
+                    allowVoid: true);
                 diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
             var diagnostics = SetSemanticDiagnostics(commandDeclaration, diagnosticsBag);
@@ -604,14 +625,8 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             return declaration;
         }
 
-        private CSharpSymbolDefinition ResolveExplicitStateType(StateDeclarationSyntax stateDeclaration)
+        private CSharpBindingResult BindDeclaredType(CSharpTypeSyntax typeSyntax)
         {
-            var typeSyntax = stateDeclaration.Type;
-            if (typeSyntax == null)
-            {
-                return default;
-            }
-
             CSharp.TypeSyntax csharpType;
             try
             {
@@ -619,69 +634,43 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
             }
             catch (InvalidOperationException)
             {
-                return default;
+                return CSharpBindingResult.Empty;
             }
 
-            var binding = BindCSharpType(csharpType);
+            return BindCSharpType(csharpType);
+        }
+
+        private static CSharpSymbolDefinition GetBoundType(CSharpBindingResult binding)
+        {
             var typeSymbol = binding.TypeSymbol;
             return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
         }
 
-        private CSharpSymbolDefinition ResolveExplicitParamType(ParamDeclarationSyntax paramDeclaration)
+        private static void AddDeclaredTypeDiagnostics(
+            CSharpTypeSyntax? typeSyntax,
+            CSharpBindingResult binding,
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+            bool allowVoid = false)
         {
-            var typeSyntax = paramDeclaration.Type;
             if (typeSyntax == null)
             {
-                return default;
+                return;
             }
 
-            CSharp.TypeSyntax csharpType;
-            try
+            if (allowVoid &&
+                binding.TypeSymbol is
+                {
+                    SpecialType: SpecialType.System_Void,
+                })
             {
-                csharpType = typeSyntax.ToCSharp();
-            }
-            catch (InvalidOperationException)
-            {
-                return default;
-            }
-
-            var binding = BindCSharpType(csharpType);
-            var typeSymbol = binding.TypeSymbol;
-            return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-        }
-
-        private CSharpSymbolDefinition ResolveInjectType(InjectDeclarationSyntax injectDeclaration)
-        {
-            CSharp.TypeSyntax csharpType;
-            try
-            {
-                csharpType = injectDeclaration.Type.ToCSharp();
-            }
-            catch (InvalidOperationException)
-            {
-                return default;
+                return;
             }
 
-            var binding = BindCSharpType(csharpType);
-            var typeSymbol = binding.TypeSymbol;
-            return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
-        }
-
-        private CSharpSymbolDefinition ResolveCommandReturnType(CommandDeclarationSyntax commandDeclaration)
-        {
-            CSharp.TypeSyntax csharpType;
-            try
-            {
-                csharpType = commandDeclaration.ReturnType.ToCSharp();
-            }
-            catch (InvalidOperationException)
-            {
-                return default;
-            }
-
-            var binding = BindCSharpType(csharpType);
-            var typeSymbol = binding.TypeSymbol;
-            return typeSymbol == null ? default : new CSharpSymbolDefinition(typeSymbol);
+            AkburaSemanticModel.AddCSharpBindingDiagnostics(
+                typeSyntax,
+                typeSyntax.ToFullString().Trim(),
+                binding,
+                diagnosticsBuilder);
         }
 
         private ImmutableArray<ICommandParameterSymbol> CreateCommandParameters(

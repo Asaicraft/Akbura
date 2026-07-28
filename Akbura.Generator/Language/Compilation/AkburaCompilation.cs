@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language;
 
@@ -14,6 +15,9 @@ internal sealed partial class AkburaCompilation
     private readonly ConcurrentDictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
     private readonly SyntaxAndDeclarationManager _syntaxAndDeclarations;
     private readonly ReferenceManager _referenceManager;
+    private ImmutableArray<UsingDirectiveSyntax> _lazyGlobalAkburaUsingDirectives;
+    private ImmutableArray<AkcssUsingDirectiveSyntax> _lazyGlobalAkcssUsingDirectives;
+    private ImmutableArray<CSharp.UsingDirectiveSyntax> _lazyGlobalCSharpUsingDirectives;
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
@@ -107,6 +111,51 @@ internal sealed partial class AkburaCompilation
     internal SyntaxAndDeclarationManager SyntaxAndDeclarations => _syntaxAndDeclarations;
 
     public DeclarationTable DeclarationTable => _syntaxAndDeclarations.DeclarationTable;
+
+    internal ImmutableArray<UsingDirectiveSyntax> GlobalAkburaUsingDirectives
+    {
+        get
+        {
+            if (_lazyGlobalAkburaUsingDirectives.IsDefault)
+            {
+                ImmutableInterlocked.InterlockedInitialize(
+                    ref _lazyGlobalAkburaUsingDirectives,
+                    CreateGlobalAkburaUsingDirectives());
+            }
+
+            return _lazyGlobalAkburaUsingDirectives;
+        }
+    }
+
+    internal ImmutableArray<AkcssUsingDirectiveSyntax> GlobalAkcssUsingDirectives
+    {
+        get
+        {
+            if (_lazyGlobalAkcssUsingDirectives.IsDefault)
+            {
+                ImmutableInterlocked.InterlockedInitialize(
+                    ref _lazyGlobalAkcssUsingDirectives,
+                    CreateGlobalAkcssUsingDirectives());
+            }
+
+            return _lazyGlobalAkcssUsingDirectives;
+        }
+    }
+
+    internal ImmutableArray<CSharp.UsingDirectiveSyntax> GlobalCSharpUsingDirectives
+    {
+        get
+        {
+            if (_lazyGlobalCSharpUsingDirectives.IsDefault)
+            {
+                ImmutableInterlocked.InterlockedInitialize(
+                    ref _lazyGlobalCSharpUsingDirectives,
+                    CreateGlobalCSharpUsingDirectives());
+            }
+
+            return _lazyGlobalCSharpUsingDirectives;
+        }
+    }
 
     public AkburaCompilation WithSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
@@ -325,6 +374,73 @@ internal sealed partial class AkburaCompilation
     {
         return DeclarationTable.TryGetDeclarationPath(syntax, position, out path) ||
                _referenceManager.TryGetDeclarationPath(syntax, position, out path);
+    }
+
+    private ImmutableArray<UsingDirectiveSyntax> CreateGlobalAkburaUsingDirectives()
+    {
+        var builder = ImmutableArray.CreateBuilder<UsingDirectiveSyntax>();
+        foreach (var syntaxTree in SyntaxTrees)
+        {
+            var isGlobalUsingsFile =
+                GlobalUsings.IsComponentFile(syntaxTree);
+            foreach (var member in syntaxTree.GetRoot().Members)
+            {
+                if (member is UsingDirectiveSyntax usingDirective &&
+                    (isGlobalUsingsFile ||
+                     usingDirective.GlobalKeyword.RawKind != 0))
+                {
+                    builder.Add(usingDirective);
+                }
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<AkcssUsingDirectiveSyntax> CreateGlobalAkcssUsingDirectives()
+    {
+        var builder =
+            ImmutableArray.CreateBuilder<AkcssUsingDirectiveSyntax>();
+        foreach (var syntaxTree in AkcssSyntaxTrees)
+        {
+            if (!GlobalUsings.IsAkcssFile(syntaxTree))
+            {
+                continue;
+            }
+
+            foreach (var member in syntaxTree.GetRoot().Members)
+            {
+                if (member is AkcssUsingDirectiveSyntax usingDirective)
+                {
+                    builder.Add(usingDirective);
+                }
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<CSharp.UsingDirectiveSyntax> CreateGlobalCSharpUsingDirectives()
+    {
+        var builder =
+            ImmutableArray.CreateBuilder<CSharp.UsingDirectiveSyntax>();
+        foreach (var syntaxTree in CSharpCompilation.SyntaxTrees)
+        {
+            if (syntaxTree.GetRoot() is not CSharp.CompilationUnitSyntax root)
+            {
+                continue;
+            }
+
+            foreach (var usingDirective in root.Usings)
+            {
+                if (usingDirective.GlobalKeyword.RawKind != 0)
+                {
+                    builder.Add(usingDirective);
+                }
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     private AkburaCompilation WithSyntaxAndDeclarations(

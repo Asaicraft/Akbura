@@ -65,5 +65,6 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_UseHookInvalidContext = nameof(AKBURA_SEMANTIC_UseHookInvalidContext);
     public const string AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid = nameof(AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid);
     public const string AKBURA_SEMANTIC_MarkupWhitespaceDuplicate = nameof(AKBURA_SEMANTIC_MarkupWhitespaceDuplicate);
+    public const string AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing = nameof(AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing);
     public const string WRN_ErrorOverride = nameof(WRN_ErrorOverride);
 }

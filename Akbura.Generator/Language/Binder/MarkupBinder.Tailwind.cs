@@ -909,14 +909,9 @@ internal sealed partial class MarkupBinder
     private ImmutableArray<string> GetAkcssImportNames()
     {
         using var builder = ImmutableArrayBuilder<string>.Rent();
-        foreach (var member in SemanticModel.SyntaxTree.GetRoot().Members)
+        foreach (var usingDirective in SemanticModel.GetAkburaUsingDirectives())
         {
-            if (member.Kind != AkburaSyntaxKind.UsingDirectiveSyntax)
-            {
-                continue;
-            }
-
-            if (TryGetAkcssImportName(Unsafe.As<UsingDirectiveSyntax>(member), out var importName))
+            if (TryGetAkcssImportName(usingDirective, out var importName))
             {
                 builder.Add(importName);
             }

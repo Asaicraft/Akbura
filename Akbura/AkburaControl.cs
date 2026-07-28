@@ -449,8 +449,19 @@ public abstract class AkburaControl : Control, IComponentTree
 			return;
 		}
 
+		var updateCount = 0;
+		var maxUpdatesPerBatch = _engine.MaxUpdatesPerBatch;
 		while (_updatePending && _updateSuppressionDepth == 0)
 		{
+			if (updateCount >= maxUpdatesPerBatch)
+			{
+				_updatePending = false;
+				throw new AkburaUpdateLimitExceededException(
+					this,
+					maxUpdatesPerBatch);
+			}
+
+			updateCount++;
 			_updatePending = false;
 			_isUpdating = true;
 			_useHooks.BeginFrame();

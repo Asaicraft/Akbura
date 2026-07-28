@@ -156,6 +156,11 @@ internal sealed partial class DeclarationTable
         var componentsBuilder = ImmutableArray.CreateBuilder<Declaration>(syntaxTrees.Length);
         foreach (var tree in syntaxTrees)
         {
+            if (GlobalUsings.IsComponentFile(tree))
+            {
+                continue;
+            }
+
             componentsBuilder.Add(TryReuseComponent(previous, tree, out var declaration)
                 ? declaration
                 : DeclarationTreeBuilder.ForSyntaxDeclaration(tree));
@@ -164,6 +169,11 @@ internal sealed partial class DeclarationTable
         var akcssModulesBuilder = ImmutableArray.CreateBuilder<Declaration>(akcssSyntaxTrees.Length);
         foreach (var tree in akcssSyntaxTrees)
         {
+            if (GlobalUsings.IsAkcssFile(tree))
+            {
+                continue;
+            }
+
             akcssModulesBuilder.Add(TryReuseAkcssModule(previous, tree, out var declaration)
                 ? declaration
                 : DeclarationTreeBuilder.ForSyntaxDeclaration(tree));

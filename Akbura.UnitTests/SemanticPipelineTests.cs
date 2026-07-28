@@ -44,6 +44,287 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_GlobalAkburaUsingsApplyToEveryComponent()
+    {
+        var globalUsings = ComponentSyntaxTree.ParseText(
+            """
+            using System.Text;
+            using Avalonia.Controls.Presenters;
+            """,
+            Path.Combine(
+                @"C:\Project",
+                "Configuration",
+                GlobalUsings.ComponentFileName));
+        var component = ComponentSyntaxTree.ParseText(
+            """
+            state StringBuilder text = new();
+
+            <ContentPresenter />
+            """,
+            Path.Combine(
+                @"C:\Project",
+                "Views",
+                "Counter.akbura"));
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [globalUsings, component]);
+        var semanticModel = compilation.GetSemanticModel(component);
+        var state = Assert.Single(
+            component.GetRoot().Members.OfType<StateDeclarationSyntax>());
+        var element = GetOnlyMarkupElement(component);
+
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            semanticModel.GetSymbolInfo(state).Symbol);
+        var componentSymbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            semanticModel.GetSymbolInfo(element).Symbol);
+
+        Assert.Equal(
+            "global::System.Text.StringBuilder",
+            stateSymbol.Type.Symbol?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal(
+            "global::Avalonia.Controls.Presenters.ContentPresenter",
+            componentSymbol.ComponentType?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Single(compilation.DeclarationTable.Components);
+        Assert.DoesNotContain(
+            compilation.DeclarationTable.Components,
+            static declaration =>
+                declaration.Name == "GlobalUsings");
+    }
+
+    [Fact]
+    public void SemanticModel_AkburaGlobalUsingAppliesToSiblingComponent()
+    {
+        var imports = ComponentSyntaxTree.ParseText(
+            "global using Avalonia.Controls.Presenters;",
+            Path.Combine(@"C:\Project", "Imports.akbura"));
+        var component = ComponentSyntaxTree.ParseText(
+            "<ContentPresenter />",
+            Path.Combine(@"C:\Project", "Counter.akbura"));
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [imports, component]);
+        var semanticModel = compilation.GetSemanticModel(component);
+        var symbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            semanticModel.GetSymbolInfo(
+                GetOnlyMarkupElement(component)).Symbol);
+
+        Assert.Equal(
+            "global::Avalonia.Controls.Presenters.ContentPresenter",
+            symbol.ComponentType?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+    }
+
+    [Fact]
+    public void SemanticModel_CSharpGlobalUsingAppliesToAkburaComponent()
+    {
+        var component = ComponentSyntaxTree.ParseText(
+            """
+            state StringBuilder text = new();
+
+            <ContentPresenter />
+            """,
+            Path.Combine(@"C:\Project", "Counter.akbura"));
+        var csharpCompilation = CreateCSharpCompilation(
+            """
+            global using Avalonia.Controls.Presenters;
+            global using System.Text;
+            """);
+        var compilation = new AkburaCompilation(
+            csharpCompilation,
+            [component]);
+        var semanticModel = compilation.GetSemanticModel(component);
+        var state = Assert.Single(
+            component.GetRoot().Members.OfType<StateDeclarationSyntax>());
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            semanticModel.GetSymbolInfo(state).Symbol);
+        var symbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            semanticModel.GetSymbolInfo(
+                GetOnlyMarkupElement(component)).Symbol);
+
+        Assert.Equal(
+            "global::System.Text.StringBuilder",
+            stateSymbol.Type.Symbol?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal(
+            "global::Avalonia.Controls.Presenters.ContentPresenter",
+            symbol.ComponentType?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+    }
+
+    [Fact]
+    public void SemanticModel_GlobalAkcssUsingsApplyToEveryAkcssFile()
+    {
+        var component = ComponentSyntaxTree.ParseText(
+            string.Empty,
+            Path.Combine(@"C:\Project", "Host.akbura"));
+        var globalUsings = AkcssSyntaxTree.ParseText(
+            "@using Avalonia.Controls;",
+            Path.Combine(
+                @"C:\Project",
+                "Configuration",
+                GlobalUsings.AkcssFileName));
+        var styles = AkcssSyntaxTree.ParseText(
+            """
+            Control.example {
+                Width: 10;
+            }
+            """,
+            Path.Combine(@"C:\Project", "Styles.akcss"));
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [component],
+            [globalUsings, styles]);
+        var semanticModel = compilation.GetSemanticModel(component);
+        var rule = Assert.Single(
+            styles.GetRoot().Members.OfType<AkcssStyleRuleSyntax>());
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rule).Symbol);
+
+        Assert.Equal(
+            "global::Avalonia.Controls.Control",
+            symbol.TargetType.Symbol?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Single(compilation.DeclarationTable.AkcssModules);
+        Assert.DoesNotContain(
+            compilation.DeclarationTable.AkcssModules,
+            static declaration =>
+                declaration.Name == "GlobalUsings.akcss");
+    }
+
+    [Fact]
+    public void SemanticModel_GlobalAkcssModuleImportAppliesToEveryAkcssFile()
+    {
+        var component = ComponentSyntaxTree.ParseText(
+            string.Empty,
+            Path.Combine(@"C:\Project", "Host.akbura"));
+        var globalUsings = AkcssSyntaxTree.ParseText(
+            "@using Shared.Styles.akcss;",
+            Path.Combine(@"C:\Project", GlobalUsings.AkcssFileName));
+        var imported = AkcssSyntaxTree.ParseText(
+            ".imported { }",
+            Path.Combine(@"C:\Project", "Shared.akcss"),
+            "Shared.Styles.akcss");
+        var styles = AkcssSyntaxTree.ParseText(
+            """
+            .consumer {
+                @apply imported;
+            }
+            """,
+            Path.Combine(@"C:\Project", "Styles.akcss"));
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [component],
+            [globalUsings, imported, styles]);
+        var semanticModel = compilation.GetSemanticModel(component);
+        var rule = Assert.Single(
+            styles.GetRoot().Members.OfType<AkcssStyleRuleSyntax>());
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rule).Symbol);
+        var apply = Assert.IsAssignableFrom<IAkcssApplyOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.False(apply.HasErrors);
+        Assert.Equal(
+            "imported",
+            Assert.Single(apply.AppliedSymbols).ClassName);
+    }
+
+    [Fact]
+    public void SemanticModel_GlobalAkburaAkcssImportAppliesToEveryComponent()
+    {
+        var globalUsings = ComponentSyntaxTree.ParseText(
+            "using Shared.Styles.akcss;",
+            Path.Combine(@"C:\Project", GlobalUsings.ComponentFileName));
+        var component = ComponentSyntaxTree.ParseText(
+            """
+            using Avalonia.Controls;
+
+            <Button flex />
+            """,
+            Path.Combine(@"C:\Project", "View.akbura"));
+        var styles = AkcssSyntaxTree.ParseText(
+            """
+            @utilities {
+                .flex {
+                    Width: 10;
+                }
+            }
+            """,
+            Path.Combine(@"C:\Project", "Styles.akcss"),
+            "Shared.Styles.akcss");
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [globalUsings, component],
+            [styles]);
+        var semanticModel = compilation.GetSemanticModel(component);
+        var attribute = Assert.IsAssignableFrom<TailwindFlagAttributeSyntax>(
+            Assert.Single(
+                GetOnlyMarkupElement(component)
+                    .StartTag!
+                    .Attributes));
+        var operation =
+            Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                semanticModel.GetOperation(attribute));
+
+        Assert.False(operation.HasErrors);
+        Assert.Equal("flex", operation.Utility?.Name);
+    }
+
+    [Fact]
+    public void SemanticModel_ReplacingGlobalUsingsUpdatesSiblingBinding()
+    {
+        var firstGlobalUsings = ComponentSyntaxTree.ParseText(
+            "using First;",
+            Path.Combine(@"C:\Project", GlobalUsings.ComponentFileName));
+        var component = ComponentSyntaxTree.ParseText(
+            "<Widget />",
+            Path.Combine(@"C:\Project", "View.akbura"));
+        var csharpCompilation = CreateCSharpCompilation(
+            """
+            namespace First
+            {
+                public sealed class Widget : Avalonia.Controls.Control { }
+            }
+
+            namespace Second
+            {
+                public sealed class Widget : Avalonia.Controls.Control { }
+            }
+            """);
+        var firstCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [firstGlobalUsings, component]);
+        var firstSymbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            firstCompilation
+                .GetSemanticModel(component)
+                .GetSymbolInfo(GetOnlyMarkupElement(component))
+                .Symbol);
+
+        var secondGlobalUsings = ComponentSyntaxTree.ParseText(
+            "using Second;",
+            firstGlobalUsings.FilePath);
+        var secondCompilation = firstCompilation.ReplaceSyntaxTree(
+            firstGlobalUsings,
+            secondGlobalUsings);
+        var secondSymbol = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            secondCompilation
+                .GetSemanticModel(component)
+                .GetSymbolInfo(GetOnlyMarkupElement(component))
+                .Symbol);
+
+        Assert.Equal(
+            "global::First.Widget",
+            firstSymbol.ComponentType?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal(
+            "global::Second.Widget",
+            secondSymbol.ComponentType?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+    }
+
+    [Fact]
     public void SemanticModel_AkburaComponentSymbol_CollectsTopLevelAndConditionalMarkup()
     {
         const string code =
@@ -4429,6 +4710,75 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkburaDataTemplateParameterWrapsControlAndDeclaresItemName()
+    {
+        var routerTree = ComponentSyntaxTree.ParseText(
+            """
+            using Avalonia.Controls;
+            using Avalonia.Controls.Templates;
+
+            param IDataTemplate NotFound;
+
+            <ContentControl />
+            """,
+            Path.Combine(@"C:\Project", "Router.akbura"));
+        var appTree = ComponentSyntaxTree.ParseText(
+            """
+            using Avalonia.Controls;
+
+            <Router>
+                <Router.NotFound x.DataType="string" x.ItemName="url">
+                    <TextBlock Text={$"Page '{url}' not found"} />
+                </Router.NotFound>
+            </Router>
+            """,
+            Path.Combine(@"C:\Project", "App.akbura"));
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [routerTree, appTree]);
+        var semanticModel = compilation.GetSemanticModel(appTree);
+        var propertyElement = Assert.Single(
+            appTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() ==
+                "Router.NotFound");
+        var textAttribute = Assert.Single(
+            appTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MarkupPlainAttributeSyntax>(),
+            static attribute =>
+                attribute.Name.Identifier.ValueText == "Text");
+
+        var contentOperation =
+            Assert.IsAssignableFrom<IMarkupContentOperation>(
+                semanticModel.GetOperation(propertyElement));
+        var textOperation =
+            Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+                semanticModel.GetOperation(textAttribute));
+        var itemReference = Assert.Single(
+            semanticModel.GetCSharpSymbolReferences(textAttribute),
+            static reference =>
+                reference.AkburaSymbol is
+                    IMarkupItemSymbol { Name: "url" });
+        var itemSymbol =
+            Assert.IsAssignableFrom<IMarkupItemSymbol>(
+                itemReference.AkburaSymbol);
+
+        Assert.False(contentOperation.HasErrors);
+        Assert.False(textOperation.HasErrors);
+        Assert.Equal(
+            SpecialType.System_String,
+            Assert.IsAssignableFrom<INamedTypeSymbol>(
+                itemSymbol.Type.Symbol).SpecialType);
+        Assert.Empty(
+            semanticModel.GetSemanticDiagnostics(propertyElement));
+        Assert.Empty(
+            semanticModel.GetSemanticDiagnostics(textAttribute));
+    }
+
+    [Fact]
     public void SemanticModel_ItemTemplateBinding_UsesConfiguredItemsAncestorType()
     {
         const string code =
@@ -5088,6 +5438,7 @@ public class SemanticPipelineTests
     }
 
     [Theory]
+    [InlineData("() => count++", 0, false)]
     [InlineData("(sender, args) => count++", 2, false)]
     [InlineData("(_, args) => { if(count == 5) { Console.WriteLine(\"Hello!\"); } count++; }", 2, false)]
     public void SemanticModel_MarkupRoutedEventAttribute_BindsLambdaHandlers(
@@ -5113,7 +5464,11 @@ public class SemanticPipelineTests
 
         Assert.Equal("Click", operation.Event.Name);
         Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
-        Assert.Equal(MarkupCommandArgumentMode.ReceivesCommandArgument, operation.ArgumentMode);
+        Assert.Equal(
+            expectedParameterCount == 0
+                ? MarkupCommandArgumentMode.IgnoresCommandArgument
+                : MarkupCommandArgumentMode.ReceivesCommandArgument,
+            operation.ArgumentMode);
         Assert.Equal(expectedParameterCount, operation.HandlerParameterCount);
         Assert.Equal(expectedAsync, operation.IsAsync);
         Assert.False(operation.HandlerOperation.IsDefault);
@@ -5124,6 +5479,44 @@ public class SemanticPipelineTests
         Assert.Equal("RoutedEventArgs", operation.EventArgsType.Name);
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupRoutedEventAttribute_BindsComponentMethodFromParameterlessLambda()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            state string url = "";
+
+            void Navigate(string target)
+            {
+                url = target;
+            }
+
+            <Button Click={() => Navigate("/pages")} />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var method = Assert.Single(
+            syntaxTree.GetRoot().Members.OfType<CSharpStatementSyntax>());
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+        var operation =
+            Assert.IsAssignableFrom<IMarkupRoutedEventBindingOperation>(
+                semanticModel.GetOperation(attribute));
+
+        Assert.False(operation.HasErrors);
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(method));
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(attribute));
+        Assert.Contains(
+            EnumerateCSharpOperations(operation),
+            static csharpOperation =>
+                csharpOperation.CSharpTargetDefinition.Symbol is
+                    IMethodSymbol { Name: "Navigate" });
     }
 
     [Fact]

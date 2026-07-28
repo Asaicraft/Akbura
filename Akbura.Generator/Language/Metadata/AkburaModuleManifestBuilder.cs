@@ -81,17 +81,29 @@ internal static class AkburaModuleManifestBuilder
         {
             var sourceCodePath = NormalizeSourceCodePath(source.SourceCodePath);
 
-            builder.Add(componentTrees.TryGetValue(
+            if (componentTrees.TryGetValue(
                 sourceCodePath,
-                out var componentTree)
-            ? BuildComponentSource(
-                sourceCodePath,
-                componentTree,
-                compilation)
-            : BuildAkcssSource(
-                sourceCodePath,
-                akcssTrees[sourceCodePath],
-                rootNamespace));
+                out var componentTree))
+            {
+                if (!GlobalUsings.IsComponentFile(componentTree))
+                {
+                    builder.Add(BuildComponentSource(
+                        sourceCodePath,
+                        componentTree,
+                        compilation));
+                }
+
+                continue;
+            }
+
+            var akcssTree = akcssTrees[sourceCodePath];
+            if (!GlobalUsings.IsAkcssFile(akcssTree))
+            {
+                builder.Add(BuildAkcssSource(
+                    sourceCodePath,
+                    akcssTree,
+                    rootNamespace ?? string.Empty));
+            }
         }
 
         return new AkburaModuleManifest(
@@ -142,7 +154,7 @@ internal static class AkburaModuleManifestBuilder
             parameters.Add(new AkburaModuleComponentParameter(
                 ordinal,
                 parameter.Name,
-                GetRequiredTypeName(parameter.Type, $"parameter '{parameter.Name}'"),
+                GetTypeNameOrRecoveryType(parameter.Type),
                 parameter.BindingKind,
                 parameter.HasDefaultValue,
                 parameter.DeclarationSyntax.FullSpan.Start,
@@ -157,26 +169,26 @@ internal static class AkburaModuleManifestBuilder
             injectedServices.Add(new AkburaModuleComponentInject(
                 ordinal,
                 injectedService.Name,
-                GetRequiredTypeName(injectedService.Type, $"injected service '{injectedService.Name}'"),
+                GetTypeNameOrRecoveryType(injectedService.Type),
                 injectedService.IsOptional,
                 injectedService.DeclarationSyntax.FullSpan.Start,
                 injectedService.DeclarationSyntax.FullSpan.Length));
         }
 
         return new AkburaModuleComponent(
-            GetRequiredTypeName(component.BaseType, $"component '{component.MetadataName}' base type"),
+            GetTypeNameOrRecoveryType(component.BaseType),
             parameters.ToImmutable(),
             injectedServices.ToImmutable());
     }
 
-    private static string GetRequiredTypeName(
-        CSharpSymbolDefinition definition,
-        string description)
+    private static string GetTypeNameOrRecoveryType(
+        CSharpSymbolDefinition definition)
     {
         if (definition.Symbol is not ITypeSymbol { TypeKind: not TypeKind.Error } type)
         {
-            throw new InvalidOperationException(
-                $"Could not resolve the {description} while creating the Akbura module manifest.");
+            // Manifest generation precedes Csc, so keep the build moving until
+            // the source generator can report the actual semantic diagnostic.
+            return "global::System.Object";
         }
 
         return type.ToDisplayString(s_typeDisplayFormat);

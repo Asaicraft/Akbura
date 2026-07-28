@@ -146,6 +146,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         var componentTrees = ImmutableArray.CreateBuilder<AkburaSyntaxTree>();
         var sourceComponentTrees = ImmutableArray.CreateBuilder<ComponentSyntaxTree>();
         var akcssTrees = ImmutableArray.CreateBuilder<AkcssSyntaxTree>();
+        var sourceAkcssTrees = ImmutableArray.CreateBuilder<AkcssSyntaxTree>();
 
         foreach (var syntaxTree in syntaxTrees)
         {
@@ -153,19 +154,28 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             {
                 case ComponentSyntaxTree componentSyntaxTree:
                     componentTrees.Add(syntaxTree);
-                    sourceComponentTrees.Add(componentSyntaxTree);
+                    if (!GlobalUsings.IsComponentFile(componentSyntaxTree))
+                    {
+                        sourceComponentTrees.Add(componentSyntaxTree);
+                    }
+
                     break;
                 case AkcssSyntaxTree akcssSyntaxTree:
                     akcssTrees.Add(akcssSyntaxTree);
+                    if (!GlobalUsings.IsAkcssFile(akcssSyntaxTree))
+                    {
+                        sourceAkcssTrees.Add(akcssSyntaxTree);
+                    }
+
                     break;
             }
         }
 
-        var semanticHost = componentTrees.Count > 0
-            ? componentTrees[0]
+        var semanticHost = sourceComponentTrees.Count > 0
+            ? sourceComponentTrees[0]
             : CreateSemanticHost(projectOptions.ProjectDirectory, context.CancellationToken);
 
-        if (componentTrees.Count == 0)
+        if (sourceComponentTrees.Count == 0)
         {
             componentTrees.Add(semanticHost);
         }
@@ -173,6 +183,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         var componentSyntaxTrees = componentTrees.ToImmutable();
         var sourceComponents = sourceComponentTrees.ToImmutable();
         var akcssSyntaxTrees = akcssTrees.ToImmutable();
+        var sourceAkcssSyntaxTrees = sourceAkcssTrees.ToImmutable();
         var akburaCompilation = new AkburaCompilation(
             csharpCompilation,
             componentSyntaxTrees,
@@ -187,7 +198,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         var sourceMap = new AkcssGenerationSourceMap(mappedSyntaxTrees);
         var akcssModuleTypeNames = new Dictionary<Akbura.Language.Syntax.AkburaSyntax, string>();
         var componentInputs = new ComponentGenerationInput?[sourceComponents.Length];
-        var externalAkcssInputs = new AkcssGenerationInput?[akcssSyntaxTrees.Length];
+        var externalAkcssInputs = new AkcssGenerationInput?[sourceAkcssSyntaxTrees.Length];
         var inlineAkcssInputs = new List<AkcssGenerationInput>();
 
         for (var index = 0; index < sourceComponents.Length; index++)
@@ -216,13 +227,14 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                 inlineAkcssInputs.Add(new AkcssGenerationInput(
                     module,
                     sourcePath,
-                    moduleIdentity));
+                    moduleIdentity,
+                    model.GetAkcssCSharpUsingDirectives(module)));
             }
         }
 
-        for (var index = 0; index < akcssSyntaxTrees.Length; index++)
+        for (var index = 0; index < sourceAkcssSyntaxTrees.Length; index++)
         {
-            var syntaxTree = akcssSyntaxTrees[index];
+            var syntaxTree = sourceAkcssSyntaxTrees[index];
             var root = syntaxTree.GetRootSyntax();
             if (semanticModel.GetDeclaredSymbol(root) is not IAkcssModuleSymbol symbol)
             {
@@ -233,7 +245,8 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             externalAkcssInputs[index] = new AkcssGenerationInput(
                 symbol,
                 sourcePath,
-                sourcePath);
+                sourcePath,
+                semanticModel.GetAkcssCSharpUsingDirectives(symbol));
 
             akcssModuleTypeNames[symbol.DeclaringSyntax] =
                 AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
@@ -242,7 +255,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         }
 
         var componentResults = new GeneratedSource?[sourceComponents.Length];
-        var akcssResults = new GeneratedSource?[akcssSyntaxTrees.Length];
+        var akcssResults = new GeneratedSource?[sourceAkcssSyntaxTrees.Length];
         var inlineAkcssResults = new GeneratedSource?[inlineAkcssInputs.Count];
 
         Parallel.For(
@@ -272,7 +285,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
 
         Parallel.For(
             0,
-            akcssSyntaxTrees.Length,
+            sourceAkcssSyntaxTrees.Length,
             new ParallelOptions
             {
                 CancellationToken = context.CancellationToken,
@@ -290,7 +303,8 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     sourceMap,
                     input.SourcePath,
                     projectOptions.RootNamespace,
-                    input.ModuleIdentity);
+                    input.ModuleIdentity,
+                    input.UsingDirectives);
 
                 akcssResults[index] = new GeneratedSource(
                     AkcssGenerator.GetHintName(
@@ -316,7 +330,8 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     sourceMap,
                     input.SourcePath,
                     projectOptions.RootNamespace,
-                    input.ModuleIdentity);
+                    input.ModuleIdentity,
+                    input.UsingDirectives);
                 inlineAkcssResults[index] = new GeneratedSource(
                     AkcssGenerator.GetHintName(
                         input.Symbol,
@@ -328,6 +343,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         AddGeneratedSources(context, componentResults);
         AddGeneratedSources(context, akcssResults);
         AddGeneratedSources(context, inlineAkcssResults);
+        ReportGlobalUsingsDiagnostics(context, syntaxTrees);
 
         foreach (var syntaxTree in sourceComponents)
         {
@@ -353,7 +369,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
     }
 
     private static Diagnostic CreateDiagnostic(
-        ComponentSyntaxTree syntaxTree,
+        AkburaSyntaxTree syntaxTree,
         AkburaSemanticDiagnostic diagnostic)
     {
         var severity = diagnostic.Severity switch
@@ -376,6 +392,64 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             span,
             syntaxTree.Text.Lines.GetLinePositionSpan(span));
         return Diagnostic.Create(descriptor, location);
+    }
+
+    private static void ReportGlobalUsingsDiagnostics(
+        SourceProductionContext context,
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees)
+    {
+        foreach (var syntaxTree in syntaxTrees)
+        {
+            if (GlobalUsings.IsComponentFile(syntaxTree))
+            {
+                foreach (var member in syntaxTree.GetRoot().Members)
+                {
+                    if (member is not Akbura.Language.Syntax.UsingDirectiveSyntax)
+                    {
+                        context.ReportDiagnostic(
+                            CreateInvalidGlobalUsingsDiagnostic(
+                                syntaxTree,
+                                member));
+                    }
+                }
+            }
+            else if (syntaxTree is AkcssSyntaxTree akcssSyntaxTree &&
+                     GlobalUsings.IsAkcssFile(akcssSyntaxTree))
+            {
+                foreach (var member in akcssSyntaxTree.GetRoot().Members)
+                {
+                    if (member is not Akbura.Language.Syntax.AkcssUsingDirectiveSyntax)
+                    {
+                        context.ReportDiagnostic(
+                            CreateInvalidGlobalUsingsDiagnostic(
+                                syntaxTree,
+                                member));
+                    }
+                }
+            }
+        }
+    }
+
+    private static Diagnostic CreateInvalidGlobalUsingsDiagnostic(
+        AkburaSyntaxTree syntaxTree,
+        Akbura.Language.Syntax.AkburaSyntax syntax)
+    {
+        var descriptor = new DiagnosticDescriptor(
+            ErrorCodes.AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing,
+            ErrorCodes.AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing,
+            "Global usings file '{0}' may contain only using directives",
+            "Akbura",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+        var span = syntax.Span;
+        var location = Microsoft.CodeAnalysis.Location.Create(
+            syntaxTree.FilePath,
+            span,
+            syntaxTree.Text.Lines.GetLinePositionSpan(span));
+        return Diagnostic.Create(
+            descriptor,
+            location,
+            Path.GetFileName(syntaxTree.FilePath));
     }
 
     private static ComponentSyntaxTree CreateSemanticHost(
@@ -463,7 +537,8 @@ internal readonly record struct ComponentGenerationInput(
 internal readonly record struct AkcssGenerationInput(
     IAkcssModuleSymbol Symbol,
     string SourcePath,
-    string ModuleIdentity);
+    string ModuleIdentity,
+    ImmutableArray<Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax> UsingDirectives);
 
 internal readonly record struct AkburaAndAkcssFile(SourceText? SourceText, string Path)
 {

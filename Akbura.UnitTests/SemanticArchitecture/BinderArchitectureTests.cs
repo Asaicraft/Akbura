@@ -599,6 +599,83 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
         Assert.NotEmpty(invalidBinding.Diagnostics);
     }
 
+    [Fact]
+    public void CSharpProbeBinder_BindsTopLevelLocalDeclarationWithLambda()
+    {
+        const string code =
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            param IList<Page> Pages;
+            param string Url = "";
+
+            var page = Pages.FirstOrDefault(page =>
+                string.Equals(
+                    page.Uri,
+                    Url,
+                    StringComparison.OrdinalIgnoreCase));
+            """;
+        const string projectDirectory = @"C:\Project";
+        var tree = AkburaSyntaxTree.ParseText(
+            code,
+            Path.Combine(
+                projectDirectory,
+                "Components",
+                "Router.akbura"));
+        var csharpCompilation = CreateCSharpCompilation().AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(
+                """
+                namespace Akbura.FeatureGallery.Components;
+
+                public sealed class Page
+                {
+                    public string Uri { get; set; } = string.Empty;
+                }
+                """));
+        var compilation = new AkburaCompilation(
+            csharpCompilation,
+            [tree],
+            rootNamespace: "Akbura.FeatureGallery",
+            projectDirectory);
+        var model = compilation.GetSemanticModel(tree);
+        var statement = Assert.Single(
+            tree.GetRoot().Members.OfType<CSharpStatementSyntax>());
+        var parsed = Assert.IsType<
+            Microsoft.CodeAnalysis.CSharp.Syntax.LocalDeclarationStatementSyntax>(
+            statement.GetRawCSharpStatement());
+
+        var bound = model.BindingSession
+            .GetCSharpProbeBinder(
+                statement,
+                BinderUsage.Statement)
+            .BindStatement(
+                statement,
+                parsed);
+
+        var localDeclaration =
+            Assert.IsType<BoundLocalDeclarationStatement>(bound);
+        Assert.True(
+            !localDeclaration.HasErrors,
+            string.Join(
+                Environment.NewLine,
+                localDeclaration.Diagnostics.Select(
+                    static diagnostic => diagnostic.Message)));
+        Assert.Equal(
+            "page",
+            Assert.Single(localDeclaration.Locals).Name);
+
+        Assert.NotNull(model.GetOperation(statement));
+        var semanticDiagnostics = model.GetSemanticDiagnostics(statement);
+        Assert.True(
+            semanticDiagnostics.IsEmpty,
+            string.Join(
+                Environment.NewLine,
+                semanticDiagnostics.Select(
+                    static diagnostic => diagnostic.Message)));
+    }
+
 
     [Fact]
     public void CSharpProbeBinder_BindExpressionUsesComponentAndBlockScope()

@@ -20,6 +20,7 @@ using RoslynFieldSymbol = Microsoft.CodeAnalysis.IFieldSymbol;
 using RoslynMethodSymbol = Microsoft.CodeAnalysis.IMethodSymbol;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Furioso;
 
@@ -406,9 +407,9 @@ internal static class ComponentGenerator
         {
             foreach (var parameter in _symbol.Parameters)
             {
-                if (TryGetContentCollection(parameter, out var collection))
+                if (TryGetParameterCollection(parameter, out var collection))
                 {
-                    AppendCollectionContentParameter(
+                    AppendCollectionParameter(
                         source,
                         indentation,
                         parameter,
@@ -492,34 +493,39 @@ internal static class ComponentGenerator
             source.AppendLine();
         }
 
-        private void AppendCollectionContentParameter(
+        private void AppendCollectionParameter(
             StringBuilder source,
             int indentation,
             IParamSymbol parameter,
-            ContentCollectionInfo collection)
+            ParameterCollectionInfo collection)
         {
             var ownerType = EscapeIdentifier(_symbol.Name);
             var name = EscapeIdentifier(parameter.Name);
             var suffix = SanitizeIdentifier(parameter.Name);
-            var backingField = "__content_" + suffix;
+            var isContent = IsContentParameter(parameter);
+            var backingField = "__collection_" + suffix;
             var subscribedField = "__contentSubscribed_" + suffix;
             var logicalChildrenField = "__contentLogicalChildren_" + suffix;
             var synchronizeMethod = "__SynchronizeContentLogicalChildren_" + suffix;
             var collectionChangedMethod = "__OnContentCollectionChanged_" + suffix;
-            var addMethod = "__AkburaAddContent_" + suffix;
+            var addMethod = "__AkburaAddCollection_" + suffix;
 
             AppendIndented(source, indentation)
                 .Append("private readonly ").Append(collection.BackingType).Append(' ')
                 .Append(backingField).AppendLine(" = [];");
-            if (collection.ObservesChanges)
+            if (isContent && collection.ObservesChanges)
             {
                 AppendIndented(source, indentation).Append("private bool ")
                     .Append(subscribedField).AppendLine(";");
             }
 
-            AppendIndented(source, indentation)
-                .Append("private readonly global::System.Collections.Generic.List<global::Avalonia.Controls.Control> ")
-                .Append(logicalChildrenField).AppendLine(" = [];");
+            if (isContent)
+            {
+                AppendIndented(source, indentation)
+                    .Append("private readonly global::System.Collections.Generic.List<global::Avalonia.Controls.Control> ")
+                    .Append(logicalChildrenField).AppendLine(" = [];");
+            }
+
             source.AppendLine();
 
             AppendIndented(source, indentation)
@@ -531,13 +537,17 @@ internal static class ComponentGenerator
                 .Append(ownerType).Append(", ").Append(collection.PropertyType).Append(">(")
                 .Append(ToStringLiteral(parameter.Name)).Append(", static __owner => __owner.")
                 .Append(name).AppendLine(");");
-            AppendIndentedLine(source, indentation, "[global::Avalonia.Metadata.Content]");
+            if (isContent)
+            {
+                AppendIndentedLine(source, indentation, "[global::Avalonia.Metadata.Content]");
+            }
+
             AppendIndented(source, indentation).Append("public ").Append(collection.PropertyType)
                 .Append(' ').Append(name).AppendLine();
             AppendIndentedLine(source, indentation, "{");
             AppendIndentedLine(source, indentation + 1, "get");
             AppendIndentedLine(source, indentation + 1, "{");
-            if (collection.ObservesChanges)
+            if (isContent && collection.ObservesChanges)
             {
                 AppendIndented(source, indentation + 2).Append("if (!").Append(subscribedField).AppendLine(")");
                 AppendIndentedLine(source, indentation + 2, "{");
@@ -558,13 +568,18 @@ internal static class ComponentGenerator
                 .Append('(').Append(collection.ElementType).AppendLine(" value)");
             AppendIndentedLine(source, indentation, "{");
             AppendIndented(source, indentation + 1).Append(name).AppendLine(".Add(value);");
-            if (!collection.ObservesChanges)
+            if (isContent && !collection.ObservesChanges)
             {
                 AppendIndented(source, indentation + 1).Append(synchronizeMethod).AppendLine("();");
             }
 
             AppendIndentedLine(source, indentation, "}");
             source.AppendLine();
+
+            if (!isContent)
+            {
+                return;
+            }
 
             if (collection.ObservesChanges)
             {
@@ -770,7 +785,9 @@ internal static class ComponentGenerator
                 {
                     AppendIndented(source, indentation).Append("private global::Akbura.ComponentTree.State<")
                         .Append(type).Append("> __CreateState_").Append(suffix).Append("() => ")
-                        .Append(invocation.EffectiveInvocation.ToFullString().Trim()).AppendLine(";");
+                        .Append(GetUseHookInvocation(
+                            invocation.Hook.Method,
+                            invocation.EffectiveInvocation)).AppendLine(";");
                 }
                 else
                 {
@@ -786,7 +803,9 @@ internal static class ComponentGenerator
 
             foreach (var member in document.Members.OfType<CSharpStatementSyntax>())
             {
-                if (_semanticModel.GetOperation(member) is IUseHookOperation)
+                if (_semanticModel.GetOperation(member) is IUseHookOperation ||
+                    !IsGeneratedClassMember(member) ||
+                    HasSemanticErrors(member))
                 {
                     continue;
                 }
@@ -992,6 +1011,11 @@ internal static class ComponentGenerator
                     }
                 }
 
+                AppendVisualRootRefresh(
+                    source,
+                    roots,
+                    indentation + 1);
+
                 AppendIndented(source, indentation + 1).Append("return ").Append(roots[0].FieldName).AppendLine(";");
                 AppendIndentedLine(source, indentation, "}");
             }
@@ -1001,7 +1025,36 @@ internal static class ComponentGenerator
             AppendIndentedLine(source, indentation, "{");
             foreach (var member in _symbol.DeclarationSyntax.Members.OfType<CSharpStatementSyntax>())
             {
-                if (_semanticModel.GetOperation(member) is not IUseHookOperation operation || operation.HasErrors)
+                var operation = _semanticModel.GetOperation(member);
+                if (operation is IUseHookOperation useHookOperation)
+                {
+                    if (!useHookOperation.HasErrors)
+                    {
+                        AppendLineDirective(
+                            source,
+                            indentation + 1,
+                            member,
+                            GetUseHookInvocation(
+                                useHookOperation.Method,
+                                useHookOperation.EffectiveInvocation) + ";",
+                            valueOffset: 0);
+                    }
+
+                    continue;
+                }
+
+                if (IsGeneratedClassMember(member))
+                {
+                    continue;
+                }
+
+                if (HasSemanticErrors(member))
+                {
+                    continue;
+                }
+
+                var text = member.ToFullString().Trim();
+                if (text.Length == 0)
                 {
                     continue;
                 }
@@ -1010,7 +1063,7 @@ internal static class ComponentGenerator
                     source,
                     indentation + 1,
                     member,
-                    operation.EffectiveInvocation.ToFullString().Trim() + ";",
+                    text,
                     valueOffset: 0);
             }
 
@@ -1024,10 +1077,59 @@ internal static class ComponentGenerator
                 }
             }
 
+            AppendVisualRootRefresh(
+                source,
+                roots,
+                indentation + 1);
+
             AppendIndented(source, indentation + 1).Append("return ")
                 .Append(roots.IsDefaultOrEmpty ? "__generatedRoot" : roots[0].FieldName).AppendLine(";");
             AppendIndentedLine(source, indentation, "}");
             source.AppendLine();
+        }
+
+        private static bool IsGeneratedClassMember(CSharpStatementSyntax statement)
+        {
+            return statement.GetRawCSharpStatement() is
+                CSharp.LocalFunctionStatementSyntax;
+        }
+
+        private void AppendVisualRootRefresh(
+            StringBuilder source,
+            ImmutableArray<ElementPlan> roots,
+            int indentation)
+        {
+            foreach (var root in roots)
+            {
+                if (IsContentPresenter(root.Symbol.ComponentType))
+                {
+                    AppendIndented(source, indentation)
+                        .Append(root.FieldName)
+                        .AppendLine(".UpdateChild();");
+                }
+            }
+        }
+
+        private bool IsContentPresenter(INamedTypeSymbol? type)
+        {
+            var contentPresenterType =
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetTypeByMetadataName(
+                        "Avalonia.Controls.Presenters.ContentPresenter");
+
+            return type != null &&
+                   contentPresenterType != null &&
+                   _semanticModel.Compilation.CSharpCompilation
+                       .ClassifyConversion(type, contentPresenterType)
+                       .IsImplicit;
+        }
+
+        private bool HasSemanticErrors(AkburaSyntax syntax)
+        {
+            return _semanticModel.GetSemanticDiagnostics(syntax)
+                .Any(static diagnostic =>
+                    diagnostic.Severity ==
+                    AkburaDiagnosticSeverity.Error);
         }
 
         private static void AppendRootDataContextBinding(
@@ -1365,13 +1467,10 @@ internal static class ComponentGenerator
 
         private bool IsDataTemplateProperty(AkburaPropertySymbol property)
         {
-            var clrProperty = GetClrProperty(property);
-
-            return clrProperty != null &&
+            return property.Type.Symbol is ITypeSymbol propertyType &&
                    _semanticModel.BindingSession
                        .MarkupTemplateContent
-                       .IsDataTemplateProperty(
-                           clrProperty);
+                       .IsDataTemplateType(propertyType);
         }
 
         private bool IsDataTemplateElement(ElementPlan element)
@@ -2002,9 +2101,9 @@ internal static class ComponentGenerator
             AkburaSyntax syntax)
         {
             if (property.Parameter is { } parameter &&
-                TryGetContentCollection(parameter, out _))
+                TryGetParameterCollection(parameter, out _))
             {
-                var methodName = "__AkburaAddContent_" + SanitizeIdentifier(parameter.Name);
+                var methodName = "__AkburaAddCollection_" + SanitizeIdentifier(parameter.Name);
                 var statement = $"{target}.{methodName}({value});";
                 AppendLineDirective(
                     source,
@@ -2690,9 +2789,16 @@ internal static class ComponentGenerator
                 return "static (_, _) => { }";
             }
 
-            if (operation.HandlerKind is
-                MarkupCommandHandlerKind.Lambda or
-                MarkupCommandHandlerKind.DirectReference)
+            if (operation.HandlerKind == MarkupCommandHandlerKind.Lambda)
+            {
+                return operation.HandlerParameterCount == 0
+                    ? AdaptParameterlessEventLambda(
+                        expression!,
+                        GetEventHandlerParameterCount(operation))
+                    : expression!;
+            }
+
+            if (operation.HandlerKind == MarkupCommandHandlerKind.DirectReference)
             {
                 return expression!;
             }
@@ -2709,6 +2815,59 @@ internal static class ComponentGenerator
                 : string.Empty;
 
             return $"{asyncPrefix}{parameters} => {{ {expression}; }}";
+        }
+
+        private static int GetEventHandlerParameterCount(
+            IMarkupRoutedEventBindingOperation operation)
+        {
+            return operation.HandlerType.Symbol is INamedTypeSymbol
+            {
+                DelegateInvokeMethod: { } invokeMethod,
+            }
+                ? invokeMethod.Parameters.Length
+                : 2;
+        }
+
+        private static string AdaptParameterlessEventLambda(
+            string expression,
+            int parameterCount)
+        {
+            if (parameterCount == 0)
+            {
+                return expression;
+            }
+
+            var parsedExpression =
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(
+                    expression);
+            var parameterList =
+                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseParameterList(
+                "(" +
+                string.Join(
+                    ", ",
+                    Enumerable.Range(0, parameterCount)
+                        .Select(static index =>
+                            "__eventArgument" +
+                            index.ToString(CultureInfo.InvariantCulture))) +
+                ")");
+
+            return parsedExpression switch
+            {
+                CSharp.ParenthesizedLambdaExpressionSyntax lambda
+                    when lambda.ParameterList.Parameters.Count == 0 =>
+                    lambda.WithParameterList(parameterList)
+                        .ToFullString()
+                        .Trim(),
+                CSharp.AnonymousMethodExpressionSyntax anonymousMethod
+                    when anonymousMethod.ParameterList is
+                    {
+                        Parameters.Count: 0,
+                    } =>
+                    anonymousMethod.WithParameterList(parameterList)
+                        .ToFullString()
+                        .Trim(),
+                _ => expression,
+            };
         }
 
         private static bool IsFirstUpdateValue(IMarkupPropertySetterOperation operation)
@@ -2994,13 +3153,12 @@ internal static class ComponentGenerator
         return string.Equals(parameter.Name, "Content", StringComparison.Ordinal);
     }
 
-    private static bool TryGetContentCollection(
+    private static bool TryGetParameterCollection(
         IParamSymbol parameter,
-        out ContentCollectionInfo collection)
+        out ParameterCollectionInfo collection)
     {
         collection = default;
-        if (!IsContentParameter(parameter) ||
-            parameter.BindingKind != ParamBindingKind.Default ||
+        if (parameter.BindingKind != ParamBindingKind.Default ||
             parameter.Type.Symbol is not INamedTypeSymbol namedType)
         {
             return false;
@@ -3013,7 +3171,7 @@ internal static class ComponentGenerator
             original.Arity == 0 &&
             namespaceName == "System.Collections")
         {
-            collection = new ContentCollectionInfo(
+            collection = new ParameterCollectionInfo(
                 propertyType,
                 "global::System.Object",
                 "global::System.Collections.ObjectModel.ObservableCollection<global::System.Object>",
@@ -3027,10 +3185,11 @@ internal static class ComponentGenerator
         }
 
         var elementType = GetTypeName(namedType.TypeArguments[0]);
-        if (original.Name == "IList" &&
+        if ((original.Name == "IList" ||
+             original.Name == "ICollection") &&
             namespaceName == "System.Collections.Generic")
         {
-            collection = new ContentCollectionInfo(
+            collection = new ParameterCollectionInfo(
                 propertyType,
                 elementType,
                 $"global::System.Collections.ObjectModel.ObservableCollection<{elementType}>",
@@ -3041,7 +3200,7 @@ internal static class ComponentGenerator
         if (original.Name == "ObservableCollection" &&
             namespaceName == "System.Collections.ObjectModel")
         {
-            collection = new ContentCollectionInfo(
+            collection = new ParameterCollectionInfo(
                 propertyType,
                 elementType,
                 propertyType,
@@ -3052,7 +3211,7 @@ internal static class ComponentGenerator
         if (original.Name == "List" &&
             namespaceName == "System.Collections.Generic")
         {
-            collection = new ContentCollectionInfo(
+            collection = new ParameterCollectionInfo(
                 propertyType,
                 elementType,
                 propertyType,
@@ -3063,7 +3222,7 @@ internal static class ComponentGenerator
         return false;
     }
 
-    private readonly record struct ContentCollectionInfo(
+    private readonly record struct ParameterCollectionInfo(
         string PropertyType,
         string ElementType,
         string BackingType,
@@ -3219,12 +3378,57 @@ internal static class ComponentGenerator
         return $"{GetTypeName(method.ContainingType)}.{EscapeIdentifier(method.Name)}";
     }
 
+    private static string GetUseHookInvocation(
+        RoslynMethodSymbol method,
+        CSharp.InvocationExpressionSyntax invocation)
+    {
+        var methodReference = GetMethodReference(method);
+        if (method.IsGenericMethod)
+        {
+            methodReference +=
+                "<" +
+                string.Join(
+                    ", ",
+                    method.TypeArguments.Select(GetTypeName)) +
+                ">";
+        }
+
+        return methodReference +
+            invocation.ArgumentList.ToFullString().TrimEnd();
+    }
 
     private static string GetTypeName(Microsoft.CodeAnalysis.ISymbol? symbol)
     {
-        return symbol is ITypeSymbol type
+        return symbol is ITypeSymbol type &&
+            !ContainsErrorType(type)
             ? type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
             : "global::System.Object";
+    }
+
+    private static bool ContainsErrorType(ITypeSymbol type)
+    {
+        if (type is IErrorTypeSymbol ||
+            type.TypeKind == TypeKind.Error)
+        {
+            return true;
+        }
+
+        return type switch
+        {
+            IArrayTypeSymbol array =>
+                ContainsErrorType(array.ElementType),
+            IPointerTypeSymbol pointer =>
+                ContainsErrorType(pointer.PointedAtType),
+            INamedTypeSymbol named =>
+                named.TypeArguments.Any(ContainsErrorType),
+            IFunctionPointerTypeSymbol functionPointer =>
+                ContainsErrorType(
+                    functionPointer.Signature.ReturnType) ||
+                functionPointer.Signature.Parameters.Any(
+                    static parameter =>
+                        ContainsErrorType(parameter.Type)),
+            _ => false,
+        };
     }
 
     private static string FormatConstant(object? value, Microsoft.CodeAnalysis.ISymbol? targetType)

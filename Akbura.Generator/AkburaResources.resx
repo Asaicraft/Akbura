@@ -198,6 +198,9 @@
   <data name="AKBURA_SEMANTIC_MarkupComponentNotFound" xml:space="preserve">
     <value>Markup component '{0}' was not found. Add a using directive or use its fully qualified type name.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing" xml:space="preserve">
+    <value>Global usings file '{0}' may contain only using directives.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_MarkupPropertyNotFound" xml:space="preserve">
     <value>Property '{0}' was not found on component '{1}'.</value>
   </data>

@@ -54,7 +54,8 @@ internal sealed partial class CSharpProbeBinder : Binder
 
         var typeInfo = semanticModel.GetTypeInfo(probeType);
         var symbolInfo = semanticModel.GetSymbolInfo(probeType);
-        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
+        var diagnostics = GetProbeDiagnostics(semanticModel, probeType);
+        var typeSymbol = ContainsErrorType(typeInfo.Type)
             ? null
             : typeInfo.Type;
 
@@ -65,7 +66,8 @@ internal sealed partial class CSharpProbeBinder : Binder
             isBindingPath: true,
             symbolInfo.CandidateSymbols,
             ToAkburaCandidateReason(symbolInfo.CandidateReason),
-            operationDefinition: default);
+            operationDefinition: default,
+            diagnostics);
     }
 
     public CSharpBindingResult BindReturnExpression(
@@ -250,7 +252,11 @@ internal sealed partial class CSharpProbeBinder : Binder
         CSharp.ExpressionSyntax expression,
         ITypeSymbol? targetType)
     {
-        var probeScope = CreateProbeScope(scope, expression);
+        var containingMethod = GetContainingComponentMethodProbe(scope);
+        var probeScope = CreateProbeScope(
+            scope,
+            expression,
+            GetParameterNames(containingMethod));
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expression);
         var returnType = targetType == null
             ? CSharpSyntaxFactory.PredefinedType(
@@ -261,6 +267,7 @@ internal sealed partial class CSharpProbeBinder : Binder
                 returnType,
                 "__akbura_probe")
             .WithBody(CreateProbeBlock(probeScope.LocalStatements, returnStatement));
+        method = ApplyContainingMethodContext(method, containingMethod);
         return CreateComponentProbeCompilationUnit(
             AddProbeMethod(probeScope.MemberDeclarations, method),
             "__AkburaProbe");
@@ -270,14 +277,151 @@ internal sealed partial class CSharpProbeBinder : Binder
         AkburaSyntax scope,
         CSharp.StatementSyntax statement)
     {
-        var probeScope = CreateProbeScope(scope, statement);
+        var precedingLocals = GetPrecedingLocalDeclarations(scope);
+        var analyzedBlock = CreateProbeBlock(
+            ImmutableArray<CSharp.StatementSyntax>.Empty,
+            precedingLocals,
+            statement);
+        var containingMethod = GetContainingComponentMethodProbe(scope);
+        var probeScope = CreateProbeScope(
+            scope,
+            analyzedBlock,
+            GetParameterNames(containingMethod));
         var method = CSharpSyntaxFactory.MethodDeclaration(
-                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
+                containingMethod?.ReturnType ??
+                    CSharpSyntaxFactory.PredefinedType(
+                        CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
                 "__akbura_statement_probe")
-            .WithBody(CreateProbeBlock(probeScope.LocalStatements, statement));
+            .WithBody(CreateProbeBlock(
+                probeScope.LocalStatements,
+                precedingLocals,
+                statement));
+        method = ApplyContainingMethodContext(method, containingMethod);
         return CreateComponentProbeCompilationUnit(
             AddProbeMethod(probeScope.MemberDeclarations, method),
             "__AkburaStatementProbe");
+    }
+
+    private static CSharp.MethodDeclarationSyntax ApplyContainingMethodContext(
+        CSharp.MethodDeclarationSyntax probeMethod,
+        CSharp.MethodDeclarationSyntax? containingMethod)
+    {
+        if (containingMethod == null)
+        {
+            return probeMethod;
+        }
+
+        return probeMethod
+            .WithAttributeLists(containingMethod.AttributeLists)
+            .WithModifiers(FilterProbeMethodModifiers(containingMethod.Modifiers))
+            .WithTypeParameterList(containingMethod.TypeParameterList)
+            .WithParameterList(containingMethod.ParameterList)
+            .WithConstraintClauses(containingMethod.ConstraintClauses);
+    }
+
+    private static Microsoft.CodeAnalysis.SyntaxTokenList FilterProbeMethodModifiers(
+        Microsoft.CodeAnalysis.SyntaxTokenList modifiers)
+    {
+        return CSharpSyntaxFactory.TokenList(
+            modifiers.Where(static modifier =>
+                modifier.IsKind(CSharpSyntaxKind.StaticKeyword) ||
+                modifier.IsKind(CSharpSyntaxKind.AsyncKeyword) ||
+                modifier.IsKind(CSharpSyntaxKind.UnsafeKeyword)));
+    }
+
+    private static ImmutableArray<string> GetParameterNames(
+        CSharp.MethodDeclarationSyntax? method)
+    {
+        if (method == null ||
+            method.ParameterList.Parameters.Count == 0)
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
+        return method.ParameterList.Parameters
+            .Select(static parameter => parameter.Identifier.ValueText)
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .ToImmutableArray();
+    }
+
+    private static CSharp.MethodDeclarationSyntax? GetContainingComponentMethodProbe(
+        AkburaSyntax scope)
+    {
+        for (var current = scope.Parent;
+             current != null;
+             current = current.Parent)
+        {
+            if (current is CSharpStatementSyntax statement &&
+                statement.Parent is AkburaDocumentSyntax &&
+                TryCreateComponentMethodProbe(statement, out var method))
+            {
+                return method;
+            }
+        }
+
+        return null;
+    }
+
+    private static ImmutableArray<CSharp.StatementSyntax> GetPrecedingLocalDeclarations(
+        AkburaSyntax scope)
+    {
+        using var builder =
+            ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
+        AddPrecedingLocalDeclarations(
+            scope,
+            builder);
+        return builder.ToImmutable();
+    }
+
+    private static void AddPrecedingLocalDeclarations(
+        AkburaSyntax scope,
+        ImmutableArrayBuilder<CSharp.StatementSyntax> builder)
+    {
+        var parent = scope.Parent;
+        if (parent == null)
+        {
+            return;
+        }
+
+        AddPrecedingLocalDeclarations(
+            parent,
+            builder);
+        if (parent is AkburaDocumentSyntax document)
+        {
+            AddPrecedingLocalDeclarationsFromList(
+                document.Members,
+                scope,
+                builder);
+        }
+        else if (parent is CSharpBlockSyntax block)
+        {
+            AddPrecedingLocalDeclarationsFromList(
+                block.Tokens,
+                scope,
+                builder);
+        }
+    }
+
+    private static void AddPrecedingLocalDeclarationsFromList<TSyntax>(
+        Akbura.Language.Syntax.SyntaxList<TSyntax> members,
+        AkburaSyntax scope,
+        ImmutableArrayBuilder<CSharp.StatementSyntax> builder)
+        where TSyntax : AkburaSyntax
+    {
+        foreach (var member in members)
+        {
+            if (member.Position >= scope.Position)
+            {
+                break;
+            }
+
+            if (member is CSharpStatementSyntax statement &&
+                statement.GetRawCSharpStatement() is
+                    CSharp.LocalDeclarationStatementSyntax localDeclaration)
+            {
+                builder.Add(localDeclaration);
+            }
+        }
     }
 
     internal CSharp.CompilationUnitSyntax CreateComponentProbeCompilationUnit(
@@ -531,7 +675,7 @@ internal sealed partial class CSharpProbeBinder : Binder
             expression,
             suppressTopLevelConversionDiagnostic);
         var typeSymbol = typeInfo.Type ?? typeInfo.ConvertedType;
-        if (typeSymbol?.TypeKind == TypeKind.Error)
+        if (ContainsErrorType(typeSymbol))
         {
             typeSymbol = null;
         }
@@ -596,6 +740,37 @@ internal sealed partial class CSharpProbeBinder : Binder
         }
 
         return builder.ToImmutable();
+    }
+
+    private static bool ContainsErrorType(ITypeSymbol? type)
+    {
+        if (type == null)
+        {
+            return false;
+        }
+
+        if (type is IErrorTypeSymbol ||
+            type.TypeKind == TypeKind.Error)
+        {
+            return true;
+        }
+
+        return type switch
+        {
+            IArrayTypeSymbol array =>
+                ContainsErrorType(array.ElementType),
+            IPointerTypeSymbol pointer =>
+                ContainsErrorType(pointer.PointedAtType),
+            INamedTypeSymbol named =>
+                named.TypeArguments.Any(ContainsErrorType),
+            IFunctionPointerTypeSymbol functionPointer =>
+                ContainsErrorType(
+                    functionPointer.Signature.ReturnType) ||
+                functionPointer.Signature.Parameters.Any(
+                    static parameter =>
+                        ContainsErrorType(parameter.Type)),
+            _ => false,
+        };
     }
 
     private static ITypeSymbol? GetExpressionReceiverType(

@@ -1,3 +1,4 @@
+using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using static Akbura.UnitTests.ParserHelper;
 
@@ -34,6 +35,63 @@ public class CSharpStatementSyntaxParseTests
 		Assert.NotNull(syntax.Body);
 		Assert.Equal(1, syntax.Body!.Tokens.Count);
 		Assert.IsType<GreenCSharpStatementSyntax>(syntax.Body.Tokens[0]);
+		Assert.Equal(code, syntax.ToFullString());
+	}
+
+	[Fact]
+	public void CompilationUnit_LocalFunctionAndFollowingStatements_AreSeparateMembers()
+	{
+		const string code =
+			"void Clear()\n" +
+			"{\n" +
+			"    value = null;\n" +
+			"}\n" +
+			"\n" +
+			"if (value == null)\n" +
+			"{\n" +
+			"    value = Create();\n" +
+			"}\n" +
+			"\n" +
+			"Content = value;\n";
+
+		var parser = MakeParser(code);
+
+		var syntax = parser.ParseCompilationUnit();
+
+		Assert.Equal(3, syntax.Members.Count);
+		var localFunction =
+			Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[0]);
+		var conditional =
+			Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[1]);
+		var assignment =
+			Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[2]);
+		Assert.NotNull(localFunction.Body);
+		Assert.NotNull(conditional.Body);
+		Assert.Null(assignment.Body);
+		Assert.Equal(code, syntax.ToFullString());
+	}
+
+	[Fact]
+	public void CompilationUnit_LocalDeclarationWithLambda_ParsesAsLocalDeclaration()
+	{
+		const string code =
+			"var page = Pages.FirstOrDefault(page =>\n" +
+			"    string.Equals(\n" +
+			"        page.Uri,\n" +
+			"        Url,\n" +
+			"        StringComparison.OrdinalIgnoreCase));\n";
+
+		var parser = MakeParser(code);
+
+		var syntax = parser.ParseCompilationUnit();
+
+		Assert.Equal(1, syntax.Members.Count);
+		var statement = Assert.IsType<GreenCSharpStatementSyntax>(
+			syntax.Members[0]);
+		var red = Assert.IsType<CSharpStatementSyntax>(
+			statement.CreateRed(parent: null, position: 0));
+		Assert.IsType<Microsoft.CodeAnalysis.CSharp.Syntax.LocalDeclarationStatementSyntax>(
+			red.GetRawCSharpStatement());
 		Assert.Equal(code, syntax.ToFullString());
 	}
 

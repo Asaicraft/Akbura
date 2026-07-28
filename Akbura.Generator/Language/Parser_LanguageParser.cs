@@ -903,7 +903,8 @@ partial class Parser
 					parenDepth == 0 &&
 					bracketDepth == 0 &&
 					braceDepth == 0 &&
-					canHaveBlockBody)
+					(canHaveBlockBody ||
+					 IsCSharpLocalFunctionHeader(tokens)))
 				{
 					var body = ParseCSharpBlock();
 					return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body);
@@ -943,6 +944,25 @@ partial class Parser
 		{
 			_pool.Free(tokens);
 		}
+	}
+
+	private static bool IsCSharpLocalFunctionHeader(
+		GreenSyntaxListBuilder<GreenSyntaxToken> tokens)
+	{
+		if (tokens.Count == 0)
+		{
+			return false;
+		}
+
+		var text = new StringBuilder();
+		for (var index = 0; index < tokens.Count; index++)
+		{
+			text.Append(tokens[index].ToFullString());
+		}
+
+		text.Append("{}");
+		return CSharpFactory.ParseStatement(text.ToString()) is
+			CSharp.LocalFunctionStatementSyntax;
 	}
 
 	private static bool IsCSharpBlockStatementStarter(GreenSyntaxToken token)

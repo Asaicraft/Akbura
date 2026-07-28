@@ -46,7 +46,7 @@ internal sealed class MarkupNameScope
                     element,
                     attachedAttribute,
                     originalDeclaration: null,
-                    templateContentResolver.IsInsideTemplateContent(element));
+                    templateContentResolver.IsInsideDeferredContent(element));
                 if (declaration.IsValid &&
                     declarationsByName.TryGetValue(declaration.Name, out var originalDeclaration))
                 {

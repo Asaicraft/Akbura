@@ -1028,6 +1028,42 @@ public sealed class BinderArchitectureTests : SemanticArchitectureTestBase
 
 
     [Fact]
+    public void StateInitializer_BindsTargetTypedCollectionExpression()
+    {
+        const string code =
+            """
+            using System.Collections.Immutable;
+
+            state ImmutableArray<(string Name, int Age)> persons =
+            [
+                ("Allice", 18),
+                ("Bob", 19)
+            ];
+            """;
+
+        var tree = AkburaSyntaxTree.ParseText(code, "DataTemplates.akbura");
+        var model = CreateCompilation(tree).GetSemanticModel(tree);
+        var state = Assert.IsType<StateDeclarationSyntax>(tree.GetRoot().Members[1]);
+
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            model.GetSymbolInfo(state).Symbol);
+        var boundState = Assert.IsType<BoundStateDeclaration>(
+            model.BindingSession.BindSemanticSyntax(state));
+        var initializer = Assert.IsType<BoundStateInitializer>(
+            Assert.Single(boundState.Children));
+
+        Assert.Equal("ImmutableArray", stateSymbol.Type.Name);
+        Assert.Equal("ImmutableArray", stateSymbol.InitializerType.Name);
+        Assert.Equal(
+            AkburaConversionKind.Implicit,
+            initializer.BindingResult.Conversion.Kind);
+        Assert.True(
+            initializer.BindingResult.Conversion.CSharpConversion.IsCollectionExpression);
+        Assert.True(model.GetSemanticDiagnostics(state).IsEmpty);
+    }
+
+
+    [Fact]
     public void StateAndParamInitializers_ReportInvalidExpectedTypeConversion()
     {
         const string code =

@@ -13,7 +13,8 @@ internal readonly struct MarkupChildContent
         string text = "",
         string? rawText = null,
         MarkupWhitespaceMode whitespaceMode =
-            MarkupWhitespaceMode.Default)
+            MarkupWhitespaceMode.Default,
+        bool isDeferred = false)
     {
         Syntax = syntax ??
             throw new ArgumentNullException(nameof(syntax));
@@ -25,6 +26,7 @@ internal readonly struct MarkupChildContent
         Text = text ?? string.Empty;
         RawText = rawText ?? Text;
         WhitespaceMode = whitespaceMode;
+        IsDeferred = isDeferred;
     }
 
     public MarkupContentSyntax Syntax { get; }
@@ -40,4 +42,10 @@ internal readonly struct MarkupChildContent
     public string RawText { get; }
 
     public MarkupWhitespaceMode WhitespaceMode { get; }
+
+    /// <summary>
+    /// Indicates that this markup node must be created
+    /// by a deferred template factory, not eagerly.
+    /// </summary>
+    public bool IsDeferred { get; }
 }

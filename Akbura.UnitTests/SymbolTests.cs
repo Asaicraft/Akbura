@@ -55,6 +55,9 @@ public class SymbolTests
         var avaloniaControlsAssembly = typeof(Akbura.AkburaControl).BaseType!.Assembly;
         paths.Add(typeof(Avalonia.AvaloniaObject).Assembly.Location);
         paths.Add(avaloniaControlsAssembly.Location);
+        paths.Add(
+            typeof(Avalonia.Markup.Xaml.Templates.DataTemplate)
+                .Assembly.Location);
         paths.Add(typeof(Akbura.AkburaControl).Assembly.Location);
 
         return paths

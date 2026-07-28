@@ -3855,7 +3855,7 @@ public class SemanticPipelineTests
             stringFormat =>
             {
                 Assert.Equal("StringFormat", stringFormat.Name);
-                Assert.Equal("'{}{0} items'", stringFormat.Value);
+                Assert.Equal("{}{0} items", stringFormat.Value);
             });
         Assert.False(operation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);

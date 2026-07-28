@@ -55,7 +55,12 @@ internal partial class AkburaSemanticModel
 
     internal static string GetMarkupLiteralAttributeValueText(MarkupLiteralAttributeValueSyntax literalValue)
     {
-        var text = (literalValue.Value?.ToFullString() ?? string.Empty).Trim();
+        return GetMarkupLiteralText(literalValue.Value);
+    }
+
+    private static string GetMarkupLiteralText(MarkupTextLiteralSyntax? literalValue)
+    {
+        var text = (literalValue?.ToFullString() ?? string.Empty).Trim();
         if (text.Length >= 2 &&
             ((text[0] == '"' && text[^1] == '"') ||
              (text[0] == '\'' && text[^1] == '\'')))
@@ -1886,7 +1891,7 @@ internal partial class AkburaSemanticModel
 
     private static string GetMarkupExtensionLiteralText(MarkupExtensionLiteralValueSyntax literalValue)
     {
-        return literalValue.Value.ToFullString().Trim();
+        return GetMarkupLiteralText(literalValue.Value);
     }
 
     private static CSharp.ExpressionSyntax CreateMarkupExtensionLiteralExpression(

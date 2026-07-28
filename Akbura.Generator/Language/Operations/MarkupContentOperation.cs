@@ -40,8 +40,11 @@ internal sealed class MarkupContentOperation : IMarkupContentOperation
         ValueOperationTree = valueOperationTree;
         AdoptCSharpOperationTree(ValueOperationTree);
         Children = ValueOperationTree == null
-            ? ImmutableArray<IOperation>.Empty
-            : ImmutableArray.Create<IOperation>(ValueOperationTree);
+            ? []
+            : [ValueOperationTree];
+        IsDeferred =
+            Content.Length > 0 &&
+            Content[0].IsDeferred;
     }
 
     public OperationKind Kind => OperationKind.MarkupContent;
@@ -87,6 +90,8 @@ internal sealed class MarkupContentOperation : IMarkupContentOperation
     public string? LiteralValue { get; }
 
     public bool IsSynthesizedString { get; }
+
+    public bool IsDeferred { get; }
 
     public void Accept(OperationVisitor visitor)
     {

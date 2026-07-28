@@ -70,7 +70,8 @@ internal sealed partial class CSharpProbeBinder : Binder
 
     public CSharpBindingResult BindReturnExpression(
         CSharp.CompilationUnitSyntax compilationUnit,
-        bool isBindingPath)
+        bool isBindingPath,
+        ITypeSymbol? targetType = null)
     {
         var syntaxTree = CreateSyntaxTree(compilationUnit);
         var semanticModel = CreateSemanticModel(syntaxTree);
@@ -81,9 +82,19 @@ internal sealed partial class CSharpProbeBinder : Binder
             .Single()
             .Expression;
 
-        return probeExpression == null
+        var binding = probeExpression == null
             ? CSharpBindingResult.Empty
-            : BindExpression(semanticModel, probeExpression, isBindingPath);
+            : BindExpression(
+                semanticModel,
+                probeExpression,
+                isBindingPath,
+                suppressTopLevelConversionDiagnostic: targetType != null);
+        return targetType == null || probeExpression == null
+            ? binding
+            : binding.WithConversion(Conversions.ClassifyConversion(
+                binding.TypeSymbol,
+                targetType,
+                semanticModel.GetConversion(probeExpression)));
     }
 
     public BoundExpression BindExpression(
@@ -102,7 +113,10 @@ internal sealed partial class CSharpProbeBinder : Binder
             throw new ArgumentNullException(nameof(expression));
         }
 
-        var syntaxTree = CreateSyntaxTree(CreateReturnExpressionProbe(syntax, expression));
+        var syntaxTree = CreateSyntaxTree(CreateReturnExpressionProbe(
+            syntax,
+            expression,
+            targetType));
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeExpression = syntaxTree
             .GetCompilationUnitRoot()
@@ -113,14 +127,22 @@ internal sealed partial class CSharpProbeBinder : Binder
 
         var boundExpression = probeExpression == null
             ? new BoundCSharpExpression(syntax, this, CSharpBindingResult.Empty)
-            : BindExpressionTree(syntax, semanticModel, probeExpression, isBindingPath);
+            : BindExpressionTree(
+                syntax,
+                semanticModel,
+                probeExpression,
+                isBindingPath,
+                suppressTopLevelConversionDiagnostic: targetType != null);
 
-        if (targetType == null)
+        if (targetType == null || probeExpression == null)
         {
             return boundExpression;
         }
 
-        var conversion = Conversions.ClassifyConversion(boundExpression, targetType);
+        var conversion = Conversions.ClassifyConversion(
+            boundExpression.Type,
+            targetType,
+            semanticModel.GetConversion(probeExpression));
         return new BoundConversionExpression(
             syntax,
             this,
@@ -225,12 +247,18 @@ internal sealed partial class CSharpProbeBinder : Binder
 
     private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
         AkburaSyntax scope,
-        CSharp.ExpressionSyntax expression)
+        CSharp.ExpressionSyntax expression,
+        ITypeSymbol? targetType)
     {
         var probeScope = CreateProbeScope(scope, expression);
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expression);
+        var returnType = targetType == null
+            ? CSharpSyntaxFactory.PredefinedType(
+                CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword))
+            : CSharpSyntaxFactory.ParseTypeName(
+                targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
         var method = CSharpSyntaxFactory.MethodDeclaration(
-                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword)),
+                returnType,
                 "__akbura_probe")
             .WithBody(CreateProbeBlock(probeScope.LocalStatements, returnStatement));
         return CreateComponentProbeCompilationUnit(
@@ -399,9 +427,14 @@ internal sealed partial class CSharpProbeBinder : Binder
         AkburaSyntax syntax,
         RoslynSemanticModel semanticModel,
         CSharp.ExpressionSyntax expression,
-        bool isBindingPath)
+        bool isBindingPath,
+        bool suppressTopLevelConversionDiagnostic = false)
     {
-        var bindingResult = BindExpression(semanticModel, expression, isBindingPath);
+        var bindingResult = BindExpression(
+            semanticModel,
+            expression,
+            isBindingPath,
+            suppressTopLevelConversionDiagnostic);
 
         return expression switch
         {
@@ -486,16 +519,22 @@ internal sealed partial class CSharpProbeBinder : Binder
     private static CSharpBindingResult BindExpression(
         RoslynSemanticModel semanticModel,
         CSharp.ExpressionSyntax expression,
-        bool isBindingPath)
+        bool isBindingPath,
+        bool suppressTopLevelConversionDiagnostic = false)
     {
         var typeInfo = semanticModel.GetTypeInfo(expression);
         var symbolInfo = semanticModel.GetSymbolInfo(expression);
         var operation = semanticModel.GetOperation(expression);
         var receiverType = GetExpressionReceiverType(semanticModel, expression);
-        var diagnostics = GetProbeDiagnostics(semanticModel, expression);
-        var typeSymbol = typeInfo.Type?.TypeKind == TypeKind.Error
-            ? null
-            : typeInfo.Type;
+        var diagnostics = GetProbeDiagnostics(
+            semanticModel,
+            expression,
+            suppressTopLevelConversionDiagnostic);
+        var typeSymbol = typeInfo.Type ?? typeInfo.ConvertedType;
+        if (typeSymbol?.TypeKind == TypeKind.Error)
+        {
+            typeSymbol = null;
+        }
 
         return new CSharpBindingResult(
             typeSymbol,
@@ -529,13 +568,21 @@ internal sealed partial class CSharpProbeBinder : Binder
 
     private static ImmutableArray<Diagnostic> GetProbeDiagnostics(
         RoslynSemanticModel semanticModel,
-        SyntaxNode syntax)
+        SyntaxNode syntax,
+        bool suppressTopLevelConversionDiagnostic = false)
     {
         using var builder = ImmutableArrayBuilder<Diagnostic>.Rent();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var diagnostic in semanticModel.GetDiagnostics(syntax.Span))
         {
             if (diagnostic.Severity != DiagnosticSeverity.Error)
+            {
+                continue;
+            }
+
+            if (suppressTopLevelConversionDiagnostic &&
+                diagnostic.Location.SourceSpan == syntax.Span &&
+                diagnostic.Id is "CS0029" or "CS0266")
             {
                 continue;
             }

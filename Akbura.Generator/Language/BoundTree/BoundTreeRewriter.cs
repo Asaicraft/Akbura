@@ -710,7 +710,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             componentSymbol,
             text: content.Text,
             rawText: content.RawText,
-            whitespaceMode: content.WhitespaceMode);
+            whitespaceMode: content.WhitespaceMode,
+            isDeferred: content.IsDeferred);
     }
 
     protected virtual BoundTailwindUtilityArgument VisitTailwindUtilityArgument(

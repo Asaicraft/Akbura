@@ -141,7 +141,7 @@ public abstract class AkburaControl : Control, IComponentTree
 	private int _updateSuppressionDepth;
 	private readonly UseHookRuntime _useHooks;
 
-	public AkburaControl(): this(AkburaEngine.Singletone)
+	public AkburaControl() : this(AkburaEngine.Singletone)
 	{
 
 	}
@@ -282,7 +282,7 @@ public abstract class AkburaControl : Control, IComponentTree
 
 	[EditorBrowsable(EditorBrowsableState.Never)]
 	[Browsable(false)]
-    protected IServiceProvider CreateMarkupServiceProvider(
+	protected IServiceProvider CreateMarkupServiceProvider(
 		object targetObject,
 		object targetProperty,
 		object intermediateRootObject,
@@ -290,60 +290,89 @@ public abstract class AkburaControl : Control, IComponentTree
 		IReadOnlyList<object> directParentsStack,
 		IServiceProvider? fallbackServiceProvider = null,
 		IReadOnlyDictionary<string, Type>? knownTypes = null)
-    {
-        IAvaloniaXamlIlEagerParentStackProvider? applicationProvider = null;
+	{
+		IAvaloniaXamlIlEagerParentStackProvider?
+			parentProvider = null;
 
-        if (Application.Current is { } application)
-        {
-            applicationProvider =
-                new AkburaApplicationParentStackProvider(application);
-        }
+		if (fallbackServiceProvider?.GetService(
+				typeof(
+					IAvaloniaXamlIlParentStackProvider))
+			is IAvaloniaXamlIlEagerParentStackProvider
+				deferredParentProvider)
+		{
+			parentProvider = deferredParentProvider;
+		}
 
-        return new AkburaMarkupServiceProvider(
-            targetObject: targetObject,
-            targetProperty: targetProperty,
-            rootObject: this,
-            intermediateRootObject: intermediateRootObject,
-            baseUri: baseUri,
-            directParentsStack: directParentsStack,
-            parentProvider: applicationProvider,
-            fallbackServiceProvider: fallbackServiceProvider,
-            knownTypes: knownTypes);
-    }
+		if (parentProvider == null &&
+			Application.Current is { } application)
+		{
+			parentProvider =
+				new AkburaApplicationParentStackProvider(
+					application);
+		}
 
-    /// <summary>
-    /// Applies a markup extension result whose concrete runtime type
-    /// is not known by the generated code.
-    /// </summary>
+		return new AkburaMarkupServiceProvider(
+			targetObject: targetObject,
+			targetProperty: targetProperty,
+			rootObject: this,
+			intermediateRootObject:
+				intermediateRootObject,
+			baseUri: baseUri,
+			directParentsStack:
+				directParentsStack,
+			parentProvider: parentProvider,
+			fallbackServiceProvider:
+				fallbackServiceProvider,
+			knownTypes: knownTypes);
+	}
+
+	/// <summary>
+	/// Creates deferred template content for generated Akbura code.
+	/// </summary>
 	[EditorBrowsable(EditorBrowsableState.Never)]
-    [Browsable(false)]
-    protected static void ApplyMarkupExtensionResult(
-        AvaloniaObject target,
-        AvaloniaProperty property,
-        object? value)
-    {
-        ArgumentNullException.ThrowIfNull(target);
-        ArgumentNullException.ThrowIfNull(property);
+	[Browsable(false)]
+	protected static IDeferredContent CreateDeferredContent<T>(
+		Func<IServiceProvider, object> builder,
+		IServiceProvider parentServiceProvider)
+	{
+		return new AkburaDeferredContent<T>(
+			builder,
+			parentServiceProvider);
+	}
 
-        if (value is BindingBase binding)
-        {
-            target.Bind(property, binding);
-            return;
-        }
+	/// <summary>
+	/// Applies a markup extension result whose concrete runtime type
+	/// is not known by the generated code.
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	[Browsable(false)]
+	protected static void ApplyMarkupExtensionResult(
+		AvaloniaObject target,
+		AvaloniaProperty property,
+		object? value)
+	{
+		ArgumentNullException.ThrowIfNull(target);
+		ArgumentNullException.ThrowIfNull(property);
 
-        if (ReferenceEquals(value, AvaloniaProperty.UnsetValue))
-        {
-            // This clears the local value. It does not mean "do nothing".
-            target.SetValue(property, AvaloniaProperty.UnsetValue);
-            return;
-        }
+		if (value is BindingBase binding)
+		{
+			target.Bind(property, binding);
+			return;
+		}
 
-        // This also correctly handles Avalonia's DoNothing marker:
-        // AvaloniaObject.SetValue ignores it.
-        target.SetValue(property, value);
-    }
+		if (ReferenceEquals(value, AvaloniaProperty.UnsetValue))
+		{
+			// This clears the local value. It does not mean "do nothing".
+			target.SetValue(property, AvaloniaProperty.UnsetValue);
+			return;
+		}
 
-    internal ImmutableArray<Parameter> GetDiagnosticParameters()
+		// This also correctly handles Avalonia's DoNothing marker:
+		// AvaloniaObject.SetValue ignores it.
+		target.SetValue(property, value);
+	}
+
+	internal ImmutableArray<Parameter> GetDiagnosticParameters()
 	{
 		return GetParameters();
 	}
@@ -543,46 +572,46 @@ public abstract class AkburaControl : Control, IComponentTree
 		return LayoutHelper.ArrangeChild(Child, finalSize, Padding);
 	}
 
-    /// <summary>
-    /// Called when the <see cref="Child"/> property changes.
-    /// </summary>
-    /// <param name="e">The event args.</param>
-    private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
-    {
-        var oldChild = (Control?)e.OldValue;
-        var newChild = (Control?)e.NewValue;
+	/// <summary>
+	/// Called when the <see cref="Child"/> property changes.
+	/// </summary>
+	/// <param name="e">The event args.</param>
+	private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
+	{
+		var oldChild = (Control?)e.OldValue;
+		var newChild = (Control?)e.NewValue;
 
-        if (oldChild != null)
-        {
-            VisualChildren.Remove(oldChild);
-            ((ISetInheritanceParent)oldChild).SetParent(null);
-        }
+		if (oldChild != null)
+		{
+			VisualChildren.Remove(oldChild);
+			((ISetInheritanceParent)oldChild).SetParent(null);
+		}
 
-        if (newChild != null)
-        {
-            ((ISetInheritanceParent)newChild).SetParent(this);
+		if (newChild != null)
+		{
+			((ISetInheritanceParent)newChild).SetParent(this);
 
-            ApplyStylesToVisualTree(newChild);
+			ApplyStylesToVisualTree(newChild);
 
-            VisualChildren.Add(newChild);
-        }
-    }
+			VisualChildren.Add(newChild);
+		}
+	}
 
 
-    private static void ApplyStylesToVisualTree(Control root)
-    {
-        foreach (var visual in root.GetSelfAndVisualDescendants())
-        {
-            if (visual is StyledElement element)
-            {
-                element.ApplyStyling();
-            }
-        }
-    }
+	private static void ApplyStylesToVisualTree(Control root)
+	{
+		foreach (var visual in root.GetSelfAndVisualDescendants())
+		{
+			if (visual is StyledElement element)
+			{
+				element.ApplyStyling();
+			}
+		}
+	}
 
-    #region Explicit Thickness
+	#region Explicit Thickness
 
-    private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_paddingStates = new();
+	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_paddingStates = new();
 	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_marginStates = new();
 	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_borderThicknessStates = new();
 

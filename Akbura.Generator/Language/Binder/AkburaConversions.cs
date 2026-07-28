@@ -1,6 +1,7 @@
 using Akbura.Language.BoundTree;
 using Microsoft.CodeAnalysis;
 using System;
+using CSharpConversion = Microsoft.CodeAnalysis.CSharp.Conversion;
 
 namespace Akbura.Language.Binder;
 
@@ -38,6 +39,31 @@ internal sealed class AkburaConversions
         var kind = conversion.IsIdentity
             ? AkburaConversionKind.Identity
             : conversion.IsImplicit
+                ? AkburaConversionKind.Implicit
+                : conversion.IsExplicit
+                    ? AkburaConversionKind.Explicit
+                    : AkburaConversionKind.None;
+
+        return new AkburaConversion(
+            kind,
+            sourceType,
+            targetType,
+            conversion);
+    }
+
+    public AkburaConversion ClassifyConversion(
+        ITypeSymbol? sourceType,
+        ITypeSymbol? targetType,
+        CSharpConversion conversion)
+    {
+        if (targetType == null)
+        {
+            return AkburaConversion.None(sourceType, targetType);
+        }
+
+        var kind = conversion.IsIdentity
+            ? AkburaConversionKind.Identity
+            : conversion.IsImplicit || conversion.IsCollectionExpression
                 ? AkburaConversionKind.Implicit
                 : conversion.IsExplicit
                     ? AkburaConversionKind.Explicit

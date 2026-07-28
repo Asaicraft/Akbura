@@ -74,10 +74,16 @@ internal static class ComponentGenerator
         private readonly ComponentGenerationSourceMap _sourceMap;
         private readonly string _sourcePath;
         private readonly IReadOnlyDictionary<AkburaSyntax, string> _akcssModuleTypeNames;
+
+
         private readonly List<ElementPlan> _elements = [];
         private readonly List<PropertyElementPlan> _propertyElements = [];
-        private readonly Dictionary<MarkupElementSyntax, ElementPlan> _elementsBySyntax = new();
+        private readonly Dictionary<MarkupElementSyntax, ElementPlan> _elementsBySyntax = [];
         private int _nextElementId;
+
+        private readonly List<DeferredContentPlan> _deferredContents = [];
+        private readonly Dictionary<AkburaSyntax, DeferredContentPlan> _deferredContentsBySyntax = new();
+        private int _nextDeferredContentId;
 
         public Generator(
             IAkburaComponentSymbol symbol,
@@ -124,6 +130,7 @@ internal static class ComponentGenerator
             AppendElementFields(source, classIndentation + 1);
             AppendMarkupContextMembers(source, classIndentation + 1);
             AppendUserMembers(source, document, classIndentation + 1);
+            AppendDeferredContentBuilders(source,classIndentation + 1);
             AppendLifecycleMembers(source, roots, classIndentation + 1);
             AppendDescriptorArrays(source, classIndentation + 1);
 
@@ -141,7 +148,7 @@ internal static class ComponentGenerator
             var roots = ImmutableArray.CreateBuilder<ElementPlan>();
             foreach (var root in document.Members.OfType<MarkupRootSyntax>())
             {
-                if (TryBuildElement(root.Element, out var plan))
+                if (TryBuildElement(root.Element, deferredOwner: null, out var plan))
                 {
                     roots.Add(plan);
                 }
@@ -150,7 +157,7 @@ internal static class ComponentGenerator
             return roots.ToImmutable();
         }
 
-        private bool TryBuildElement(MarkupElementSyntax syntax, out ElementPlan plan)
+        private bool TryBuildElement(MarkupElementSyntax syntax, DeferredContentPlan? deferredOwner, out ElementPlan plan)
         {
             if (_elementsBySyntax.TryGetValue(syntax, out plan!))
             {
@@ -176,23 +183,46 @@ internal static class ComponentGenerator
                 fieldName,
                 GetComponentTypeName(component),
                 nameOperation,
-                FindTemplateOwner(syntax));
+                FindTemplateOwner(syntax),
+                deferredOwner);
             _elements.Add(plan);
             _elementsBySyntax.Add(syntax, plan);
+
+            var contentOperation =
+                _semanticModel.GetOperation(syntax)
+                    as IMarkupContentOperation;
+
+            var implicitDeferredContent =
+                CreateDeferredContentPlan(
+                    plan,
+                    syntax,
+                    contentOperation);
 
             foreach (var content in syntax.Body.OfType<MarkupElementContentSyntax>())
             {
                 var childSyntax = content.Element;
                 var childSymbol = _semanticModel.GetSymbolInfo(childSyntax).Symbol;
-                if (childSymbol is IMarkupComponentSymbol)
-                {
-                    if (TryBuildElement(childSyntax, out var child))
-                    {
-                        child.Parent = plan;
-                        plan.Children.Add(child);
-                    }
 
-                    continue;
+                var semanticChild =
+                    FindMarkupChild(
+                        contentOperation,
+                        content);
+
+                var childDeferredOwner =
+                    ResolveDeferredOwner(
+                        semanticChild,
+                        plan.DeferredOwner,
+                        implicitDeferredContent);
+
+                if (TryBuildElement(
+                        childSyntax,
+                        childDeferredOwner,
+                        out var child))
+                {
+                    child.Parent = plan;
+                    plan.Children.Add(child);
+
+                    TrackDeferredRoot(child);
                 }
 
                 if (childSymbol is not AkburaPropertySymbol property ||
@@ -208,12 +238,36 @@ internal static class ComponentGenerator
                     property,
                     operation);
                 _propertyElements.Add(propertyElement);
+
+                var explicitDeferredContent =
+                    CreateDeferredContentPlan(
+                        plan,
+                        childSyntax,
+                        operation);
+
+
                 foreach (var propertyContent in childSyntax.Body.OfType<MarkupElementContentSyntax>())
                 {
-                    if (TryBuildElement(propertyContent.Element, out var child))
+                    semanticChild =
+                        FindMarkupChild(
+                            operation,
+                            propertyContent);
+
+                    childDeferredOwner =
+                        ResolveDeferredOwner(
+                            semanticChild,
+                            plan.DeferredOwner,
+                            explicitDeferredContent);
+
+                    if (TryBuildElement(
+                            propertyContent.Element,
+                            childDeferredOwner,
+                            out child))
                     {
                         child.Parent = plan;
                         propertyElement.Children.Add(child);
+
+                        TrackDeferredRoot(child);
                     }
                 }
 
@@ -223,13 +277,123 @@ internal static class ComponentGenerator
             return true;
         }
 
+        private DeferredContentPlan? CreateDeferredContentPlan(
+            ElementPlan target,
+            AkburaSyntax syntax,
+            IMarkupContentOperation? operation)
+        {
+            if (operation?.Property is not { } property ||
+                !IsDeferredContentProperty(property))
+            {
+                return null;
+            }
+
+            if (_deferredContentsBySyntax.TryGetValue(
+                    syntax,
+                    out var existing))
+            {
+                return existing;
+            }
+
+            var result = new DeferredContentPlan(
+                _nextDeferredContentId++,
+                target,
+                syntax,
+                property,
+                operation);
+
+            _deferredContents.Add(result);
+            _deferredContentsBySyntax.Add(
+                syntax,
+                result);
+
+            return result;
+        }
+
+        private static MarkupChildContent? FindMarkupChild(
+            IMarkupContentOperation? operation,
+            MarkupElementContentSyntax syntax)
+        {
+            if (operation == null)
+            {
+                return null;
+            }
+
+            foreach (var child in operation.Content)
+            {
+                if (ReferenceEquals(
+                        child.Syntax,
+                        syntax) ||
+                    child.Syntax.FullSpan.Equals(
+                        syntax.FullSpan))
+                {
+                    return child;
+                }
+            }
+
+            return null;
+        }
+
+        private static DeferredContentPlan? ResolveDeferredOwner(
+            MarkupChildContent? child,
+            DeferredContentPlan? inheritedOwner,
+            DeferredContentPlan? newBoundary)
+        {
+            if (child is { IsDeferred: false })
+            {
+                return null;
+            }
+
+            return newBoundary ??
+                   inheritedOwner;
+        }
+
+        private static void TrackDeferredRoot(ElementPlan child)
+        {
+            var deferredOwner =
+                child.DeferredOwner;
+
+            if (deferredOwner == null)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(
+                    child.Parent?.DeferredOwner,
+                    deferredOwner))
+            {
+                return;
+            }
+
+            if (!deferredOwner.Roots.Contains(child))
+            {
+                deferredOwner.Roots.Add(child);
+            }
+        }
+
         private MarkupElementSyntax? FindTemplateOwner(MarkupElementSyntax syntax)
         {
-            for (var ancestor = syntax.Parent; ancestor != null; ancestor = ancestor.Parent)
+            for (AkburaSyntax? ancestor = syntax;
+                 ancestor != null;
+                 ancestor = ancestor.Parent)
             {
+                if (ancestor is MarkupElementSyntax componentElement &&
+                    _semanticModel.GetSymbolInfo(componentElement).Symbol
+                        is IMarkupComponentSymbol
+                        {
+                            ComponentType: { } componentType,
+                        } &&
+                    _semanticModel.BindingSession
+                        .MarkupTemplateContent
+                        .IsDataTemplateType(componentType))
+                {
+                    return null;
+                }
+
                 if (ancestor is MarkupElementSyntax propertyElement &&
-                    _semanticModel.GetSymbolInfo(propertyElement).Symbol is AkburaPropertySymbol property &&
-                    IsTemplateContentProperty(property))
+                    _semanticModel.GetSymbolInfo(propertyElement).Symbol
+                        is AkburaPropertySymbol property &&
+                    IsDataTemplateProperty(property))
                 {
                     return propertyElement;
                 }
@@ -553,7 +717,7 @@ internal static class ComponentGenerator
         {
             foreach (var element in _elements)
             {
-                if (element.TemplateOwner != null)
+                if (element.TemplateOwner != null || element.IsDeferred)
                 {
                     continue;
                 }
@@ -638,6 +802,120 @@ internal static class ComponentGenerator
             }
         }
 
+        private void AppendDeferredContentBuilders(
+            StringBuilder source,
+            int indentation)
+        {
+            foreach (var deferred in _deferredContents)
+            {
+                if (deferred.Roots.Count == 0)
+                {
+                    continue;
+                }
+
+                var elements = _elements
+                    .Where(element =>
+                        ReferenceEquals(
+                            element.DeferredOwner,
+                            deferred))
+                    .ToArray();
+
+                AppendIndented(source, indentation)
+                    .Append("private object ")
+                    .Append(deferred.BuilderName)
+                    .AppendLine(
+                        "(global::System.IServiceProvider __services)");
+
+                AppendIndentedLine(
+                    source,
+                    indentation,
+                    "{");
+
+                foreach (var element in elements)
+                {
+                    AppendIndented(source, indentation + 1)
+                        .Append("var ")
+                        .Append(element.FieldName)
+                        .Append(" = new ")
+                        .Append(element.TypeName)
+                        .AppendLine("();");
+
+                    AppendBeginInit(
+                        source,
+                        element,
+                        indentation + 1);
+                }
+
+                source.AppendLine();
+
+                foreach (var element in elements)
+                {
+                    AppendFirstUpdateAttributes(
+                        source,
+                        element,
+                        indentation + 1);
+
+                    AppendUpdateAttributes(
+                        source,
+                        element,
+                        indentation + 1);
+
+                    AppendFirstUpdateContent(
+                        source,
+                        element,
+                        indentation + 1);
+
+                    AppendDynamicContent(
+                        source,
+                        element,
+                        indentation + 1);
+                }
+
+                foreach (var propertyElement in _propertyElements)
+                {
+                    if (ReferenceEquals(
+                            propertyElement.Owner.DeferredOwner,
+                            deferred))
+                    {
+                        AppendPropertyElement(
+                            source,
+                            propertyElement,
+                            indentation + 1);
+                    }
+                }
+
+                foreach (var element in elements)
+                {
+                    AppendAkcssStyles(
+                        source,
+                        element,
+                        indentation + 1);
+                }
+
+                for (var index = elements.Length - 1;
+                     index >= 0;
+                     index--)
+                {
+                    AppendEndInit(
+                        source,
+                        elements[index],
+                        indentation + 1);
+                }
+
+                AppendIndented(source, indentation + 1)
+                    .Append("return ")
+                    .Append(deferred.Roots[0].FieldName)
+                    .AppendLine(";");
+
+                AppendIndentedLine(
+                    source,
+                    indentation,
+                    "}");
+
+                source.AppendLine();
+            }
+        }
+
         private void AppendLifecycleMembers(
             StringBuilder source,
             ImmutableArray<ElementPlan> roots,
@@ -659,20 +937,23 @@ internal static class ComponentGenerator
             {
                 foreach (var element in _elements)
                 {
-                    if (element.TemplateOwner != null)
+                    if (element.TemplateOwner != null || element.IsDeferred)
                     {
                         continue;
                     }
 
                     AppendIndented(source, indentation + 1).Append(element.FieldName).Append(" = new ")
                         .Append(element.TypeName).AppendLine("();");
-                    AppendIndented(source, indentation + 1).Append(element.FieldName).AppendLine(".BeginInit();");
+                    AppendBeginInit(
+                        source,
+                        element,
+                        indentation + 1);
                 }
 
                 source.AppendLine();
                 foreach (var element in _elements)
                 {
-                    if (element.TemplateOwner != null)
+                    if (element.TemplateOwner != null || element.IsDeferred)
                     {
                         continue;
                     }
@@ -683,7 +964,7 @@ internal static class ComponentGenerator
 
                 foreach (var propertyElement in _propertyElements)
                 {
-                    if (propertyElement.Owner.TemplateOwner == null)
+                    if (propertyElement.Owner.TemplateOwner == null && !propertyElement.Owner.IsDeferred)
                     {
                         AppendPropertyElement(source, propertyElement, indentation + 1);
                     }
@@ -691,7 +972,7 @@ internal static class ComponentGenerator
 
                 foreach (var element in _elements)
                 {
-                    if (element.TemplateOwner == null)
+                    if (element.TemplateOwner == null && !element.IsDeferred)
                     {
                         AppendAkcssStyles(source, element, indentation + 1);
                     }
@@ -701,9 +982,13 @@ internal static class ComponentGenerator
 
                 for (var index = _elements.Count - 1; index >= 0; index--)
                 {
-                    if (_elements[index].TemplateOwner == null)
+                    if (_elements[index].TemplateOwner == null &&
+                        !_elements[index].IsDeferred)
                     {
-                        AppendIndented(source, indentation + 1).Append(_elements[index].FieldName).AppendLine(".EndInit();");
+                        AppendEndInit(
+                            source,
+                            _elements[index],
+                            indentation + 1);
                     }
                 }
 
@@ -731,7 +1016,7 @@ internal static class ComponentGenerator
 
             foreach (var element in _elements)
             {
-                if (element.TemplateOwner == null)
+                if (element.TemplateOwner == null && !element.IsDeferred)
                 {
                     AppendUpdateAttributes(source, element, indentation + 1);
                     AppendDynamicContent(source, element, indentation + 1);
@@ -769,6 +1054,11 @@ internal static class ComponentGenerator
 
         private void AppendFirstUpdateAttributes(StringBuilder source, ElementPlan element, int indentation)
         {
+            AppendDataTemplateDataType(
+                source,
+                element,
+                indentation);
+
             foreach (var operation in element.Symbol.AttributeOperations)
             {
                 if (operation.HasErrors)
@@ -821,6 +1111,18 @@ internal static class ComponentGenerator
                 return;
             }
 
+            if (_deferredContentsBySyntax.TryGetValue(
+                element.Syntax,
+                out var deferred))
+            {
+                AppendDeferredContentAssignment(
+                    source,
+                    deferred,
+                    indentation);
+
+                return;
+            }
+
             if (operation.ContentModel.IsCollection)
             {
                 foreach (var child in element.Children)
@@ -870,14 +1172,49 @@ internal static class ComponentGenerator
 
         private void AppendPropertyElement(StringBuilder source, PropertyElementPlan plan, int indentation)
         {
-            if (plan.Operation.HasErrors || plan.Children.Count == 0)
+            if (plan.Operation.HasErrors)
             {
                 return;
             }
 
-            if (IsTemplateContentProperty(plan.Property))
+            if (_deferredContentsBySyntax.TryGetValue(
+                    plan.Syntax,
+                    out var deferred))
             {
-                AppendTemplatePropertyElement(source, plan, indentation);
+                AppendDeferredContentAssignment(
+                    source,
+                    deferred,
+                    indentation);
+
+                return;
+            }
+
+            if (plan.Children.Count == 0)
+            {
+                return;
+            }
+
+            if (IsDataTemplateProperty(plan.Property))
+            {
+                if (plan.Children.Count == 1 &&
+                    IsDataTemplateElement(plan.Children[0]))
+                {
+                    AppendPropertyWrite(
+                        source,
+                        plan.Owner.FieldName,
+                        plan.Property,
+                        plan.Children[0].FieldName,
+                        indentation,
+                        plan.Syntax);
+
+                    return;
+                }
+
+                AppendTemplatePropertyElement(
+                    source,
+                    plan,
+                    indentation);
+
                 return;
             }
 
@@ -933,7 +1270,10 @@ internal static class ComponentGenerator
             {
                 AppendIndented(source, indentation + 1).Append("var ").Append(element.FieldName)
                     .Append(" = new ").Append(element.TypeName).AppendLine("();");
-                AppendIndented(source, indentation + 1).Append(element.FieldName).AppendLine(".BeginInit();");
+                AppendBeginInit(
+                    source,
+                    element,
+                    indentation + 1);
             }
 
             source.AppendLine();
@@ -960,8 +1300,10 @@ internal static class ComponentGenerator
 
             for (var index = templateElements.Length - 1; index >= 0; index--)
             {
-                AppendIndented(source, indentation + 1).Append(templateElements[index].FieldName)
-                    .AppendLine(".EndInit();");
+                AppendEndInit(
+                    source,
+                    templateElements[index],
+                    indentation + 1);
             }
 
             AppendIndented(source, indentation + 1).Append("return ")
@@ -1010,13 +1352,147 @@ internal static class ComponentGenerator
                        unsetValueType);
         }
 
-        private bool IsTemplateContentProperty(AkburaPropertySymbol property)
+        private bool IsDeferredContentProperty(AkburaPropertySymbol property)
         {
-            var clrProperty = property.ClrPropertyDefinition.Symbol as RoslynPropertySymbol ??
-                              property.WriteDefinition.Symbol as RoslynPropertySymbol ??
-                              property.ReadDefinition.Symbol as RoslynPropertySymbol;
+            var clrProperty = GetClrProperty(property);
+
             return clrProperty != null &&
-                _semanticModel.BindingSession.MarkupTemplateContent.IsTemplateContentProperty(clrProperty);
+                   _semanticModel.BindingSession
+                       .MarkupTemplateContent
+                       .IsDeferredContentProperty(
+                           clrProperty);
+        }
+
+        private bool IsDataTemplateProperty(AkburaPropertySymbol property)
+        {
+            var clrProperty = GetClrProperty(property);
+
+            return clrProperty != null &&
+                   _semanticModel.BindingSession
+                       .MarkupTemplateContent
+                       .IsDataTemplateProperty(
+                           clrProperty);
+        }
+
+        private bool IsDataTemplateElement(ElementPlan element)
+        {
+            return element.Symbol.ComponentType is { } componentType &&
+                   _semanticModel.BindingSession
+                       .MarkupTemplateContent
+                       .IsDataTemplateType(componentType);
+        }
+
+        private void AppendDataTemplateDataType(
+            StringBuilder source,
+            ElementPlan element,
+            int indentation)
+        {
+            if (element.Symbol.ComponentType is not { } componentType ||
+                !_semanticModel.BindingSession
+                    .MarkupTemplateContent
+                    .IsDataTemplateType(componentType) ||
+                _semanticModel.BindingSession
+                    .MarkupTemplateContent
+                    .FindDataTypeProperty(componentType) is not
+                    { } dataTypeProperty ||
+                !TryGetTemplateDataType(
+                    element.Syntax,
+                    out var dataType))
+            {
+                return;
+            }
+
+            AppendIndented(source, indentation)
+                .Append(element.FieldName)
+                .Append('.')
+                .Append(EscapeIdentifier(dataTypeProperty.Name))
+                .Append(" = typeof(")
+                .Append(GetTypeName(dataType))
+                .AppendLine(");");
+        }
+
+        private bool TryGetTemplateDataType(
+            MarkupElementSyntax syntax,
+            out INamedTypeSymbol dataType)
+        {
+            if (_semanticModel.BindingSession.MarkupDataTypes
+                .TryGetDataType(syntax, out dataType))
+            {
+                return true;
+            }
+
+            for (var ancestor = syntax.Parent;
+                 ancestor != null;
+                 ancestor = ancestor.Parent)
+            {
+                if (ancestor is not MarkupElementSyntax propertyElement ||
+                    _semanticModel.GetSymbolInfo(propertyElement).Symbol
+                        is not AkburaPropertySymbol property ||
+                    !IsDataTemplateProperty(property))
+                {
+                    continue;
+                }
+
+                return _semanticModel.BindingSession.MarkupDataTypes
+                    .TryGetDataType(propertyElement, out dataType);
+            }
+
+            dataType = null!;
+            return false;
+        }
+
+        private void AppendBeginInit(
+            StringBuilder source,
+            ElementPlan element,
+            int indentation)
+        {
+            if (SupportsInitialization(element))
+            {
+                AppendIndented(source, indentation)
+                    .Append(element.FieldName)
+                    .AppendLine(".BeginInit();");
+            }
+        }
+
+        private void AppendEndInit(
+            StringBuilder source,
+            ElementPlan element,
+            int indentation)
+        {
+            if (SupportsInitialization(element))
+            {
+                AppendIndented(source, indentation)
+                    .Append(element.FieldName)
+                    .AppendLine(".EndInit();");
+            }
+        }
+
+        private bool SupportsInitialization(ElementPlan element)
+        {
+            var componentType = element.Symbol.ComponentType ??
+                element.Symbol.AkburaComponent?.ComponentType;
+            var initializationType =
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetTypeByMetadataName(
+                        "System.ComponentModel.ISupportInitialize");
+
+            return componentType != null &&
+                   initializationType != null &&
+                   _semanticModel.Compilation.CSharpCompilation
+                       .ClassifyConversion(
+                           componentType,
+                           initializationType)
+                       .IsImplicit;
+        }
+
+        private static RoslynPropertySymbol? GetClrProperty(AkburaPropertySymbol property)
+        {
+            return property.ClrPropertyDefinition.Symbol
+                       as RoslynPropertySymbol
+                   ?? property.WriteDefinition.Symbol
+                       as RoslynPropertySymbol
+                   ?? property.ReadDefinition.Symbol
+                       as RoslynPropertySymbol;
         }
 
         private void AppendAkcssStyles(
@@ -1806,7 +2282,11 @@ internal static class ComponentGenerator
                         GetDirectParentsStackExpression(element);
 
                     // Outside templates the component itself is both roots.
-                    var intermediateRoot = "this";
+                    var intermediateRoot =
+                        element.IsDeferred &&
+                        element.DeferredOwner?.Roots.Count > 0
+                            ? element.DeferredOwner.Roots[0].FieldName
+                            : "this";
 
                     creation
                         .Append("CreateMarkupServiceProvider(")
@@ -1818,8 +2298,15 @@ internal static class ComponentGenerator
                         .Append(intermediateRoot)
                         .Append(", baseUri: __akburaBaseUri")
                         .Append(", directParentsStack: ")
-                        .Append(parentStackExpression)
-                        .Append(')');
+                        .Append(parentStackExpression);
+
+                    if (element.IsDeferred)
+                    {
+                        creation.Append(
+                            ", fallbackServiceProvider: __services");
+                    }
+
+                    creation.Append(')');
                 }
 
                 creation.Append(')');
@@ -1834,6 +2321,38 @@ internal static class ComponentGenerator
             ElementPlan element,
             AkburaPropertySymbol targetProperty)
         {
+            if (binding.Kind == MarkupBindingKind.Compiled &&
+                TryGetSingleFieldBindingPath(
+                    binding,
+                    out var field))
+            {
+                var sourceType =
+                    GetTypeName(binding.SourceType.Symbol);
+                var resultType =
+                    GetTypeName(binding.ResultType.Symbol);
+                var fieldName =
+                    field.Symbol.Name ?? field.Text;
+                var compiledField =
+                    new StringBuilder(
+                            "global::Akbura.Markup." +
+                            "AkburaCompiledBinding.CreateField<")
+                        .Append(sourceType)
+                        .Append(", ")
+                        .Append(resultType)
+                        .Append(">(")
+                        .Append(ToStringLiteral(field.Text))
+                        .Append(", static __source => __source.")
+                        .Append(EscapeIdentifier(fieldName));
+
+                AppendCompiledBindingArguments(
+                    compiledField,
+                    extension.Properties,
+                    element,
+                    targetProperty);
+
+                return compiledField.Append(')').ToString();
+            }
+
             if (binding.Kind == MarkupBindingKind.Compiled &&
                 TryGetCompiledBindingPathExpression(binding, out var pathExpression))
             {
@@ -1891,6 +2410,22 @@ internal static class ComponentGenerator
             }
 
             return result.ToString();
+        }
+
+        private static bool TryGetSingleFieldBindingPath(
+            MarkupBindingValue binding,
+            out MarkupBindingPathElement field)
+        {
+            if (binding.PathElements.Length == 1 &&
+                binding.PathElements[0].Kind ==
+                    MarkupBindingPathElementKind.Field)
+            {
+                field = binding.PathElements[0];
+                return true;
+            }
+
+            field = default;
+            return false;
         }
 
         private static bool TryGetCompiledBindingPathExpression(
@@ -2209,11 +2744,112 @@ internal static class ComponentGenerator
             AppendIndentedLine(source, indentation, statement);
         }
 
+        private void AppendDeferredContentAssignment(
+            StringBuilder source,
+            DeferredContentPlan deferred,
+            int indentation)
+        {
+            if (deferred.Roots.Count == 0)
+            {
+                return;
+            }
+
+            var target = deferred.Target;
+            var resultType =
+                GetDeferredResultTypeName(
+                    deferred.Property);
+
+            var propertyExpression =
+                GetProvideValueTargetPropertyExpression(
+                    deferred.Property);
+
+            var directParentsStack =
+                GetDirectParentsStackExpression(
+                    target);
+
+            var intermediateRoot =
+                target.IsDeferred &&
+                target.DeferredOwner?.Roots.Count > 0
+                    ? target.DeferredOwner.Roots[0].FieldName
+                    : "this";
+
+            var provider = new StringBuilder()
+                .Append("CreateMarkupServiceProvider(")
+                .Append("targetObject: ")
+                .Append(target.FieldName)
+                .Append(", targetProperty: ")
+                .Append(propertyExpression)
+                .Append(", intermediateRootObject: ")
+                .Append(intermediateRoot)
+                .Append(", baseUri: __akburaBaseUri")
+                .Append(", directParentsStack: ")
+                .Append(directParentsStack);
+
+            if (target.IsDeferred)
+            {
+                provider.Append(
+                    ", fallbackServiceProvider: __services");
+            }
+
+            provider.Append(')');
+
+            var ownerType =
+                EscapeIdentifier(_symbol.Name);
+
+            var valueExpression =
+                new StringBuilder()
+                    .Append("CreateDeferredContent<")
+                    .Append(resultType)
+                    .Append(">(")
+                    .Append("static __services => ")
+                    .Append("((")
+                    .Append(ownerType)
+                    .Append(")")
+                    .Append("((global::Avalonia.Markup.Xaml.IRootObjectProvider)")
+                    .Append("__services.GetService(typeof(")
+                    .Append("global::Avalonia.Markup.Xaml.IRootObjectProvider")
+                    .Append("))!).RootObject)")
+                    .Append('.')
+                    .Append(deferred.BuilderName)
+                    .Append("(__services), ")
+                    .Append(provider)
+                    .Append(')')
+                    .ToString();
+
+            AppendPropertyWrite(
+                source,
+                target.FieldName,
+                deferred.Property,
+                valueExpression,
+                indentation,
+                deferred.Syntax);
+        }
+
         private string GetBaseTypeName()
         {
             return _symbol.BaseType.Symbol is ITypeSymbol type
                 ? GetTypeName(type)
                 : "global::Akbura.AkburaControl";
+        }
+
+        private string GetDeferredResultTypeName(AkburaPropertySymbol property)
+        {
+            var clrProperty =
+                GetClrProperty(property);
+
+            if (clrProperty == null)
+            {
+                return
+                    "global::Avalonia.Controls.Control";
+            }
+
+            var type =
+                _semanticModel.BindingSession
+                    .MarkupTemplateContent
+                    .GetDeferredResultType(
+                        clrProperty);
+
+            return GetTypeName(type);
         }
 
         private static string GetCommandType(ICommandSymbol command)
@@ -2238,31 +2874,56 @@ internal static class ComponentGenerator
             return syntax?.GetRawCSharpExpression()?.ToFullString().Trim() ?? "default";
         }
 
-        private static string GetDirectParentsStackExpression(
-            ElementPlan element)
+        private static string GetDirectParentsStackExpression(ElementPlan element)
         {
-            var hierarchy = new List<ElementPlan>();
+            var deferredOwner =
+                element.DeferredOwner;
+
+            var hierarchy =
+                new List<ElementPlan>();
 
             for (var current = element;
-                 current is not null;
+                 current != null;
                  current = current.Parent)
             {
+                if (!ReferenceEquals(
+                        current.DeferredOwner,
+                        deferredOwner))
+                {
+                    break;
+                }
+
                 hierarchy.Add(current);
             }
 
             hierarchy.Reverse();
 
-            var result = new StringBuilder(
-                "new global::System.Object[] { this");
+            var result =
+                new StringBuilder(
+                    "new global::System.Object[] { ");
+
+            var hasValue = false;
+
+            if (deferredOwner == null)
+            {
+                result.Append("this");
+                hasValue = true;
+            }
 
             foreach (var parent in hierarchy)
             {
-                result
-                    .Append(", ")
-                    .Append(parent.FieldName);
+                if (hasValue)
+                {
+                    result.Append(", ");
+                }
+
+                result.Append(parent.FieldName);
+                hasValue = true;
             }
 
-            return result.Append(" }").ToString();
+            return result
+                .Append(" }")
+                .ToString();
         }
 
         private static string GetProvideValueTargetPropertyExpression(
@@ -2417,7 +3078,8 @@ internal static class ComponentGenerator
             string fieldName,
             string typeName,
             IMarkupNameAssignmentOperation? nameOperation,
-            MarkupElementSyntax? templateOwner)
+            MarkupElementSyntax? templateOwner,
+            DeferredContentPlan? deferredOwner)
         {
             Id = id;
             Syntax = syntax;
@@ -2426,6 +3088,7 @@ internal static class ComponentGenerator
             TypeName = typeName;
             NameOperation = nameOperation;
             TemplateOwner = templateOwner;
+            DeferredOwner = deferredOwner;
         }
 
         public int Id { get; }
@@ -2447,6 +3110,53 @@ internal static class ComponentGenerator
         public List<ElementPlan> Children { get; } = [];
 
         public List<PropertyElementPlan> PropertyElements { get; } = [];
+
+        public DeferredContentPlan? DeferredOwner { get; }
+
+        public bool IsDeferred =>
+            DeferredOwner != null;
+    }
+
+    private sealed class DeferredContentPlan
+    {
+        public DeferredContentPlan(
+            int id,
+            ElementPlan target,
+            AkburaSyntax syntax,
+            AkburaPropertySymbol property,
+            IMarkupContentOperation operation)
+        {
+            Id = id;
+            Target = target;
+            Syntax = syntax;
+            Property = property;
+            Operation = operation;
+        }
+
+        public int Id { get; }
+
+        /// <summary>
+        /// Object whose property receives IDeferredContent.
+        /// For DataTemplate.Content this is the DataTemplate instance.
+        /// </summary>
+        public ElementPlan Target { get; }
+
+        /// <summary>
+        /// The normal element syntax for implicit content,
+        /// or property-element syntax for explicit content.
+        /// </summary>
+        public AkburaSyntax Syntax { get; }
+
+        public AkburaPropertySymbol Property { get; }
+
+        public IMarkupContentOperation Operation { get; }
+
+        public List<ElementPlan> Roots { get; } = [];
+
+        public string BuilderName =>
+            "__BuildDeferredContent" +
+            Id.ToString(
+                CultureInfo.InvariantCulture);
     }
 
     private sealed class PropertyElementPlan
@@ -2508,6 +3218,7 @@ internal static class ComponentGenerator
     {
         return $"{GetTypeName(method.ContainingType)}.{EscapeIdentifier(method.Name)}";
     }
+
 
     private static string GetTypeName(Microsoft.CodeAnalysis.ISymbol? symbol)
     {

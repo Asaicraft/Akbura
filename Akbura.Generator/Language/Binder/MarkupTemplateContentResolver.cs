@@ -1,6 +1,8 @@
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
-using System;
+using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
+using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 
 namespace Akbura.Language.Binder;
 
@@ -8,20 +10,103 @@ internal sealed class MarkupTemplateContentResolver
 {
     private const string TemplateContentAttributeName =
         "global::Avalonia.Metadata.TemplateContentAttribute";
+    private const string DataTypeAttributeName =
+        "global::Avalonia.Metadata.DataTypeAttribute";
+    private const string DataTemplateTypeName =
+        "Avalonia.Controls.Templates.IDataTemplate";
 
     private readonly AkburaSemanticModel _semanticModel;
 
-    public MarkupTemplateContentResolver(AkburaSemanticModel semanticModel)
+    public MarkupTemplateContentResolver(
+        AkburaSemanticModel semanticModel)
     {
-        _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _semanticModel = semanticModel ??
+            throw new ArgumentNullException(
+                nameof(semanticModel));
     }
 
-    public bool IsInsideTemplateContent(MarkupElementSyntax element)
+    /// <summary>
+    /// Returns true when the children of this markup element
+    /// belong to deferred template content.
+    /// </summary>
+    internal bool IsDeferredContent(
+        MarkupElementSyntax element,
+        MarkupContentModel contentModel)
     {
-        for (var ancestor = element.Parent; ancestor != null; ancestor = ancestor.Parent)
+        // Example:
+        //
+        // <DataTemplate>
+        //     <Button />
+        // </DataTemplate>
+        //
+        // DataTemplate.Content itself has [TemplateContent].
+        if (contentModel.ContentProperty.Symbol
+                is RoslynPropertySymbol contentProperty &&
+            IsDeferredContentProperty(contentProperty))
         {
-            if (ancestor is MarkupElementSyntax propertyElement &&
-                IsTemplateContentPropertyElement(propertyElement))
+            return true;
+        }
+
+        // Example:
+        //
+        // <DataTemplate>
+        //     <Button>
+        //         <TextBlock />
+        //     </Button>
+        // </DataTemplate>
+        //
+        // Button.Content does not have [TemplateContent],
+        // but Button is already inside a deferred section.
+        return IsInsideDeferredContent(element);
+    }
+
+    /// <summary>
+    /// Checks whether an element is nested somewhere inside
+    /// a property marked with TemplateContentAttribute.
+    /// </summary>
+    public bool IsInsideDeferredContent(
+        MarkupElementSyntax element)
+    {
+        for (var ancestor = element.Parent;
+             ancestor != null;
+             ancestor = ancestor.Parent)
+        {
+            if (ancestor is not MarkupElementSyntax ancestorElement)
+            {
+                continue;
+            }
+
+            var symbol =
+                _semanticModel.GetSymbolInfo(ancestorElement).Symbol;
+
+            // Explicit property element:
+            //
+            // <DataTemplate.Content>
+            //     <Button />
+            // </DataTemplate.Content>
+            if (symbol is AkburaPropertySymbol propertySymbol)
+            {
+                var clrProperty =
+                    GetClrProperty(propertySymbol);
+
+                if (clrProperty != null &&
+                    IsDeferredContentProperty(clrProperty))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            // Implicit content property:
+            //
+            // <DataTemplate>
+            //     <Button />
+            // </DataTemplate>
+            if (symbol is IMarkupComponentSymbol component &&
+                component.ContentModel.ContentProperty.Symbol
+                    is RoslynPropertySymbol componentContentProperty &&
+                IsDeferredContentProperty(componentContentProperty))
             {
                 return true;
             }
@@ -30,52 +115,116 @@ internal sealed class MarkupTemplateContentResolver
         return false;
     }
 
-    private bool IsTemplateContentPropertyElement(MarkupElementSyntax propertyElement)
+    /// <summary>
+    /// True only for properties with TemplateContentAttribute.
+    /// </summary>
+    internal bool IsDeferredContentProperty(
+        RoslynPropertySymbol property)
     {
-        var nameText = propertyElement.StartTag?.Name.ToFullString().Trim();
-        if (string.IsNullOrWhiteSpace(nameText))
-        {
-            return false;
-        }
-
-        var separator = nameText!.LastIndexOf('.');
-        if (separator <= 0 || separator == nameText.Length - 1)
-        {
-            return false;
-        }
-
-        var containingElement = AkburaSemanticModel.GetParentMarkupElement(propertyElement);
-        if (containingElement == null ||
-            !_semanticModel.TryGetMarkupElementReferenceType(containingElement, out var typeDefinition) ||
-            typeDefinition.Symbol is not INamedTypeSymbol containingType ||
-            !AkburaSemanticModel.IsMarkupPropertyElementOwner(
-                containingType,
-                nameText[..separator]))
-        {
-            return false;
-        }
-
-        var propertyName = nameText[(separator + 1)..].Trim();
-        var property = AkburaSemanticModel.FindPublicClrProperty(containingType, propertyName);
-        return property != null && IsTemplateContentProperty(property);
+        return FindTemplateContentAttribute(property) != null;
     }
 
-    internal bool IsTemplateContentProperty(IPropertySymbol property)
+    /// <summary>
+    /// True when the property's type implements IDataTemplate.
+    /// This is separate from TemplateContentAttribute.
+    /// </summary>
+    internal bool IsDataTemplateProperty(
+        RoslynPropertySymbol property)
     {
-        if (HasTemplateContentAttribute(property))
-        {
-            return true;
-        }
+        return IsDataTemplateType(property.Type);
+    }
 
-        var dataTemplateType = _semanticModel.Compilation.CSharpCompilation.GetTypeByMetadataName(
-            "Avalonia.Controls.Templates.IDataTemplate");
+    internal bool IsDataTemplateType(ITypeSymbol type)
+    {
+        var dataTemplateType =
+            _semanticModel.Compilation.CSharpCompilation
+                .GetTypeByMetadataName(DataTemplateTypeName);
+
         return dataTemplateType != null &&
-            AkburaSemanticModel.IsAssignableTo(property.Type, dataTemplateType);
+               AkburaSemanticModel.IsAssignableTo(
+                   type,
+                   dataTemplateType);
     }
 
-    private static bool HasTemplateContentAttribute(IPropertySymbol property)
+    internal RoslynPropertySymbol? FindDataTypeProperty(
+        INamedTypeSymbol type)
     {
-        for (var current = property; current != null; current = current.OverriddenProperty)
+        for (var current = type;
+             current != null;
+             current = current.BaseType)
+        {
+            foreach (var property in current.GetMembers()
+                         .OfType<RoslynPropertySymbol>())
+            {
+                if (property.IsStatic ||
+                    property.DeclaredAccessibility !=
+                        Accessibility.Public ||
+                    property.SetMethod?.DeclaredAccessibility !=
+                        Accessibility.Public)
+                {
+                    continue;
+                }
+
+                for (var candidate = property;
+                     candidate != null;
+                     candidate = candidate.OverriddenProperty)
+                {
+                    foreach (var attribute in
+                             candidate.GetAttributes())
+                    {
+                        if (attribute.AttributeClass?.ToDisplayString(
+                                SymbolDisplayFormat
+                                    .FullyQualifiedFormat) ==
+                            DataTypeAttributeName)
+                        {
+                            return property;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Resolves TemplateContentAttribute.TemplateResultType.
+    /// Avalonia uses Control when TemplateResultType is omitted.
+    /// </summary>
+    internal ITypeSymbol GetDeferredResultType(
+        RoslynPropertySymbol property)
+    {
+        var attribute =
+            FindTemplateContentAttribute(property);
+
+        if (attribute != null)
+        {
+            foreach (var argument in attribute.NamedArguments)
+            {
+                if (argument.Key == "TemplateResultType" &&
+                    argument.Value.Kind == TypedConstantKind.Type &&
+                    argument.Value.Value is ITypeSymbol resultType)
+                {
+                    return resultType;
+                }
+            }
+        }
+
+        return _semanticModel.Compilation.CSharpCompilation
+                   .GetTypeByMetadataName(
+                       "Avalonia.Controls.Control")
+               ?? _semanticModel.Compilation.CSharpCompilation
+                   .GetSpecialType(
+                       SpecialType.System_Object);
+    }
+
+    private static AttributeData?
+        FindTemplateContentAttribute(
+            RoslynPropertySymbol property)
+    {
+        for (var current = property;
+             current != null;
+             current = current.OverriddenProperty)
         {
             foreach (var attribute in current.GetAttributes())
             {
@@ -83,11 +232,23 @@ internal sealed class MarkupTemplateContentResolver
                         SymbolDisplayFormat.FullyQualifiedFormat) ==
                     TemplateContentAttributeName)
                 {
-                    return true;
+                    return attribute;
                 }
             }
         }
 
-        return false;
+        return null;
+    }
+
+    private static RoslynPropertySymbol?
+        GetClrProperty(
+            AkburaPropertySymbol property)
+    {
+        return property.ClrPropertyDefinition.Symbol
+                   as RoslynPropertySymbol
+               ?? property.WriteDefinition.Symbol
+                   as RoslynPropertySymbol
+               ?? property.ReadDefinition.Symbol
+                   as RoslynPropertySymbol;
     }
 }

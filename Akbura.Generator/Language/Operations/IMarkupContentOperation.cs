@@ -17,4 +17,6 @@ internal interface IMarkupContentOperation : IPropertySetterOperation
     string? LiteralValue { get; }
 
     bool IsSynthesizedString { get; }
+
+    bool IsDeferred { get; }
 }

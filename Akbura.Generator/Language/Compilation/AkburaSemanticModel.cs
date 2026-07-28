@@ -2597,13 +2597,21 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.Success(symbol);
         }
 
-        SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
         var candidates = CreateMarkupComponentCandidates(componentNameText, binding.CandidateSymbols);
         if (candidates.Length > 0)
         {
+            SetSemanticDiagnostics(
+                markupElement,
+                ImmutableArray<AkburaSemanticDiagnostic>.Empty);
             return AkburaSymbolInfo.Candidates(candidates, binding.CandidateReason);
         }
 
+        SetSemanticDiagnostics(
+            markupElement,
+            ImmutableArray.Create(
+                CreateMarkupComponentNotFoundDiagnostic(
+                    componentName,
+                    componentNameText)));
         return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
     }
 
@@ -2713,12 +2721,23 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         if (property.ClrPropertyDefinition.Symbol is RoslynPropertySymbol clrProperty &&
-            BindingSession.MarkupTemplateContent.IsTemplateContentProperty(clrProperty) &&
-            Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.Controls.Control") is { } controlType)
+            BindingSession.MarkupTemplateContent.IsDeferredContentProperty(clrProperty))
+        {
+            var resultType = BindingSession.MarkupTemplateContent
+                .GetDeferredResultType(clrProperty);
+            return new MarkupContentModel(
+                property.CSharpDefinition,
+                new CSharpSymbolDefinition(resultType),
+                isCollection: false,
+                allowsText: false);
+        }
+
+        if (property.ClrPropertyDefinition.Symbol is RoslynPropertySymbol dataTemplateProperty &&
+            BindingSession.MarkupTemplateContent.IsDataTemplateProperty(dataTemplateProperty))
         {
             return new MarkupContentModel(
                 property.CSharpDefinition,
-                new CSharpSymbolDefinition(controlType),
+                property.Type,
                 isCollection: false,
                 allowsText: false);
         }
@@ -3660,6 +3679,16 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             componentSymbol);
     }
 
+    private static AkburaSemanticDiagnostic CreateMarkupComponentNotFoundDiagnostic(
+        AkburaSyntax syntax,
+        string componentName)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound,
+            [componentName]);
+    }
+
     private AkburaSemanticDiagnostic CreateMarkupPropertyNotFoundDiagnostic(
         AkburaSyntax syntax,
         string propertyName,
@@ -4303,13 +4332,19 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return textBlockContentModel;
         }
 
-        if (TryGetAvaloniaControlType(out var controlType) &&
-            IsAssignableTo(componentType, controlType))
+        var contentProperty = FindAvaloniaContentProperty(componentType);
+        if (contentProperty != null)
         {
-            var contentProperty = FindAvaloniaContentProperty(componentType);
-            if (contentProperty == null)
+            if (BindingSession.MarkupTemplateContent
+                .IsDeferredContentProperty(contentProperty))
             {
-                return default;
+                var resultType = BindingSession.MarkupTemplateContent
+                    .GetDeferredResultType(contentProperty);
+                return new MarkupContentModel(
+                    new CSharpSymbolDefinition(contentProperty),
+                    new CSharpSymbolDefinition(resultType),
+                    isCollection: false,
+                    allowsText: false);
             }
 
             var contentType = contentProperty.Type;
@@ -4549,6 +4584,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var whitespaceMode = BindingSession.MarkupWhitespace
             .GetEffectiveMode(markupElement);
 
+        var isDeferred =
+            BindingSession.MarkupTemplateContent
+                .IsDeferredContent(
+                    markupElement,
+                    contentModel);
+
         var valueContentCount = 0;
 
         foreach (var childSyntax in markupElement.Body)
@@ -4656,6 +4697,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                             childSyntax),
                         contentModel,
                         whitespaceMode,
+                        isDeferred,
                         childrenBuilder,
                         diagnosticsBuilder);
                     break;
@@ -4668,6 +4710,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                         whitespaceMode,
                         trimStart,
                         trimEnd,
+                        isDeferred,
                         childrenBuilder,
                         diagnosticsBuilder);
                     break;
@@ -4679,6 +4722,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                         contentModel,
                         whitespaceMode,
                         validateInlineExpressionContent,
+                        isDeferred,
                         childrenBuilder,
                         diagnosticsBuilder);
                     break;
@@ -4754,6 +4798,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         MarkupElementContentSyntax elementContent,
         MarkupContentModel contentModel,
         MarkupWhitespaceMode whitespaceMode,
+        bool isDeferred,
         ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic>
         diagnosticsBuilder)
@@ -4767,7 +4812,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             MarkupChildKind.Element,
             childType,
             componentSymbol,
-            whitespaceMode: whitespaceMode));
+            whitespaceMode: whitespaceMode,
+            isDeferred: isDeferred));
 
         if (componentSymbol?.ComponentType == null)
         {
@@ -4789,6 +4835,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         MarkupWhitespaceMode whitespaceMode,
         bool trimStart,
         bool trimEnd,
+        bool isDeferred,
         ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic>
         diagnosticsBuilder)
@@ -4820,7 +4867,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 textType,
                 text: text,
                 rawText: rawText,
-                whitespaceMode: whitespaceMode));
+                whitespaceMode: whitespaceMode,
+                isDeferred: isDeferred));
 
         if (!contentModel.AllowsText)
         {
@@ -4837,6 +4885,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         MarkupContentModel contentModel,
         MarkupWhitespaceMode whitespaceMode,
         bool validateContentType,
+        bool isDeferred,
         ImmutableArrayBuilder<MarkupChildContent> childrenBuilder,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic>
         diagnosticsBuilder)
@@ -4863,7 +4912,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             inlineExpression,
             MarkupChildKind.Expression,
             expressionType,
-            whitespaceMode: whitespaceMode));
+            whitespaceMode: whitespaceMode,
+            isDeferred: isDeferred));
 
         if (expression != null)
         {
@@ -4912,8 +4962,20 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private bool IsAllowedMarkupChildType(ITypeSymbol childType, MarkupContentModel contentModel)
     {
-        return contentModel.AllowedChildType.Symbol is ITypeSymbol allowedType &&
-            IsAssignableTo(childType, allowedType);
+        if (contentModel.AllowedChildType.Symbol is not ITypeSymbol allowedType)
+        {
+            return false;
+        }
+
+        if (IsAssignableTo(childType, allowedType))
+        {
+            return true;
+        }
+
+        return contentModel.ContentProperty.Symbol is RoslynPropertySymbol property &&
+            BindingSession.MarkupTemplateContent.IsDataTemplateProperty(property) &&
+            TryGetAvaloniaControlType(out var controlType) &&
+            IsAssignableTo(childType, controlType);
     }
 
     private bool AllowsTextContent(ITypeSymbol type)
@@ -5075,8 +5137,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var binder = BindingSession.GetCSharpProbeBinder(scope, BinderUsage.Expression);
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
-                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(
-                    Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                CreateCSharpProbeReturnType(targetType),
                 "__AkburaSemanticProbe")
             .WithBody(CSharpSyntaxFactory.Block(returnStatement));
 
@@ -5090,8 +5151,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var compilationUnit = binder.CreateComponentProbeCompilationUnit(
             members.ToImmutable(),
             "__AkburaSemanticProbe");
-        var binding = binder.BindReturnExpression(compilationUnit, isBindingPath);
-        return ApplyExpectedTypeConversion(binding, binder, targetType);
+        return binder.BindReturnExpression(
+            compilationUnit,
+            isBindingPath,
+            targetType);
     }
 
     internal CSharpBindingResult BindAkcssExpression(
@@ -5101,7 +5164,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
         var method = CSharpSyntaxFactory.MethodDeclaration(
-                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
+                CreateCSharpProbeReturnType(targetType),
                 "__AkburaSemanticProbe")
             .WithParameterList(CreateAkcssExpressionParameterList(containingSymbol))
             .WithBody(CSharpSyntaxFactory.Block(returnStatement));
@@ -5116,18 +5179,20 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var binder = BindingSession.GetCSharpProbeBinder(
             containingSymbol.DeclarationSyntax,
             BinderUsage.Akcss);
-        var binding = binder.BindReturnExpression(compilationUnit, isBindingPath: true);
-        return ApplyExpectedTypeConversion(binding, binder, targetType);
+        return binder.BindReturnExpression(
+            compilationUnit,
+            isBindingPath: true,
+            targetType);
     }
 
-    private static CSharpBindingResult ApplyExpectedTypeConversion(
-        CSharpBindingResult binding,
-        CSharpProbeBinder binder,
+    private static CSharp.TypeSyntax CreateCSharpProbeReturnType(
         ITypeSymbol? targetType)
     {
         return targetType == null
-            ? binding
-            : binding.WithConversion(binder.ClassifyConversion(binding.TypeSymbol, targetType));
+            ? CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(
+                Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword))
+            : CSharpSyntaxFactory.ParseTypeName(
+                targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
     }
 
     private CSharp.ParameterListSyntax CreateAkcssExpressionParameterList(IAkcssSymbol containingSymbol)

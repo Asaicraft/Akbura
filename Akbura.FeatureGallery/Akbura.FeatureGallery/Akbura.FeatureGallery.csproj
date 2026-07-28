@@ -30,10 +30,6 @@
 		<ProjectReference Include="..\..\Akbura.Furioso\Akbura.Furioso.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <Folder Include="Components\" />
-	</ItemGroup>
-
 	<Import Project="..\..\Akbura\buildTransitive\Akbura.targets" />
 
 </Project>

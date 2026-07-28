@@ -1,0 +1,40 @@
+using Akbura.FeatureGallery.Styles.akcss;
+using System.Collections.Immutable;
+using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Markup.Xaml.Templates;
+
+state ImmutableArray<(string Name, int Age)> persons =
+[
+    ("Allice", 18),
+    ("Bob", 19),
+    ("Hello", 92),
+    ("World!", 45)
+];
+
+<Grid ColumnDefinitions="*, *" gap-3>
+
+    <ItemsControl ItemsSource={persons}>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate>
+                <StackPanel>
+                    <TextBlock Text=${Binding Name, StringFormat="Name {0}"}/>
+
+                    <TextBlock Text=${Binding Age, StringFormat="Age {0}"}/>
+                </StackPanel>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl
+    
+    <ItemsControl ItemsSource={persons} col-1>
+        <ItemsControl.ItemTemplate x.ItemName="person">
+            <StackPanel>
+                    <TextBlock Text={$"Name {person.Name}"}/>
+
+                    <TextBlock Text={$"Age {person.Age}"}/>
+                </StackPanel>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+</Grid>
+

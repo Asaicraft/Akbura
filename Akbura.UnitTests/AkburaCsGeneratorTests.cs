@@ -1,6 +1,7 @@
 using Akbura.Akcss;
 using Akbura.CompilerAnotations;
 using Akbura.Furioso;
+using Akbura.Language.Operations;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.LogicalTree;
@@ -118,6 +119,7 @@ public sealed class AkburaCsGeneratorTests
     {
         const string wrapper =
             "using Avalonia.Controls;\n" +
+            "using Avalonia.Controls.Presenters;\n" +
             "\n" +
             "param object Content;\n" +
             "param Button Submit;\n" +
@@ -587,6 +589,307 @@ public sealed class AkburaCsGeneratorTests
                 window.Close();
             },
             CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_AssignsExplicitDataTemplateAndDefersItsContent()
+    {
+        const string component =
+            """
+            using System.Collections.Immutable;
+            using Avalonia.Controls;
+            using Avalonia.Data;
+            using Avalonia.Markup.Xaml.Templates;
+
+            state ImmutableArray<(string Name, int Age)> persons =
+            [
+                ("Allice", 18),
+                ("Bob", 19)
+            ];
+
+            <ItemsControl ItemsSource={persons}>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel>
+                            <TextBlock Text=${Binding Name, StringFormat="Name {0}"}/>
+                            <TextBlock Text=${Binding Age, StringFormat="Age {0}"}/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        const string csharp =
+            """
+            public partial class DataTemplates
+            {
+                public DataTemplates()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaExplicitDataTemplateTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "DataTemplates.akbura");
+        var componentTree =
+            Akbura.Language.ComponentSyntaxTree.ParseText(
+                SourceText.From(component),
+                sourcePath);
+        var semanticModel = new Akbura.Language.AkburaCompilation(
+            compilation,
+            [componentTree]).GetSemanticModel(componentTree);
+        Assert.NotNull(
+            semanticModel.GetDeclaredSymbol(
+                componentTree.GetRoot()));
+
+        var elements = componentTree.GetRoot().DescendantNodes()
+            .OfType<Akbura.Language.Syntax.MarkupElementSyntax>()
+            .ToArray();
+        var itemTemplateElement = Assert.Single(
+            elements,
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() ==
+                "ItemsControl.ItemTemplate");
+        var dataTemplateElement = Assert.Single(
+            elements,
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() ==
+                "DataTemplate");
+        Assert.NotNull(
+            semanticModel.GetSymbolInfo(dataTemplateElement).Symbol);
+        var itemTemplateOperation =
+            Assert.IsAssignableFrom<IMarkupContentOperation>(
+                semanticModel.GetOperation(itemTemplateElement));
+        Assert.False(itemTemplateOperation.HasErrors);
+        Assert.Equal(
+            "global::Avalonia.Controls.Templates.IDataTemplate",
+            itemTemplateOperation.ContentModel.AllowedChildType
+                .ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat));
+        var dataTemplateOperation =
+            Assert.IsAssignableFrom<IMarkupContentOperation>(
+                semanticModel.GetOperation(dataTemplateElement));
+        Assert.False(dataTemplateOperation.HasErrors);
+        Assert.True(dataTemplateOperation.IsDeferred);
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results)
+                .GeneratedSources);
+        var text = generated.SourceText.ToString();
+        Assert.Contains(
+            "new global::Avalonia.Markup.Xaml.Templates.DataTemplate();",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            ".DataType = typeof(",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "CreateDeferredContent<global::Avalonia.Controls.Control>",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ItemsControl.ItemTemplateProperty",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stringFormat: \"Name {0}\"",
+            text,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "stringFormat: \"\\\"Name {0}\\\"\"",
+            text,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "FuncDataTemplate<",
+            text,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult =
+            updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly =
+            Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType =
+                    assembly.GetType("DataTemplates");
+                Assert.NotNull(componentType);
+                var component =
+                    Assert.IsAssignableFrom<AkburaControl>(
+                        Activator.CreateInstance(componentType));
+                var window = new Window
+                {
+                    Content = component,
+                };
+                window.Show();
+
+                var itemsControl =
+                    Assert.IsType<ItemsControl>(component.Child);
+                Assert.NotNull(itemsControl.ItemTemplate);
+                var templateType =
+                    itemsControl.ItemTemplate.GetType();
+                Assert.Equal(
+                    "Avalonia.Markup.Xaml.Templates.DataTemplate",
+                    templateType.FullName);
+                Assert.Equal(
+                    typeof((string, int)),
+                    templateType.GetProperty("DataType")!
+                        .GetValue(itemsControl.ItemTemplate));
+                var templateContent =
+                    Assert.IsType<StackPanel>(
+                        itemsControl.ItemTemplate.Build(
+                            ("Allice", 18)));
+                templateContent.DataContext = ("Allice", 18);
+                Assert.Equal(2, templateContent.Children.Count);
+                Assert.Equal(
+                    "Name Allice",
+                    Assert.IsType<TextBlock>(
+                        templateContent.Children[0]).Text);
+                Assert.Equal(
+                    "Age 18",
+                    Assert.IsType<TextBlock>(
+                        templateContent.Children[1]).Text);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public void Generator_ReportsMissingUsingForDataTemplate()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <ItemsControl>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaMissingDataTemplateUsingTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "MissingDataTemplateUsing.akbura");
+        var componentTree =
+            Akbura.Language.ComponentSyntaxTree.ParseText(
+                SourceText.From(component),
+                sourcePath);
+        var semanticModel = new Akbura.Language.AkburaCompilation(
+            compilation,
+            [componentTree]).GetSemanticModel(componentTree);
+        var dataTemplateElement = componentTree.GetRoot()
+            .DescendantNodes()
+            .OfType<Akbura.Language.Syntax.MarkupElementSyntax>()
+            .Single(
+                static element =>
+                    element.StartTag?.Name.ToFullString().Trim() ==
+                    "DataTemplate");
+
+        var symbolInfo =
+            semanticModel.GetSymbolInfo(dataTemplateElement);
+        var semanticDiagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(dataTemplateElement),
+            static diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound);
+        Assert.Null(symbolInfo.Symbol);
+        Assert.Equal(
+            Akbura.Language.Symbols.CandidateReason.NotFound,
+            symbolInfo.CandidateReason);
+        Assert.Contains(
+            "DataTemplate",
+            semanticDiagnostic.Message,
+            StringComparison.Ordinal);
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out _,
+            out var generatorDiagnostics);
+
+        var generatorDiagnostic = Assert.Single(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Id ==
+                ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound);
+        Assert.Equal(
+            DiagnosticSeverity.Error,
+            generatorDiagnostic.Severity);
+        Assert.Contains(
+            "DataTemplate",
+            generatorDiagnostic.GetMessage(),
+            StringComparison.Ordinal);
     }
 
     [Fact]

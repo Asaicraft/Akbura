@@ -299,7 +299,9 @@ internal partial class AkburaSemanticModel
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
         syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var probeCompilation =
+            Compilation.CSharpProbeCompilation
+                .AddSyntaxTrees(syntaxTree);
         return probeCompilation.GetSemanticModel(syntaxTree);
     }
 

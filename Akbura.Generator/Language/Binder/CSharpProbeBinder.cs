@@ -31,7 +31,8 @@ internal sealed partial class CSharpProbeBinder : Binder
     {
     }
 
-    public CSharpCompilation CSharpCompilation => Compilation.CSharpCompilation;
+    public CSharpCompilation CSharpCompilation =>
+        Compilation.CSharpProbeCompilation;
 
     public AkburaConversion ClassifyConversion(
         ITypeSymbol? sourceType,

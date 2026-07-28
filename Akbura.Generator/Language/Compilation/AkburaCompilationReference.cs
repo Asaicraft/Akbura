@@ -18,7 +18,7 @@ internal sealed class AkburaCompilationReference
     public AkburaCompilationReference(AkburaCompilation compilation)
         : this(
             compilation,
-            compilation?.CSharpCompilation.ToMetadataReference() ??
+            compilation?.CSharpProbeCompilation.ToMetadataReference() ??
             throw new ArgumentNullException(nameof(compilation)))
     {
     }

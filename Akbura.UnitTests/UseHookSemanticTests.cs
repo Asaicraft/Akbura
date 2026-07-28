@@ -91,6 +91,101 @@ public sealed class UseHookSemanticTests
     }
 
     [Fact]
+    public void SourceComponentParameterAndParameterProperty_AreAvailableToUseHook()
+    {
+        const string routerCode =
+            """
+            param bind string Url = "";
+
+            <object />
+            """;
+        const string linkCode =
+            """
+            using Akbura.Hooks;
+
+            param Router Router;
+
+            state string currentUrl =
+                useAvaloniaProperty(
+                    Router,
+                    Components.Router.UrlProperty);
+
+            <object />
+            """;
+        var projectDirectory =
+            Environment.CurrentDirectory;
+        var routerTree = AkburaSyntaxTree.ParseText(
+            routerCode,
+            Path.Combine(
+                projectDirectory,
+                "Components",
+                "Router.akbura"));
+        var linkTree = AkburaSyntaxTree.ParseText(
+            linkCode,
+            Path.Combine(
+                projectDirectory,
+                "Components",
+                "Link.akbura"));
+        var compilation = new AkburaCompilation(
+            CSharpCompilation.Create(
+                "SourceComponentUseHookTests",
+                references:
+                    SymbolTests.CreateAvaloniaReferences()),
+            [routerTree, linkTree],
+            rootNamespace: "FeatureGallery",
+            projectDirectory);
+        var semanticModel =
+            compilation.GetSemanticModel(linkTree);
+        var parameter =
+            Assert.IsAssignableFrom<IParamSymbol>(
+                semanticModel.GetDeclaredSymbol(
+                    linkTree.GetRoot()
+                        .Members
+                        .OfType<ParamDeclarationSyntax>()
+                        .Single()));
+        var state = linkTree.GetRoot()
+            .Members
+            .OfType<StateDeclarationSyntax>()
+            .Single();
+        var bound = Assert.IsType<
+            BoundStateInitializer>(
+            semanticModel.BindingSession
+                .BindSemanticSyntax(
+                    state.Initializer));
+        var invocation = Assert.IsType<
+            BoundUseHookInvocation>(
+            bound.UseHookInvocation);
+
+        Assert.Equal(
+            "global::FeatureGallery.Components.Router",
+            parameter.Type.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal(
+            "useAvaloniaProperty",
+            invocation.Hook.Method.Name);
+        Assert.Equal(
+            "AvaloniaPropertyHooks",
+            invocation.Hook.Method.ContainingType.Name);
+        Assert.Equal(
+            "Parameter",
+            Assert.IsAssignableFrom<INamedTypeSymbol>(
+                invocation.Hook.Method.Parameters[1].Type)
+                .Name);
+        Assert.Collection(
+            invocation.TypeArguments,
+            type => Assert.Equal(
+                "Router",
+                type.Name),
+            type => Assert.Equal(
+                SpecialType.System_String,
+                type.SpecialType));
+        Assert.True(
+            semanticModel
+                .GetSemanticDiagnostics(state)
+                .IsEmpty);
+    }
+
+    [Fact]
     public void OrdinaryCSharpArgument_HasPriorityOverAvaloniaPropertySubstitution()
     {
         const string hookSource =

@@ -874,7 +874,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
         var syntaxTree = CSharpSyntaxTree.Create(compilationUnit, parseOptions);
-        var probeCompilation = Compilation.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var probeCompilation =
+            Compilation.CSharpProbeCompilation
+                .AddSyntaxTrees(syntaxTree);
         var semanticModel = probeCompilation.GetSemanticModel(syntaxTree);
         var probeMethod = syntaxTree
             .GetCompilationUnitRoot()

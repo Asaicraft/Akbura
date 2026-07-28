@@ -24,6 +24,19 @@ public static class AvaloniaPropertyHooks
     }
 
     [UseHook]
+    public static State<TValue> useAvaloniaProperty<TObject, TValue>(
+        [Self] TObject control,
+        Parameter<TValue> parameter)
+        where TObject : AvaloniaObject
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+
+        return useAvaloniaProperty(
+            control,
+            parameter.AvaloniaProperty);
+    }
+
+    [UseHook]
     public static void useAvaloniaProperty(
         [Self] AkburaControl control,
         Action effect,

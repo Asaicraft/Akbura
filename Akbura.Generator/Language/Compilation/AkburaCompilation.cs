@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language;
@@ -18,6 +19,7 @@ internal sealed partial class AkburaCompilation
     private ImmutableArray<UsingDirectiveSyntax> _lazyGlobalAkburaUsingDirectives;
     private ImmutableArray<AkcssUsingDirectiveSyntax> _lazyGlobalAkcssUsingDirectives;
     private ImmutableArray<CSharp.UsingDirectiveSyntax> _lazyGlobalCSharpUsingDirectives;
+    private CSharpCompilation? _lazyCSharpProbeCompilation;
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
@@ -92,6 +94,31 @@ internal sealed partial class AkburaCompilation
     }
 
     public CSharpCompilation CSharpCompilation { get; }
+
+    internal CSharpCompilation CSharpProbeCompilation
+    {
+        get
+        {
+            var compilation = Volatile.Read(
+                ref _lazyCSharpProbeCompilation);
+            if (compilation != null)
+            {
+                return compilation;
+            }
+
+            compilation =
+                AkburaComponentProbeCompilationBuilder.Build(
+                    CSharpCompilation,
+                    SyntaxTrees,
+                    RootNamespace,
+                    ProjectDirectory);
+            return Interlocked.CompareExchange(
+                       ref _lazyCSharpProbeCompilation,
+                       compilation,
+                       comparand: null) ??
+                   compilation;
+        }
+    }
 
     public ImmutableArray<AkburaSyntaxTree> SyntaxTrees => _syntaxAndDeclarations.SyntaxTrees;
 

@@ -1,0 +1,56 @@
+using Akbura.Hooks;
+using Akbura.FeatureGallery.Styles.akcss;
+
+using Avalonia.Media;
+
+param string Content = "";
+param string Url = "";
+param Router Router;
+
+state string currentUrl =
+    useAvaloniaProperty(
+        Router,
+        Components.Router.UrlProperty);
+
+void Navigate()
+{
+    if (!string.Equals(
+        currentUrl,
+        Url,
+        StringComparison.OrdinalIgnoreCase))
+    {
+        Router.Url = Url;
+    }
+}
+
+@akcss {
+    @utilities {
+        Button.navigation-link {
+            HorizontalContentAlignment: Left;
+            Background: Brushes.Transparent;
+            Opacity: 0.75d;
+        }
+
+        Button.active-link {
+            Background:
+                Amx.DynamicResource<IBrush>(
+                    "--color-blue-600");
+
+            Foreground: Brushes.White;
+            Opacity: 1d;
+        }
+    }
+}
+
+<Button Content={Content}
+        Click={() => Navigate()}
+        navigation-link
+        {string.Equals(
+            currentUrl,
+            Url,
+            StringComparison.OrdinalIgnoreCase)}:active-link
+        w-full
+        px-3
+        py-2
+        rounded-md
+        font-medium/>

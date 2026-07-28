@@ -1,0 +1,16 @@
+using Akbura.FeatureGallery.Styles.akcss;
+
+<StackPanel gap-3>
+
+    <TextBlock Text="About"
+               text-3xl
+               font-bold
+               text-slate-100/>
+
+    <TextBlock
+        Text="Akbura Feature Gallery demonstrates available components and markup features."
+        text-base
+        text-slate-300
+        whitespace-normal/>
+
+</StackPanel>

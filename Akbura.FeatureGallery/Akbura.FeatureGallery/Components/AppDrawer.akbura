@@ -1,0 +1,56 @@
+using Akbura.FeatureGallery.Styles.akcss;
+
+param Router Router;
+param string CurrentUrl = "";
+
+<Border p-4 bg-slate-950>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <StackPanel gap-1>
+
+            <TextBlock Text="Akbura"
+                       text-2xl
+                       font-bold
+                       text-slate-100/>
+
+            <TextBlock Text="Feature Gallery"
+                       text-sm
+                       text-slate-400/>
+
+        </StackPanel>
+
+        <StackPanel row-1
+                    mt-6
+                    gap-2>
+
+            <Link Content="Counter"
+                  Url="/pages"
+                  Router={Router}/>
+
+            <Link Content="Data templates"
+                  Url="/data-templates"
+                  Router={Router}/>
+
+            <Link Content="About"
+                  Url="/about"
+                  Router={Router}/>
+
+        </StackPanel>
+
+        <StackPanel row-2 gap-1>
+
+            <TextBlock Text="Current page"
+                       text-xs
+                       text-slate-500/>
+
+            <TextBlock Text={CurrentUrl}
+                       text-sm
+                       text-slate-300
+                       truncate/>
+
+        </StackPanel>
+
+    </Grid>
+
+</Border>

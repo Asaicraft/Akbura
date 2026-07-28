@@ -1,0 +1,93 @@
+﻿using Akbura.Hooks;
+using Akbura.FeatureGallery.Styles.akcss;
+
+param IDataTemplate View;
+param string Path;
+param string Code;
+
+state Control? preview = null;
+
+useEffect(View)
+{
+    preview = View.Build(null);
+}
+
+<Grid RowDefinitions="Auto,*"
+      gap-y-4>
+
+    <StackPanel gap-1>
+
+        <TextBlock Text="Feature"
+                   text-2xl
+                   font-bold
+                   text-slate-100/>
+
+        <TextBlock Text={Path}
+                   text-sm
+                   text-slate-400
+                   truncate/>
+
+    </StackPanel>
+
+    <Border row-1
+            min-h-96
+            bg-slate-950
+            border-1
+            border-slate-700
+            rounded-xl
+            overflow-hidden>
+
+        <TabControl>
+
+            <TabItem Header="Preview">
+
+                <Border p-6
+                        bg-slate-950>
+
+                    <ContentPresenter Content={preview}
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Stretch"/>
+
+                </Border>
+
+            </TabItem>
+
+            <TabItem Header="Code">
+
+                <Grid RowDefinitions="Auto,*">
+
+                    <Border p-3
+                            bg-slate-800>
+
+                        <TextBlock Text={Path}
+                                   text-sm
+                                   font-medium
+                                   text-slate-200
+                                   truncate/>
+
+                    </Border>
+
+                    <TextBox row-1
+                             Text={Code}
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             TextWrapping="NoWrap"
+                             FontFamily="Consolas"
+                             text-sm
+                             text-slate-200
+                             bg-slate-950
+                             border-0
+                             p-4
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                </Grid>
+
+            </TabItem>
+
+        </TabControl>
+
+    </Border>
+
+</Grid>

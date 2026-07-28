@@ -1,0 +1,24 @@
+using Akbura.FeatureGallery.Styles.akcss;
+
+param string Url = "";
+param Router Router;
+
+<StackPanel gap-4
+            self-center>
+
+    <TextBlock Text="Page not found"
+               text-3xl
+               font-bold
+               text-slate-100
+               text-center/>
+
+    <TextBlock Text={$"The page '{Url}' does not exist."}
+               text-base
+               text-slate-400
+               text-center/>
+
+    <Link Content="Go to Counter"
+          Url="/pages"
+          Router={Router}/>
+
+</StackPanel>

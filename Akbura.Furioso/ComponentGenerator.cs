@@ -1200,7 +1200,8 @@ internal static class ComponentGenerator
                         break;
                     case IMarkupPropertySetterOperation setter
                         when setter.BindingKind != MarkupAttributeBindingKind.Out &&
-                             IsFirstUpdateValue(setter):
+                             (setter.Property?.Parameter != null ||
+                              IsFirstUpdateValue(setter)):
                         AppendPropertySetter(source, element, setter, indentation);
                         break;
                 }

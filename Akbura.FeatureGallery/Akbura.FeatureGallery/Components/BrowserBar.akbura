@@ -1,0 +1,49 @@
+using Akbura.FeatureGallery.Styles.akcss;
+
+param Router Router;
+param string CurrentUrl = "";
+
+<Border row-0
+        p-3
+        bg-slate-900
+        border-1
+        border-slate-800>
+
+    <Grid ColumnDefinitions="Auto,*"
+          gap-x-3>
+
+        <Button Content="⌂"
+                Click={() => Router.Url = "/pages"}
+                size-10
+                rounded-lg
+                font-bold/>
+
+        <Border col-1
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg
+                px-4
+                py-2>
+
+            <Grid ColumnDefinitions="Auto,*"
+                  gap-x-3>
+
+                <TextBlock Text="●"
+                           text-slate-500
+                           VerticalAlignment="Center"/>
+
+                <TextBlock col-1
+                           Text={$"akbura://feature-gallery{CurrentUrl}"}
+                           text-sm
+                           text-slate-200
+                           VerticalAlignment="Center"
+                           truncate/>
+
+            </Grid>
+
+        </Border>
+
+    </Grid>
+
+</Border>

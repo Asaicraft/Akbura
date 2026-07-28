@@ -6,101 +6,15 @@ state string url = "/pages";
             DrawerLength="260">
 
     <DrawerPage.Drawer>
-        <Border p-4
-                bg-slate-950>
-
-            <Grid RowDefinitions="Auto,*,Auto">
-
-                <StackPanel gap-1>
-                    <TextBlock Text="Akbura"
-                               text-2xl
-                               font-bold
-                               text-slate-100/>
-
-                    <TextBlock Text="Feature Gallery"
-                               text-sm
-                               text-slate-400/>
-                </StackPanel>
-
-                <StackPanel row-1
-                            mt-6
-                            gap-2>
-
-                    <Link Content="Counter"
-                          Url="/pages"
-                          Router={Router}/>
-
-                    <Link Content="Data templates"
-                          Url="/data-templates"
-                          Router={Router}/>
-
-                    <Link Content="About"
-                          Url="/about"
-                          Router={Router}/>
-                </StackPanel>
-
-                <StackPanel row-2
-                            gap-1>
-
-                    <TextBlock Text="Current page"
-                               text-xs
-                               text-slate-500/>
-
-                    <TextBlock Text={url}
-                               text-sm
-                               text-slate-300
-                               truncate/>
-                </StackPanel>
-
-            </Grid>
-        </Border>
+        <AppDrawer Router={Router}
+                   CurrentUrl={url}/>
     </DrawerPage.Drawer>
 
     <Grid RowDefinitions="Auto,*"
           bg-slate-950>
 
-        <Border row-0
-                p-3
-                bg-slate-900
-                border-1
-                border-slate-800>
-
-            <Grid ColumnDefinitions="Auto,*"
-                  gap-x-3>
-
-                <Button Content="⌂"
-                        Click={() => Router.Url = "/pages"}
-                        size-10
-                        rounded-lg
-                        font-bold/>
-
-                <Border col-1
-                        bg-slate-800
-                        border-1
-                        border-slate-700
-                        rounded-lg
-                        px-4
-                        py-2>
-
-                    <Grid ColumnDefinitions="Auto,*"
-                          gap-x-3>
-
-                        <TextBlock Text="●"
-                                   text-slate-500
-                                   VerticalAlignment="Center"/>
-
-                        <TextBlock col-1
-                                   Text={$"akbura://feature-gallery{url}"}
-                                   text-sm
-                                   text-slate-200
-                                   VerticalAlignment="Center"
-                                   truncate/>
-
-                    </Grid>
-                </Border>
-
-            </Grid>
-        </Border>
+        <BrowserBar Router={Router}
+                    CurrentUrl={url}/>
 
         <Border row-1
                 p-4
@@ -120,25 +34,8 @@ state string url = "/pages";
                         <Router.NotFound x.DataType="string"
                                          x.ItemName="notFoundUrl">
 
-                            <StackPanel gap-4 self-center>
-
-                                <TextBlock Text="Page not found"
-                                           text-3xl
-                                           font-bold
-                                           text-slate-100
-                                           text-center/>
-
-                                <TextBlock
-                                    Text={$"The page '{notFoundUrl}' does not exist."}
-                                    text-base
-                                    text-slate-400
-                                    text-center/>
-
-                                <Link Content="Go to Counter"
-                                      Url="/pages"
-                                      Router={Router}/>
-
-                            </StackPanel>
+                            <NotFoundPage Url={notFoundUrl}
+                                          Router={Router}/>
 
                         </Router.NotFound>
 
@@ -153,20 +50,7 @@ state string url = "/pages";
                             </Page>
 
                             <Page Url="/about">
-                                <StackPanel gap-3>
-
-                                    <TextBlock Text="About"
-                                               text-3xl
-                                               font-bold
-                                               text-slate-100/>
-
-                                    <TextBlock
-                                        Text="Akbura Feature Gallery demonstrates available components and markup features."
-                                        text-base
-                                        text-slate-300
-                                        whitespace-normal/>
-
-                                </StackPanel>
+                                <AboutPage/>
                             </Page>
 
                         </Router.Pages>

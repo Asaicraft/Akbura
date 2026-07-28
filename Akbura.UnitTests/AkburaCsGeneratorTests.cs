@@ -666,11 +666,22 @@ public sealed class AkburaCsGeneratorTests
 
             <TextBlock Text={currentUrl} />
             """;
+        const string app =
+            """
+            namespace Components;
+
+            using Avalonia.Controls;
+
+            <StackPanel>
+                <Link Router={Router} />
+                <Router x.Name="Router" />
+            </StackPanel>
+            """;
         const string csharp =
             """
             namespace Components;
 
-            public partial class Router
+            public partial class Router : global::Akbura.AkburaControl
             {
                 public Router()
                     : base(
@@ -679,9 +690,18 @@ public sealed class AkburaCsGeneratorTests
                 }
             }
 
-            public partial class Link
+            public partial class Link : global::Akbura.AkburaControl
             {
                 public Link()
+                    : base(
+                        global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+
+            public partial class App : global::Akbura.AkburaControl
+            {
+                public App()
                     : base(
                         global::Akbura.Engine.AkburaEngine.Empty)
                 {
@@ -723,6 +743,12 @@ public sealed class AkburaCsGeneratorTests
                             "Components",
                             "Link.akbura"),
                         SourceText.From(link)),
+                    new TestAdditionalText(
+                        Path.Combine(
+                            Environment.CurrentDirectory,
+                            "Components",
+                            "App.akbura"),
+                        SourceText.From(app)),
                 ],
                 parseOptions: parseOptions);
 
@@ -826,6 +852,51 @@ public sealed class AkburaCsGeneratorTests
                     textBlock.Text);
 
                 window.Close();
+
+                var appControl =
+                    Assert.IsAssignableFrom<
+                        AkburaControl>(
+                        Activator.CreateInstance(
+                            assembly.GetType(
+                                "Components.App")!));
+                var appWindow = new Window
+                {
+                    Content = appControl,
+                };
+
+                appWindow.Show();
+
+                var panel =
+                    Assert.IsType<StackPanel>(
+                        appControl.Child);
+                var generatedLink =
+                    Assert.IsAssignableFrom<
+                        AkburaControl>(
+                        panel.Children[0]);
+                var generatedRouter =
+                    Assert.IsAssignableFrom<
+                        AkburaControl>(
+                        panel.Children[1]);
+                var generatedText =
+                    Assert.IsType<TextBlock>(
+                        generatedLink.Child);
+                var generatedUrl =
+                    generatedRouter.GetType()
+                        .GetProperty("Url")!;
+
+                Assert.Equal(
+                    string.Empty,
+                    generatedText.Text);
+
+                generatedUrl.SetValue(
+                    generatedRouter,
+                    "/generated");
+
+                Assert.Equal(
+                    "/generated",
+                    generatedText.Text);
+
+                appWindow.Close();
             },
             CancellationToken.None);
     }

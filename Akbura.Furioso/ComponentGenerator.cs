@@ -1168,6 +1168,18 @@ internal static class ComponentGenerator
                     continue;
                 }
 
+                if (operation is IMarkupPropertySetterOperation
+                    {
+                        BindingKind: MarkupAttributeBindingKind.Bind or MarkupAttributeBindingKind.Out,
+                    } binding)
+                {
+                    AppendPropertyBindingSubscription(
+                        source,
+                        element,
+                        binding,
+                        indentation);
+                }
+
                 switch (operation)
                 {
                     case IMarkupNameAssignmentOperation { NameSymbol: { } name }:
@@ -1186,7 +1198,9 @@ internal static class ComponentGenerator
                     case IMarkupCommandBindingOperation command:
                         AppendCommandBinding(source, element, command, indentation);
                         break;
-                    case IMarkupPropertySetterOperation setter when IsFirstUpdateValue(setter):
+                    case IMarkupPropertySetterOperation setter
+                        when setter.BindingKind != MarkupAttributeBindingKind.Out &&
+                             IsFirstUpdateValue(setter):
                         AppendPropertySetter(source, element, setter, indentation);
                         break;
                 }
@@ -1197,11 +1211,126 @@ internal static class ComponentGenerator
         {
             foreach (var operation in element.Symbol.AttributeOperations.OfType<IMarkupPropertySetterOperation>())
             {
-                if (!operation.HasErrors && !IsFirstUpdateValue(operation))
+                if (!operation.HasErrors &&
+                    operation.BindingKind != MarkupAttributeBindingKind.Out &&
+                    !IsFirstUpdateValue(operation))
                 {
                     AppendPropertySetter(source, element, operation, indentation);
                 }
             }
+        }
+
+        private void AppendPropertyBindingSubscription(
+            StringBuilder source,
+            ElementPlan element,
+            IMarkupPropertySetterOperation operation,
+            int indentation)
+        {
+            if (operation.Property == null ||
+                operation.ValueSyntax is not MarkupDynamicAttributeValueSyntax dynamicValue)
+            {
+                return;
+            }
+
+            var targetExpression = dynamicValue.Expression.Expression
+                .GetRawCSharpExpression()
+                ?.ToFullString()
+                .Trim();
+            if (string.IsNullOrWhiteSpace(targetExpression))
+            {
+                return;
+            }
+
+            var suffix = SanitizeIdentifier(
+                element.FieldName + "_" + operation.Property.Name);
+            var changeName = "__bindingChange_" + suffix;
+            var avaloniaProperty = GetAvaloniaPropertyReference(
+                operation.Property,
+                element.Symbol);
+            if (avaloniaProperty != null)
+            {
+                AppendIndented(source, indentation)
+                    .Append(element.FieldName)
+                    .Append(".PropertyChanged += (_, ")
+                    .Append(changeName)
+                    .AppendLine(") =>");
+                AppendIndentedLine(source, indentation, "{");
+                AppendIndented(source, indentation + 1)
+                    .Append("if (")
+                    .Append(changeName)
+                    .Append(".Property == (global::Avalonia.AvaloniaProperty)")
+                    .Append(avaloniaProperty)
+                    .AppendLine(")");
+                AppendIndentedLine(source, indentation + 1, "{");
+
+                var assignment =
+                    targetExpression +
+                    " = (" +
+                    GetTypeName(operation.Property.Type.Symbol) +
+                    ")" +
+                    changeName +
+                    ".NewValue!;";
+                AppendLineDirective(
+                    source,
+                    indentation + 2,
+                    operation.Syntax,
+                    assignment,
+                    0);
+
+                AppendIndentedLine(source, indentation + 1, "}");
+                AppendIndentedLine(source, indentation, "};");
+                return;
+            }
+
+            if (operation.Property.ReadDefinition.Symbol is not RoslynPropertySymbol clrProperty)
+            {
+                return;
+            }
+
+            var notifierName = "__bindingNotifier_" + suffix;
+            var eventName = "__bindingEvent_" + suffix;
+            AppendIndented(source, indentation)
+                .Append("if (")
+                .Append(element.FieldName)
+                .Append(" is global::System.ComponentModel.INotifyPropertyChanged ")
+                .Append(notifierName)
+                .AppendLine(")");
+            AppendIndentedLine(source, indentation, "{");
+            AppendIndented(source, indentation + 1)
+                .Append(notifierName)
+                .Append(".PropertyChanged += (_, ")
+                .Append(eventName)
+                .AppendLine(") =>");
+            AppendIndentedLine(source, indentation + 1, "{");
+            AppendIndented(source, indentation + 2)
+                .Append("if (global::System.String.IsNullOrEmpty(")
+                .Append(eventName)
+                .Append(".PropertyName) || ")
+                .Append(eventName)
+                .Append(".PropertyName == ")
+                .Append(ToStringLiteral(clrProperty.Name))
+                .AppendLine(")");
+            AppendIndentedLine(source, indentation + 2, "{");
+
+            var clrAssignment =
+                targetExpression +
+                " = ((" +
+                GetTypeName(clrProperty.ContainingType) +
+                ")" +
+                element.FieldName +
+                ")." +
+                EscapeIdentifier(clrProperty.Name) +
+                ";";
+            AppendLineDirective(
+                source,
+                indentation + 3,
+                operation.Syntax,
+                clrAssignment,
+                0);
+
+            AppendIndentedLine(source, indentation + 2, "}");
+            AppendIndentedLine(source, indentation + 1, "};");
+            AppendIndentedLine(source, indentation, "}");
         }
 
         private void AppendFirstUpdateContent(StringBuilder source, ElementPlan element, int indentation)
@@ -2057,10 +2186,24 @@ internal static class ComponentGenerator
                         StringComparison.Ordinal)));
         }
 
-        private static string? GetAvaloniaPropertyReference(AkburaPropertySymbol property)
+        private static string? GetAvaloniaPropertyReference(
+            AkburaPropertySymbol property,
+            IMarkupComponentSymbol? containingComponent = null)
         {
-            return GetStaticMemberReference(property.WriteDefinition.Symbol) ??
-                   GetStaticMemberReference(property.AvaloniaPropertyDefinition.Symbol);
+            var reference =
+                GetStaticMemberReference(property.WriteDefinition.Symbol) ??
+                GetStaticMemberReference(property.AvaloniaPropertyDefinition.Symbol);
+            if (reference != null ||
+                property.Parameter == null ||
+                containingComponent == null)
+            {
+                return reference;
+            }
+
+            return GetComponentTypeName(containingComponent) +
+                "." +
+                EscapeIdentifier(property.Name) +
+                "Property.AvaloniaProperty";
         }
 
         private void AppendPropertyWrite(

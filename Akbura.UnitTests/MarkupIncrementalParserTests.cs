@@ -293,6 +293,39 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void TailwindAlphaNumericSegmentEdit_PreservesSingleIdentifierSegment()
+    {
+        const string oldCode = "<TextBlock text-2xl/>";
+        const string newCode = "<TextBlock text-3xl/>";
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            oldCode.IndexOf("2xl", StringComparison.Ordinal),
+            oldLength: "2xl".Length,
+            newLength: "3xl".Length);
+
+        Assert.Equal(1, oldMarkup.Element.StartTag!.Attributes.Count);
+        Assert.Equal(1, newMarkup.Element.StartTag!.Attributes.Count);
+        var oldAttribute = Assert.IsType<GreenTailwindFullAttributeSyntax>(
+            oldMarkup.Element.StartTag.Attributes[0]);
+        var newAttribute = Assert.IsType<GreenTailwindFullAttributeSyntax>(
+            newMarkup.Element.StartTag.Attributes[0]);
+        Assert.Equal(1, oldAttribute.Segments.Count);
+        Assert.Equal(1, newAttribute.Segments.Count);
+        var oldSegment = Assert.IsType<GreenTailwindIdentifierSegmentSyntax>(
+            oldAttribute.Segments[0]);
+        var newSegment = Assert.IsType<GreenTailwindIdentifierSegmentSyntax>(
+            newAttribute.Segments[0]);
+
+        Assert.Same(oldAttribute.Name.Identifier, newAttribute.Name.Identifier);
+        Assert.Same(oldAttribute.Minus, newAttribute.Minus);
+        Assert.Equal("2xl", oldSegment.Name.Identifier.ValueText);
+        Assert.Equal("3xl", newSegment.Name.Identifier.ValueText);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void TailwindSegmentInsert_ReusesExistingRightSegment()
     {
         const string oldCode = "<StackPanel gap-4/>";

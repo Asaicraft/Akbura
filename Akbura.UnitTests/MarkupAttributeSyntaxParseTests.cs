@@ -29,6 +29,23 @@ public class MarkupAttributeSyntaxParseTests
     }
 
     [Fact]
+    public void TailwindAttribute_ParsesAlphaNumericSegmentStartingWithDigit()
+    {
+        const string code = "text-2xl";
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenTailwindFullAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+        Assert.Equal(1, syntax.Segments.Count);
+        var segment = Assert.IsType<GreenTailwindIdentifierSegmentSyntax>(
+            syntax.Segments[0]);
+
+        Assert.Equal("text", syntax.Name.Identifier.ValueText);
+        Assert.Equal("2xl", segment.Name.Identifier.ValueText);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
     public void PrefixedAttribute_ParseSuccessfully()
     {
         const string code = "bind:Search={search}";

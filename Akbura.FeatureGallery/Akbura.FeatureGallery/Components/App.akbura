@@ -1,107 +1,182 @@
-state string url = "/pages";
+using Akbura.FeatureGallery.Styles.akcss;
 
-void Navigate(string target)
-{
-    url = target;
-}
+state string url = "/pages";
 
 <DrawerPage Header="Akbura Feature Gallery"
             DrawerLength="260">
 
     <DrawerPage.Drawer>
-        <Border Padding="16">
+        <Border p-4
+                bg-slate-950>
+
             <Grid RowDefinitions="Auto,*,Auto">
 
-                <StackPanel Spacing="4">
+                <StackPanel gap-1>
                     <TextBlock Text="Akbura"
-                               FontSize="24"
-                               FontWeight="Bold"/>
+                               text-2xl
+                               font-bold
+                               text-slate-100/>
 
                     <TextBlock Text="Feature Gallery"
-                               FontSize="13"
-                               Opacity="0.65"/>
+                               text-sm
+                               text-slate-400/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1"
-                            Margin="0,24,0,0"
-                            Spacing="8">
+                <StackPanel row-1
+                            mt-6
+                            gap-2>
 
-                    <Button Content="Counter"
-                            HorizontalContentAlignment="Left"
-                            Click={() => Navigate("/pages")}/>
+                    <Link Content="Counter"
+                          Url="/pages"
+                          Router={Router}/>
 
-                    <Button Content="Data templates"
-                            HorizontalContentAlignment="Left"
-                            Click={() => Navigate("/data-templates")}/>
+                    <Link Content="Data templates"
+                          Url="/data-templates"
+                          Router={Router}/>
 
-                    <Button Content="About"
-                            HorizontalContentAlignment="Left"
-                            Click={() => Navigate("/about")}/>
+                    <Link Content="About"
+                          Url="/about"
+                          Router={Router}/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="2"
-                           Text={$"Current page: {url}"}
-                           FontSize="12"
-                           Opacity="0.5"/>
+                <StackPanel row-2
+                            gap-1>
+
+                    <TextBlock Text="Current page"
+                               text-xs
+                               text-slate-500/>
+
+                    <TextBlock Text={url}
+                               text-sm
+                               text-slate-300
+                               truncate/>
+                </StackPanel>
+
             </Grid>
         </Border>
     </DrawerPage.Drawer>
 
-    <Border Padding="24">
-        <ScrollViewer>
-            <Router bind:Url={url}>
+    <Grid RowDefinitions="Auto,*"
+          bg-slate-950>
 
-                <Router.NotFound x.DataType="string"
-                                 x.ItemName="notFoundUrl">
-                    <Border Padding="32">
-                        <StackPanel Spacing="12"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
+        <Border row-0
+                p-3
+                bg-slate-900
+                border-1
+                border-slate-800>
 
-                            <TextBlock Text="Page not found"
-                                       FontSize="28"
-                                       FontWeight="Bold"
-                                       HorizontalAlignment="Center"/>
+            <Grid ColumnDefinitions="Auto,*"
+                  gap-x-3>
 
-                            <TextBlock Text={$"The page '{notFoundUrl}' does not exist."}
-                                       FontSize="15"
-                                       Opacity="0.7"
-                                       HorizontalAlignment="Center"/>
+                <Button Content="⌂"
+                        Click={() => Router.Url = "/pages"}
+                        size-10
+                        rounded-lg
+                        font-bold/>
 
-                            <Button Content="Go to Counter"
-                                    HorizontalAlignment="Center"
-                                    Click={() => Navigate("/pages")}/>
-                        </StackPanel>
-                    </Border>
-                </Router.NotFound>
+                <Border col-1
+                        bg-slate-800
+                        border-1
+                        border-slate-700
+                        rounded-lg
+                        px-4
+                        py-2>
 
-                <Router.Pages>
-                    <Page Url="/pages">
-                        <Counter/>
-                    </Page>
+                    <Grid ColumnDefinitions="Auto,*"
+                          gap-x-3>
 
-                    <Page Url="/data-templates">
-                        <DataTemplates/>
-                    </Page>
+                        <TextBlock Text="●"
+                                   text-slate-500
+                                   VerticalAlignment="Center"/>
 
-                    <Page Url="/about">
-                        <Border Padding="24">
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="About"
-                                           FontSize="28"
-                                           FontWeight="Bold"/>
+                        <TextBlock col-1
+                                   Text={$"akbura://feature-gallery{url}"}
+                                   text-sm
+                                   text-slate-200
+                                   VerticalAlignment="Center"
+                                   truncate/>
+
+                    </Grid>
+                </Border>
+
+            </Grid>
+        </Border>
+
+        <Border row-1
+                p-4
+                bg-slate-950>
+
+            <Border bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl
+                    shadow-lg
+                    p-6>
+
+                <ScrollViewer>
+                    <Router bind:Url={url}
+                            x.Name="Router">
+
+                        <Router.NotFound x.DataType="string"
+                                         x.ItemName="notFoundUrl">
+
+                            <StackPanel gap-4 self-center>
+
+                                <TextBlock Text="Page not found"
+                                           text-3xl
+                                           font-bold
+                                           text-slate-100
+                                           text-center/>
 
                                 <TextBlock
-                                    Text="Akbura Feature Gallery demonstrates available components and markup features."
-                                    TextWrapping="Wrap"
-                                    FontSize="15"/>
-                            </StackPanel>
-                        </Border>
-                    </Page>
-                </Router.Pages>
+                                    Text={$"The page '{notFoundUrl}' does not exist."}
+                                    text-base
+                                    text-slate-400
+                                    text-center/>
 
-            </Router>
-        </ScrollViewer>
-    </Border>
+                                <Link Content="Go to Counter"
+                                      Url="/pages"
+                                      Router={Router}/>
+
+                            </StackPanel>
+
+                        </Router.NotFound>
+
+                        <Router.Pages>
+
+                            <Page Url="/pages">
+                                <Counter/>
+                            </Page>
+
+                            <Page Url="/data-templates">
+                                <DataTemplates/>
+                            </Page>
+
+                            <Page Url="/about">
+                                <StackPanel gap-3>
+
+                                    <TextBlock Text="About"
+                                               text-3xl
+                                               font-bold
+                                               text-slate-100/>
+
+                                    <TextBlock
+                                        Text="Akbura Feature Gallery demonstrates available components and markup features."
+                                        text-base
+                                        text-slate-300
+                                        whitespace-normal/>
+
+                                </StackPanel>
+                            </Page>
+
+                        </Router.Pages>
+
+                    </Router>
+                </ScrollViewer>
+
+            </Border>
+        </Border>
+
+    </Grid>
 
 </DrawerPage>

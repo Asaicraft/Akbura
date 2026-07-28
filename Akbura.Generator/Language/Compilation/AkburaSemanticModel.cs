@@ -3140,18 +3140,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return false;
         }
 
-        var componentNameText = startTag.Name.ToFullString().Trim();
-        if (componentNameText.Length > 0 &&
-            TryResolveAkburaMarkupComponent(
-                markupElement,
-                componentNameText,
-                out var akburaComponent) &&
-            !akburaComponent.CSharpDefinition.IsDefault)
-        {
-            type = akburaComponent.CSharpDefinition;
-            return true;
-        }
-
         try
         {
             var binding = BindCSharpType(startTag.Name.ToCSharp());

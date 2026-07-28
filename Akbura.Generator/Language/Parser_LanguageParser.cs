@@ -1810,13 +1810,45 @@ partial class Parser
 	{
 		return CurrentToken.Kind switch
 		{
-			SyntaxKind.NumericLiteralToken => GreenSyntaxFactory.TailwindNumericSegmentSyntax(
-				EatToken(SyntaxKind.NumericLiteralToken)),
+			SyntaxKind.NumericLiteralToken => ParseTailwindNumericOrIdentifierSegmentSyntax(),
 			SyntaxKind.OpenBraceToken => GreenSyntaxFactory.TailwindExpressionSegmentSyntax(
 				ParseInlineExpressionSyntax()),
 			_ => GreenSyntaxFactory.TailwindIdentifierSegmentSyntax(
 				ParseTailwindSimpleName()),
 		};
+	}
+
+	private GreenTailwindSegmentSyntax ParseTailwindNumericOrIdentifierSegmentSyntax()
+	{
+		var first = EatToken(SyntaxKind.NumericLiteralToken);
+		if (!IsTailwindNameToken(CurrentToken) ||
+			first.ContainsDiagnostics ||
+			CurrentToken.ContainsDiagnostics ||
+			!AreAdjacent(first, CurrentToken))
+		{
+			return GreenSyntaxFactory.TailwindNumericSegmentSyntax(first);
+		}
+
+		var text = new StringBuilder(first.Text);
+		var last = first;
+		do
+		{
+			last = EatToken();
+			text.Append(last.Text);
+		}
+		while (IsTailwindNameToken(CurrentToken) &&
+			!CurrentToken.ContainsDiagnostics &&
+			AreAdjacent(last, CurrentToken));
+
+		var value = text.ToString();
+		var identifier = GreenSyntaxToken.Identifier(
+			SyntaxKind.IdentifierToken,
+			first.LeadingTrivia.Node,
+			value,
+			value,
+			last.TrailingTrivia.Node);
+		return GreenSyntaxFactory.TailwindIdentifierSegmentSyntax(
+			GreenSyntaxFactory.IdentifierName(identifier));
 	}
 
 	#endregion

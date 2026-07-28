@@ -5708,6 +5708,45 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_TailwindUtilityAttribute_PrefersImportedAlphaNumericFixedName()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "using My.NameSpace.Styles.akcss;\n" +
+            "\n" +
+            "<TextBlock text-2xl />";
+        const string akcss =
+            "@utilities {\n" +
+            "    TextBlock.text-2xl { FontSize: 24; }\n" +
+            "    TextBlock.text-(string color) { Text: color; }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Root.akbura");
+        var akcssTree = AkcssSyntaxTree.ParseText(
+            akcss,
+            "Styles.akcss",
+            "My.NameSpace.Styles.akcss");
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(),
+            [akcssTree]);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<TailwindFullAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal("text-2xl", operation.UtilityName);
+        Assert.NotNull(operation.Utility);
+        Assert.Equal("text-2xl", operation.Utility!.Name);
+        Assert.True(operation.Utility.Parameters.IsEmpty);
+        Assert.True(operation.Arguments.IsEmpty);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssClassAndUtilityAttributes_ResolveAllCompatibleSources()
     {
         const string code =

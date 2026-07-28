@@ -957,13 +957,47 @@ internal sealed partial class Parser
 
         return PeekIncrementalTokenKind() switch
         {
-            SyntaxKind.NumericLiteralToken => GreenSyntaxFactory.TailwindNumericSegmentSyntax(
-                ReadRequiredIncrementalToken(SyntaxKind.NumericLiteralToken)),
+            SyntaxKind.NumericLiteralToken => ParseIncrementalTailwindNumericOrIdentifierSegmentSyntax(),
             SyntaxKind.OpenBraceToken => GreenSyntaxFactory.TailwindExpressionSegmentSyntax(
                 ParseIncrementalInlineExpressionSyntax()),
             _ => GreenSyntaxFactory.TailwindIdentifierSegmentSyntax(
                 ParseIncrementalTailwindSimpleName()),
         };
+    }
+
+    private GreenTailwindSegmentSyntax ParseIncrementalTailwindNumericOrIdentifierSegmentSyntax()
+    {
+        var first = ReadRequiredIncrementalToken(SyntaxKind.NumericLiteralToken);
+        var next = PeekIncrementalToken();
+        if (!IsTailwindNameToken(next) ||
+            first.ContainsDiagnostics ||
+            next.ContainsDiagnostics ||
+            !AreAdjacent(first, next))
+        {
+            return GreenSyntaxFactory.TailwindNumericSegmentSyntax(first);
+        }
+
+        var text = new StringBuilder(first.Text);
+        var last = first;
+        do
+        {
+            last = ReadIncrementalToken();
+            text.Append(last.Text);
+            next = PeekIncrementalToken();
+        }
+        while (IsTailwindNameToken(next) &&
+            !next.ContainsDiagnostics &&
+            AreAdjacent(last, next));
+
+        var value = text.ToString();
+        var identifier = GreenSyntaxToken.Identifier(
+            SyntaxKind.IdentifierToken,
+            first.LeadingTrivia.Node,
+            value,
+            value,
+            last.TrailingTrivia.Node);
+        return GreenSyntaxFactory.TailwindIdentifierSegmentSyntax(
+            GreenSyntaxFactory.IdentifierName(identifier));
     }
 
     private GreenMarkupPlainAttributeSyntax ParseIncrementalMarkupPlainAttributeSyntax()

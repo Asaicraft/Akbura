@@ -831,6 +831,301 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public async Task Generator_BindAttributePropagatesSourceComponentParameterChangesToParentState()
+    {
+        const string router =
+            """
+            namespace Components;
+
+            using Avalonia.Controls;
+
+            param bind string Url = "";
+
+            <Control />
+            """;
+        const string app =
+            """
+            namespace Components;
+
+            using Avalonia.Controls;
+
+            state string url = "/first";
+
+            <StackPanel>
+                <TextBlock Text={url} />
+                <Router bind:Url={url} x.Name="Router" />
+            </StackPanel>
+            """;
+        const string csharp =
+            """
+            namespace Components;
+
+            public partial class Router : global::Akbura.AkburaControl
+            {
+                public Router()
+                    : base(
+                        global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+
+            public partial class App : global::Akbura.AkburaControl
+            {
+                public App()
+                    : base(
+                        global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedBindAttributeTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    csharp,
+                    parseOptions),
+            ],
+            references:
+                SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver =
+            CSharpGeneratorDriver.Create(
+                generators:
+                [
+                    new AkburaCsGenerator()
+                        .AsSourceGenerator(),
+                ],
+                additionalTexts:
+                [
+                    new TestAdditionalText(
+                        Path.Combine(
+                            Environment.CurrentDirectory,
+                            "Components",
+                            "Router.akbura"),
+                        SourceText.From(router)),
+                    new TestAdditionalText(
+                        Path.Combine(
+                            Environment.CurrentDirectory,
+                            "Components",
+                            "App.akbura"),
+                        SourceText.From(app)),
+                ],
+                parseOptions: parseOptions);
+
+        driver =
+            driver.RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out var updatedCompilation,
+                out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+        var result = Assert.Single(
+            driver.GetRunResult().Results);
+        var appSource = Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName.Contains(
+                    "App.akbura",
+                    StringComparison.Ordinal));
+        var appText =
+            appSource.SourceText.ToString();
+        Assert.Contains(
+            "Router.PropertyChanged += ",
+            appText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "url = (string)__bindingChange_",
+            appText,
+            StringComparison.Ordinal);
+
+        using var assemblyStream =
+            new MemoryStream();
+        var emitResult =
+            updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly =
+            Assembly.Load(assemblyStream.ToArray());
+
+        using var session =
+            HeadlessUnitTestSession.StartNew(
+                typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var appControl =
+                    Assert.IsAssignableFrom<
+                        AkburaControl>(
+                        Activator.CreateInstance(
+                            assembly.GetType(
+                                "Components.App")!));
+                var window = new Window
+                {
+                    Content = appControl,
+                };
+
+                window.Show();
+
+                var panel =
+                    Assert.IsType<StackPanel>(
+                        appControl.Child);
+                var textBlock =
+                    Assert.IsType<TextBlock>(
+                        panel.Children[0]);
+                var routerControl =
+                    Assert.IsAssignableFrom<
+                        AkburaControl>(
+                        panel.Children[1]);
+                var urlProperty =
+                    routerControl.GetType()
+                        .GetProperty("Url")!;
+
+                Assert.Equal(
+                    "/first",
+                    textBlock.Text);
+                Assert.Equal(
+                    "/first",
+                    urlProperty.GetValue(
+                        routerControl));
+
+                urlProperty.SetValue(
+                    routerControl,
+                    "/second");
+
+                Assert.Equal(
+                    "/second",
+                    textBlock.Text);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public void Generator_SourceComponentNameCanBeReferencedBeforeItsMarkupDeclaration()
+    {
+        const string router =
+            """
+            namespace Components;
+
+            using Avalonia.Controls;
+
+            param bind string Url = "";
+
+            <ContentControl />
+            """;
+        const string link =
+            """
+            namespace Components;
+
+            using Avalonia.Controls;
+
+            param Router Router;
+
+            <Button />
+            """;
+        const string app =
+            """
+            namespace Components;
+
+            using Avalonia.Controls;
+
+            <StackPanel>
+                <Link Router={Router} />
+                <Router x.Name="Router" />
+            </StackPanel>
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedForwardComponentNameTests",
+            references:
+                SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver =
+            CSharpGeneratorDriver.Create(
+                generators:
+                [
+                    new AkburaCsGenerator()
+                        .AsSourceGenerator(),
+                ],
+                additionalTexts:
+                [
+                    new TestAdditionalText(
+                        Path.Combine(
+                            Environment.CurrentDirectory,
+                            "Components",
+                            "Router.akbura"),
+                        SourceText.From(router)),
+                    new TestAdditionalText(
+                        Path.Combine(
+                            Environment.CurrentDirectory,
+                            "Components",
+                            "Link.akbura"),
+                        SourceText.From(link)),
+                    new TestAdditionalText(
+                        Path.Combine(
+                            Environment.CurrentDirectory,
+                            "Components",
+                            "App.akbura"),
+                        SourceText.From(app)),
+                ],
+                parseOptions: parseOptions);
+
+        driver =
+            driver.RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out var updatedCompilation,
+                out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error);
+        var result = Assert.Single(
+            driver.GetRunResult().Results);
+        Assert.Null(result.Exception);
+        var appSource = Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName.Contains(
+                    "App.akbura",
+                    StringComparison.Ordinal));
+        var appText = appSource.SourceText.ToString();
+        Assert.Contains(
+            "private global::Components.Router Router",
+            appText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            ".Router = Router;",
+            appText,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Generator_DeferredComponentBecomesContentPresenterVisualChild()
     {
         const string child =

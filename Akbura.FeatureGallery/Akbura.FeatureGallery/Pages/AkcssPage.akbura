@@ -1,0 +1,718 @@
+using Akbura.FeatureGallery.Styles.akcss;
+
+<StackPanel gap-8>
+
+    <StackPanel gap-2>
+
+        <TextBlock Text="AKCSS"
+                   text-4xl
+                   font-bold
+                   text-slate-100/>
+
+        <TextBlock
+            Text="Typed, reactive styles and reusable utilities for Akbura components and Avalonia controls."
+            text-lg
+            text-slate-400
+            whitespace-normal
+            self-start
+            MaxWidth="840"/>
+
+    </StackPanel>
+
+    <Grid ColumnDefinitions="*,*,*"
+          gap-x-4>
+
+        <Border p-5
+                bg-slate-900
+                border-1
+                border-slate-800
+                rounded-xl>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="Typed"
+                           text-xl
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text="Selectors, properties, values and utility parameters are checked against their target types."
+                    text-sm
+                    text-slate-400
+                    whitespace-normal/>
+
+                <TextBlock Text="Button.primary"
+                           FontFamily="Cascadia Code,Consolas,Monospace"
+                           text-sm
+                           text-blue-400/>
+
+            </StackPanel>
+
+        </Border>
+
+        <Border col-1
+                p-5
+                bg-slate-900
+                border-1
+                border-slate-800
+                rounded-xl>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="Reactive"
+                           text-xl
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text="Expressions and conditions are reevaluated when their observable dependencies change."
+                    text-sm
+                    text-slate-400
+                    whitespace-normal/>
+
+                <TextBlock Text="@if(IsPointerOver)"
+                           FontFamily="Cascadia Code,Consolas,Monospace"
+                           text-sm
+                           text-blue-400/>
+
+            </StackPanel>
+
+        </Border>
+
+        <Border col-2
+                p-5
+                bg-slate-900
+                border-1
+                border-slate-800
+                rounded-xl>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="Composable"
+                           text-xl
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text="Small utilities can be combined directly in markup or reused inside styles through @apply."
+                    text-sm
+                    text-slate-400
+                    whitespace-normal/>
+
+                <TextBlock Text="p-4 rounded-xl bg-blue-600"
+                           FontFamily="Cascadia Code,Consolas,Monospace"
+                           text-sm
+                           text-blue-400/>
+
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+    <StackPanel gap-4>
+
+        <StackPanel gap-1>
+
+            <TextBlock Text="Try AKCSS"
+                       text-3xl
+                       font-bold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="This example demonstrates a reactive class, @apply, custom utilities, typed parameters and conditional utilities."
+                text-base
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/AkcssDemo.akbura">
+
+            <FeatureView.Code>
+                {"""
+                using Akbura.FeatureGallery.Styles.akcss;
+
+                state bool isHighlighted = false;
+
+                @akcss {
+                    @using Akbura.FeatureGallery.Styles.akcss;
+
+                    Button.reactive-button {
+                        @apply bg-blue-600 text-white
+                               px-4 py-2 rounded-lg
+                               font-semibold;
+
+                        @if(IsPointerOver) {
+                            @apply bg-blue-500 px-5 py-3;
+                        }
+                    }
+
+                    @utilities {
+                        Border.demo-surface {
+                            @apply bg-slate-800
+                                   border-1
+                                   border-slate-700
+                                   rounded-lg;
+                        }
+
+                        Control.square-(double size) {
+                            Width: size;
+                            Height: size;
+                        }
+                    }
+                }
+
+                <StackPanel gap-5>
+
+                    <Button class="reactive-button"
+                            HorizontalAlignment="Left"
+                            Click={() =>
+                                isHighlighted = !isHighlighted}>
+
+                        {isHighlighted
+                            ? "Disable highlight"
+                            : "Enable highlight"}
+
+                    </Button>
+
+                    <Border demo-surface
+                            p-4
+                            {isHighlighted}:border-blue-500
+                            {isHighlighted}:shadow-lg>
+
+                        <Grid ColumnDefinitions="Auto,*"
+                              gap-x-4>
+
+                            <Border square-48
+                                    bg-blue-600
+                                    rounded-lg/>
+
+                            <TextBlock col-1
+                                       Text="Utility composition"
+                                       self-center/>
+
+                        </Grid>
+
+                    </Border>
+
+                    <Border demo-surface
+                            p-3
+                            pt-2>
+
+                        Composable spacing
+
+                    </Border>
+
+                </StackPanel>
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <AkcssDemo/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <TextBlock Text="Classes and utilities"
+                   text-3xl
+                   font-bold
+                   text-slate-100/>
+
+        <Grid ColumnDefinitions="*,*"
+              gap-x-4>
+
+            <Border p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="AKCSS class"
+                               text-xl
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="A named collection of declarations applied through the lowercase class attribute."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                    <Border p-3
+                            bg-slate-950
+                            rounded-lg>
+
+                        <TextBlock
+                            Text={"<Button class=\"primary\" />"}
+                            FontFamily="Cascadia Code,Consolas,Monospace"
+                            text-sm
+                            text-blue-400/>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-1
+                    p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="AKCSS utility"
+                               text-xl
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="A small typed style applied directly as a markup attribute without class."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                    <Border p-3
+                            bg-slate-950
+                            rounded-lg>
+
+                        <TextBlock
+                            Text={"<Button p-4 rounded-lg />"}
+                            FontFamily="Cascadia Code,Consolas,Monospace"
+                            text-sm
+                            text-blue-400/>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+        <Border p-4
+                bg-slate-950
+                border-1
+                border-slate-700
+                rounded-xl>
+
+            <TextBlock
+                Text="The lowercase class attribute applies AKCSS classes. Avalonia's Classes property continues to use standard Avalonia style classes."
+                text-sm
+                text-slate-300
+                whitespace-normal/>
+
+        </Border>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <TextBlock Text="Composing styles with @apply"
+                   text-3xl
+                   font-bold
+                   text-slate-100/>
+
+        <Border p-5
+                bg-slate-900
+                border-1
+                border-slate-800
+                rounded-xl>
+
+            <Grid ColumnDefinitions="*,Auto,*"
+                  gap-x-5>
+
+                <StackPanel gap-2>
+
+                    <TextBlock Text="Utilities"
+                               text-lg
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                        FontFamily="Cascadia Code,Consolas,Monospace"
+                        text-sm
+                        text-blue-400
+                        whitespace-normal/>
+
+                </StackPanel>
+
+                <TextBlock col-1
+                           Text="→"
+                           text-2xl
+                           text-slate-500
+                           self-center/>
+
+                <StackPanel col-2
+                            gap-2>
+
+                    <TextBlock Text="Reusable class"
+                               text-lg
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="@apply bg-blue-600 text-white px-4 py-2 rounded-lg;"
+                        FontFamily="Cascadia Code,Consolas,Monospace"
+                        text-sm
+                        text-blue-400
+                        whitespace-normal/>
+
+                </StackPanel>
+
+            </Grid>
+
+        </Border>
+
+        <TextBlock
+            Text="@apply copies compatible declarations from existing classes and utilities into the current AKCSS rule."
+            text-sm
+            text-slate-400
+            whitespace-normal/>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <TextBlock Text="Reactive cascade"
+                   text-3xl
+                   font-bold
+                   text-slate-100/>
+
+        <Grid ColumnDefinitions="*,Auto,*"
+              gap-x-4>
+
+            <Border p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-2>
+
+                    <TextBlock Text="Regular declaration"
+                               text-lg
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock Text="@apply bg-blue-600;"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-sm
+                               text-blue-400/>
+
+                    <TextBlock Text="BindingPriority.Style"
+                               text-sm
+                               text-slate-400/>
+
+                </StackPanel>
+
+            </Border>
+
+            <TextBlock col-1
+                       Text="→"
+                       text-2xl
+                       text-slate-500
+                       self-center/>
+
+            <Border col-2
+                    p-5
+                    bg-slate-900
+                    border-1
+                    border-blue-600
+                    rounded-xl>
+
+                <StackPanel gap-2>
+
+                    <TextBlock Text="Active @if declaration"
+                               text-lg
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock Text="@apply bg-blue-500;"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-sm
+                               text-blue-400/>
+
+                    <TextBlock Text="BindingPriority.StyleTrigger"
+                               text-sm
+                               text-slate-400/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+        <TextBlock
+            Text="When the condition becomes false, AKCSS removes the trigger values and exposes the regular style values again."
+            text-sm
+            text-slate-400
+            whitespace-normal/>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <TextBlock Text="Utility arguments"
+                   text-3xl
+                   font-bold
+                   text-slate-100/>
+
+        <Grid ColumnDefinitions="*,*"
+              gap-x-4>
+
+            <Border p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="Parameterized utility"
+                               text-xl
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="Parameters are declared using normal C# types and passed through utility name segments."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                    <Border p-3
+                            bg-slate-950
+                            rounded-lg>
+
+                        <StackPanel gap-2>
+
+                            <TextBlock
+                                Text="Control.square-(double size)"
+                                FontFamily="Cascadia Code,Consolas,Monospace"
+                                text-sm
+                                text-blue-400/>
+
+                            <TextBlock
+                                Text={"<Border square-48 />"}
+                                FontFamily="Cascadia Code,Consolas,Monospace"
+                                text-sm
+                                text-slate-300/>
+
+                        </StackPanel>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-1
+                    p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="Conditional utility"
+                               text-xl
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="A boolean C# expression before the colon controls whether a utility is applied."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                    <Border p-3
+                            bg-slate-950
+                            rounded-lg>
+
+                        <TextBlock
+                            Text={"<Border {isActive}:border-blue-500 />"}
+                            FontFamily="Cascadia Code,Consolas,Monospace"
+                            text-sm
+                            text-blue-400
+                            whitespace-normal/>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <TextBlock Text="Where styles are resolved"
+                   text-3xl
+                   font-bold
+                   text-slate-100/>
+
+        <Grid ColumnDefinitions="*,Auto,*,Auto,*"
+              gap-x-3>
+
+            <Border p-4
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-1>
+
+                    <TextBlock Text="1"
+                               text-sm
+                               text-blue-400/>
+
+                    <TextBlock Text="Inline @akcss"
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock Text="Current component"
+                               text-sm
+                               text-slate-400/>
+
+                </StackPanel>
+
+            </Border>
+
+            <TextBlock col-1
+                       Text="→"
+                       text-xl
+                       text-slate-500
+                       self-center/>
+
+            <Border col-2
+                    p-4
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-1>
+
+                    <TextBlock Text="2"
+                               text-sm
+                               text-blue-400/>
+
+                    <TextBlock Text="Companion file"
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock Text="ComponentName.akcss"
+                               text-sm
+                               text-slate-400/>
+
+                </StackPanel>
+
+            </Border>
+
+            <TextBlock col-3
+                       Text="→"
+                       text-xl
+                       text-slate-500
+                       self-center/>
+
+            <Border col-4
+                    p-4
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-1>
+
+                    <TextBlock Text="3"
+                               text-sm
+                               text-blue-400/>
+
+                    <TextBlock Text="Imported modules"
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock Text="Resolved in using order"
+                               text-sm
+                               text-slate-400
+                               whitespace-normal/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <TextBlock Text="Composable spacing"
+                   text-3xl
+                   font-bold
+                   text-slate-100/>
+
+        <Border p-5
+                bg-slate-900
+                border-1
+                border-slate-800
+                rounded-xl>
+
+            <Grid ColumnDefinitions="Auto,Auto,*"
+                  gap-x-5>
+
+                <StackPanel gap-1>
+
+                    <TextBlock Text="p-3"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-lg
+                               text-blue-400/>
+
+                    <TextBlock Text="12 on every side"
+                               text-sm
+                               text-slate-400/>
+
+                </StackPanel>
+
+                <TextBlock col-1
+                           Text="+"
+                           text-xl
+                           text-slate-500
+                           self-center/>
+
+                <StackPanel col-2
+                            gap-1>
+
+                    <TextBlock Text="pt-2"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-lg
+                               text-blue-400/>
+
+                    <TextBlock
+                        Text="Top becomes 8 while left, right and bottom remain 12."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                </StackPanel>
+
+            </Grid>
+
+        </Border>
+
+    </StackPanel>
+
+</StackPanel>

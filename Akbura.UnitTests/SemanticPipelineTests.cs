@@ -3040,6 +3040,45 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssIfDirective_BindsTargetControlProperty()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "@akcss {\n" +
+            "    Button.reactive-button {\n" +
+            "        @if(IsPointerOver) {\n" +
+            "            Opacity: 0.75;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(Assert.Single(rule.Members));
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rule).Symbol);
+        var ifOperation = Assert.IsAssignableFrom<IAkcssIfOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.Equal("reactive-button", symbol.Name);
+        Assert.Equal("Boolean", ifOperation.ConditionType.Name);
+        Assert.Contains(
+            "((global::Avalonia.Controls.Button)__target).IsPointerOver",
+            ifOperation.ConditionOperation.Syntax!.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            EnumerateCSharpOperations(ifOperation),
+            operation => operation.CSharpTargetDefinition.Symbol is Microsoft.CodeAnalysis.IPropertySymbol
+            {
+                Name: "IsPointerOver",
+            });
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(ifDirective));
+        Assert.False(ifOperation.HasErrors);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssUtilityIfDirective_BindsConditionInUtilityParameterScope()
     {
         const string code =

@@ -78,6 +78,116 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public async Task Generator_UpdatesInlineExpressionContentAfterStateChange()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            state bool isHighlighted = false;
+
+            <Button Click={() => isHighlighted = !isHighlighted}>
+                {isHighlighted
+                    ? "Disable highlight"
+                    : "Enable highlight"}
+            </Button>
+            """;
+        const string csharp =
+            """
+            public partial class ReactiveContent
+            {
+                public ReactiveContent()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedReactiveContentTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "ReactiveContent.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results)
+                .GeneratedSources);
+        Assert.Contains(
+            "ContentControl.ContentProperty, isHighlighted",
+            generated.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentControl = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(
+                        assembly.GetType("ReactiveContent")!));
+                var window = new Window
+                {
+                    Content = componentControl,
+                };
+
+                window.Show();
+
+                var button = Assert.IsType<Button>(
+                    componentControl.Child);
+                Assert.Equal("Enable highlight", button.Content);
+
+                button.RaiseEvent(
+                    new Avalonia.Interactivity.RoutedEventArgs(
+                        Button.ClickEvent));
+
+                Assert.Equal("Disable highlight", button.Content);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
     public void Generator_EmitsPropertyElementRawStringExpressionWithSemicolon()
     {
         const string featureView =
@@ -2945,6 +3055,84 @@ public sealed class AkburaCsGeneratorTests
                 Assert.True(double.IsNaN(target.Width));
                 target.Resources["--spacing"] = 8d;
                 Assert.True(double.IsNaN(target.Width));
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_ObservesTargetPropertiesUsedByAkcssConditions()
+    {
+        const string akcss =
+            "@using Avalonia.Controls;\n" +
+            "\n" +
+            "Button.reactive-button {\n" +
+            "    @if(IsEnabled) {\n" +
+            "        Opacity: 0.25;\n" +
+            "    }\n" +
+            "}\n";
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedObservedAkcssTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(Environment.CurrentDirectory, "Reactive.akcss");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts: [new TestAdditionalText(sourcePath, SourceText.From(akcss))],
+            parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var generatedText = generatedSource.SourceText.ToString();
+        Assert.Contains(
+            "[global::Akbura.CompilerAnotations.ObservesPropertyAttribute(\"IsEnabled\")]",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "((global::Avalonia.Controls.Button)__target).IsEnabled",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+        var moduleType = Assert.Single(
+            assembly.GetTypes(),
+            static type => type.GetCustomAttribute<AkcssModuleAttribute>() != null);
+        var styleType = moduleType.GetNestedType("Style_0", BindingFlags.NonPublic);
+        Assert.NotNull(styleType);
+        var style = Assert.IsAssignableFrom<AkcssClass>(
+            Activator.CreateInstance(styleType, nonPublic: true));
+
+        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var button = new Button();
+                AkburaControl.SetAkcssStyles(
+                    button,
+                    [new AkcssClassActivator(style)]);
+
+                Assert.Equal(0.25d, button.Opacity);
+
+                button.IsEnabled = false;
+                Assert.Equal(1d, button.Opacity);
+
+                button.IsEnabled = true;
+                Assert.Equal(0.25d, button.Opacity);
             },
             CancellationToken.None);
     }

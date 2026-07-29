@@ -4,6 +4,7 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Operations;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -35,6 +36,7 @@ internal static class AkcssGenerator
     private const string RuntimeZeroUtilityType = "global::Akbura.Akcss.ZeroAkcssUtility";
     private const string StyleNameAttribute = "global::Akbura.CompilerAnotations.StyleNameAttribute";
     private const string InlinedStyleAttribute = "global::Akbura.CompilerAnotations.InlinedStyleAttribute";
+    private const string ObservesPropertyAttribute = "global::Akbura.CompilerAnotations.ObservesPropertyAttribute";
     private const string AkcssModuleAttribute = "global::Akbura.CompilerAnotations.AkcssModuleAttribute";
     private const string EditorBrowsableAttribute = "global::System.ComponentModel.EditorBrowsableAttribute";
     private const string BrowsableAttribute = "global::System.ComponentModel.BrowsableAttribute";
@@ -270,6 +272,8 @@ internal static class AkcssGenerator
             source.Append("        [").Append(InlinedStyleAttribute).AppendLine("]");
         }
 
+        AppendObservedPropertyAttributes(source, symbol, sourceMap);
+
         if (symbol is ITailwindUtilitySymbol utility)
         {
             AppendUtilityType(source, utility, index, sourceMap);
@@ -278,6 +282,163 @@ internal static class AkcssGenerator
         {
             AppendClassType(source, symbol, index, sourceMap);
         }
+    }
+
+    private static void AppendObservedPropertyAttributes(
+        StringBuilder source,
+        IAkcssSymbol symbol,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        var propertyNames = new SortedSet<string>(StringComparer.Ordinal);
+        CollectObservedPropertyNames(
+            symbol.Operations,
+            propertyNames,
+            new HashSet<AkburaSyntax> { symbol.DeclarationSyntax },
+            sourceMap);
+
+        foreach (var propertyName in propertyNames)
+        {
+            source.Append("        [").Append(ObservesPropertyAttribute).Append('(')
+                .Append(ToStringLiteral(propertyName)).AppendLine(")]");
+        }
+    }
+
+    private static void CollectObservedPropertyNames(
+        ImmutableArray<IAkcssOperation> operations,
+        SortedSet<string> propertyNames,
+        HashSet<AkburaSyntax> expansionPath,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        foreach (var operation in operations)
+        {
+            switch (operation)
+            {
+                case IAkcssPropertySetterOperation setter:
+                    CollectObservedPropertyNames(
+                        setter.ValueOperation.Operation,
+                        GetTargetParameterName(setter.ContainingAkcssSymbol),
+                        propertyNames);
+                    break;
+
+                case IAkcssIfOperation ifOperation:
+                    CollectObservedPropertyNames(
+                        ifOperation.ConditionOperation.Operation,
+                        GetTargetParameterName(ifOperation.ContainingAkcssSymbol),
+                        propertyNames);
+                    CollectObservedPropertyNames(
+                        ifOperation.Operations,
+                        propertyNames,
+                        expansionPath,
+                        sourceMap);
+                    break;
+
+                case IAkcssApplyOperation applyOperation:
+                    foreach (var appliedSymbol in applyOperation.AppliedSymbols)
+                    {
+                        var declarationSyntax = appliedSymbol.DeclarationSyntax;
+                        if (!expansionPath.Add(declarationSyntax))
+                        {
+                            continue;
+                        }
+
+                        var generationSymbol = sourceMap.GetGenerationSymbol(appliedSymbol);
+                        CollectObservedPropertyNames(
+                            generationSymbol.Operations,
+                            propertyNames,
+                            expansionPath,
+                            sourceMap);
+                        expansionPath.Remove(declarationSyntax);
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static void CollectObservedPropertyNames(
+        Microsoft.CodeAnalysis.IOperation? operation,
+        string targetParameterName,
+        SortedSet<string> propertyNames)
+    {
+        if (operation == null)
+        {
+            return;
+        }
+
+        if (operation is IPropertyReferenceOperation propertyReference &&
+            IsTargetReference(propertyReference.Instance, targetParameterName) &&
+            HasAvaloniaProperty(propertyReference.Property))
+        {
+            propertyNames.Add(propertyReference.Property.Name);
+        }
+
+        foreach (var child in operation.ChildOperations)
+        {
+            CollectObservedPropertyNames(child, targetParameterName, propertyNames);
+        }
+    }
+
+    private static bool IsTargetReference(
+        Microsoft.CodeAnalysis.IOperation? operation,
+        string targetParameterName)
+    {
+        while (operation != null)
+        {
+            switch (operation)
+            {
+                case IConversionOperation conversion:
+                    operation = conversion.Operand;
+                    continue;
+                case IParenthesizedOperation parenthesized:
+                    operation = parenthesized.Operand;
+                    continue;
+                case IParameterReferenceOperation parameterReference:
+                    return string.Equals(
+                        parameterReference.Parameter.Name,
+                        targetParameterName,
+                        StringComparison.Ordinal);
+                default:
+                    return false;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasAvaloniaProperty(RoslynPropertySymbol property)
+    {
+        var fieldName = property.Name + "Property";
+        for (INamedTypeSymbol? type = property.ContainingType;
+             type != null;
+             type = type.BaseType)
+        {
+            foreach (var field in type.GetMembers(fieldName))
+            {
+                if (field is RoslynFieldSymbol { IsStatic: true } propertyField &&
+                    IsAvaloniaPropertyType(propertyField.Type))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsAvaloniaPropertyType(ITypeSymbol type)
+    {
+        for (var current = type as INamedTypeSymbol;
+             current != null;
+             current = current.BaseType)
+        {
+            if (current.Name == "AvaloniaProperty" &&
+                current.ContainingNamespace.ToDisplayString() == "Avalonia")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void AppendClassType(
@@ -426,7 +587,14 @@ internal static class AkcssGenerator
                     AppendPropertySetter(source, setter, targetName, indentation, sourceMap);
                     break;
                 case IAkcssIfOperation ifOperation:
-                    var condition = ifOperation.Syntax.Condition.GetRawCSharpExpression()?.ToString() ?? "false";
+                    var conditionSyntax =
+                        ifOperation.ConditionOperation.Syntax as CSharpExpressionSyntax ??
+                        ifOperation.Syntax.Condition.GetRawCSharpExpression();
+                    var conditionRewriter = new AmxExpressionRewriter(
+                        targetName,
+                        observeDynamicResource: false,
+                        GetTargetParameterName(ifOperation.ContainingAkcssSymbol));
+                    var condition = RewriteExpression(conditionSyntax, conditionRewriter);
                     AppendIndentedLine(source, indentation, $"if ({condition})");
                     AppendIndentedLine(source, indentation, "{");
                     AppendOperations(
@@ -921,7 +1089,10 @@ internal static class AkcssGenerator
         string targetName,
         bool observeDynamicResource)
     {
-        var rewriter = new AmxExpressionRewriter(targetName, observeDynamicResource);
+        var rewriter = new AmxExpressionRewriter(
+            targetName,
+            observeDynamicResource,
+            GetTargetParameterName(operation.ContainingAkcssSymbol));
         string value = operation.ConvertedValue switch
         {
             AkcssColorValue color =>
@@ -929,7 +1100,10 @@ internal static class AkcssGenerator
             AkcssThicknessValue thickness => CreateThicknessExpression(thickness),
             AkcssThicknessExpressionValue thickness => CreateThicknessExpression(thickness, rewriter),
             CSharpSymbolDefinition definition when GetStaticMemberReference(definition.Symbol) is { } member => member,
-            _ => RewriteExpression(operation.Syntax.Expression.GetRawCSharpExpression(), rewriter),
+            _ => RewriteExpression(
+                operation.ValueOperation.Syntax as CSharpExpressionSyntax ??
+                    operation.Syntax.Expression.GetRawCSharpExpression(),
+                rewriter),
         };
 
         if (operation.RequiresBrushConversion)
@@ -1120,7 +1294,8 @@ internal static class AkcssGenerator
             hasConflict = false;
             foreach (var parameter in parameters)
             {
-                if (string.Equals(parameter.Name, name, StringComparison.Ordinal))
+                if (string.Equals(parameter.Name, name, StringComparison.Ordinal) ||
+                    string.Equals(parameter.CSharpParameter?.Name, name, StringComparison.Ordinal))
                 {
                     name += "_";
                     hasConflict = true;
@@ -1130,6 +1305,13 @@ internal static class AkcssGenerator
         }
 
         return name;
+    }
+
+    private static string GetTargetParameterName(IAkcssSymbol symbol)
+    {
+        return symbol is ITailwindUtilitySymbol utility
+            ? GetTargetParameterName(utility.Parameters)
+            : "__target";
     }
 
     private static string GetParameterName(ITailwindUtilityParameterSymbol parameter)
@@ -1273,18 +1455,30 @@ internal static class AkcssGenerator
         private const string ResourceValueParameter = "__resourceValue";
         private readonly string _targetName;
         private readonly bool _observeDynamicResource;
+        private readonly string _sourceTargetName;
 
         public AmxExpressionRewriter(
             string targetName,
-            bool observeDynamicResource)
+            bool observeDynamicResource,
+            string? sourceTargetName = null)
         {
             _targetName = targetName;
             _observeDynamicResource = observeDynamicResource;
+            _sourceTargetName = sourceTargetName ?? targetName;
         }
 
         public DynamicResourceBinding? DynamicResource { get; private set; }
 
         public bool RequiresResourceHost { get; private set; }
+
+        public override Microsoft.CodeAnalysis.SyntaxNode? VisitIdentifierName(
+            CSharpIdentifierNameSyntax node)
+        {
+            return !string.Equals(_sourceTargetName, _targetName, StringComparison.Ordinal) &&
+                string.Equals(node.Identifier.ValueText, _sourceTargetName, StringComparison.Ordinal)
+                ? CSharpSyntaxFactory.IdentifierName(_targetName).WithTriviaFrom(node)
+                : base.VisitIdentifierName(node);
+        }
 
         public override Microsoft.CodeAnalysis.SyntaxNode? VisitInvocationExpression(
             CSharpInvocationExpressionSyntax node)

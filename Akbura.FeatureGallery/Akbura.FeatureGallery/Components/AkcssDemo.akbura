@@ -1,0 +1,107 @@
+using Akbura.FeatureGallery.Styles.akcss;
+
+state bool isHighlighted = false;
+
+@akcss {
+    @using Akbura.FeatureGallery.Styles.akcss;
+
+    Button.reactive-button {
+        @apply bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold;
+
+        @if(IsPointerOver) {
+            @apply bg-blue-500 px-5 py-3;
+        }
+    }
+
+    @utilities {
+        Border.demo-surface {
+            @apply bg-slate-800 border-1 border-slate-700 rounded-lg;
+        }
+
+        Control.square-(double size) {
+            Width: size;
+            Height: size;
+        }
+    }
+}
+
+<StackPanel gap-5>
+
+    <StackPanel gap-1>
+
+        <TextBlock Text="Interactive AKCSS"
+                   text-2xl
+                   font-bold
+                   text-slate-100/>
+
+        <TextBlock
+            Text="Hover the button and click it to activate a conditional utility."
+            text-sm
+            text-slate-400
+            whitespace-normal/>
+
+    </StackPanel>
+
+    <Button class="reactive-button"
+            HorizontalAlignment="Left"
+            Click={() => isHighlighted = !isHighlighted}>
+
+        {isHighlighted
+            ? "Disable highlight"
+            : "Enable highlight"}
+
+    </Button>
+
+    <Border demo-surface
+            p-4
+            {isHighlighted}:border-blue-500
+            {isHighlighted}:shadow-lg>
+
+        <Grid ColumnDefinitions="Auto,*"
+              gap-x-4>
+
+            <Border square-48
+                    bg-blue-600
+                    rounded-lg/>
+
+            <StackPanel col-1
+                        gap-1
+                        self-center>
+
+                <TextBlock Text="Utility composition"
+                           text-lg
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text={$"Conditional utilities: {(isHighlighted ? "active" : "inactive")}"}
+                    text-sm
+                    text-slate-400/>
+
+            </StackPanel>
+
+        </Grid>
+
+    </Border>
+
+    <Border demo-surface
+            p-3
+            pt-2>
+
+        <StackPanel gap-1>
+
+            <TextBlock Text="Composable spacing"
+                       font-semibold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="p-3 sets every side to 12, while pt-2 changes only the top padding to 8."
+                text-sm
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+    </Border>
+
+</StackPanel>

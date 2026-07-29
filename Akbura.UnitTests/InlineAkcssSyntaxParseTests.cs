@@ -27,6 +27,22 @@ public class InlineAkcssSyntaxParseTests
 	}
 
 	[Fact]
+	public void AkcssStyleRule_WithHyphenatedClassName_ParseSuccessfully()
+	{
+		const string code = "Button.reactive-button { Opacity: 0.75; }";
+
+		var parser = MakeParser(code);
+
+		var syntax = parser.ParseAkcssStyleRuleSyntax();
+
+		Assert.Equal("Button", syntax.Selector.TargetType!.ToFullString());
+		Assert.Equal("reactive-button", syntax.Selector.Name!.Identifier.ValueText);
+		Assert.Equal(1, syntax.Members.Count);
+		Assert.Equal(code, syntax.ToFullString());
+		Assert.False(syntax.ContainsDiagnostics);
+	}
+
+	[Fact]
 	public void AkcssStyleRule_WithIfDirective_ParseSuccessfully()
 	{
 		const string code = "Button.btn { @if(IsHovered) { Background: \"Blue\"; } }";

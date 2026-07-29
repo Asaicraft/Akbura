@@ -5188,11 +5188,18 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         IAkcssSymbol containingSymbol,
         ITypeSymbol? targetType = null)
     {
-        var returnStatement = CSharpSyntaxFactory.ReturnStatement(expressionSyntax);
+        var targetParameterName = GetAkcssTargetParameterName(containingSymbol);
+        var boundExpression = RewriteAkcssTargetMemberAccess(
+            expressionSyntax,
+            containingSymbol,
+            targetParameterName);
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(boundExpression);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CreateCSharpProbeReturnType(targetType),
                 "__AkburaSemanticProbe")
-            .WithParameterList(CreateAkcssExpressionParameterList(containingSymbol))
+            .WithParameterList(CreateAkcssExpressionParameterList(
+                containingSymbol,
+                targetParameterName))
             .WithBody(CSharpSyntaxFactory.Block(returnStatement));
 
         var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
@@ -5211,6 +5218,59 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             targetType);
     }
 
+    private static CSharp.ExpressionSyntax RewriteAkcssTargetMemberAccess(
+        CSharp.ExpressionSyntax expression,
+        IAkcssSymbol containingSymbol,
+        string targetParameterName)
+    {
+        if (containingSymbol.TargetType.Symbol is not INamedTypeSymbol targetType)
+        {
+            return expression;
+        }
+
+        var shadowedNames = new HashSet<string>(StringComparer.Ordinal);
+        if (containingSymbol is ITailwindUtilitySymbol utility)
+        {
+            foreach (var parameter in utility.Parameters)
+            {
+                shadowedNames.Add(parameter.CSharpParameter?.Name ?? parameter.Name);
+            }
+        }
+
+        foreach (var node in expression.DescendantNodesAndSelf())
+        {
+            switch (node)
+            {
+                case CSharp.ParameterSyntax parameter:
+                    shadowedNames.Add(parameter.Identifier.ValueText);
+                    break;
+                case CSharp.VariableDeclaratorSyntax variable:
+                    shadowedNames.Add(variable.Identifier.ValueText);
+                    break;
+                case CSharp.SingleVariableDesignationSyntax designation:
+                    shadowedNames.Add(designation.Identifier.ValueText);
+                    break;
+                case CSharp.FromClauseSyntax fromClause:
+                    shadowedNames.Add(fromClause.Identifier.ValueText);
+                    break;
+                case CSharp.LetClauseSyntax letClause:
+                    shadowedNames.Add(letClause.Identifier.ValueText);
+                    break;
+                case CSharp.JoinClauseSyntax joinClause:
+                    shadowedNames.Add(joinClause.Identifier.ValueText);
+                    break;
+                case CSharp.QueryContinuationSyntax continuation:
+                    shadowedNames.Add(continuation.Identifier.ValueText);
+                    break;
+            }
+        }
+
+        return (CSharp.ExpressionSyntax)new AkcssTargetMemberAccessRewriter(
+            targetType,
+            targetParameterName,
+            shadowedNames).Visit(expression)!;
+    }
+
     private static CSharp.TypeSyntax CreateCSharpProbeReturnType(
         ITypeSymbol? targetType)
     {
@@ -5221,29 +5281,177 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
     }
 
-    private CSharp.ParameterListSyntax CreateAkcssExpressionParameterList(IAkcssSymbol containingSymbol)
+    private CSharp.ParameterListSyntax CreateAkcssExpressionParameterList(
+        IAkcssSymbol containingSymbol,
+        string targetParameterName)
     {
-        if (containingSymbol is not ITailwindUtilitySymbol utilitySymbol ||
-            utilitySymbol.Parameters.Length == 0)
+        using var builder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
+        if (containingSymbol.HasTargetType)
         {
-            return CSharpSyntaxFactory.ParameterList();
+            builder.Add(CSharpSyntaxFactory.Parameter(
+                    CSharpSyntaxFactory.Identifier(targetParameterName))
+                .WithType(CSharpSyntaxFactory.PredefinedType(
+                    CSharpSyntaxFactory.Token(
+                        Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword))));
         }
 
-        using var builder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
-        foreach (var parameter in utilitySymbol.Parameters)
+        if (containingSymbol is ITailwindUtilitySymbol utilitySymbol)
         {
-            var parameterType = parameter.Type.Symbol == null
-                ? CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword))
-                : CSharpSyntaxFactory.ParseTypeName(
-                    parameter.Type.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            foreach (var parameter in utilitySymbol.Parameters)
+            {
+                var parameterType = parameter.Type.Symbol == null
+                    ? CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword))
+                    : CSharpSyntaxFactory.ParseTypeName(
+                        parameter.Type.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
 
-            builder.Add(CSharpSyntaxFactory.Parameter(
-                    CSharpSyntaxFactory.Identifier(parameter.Name))
-                .WithType(parameterType));
+                builder.Add(CSharpSyntaxFactory.Parameter(
+                        CSharpSyntaxFactory.Identifier(parameter.CSharpParameter?.Name ?? parameter.Name))
+                    .WithType(parameterType));
+            }
         }
 
         return CSharpSyntaxFactory.ParameterList(
             CSharpSyntaxFactory.SeparatedList(builder.ToImmutable()));
+    }
+
+    private static string GetAkcssTargetParameterName(IAkcssSymbol containingSymbol)
+    {
+        var name = "__target";
+        if (containingSymbol is not ITailwindUtilitySymbol utility)
+        {
+            return name;
+        }
+
+        while (utility.Parameters.Any(parameter =>
+                   string.Equals(
+                       parameter.CSharpParameter?.Name ?? parameter.Name,
+                       name,
+                       StringComparison.Ordinal)))
+        {
+            name += "_";
+        }
+
+        return name;
+    }
+
+    private sealed class AkcssTargetMemberAccessRewriter : CSharpSyntaxRewriter
+    {
+        private readonly INamedTypeSymbol _targetType;
+        private readonly string _targetParameterName;
+        private readonly HashSet<string> _shadowedNames;
+
+        public AkcssTargetMemberAccessRewriter(
+            INamedTypeSymbol targetType,
+            string targetParameterName,
+            HashSet<string> shadowedNames)
+        {
+            _targetType = targetType;
+            _targetParameterName = targetParameterName;
+            _shadowedNames = shadowedNames;
+        }
+
+        public override SyntaxNode? VisitIdentifierName(CSharp.IdentifierNameSyntax node)
+        {
+            return ShouldRewrite(node)
+                ? CreateTargetMemberAccess(node)
+                : base.VisitIdentifierName(node);
+        }
+
+        public override SyntaxNode? VisitGenericName(CSharp.GenericNameSyntax node)
+        {
+            var visited = (CSharp.GenericNameSyntax)base.VisitGenericName(node)!;
+            return ShouldRewrite(node)
+                ? CreateTargetMemberAccess(visited)
+                : visited;
+        }
+
+        private bool ShouldRewrite(CSharp.SimpleNameSyntax node)
+        {
+            var name = node.Identifier.ValueText;
+            if (_shadowedNames.Contains(name) ||
+                Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsInTypeOnlyContext(node) ||
+                IsAlreadyQualified(node) ||
+                IsTypeOrNamedMemberPosition(node))
+            {
+                return false;
+            }
+
+            for (INamedTypeSymbol? type = _targetType; type != null; type = type.BaseType)
+            {
+                if (type.GetMembers(name).Any(IsInstanceMember))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var @interface in _targetType.AllInterfaces)
+            {
+                if (@interface.GetMembers(name).Any(IsInstanceMember))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private CSharp.MemberAccessExpressionSyntax CreateTargetMemberAccess(
+            CSharp.SimpleNameSyntax member)
+        {
+            var targetType = CSharpSyntaxFactory.ParseTypeName(
+                _targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            var target = CSharpSyntaxFactory.ParenthesizedExpression(
+                CSharpSyntaxFactory.CastExpression(
+                    targetType,
+                    CSharpSyntaxFactory.IdentifierName(_targetParameterName)));
+            return CSharpSyntaxFactory.MemberAccessExpression(
+                    Microsoft.CodeAnalysis.CSharp.SyntaxKind.SimpleMemberAccessExpression,
+                    target,
+                    member.WithoutTrivia())
+                .WithTriviaFrom(member);
+        }
+
+        private static bool IsInstanceMember(RoslynSymbol member)
+        {
+            return !member.IsStatic &&
+                member is RoslynPropertySymbol or RoslynFieldSymbol or
+                    RoslynEventSymbol or RoslynMethodSymbol;
+        }
+
+        private static bool IsAlreadyQualified(CSharp.SimpleNameSyntax node)
+        {
+            return node.Parent switch
+            {
+                CSharp.MemberAccessExpressionSyntax memberAccess
+                    when ReferenceEquals(memberAccess.Name, node) => true,
+                CSharp.MemberBindingExpressionSyntax memberBinding
+                    when ReferenceEquals(memberBinding.Name, node) => true,
+                CSharp.QualifiedNameSyntax => true,
+                CSharp.AliasQualifiedNameSyntax => true,
+                _ => false,
+            };
+        }
+
+        private static bool IsTypeOrNamedMemberPosition(CSharp.SimpleNameSyntax node)
+        {
+            return node.Parent switch
+            {
+                CSharp.NameColonSyntax => true,
+                CSharp.NameEqualsSyntax => true,
+                CSharp.CastExpressionSyntax cast when ReferenceEquals(cast.Type, node) => true,
+                CSharp.ObjectCreationExpressionSyntax creation
+                    when ReferenceEquals(creation.Type, node) => true,
+                CSharp.TypeOfExpressionSyntax typeOf
+                    when ReferenceEquals(typeOf.Type, node) => true,
+                CSharp.DefaultExpressionSyntax defaultExpression
+                    when ReferenceEquals(defaultExpression.Type, node) => true,
+                CSharp.DeclarationPatternSyntax pattern
+                    when ReferenceEquals(pattern.Type, node) => true,
+                CSharp.RecursivePatternSyntax pattern
+                    when ReferenceEquals(pattern.Type, node) => true,
+                _ => false,
+            };
+        }
     }
 
     private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateStateProbeFieldsBefore(

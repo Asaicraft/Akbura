@@ -604,7 +604,7 @@ partial class Parser
 		if (CurrentToken.Kind == SyntaxKind.DotToken)
 		{
 			var dotToken = EatToken(SyntaxKind.DotToken);
-			var name = ParseAkcssSimpleName();
+			var name = ParseAkcssUtilityName();
 			return (openParen, targetType, closeParen, dotToken, name);
 		}
 

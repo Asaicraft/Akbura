@@ -1403,6 +1403,11 @@ internal static class ComponentGenerator
                 return;
             }
 
+            if (HasExpressionContent(operation))
+            {
+                return;
+            }
+
             if (!operation.IsSynthesizedString)
             {
                 var value = operation.LiteralValue != null
@@ -1420,9 +1425,11 @@ internal static class ComponentGenerator
             if (_semanticModel.GetOperation(element.Syntax) is not IMarkupContentOperation
                 {
                     HasErrors: false,
-                    IsSynthesizedString: true,
                     Property: { } property,
-                } operation)
+                } operation ||
+                operation.ContentModel.IsCollection ||
+                element.Children.Count != 0 ||
+                !HasExpressionContent(operation))
             {
                 return;
             }
@@ -1432,6 +1439,19 @@ internal static class ComponentGenerator
             {
                 AppendPropertyWrite(source, element.FieldName, property, expression, indentation, operation.Syntax);
             }
+        }
+
+        private static bool HasExpressionContent(IMarkupContentOperation operation)
+        {
+            foreach (var content in operation.Content)
+            {
+                if (content.Kind == MarkupChildKind.Expression)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void AppendPropertyElement(StringBuilder source, PropertyElementPlan plan, int indentation)

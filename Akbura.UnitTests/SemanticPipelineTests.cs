@@ -2241,6 +2241,60 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssApply_FiltersImportedUtilitiesByContainingTargetType()
+    {
+        const string styles =
+            "@using Avalonia.Controls;\n" +
+            "@using Avalonia.Controls.Primitives;\n" +
+            "@using Shared.Styles.akcss;\n" +
+            "\n" +
+            "@utilities {\n" +
+            "    Border.card {\n" +
+            "        @apply p-4;\n" +
+            "    }\n" +
+            "}";
+        const string importedAkcss =
+            "@using Avalonia.Controls;\n" +
+            "@using Avalonia.Controls.Primitives;\n" +
+            "\n" +
+            "@utilities {\n" +
+            "    Decorator.p-(double value) { Padding: new Avalonia.Thickness(value); }\n" +
+            "    TemplatedControl.p-(double value) { Padding: new Avalonia.Thickness(value); }\n" +
+            "}";
+
+        var stylesTree = AkcssSyntaxTree.ParseText(styles, "Card.akcss");
+        var importedTree = AkcssSyntaxTree.ParseText(
+            importedAkcss,
+            "Styles.akcss",
+            "Shared.Styles.akcss");
+        var componentTree = AkburaSyntaxTree.ParseText(
+            string.Empty,
+            Path.Combine("C:\\Project", "Host.akbura"));
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [componentTree],
+            [stylesTree, importedTree]);
+        var semanticModel = compilation.GetSemanticModel(stylesTree);
+        var card = Assert.Single(
+            stylesTree.GetRoot().Members
+                .OfType<AkcssUtilitiesSectionSyntax>()
+                .Single()
+                .Utilities);
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetDeclaredSymbol(card));
+        var apply = Assert.IsAssignableFrom<IAkcssApplyOperation>(
+            Assert.Single(symbol.Operations));
+        var appliedUtility = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(
+            Assert.Single(apply.AppliedSymbols));
+
+        Assert.Equal(
+            "Avalonia.Controls.Decorator",
+            appliedUtility.TargetType.Symbol?.ToDisplayString());
+        Assert.False(apply.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(apply.Syntax).IsEmpty);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssApply_DuplicateSameLayerCandidatesProduceDiagnostic()
     {
         const string code =

@@ -1,6 +1,6 @@
 using Akbura.FeatureGallery.Styles.akcss;
 
-state string url = "/pages";
+state string url = "/overview";
 
 <DrawerPage Header="Akbura Feature Gallery"
             DrawerLength="260">
@@ -38,12 +38,12 @@ state string url = "/pages";
 
                         <Router.Pages>
 
-                            <Page Url="/pages">
+                            <Page Url="/overview">
                                 <OverviewPage/>
                             </Page>
 
                             <Page Url="/data-templates">
-                                <DataTemplates/>
+                                <DataTemplatesPage/>
                             </Page>
 
                             <Page Url="/about">

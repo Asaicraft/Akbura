@@ -1,0 +1,445 @@
+using Akbura.FeatureGallery.Styles.akcss;
+
+<StackPanel gap-8>
+
+    <StackPanel gap-2>
+
+        <TextBlock Text="Data templates"
+                   text-4xl
+                   font-bold
+                   text-slate-100/>
+
+        <TextBlock
+            Text="Create strongly typed visual templates using compiled bindings, direct C# expressions and deferred content."
+            text-lg
+            text-slate-400
+            whitespace-normal
+            self-start
+            MaxWidth="840"/>
+
+    </StackPanel>
+
+    <Grid ColumnDefinitions="*,*"
+          gap-x-4>
+
+        <Border p-5
+                bg-slate-900
+                border-1
+                border-slate-800
+                rounded-xl>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="IDataTemplate"
+                           text-xl
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text="Describes how one data item is converted into a new control tree."
+                    text-sm
+                    text-slate-400
+                    whitespace-normal/>
+
+                <Border px-3
+                        py-2
+                        bg-slate-950
+                        rounded-lg>
+
+                    <TextBlock Text="item → Build(item) → Control"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-sm
+                               text-blue-400/>
+
+                </Border>
+
+            </StackPanel>
+
+        </Border>
+
+        <Border col-1
+                p-5
+                bg-slate-900
+                border-1
+                border-slate-800
+                rounded-xl>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="IDeferredContent"
+                           text-xl
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text="Stores a control factory so the markup can be created later rather than immediately."
+                    text-sm
+                    text-slate-400
+                    whitespace-normal/>
+
+                <Border px-3
+                        py-2
+                        bg-slate-950
+                        rounded-lg>
+
+                    <TextBlock Text="markup → factory → Build later"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-sm
+                               text-blue-400/>
+
+                </Border>
+
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+    <StackPanel gap-4>
+
+        <StackPanel gap-1>
+
+            <TextBlock Text="Implicit and explicit templates"
+                       text-3xl
+                       font-bold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="Both forms create the same visible result, but they use different generated representations."
+                text-base
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/DataTemplates.akbura">
+
+            <FeatureView.Code>
+                {"""
+                using System.Collections.Immutable;
+
+                state ImmutableArray<(string Name, int Age)> persons =
+                [
+                    ("Alice", 18),
+                    ("Bob", 19),
+                    ("Charlie", 24),
+                    ("Diana", 31)
+                ];
+
+                <Grid ColumnDefinitions="*,*"
+                      gap-x-4>
+
+                    <ItemsControl ItemsSource={persons}>
+
+                        <ItemsControl.ItemTemplate x.ItemName="person">
+
+                            <StackPanel>
+                                <TextBlock Text={person.Name}/>
+
+                                <TextBlock
+                                    Text={$"{person.Age} years"}/>
+                            </StackPanel>
+
+                        </ItemsControl.ItemTemplate>
+
+                    </ItemsControl>
+
+                    <ItemsControl ItemsSource={persons}
+                                  col-1>
+
+                        <ItemsControl.ItemTemplate>
+
+                            <DataTemplate>
+
+                                <StackPanel>
+                                    <TextBlock Text=${Binding Name}/>
+
+                                    <TextBlock
+                                        Text=${Binding Age, StringFormat="{0} years"}/>
+                                </StackPanel>
+
+                            </DataTemplate>
+
+                        </ItemsControl.ItemTemplate>
+
+                    </ItemsControl>
+
+                </Grid>
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <DataTemplates/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <TextBlock Text="What Akbura generates"
+                   text-3xl
+                   font-bold
+                   text-slate-100/>
+
+        <Grid ColumnDefinitions="*,*,*"
+              gap-x-4>
+
+            <Border p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-2>
+
+                    <TextBlock Text="1. Infer the item type"
+                               text-lg
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="The compiler examines the static type of ItemsSource and obtains the collection item type."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                    <TextBlock
+                        Text="ImmutableArray<(string, int)>"
+                        FontFamily="Cascadia Code,Consolas,Monospace"
+                        text-sm
+                        text-blue-400/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-1
+                    p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-2>
+
+                    <TextBlock Text="2. Create a template"
+                               text-lg
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="A direct control is wrapped in FuncDataTemplate. An explicit DataTemplate remains an Avalonia DataTemplate."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                    <TextBlock Text="FuncDataTemplate"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-sm
+                               text-blue-400/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-2
+                    p-5
+                    bg-slate-900
+                    border-1
+                    border-slate-800
+                    rounded-xl>
+
+                <StackPanel gap-2>
+
+                    <TextBlock Text="3. Build each item"
+                               text-lg
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="ItemsControl calls the template for every item and receives a fresh control tree."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                    <TextBlock Text="template.Build(item)"
+                               FontFamily="Cascadia Code,Consolas,Monospace"
+                               text-sm
+                               text-blue-400/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
+        <StackPanel gap-1>
+
+            <TextBlock Text="How IDeferredContent works"
+                       text-3xl
+                       font-bold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="IDeferredContent prevents a template body from being instantiated before it is actually needed."
+                text-base
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/Page.cs + Components/Router.akbura">
+
+            <FeatureView.Code>
+                {"""
+                public sealed class Page
+                {
+                    public string Url { get; set; } = null!;
+
+                    [Content]
+                    [TemplateContent]
+                    public object Content { get; set; } = null!;
+                }
+
+                <Page Url="/about">
+                    <AboutPage/>
+                </Page>
+
+                content = page == null
+                    ? NotFound.Build(Url)
+                    : TemplateContent
+                        .Load<Control>(page.Content)
+                        .Result;
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+
+                <Grid ColumnDefinitions="*,Auto,*,Auto,*"
+                      gap-x-3
+                      self-center>
+
+                    <Border p-4
+                            bg-slate-900
+                            border-1
+                            border-slate-700
+                            rounded-xl>
+
+                        <StackPanel gap-2>
+
+                            <TextBlock Text="Markup"
+                                       text-lg
+                                       font-semibold
+                                       text-slate-100
+                                       text-center/>
+
+                            <TextBlock Text="<AboutPage/>"
+                                       FontFamily="Cascadia Code,Consolas,Monospace"
+                                       text-sm
+                                       text-blue-400
+                                       text-center/>
+
+                        </StackPanel>
+
+                    </Border>
+
+                    <TextBlock col-1
+                               Text="→"
+                               text-2xl
+                               text-slate-500
+                               self-center/>
+
+                    <Border col-2
+                            p-4
+                            bg-slate-900
+                            border-1
+                            border-slate-700
+                            rounded-xl>
+
+                        <StackPanel gap-2>
+
+                            <TextBlock Text="Deferred factory"
+                                       text-lg
+                                       font-semibold
+                                       text-slate-100
+                                       text-center/>
+
+                            <TextBlock Text="IDeferredContent"
+                                       FontFamily="Cascadia Code,Consolas,Monospace"
+                                       text-sm
+                                       text-blue-400
+                                       text-center/>
+
+                        </StackPanel>
+
+                    </Border>
+
+                    <TextBlock col-3
+                               Text="→"
+                               text-2xl
+                               text-slate-500
+                               self-center/>
+
+                    <Border col-4
+                            p-4
+                            bg-slate-900
+                            border-1
+                            border-slate-700
+                            rounded-xl>
+
+                        <StackPanel gap-2>
+
+                            <TextBlock Text="Built later"
+                                       text-lg
+                                       font-semibold
+                                       text-slate-100
+                                       text-center/>
+
+                            <TextBlock Text="TemplateContent.Load"
+                                       FontFamily="Cascadia Code,Consolas,Monospace"
+                                       text-sm
+                                       text-blue-400
+                                       text-center/>
+
+                        </StackPanel>
+
+                    </Border>
+
+                </Grid>
+
+            </FeatureView.View>
+
+        </FeatureView>
+
+    </StackPanel>
+
+    <Border p-5
+            bg-slate-950
+            border-1
+            border-slate-700
+            rounded-xl>
+
+        <StackPanel gap-2>
+
+            <TextBlock Text="IDataTemplate and IDeferredContent are not the same thing"
+                       text-xl
+                       font-semibold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="IDataTemplate describes how data becomes a control. IDeferredContent stores the factory for a deferred section of markup. An explicit DataTemplate uses both: the DataTemplate itself implements IDataTemplate, while its Content is represented by IDeferredContent."
+                text-sm
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+    </Border>
+
+</StackPanel>

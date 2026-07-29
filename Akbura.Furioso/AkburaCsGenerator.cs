@@ -224,6 +224,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
                         projectOptions.RootNamespace,
                         moduleIdentity);
+                sourceMap.RegisterModule(module);
                 inlineAkcssInputs.Add(new AkcssGenerationInput(
                     module,
                     sourcePath,
@@ -252,6 +253,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                 AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
                     projectOptions.RootNamespace,
                     sourcePath);
+            sourceMap.RegisterModule(symbol);
         }
 
         var componentResults = new GeneratedSource?[sourceComponents.Length];
@@ -346,6 +348,15 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         ReportGlobalUsingsDiagnostics(context, syntaxTrees);
 
         foreach (var syntaxTree in sourceComponents)
+        {
+            var model = akburaCompilation.GetSemanticModel(syntaxTree);
+            foreach (var diagnostic in model.GetSemanticDiagnostics(syntaxTree.GetRoot()))
+            {
+                context.ReportDiagnostic(CreateDiagnostic(syntaxTree, diagnostic));
+            }
+        }
+
+        foreach (var syntaxTree in sourceAkcssSyntaxTrees)
         {
             var model = akburaCompilation.GetSemanticModel(syntaxTree);
             foreach (var diagnostic in model.GetSemanticDiagnostics(syntaxTree.GetRoot()))

@@ -1,37 +1,120 @@
-using Akbura.FeatureGallery.Styles.akcss;
 using System.Collections.Immutable;
+using Akbura.FeatureGallery.Styles.akcss;
 
 state ImmutableArray<(string Name, int Age)> persons =
 [
-    ("Allice", 18),
+    ("Alice", 18),
     ("Bob", 19),
-    ("Hello", 92),
-    ("World!", 45)
+    ("Charlie", 24),
+    ("Diana", 31)
 ];
 
-<Grid ColumnDefinitions="*, *" gap-3>
+<Grid ColumnDefinitions="*,*"
+      gap-x-4>
 
-    <ItemsControl ItemsSource={persons}>
-        <ItemsControl.ItemTemplate>
-            <DataTemplate>
-                <StackPanel>
-                    <TextBlock Text=${Binding Name, StringFormat="Name {0}"}/>
+    <Border card>
 
-                    <TextBlock Text=${Binding Age, StringFormat="Age {0}"}/>
-                </StackPanel>
-            </DataTemplate>
-        </ItemsControl.ItemTemplate>
-    </ItemsControl
-    
-    <ItemsControl ItemsSource={persons} col-1>
-        <ItemsControl.ItemTemplate x.ItemName="person">
-            <StackPanel>
-                    <TextBlock Text={$"Name {person.Name}"}/>
+        <StackPanel gap-3>
 
-                    <TextBlock Text={$"Age {person.Age}"}/>
-                </StackPanel>
-        </ItemsControl.ItemTemplate>
-    </ItemsControl>
+            <StackPanel gap-1>
+
+                <TextBlock Text="Implicit template"
+                           text-xl
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text="Akbura generates a typed FuncDataTemplate automatically."
+                    text-sm
+                    text-slate-400
+                    whitespace-normal/>
+
+            </StackPanel>
+
+            <ItemsControl ItemsSource={persons}>
+
+                <ItemsControl.ItemTemplate x.ItemName="person">
+
+                    <Border p-3
+                            mb-2
+                            bg-slate-800
+                            rounded-lg>
+
+                        <Grid ColumnDefinitions="*,Auto">
+
+                            <TextBlock Text={person.Name}
+                                       font-semibold
+                                       text-slate-100/>
+
+                            <TextBlock col-1
+                                       Text={$"{person.Age} years"}
+                                       text-slate-400/>
+
+                        </Grid>
+
+                    </Border>
+
+                </ItemsControl.ItemTemplate>
+
+            </ItemsControl>
+
+        </StackPanel>
+
+    </Border>
+
+    <Border col-1 card>
+
+        <StackPanel gap-3>
+
+            <StackPanel gap-1>
+
+                <TextBlock Text="Explicit DataTemplate"
+                           text-xl
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock
+                    Text="The DataTemplate exists immediately, while its Content remains deferred."
+                    text-sm
+                    text-slate-400
+                    whitespace-normal/>
+
+            </StackPanel>
+
+            <ItemsControl ItemsSource={persons}>
+
+                <ItemsControl.ItemTemplate>
+
+                    <DataTemplate>
+
+                        <Border p-3
+                                mb-2
+                                bg-slate-800
+                                rounded-lg>
+
+                            <Grid ColumnDefinitions="*,Auto">
+
+                                <TextBlock
+                                    Text=${Binding Name}
+                                    font-semibold
+                                    text-slate-100/>
+
+                                <TextBlock col-1
+                                           Text=${Binding Age, StringFormat="{0} years"}
+                                           text-slate-400/>
+
+                            </Grid>
+
+                        </Border>
+
+                    </DataTemplate>
+
+                </ItemsControl.ItemTemplate>
+
+            </ItemsControl>
+
+        </StackPanel>
+
+    </Border>
 
 </Grid>
-

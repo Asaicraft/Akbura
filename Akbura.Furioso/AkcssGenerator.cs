@@ -297,10 +297,10 @@ internal static class AkcssGenerator
             symbol.Operations,
             "__target",
             4,
-            new HashSet<IAkcssSymbol>(),
+            new HashSet<AkburaSyntax> { symbol.DeclarationSyntax },
             sourceMap);
         source.AppendLine("            }");
-        AppendResetMethod(source, symbol);
+        AppendResetMethod(source, symbol, sourceMap);
         source.AppendLine("        }");
     }
 
@@ -341,10 +341,10 @@ internal static class AkcssGenerator
             symbol.Operations,
             targetName,
             4,
-            new HashSet<IAkcssSymbol>(),
+            new HashSet<AkburaSyntax> { symbol.DeclarationSyntax },
             sourceMap);
         source.AppendLine("            }");
-        AppendResetMethod(source, symbol);
+        AppendResetMethod(source, symbol, sourceMap);
         source.AppendLine("        }");
     }
 
@@ -409,7 +409,7 @@ internal static class AkcssGenerator
         ImmutableArray<IAkcssOperation> operations,
         string targetName,
         int indentation,
-        HashSet<IAkcssSymbol> expansionPath,
+        HashSet<AkburaSyntax> expansionPath,
         AkcssGenerationSourceMap sourceMap)
     {
         foreach (var operation in operations)
@@ -456,35 +456,267 @@ internal static class AkcssGenerator
         IAkcssApplyOperation operation,
         string targetName,
         int indentation,
-        HashSet<IAkcssSymbol> expansionPath,
+        HashSet<AkburaSyntax> expansionPath,
         AkcssGenerationSourceMap sourceMap)
     {
-        foreach (var appliedSymbol in operation.AppliedSymbols)
+        for (var index = 0; index < operation.AppliedSymbols.Length; index++)
         {
-            if (appliedSymbol is ITailwindUtilitySymbol { Parameters.Length: > 0 })
-            {
-                AppendIndentedLine(
-                    source,
-                    indentation,
-                    "// Parameterized @apply is preserved for a later code-generation pass.");
-                continue;
-            }
+            var appliedSymbol = operation.AppliedSymbols[index];
+            var declarationSyntax = appliedSymbol.DeclarationSyntax;
 
-            if (!expansionPath.Add(appliedSymbol))
+            if (!expansionPath.Add(declarationSyntax))
             {
                 AppendIndentedLine(source, indentation, "// Cyclic @apply was ignored.");
                 continue;
             }
 
-            AppendOperations(
-                source,
-                appliedSymbol.Operations,
-                targetName,
-                indentation,
-                expansionPath,
-                sourceMap);
-            expansionPath.Remove(appliedSymbol);
+            var generationSymbol = sourceMap.GetGenerationSymbol(appliedSymbol);
+            if (generationSymbol is ITailwindUtilitySymbol { Parameters.Length: > 0 } utility)
+            {
+                var item = index < operation.Items.Length
+                    ? operation.Items[index]
+                    : string.Empty;
+                if (!TryCreateApplyArgumentExpressions(
+                        item,
+                        utility,
+                        operation.ContainingAkcssSymbol,
+                        out var arguments))
+                {
+                    AppendIndentedLine(
+                        source,
+                        indentation,
+                        "// The parameterized @apply arguments could not be emitted.");
+                    expansionPath.Remove(declarationSyntax);
+                    continue;
+                }
+
+                AppendIndentedLine(source, indentation, "{");
+                for (var parameterIndex = 0;
+                     parameterIndex < utility.Parameters.Length;
+                     parameterIndex++)
+                {
+                    var parameter = utility.Parameters[parameterIndex];
+                    AppendIndentedLine(
+                        source,
+                        indentation + 1,
+                        $"{GetTypeName(parameter.Type.Symbol)} {GetParameterName(parameter)} = {arguments[parameterIndex]};");
+                }
+
+                AppendOperations(
+                    source,
+                    generationSymbol.Operations,
+                    targetName,
+                    indentation + 1,
+                    expansionPath,
+                    sourceMap);
+                AppendIndentedLine(source, indentation, "}");
+            }
+            else
+            {
+                AppendOperations(
+                    source,
+                    generationSymbol.Operations,
+                    targetName,
+                    indentation,
+                    expansionPath,
+                    sourceMap);
+            }
+
+            expansionPath.Remove(declarationSyntax);
         }
+    }
+
+    private static bool TryCreateApplyArgumentExpressions(
+        string item,
+        ITailwindUtilitySymbol utility,
+        IAkcssSymbol containingSymbol,
+        out ImmutableArray<string> arguments)
+    {
+        arguments = ImmutableArray<string>.Empty;
+        var prefix = utility.Name + "-";
+        if (!item.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var argumentTexts = item[prefix.Length..].Split('-');
+        if (argumentTexts.Length != utility.Parameters.Length)
+        {
+            return false;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<string>(argumentTexts.Length);
+        for (var index = 0; index < argumentTexts.Length; index++)
+        {
+            var argumentText = argumentTexts[index];
+            if (argumentText.Length == 0 ||
+                !TryCreateApplyArgumentExpression(
+                    argumentText,
+                    utility.Parameters[index].Type.Symbol,
+                    containingSymbol,
+                    out var expression))
+            {
+                return false;
+            }
+
+            builder.Add(expression);
+        }
+
+        arguments = builder.MoveToImmutable();
+        return true;
+    }
+
+    private static bool TryCreateApplyArgumentExpression(
+        string text,
+        Microsoft.CodeAnalysis.ISymbol? parameterTypeSymbol,
+        IAkcssSymbol containingSymbol,
+        out string expression)
+    {
+        if (containingSymbol is ITailwindUtilitySymbol containingUtility)
+        {
+            foreach (var parameter in containingUtility.Parameters)
+            {
+                if (string.Equals(parameter.Name, text, StringComparison.Ordinal) ||
+                    string.Equals(parameter.CSharpParameter?.Name, text, StringComparison.Ordinal))
+                {
+                    expression = GetParameterName(parameter);
+                    return true;
+                }
+            }
+        }
+
+        var parameterType = parameterTypeSymbol as ITypeSymbol;
+        if (parameterType is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
+                TypeArguments.Length: 1,
+            } nullableType)
+        {
+            parameterType = nullableType.TypeArguments[0];
+        }
+
+        if (parameterType is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType)
+        {
+            foreach (var member in enumType.GetMembers())
+            {
+                if (member is RoslynFieldSymbol field &&
+                    field.HasConstantValue &&
+                    string.Equals(field.Name, text, StringComparison.OrdinalIgnoreCase))
+                {
+                    expression =
+                        $"{GetTypeName(enumType)}.{EscapeIdentifier(field.Name)}";
+                    return true;
+                }
+            }
+
+            expression = string.Empty;
+            return false;
+        }
+
+        switch (parameterType?.SpecialType)
+        {
+            case SpecialType.System_String:
+                expression = ToStringLiteral(text);
+                return true;
+            case SpecialType.System_Char when text.Length == 1:
+                expression = SymbolDisplay.FormatLiteral(text[0], quote: true);
+                return true;
+            case SpecialType.System_Boolean when bool.TryParse(text, out var boolean):
+                expression = boolean ? "true" : "false";
+                return true;
+            case SpecialType.System_SByte:
+            case SpecialType.System_Byte:
+            case SpecialType.System_Int16:
+            case SpecialType.System_UInt16:
+            case SpecialType.System_Int32:
+                if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                {
+                    expression = text;
+                    return true;
+                }
+
+                break;
+            case SpecialType.System_UInt32:
+                if (uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var uintValue))
+                {
+                    expression = uintValue.ToString(CultureInfo.InvariantCulture) + "u";
+                    return true;
+                }
+
+                break;
+            case SpecialType.System_Int64:
+                if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
+                {
+                    expression = longValue.ToString(CultureInfo.InvariantCulture) + "L";
+                    return true;
+                }
+
+                break;
+            case SpecialType.System_UInt64:
+                if (ulong.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ulongValue))
+                {
+                    expression = ulongValue.ToString(CultureInfo.InvariantCulture) + "UL";
+                    return true;
+                }
+
+                break;
+            case SpecialType.System_Single:
+                if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var floatValue))
+                {
+                    expression = floatValue.ToString("R", CultureInfo.InvariantCulture) + "f";
+                    return true;
+                }
+
+                break;
+            case SpecialType.System_Double:
+                if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue))
+                {
+                    expression = FormatDouble(doubleValue);
+                    return true;
+                }
+
+                break;
+            case SpecialType.System_Decimal:
+                if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
+                {
+                    expression = decimalValue.ToString(CultureInfo.InvariantCulture) + "m";
+                    return true;
+                }
+
+                break;
+            case SpecialType.System_Object:
+                if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                {
+                    expression = text;
+                    return true;
+                }
+
+                if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var objectDouble))
+                {
+                    expression = FormatDouble(objectDouble);
+                    return true;
+                }
+
+                if (bool.TryParse(text, out var objectBoolean))
+                {
+                    expression = objectBoolean ? "true" : "false";
+                    return true;
+                }
+
+                expression = ToStringLiteral(text);
+                return true;
+            default:
+                if (parameterType == null)
+                {
+                    expression = text;
+                    return true;
+                }
+
+                break;
+        }
+
+        expression = text;
+        return expression.Length > 0;
     }
 
     private static void AppendPropertySetter(
@@ -739,13 +971,15 @@ internal static class AkcssGenerator
 
     private static void AppendResetMethod(
         StringBuilder source,
-        IAkcssSymbol symbol)
+        IAkcssSymbol symbol,
+        AkcssGenerationSourceMap sourceMap)
     {
         var propertyReferences = new Dictionary<string, ITypeSymbol?>(StringComparer.Ordinal);
         CollectResetProperties(
             symbol.Operations,
             propertyReferences,
-            new HashSet<IAkcssSymbol>());
+            new HashSet<AkburaSyntax> { symbol.DeclarationSyntax },
+            sourceMap);
         if (propertyReferences.Count == 0)
         {
             return;
@@ -779,7 +1013,8 @@ internal static class AkcssGenerator
     private static void CollectResetProperties(
         ImmutableArray<IAkcssOperation> operations,
         Dictionary<string, ITypeSymbol?> properties,
-        HashSet<IAkcssSymbol> expansionPath)
+        HashSet<AkburaSyntax> expansionPath,
+        AkcssGenerationSourceMap sourceMap)
     {
         foreach (var operation in operations)
         {
@@ -795,19 +1030,28 @@ internal static class AkcssGenerator
 
                     break;
                 case IAkcssIfOperation ifOperation:
-                    CollectResetProperties(ifOperation.Operations, properties, expansionPath);
+                    CollectResetProperties(
+                        ifOperation.Operations,
+                        properties,
+                        expansionPath,
+                        sourceMap);
                     break;
                 case IAkcssApplyOperation applyOperation:
                     foreach (var appliedSymbol in applyOperation.AppliedSymbols)
                     {
-                        if (appliedSymbol is ITailwindUtilitySymbol { Parameters.Length: > 0 } ||
-                            !expansionPath.Add(appliedSymbol))
+                        var declarationSyntax = appliedSymbol.DeclarationSyntax;
+                        if (!expansionPath.Add(declarationSyntax))
                         {
                             continue;
                         }
 
-                        CollectResetProperties(appliedSymbol.Operations, properties, expansionPath);
-                        expansionPath.Remove(appliedSymbol);
+                        var generationSymbol = sourceMap.GetGenerationSymbol(appliedSymbol);
+                        CollectResetProperties(
+                            generationSymbol.Operations,
+                            properties,
+                            expansionPath,
+                            sourceMap);
+                        expansionPath.Remove(declarationSyntax);
                     }
 
                     break;

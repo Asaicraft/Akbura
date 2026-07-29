@@ -24,8 +24,8 @@ param string CurrentUrl = "";
                     mt-6
                     gap-2>
 
-            <Link Content="Counter"
-                  Url="/pages"
+            <Link Content="Overview"
+                  Url="/overview"
                   Router={Router}/>
 
             <Link Content="Data templates"

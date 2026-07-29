@@ -17,8 +17,8 @@ param Router Router;
                text-slate-400
                text-center/>
 
-    <Link Content="Go to Counter"
-          Url="/pages"
+    <Link Content="Go to Overview"
+          Url="/overview"
           Router={Router}/>
 
 </StackPanel>

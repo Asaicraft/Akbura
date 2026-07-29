@@ -1,0 +1,19 @@
+@using System;
+@using Akbura;
+@using Avalonia;
+@using Avalonia.Controls;
+@using Avalonia.Controls.Primitives;
+@using Avalonia.Media;
+@using Akbura.FeatureGallery.Styles.akcss;
+
+@utilities {
+
+	Border.card {
+		@apply p-4
+			bg-slate-900
+			border-1
+			border-slate-700
+			rounded-xl;
+	}
+
+}

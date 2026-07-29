@@ -1082,7 +1082,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         var localCandidates = FindAkcssApplyItemCandidates(
             GetContainingAkcssLayer(containingSymbol.DeclarationSyntax),
-            text);
+            text,
+            containingSymbol);
         if (localCandidates.Length > 1)
         {
             diagnosticsBuilder.Add(CreateAkcssApplyItemAmbiguousDiagnostic(applyDirective, item));
@@ -1096,7 +1097,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         foreach (var layer in GetImportedAkcssSymbolLayers(containingSymbol.DeclarationSyntax, diagnosticsBuilder))
         {
-            var candidates = FindAkcssApplyItemCandidates(layer, text);
+            var candidates = FindAkcssApplyItemCandidates(
+                layer,
+                text,
+                containingSymbol);
             if (candidates.Length > 1)
             {
                 diagnosticsBuilder.Add(CreateAkcssApplyItemAmbiguousDiagnostic(applyDirective, item));
@@ -1115,9 +1119,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private ImmutableArray<IAkcssSymbol> FindAkcssApplyItemCandidates(
         ImmutableArray<IAkcssSymbol> layer,
-        string item)
+        string item,
+        IAkcssSymbol containingSymbol)
     {
-        var exactCandidates = FindAkcssApplyCandidates(layer, item, argumentCount: 0);
+        var exactCandidates = FindAkcssApplyCandidates(
+            layer,
+            item,
+            argumentCount: 0,
+            containingSymbol);
         if (!exactCandidates.IsDefaultOrEmpty)
         {
             return exactCandidates;
@@ -1131,7 +1140,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             var candidates = FindAkcssApplyCandidates(
                 layer,
                 item[..dashIndex],
-                argumentCount);
+                argumentCount,
+                containingSymbol);
             if (!candidates.IsDefaultOrEmpty)
             {
                 return candidates;
@@ -1144,11 +1154,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private ImmutableArray<IAkcssSymbol> FindAkcssApplyCandidates(
         ImmutableArray<IAkcssSymbol> layer,
         string name,
-        int argumentCount)
+        int argumentCount,
+        IAkcssSymbol containingSymbol)
     {
         using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
         foreach (var symbol in layer)
         {
+            if (!IsAkcssApplyTargetCompatible(symbol, containingSymbol))
+            {
+                continue;
+            }
+
             if (symbol is ITailwindUtilitySymbol utility)
             {
                 if (utility.Name == name &&
@@ -1169,6 +1185,25 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return builder.ToImmutable();
+    }
+
+    private static bool IsAkcssApplyTargetCompatible(
+        IAkcssSymbol candidate,
+        IAkcssSymbol containingSymbol)
+    {
+        if (!candidate.HasTargetType)
+        {
+            return true;
+        }
+
+        if (!containingSymbol.HasTargetType)
+        {
+            return true;
+        }
+
+        return containingSymbol.TargetType.Symbol is ITypeSymbol containingTargetType &&
+               candidate.TargetType.Symbol is ITypeSymbol candidateTargetType &&
+               IsAssignableTo(containingTargetType, candidateTargetType);
     }
 
     private ImmutableArray<IAkcssSymbol> GetContainingAkcssLayer(AkburaSyntax syntax)

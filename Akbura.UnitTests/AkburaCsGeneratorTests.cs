@@ -3,6 +3,7 @@ using Akbura.CompilerAnotations;
 using Akbura.Furioso;
 using Akbura.Language;
 using Akbura.Language.Operations;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.LogicalTree;
@@ -2697,6 +2698,128 @@ public sealed class AkburaCsGeneratorTests
                 Assert.True(double.IsNaN(border.Width));
                 componentType.GetProperty("ApplyWidth")!.SetValue(component, true);
                 Assert.Equal(72d, border.Width);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_AkcssApplyExpandsImportedParameterizedUtilities()
+    {
+        const string component =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Border card />\n";
+        const string componentAkcss =
+            "@using Avalonia.Controls;\n" +
+            "@using Styles.akcss;\n" +
+            "\n" +
+            "@utilities {\n" +
+            "    Border.card {\n" +
+            "        @apply p-4 bg-red-500 rounded-xl;\n" +
+            "    }\n" +
+            "}\n";
+        const string sharedAkcss =
+            "@using Avalonia;\n" +
+            "@using Avalonia.Controls;\n" +
+            "@using Avalonia.Controls.Primitives;\n" +
+            "\n" +
+            "@utilities {\n" +
+            "    Decorator.p-(double value) { Padding: new Thickness(value); }\n" +
+            "    TemplatedControl.p-(double value) { Padding: new Thickness(value * 2); }\n" +
+            "    Border.bg-(string color)-(int shade) { Opacity: shade / 1000d; }\n" +
+            "    Border.rounded-xl { CornerRadius: new CornerRadius(12); }\n" +
+            "}\n";
+        const string csharp =
+            "public partial class CardView\n" +
+            "{\n" +
+            "    public CardView() : base(global::Akbura.Engine.AkburaEngine.Empty) { }\n" +
+            "}\n";
+
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedApplyTests",
+            syntaxTrees: [CSharpSyntaxTree.ParseText(csharp, parseOptions)],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var projectDirectory = Path.Combine(
+            Environment.CurrentDirectory,
+            "AkcssApplyProject");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(projectDirectory, "CardView.akbura"),
+                    SourceText.From(component)),
+                new TestAdditionalText(
+                    Path.Combine(projectDirectory, "CardView.akcss"),
+                    SourceText.From(componentAkcss)),
+                new TestAdditionalText(
+                    Path.Combine(projectDirectory, "Styles.akcss"),
+                    SourceText.From(sharedAkcss)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedSources = Assert.Single(
+            driver.GetRunResult().Results).GeneratedSources;
+        var generatedCardStyles = Assert.Single(
+            generatedSources,
+            static source => source.HintName.Contains(
+                "CardView.akcss",
+                StringComparison.Ordinal));
+        var generatedText = generatedCardStyles.SourceText.ToString();
+        Assert.Contains("double value = 4;", generatedText, StringComparison.Ordinal);
+        Assert.Contains("string color = \"red\";", generatedText, StringComparison.Ordinal);
+        Assert.Contains("int shade = 500;", generatedText, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "invalid AKCSS operation",
+            generatedText,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "could not be emitted",
+            generatedText,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType = assembly.GetType("CardView");
+                Assert.NotNull(componentType);
+                var componentControl = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(componentType));
+                var window = new Window
+                {
+                    Content = componentControl,
+                };
+
+                window.Show();
+
+                var border = Assert.IsType<Border>(componentControl.Child);
+                Assert.Equal(new Thickness(4), border.Padding);
+                Assert.Equal(0.5d, border.Opacity);
+                Assert.Equal(new CornerRadius(12), border.CornerRadius);
 
                 window.Close();
             },

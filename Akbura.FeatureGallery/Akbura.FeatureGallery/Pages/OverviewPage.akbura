@@ -25,7 +25,7 @@ using Akbura.FeatureGallery.Styles.akcss;
 					text-lg
 					text-slate-400
 					whitespace-normal
-					HorizontalAlignment="Left"
+					self-start
 					MaxWidth="720"/>
 
 				<StackPanel Orientation="Horizontal"

@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
@@ -8,6 +9,7 @@ namespace Akbura.Furioso;
 internal sealed class AkcssGenerationSourceMap
 {
     private readonly Dictionary<AkburaSyntax, AkburaSyntaxTree> _syntaxTreesByRoot = new();
+    private readonly Dictionary<AkburaSyntax, IAkcssSymbol> _symbolsBySyntax = new();
 
     public AkcssGenerationSourceMap(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
@@ -19,6 +21,34 @@ internal sealed class AkcssGenerationSourceMap
                 _syntaxTreesByRoot.Add(root, syntaxTree);
             }
         }
+    }
+
+    public void RegisterModule(IAkcssModuleSymbol module)
+    {
+        foreach (var symbol in module.AkcssSymbols)
+        {
+            _symbolsBySyntax[symbol.DeclarationSyntax] = symbol;
+        }
+    }
+
+    public IAkcssSymbol GetGenerationSymbol(IAkcssSymbol symbol)
+    {
+        if (_symbolsBySyntax.TryGetValue(symbol.DeclarationSyntax, out var registered))
+        {
+            return registered;
+        }
+
+        foreach (var pair in _symbolsBySyntax)
+        {
+            if (ReferenceEquals(pair.Key.Root, symbol.DeclarationSyntax.Root) &&
+                pair.Key.Kind == symbol.DeclarationSyntax.Kind &&
+                pair.Key.FullSpan == symbol.DeclarationSyntax.FullSpan)
+            {
+                return pair.Value;
+            }
+        }
+
+        return symbol;
     }
 
     public bool TryGetLineDirective(

@@ -145,6 +145,36 @@ public sealed class CSharpIncrementalParserTests
     }
 
     [Fact]
+    public void MultilineRawStringEdit_ReusesFollowingMarkup()
+    {
+        const string oldCode =
+            "string code =\n" +
+            "\"\"\"\n" +
+            "<Button>Before</Button>\n" +
+            "\"\"\";\n" +
+            "<TextBlock Text={code}/>";
+        const string newCode =
+            "string code =\n" +
+            "\"\"\"\n" +
+            "<Button>After</Button>\n" +
+            "\"\"\";\n" +
+            "<TextBlock Text={code}/>";
+
+        var oldSyntax = Parse(oldCode);
+        var changeStart = oldCode.IndexOf("Before", StringComparison.Ordinal);
+        var change = new TextChangeRange(
+            new TextSpan(changeStart, "Before".Length),
+            "After".Length);
+
+        var incremental = ParseIncremental(newCode, oldSyntax, [change]);
+
+        Assert.Equal(newCode, incremental.ToFullString());
+        Assert.Equal(2, incremental.Members.Count);
+        Assert.IsType<GreenCSharpStatementSyntax>(incremental.Members[0]);
+        Assert.Same(oldSyntax.Members[1], incremental.Members[1]);
+    }
+
+    [Fact]
     public void RawExpressionIdentifierEdit_ReparsesCSharpRawWrapper()
     {
         const string oldCode = "state value = a + 1;";

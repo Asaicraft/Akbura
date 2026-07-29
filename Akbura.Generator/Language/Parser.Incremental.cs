@@ -1335,6 +1335,8 @@ internal sealed partial class Parser
 
     private GreenCSharpStatementSyntax ParseIncrementalCSharpStatementSyntaxCore()
     {
+        var mode = _mode;
+        _mode = Lexer.LexerMode.InCSharpStatement;
         var tokens = _pool.Allocate<GreenSyntaxToken>();
         var canHaveBlockBody = IsCSharpBlockStatementStarter(PeekIncrementalToken());
         var parenDepth = 0;
@@ -1359,6 +1361,7 @@ internal sealed partial class Parser
                     (canHaveBlockBody ||
                      IsCSharpLocalFunctionHeader(tokens)))
                 {
+                    _mode = mode;
                     var body = ParseIncrementalCSharpBlockSyntaxCore();
                     return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body);
                 }
@@ -1395,6 +1398,7 @@ internal sealed partial class Parser
         }
         finally
         {
+            _mode = mode;
             _pool.Free(tokens);
         }
     }
@@ -2097,7 +2101,9 @@ internal sealed partial class Parser
     private bool CanReadIncrementalNodeOrToken()
     {
         return _isIncremental &&
-               _mode is Lexer.LexerMode.TopLevel or Lexer.LexerMode.InAkcss &&
+               _mode is Lexer.LexerMode.TopLevel or
+                   Lexer.LexerMode.InAkcss or
+                   Lexer.LexerMode.InCSharpStatement &&
                _currentToken == null &&
                _tokenOffset >= _tokenCount;
     }

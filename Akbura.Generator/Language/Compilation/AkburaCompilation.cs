@@ -311,7 +311,9 @@ internal sealed partial class AkburaCompilation
             throw new ArgumentNullException(nameof(syntaxTree));
         }
 
-        if (SyntaxTrees.Contains(syntaxTree))
+        if (SyntaxTrees.Contains(syntaxTree) ||
+            syntaxTree is AkcssSyntaxTree akcssSyntaxTree &&
+            AkcssSyntaxTrees.Contains(akcssSyntaxTree))
         {
             return _semanticModels.GetOrAdd(
                 syntaxTree,

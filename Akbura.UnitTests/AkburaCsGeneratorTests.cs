@@ -2277,6 +2277,101 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public void Generator_InitializesComponentParameterFromPrecedingRawStringLocal()
+    {
+        const string child =
+            """
+            using Avalonia.Controls;
+
+            param string Code;
+
+            <TextBlock Text={Code}/>
+            """;
+        const string host =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "string counterCode =\n" +
+            "\"\"\"\n" +
+            "<Button Content=\"Increment\"/>\n" +
+            "\"\"\";\n" +
+            "\n" +
+            "<CodeView Code={counterCode}/>";
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedRawStringLocalTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(Environment.CurrentDirectory, "CodeView.akbura"),
+                    SourceText.From(child)),
+                new TestAdditionalText(
+                    Path.Combine(Environment.CurrentDirectory, "RawStringHost.akbura"),
+                    SourceText.From(host)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedSources = Assert.Single(driver.GetRunResult().Results)
+            .GeneratedSources;
+        var hostSource = Assert.Single(
+            generatedSources,
+            static generated =>
+                generated.HintName.Contains(
+                    "RawStringHost",
+                    StringComparison.Ordinal));
+        var generatedRoot = hostSource.SyntaxTree.GetCompilationUnitRoot();
+        var generatedClass = Assert.Single(
+            generatedRoot.DescendantNodes()
+                .OfType<CSharp.ClassDeclarationSyntax>());
+        var firstUpdate = Assert.Single(
+            generatedClass.Members
+                .OfType<CSharp.MethodDeclarationSyntax>(),
+            static method =>
+                method.Identifier.ValueText == "FirstUpdate");
+        var update = Assert.Single(
+            generatedClass.Members
+                .OfType<CSharp.MethodDeclarationSyntax>(),
+            static method =>
+                method.Identifier.ValueText == "Update");
+
+        Assert.Contains(
+            firstUpdate.Body!.Statements,
+            static statement =>
+                statement is CSharp.LocalDeclarationStatementSyntax declaration &&
+                declaration.Declaration.Variables.Any(
+                    static variable =>
+                        variable.Identifier.ValueText == "counterCode"));
+        Assert.Contains(
+            update.Body!.Statements,
+            static statement =>
+                statement is CSharp.LocalDeclarationStatementSyntax declaration &&
+                declaration.Declaration.Variables.Any(
+                    static variable =>
+                        variable.Identifier.ValueText == "counterCode"));
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public async Task Generator_EmitsAndAppliesInlineAkcssClassesAndUtilities()
     {
         const string component =

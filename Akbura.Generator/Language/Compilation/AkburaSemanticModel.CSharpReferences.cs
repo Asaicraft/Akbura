@@ -492,7 +492,12 @@ internal partial class AkburaSemanticModel
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
         Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
     {
-        foreach (var member in SyntaxTree.GetRoot().Members)
+        if (SyntaxTree.GetRootSyntax() is not AkburaDocumentSyntax root)
+        {
+            return;
+        }
+
+        foreach (var member in root.Members)
         {
             switch (member.Kind)
             {
@@ -562,7 +567,8 @@ internal partial class AkburaSemanticModel
         AkburaSyntax scopeSyntax,
         Dictionary<string, AkburaSymbol> akburaSymbolsByName)
     {
-        if (scopeSyntax == null)
+        if (scopeSyntax == null ||
+            SyntaxTree.Kind != SyntaxTreeKind.Component)
         {
             return;
         }

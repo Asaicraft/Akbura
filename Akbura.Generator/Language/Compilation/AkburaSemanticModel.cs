@@ -3043,6 +3043,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     internal string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
     {
+        if (syntaxTree.Kind != SyntaxTreeKind.Component)
+        {
+            return string.Empty;
+        }
+
         var componentName = syntaxTree.ComponentName;
         if (Compilation.TryGetReferencedComponentDeclaration(syntaxTree, out var declaration) &&
             declaration.MetadataName is { Length: > 0 } metadataName)
@@ -5642,11 +5647,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private CSharp.FileScopedNamespaceDeclarationSyntax? GetCSharpNamespaceDeclaration()
     {
-        foreach (var member in SyntaxTree.GetRoot().Members)
+        if (SyntaxTree.GetRootSyntax() is AkburaDocumentSyntax root)
         {
-            if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
+            foreach (var member in root.Members)
             {
-                return Unsafe.As<NamespaceDeclarationSyntax>(member).ToCSharp();
+                if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
+                {
+                    return Unsafe.As<NamespaceDeclarationSyntax>(member).ToCSharp();
+                }
             }
         }
 
@@ -5705,6 +5713,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         out CSharp.ClassDeclarationSyntax componentType)
     {
         componentType = null!;
+        if (SyntaxTree.Kind != SyntaxTreeKind.Component)
+        {
+            return false;
+        }
 
         var componentName = SyntaxTree.ComponentName;
         if (string.IsNullOrWhiteSpace(componentName))
@@ -5769,7 +5781,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     [Conditional("DEBUG")]
     protected void ValidateSyntaxTreeOwnership(AkburaSyntax syntax)
     {
-        if (!ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()))
+        if (!ReferenceEquals(syntax.Root, SyntaxTree.GetRootSyntax()))
         {
             throw new ArgumentException("Syntax node is not part of this semantic model syntax tree.", nameof(syntax));
         }
@@ -5778,7 +5790,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     [Conditional("DEBUG")]
     private void ValidateBoundSyntaxOwnership(AkburaSyntax syntax)
     {
-        if (ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()) ||
+        if (ReferenceEquals(syntax.Root, SyntaxTree.GetRootSyntax()) ||
             Compilation.TryGetDeclaration(syntax.Root, out _))
         {
             return;

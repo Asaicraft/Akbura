@@ -141,6 +141,22 @@ public sealed class RealisticIncrementalParserTests
         builder.Append(syntax.FullWidth);
         builder.AppendLine(".");
 
+        var roundTrip = syntax.ToFullString();
+        var commonLength = Math.Min(code.Length, roundTrip.Length);
+        var mismatchIndex = 0;
+        while (mismatchIndex < commonLength &&
+               code[mismatchIndex] == roundTrip[mismatchIndex])
+        {
+            mismatchIndex++;
+        }
+
+        builder.Append("First mismatch: ");
+        builder.Append(mismatchIndex);
+        builder.Append(", source: ");
+        builder.AppendLine(GetDiagnosticText(code, mismatchIndex));
+        builder.Append("Tree: ");
+        builder.AppendLine(GetDiagnosticText(roundTrip, mismatchIndex));
+
         for (var i = 0; i < syntax.Members.Count; i++)
         {
             var member = syntax.Members[i];
@@ -165,6 +181,15 @@ public sealed class RealisticIncrementalParserTests
         }
 
         Assert.Fail(builder.ToString());
+    }
+
+    private static string GetDiagnosticText(string text, int position)
+    {
+        var start = Math.Max(0, position - 30);
+        var length = Math.Min(text.Length - start, 60);
+        return text.Substring(start, length)
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
     }
 
     private static double GetTopLevelReuseRatio(

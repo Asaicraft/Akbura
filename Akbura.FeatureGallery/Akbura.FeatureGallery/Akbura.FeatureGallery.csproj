@@ -13,10 +13,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Compile Include="Components\FeatureView.akbura" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<PackageReference Include="Avalonia" />
 		<PackageReference Include="Avalonia.Themes.Fluent" />
 		<PackageReference Include="Avalonia.Fonts.Inter" />
@@ -29,6 +25,10 @@
 		<ProjectReference Include="..\..\Akbura\Akbura.csproj" />
 		<ProjectReference Include="..\..\Akbura.Build.Tasks\Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
 		<ProjectReference Include="..\..\Akbura.Furioso\Akbura.Furioso.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Pages\" />
 	</ItemGroup>
 
 	<Import Project="..\..\Akbura\buildTransitive\Akbura.targets" />

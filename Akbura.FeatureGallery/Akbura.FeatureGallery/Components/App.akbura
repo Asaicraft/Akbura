@@ -42,7 +42,7 @@ state string url = "/pages";
                         <Router.Pages>
 
                             <Page Url="/pages">
-                                <Counter/>
+                                <OverviewPage/>
                             </Page>
 
                             <Page Url="/data-templates">

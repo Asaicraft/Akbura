@@ -253,6 +253,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         CSharp.ExpressionSyntax expression,
         ITypeSymbol? targetType)
     {
+        var precedingLocals = GetPrecedingLocalDeclarations(scope);
         var containingMethod = GetContainingComponentMethodProbe(scope);
         var probeScope = CreateProbeScope(
             scope,
@@ -267,7 +268,10 @@ internal sealed partial class CSharpProbeBinder : Binder
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 returnType,
                 "__akbura_probe")
-            .WithBody(CreateProbeBlock(probeScope.LocalStatements, returnStatement));
+            .WithBody(CreateProbeBlock(
+                probeScope.LocalStatements,
+                precedingLocals,
+                returnStatement));
         method = ApplyContainingMethodContext(method, containingMethod);
         return CreateComponentProbeCompilationUnit(
             AddProbeMethod(probeScope.MemberDeclarations, method),

@@ -111,7 +111,8 @@ internal sealed class BindingSession
         BinderUsage usage = BinderUsage.Expression)
     {
         var next = GetBinder(syntax, usage);
-        if (IsCurrentSemanticModelSyntax(syntax) &&
+        if (_semanticModel.SyntaxTree.Kind == SyntaxTreeKind.Component &&
+            IsCurrentSemanticModelSyntax(syntax) &&
             _semanticModel.GetMemberSemanticModel(syntax) is ExecutableMemberSemanticModel executableModel)
         {
             next = executableModel.CreateIncrementalBinder(next);
@@ -125,7 +126,8 @@ internal sealed class BindingSession
         BinderUsage usage = BinderUsage.Expression)
     {
         var next = GetBinder(syntax, usage);
-        if (IsCurrentSemanticModelSyntax(syntax) &&
+        if (_semanticModel.SyntaxTree.Kind == SyntaxTreeKind.Component &&
+            IsCurrentSemanticModelSyntax(syntax) &&
             _semanticModel.GetMemberSemanticModel(syntax) is ExecutableMemberSemanticModel executableModel)
         {
             next = executableModel.CreateIncrementalBinder(next);
@@ -166,7 +168,7 @@ internal sealed class BindingSession
     {
         return SemanticSyntaxIdentity.IsInSameTree(
             syntax,
-            _semanticModel.SyntaxTree.GetRoot());
+            _semanticModel.SyntaxTree.GetRootSyntax());
     }
 
     internal Binder GetOperationBinder(AkburaSyntax syntax)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Akbura.FeatureGallery.Components;
+using Akbura.FeatureGallery.Pages;
 
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;

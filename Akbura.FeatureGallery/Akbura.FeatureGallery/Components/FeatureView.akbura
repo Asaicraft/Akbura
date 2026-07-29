@@ -1,5 +1,5 @@
-﻿using Akbura.Hooks;
-using Akbura.FeatureGallery.Styles.akcss;
+﻿using Akbura.FeatureGallery.Styles.akcss;
+using Akbura.Hooks;
 
 param IDataTemplate View;
 param string Path;
@@ -7,10 +7,10 @@ param string Code;
 
 state Control? preview = null;
 
-useEffect(View)
+useEffect(() =>
 {
     preview = View.Build(null);
-}
+}, [View]);
 
 <Grid RowDefinitions="Auto,*"
       gap-y-4>

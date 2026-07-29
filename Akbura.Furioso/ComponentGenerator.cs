@@ -969,6 +969,10 @@ internal static class ComponentGenerator
                         indentation + 1);
                 }
 
+                AppendInitialRenderLocalDeclarations(
+                    source,
+                    indentation + 1);
+
                 source.AppendLine();
                 foreach (var element in _elements)
                 {
@@ -1086,6 +1090,35 @@ internal static class ComponentGenerator
                 .Append(roots.IsDefaultOrEmpty ? "__generatedRoot" : roots[0].FieldName).AppendLine(";");
             AppendIndentedLine(source, indentation, "}");
             source.AppendLine();
+        }
+
+        private void AppendInitialRenderLocalDeclarations(
+            StringBuilder source,
+            int indentation)
+        {
+            foreach (var member in _symbol.DeclarationSyntax.Members
+                         .OfType<CSharpStatementSyntax>())
+            {
+                if (member.GetRawCSharpStatement() is not
+                        CSharp.LocalDeclarationStatementSyntax ||
+                    HasSemanticErrors(member))
+                {
+                    continue;
+                }
+
+                var text = member.ToFullString().Trim();
+                if (text.Length == 0)
+                {
+                    continue;
+                }
+
+                AppendLineDirective(
+                    source,
+                    indentation,
+                    member,
+                    text,
+                    valueOffset: 0);
+            }
         }
 
         private static bool IsGeneratedClassMember(CSharpStatementSyntax statement)

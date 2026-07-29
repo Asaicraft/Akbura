@@ -48,6 +48,7 @@ internal sealed partial class Lexer : IDisposable
 		InAkcss = 1 << 6,
 		InCSharpParameterList = 1 << 7,
 		InCSharpArgumentList = 1 << 8,
+		InCSharpStatement = 1 << 9,
 	}
 
 	internal struct TokenInfo
@@ -157,7 +158,7 @@ internal sealed partial class Lexer : IDisposable
 #endif
 		_mode = mode;
 
-		if (mode != LexerMode.TopLevel && mode != LexerMode.InAkcss)
+		if (mode is not (LexerMode.TopLevel or LexerMode.InAkcss or LexerMode.InCSharpStatement))
 		{
 			var tokenInfo = mode switch
 			{
@@ -173,6 +174,11 @@ internal sealed partial class Lexer : IDisposable
 
 			// In expression modes, we do not care about trivia or errors.
 			return CreateToken(in tokenInfo, null, null, null);
+		}
+
+		if (mode == LexerMode.InCSharpStatement)
+		{
+			return ParseNextToken();
 		}
 
 #if ENABLE_QUICK_SCAN_BENCHMARK
@@ -242,6 +248,15 @@ internal sealed partial class Lexer : IDisposable
 			}
 
 			info.Kind = SyntaxKind.EndOfFileToken;
+			return;
+		}
+
+		if (_mode == LexerMode.InCSharpStatement &&
+			TryScanCSharpStringOrCharText(out var stringOrCharText))
+		{
+			info.Kind = SyntaxKind.StringLiteralToken;
+			info.Text = stringOrCharText;
+			info.StringValue = stringOrCharText;
 			return;
 		}
 
@@ -2416,6 +2431,16 @@ internal sealed partial class Lexer : IDisposable
 			AkburaDebug.AssertNotNull(tokenInfo.Text);
 
 			token = GreenSyntaxToken.Identifier(leadingNode, tokenInfo.Text, trailingNode);
+		}
+		else if (tokenInfo.Kind == SyntaxKind.StringLiteralToken)
+		{
+			AkburaDebug.AssertNotNull(tokenInfo.Text);
+			AkburaDebug.AssertNotNull(tokenInfo.StringValue);
+			token = GreenSyntaxFactory.Literal(
+				leadingNode,
+				tokenInfo.Text,
+				tokenInfo.StringValue,
+				trailingNode);
 		}
 		else if (tokenInfo.Kind == SyntaxKind.NumericLiteralToken)
 		{

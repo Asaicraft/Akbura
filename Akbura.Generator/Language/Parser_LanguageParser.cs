@@ -882,6 +882,8 @@ partial class Parser
 
 	internal GreenCSharpStatementSyntax ParseCSharpStatementSyntax()
 	{
+		var mode = _mode;
+		_mode = Lexer.LexerMode.InCSharpStatement;
 		var tokens = _pool.Allocate<GreenSyntaxToken>();
 		var canHaveBlockBody = IsCSharpBlockStatementStarter(CurrentToken);
 		var parenDepth = 0;
@@ -906,6 +908,7 @@ partial class Parser
 					(canHaveBlockBody ||
 					 IsCSharpLocalFunctionHeader(tokens)))
 				{
+					_mode = mode;
 					var body = ParseCSharpBlock();
 					return GreenSyntaxFactory.CSharpStatementSyntax(tokens.ToList(), body);
 				}
@@ -942,6 +945,7 @@ partial class Parser
 		}
 		finally
 		{
+			_mode = mode;
 			_pool.Free(tokens);
 		}
 	}

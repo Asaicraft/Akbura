@@ -176,7 +176,7 @@ public class SemanticPipelineTests
             CreateCSharpCompilation(),
             [component],
             [globalUsings, styles]);
-        var semanticModel = compilation.GetSemanticModel(component);
+        var semanticModel = compilation.GetSemanticModel(styles);
         var rule = Assert.Single(
             styles.GetRoot().Members.OfType<AkcssStyleRuleSyntax>());
         var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
@@ -217,7 +217,7 @@ public class SemanticPipelineTests
             CreateCSharpCompilation(),
             [component],
             [globalUsings, imported, styles]);
-        var semanticModel = compilation.GetSemanticModel(component);
+        var semanticModel = compilation.GetSemanticModel(styles);
         var rule = Assert.Single(
             styles.GetRoot().Members.OfType<AkcssStyleRuleSyntax>());
         var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
@@ -5181,6 +5181,38 @@ public class SemanticPipelineTests
         Assert.False(clickOperation.HandlerOperation.IsDefault);
         Assert.False(clickOperation.HasErrors);
         Assert.True(semanticModel.GetSemanticDiagnostics(clickAttribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupExpression_BindsPrecedingRawStringLocal()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "string counterCode =\n" +
+            "\"\"\"\n" +
+            "<Button Content=\"Increment\"/>\n" +
+            "\"\"\";\n" +
+            "\n" +
+            "<TextBlock Text={counterCode}/>";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var declaration = Assert.Single(
+            syntaxTree.GetRoot().Members.OfType<CSharpStatementSyntax>());
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(
+            SpecialType.System_String,
+            Assert.IsAssignableFrom<ITypeSymbol>(operation.ValueType.Symbol).SpecialType);
+        Assert.True(semanticModel.GetSemanticDiagnostics(declaration).IsEmpty);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
 
     [Fact]

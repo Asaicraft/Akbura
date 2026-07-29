@@ -21,6 +21,8 @@
 			<LogicalName>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</LogicalName>
 		</_AkburaModuleSource>
 
+		<Compile Remove="@(_AkburaModuleSource)" />
+
 		<AdditionalFiles Include="@(_AkburaModuleSource)"
 						 Exclude="@(AdditionalFiles)" />
 	</ItemGroup>

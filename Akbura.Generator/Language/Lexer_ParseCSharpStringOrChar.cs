@@ -35,13 +35,13 @@ partial class Lexer
                 consumeFullText: false);
 
             if (expression is not CSharp.InterpolatedStringExpressionSyntax ||
-                expression.FullSpan.Length <= 0)
+                expression.Span.Length <= 0)
             {
                 return false;
             }
 
-            text = TextWindow.GetText(start, expression.FullSpan.Length, intern: false);
-            TextWindow.Reset(start + expression.FullSpan.Length);
+            text = TextWindow.GetText(start, expression.Span.Length, intern: false);
+            TextWindow.Reset(start + expression.Span.Length);
             return true;
         }
 
@@ -155,7 +155,7 @@ partial class Lexer
 
         if(IsCSharpStringOrCharKind(token.Kind()))
         {
-            TextWindow.Reset(start + token.FullSpan.Length);
+            TextWindow.Reset(start + token.Span.Length);
             return token;
         }
 

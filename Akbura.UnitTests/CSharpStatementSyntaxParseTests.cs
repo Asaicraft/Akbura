@@ -96,6 +96,48 @@ public class CSharpStatementSyntaxParseTests
 	}
 
 	[Fact]
+	public void CompilationUnit_MultilineRawStringContainingMarkup_ParsesAsSingleStatement()
+	{
+		const string code =
+			"string counterCode =\n" +
+			"\"\"\"\n" +
+			"state int count = 0;\n" +
+			"<StackPanel>\n" +
+			"    <TextBlock Text={$\"Current value: {count}\"}/>\n" +
+			"</StackPanel>\n" +
+			"\"\"\";\n" +
+			"\n" +
+			"<TextBlock Text={counterCode}/>";
+
+		using var parser = MakeParser(code);
+		var syntax = parser.ParseCompilationUnit();
+
+		Assert.Equal(2, syntax.Members.Count);
+		var statement = Assert.IsType<GreenCSharpStatementSyntax>(syntax.Members[0]);
+		var red = Assert.IsType<CSharpStatementSyntax>(
+			statement.CreateRed(parent: null, position: 0));
+		var declaration =
+			Assert.IsType<Microsoft.CodeAnalysis.CSharp.Syntax.LocalDeclarationStatementSyntax>(
+				red.GetRawCSharpStatement());
+		Assert.Empty(declaration.GetDiagnostics());
+		Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[1]);
+		Assert.Equal(code, syntax.ToFullString());
+	}
+
+	[Theory]
+	[InlineData("var value = Parse(\"text\" , suffix);")]
+	[InlineData("var value = $\"{prefix}\" + suffix;")]
+	public void CompilationUnit_CSharpStringPreservesTrailingWhitespace(string code)
+	{
+		using var parser = MakeParser(code);
+
+		var syntax = parser.ParseCompilationUnit();
+
+		Assert.Equal(code, syntax.ToFullString());
+		Assert.Equal(code.Length, syntax.FullWidth);
+	}
+
+	[Fact]
 	public void StatementWithObjectInitializer_DoesNotTreatInitializerAsBody()
 	{
 		const string code = "var item = new Item { Count = 1 };";

@@ -1863,9 +1863,16 @@ partial class Parser
 	{
 		var openBrace = EatToken(SyntaxKind.OpenBraceToken);
 		var expression = ParseCSharpExpressionInMode(Lexer.LexerMode.InInlineExpression);
+		var semicolon = CurrentToken.Kind == SyntaxKind.SemicolonToken
+			? EatToken()
+			: null;
 		var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
 
-		return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, expression, closeBrace);
+		return GreenSyntaxFactory.InlineExpressionSyntax(
+			openBrace,
+			expression,
+			semicolon,
+			closeBrace);
 	}
 
 	#endregion

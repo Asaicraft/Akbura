@@ -1,5 +1,7 @@
 ﻿using Akbura.FeatureGallery.Styles.akcss;
 using Akbura.Hooks;
+using AvaloniaEdit;
+using AvaloniaEdit.Highlighting;
 
 param IDataTemplate View;
 param string Path;
@@ -67,20 +69,20 @@ useEffect(() =>
 
                     </Border>
 
-                    <TextBox row-1
-                             Text={Code}
-                             IsReadOnly="True"
-                             AcceptsReturn="True"
-                             AcceptsTab="True"
-                             TextWrapping="NoWrap"
-                             FontFamily="Consolas"
-                             text-sm
-                             text-slate-200
-                             bg-slate-950
-                             border-0
-                             p-4
-                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                    <TextEditor row-1
+                        Text={Code}
+                        IsReadOnly="True"
+                        ShowLineNumbers="True"
+                        WordWrap="False"
+                        SyntaxHighlighting={
+                            HighlightingManager.Instance.GetDefinition("XML")}
+                        FontFamily="Cascadia Code,Consolas,Menlo,Monospace"
+                        FontSize="15"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        bg-slate-950
+                        text-slate-200
+                        p-4/>
 
                 </Grid>
 

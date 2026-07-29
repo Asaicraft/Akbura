@@ -1400,7 +1400,7 @@ internal sealed partial class Lexer : IDisposable
 
 	private TokenInfo ParseInlineExpression()
 	{
-		return ParseExpressionUntil('}');
+		return ParseExpressionUntil(';', '}');
 	}
 
 	private TokenInfo ParseExpressionUntilSemicolon()
@@ -1448,9 +1448,6 @@ internal sealed partial class Lexer : IDisposable
 			Kind = SyntaxKind.CSharpRawToken,
 			ContextualKind = SyntaxKind.CSharpRawToken
 		};
-
-		// We assume the token that starts the expression (e.g. '=' or '(' or ',') has already been consumed.
-		var expressionOffset = TextWindow.Position;
 
 		_builder.Clear();
 
@@ -1559,14 +1556,14 @@ internal sealed partial class Lexer : IDisposable
 
 	private TokenInfo ParseExpressionUntil(char firstTerminator, char secondTerminator)
 	{
-		static void IncreaseDepth(ref int depth, char character, StringBuilder stringBuilder, in SlidingTextWindow TextWindow)
+		static void IncreaseDepth(ref int depth, char character, StringBuilder stringBuilder, ref SlidingTextWindow TextWindow)
 		{
 			depth++;
 			stringBuilder.Append(character);
 			TextWindow.NextChar();
 		}
 
-		static bool DecreaseDepth(ref int depth, char character, StringBuilder stringBuilder, in SlidingTextWindow TextWindow)
+		static bool DecreaseDepth(ref int depth, char character, StringBuilder stringBuilder, ref SlidingTextWindow TextWindow)
 		{
 			depth--;
 			stringBuilder.Append(character);
@@ -1587,7 +1584,6 @@ internal sealed partial class Lexer : IDisposable
 			ContextualKind = SyntaxKind.CSharpRawToken
 		};
 
-		var expressionOffset = TextWindow.Position;
 		_builder.Clear();
 
 		var paren = 0;
@@ -1611,7 +1607,12 @@ internal sealed partial class Lexer : IDisposable
 
 			// Stop before Akbura-owned separators/closers. They must remain in
 			// the token stream for the outer parser to consume.
-			if ((character == firstTerminator || character == secondTerminator) &&
+			var isFirstTerminator =
+				character == firstTerminator &&
+				(firstTerminator != ';' ||
+				 secondTerminator != '}' ||
+				 IsTrailingInlineExpressionSemicolon());
+			if ((isFirstTerminator || character == secondTerminator) &&
 				paren == 0 && brace == 0 && bracket == 0)
 			{
 				break;
@@ -1620,13 +1621,13 @@ internal sealed partial class Lexer : IDisposable
 			// structure: (
 			if (character == '(')
 			{
-				IncreaseDepth(ref paren, character, _builder, in TextWindow);
+				IncreaseDepth(ref paren, character, _builder, ref TextWindow);
 				continue;
 			}
 
 			if (character == ')')
 			{
-				if (DecreaseDepth(ref paren, character, _builder, in TextWindow))
+				if (DecreaseDepth(ref paren, character, _builder, ref TextWindow))
 					break;
 				continue;
 			}
@@ -1634,13 +1635,13 @@ internal sealed partial class Lexer : IDisposable
 			// structure: {
 			if (character == '{')
 			{
-				IncreaseDepth(ref brace, character, _builder, in TextWindow);
+				IncreaseDepth(ref brace, character, _builder, ref TextWindow);
 				continue;
 			}
 
 			if (character == '}')
 			{
-				if (DecreaseDepth(ref brace, character, _builder, in TextWindow))
+				if (DecreaseDepth(ref brace, character, _builder, ref TextWindow))
 					break;
 				continue;
 			}
@@ -1648,13 +1649,13 @@ internal sealed partial class Lexer : IDisposable
 			// structure: [
 			if (character == '[')
 			{
-				IncreaseDepth(ref bracket, character, _builder, in TextWindow);
+				IncreaseDepth(ref bracket, character, _builder, ref TextWindow);
 				continue;
 			}
 
 			if (character == ']')
 			{
-				if (DecreaseDepth(ref bracket, character, _builder, in TextWindow))
+				if (DecreaseDepth(ref bracket, character, _builder, ref TextWindow))
 					break;
 				continue;
 			}
@@ -1668,7 +1669,7 @@ internal sealed partial class Lexer : IDisposable
 
 		var parsed = CSharpSyntaxFactory.ParseExpression(
 			expressionText,
-			expressionOffset,
+			0,
 			options: null,
 			consumeFullText: true);
 
@@ -1676,6 +1677,17 @@ internal sealed partial class Lexer : IDisposable
 		tokenInfo.CSharpSyntaxKind = parsed.Kind();
 
 		return tokenInfo;
+	}
+
+	private bool IsTrailingInlineExpressionSemicolon()
+	{
+		var offset = 1;
+		while (char.IsWhiteSpace(TextWindow.PeekChar(offset)))
+		{
+			offset++;
+		}
+
+		return TextWindow.PeekChar(offset) == '}';
 	}
 
 	#endregion

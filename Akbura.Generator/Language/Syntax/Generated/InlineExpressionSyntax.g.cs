@@ -14,11 +14,13 @@ namespace Akbura.Language.Syntax.Green
     {
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken OpenBrace;
         public readonly global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax Expression;
+        public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken? Semicolon;
         public readonly global::Akbura.Language.Syntax.Green.GreenSyntaxToken CloseBrace;
 
         public GreenInlineExpressionSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken openBrace,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? semicolon,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics,
             ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
@@ -26,12 +28,17 @@ namespace Akbura.Language.Syntax.Green
         {
             this.OpenBrace = openBrace;
             this.Expression = expression;
+            this.Semicolon = semicolon;
             this.CloseBrace = closeBrace;
 
             AkburaDebug.Assert(this.OpenBrace != null);
             AkburaDebug.Assert(this.Expression != null);
             AkburaDebug.Assert(this.CloseBrace != null);
             AkburaDebug.Assert(this.OpenBrace.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenBraceToken);
+            if (this.Semicolon != null)
+            {
+                AkburaDebug.Assert(this.Semicolon.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken);
+            }
             AkburaDebug.Assert(this.CloseBrace.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseBraceToken);
 
             var flags = Flags;
@@ -39,9 +46,13 @@ namespace Akbura.Language.Syntax.Green
 
             AdjustWidthAndFlags(OpenBrace, ref fullWidth, ref flags);
             AdjustWidthAndFlags(Expression, ref fullWidth, ref flags);
+            if (Semicolon != null)
+            {
+                AdjustWidthAndFlags(Semicolon, ref fullWidth, ref flags);
+            }
             AdjustWidthAndFlags(CloseBrace, ref fullWidth, ref flags);
 
-            SlotCount = 3;
+            SlotCount = 4;
             FullWidth = fullWidth;
             Flags = flags;
         }
@@ -49,14 +60,22 @@ namespace Akbura.Language.Syntax.Green
         public GreenInlineExpressionSyntax UpdateInlineExpressionSyntax(
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken openBrace,
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? semicolon,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
         {
-            if (this.OpenBrace == openBrace && this.Expression == expression && this.CloseBrace == closeBrace)
+            if (this.OpenBrace == openBrace &&
+                this.Expression == expression &&
+                this.Semicolon == semicolon &&
+                this.CloseBrace == closeBrace)
             {
                 return this;
             }
 
-            var newNode = GreenSyntaxFactory.InlineExpressionSyntax(openBrace, expression, closeBrace);
+            var newNode = GreenSyntaxFactory.InlineExpressionSyntax(
+                openBrace,
+                expression,
+                semicolon,
+                closeBrace);
 
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
@@ -75,17 +94,22 @@ namespace Akbura.Language.Syntax.Green
 
         public GreenInlineExpressionSyntax WithOpenBrace(global::Akbura.Language.Syntax.Green.GreenSyntaxToken openBrace)
         {
-            return UpdateInlineExpressionSyntax(openBrace, this.Expression, this.CloseBrace);
+            return UpdateInlineExpressionSyntax(openBrace, this.Expression, this.Semicolon, this.CloseBrace);
         }
 
         public GreenInlineExpressionSyntax WithExpression(global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression)
         {
-            return UpdateInlineExpressionSyntax(this.OpenBrace, expression, this.CloseBrace);
+            return UpdateInlineExpressionSyntax(this.OpenBrace, expression, this.Semicolon, this.CloseBrace);
+        }
+
+        public GreenInlineExpressionSyntax WithSemicolon(global::Akbura.Language.Syntax.Green.GreenSyntaxToken? semicolon)
+        {
+            return UpdateInlineExpressionSyntax(this.OpenBrace, this.Expression, semicolon, this.CloseBrace);
         }
 
         public GreenInlineExpressionSyntax WithCloseBrace(global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
         {
-            return UpdateInlineExpressionSyntax(this.OpenBrace, this.Expression, closeBrace);
+            return UpdateInlineExpressionSyntax(this.OpenBrace, this.Expression, this.Semicolon, closeBrace);
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode? GetSlot(int index)
@@ -94,7 +118,8 @@ namespace Akbura.Language.Syntax.Green
             {
                 0 => OpenBrace,
                 1 => Expression,
-                2 => CloseBrace,
+                2 => Semicolon,
+                3 => CloseBrace,
                 _ => null,
             };
         }
@@ -106,12 +131,12 @@ namespace Akbura.Language.Syntax.Green
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithDiagnostics(ImmutableArray<global::Akbura.Language.Syntax.AkburaDiagnostic>? diagnostics)
         {
-            return new GreenInlineExpressionSyntax(this.OpenBrace, this.Expression, this.CloseBrace, diagnostics, GetAnnotations());
+            return new GreenInlineExpressionSyntax(this.OpenBrace, this.Expression, this.Semicolon, this.CloseBrace, diagnostics, GetAnnotations());
         }
 
         public override global::Akbura.Language.Syntax.Green.GreenNode WithAnnotations(ImmutableArray<global::Akbura.Language.Syntax.AkburaSyntaxAnnotation>? annotations)
         {
-            return new GreenInlineExpressionSyntax(this.OpenBrace, this.Expression, this.CloseBrace, GetDiagnostics(), annotations);
+            return new GreenInlineExpressionSyntax(this.OpenBrace, this.Expression, this.Semicolon, this.CloseBrace, GetDiagnostics(), annotations);
         }
 
         public override void Accept(GreenSyntaxVisitor greenSyntaxVisitor)
@@ -137,39 +162,38 @@ namespace Akbura.Language.Syntax.Green
             global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
             global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
         {
+            return InlineExpressionSyntax(openBrace, expression, semicolon: null, closeBrace);
+        }
+
+        public static GreenInlineExpressionSyntax InlineExpressionSyntax(
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken openBrace,
+            global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax expression,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken? semicolon,
+            global::Akbura.Language.Syntax.Green.GreenSyntaxToken closeBrace)
+        {
             AkburaDebug.Assert(openBrace != null);
             AkburaDebug.Assert(expression != null);
             AkburaDebug.Assert(closeBrace != null);
             AkburaDebug.Assert(
                 openBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.OpenBraceToken ||
                 false);
+            if (semicolon != null)
+            {
+                AkburaDebug.Assert(
+                    semicolon!.Kind == global::Akbura.Language.Syntax.SyntaxKind.SemicolonToken ||
+                    false);
+            }
             AkburaDebug.Assert(
                 closeBrace!.Kind == global::Akbura.Language.Syntax.SyntaxKind.CloseBraceToken ||
                 false);
 
-            var kind = global::Akbura.Language.Syntax.SyntaxKind.InlineExpressionSyntax;
-            int hash;
-            var cache = Unsafe.As<GreenInlineExpressionSyntax?>(
-                GreenNodeCache.TryGetNode(
-                    (ushort)kind,
-                    openBrace,
-                    expression,
-                    closeBrace,
-                    out hash));
-
-            if (cache != null)
-            {
-                return cache;
-            }
-
-            var result = new GreenInlineExpressionSyntax(openBrace, expression, closeBrace, diagnostics: null, annotations: null);
-
-            if (hash > 0)
-            {
-                GreenNodeCache.AddNode(result, hash);
-            }
-
-            return result;
+            return new GreenInlineExpressionSyntax(
+                openBrace,
+                expression,
+                semicolon,
+                closeBrace,
+                diagnostics: null,
+                annotations: null);
         }
     }
 
@@ -204,6 +228,7 @@ namespace Akbura.Language.Syntax.Green
             return node.UpdateInlineExpressionSyntax(
                 (GreenSyntaxToken)VisitToken(node.OpenBrace),
                 (GreenCSharpExpressionSyntax)Visit(node.Expression)!,
+                (GreenSyntaxToken?)VisitToken(node.Semicolon),
                 (GreenSyntaxToken)VisitToken(node.CloseBrace));
         }
     }
@@ -236,22 +261,34 @@ namespace Akbura.Language.Syntax
             }
         }
 
+        public SyntaxToken Semicolon
+            => new(this, this.Green.Semicolon!, GetChildPosition(2), GetChildIndex(2));
+
         public SyntaxToken CloseBrace
-            => new(this, this.Green.CloseBrace, GetChildPositionFromEnd(2), GetChildIndex(2));
+            => new(this, this.Green.CloseBrace, GetChildPositionFromEnd(3), GetChildIndex(3));
 
         private AkburaSyntax? _expression;
 
         public InlineExpressionSyntax UpdateInlineExpressionSyntax(
             SyntaxToken openBrace,
             CSharpExpressionSyntax expression,
+            SyntaxToken? semicolon,
             SyntaxToken closeBrace)
         {
-            if (this.OpenBrace == openBrace && this.Expression == expression && this.CloseBrace == closeBrace)
+            if (this.OpenBrace == openBrace &&
+                this.Expression == expression &&
+                ((this.Green.Semicolon == null && semicolon is null) ||
+                 (this.Green.Semicolon != null && semicolon is { } s && s == this.Semicolon)) &&
+                this.CloseBrace == closeBrace)
             {
                 return this;
             }
 
-            var newNode = SyntaxFactory.InlineExpressionSyntax(openBrace, expression, closeBrace);
+            var newNode = SyntaxFactory.InlineExpressionSyntax(
+                openBrace,
+                expression,
+                semicolon,
+                closeBrace);
 
             var annotations = this.GetAnnotations();
             if (!annotations.IsDefaultOrEmpty)
@@ -270,17 +307,38 @@ namespace Akbura.Language.Syntax
 
         public InlineExpressionSyntax WithOpenBrace(SyntaxToken openBrace)
         {
-            return UpdateInlineExpressionSyntax(openBrace, this.Expression, this.CloseBrace);
+            return UpdateInlineExpressionSyntax(
+                openBrace,
+                this.Expression,
+                this.Green.Semicolon != null ? this.Semicolon : (SyntaxToken?)null,
+                this.CloseBrace);
         }
 
         public InlineExpressionSyntax WithExpression(CSharpExpressionSyntax expression)
         {
-            return UpdateInlineExpressionSyntax(this.OpenBrace, expression, this.CloseBrace);
+            return UpdateInlineExpressionSyntax(
+                this.OpenBrace,
+                expression,
+                this.Green.Semicolon != null ? this.Semicolon : (SyntaxToken?)null,
+                this.CloseBrace);
+        }
+
+        public InlineExpressionSyntax WithSemicolon(SyntaxToken? semicolon)
+        {
+            return UpdateInlineExpressionSyntax(
+                this.OpenBrace,
+                this.Expression,
+                semicolon,
+                this.CloseBrace);
         }
 
         public InlineExpressionSyntax WithCloseBrace(SyntaxToken closeBrace)
         {
-            return UpdateInlineExpressionSyntax(this.OpenBrace, this.Expression, closeBrace);
+            return UpdateInlineExpressionSyntax(
+                this.OpenBrace,
+                this.Expression,
+                this.Green.Semicolon != null ? this.Semicolon : (SyntaxToken?)null,
+                closeBrace);
         }
 
         public override global::Akbura.Language.Syntax.AkburaSyntax? GetNodeSlot(int index)
@@ -334,6 +392,15 @@ namespace Akbura.Language.Syntax
             CSharpExpressionSyntax expression,
             SyntaxToken closeBrace)
         {
+            return InlineExpressionSyntax(openBrace, expression, semicolon: null, closeBrace);
+        }
+
+        internal static InlineExpressionSyntax InlineExpressionSyntax(
+            SyntaxToken openBrace,
+            CSharpExpressionSyntax expression,
+            SyntaxToken? semicolon,
+            SyntaxToken closeBrace)
+        {
             if (openBrace.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(openBrace), message: $"openBrace must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
@@ -349,9 +416,21 @@ namespace Akbura.Language.Syntax
                 ThrowHelper.ThrowArgumentNullException(nameof(expression));
             }
 
+            if (semicolon is { } semicolonToken &&
+                semicolonToken.Node is not global::Akbura.Language.Syntax.Green.GreenSyntaxToken)
+            {
+                ThrowHelper.ThrowArgumentException(nameof(semicolon), message: $"semicolon must be a GreenSyntaxToken. Use SyntaxFactory.Token(...)?");
+            }
+
             if (openBrace.RawKind != (ushort)SyntaxKind.OpenBraceToken)
             {
                 ThrowHelper.ThrowArgumentException(nameof(openBrace), message: $"openBrace must be SyntaxKind.OpenBraceToken");
+            }
+
+            if (semicolon is { } s &&
+                s.RawKind != (ushort)SyntaxKind.SemicolonToken)
+            {
+                ThrowHelper.ThrowArgumentException(nameof(semicolon), message: $"semicolon must be SyntaxKind.SemicolonToken");
             }
 
             if (closeBrace.RawKind != (ushort)SyntaxKind.CloseBraceToken)
@@ -362,6 +441,9 @@ namespace Akbura.Language.Syntax
             var green = global::Akbura.Language.Syntax.Green.GreenSyntaxFactory.InlineExpressionSyntax(
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(openBrace.Node!),
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenCSharpExpressionSyntax>(expression.Green),
+                semicolon is { } semicolonValue
+                    ? Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(semicolonValue.Node!)
+                    : null,
                 Unsafe.As<global::Akbura.Language.Syntax.Green.GreenSyntaxToken>(closeBrace.Node!));
 
             return Unsafe.As<InlineExpressionSyntax>(green.CreateRed(null, 0));
@@ -399,6 +481,9 @@ namespace Akbura.Language.Syntax
             return node.UpdateInlineExpressionSyntax(
                 VisitToken(node.OpenBrace),
                 (CSharpExpressionSyntax)Visit(node.Expression)!,
+                node.Green.Semicolon != null
+                    ? VisitToken(node.Semicolon)
+                    : (SyntaxToken?)null,
                 VisitToken(node.CloseBrace));
         }
     }

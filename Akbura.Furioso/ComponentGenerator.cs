@@ -1015,9 +1015,8 @@ internal static class ComponentGenerator
                     }
                 }
 
-                AppendVisualRootRefresh(
+                AppendContentPresenterRefresh(
                     source,
-                    roots,
                     indentation + 1);
 
                 AppendIndented(source, indentation + 1).Append("return ").Append(roots[0].FieldName).AppendLine(";");
@@ -1081,9 +1080,8 @@ internal static class ComponentGenerator
                 }
             }
 
-            AppendVisualRootRefresh(
+            AppendContentPresenterRefresh(
                 source,
-                roots,
                 indentation + 1);
 
             AppendIndented(source, indentation + 1).Append("return ")
@@ -1127,17 +1125,18 @@ internal static class ComponentGenerator
                 CSharp.LocalFunctionStatementSyntax;
         }
 
-        private void AppendVisualRootRefresh(
+        private void AppendContentPresenterRefresh(
             StringBuilder source,
-            ImmutableArray<ElementPlan> roots,
             int indentation)
         {
-            foreach (var root in roots)
+            foreach (var element in _elements)
             {
-                if (IsContentPresenter(root.Symbol.ComponentType))
+                if (element.TemplateOwner == null &&
+                    !element.IsDeferred &&
+                    IsContentPresenter(element.Symbol.ComponentType))
                 {
                     AppendIndented(source, indentation)
-                        .Append(root.FieldName)
+                        .Append(element.FieldName)
                         .AppendLine(".UpdateChild();");
                 }
             }
@@ -1456,6 +1455,18 @@ internal static class ComponentGenerator
 
             if (plan.Children.Count == 0)
             {
+                var value = GetContentExpression(plan.Operation);
+                if (value != null)
+                {
+                    AppendPropertyWrite(
+                        source,
+                        plan.Owner.FieldName,
+                        plan.Property,
+                        value,
+                        indentation,
+                        plan.Syntax);
+                }
+
                 return;
             }
 
@@ -2919,9 +2930,30 @@ internal static class ComponentGenerator
         {
             if (!operation.IsSynthesizedString)
             {
-                return operation.LiteralValue != null
-                    ? ToStringLiteral(operation.LiteralValue)
-                    : operation.ValueOperation.Syntax?.ToString();
+                if (operation.LiteralValue != null)
+                {
+                    return ToStringLiteral(operation.LiteralValue);
+                }
+
+                var boundExpression =
+                    operation.ValueOperation.Syntax?.ToString();
+                if (!string.IsNullOrWhiteSpace(boundExpression))
+                {
+                    return boundExpression;
+                }
+
+                if (operation.Content.Length == 1 &&
+                    operation.Content[0] is
+                    {
+                        Kind: MarkupChildKind.Expression,
+                        Syntax: MarkupInlineExpressionSyntax expression,
+                    })
+                {
+                    return GetExpression(
+                        expression.Expression.Expression);
+                }
+
+                return null;
             }
 
             var result = new StringBuilder("$\"");

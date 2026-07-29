@@ -1,24 +1,26 @@
 <Application xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="using:Akbura.FeatureGallery"
-             x:Class="Akbura.FeatureGallery.App"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:local="using:Akbura.FeatureGallery"
+			 x:Class="Akbura.FeatureGallery.App"
+			 RequestedThemeVariant="Default">
+	<!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
-    <Application.DataTemplates>
-        <local:ViewLocator/>
-    </Application.DataTemplates>
+	<Application.DataTemplates>
+		<local:ViewLocator/>
+	</Application.DataTemplates>
 
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceInclude Source="avares://Akbura/Styles.axaml" />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Application.Resources>
+	<Application.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceInclude Source="avares://Akbura/Styles.axaml" />
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</Application.Resources>
 
 
-    <Application.Styles>
-        <FluentTheme />
-    </Application.Styles>
+	<Application.Styles>
+		<FluentTheme />
+
+		<StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
+	</Application.Styles>
 </Application>

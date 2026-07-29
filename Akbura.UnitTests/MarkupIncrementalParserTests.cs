@@ -89,6 +89,53 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void PropertyElementRawStringExpressionEdit_PreservesSemicolonAndReusesBraces()
+    {
+        const string oldCode =
+            """"
+            <FeatureView>
+                <FeatureView.Code>
+                    {"""
+                    state int count = 0;
+                    """;}
+                </FeatureView.Code>
+            </FeatureView>
+            """";
+        const string newCode =
+            """"
+            <FeatureView>
+                <FeatureView.Code>
+                    {"""
+                    state int count = 1;
+                    """;}
+                </FeatureView.Code>
+            </FeatureView>
+            """";
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            oldCode.IndexOf("count = 0", StringComparison.Ordinal),
+            oldLength: "count = 0".Length,
+            newLength: "count = 1".Length);
+        var oldProperty = Assert.IsType<GreenMarkupElementContentSyntax>(
+            oldMarkup.Element.Body[0]);
+        var newProperty = Assert.IsType<GreenMarkupElementContentSyntax>(
+            newMarkup.Element.Body[0]);
+        var oldInline = Assert.IsType<GreenMarkupInlineExpressionSyntax>(
+            oldProperty.Element.Body[0]).Expression;
+        var newInline = Assert.IsType<GreenMarkupInlineExpressionSyntax>(
+            newProperty.Element.Body[0]).Expression;
+
+        Assert.Same(oldInline.OpenBrace, newInline.OpenBrace);
+        Assert.NotSame(oldInline.Expression, newInline.Expression);
+        Assert.Same(oldInline.Semicolon, newInline.Semicolon);
+        Assert.Same(oldInline.CloseBrace, newInline.CloseBrace);
+        Assert.Equal(SyntaxKind.SemicolonToken, newInline.Semicolon!.Kind);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void MarkupExtensionExpressionEdit_ReusesUnaffectedArguments()
     {
         const string oldCode = "<Button Content=${MyMx 123, Property={mystate + 1}, Binding=${Binding Hello}} class=\"primary\"/>";

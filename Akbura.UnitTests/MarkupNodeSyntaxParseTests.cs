@@ -177,6 +177,49 @@ public class MarkupNodeSyntaxParseTests
     }
 
     [Fact]
+    public void PropertyElementRawStringExpressionWithSemicolon_ParseSuccessfully()
+    {
+        const string code =
+            """"
+            <FeatureView>
+                <FeatureView.Code>
+                    {"""
+                    state int count = 0;
+
+                    <TextBlock Text={$"Current value: {count}"} />
+                    """;}
+                </FeatureView.Code>
+            </FeatureView>
+            """";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+        Assert.Equal(1, syntax.Element.Body.Count);
+        var propertyContent = Assert.IsType<GreenMarkupElementContentSyntax>(
+            syntax.Element.Body[0]);
+        Assert.Equal(1, propertyContent.Element.Body.Count);
+        var inlineContent = Assert.IsType<GreenMarkupInlineExpressionSyntax>(
+            propertyContent.Element.Body[0]);
+        var inlineExpression = inlineContent.Expression;
+        Assert.Equal(1, inlineExpression.Expression.Tokens.Count);
+        var rawToken = Assert.IsType<GreenSyntaxToken.CSharpRawToken>(
+            inlineExpression.Expression.Tokens[0]);
+        var expression = Assert.IsType<
+            Microsoft.CodeAnalysis.CSharp.Syntax.LiteralExpressionSyntax>(
+            rawToken.RawNode);
+
+        Assert.False(syntax.ContainsDiagnostics);
+        Assert.Equal(SyntaxKind.SemicolonToken, inlineExpression.Semicolon!.Kind);
+        Assert.Equal(
+            (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.MultiLineRawStringLiteralToken,
+            expression.Token.RawKind);
+        Assert.Empty(expression.GetDiagnostics());
+        Assert.Contains("state int count = 0;", expression.Token.ValueText);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
     public void MarkupBodyControlFlowDirective_ProducesDiagnosticAndRoundTrips()
     {
         const string code =

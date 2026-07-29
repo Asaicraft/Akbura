@@ -1,11 +1,21 @@
-using Akbura.FeatureGallery.Styles.akcss;
-using Avalonia.Controls;
-
 state int count = 0;
 
-<StackPanel Spacing="12" bg-blue-100>
-    <TextBlock Text={$"Count: {count}"} Background=${StaticResource bg-red-700}/>
-    <Button Click={count++} Background=${DynamicResource bg-red-500}>
-        Increment to {count+1}
-    </Button>
+<StackPanel gap-3>
+    <TextBlock Text="Akbura Counter"
+                text-2xl
+                font-bold/>
+
+    <TextBlock Text={$"Current value: {count}"}
+                text-base/>
+
+    <StackPanel Orientation="Horizontal"
+                gap-2>
+
+        <Button Content="Decrease"
+                Click={count--}/>
+
+        <Button Content="Increase"
+                Click={count++}/>
+
+    </StackPanel>
 </StackPanel>

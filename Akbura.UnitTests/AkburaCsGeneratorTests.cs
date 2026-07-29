@@ -77,6 +77,69 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public void Generator_EmitsPropertyElementRawStringExpressionWithSemicolon()
+    {
+        const string featureView =
+            """
+            using Avalonia.Controls;
+
+            param string Code = "";
+
+            <ContentControl />
+            """;
+        const string app =
+            """"
+            using Avalonia.Controls;
+
+            <FeatureView>
+                <FeatureView.Code>
+                    {"""
+                    state int count = 0;
+
+                    <TextBlock Text={$"Current value: {count}"} />
+                    """;}
+                </FeatureView.Code>
+            </FeatureView>
+            """";
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedRawStringPropertyElementTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var featureViewPath = Path.Combine(Environment.CurrentDirectory, "FeatureView.akbura");
+        var appPath = Path.Combine(Environment.CurrentDirectory, "App.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts:
+            [
+                new TestAdditionalText(featureViewPath, SourceText.From(featureView)),
+                new TestAdditionalText(appPath, SourceText.From(app)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedSources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
+        var appSource = Assert.Single(
+            generatedSources,
+            static source => source.HintName.Contains("App.akbura", StringComparison.Ordinal));
+
+        Assert.Contains(
+            "state int count = 0;",
+            appSource.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void Generator_NormalizesIndentedInterpolatedContent()
     {
         const string component =
@@ -631,6 +694,181 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Same(
                     presenter,
                     border.GetVisualParent());
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_DataTemplatePreviewEffectBuildsAndDisplaysComponent()
+    {
+        const string featureView =
+            """
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+            using Avalonia.Controls.Presenters;
+            using Avalonia.Controls.Templates;
+
+            param IDataTemplate View;
+
+            state Control? preview = null;
+
+            useEffect(() =>
+            {
+                preview = View.Build(null);
+            }, [View]);
+
+            <TabControl>
+                <TabItem Header="Preview">
+                    <ContentPresenter Content={preview} />
+                </TabItem>
+            </TabControl>
+            """;
+        const string previewChild =
+            """
+            using Avalonia.Controls;
+
+            <TextBlock Text="Visible preview" />
+            """;
+        const string host =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Controls.Templates;
+
+            <FeatureView>
+                <FeatureView.View>
+                    <PreviewChild />
+                </FeatureView.View>
+            </FeatureView>
+            """;
+        const string csharp =
+            """
+            public partial class FeatureView : global::Akbura.AkburaControl
+            {
+                public FeatureView()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+
+            public partial class PreviewChild : global::Akbura.AkburaControl
+            {
+                public PreviewChild()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+
+            public partial class PreviewHost : global::Akbura.AkburaControl
+            {
+                public PreviewHost()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedDataTemplatePreviewTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var projectDirectory = Environment.CurrentDirectory;
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(projectDirectory, "FeatureView.akbura"),
+                    SourceText.From(featureView)),
+                new TestAdditionalText(
+                    Path.Combine(projectDirectory, "PreviewChild.akbura"),
+                    SourceText.From(previewChild)),
+                new TestAdditionalText(
+                    Path.Combine(projectDirectory, "PreviewHost.akbura"),
+                    SourceText.From(host)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var featureViewSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            static source => source.HintName.Contains(
+                "FeatureView.akbura",
+                StringComparison.Ordinal));
+        Assert.Contains(
+            "__element2.UpdateChild();",
+            featureViewSource.SourceText.ToString(),
+            StringComparison.Ordinal);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                Avalonia.Application.Current!.Styles.Add(
+                    new Avalonia.Themes.Fluent.FluentTheme());
+                var hostControl = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(
+                        assembly.GetType("PreviewHost")!));
+                var window = new Window
+                {
+                    Content = hostControl,
+                };
+
+                window.Show();
+                window.UpdateLayout();
+
+                var featureControl = Assert.IsAssignableFrom<AkburaControl>(
+                    hostControl.Child);
+                var tabs = Assert.IsType<TabControl>(
+                    featureControl.Child);
+                var previewTab = Assert.IsType<TabItem>(
+                    Assert.Single(tabs.Items));
+                var presenter = Assert.IsType<
+                    Avalonia.Controls.Presenters.ContentPresenter>(
+                    previewTab.Content);
+                var previewControl = Assert.IsAssignableFrom<AkburaControl>(
+                    presenter.Content);
+                Assert.Equal(
+                    "PreviewChild",
+                    previewControl.GetType().Name);
+                Assert.Same(
+                    presenter,
+                    previewControl.GetVisualParent());
+                Assert.True(previewControl.IsInitialized);
+                Assert.Equal(
+                    "Visible preview",
+                    Assert.IsType<TextBlock>(
+                        previewControl.Child).Text);
 
                 window.Close();
             },

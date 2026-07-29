@@ -142,11 +142,12 @@ node CSharpStatementSyntax: AkTopLevelMember {
 }
 
 /// <summary>
-/// Inline expression used in markup: { expr }.
+/// Inline expression used in markup: { expr } or { expr; }.
 /// </summary>
 node InlineExpressionSyntax {
 	OpenBrace  : OpenBraceToken;
 	Expression : CSharpExpressionSyntax;
+	Semicolon? : SemicolonToken;
 	CloseBrace : CloseBraceToken;
 }
 

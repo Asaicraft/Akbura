@@ -1,255 +1,256 @@
 using Akbura.FeatureGallery.Styles.akcss;
 
-string counterCode =
-"""
-state int count = 0;
-
-<StackPanel gap-3>
-    <TextBlock Text="Akbura Counter"
-               text-2xl
-               font-bold/>
-
-    <TextBlock Text={$"Current value: {count}"}
-               text-base/>
-
-    <StackPanel Orientation="Horizontal"
-                gap-2>
-
-        <Button Content="Decrease"
-                Click={() => count--}/>
-
-        <Button Content="Increase"
-                Click={() => count++}/>
-
-    </StackPanel>
-</StackPanel>
-""";
-
 <StackPanel gap-8>
 
-    <Border p-8
-            bg-slate-950
-            border-1
-            border-slate-800
-            rounded-2xl
-            overflow-hidden>
+	<Border p-8
+			bg-slate-950
+			border-1
+			border-slate-800
+			rounded-2xl
+			overflow-hidden>
 
-        <Grid ColumnDefinitions="*,Auto"
-              gap-x-8>
+		<Grid ColumnDefinitions="*,Auto"
+			  gap-x-8>
 
-            <StackPanel gap-4>
+			<StackPanel gap-4>
 
-                <TextBlock Text="Build Avalonia interfaces with C#"
-                           text-5xl
-                           font-bold
-                           text-slate-100
-                           whitespace-normal/>
+				<TextBlock Text="Build Avalonia interfaces with C#"
+						   text-5xl
+						   font-bold
+						   text-slate-100
+						   whitespace-normal/>
 
-                <TextBlock
-                    Text="Akbura combines declarative markup, reactive state and strongly typed C# in a single component."
-                    text-lg
-                    text-slate-400
-                    whitespace-normal
-                    MaxWidth="720"/>
+				<TextBlock
+					Text="Akbura combines declarative markup, reactive state and strongly typed C# in a single component."
+					text-lg
+					text-slate-400
+					whitespace-normal
+					HorizontalAlignment="Left"
+					MaxWidth="720"/>
 
-                <StackPanel Orientation="Horizontal"
-                            gap-3>
+				<StackPanel Orientation="Horizontal"
+							gap-3>
 
-                    <Border px-3
-                            py-2
-                            bg-blue-600
-                            rounded-lg>
+					<Border px-3
+							py-2
+							bg-blue-600
+							rounded-lg>
 
-                        <TextBlock Text="Compiled"
-                                   text-sm
-                                   font-semibold
-                                   text-slate-100/>
+						<TextBlock Text="Compiled"
+								   text-sm
+								   font-semibold
+								   text-slate-100/>
 
-                    </Border>
+					</Border>
 
-                    <Border px-3
-                            py-2
-                            bg-slate-800
-                            rounded-lg>
+					<Border px-3
+							py-2
+							bg-slate-800
+							rounded-lg>
 
-                        <TextBlock Text="Reactive"
-                                   text-sm
-                                   font-semibold
-                                   text-slate-200/>
+						<TextBlock Text="Reactive"
+								   text-sm
+								   font-semibold
+								   text-slate-200/>
 
-                    </Border>
+					</Border>
 
-                    <Border px-3
-                            py-2
-                            bg-slate-800
-                            rounded-lg>
+					<Border px-3
+							py-2
+							bg-slate-800
+							rounded-lg>
 
-                        <TextBlock Text="Type-safe"
-                                   text-sm
-                                   font-semibold
-                                   text-slate-200/>
+						<TextBlock Text="Type-safe"
+								   text-sm
+								   font-semibold
+								   text-slate-200/>
 
-                    </Border>
+					</Border>
 
-                </StackPanel>
+				</StackPanel>
 
-            </StackPanel>
+			</StackPanel>
 
-            <Border col-1
-                    p-6
-                    bg-slate-900
-                    border-1
-                    border-slate-700
-                    rounded-xl
-                    self-center>
+			<Border col-1
+					p-6
+					bg-slate-900
+					border-1
+					border-slate-700
+					rounded-xl
+					self-center>
 
-                <StackPanel gap-2>
+				<StackPanel gap-2>
 
-                    <TextBlock Text="Akbura"
-                               text-3xl
-                               font-bold
-                               text-blue-400
-                               text-center/>
+					<TextBlock Text="Akbura"
+							   text-3xl
+							   font-bold
+							   text-blue-400
+							   text-center/>
 
-                    <TextBlock Text=".akbura"
-                               text-sm
-                               text-slate-500
-                               text-center/>
+					<TextBlock Text=".akbura"
+							   text-sm
+							   text-slate-500
+							   text-center/>
 
-                </StackPanel>
+				</StackPanel>
 
-            </Border>
+			</Border>
 
-        </Grid>
+		</Grid>
 
-    </Border>
+	</Border>
 
-    <StackPanel gap-4>
+	<StackPanel gap-4>
 
-        <TextBlock Text="Why Akbura?"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+		<TextBlock Text="Why Akbura?"
+				   text-3xl
+				   font-bold
+				   text-slate-100/>
 
-        <Grid ColumnDefinitions="*,*,*"
-              gap-x-4>
+		<Grid ColumnDefinitions="*,*,*"
+			  gap-x-4>
 
-            <Border p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+			<Border p-5
+					bg-slate-900
+					border-1
+					border-slate-800
+					rounded-xl>
 
-                <StackPanel gap-3>
+				<StackPanel gap-3>
 
-                    <TextBlock Text="Reactive state"
-                               text-xl
-                               font-semibold
-                               text-slate-100/>
+					<TextBlock Text="Reactive state"
+							   text-xl
+							   font-semibold
+							   text-slate-100/>
 
-                    <TextBlock
-                        Text="Declare state directly inside the component. The interface updates when its value changes."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+					<TextBlock
+						Text="Declare state directly inside the component. The interface updates when its value changes."
+						text-sm
+						text-slate-400
+						whitespace-normal/>
 
-                    <TextBlock Text="state int count = 0;"
-                               FontFamily="Consolas"
-                               text-sm
-                               text-blue-400/>
+					<TextBlock Text="state int count = 0;"
+							   FontFamily="Consolas"
+							   text-sm
+							   text-blue-400/>
 
-                </StackPanel>
+				</StackPanel>
 
-            </Border>
+			</Border>
 
-            <Border col-1
-                    p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+			<Border col-1
+					p-5
+					bg-slate-900
+					border-1
+					border-slate-800
+					rounded-xl>
 
-                <StackPanel gap-3>
+				<StackPanel gap-3>
 
-                    <TextBlock Text="Native C#"
-                               text-xl
-                               font-semibold
-                               text-slate-100/>
+					<TextBlock Text="Native C#"
+							   text-xl
+							   font-semibold
+							   text-slate-100/>
 
-                    <TextBlock
-                        Text="Use normal C# expressions, methods, types and lambdas without introducing a separate scripting language."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+					<TextBlock
+						Text="Use normal C# expressions, methods, types and lambdas without introducing a separate scripting language."
+						text-sm
+						text-slate-400
+						whitespace-normal/>
 
-                    <TextBlock Text="Click={() => count++}"
-                               FontFamily="Consolas"
-                               text-sm
-                               text-blue-400/>
+					<TextBlock Text="Click={() => count++}"
+							   FontFamily="Consolas"
+							   text-sm
+							   text-blue-400/>
 
-                </StackPanel>
+				</StackPanel>
 
-            </Border>
+			</Border>
 
-            <Border col-2
-                    p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+			<Border col-2
+					p-5
+					bg-slate-900
+					border-1
+					border-slate-800
+					rounded-xl>
 
-                <StackPanel gap-3>
+				<StackPanel gap-3>
 
-                    <TextBlock Text="AKCSS utilities"
-                               text-xl
-                               font-semibold
-                               text-slate-100/>
+					<TextBlock Text="AKCSS utilities"
+							   text-xl
+							   font-semibold
+							   text-slate-100/>
 
-                    <TextBlock
-                        Text="Compose reusable styles with compact utilities while keeping access to Avalonia properties."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+					<TextBlock
+						Text="Compose reusable styles with compact utilities while keeping access to Avalonia properties."
+						text-sm
+						text-slate-400
+						whitespace-normal/>
 
-                    <TextBlock Text="p-4 rounded-xl text-lg"
-                               FontFamily="Consolas"
-                               text-sm
-                               text-blue-400/>
+					<TextBlock Text="p-4 rounded-xl text-lg"
+							   FontFamily="Consolas"
+							   text-sm
+							   text-blue-400/>
 
-                </StackPanel>
+				</StackPanel>
 
-            </Border>
+			</Border>
 
-        </Grid>
+		</Grid>
 
-    </StackPanel>
+	</StackPanel>
 
-    <StackPanel gap-4>
+	<StackPanel gap-4>
 
-        <StackPanel gap-1>
+		<StackPanel gap-1>
 
-            <TextBlock Text="Try it"
-                       text-3xl
-                       font-bold
-                       text-slate-100/>
+			<TextBlock Text="Try it"
+					   text-3xl
+					   font-bold
+					   text-slate-100/>
 
-            <TextBlock
-                Text="Switch between the live preview and its Akbura source code."
-                text-base
-                text-slate-400
-                whitespace-normal/>
+			<TextBlock
+				Text="Switch between the live preview and its Akbura source code."
+				text-base
+				text-slate-400
+				whitespace-normal/>
 
-        </StackPanel>
+		</StackPanel>
 
-        <FeatureView Path="Components/Counter.akbura"
-                     Code={counterCode}>
+		<FeatureView Path="Components/Counter.akbura">
 
-            <FeatureView.View>
-                <Counter/>
-            </FeatureView.View>
+			<FeatureView.Code>
+				{"""
+				state int count = 0;
 
-        </FeatureView>
+				<StackPanel gap-3>
+					<TextBlock Text="Akbura Counter"
+							   text-2xl
+							   font-bold/>
 
-    </StackPanel>
+					<TextBlock Text={$"Current value: {count}"}
+							   text-base/>
+
+					<StackPanel Orientation="Horizontal"
+								gap-2>
+
+						<Button Content="Decrease"
+								Click={count--}/>
+
+						<Button Content="Increase"
+								Click={count++}/>
+
+					</StackPanel>
+				</StackPanel>
+				"""}
+			</FeatureView.Code>
+
+			<FeatureView.View>
+				<Counter/>
+			</FeatureView.View>
+
+		</FeatureView>
+
+	</StackPanel>
 
 </StackPanel>

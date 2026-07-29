@@ -1303,9 +1303,18 @@ internal sealed partial class Parser
 
         var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
         var csharpExpression = ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode.InInlineExpression);
+        var semicolon = TryReadIncrementalToken(
+            static kind => kind == SyntaxKind.SemicolonToken,
+            out var parsedSemicolon)
+            ? parsedSemicolon
+            : null;
         var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
 
-        return GreenSyntaxFactory.InlineExpressionSyntax(openBrace, csharpExpression, closeBrace);
+        return GreenSyntaxFactory.InlineExpressionSyntax(
+            openBrace,
+            csharpExpression,
+            semicolon,
+            closeBrace);
     }
 
     private bool TryParseIncrementalCSharpStatementSyntax(

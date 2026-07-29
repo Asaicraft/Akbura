@@ -3398,6 +3398,64 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_PropertyElementRawStringExpressionWithSemicolon_BindsToString()
+    {
+        var featureViewTree = ComponentSyntaxTree.ParseText(
+            """
+            using Avalonia.Controls;
+
+            param string Code = "";
+
+            <ContentControl />
+            """,
+            Path.Combine(@"C:\Project", "FeatureView.akbura"));
+        var appTree = ComponentSyntaxTree.ParseText(
+            """"
+            using Avalonia.Controls;
+
+            <FeatureView>
+                <FeatureView.Code>
+                    {"""
+                    state int count = 0;
+
+                    <TextBlock Text={$"Current value: {count}"} />
+                    """;}
+                </FeatureView.Code>
+            </FeatureView>
+            """",
+            Path.Combine(@"C:\Project", "App.akbura"));
+        var compilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [featureViewTree, appTree]);
+        var semanticModel = compilation.GetSemanticModel(appTree);
+        var propertyElement = Assert.Single(
+            appTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() ==
+                "FeatureView.Code");
+
+        var operation = Assert.IsAssignableFrom<IMarkupContentOperation>(
+            semanticModel.GetOperation(propertyElement));
+        var value = Assert.Single(operation.Content);
+
+        Assert.Equal("Code", operation.Property!.Name);
+        Assert.Equal(MarkupChildKind.Expression, value.Kind);
+        Assert.Equal(
+            SpecialType.System_String,
+            Assert.IsAssignableFrom<INamedTypeSymbol>(value.Type.Symbol).SpecialType);
+        Assert.False(operation.HasErrors);
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(propertyElement).IsEmpty,
+            string.Join(
+                " | ",
+                semanticModel
+                    .GetSemanticDiagnostics(propertyElement)
+                    .Select(static diagnostic => diagnostic.Message)));
+    }
+
+    [Fact]
     public void SemanticModel_PropertyElementNode_ReportsInvalidChildType()
     {
         const string code =

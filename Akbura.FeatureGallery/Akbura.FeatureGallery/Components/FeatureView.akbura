@@ -32,7 +32,7 @@ useEffect(() =>
     </StackPanel>
 
     <Border row-1
-            min-h-96
+            h-120
             bg-slate-950
             border-1
             border-slate-700

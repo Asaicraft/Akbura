@@ -13,9 +13,6 @@ state string url = "/pages";
     <Grid RowDefinitions="Auto,*"
           bg-slate-950>
 
-        <BrowserBar Router={Router}
-                    CurrentUrl={url}/>
-
         <Border row-1
                 p-4
                 bg-slate-950>

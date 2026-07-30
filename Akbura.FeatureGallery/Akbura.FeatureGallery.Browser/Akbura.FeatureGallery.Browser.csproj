@@ -4,10 +4,22 @@
     <OutputType>Exe</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
   </PropertyGroup>
 
   <ItemGroup>
+    <StaticWebAssetFingerprintPattern
+      Include="JS"
+      Pattern="*.js"
+      Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia.Browser" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <TrimmerRootAssembly Include="AvaloniaUI.DiagnosticsSupport.Avalonia" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,6 +5,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <WasmBuildNative Condition="'$(Configuration)' == 'Release'">true</WasmBuildNative>
   </PropertyGroup>
 
   <ItemGroup>

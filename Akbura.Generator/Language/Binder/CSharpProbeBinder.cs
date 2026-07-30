@@ -3,6 +3,7 @@ using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -184,6 +185,14 @@ internal sealed partial class CSharpProbeBinder : Binder
             throw new ArgumentNullException(nameof(statement));
         }
 
+        if (TryBindComponentMethodStatement(
+                syntax,
+                isBindingPath,
+                out var componentMethodStatement))
+        {
+            return componentMethodStatement;
+        }
+
         var syntaxTree = CreateSyntaxTree(CreateStatementProbe(syntax, statement));
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeStatement = syntaxTree
@@ -196,6 +205,103 @@ internal sealed partial class CSharpProbeBinder : Binder
             .Last();
 
         return BindStatementTree(syntax, semanticModel, probeStatement, isBindingPath);
+    }
+
+    private bool TryBindComponentMethodStatement(
+        AkburaSyntax syntax,
+        bool isBindingPath,
+        out BoundStatement boundStatement)
+    {
+        boundStatement = null!;
+        if (syntax is not CSharpStatementSyntax ||
+            !TryGetContainingComponentMethod(
+                syntax,
+                out var methodSyntax,
+                out var method))
+        {
+            return false;
+        }
+
+        var relativeSpan = new TextSpan(
+            syntax.Span.Start - methodSyntax.Position,
+            syntax.Span.Length);
+        var statement = method
+            .DescendantNodes()
+            .OfType<CSharp.StatementSyntax>()
+            .FirstOrDefault(candidate => candidate.Span == relativeSpan);
+        if (statement == null)
+        {
+            return false;
+        }
+
+        var annotation = new SyntaxAnnotation();
+        method = method.ReplaceNode(
+            statement,
+            statement.WithAdditionalAnnotations(annotation));
+        var probeScope = CreateProbeScope(
+            syntax,
+            method,
+            ImmutableArray.Create(method.Identifier.ValueText));
+        if (!probeScope.LocalStatements.IsDefaultOrEmpty &&
+            method.Body != null)
+        {
+            method = method.WithBody(method.Body.WithStatements(
+                method.Body.Statements.InsertRange(
+                    0,
+                    probeScope.LocalStatements)));
+        }
+
+        var syntaxTree = CreateSyntaxTree(CreateComponentProbeCompilationUnit(
+            AddProbeMethod(probeScope.MemberDeclarations, method),
+            "__AkburaComponentMethodProbe"));
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var probeStatement = syntaxTree
+            .GetRoot()
+            .GetAnnotatedNodes(annotation)
+            .OfType<CSharp.StatementSyntax>()
+            .Single();
+        boundStatement = BindStatementTree(
+            syntax,
+            semanticModel,
+            probeStatement,
+            isBindingPath);
+        return true;
+    }
+
+    private static bool TryGetContainingComponentMethod(
+        AkburaSyntax syntax,
+        out CSharpStatementSyntax methodSyntax,
+        out CSharp.MethodDeclarationSyntax method)
+    {
+        for (var current = syntax.Parent;
+             current != null;
+             current = current.Parent)
+        {
+            if (current is not CSharpStatementSyntax statement ||
+                statement.Parent is not AkburaDocumentSyntax)
+            {
+                continue;
+            }
+
+            try
+            {
+                var parsedMethod = CSharpSyntaxFactory.ParseMemberDeclaration(
+                    statement.ToFullString()) as CSharp.MethodDeclarationSyntax;
+                if (parsedMethod != null)
+                {
+                    methodSyntax = statement;
+                    method = parsedMethod;
+                    return true;
+                }
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        methodSyntax = null!;
+        method = null!;
+        return false;
     }
 
     public CSharpBindingResult BindMethodBlock(

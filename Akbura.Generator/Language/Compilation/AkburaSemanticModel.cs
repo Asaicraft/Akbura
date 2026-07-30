@@ -3278,7 +3278,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.None(componentSymbolInfo.CandidateReason);
         }
 
-        var componentType = componentSymbol.ComponentType;
+        var componentType =
+            componentSymbol.ComponentType ??
+            componentSymbol.AkburaComponent?.BaseType.NamedType;
         if (markupAttribute.Kind == AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax &&
             componentType != null)
         {

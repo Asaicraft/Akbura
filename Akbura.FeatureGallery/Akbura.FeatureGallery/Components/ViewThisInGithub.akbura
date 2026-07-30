@@ -1,0 +1,25 @@
+inject GalleryOptions GalleryOptions;
+
+param object Content = "View in GitHub";
+param string Url;
+
+Uri BuildNavigateUri(string relativeUrl)
+{
+    var repositoryUrl =
+        GalleryOptions.RepositoryUrl.TrimEnd('/');
+
+    var branchName =
+        GalleryOptions.MainBranchName.Trim('/');
+
+    var galleryPath =
+        GalleryOptions.PathToGallery.Trim('/');
+
+    var sourcePath =
+        relativeUrl.Trim('/');
+
+    return new Uri(
+        $"{repositoryUrl}/blob/{branchName}/{galleryPath}/{sourcePath}");
+}
+
+<HyperlinkButton NavigateUri={BuildNavigateUri(Url)}
+                 Content={Content}/>

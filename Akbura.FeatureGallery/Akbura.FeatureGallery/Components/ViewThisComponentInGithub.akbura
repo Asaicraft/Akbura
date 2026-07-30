@@ -1,0 +1,76 @@
+using Akbura.ComponentTree;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+
+state string? componentUrl = null;
+
+AkburaControl? FindFirstComponentAncestor()
+{
+    var current =
+        ((IComponentTree)this).ComponentParent;
+
+    while (current != null)
+    {
+        var type = current.GetType();
+        var currentNamespace = type.Namespace;
+
+        if (currentNamespace ==
+            "Akbura.FeatureGallery.Pages")
+        {
+            return null;
+        }
+
+        if (current is AkburaControl component &&
+            currentNamespace ==
+                "Akbura.FeatureGallery.Components")
+        {
+            return component;
+        }
+
+        current = current.ComponentParent;
+    }
+
+    return null;
+}
+
+void ResolveComponent()
+{
+    var component =
+        FindFirstComponentAncestor();
+
+    var newComponentUrl =
+        component == null
+            ? null
+            : $"Components/{component.GetType().Name}.akbura";
+
+    if (componentUrl != newComponentUrl)
+    {
+        componentUrl = newComponentUrl;
+    }
+}
+
+useEffect(() =>
+{
+    EventHandler<VisualTreeAttachmentEventArgs> onAttached =
+        (_, _) =>
+        {
+            Dispatcher.UIThread.Post(
+                ResolveComponent);
+        };
+
+    AttachedToVisualTree += onAttached;
+
+    Dispatcher.UIThread.Post(
+        ResolveComponent);
+
+    return () =>
+    {
+        AttachedToVisualTree -= onAttached;
+    };
+}, []);
+
+<ViewThisInGithub
+    Url={componentUrl ?? ""}
+    Content="View this component in GitHub"
+    IsVisible={componentUrl != null}
+    HorizontalAlignment="Left"/>

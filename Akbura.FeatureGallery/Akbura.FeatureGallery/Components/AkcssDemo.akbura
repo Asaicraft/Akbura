@@ -104,4 +104,6 @@ state bool isHighlighted = false;
 
     </Border>
 
+    <ViewThisComponentInGithub/>
+
 </StackPanel>

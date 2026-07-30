@@ -1,0 +1,101 @@
+using Akbura.ComponentTree;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using System.Diagnostics;
+
+state string? pageUrl = null;
+
+AkburaControl? FindFirstPageAncestor()
+{
+    var current =
+        ((IComponentTree)this).ComponentParent;
+
+    Debug.WriteLine(
+        $"[GitHubLink] Component search started. " +
+        $"ComponentParent={current?.GetType().FullName ?? "null"}");
+
+    var level = 0;
+
+    while (current != null)
+    {
+        var type = current.GetType();
+
+        Debug.WriteLine(
+            $"[GitHubLink] Component ancestor #{level}: " +
+            $"{type.FullName}");
+
+        if (current is AkburaControl component &&
+            type.Namespace ==
+                "Akbura.FeatureGallery.Pages")
+        {
+            Debug.WriteLine(
+                $"[GitHubLink] Page found: {type.FullName}");
+
+            return component;
+        }
+
+        current = current.ComponentParent;
+        level++;
+    }
+
+    Debug.WriteLine(
+        "[GitHubLink] Page component was not found.");
+
+    return null;
+}
+
+void ResolvePage()
+{
+    Debug.WriteLine(
+        "[GitHubLink] ResolvePage called.");
+
+    var page =
+        FindFirstPageAncestor();
+
+    var newPageUrl =
+        page == null
+            ? null
+            : $"Pages/{page.GetType().Name}.akbura";
+
+    Debug.WriteLine(
+        $"[GitHubLink] Resolved URL: " +
+        $"{newPageUrl ?? "null"}");
+
+    if (pageUrl != newPageUrl)
+    {
+        pageUrl = newPageUrl;
+    }
+}
+
+useEffect(() =>
+{
+    Debug.WriteLine(
+        "[GitHubLink] useEffect started.");
+
+    EventHandler<VisualTreeAttachmentEventArgs> onAttached =
+        (_, _) =>
+        {
+            Debug.WriteLine(
+                "[GitHubLink] AttachedToVisualTree fired.");
+
+            Dispatcher.UIThread.Post(ResolvePage);
+        };
+
+    AttachedToVisualTree += onAttached;
+
+    Dispatcher.UIThread.Post(ResolvePage);
+
+    return () =>
+    {
+        Debug.WriteLine(
+            "[GitHubLink] useEffect cleanup.");
+
+        AttachedToVisualTree -= onAttached;
+    };
+}, []);
+
+<ViewThisInGithub
+    Url={pageUrl ?? ""}
+    Content="View this page in GitHub"
+    IsVisible={pageUrl != null}
+    HorizontalAlignment="Left"/>

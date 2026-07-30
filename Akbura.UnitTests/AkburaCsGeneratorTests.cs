@@ -78,6 +78,132 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public void Generator_EmitsNonVoidComponentFunction()
+    {
+        const string component =
+            """
+            using Akbura;
+            using Avalonia;
+            using Avalonia.Controls;
+
+            StyledElement? FindAncestor(StyledElement? current)
+            {
+                while (current != null)
+                {
+                    if (current is AkburaControl)
+                    {
+                        return current;
+                    }
+
+                    current = current.Parent;
+                }
+
+                return null;
+            }
+
+            var ancestor = FindAncestor(Parent);
+
+            <TextBlock Text={ancestor?.GetType().Name ?? ""}/>
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedNonVoidFunctionTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "AncestorLink.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results)
+                .GeneratedSources);
+        Assert.Contains(
+            "StyledElement? FindAncestor(StyledElement? current)",
+            generated.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Generator_ResolvesInheritedPropertyOnSourceComponent()
+    {
+        const string child =
+            """
+            using Avalonia.Controls;
+
+            <TextBlock Text="Child"/>
+            """;
+        const string host =
+            """
+            using Avalonia.Controls;
+
+            <Child IsVisible={false}/>
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedInheritedPropertyTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(Environment.CurrentDirectory, "Child.akbura"),
+                    SourceText.From(child)),
+                new TestAdditionalText(
+                    Path.Combine(Environment.CurrentDirectory, "Host.akbura"),
+                    SourceText.From(host)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public async Task Generator_UpdatesInlineExpressionContentAfterStateChange()
     {
         const string component =

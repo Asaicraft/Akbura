@@ -1,12 +1,13 @@
 state int count = 0;
 
 <StackPanel gap-3>
+
     <TextBlock Text="Akbura Counter"
-                text-2xl
-                font-bold/>
+               text-2xl
+               font-bold/>
 
     <TextBlock Text={$"Current value: {count}"}
-                text-base/>
+               text-base/>
 
     <StackPanel Orientation="Horizontal"
                 gap-2>
@@ -18,4 +19,7 @@ state int count = 0;
                 Click={count++}/>
 
     </StackPanel>
+
+    <ViewThisComponentInGithub/>
+
 </StackPanel>

@@ -9,83 +9,33 @@ state ImmutableArray<(string Name, int Age)> persons =
     ("Diana", 31)
 ];
 
-<Grid ColumnDefinitions="*,*"
-      gap-x-4>
+<StackPanel gap-4>
 
-    <Border card>
+    <Grid ColumnDefinitions="*,*"
+          gap-x-4>
 
-        <StackPanel gap-3>
+        <Border card>
 
-            <StackPanel gap-1>
+            <StackPanel gap-3>
 
-                <TextBlock Text="Implicit template"
-                           text-xl
-                           font-semibold
-                           text-slate-100/>
+                <StackPanel gap-1>
 
-                <TextBlock
-                    Text="Akbura generates a typed FuncDataTemplate automatically."
-                    text-sm
-                    text-slate-400
-                    whitespace-normal/>
+                    <TextBlock Text="Implicit template"
+                               text-xl
+                               font-semibold
+                               text-slate-100/>
 
-            </StackPanel>
+                    <TextBlock
+                        Text="Akbura generates a typed FuncDataTemplate automatically."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
 
-            <ItemsControl ItemsSource={persons}>
+                </StackPanel>
 
-                <ItemsControl.ItemTemplate x.ItemName="person">
+                <ItemsControl ItemsSource={persons}>
 
-                    <Border p-3
-                            mb-2
-                            bg-slate-800
-                            rounded-lg>
-
-                        <Grid ColumnDefinitions="*,Auto">
-
-                            <TextBlock Text={person.Name}
-                                       font-semibold
-                                       text-slate-100/>
-
-                            <TextBlock col-1
-                                       Text={$"{person.Age} years"}
-                                       text-slate-400/>
-
-                        </Grid>
-
-                    </Border>
-
-                </ItemsControl.ItemTemplate>
-
-            </ItemsControl>
-
-        </StackPanel>
-
-    </Border>
-
-    <Border col-1 card>
-
-        <StackPanel gap-3>
-
-            <StackPanel gap-1>
-
-                <TextBlock Text="Explicit DataTemplate"
-                           text-xl
-                           font-semibold
-                           text-slate-100/>
-
-                <TextBlock
-                    Text="The DataTemplate exists immediately, while its Content remains deferred."
-                    text-sm
-                    text-slate-400
-                    whitespace-normal/>
-
-            </StackPanel>
-
-            <ItemsControl ItemsSource={persons}>
-
-                <ItemsControl.ItemTemplate>
-
-                    <DataTemplate>
+                    <ItemsControl.ItemTemplate x.ItemName="person">
 
                         <Border p-3
                                 mb-2
@@ -94,27 +44,84 @@ state ImmutableArray<(string Name, int Age)> persons =
 
                             <Grid ColumnDefinitions="*,Auto">
 
-                                <TextBlock
-                                    Text=${Binding Name}
-                                    font-semibold
-                                    text-slate-100/>
+                                <TextBlock Text={person.Name}
+                                           font-semibold
+                                           text-slate-100/>
 
                                 <TextBlock col-1
-                                           Text=${Binding Age, StringFormat="{0} years"}
+                                           Text={$"{person.Age} years"}
                                            text-slate-400/>
 
                             </Grid>
 
                         </Border>
 
-                    </DataTemplate>
+                    </ItemsControl.ItemTemplate>
 
-                </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-            </ItemsControl>
+            </StackPanel>
 
-        </StackPanel>
+        </Border>
 
-    </Border>
+        <Border col-1
+                card>
 
-</Grid>
+            <StackPanel gap-3>
+
+                <StackPanel gap-1>
+
+                    <TextBlock Text="Explicit DataTemplate"
+                               text-xl
+                               font-semibold
+                               text-slate-100/>
+
+                    <TextBlock
+                        Text="The DataTemplate exists immediately, while its Content remains deferred."
+                        text-sm
+                        text-slate-400
+                        whitespace-normal/>
+
+                </StackPanel>
+
+                <ItemsControl ItemsSource={persons}>
+
+                    <ItemsControl.ItemTemplate>
+
+                        <DataTemplate>
+
+                            <Border p-3
+                                    mb-2
+                                    bg-slate-800
+                                    rounded-lg>
+
+                                <Grid ColumnDefinitions="*,Auto">
+
+                                    <TextBlock
+                                        Text=${Binding Name}
+                                        font-semibold
+                                        text-slate-100/>
+
+                                    <TextBlock col-1
+                                               Text=${Binding Age, StringFormat="{0} years"}
+                                               text-slate-400/>
+
+                                </Grid>
+
+                            </Border>
+
+                        </DataTemplate>
+
+                    </ItemsControl.ItemTemplate>
+
+                </ItemsControl>
+
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+    <ViewThisComponentInGithub/>
+
+</StackPanel>

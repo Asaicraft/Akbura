@@ -715,4 +715,6 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
+    <ViewThisPageInGithub/>
+
 </StackPanel>

@@ -266,7 +266,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             new ParallelOptions
             {
                 CancellationToken = context.CancellationToken,
-                MaxDegreeOfParallelism = Math.Max(1, EnvironmentProcessorCount.Count / 2),
+                MaxDegreeOfParallelism = Math.Max(1, EnvironmentProcessorCount.Count / 4),
             },
             index =>
             {

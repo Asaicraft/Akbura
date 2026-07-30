@@ -9,14 +9,18 @@ partial class CSharpStatementSyntax
     public CSharp.StatementSyntax? GetRawCSharpStatement()
     {
         var text = Tokens.ToFullString();
-        if (Body != null)
-        {
-            text += "{}";
-        }
 
         try
         {
-            return CSharpSyntaxFactory.ParseStatement(text);
+            if (Body == null)
+            {
+                return CSharpSyntaxFactory.ParseStatement(text);
+            }
+
+            var statement = CSharpSyntaxFactory.ParseStatement(text + "{}");
+            return statement is CSharp.LocalFunctionStatementSyntax
+                ? CSharpSyntaxFactory.ParseStatement(ToFullString())
+                : statement;
         }
         catch (ArgumentException)
         {

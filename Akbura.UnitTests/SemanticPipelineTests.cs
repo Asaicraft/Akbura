@@ -5703,6 +5703,54 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ComponentMethod_PreservesMethodBodyScope()
+    {
+        const string code =
+            """
+            using Akbura;
+            using Avalonia;
+            using Avalonia.Controls;
+
+            AkburaControl? FindFirstPageAncestor(StyledElement? current)
+            {
+                while (current != null)
+                {
+                    if (current is AkburaControl component)
+                    {
+                        return component;
+                    }
+
+                    current = current.Parent;
+                }
+
+                return null;
+            }
+
+            var component = FindFirstPageAncestor(Parent);
+
+            <TextBlock Text={component?.GetType().Name ?? ""}/>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var returnStatement = Assert.Single(
+            root.DescendantNodes().OfType<CSharpStatementSyntax>(),
+            static statement =>
+                statement.ToFullString().Trim() == "return component;");
+        var invocationStatement = Assert.Single(
+            root.Members.OfType<CSharpStatementSyntax>(),
+            static statement =>
+                statement.ToFullString().Contains(
+                    "FindFirstPageAncestor(Parent)",
+                    StringComparison.Ordinal));
+
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(returnStatement));
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(invocationStatement));
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(root));
+    }
+
+    [Fact]
     public void SemanticModel_MarkupRoutedEventAttribute_BindsCSharpBlockLocalScope()
     {
         const string code =

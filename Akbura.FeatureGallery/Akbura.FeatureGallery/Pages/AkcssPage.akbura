@@ -348,7 +348,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                 </StackPanel>
 
                 <TextBlock col-1
-                           Text="→"
+                           Text="->"
                            text-2xl
                            text-slate-500
                            self-center/>
@@ -419,7 +419,7 @@ using Akbura.FeatureGallery.Styles.akcss;
             </Border>
 
             <TextBlock col-1
-                       Text="→"
+                       Text="->"
                        text-2xl
                        text-slate-500
                        self-center/>
@@ -592,7 +592,7 @@ using Akbura.FeatureGallery.Styles.akcss;
             </Border>
 
             <TextBlock col-1
-                       Text="→"
+                       Text="->"
                        text-xl
                        text-slate-500
                        self-center/>
@@ -623,7 +623,7 @@ using Akbura.FeatureGallery.Styles.akcss;
             </Border>
 
             <TextBlock col-3
-                       Text="→"
+                       Text="->"
                        text-xl
                        text-slate-500
                        self-center/>

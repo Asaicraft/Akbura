@@ -46,7 +46,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                         bg-slate-950
                         rounded-lg>
 
-                    <TextBlock Text="item → Build(item) → Control"
+                    <TextBlock Text="item -> Build(item) -> Control"
                                FontFamily="Cascadia Code,Consolas,Monospace"
                                text-sm
                                text-blue-400/>
@@ -82,7 +82,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                         bg-slate-950
                         rounded-lg>
 
-                    <TextBlock Text="markup → factory → Build later"
+                    <TextBlock Text="markup -> factory -> Build later"
                                FontFamily="Cascadia Code,Consolas,Monospace"
                                text-sm
                                text-blue-400/>
@@ -350,7 +350,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                     </Border>
 
                     <TextBlock col-1
-                               Text="→"
+                               Text="->"
                                text-2xl
                                text-slate-500
                                self-center/>
@@ -381,7 +381,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                     </Border>
 
                     <TextBlock col-3
-                               Text="→"
+                               Text="->"
                                text-2xl
                                text-slate-500
                                self-center/>

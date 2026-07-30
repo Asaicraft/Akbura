@@ -9,6 +9,7 @@ on:
       - master
     paths:
       - "AkburaDocs/**"
+      - "Akbura.FeatureGallery/**"
       - ".github/workflows/build.yml"
 
 jobs:
@@ -78,6 +79,22 @@ jobs:
               --configuration Release \
               --environment Production
           fi
+
+      - name: Publish Feature Gallery
+        run: |
+          dotnet publish \
+            ./Akbura.FeatureGallery/Akbura.FeatureGallery.Browser/Akbura.FeatureGallery.Browser.csproj \
+            --configuration Release \
+            --output "${{ runner.temp }}/feature-gallery"
+
+      - name: Add Feature Gallery to site
+        run: |
+          mkdir -p ./AkburaDocs/dist/Gallery
+          cp -a "${{ runner.temp }}/feature-gallery/wwwroot/." ./AkburaDocs/dist/Gallery/
+
+          test -f ./AkburaDocs/dist/404.html
+          test -f ./AkburaDocs/dist/Gallery/index.html
+          test -d ./AkburaDocs/dist/Gallery/_framework
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

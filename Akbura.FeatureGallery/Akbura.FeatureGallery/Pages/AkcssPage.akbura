@@ -1,20 +1,24 @@
 using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
 
-<StackPanel page>
+<StackPanel page
+            ${md}:page-desktop>
 
     <StackPanel page-header>
 
         <TextBlock Text="AKCSS"
-                   page-title/>
+                   page-title
+                   ${md}:page-title-desktop/>
 
         <TextBlock
             Text="Typed, reactive styles and reusable utilities for Akbura components and Avalonia controls."
-            page-description/>
+            page-description
+            ${md}:page-description-desktop/>
 
     </StackPanel>
 
-    <Grid ColumnDefinitions="*,*,*"
-          gap-x-4>
+    <Grid page-grid-3
+          ${lg}:page-grid-3-desktop>
 
         <Border page-card>
 
@@ -34,7 +38,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
         </Border>
 
-        <Border col-1
+        <Border page-cell-2
+                ${lg}:page-cell-2-desktop
                 page-card>
 
             <StackPanel gap-3>
@@ -53,7 +58,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
         </Border>
 
-        <Border col-2
+        <Border page-cell-3
+                ${lg}:page-cell-3-desktop
                 page-card>
 
             <StackPanel gap-3>
@@ -79,7 +85,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
         <StackPanel page-section-header>
 
             <TextBlock Text="Try AKCSS"
-                       page-section-title/>
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="This example demonstrates a reactive class, @apply, custom utilities, typed parameters and conditional utilities."
@@ -181,7 +188,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
         <StackPanel page-section-header>
 
             <TextBlock Text="Markup extension utilities"
-                       page-section-title/>
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="Utility arguments can come from markup extensions, while reactive extension prefixes participate in the AKCSS cascade."
@@ -254,10 +262,11 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="Classes and utilities"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
-        <Grid ColumnDefinitions="*,*"
-              gap-x-4>
+        <Grid page-grid-2
+              ${md}:page-grid-2-desktop>
 
             <Border page-card>
 
@@ -282,7 +291,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${md}:page-cell-2-desktop
                     page-card>
 
                 <StackPanel gap-3>
@@ -321,12 +331,13 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="Composing styles with @apply"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
         <Border page-card>
 
-            <Grid ColumnDefinitions="*,Auto,*"
-                  gap-x-5>
+            <Grid page-flow-2
+                  ${md}:page-flow-2-desktop>
 
                 <StackPanel gap-2>
 
@@ -335,18 +346,20 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
                     <TextBlock
                         Text="bg-blue-600 text-white px-4 py-2 rounded-lg"
-                        page-code
-                        whitespace-normal/>
+                        page-code/>
 
                 </StackPanel>
 
-                <TextBlock col-1
-                           Text="->"
-                           text-2xl
-                           text-slate-500
-                           self-center/>
+                <TextBlock
+                    Text="->"
+                    page-flow-arrow
+                    ${md}:page-flow-arrow-1-desktop
+                    text-2xl
+                    text-slate-500
+                    self-center/>
 
-                <StackPanel col-2
+                <StackPanel page-flow-second
+                            ${md}:page-flow-second-desktop
                             gap-2>
 
                     <TextBlock Text="Reusable class"
@@ -354,8 +367,7 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
                     <TextBlock
                         Text="@apply bg-blue-600 text-white px-4 py-2 rounded-lg;"
-                        page-code
-                        whitespace-normal/>
+                        page-code/>
 
                 </StackPanel>
 
@@ -372,10 +384,11 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="Reactive cascade"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
-        <Grid ColumnDefinitions="*,Auto,*"
-              gap-x-4>
+        <Grid page-flow-2
+              ${md}:page-flow-2-desktop>
 
             <Border page-card>
 
@@ -394,13 +407,16 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <TextBlock col-1
-                       Text="->"
-                       text-2xl
-                       text-slate-500
-                       self-center/>
+            <TextBlock
+                Text="->"
+                page-flow-arrow
+                ${md}:page-flow-arrow-1-desktop
+                text-2xl
+                text-slate-500
+                self-center/>
 
-            <Border col-2
+            <Border page-flow-second
+                    ${md}:page-flow-second-desktop
                     page-card-accent>
 
                 <StackPanel gap-2>
@@ -429,10 +445,11 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="Utility arguments"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
-        <Grid ColumnDefinitions="*,*"
-              gap-x-4>
+        <Grid page-grid-2
+              ${md}:page-grid-2-desktop>
 
             <Border page-card>
 
@@ -466,7 +483,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${md}:page-cell-2-desktop
                     page-card>
 
                 <StackPanel gap-3>
@@ -482,8 +500,7 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
                         <TextBlock
                             Text={"<Border {isActive}:border-blue-500 />"}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 
@@ -498,10 +515,11 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="Where styles are resolved"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
-        <Grid ColumnDefinitions="*,Auto,*,Auto,*"
-              gap-x-3>
+        <Grid page-flow-3
+              ${lg}:page-flow-3-desktop>
 
             <Border page-card-compact>
 
@@ -522,13 +540,16 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <TextBlock col-1
-                       Text="->"
-                       text-xl
-                       text-slate-500
-                       self-center/>
+            <TextBlock
+                Text="->"
+                page-flow-arrow
+                ${lg}:page-flow-arrow-1-desktop
+                text-xl
+                text-slate-500
+                self-center/>
 
-            <Border col-2
+            <Border page-flow-second
+                    ${lg}:page-flow-second-desktop
                     page-card-compact>
 
                 <StackPanel gap-1>
@@ -548,13 +569,16 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <TextBlock col-3
-                       Text="->"
-                       text-xl
-                       text-slate-500
-                       self-center/>
+            <TextBlock
+                Text="->"
+                page-flow-arrow
+                ${lg}:page-flow-arrow-2-desktop
+                text-xl
+                text-slate-500
+                self-center/>
 
-            <Border col-4
+            <Border page-flow-third
+                    ${lg}:page-flow-third-desktop
                     page-card-compact>
 
                 <StackPanel gap-1>
@@ -581,12 +605,13 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="Composable spacing"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
         <Border page-card>
 
-            <Grid ColumnDefinitions="Auto,Auto,*"
-                  gap-x-5>
+            <Grid page-flow-2
+                  ${md}:page-flow-2-desktop>
 
                 <StackPanel gap-1>
 
@@ -600,13 +625,16 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
                 </StackPanel>
 
-                <TextBlock col-1
-                           Text="+"
-                           text-xl
-                           text-slate-500
-                           self-center/>
+                <TextBlock
+                    Text="+"
+                    page-flow-arrow
+                    ${md}:page-flow-arrow-1-desktop
+                    text-xl
+                    text-slate-500
+                    self-center/>
 
-                <StackPanel col-2
+                <StackPanel page-flow-second
+                            ${md}:page-flow-second-desktop
                             gap-1>
 
                     <TextBlock Text="pt-2"

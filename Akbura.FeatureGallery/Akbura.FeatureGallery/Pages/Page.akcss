@@ -1,8 +1,17 @@
 @using Akbura.FeatureGallery.Styles.akcss;
+@using Avalonia.Controls;
 
 @utilities {
 
+    /*
+     * Page typography and spacing
+     */
+
     StackPanel.page {
+        @apply gap-6;
+    }
+
+    StackPanel.page-desktop {
         @apply gap-8;
     }
 
@@ -11,13 +20,17 @@
     }
 
     TextBlock.page-title {
-        @apply text-4xl
+        @apply text-3xl
                font-bold
                text-slate-100;
     }
 
+    TextBlock.page-title-desktop {
+        @apply text-4xl;
+    }
+
     TextBlock.page-description {
-        @apply text-lg
+        @apply text-base
                text-slate-400
                whitespace-normal
                self-start;
@@ -25,8 +38,12 @@
         MaxWidth: 840;
     }
 
+    TextBlock.page-description-desktop {
+        @apply text-lg;
+    }
+
     Border.page-hero {
-        @apply p-8
+        @apply p-4
                bg-slate-950
                border-1
                border-slate-800
@@ -34,20 +51,32 @@
                overflow-hidden;
     }
 
+    Border.page-hero-desktop {
+        @apply p-8;
+    }
+
     TextBlock.page-hero-title {
-        @apply text-5xl
+        @apply text-3xl
                font-bold
                text-slate-100
                whitespace-normal;
     }
 
+    TextBlock.page-hero-title-desktop {
+        @apply text-5xl;
+    }
+
     TextBlock.page-hero-description {
-        @apply text-lg
+        @apply text-base
                text-slate-400
                whitespace-normal
                self-start;
 
         MaxWidth: 720;
+    }
+
+    TextBlock.page-hero-description-desktop {
+        @apply text-lg;
     }
 
     StackPanel.page-section {
@@ -59,9 +88,13 @@
     }
 
     TextBlock.page-section-title {
-        @apply text-3xl
+        @apply text-2xl
                font-bold
                text-slate-100;
+    }
+
+    TextBlock.page-section-title-desktop {
+        @apply text-3xl;
     }
 
     TextBlock.page-section-description {
@@ -69,6 +102,10 @@
                text-slate-400
                whitespace-normal;
     }
+
+    /*
+     * Surfaces
+     */
 
     Border.page-card {
         @apply p-5
@@ -149,7 +186,8 @@
 
     TextBlock.page-code {
         @apply text-sm
-               text-blue-400;
+               text-blue-400
+               whitespace-normal;
 
         FontFamily: "Cascadia Code,Consolas,Monospace";
     }
@@ -178,5 +216,191 @@
         @apply text-sm
                font-semibold
                text-slate-100;
+    }
+
+    /*
+     * Responsive two-column layout
+     */
+
+    Grid.page-grid-2 {
+        ColumnDefinitions:
+            new ColumnDefinitions("*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto,Auto");
+
+        ColumnSpacing: 0d;
+        RowSpacing: 16d;
+    }
+
+    Grid.page-grid-2-desktop {
+        ColumnDefinitions:
+            new ColumnDefinitions("*,*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto");
+
+        ColumnSpacing: 16d;
+        RowSpacing: 0d;
+    }
+
+    Control.page-cell-2 {
+        Grid.Row: 1;
+        Grid.Column: 0;
+    }
+
+    Control.page-cell-2-desktop {
+        Grid.Row: 0;
+        Grid.Column: 1;
+    }
+
+    /*
+     * Responsive three-column layout
+     */
+
+    Grid.page-grid-3 {
+        ColumnDefinitions:
+            new ColumnDefinitions("*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto,Auto,Auto");
+
+        ColumnSpacing: 0d;
+        RowSpacing: 16d;
+    }
+
+    Grid.page-grid-3-desktop {
+        ColumnDefinitions:
+            new ColumnDefinitions("*,*,*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto");
+
+        ColumnSpacing: 16d;
+        RowSpacing: 0d;
+    }
+
+    Control.page-cell-3 {
+        Grid.Row: 2;
+        Grid.Column: 0;
+    }
+
+    Control.page-cell-3-desktop {
+        Grid.Row: 0;
+        Grid.Column: 2;
+    }
+
+    /*
+     * Responsive hero
+     */
+
+    Grid.page-hero-grid {
+        ColumnDefinitions:
+            new ColumnDefinitions("*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto,Auto");
+
+        ColumnSpacing: 0d;
+        RowSpacing: 16d;
+    }
+
+    Grid.page-hero-grid-desktop {
+        ColumnDefinitions:
+            new ColumnDefinitions("*,Auto");
+
+        RowDefinitions:
+            new RowDefinitions("Auto");
+
+        ColumnSpacing: 32d;
+        RowSpacing: 0d;
+    }
+
+    /*
+     * Responsive two-step flow
+     */
+
+    Grid.page-flow-2 {
+        ColumnDefinitions:
+            new ColumnDefinitions("*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto,Auto");
+
+        ColumnSpacing: 0d;
+        RowSpacing: 16d;
+    }
+
+    Grid.page-flow-2-desktop {
+        ColumnDefinitions:
+            new ColumnDefinitions("*,Auto,*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto");
+
+        ColumnSpacing: 16d;
+        RowSpacing: 0d;
+    }
+
+    Control.page-flow-second {
+        Grid.Row: 1;
+        Grid.Column: 0;
+    }
+
+    Control.page-flow-second-desktop {
+        Grid.Row: 0;
+        Grid.Column: 2;
+    }
+
+    Control.page-flow-arrow {
+        IsVisible: false;
+    }
+
+    Control.page-flow-arrow-1-desktop {
+        IsVisible: true;
+        Grid.Row: 0;
+        Grid.Column: 1;
+    }
+
+    /*
+     * Responsive three-step flow
+     */
+
+    Grid.page-flow-3 {
+        ColumnDefinitions:
+            new ColumnDefinitions("*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto,Auto,Auto");
+
+        ColumnSpacing: 0d;
+        RowSpacing: 16d;
+    }
+
+    Grid.page-flow-3-desktop {
+        ColumnDefinitions:
+            new ColumnDefinitions("*,Auto,*,Auto,*");
+
+        RowDefinitions:
+            new RowDefinitions("Auto");
+
+        ColumnSpacing: 12d;
+        RowSpacing: 0d;
+    }
+
+    Control.page-flow-third {
+        Grid.Row: 2;
+        Grid.Column: 0;
+    }
+
+    Control.page-flow-third-desktop {
+        Grid.Row: 0;
+        Grid.Column: 4;
+    }
+
+    Control.page-flow-arrow-2-desktop {
+        IsVisible: true;
+        Grid.Row: 0;
+        Grid.Column: 3;
     }
 }

@@ -1382,14 +1382,23 @@ partial class Parser
 			PeekToken(1).Kind == SyntaxKind.ColonToken;
 	}
 
-	private bool IsPlainMarkupAttributeStart()
-	{
-		return IsMarkupNameToken(CurrentToken) &&
-			(PeekToken(1).Kind == SyntaxKind.EqualsToken ||
-			 IsMarkupAttributeValueStart(PeekToken(1)));
-	}
+    private bool IsPlainMarkupAttributeStart()
+    {
+        var current = CurrentToken;
 
-	private bool IsAttachedPropertyMarkupAttributeStart()
+        if (!IsMarkupNameToken(current))
+        {
+            return false;
+        }
+
+        var next = PeekToken(1);
+
+        return next.Kind == SyntaxKind.EqualsToken ||
+               (IsMarkupAttributeValueStart(next) &&
+                AreAdjacent(current, next));
+    }
+
+    private bool IsAttachedPropertyMarkupAttributeStart()
 	{
 		if (!IsMarkupNameToken(CurrentToken) ||
 			PeekToken(1).Kind is not (SyntaxKind.DotToken or SyntaxKind.DoubleColonToken))

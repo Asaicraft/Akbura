@@ -1,4 +1,5 @@
-using Akbura.FeatureGallery.Styles.akcss;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
 
 param string Url = "";
 param Router Router;
@@ -7,14 +8,12 @@ param Router Router;
             self-center>
 
     <TextBlock Text="Page not found"
-               text-3xl
-               font-bold
-               text-slate-100
+               page-title
+               ${md}:page-title-desktop
                text-center/>
 
     <TextBlock Text={$"The page '{Url}' does not exist."}
-               text-base
-               text-slate-400
+               page-section-description
                text-center/>
 
     <Link Content="Go to Overview"

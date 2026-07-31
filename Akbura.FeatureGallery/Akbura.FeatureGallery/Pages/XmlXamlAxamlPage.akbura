@@ -1,18 +1,22 @@
 using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
 
 state string projectName = "Akbura";
 
-<StackPanel page>
+<StackPanel page
+            ${md}:page-desktop>
 
     <StackPanel page-header>
 
         <TextBlock
             Text="Differences between XML, XAML and AXAML"
-            page-title/>
+            page-title
+            ${md}:page-title-desktop/>
 
         <TextBlock
             Text="Akbura uses familiar XML-like markup, but .akbura files are not XML documents. Some XML and XAML constructs are therefore replaced by native C# syntax."
-            page-description/>
+            page-description
+            ${md}:page-description-desktop/>
 
     </StackPanel>
 
@@ -30,7 +34,8 @@ state string projectName = "Akbura";
 
             <TextBlock
                 Text="CDATA is replaced by raw strings"
-                page-section-title/>
+                page-section-title
+                ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="Akbura does not support XML CDATA sections. Use a C# raw string expression when markup must contain unescaped text, source code or another markup fragment."
@@ -38,8 +43,8 @@ state string projectName = "Akbura";
 
         </StackPanel>
 
-        <Grid ColumnDefinitions="*,*"
-              gap-x-4>
+        <Grid page-grid-2
+              ${md}:page-grid-2-desktop>
 
             <Border page-card>
 
@@ -63,8 +68,7 @@ state string projectName = "Akbura";
                                 ]]>
                             </FeatureView.Code>
                             """}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 
@@ -72,7 +76,8 @@ state string projectName = "Akbura";
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${md}:page-cell-2-desktop
                     page-card-accent>
 
                 <StackPanel gap-3>
@@ -95,8 +100,7 @@ state string projectName = "Akbura";
                                 """}
                             </FeatureView.Code>
                             """"}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 
@@ -112,10 +116,11 @@ state string projectName = "Akbura";
 
         <TextBlock
             Text="Why raw strings are useful"
-            page-section-title/>
+            page-section-title
+            ${md}:page-section-title-desktop/>
 
-        <Grid ColumnDefinitions="*,*,*"
-              gap-x-4>
+        <Grid page-grid-3
+              ${lg}:page-grid-3-desktop>
 
             <Border page-card>
 
@@ -133,7 +138,8 @@ state string projectName = "Akbura";
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
                     page-card>
 
                 <StackPanel gap-2>
@@ -150,7 +156,8 @@ state string projectName = "Akbura";
 
             </Border>
 
-            <Border col-2
+            <Border page-cell-3
+                    ${lg}:page-cell-3-desktop
                     page-card>
 
                 <StackPanel gap-2>
@@ -177,7 +184,8 @@ state string projectName = "Akbura";
 
             <TextBlock
                 Text="Interpolated raw strings"
-                page-section-title/>
+                page-section-title
+                ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="Edit the value below. The output is produced by a normal C# interpolated raw string."
@@ -185,8 +193,8 @@ state string projectName = "Akbura";
 
         </StackPanel>
 
-        <Grid ColumnDefinitions="*,*"
-              gap-x-4>
+        <Grid page-grid-2
+              ${md}:page-grid-2-desktop>
 
             <Border page-card>
 
@@ -206,8 +214,7 @@ state string projectName = "Akbura";
                             Welcome to {projectName}.
                             """}/>
                             """"}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 
@@ -215,7 +222,8 @@ state string projectName = "Akbura";
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${md}:page-cell-2-desktop
                     page-card>
 
                 <StackPanel gap-3>
@@ -226,7 +234,7 @@ state string projectName = "Akbura";
 
                     <TextBox
                         bind:Text={projectName}
-                        Watermark="Project name"/>
+                        PlaceholderText="Project name"/>
 
                     <Border page-code-surface>
 
@@ -235,8 +243,7 @@ state string projectName = "Akbura";
                             Welcome to {projectName}.
                             This text is created by an interpolated raw string.
                             """}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 
@@ -254,7 +261,8 @@ state string projectName = "Akbura";
 
             <TextBlock
                 Text="Whitespace and xml:space"
-                page-section-title/>
+                page-section-title
+                ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="CDATA and xml:space solve different problems. CDATA prevents text from being interpreted as XML markup, while xml:space controls how whitespace inside an element should be processed."
@@ -262,8 +270,8 @@ state string projectName = "Akbura";
 
         </StackPanel>
 
-        <Grid ColumnDefinitions="*,*,*"
-              gap-x-4>
+        <Grid page-grid-3
+              ${lg}:page-grid-3-desktop>
 
             <Border page-card>
 
@@ -287,8 +295,7 @@ state string projectName = "Akbura";
                                 Last line
                             </poem>
                             """}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 
@@ -300,7 +307,8 @@ state string projectName = "Akbura";
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
                     page-card>
 
                 <StackPanel gap-3>
@@ -323,8 +331,7 @@ state string projectName = "Akbura";
                                 Last line
                             </TextBlock>
                             """}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 
@@ -336,7 +343,8 @@ state string projectName = "Akbura";
 
             </Border>
 
-            <Border col-2
+            <Border page-cell-3
+                    ${lg}:page-cell-3-desktop
                     page-card-accent>
 
                 <StackPanel gap-3>
@@ -359,8 +367,7 @@ state string projectName = "Akbura";
                             Last line
                             """}/>
                             """"}
-                            page-code
-                            whitespace-normal/>
+                            page-code/>
 
                     </Border>
 

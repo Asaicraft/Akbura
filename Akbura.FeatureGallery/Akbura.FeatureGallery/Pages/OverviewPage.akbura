@@ -1,20 +1,25 @@
 using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
 
-<StackPanel page>
+<StackPanel page
+            ${md}:page-desktop>
 
-    <Border page-hero>
+    <Border page-hero
+            ${md}:page-hero-desktop>
 
-        <Grid ColumnDefinitions="*,Auto"
-              gap-x-8>
+        <Grid page-hero-grid
+              ${lg}:page-hero-grid-desktop>
 
             <StackPanel gap-4>
 
                 <TextBlock Text="Build Avalonia interfaces with C#"
-                           page-hero-title/>
+                           page-hero-title
+                           ${md}:page-hero-title-desktop/>
 
                 <TextBlock
                     Text="Akbura combines declarative markup, reactive state and strongly typed C# in a single component."
-                    page-hero-description/>
+                    page-hero-description
+                    ${md}:page-hero-description-desktop/>
 
                 <StackPanel Orientation="Horizontal"
                             gap-3>
@@ -44,7 +49,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </StackPanel>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
                     p-6
                     bg-slate-900
                     border-1
@@ -76,10 +82,11 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="Why Akbura?"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
-        <Grid ColumnDefinitions="*,*,*"
-              gap-x-4>
+        <Grid page-grid-3
+              ${lg}:page-grid-3-desktop>
 
             <Border page-card>
 
@@ -99,7 +106,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
                     page-card>
 
                 <StackPanel gap-3>
@@ -118,7 +126,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <Border col-2
+            <Border page-cell-3
+                    ${lg}:page-cell-3-desktop
                     page-card>
 
                 <StackPanel gap-3>
@@ -146,7 +155,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
         <StackPanel page-section-header>
 
             <TextBlock Text="Try it"
-                       page-section-title/>
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="Switch between the live preview and its Akbura source code."

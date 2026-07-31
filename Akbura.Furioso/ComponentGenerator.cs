@@ -855,6 +855,11 @@ internal static class ComponentGenerator
         {
             foreach (var element in _elements)
             {
+                if (RequiresLocalMarkupExtensionContext(element))
+                {
+                    continue;
+                }
+
                 foreach (var operation in
                     element.Symbol.AttributeOperations
                         .OfType<ITailwindUtilityAttributeOperation>())
@@ -1316,6 +1321,12 @@ internal static class ComponentGenerator
         {
             return statement.GetRawCSharpStatement() is
                 CSharp.LocalFunctionStatementSyntax;
+        }
+
+        private static bool RequiresLocalMarkupExtensionContext(ElementPlan element)
+        {
+            return element.IsDeferred ||
+                   element.TemplateOwner != null;
         }
 
         private void AppendContentPresenterRefresh(
@@ -2267,8 +2278,7 @@ internal static class ComponentGenerator
             return result.Append(')').ToString();
         }
 
-        private List<string>
-            GetAkcssUtilityValueSourceExpressions(
+        private List<string> GetAkcssUtilityValueSourceExpressions(
                 ElementPlan element,
                 ITailwindUtilityAttributeOperation operation,
                 ITailwindUtilitySymbol utility)
@@ -2315,8 +2325,16 @@ internal static class ComponentGenerator
         {
             var expectedTypeName =
                 GetTypeName(expectedType);
+
             var valueExpression =
-                factoryName + "(__target)";
+                RequiresLocalMarkupExtensionContext(element)
+                    ? GetMarkupExtensionExpression(
+                        extension,
+                        element,
+                        targetProperty)
+                    : factoryName + "(__target)";
+
+
             var recreate =
                 extension.IsUpdateDependent
                     ? "true"

@@ -2,7 +2,7 @@
   "profiles": {
     "Furioso": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "..\\Akbura\\Akbura.csproj"
+      "targetProject": "..\\Akbura.FeatureGallery\\Akbura.FeatureGallery\\Akbura.FeatureGallery.csproj"
     }
   }
 }

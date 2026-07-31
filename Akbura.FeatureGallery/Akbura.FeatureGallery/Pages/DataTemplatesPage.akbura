@@ -1,20 +1,24 @@
 using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
 
-<StackPanel page>
+<StackPanel page
+            ${md}:page-desktop>
 
     <StackPanel page-header>
 
         <TextBlock Text="Data templates"
-                   page-title/>
+                   page-title
+                   ${md}:page-title-desktop/>
 
         <TextBlock
             Text="Create strongly typed visual templates using compiled bindings, direct C# expressions and deferred content."
-            page-description/>
+            page-description
+            ${md}:page-description-desktop/>
 
     </StackPanel>
 
-    <Grid ColumnDefinitions="*,*"
-          gap-x-4>
+    <Grid page-grid-2
+          ${md}:page-grid-2-desktop>
 
         <Border page-card>
 
@@ -38,7 +42,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
         </Border>
 
-        <Border col-1
+        <Border page-cell-2
+                ${md}:page-cell-2-desktop
                 page-card>
 
             <StackPanel gap-3>
@@ -68,7 +73,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
         <StackPanel page-section-header>
 
             <TextBlock Text="Implicit and explicit templates"
-                       page-section-title/>
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="Both forms create the same visible result, but they use different generated representations."
@@ -143,10 +149,11 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
     <StackPanel page-section>
 
         <TextBlock Text="What Akbura generates"
-                   page-section-title/>
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
 
-        <Grid ColumnDefinitions="*,*,*"
-              gap-x-4>
+        <Grid page-grid-3
+              ${lg}:page-grid-3-desktop>
 
             <Border page-card>
 
@@ -167,7 +174,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <Border col-1
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
                     page-card>
 
                 <StackPanel gap-2>
@@ -186,7 +194,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             </Border>
 
-            <Border col-2
+            <Border page-cell-3
+                    ${lg}:page-cell-3-desktop
                     page-card>
 
                 <StackPanel gap-2>
@@ -214,7 +223,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
         <StackPanel page-section-header>
 
             <TextBlock Text="How IDeferredContent works"
-                       page-section-title/>
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
 
             <TextBlock
                 Text="IDeferredContent prevents a template body from being instantiated before it is actually needed."
@@ -249,8 +259,8 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
             <FeatureView.View>
 
-                <Grid ColumnDefinitions="*,Auto,*,Auto,*"
-                      gap-x-3
+                <Grid page-flow-3
+                      ${lg}:page-flow-3-desktop
                       self-center>
 
                     <Border page-card-compact>
@@ -269,13 +279,16 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
                     </Border>
 
-                    <TextBlock col-1
-                               Text="->"
-                               text-2xl
-                               text-slate-500
-                               self-center/>
+                    <TextBlock
+                        Text="->"
+                        page-flow-arrow
+                        ${lg}:page-flow-arrow-1-desktop
+                        text-2xl
+                        text-slate-500
+                        self-center/>
 
-                    <Border col-2
+                    <Border page-flow-second
+                            ${lg}:page-flow-second-desktop
                             page-card-compact>
 
                         <StackPanel gap-2>
@@ -292,13 +305,16 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 
                     </Border>
 
-                    <TextBlock col-3
-                               Text="->"
-                               text-2xl
-                               text-slate-500
-                               self-center/>
+                    <TextBlock
+                        Text="->"
+                        page-flow-arrow
+                        ${lg}:page-flow-arrow-2-desktop
+                        text-2xl
+                        text-slate-500
+                        self-center/>
 
-                    <Border col-4
+                    <Border page-flow-third
+                            ${lg}:page-flow-third-desktop
                             page-card-compact>
 
                         <StackPanel gap-2>

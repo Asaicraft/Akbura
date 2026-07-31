@@ -1,16 +1,20 @@
-using Akbura.FeatureGallery.Styles.akcss;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
 
-<StackPanel gap-3>
+<StackPanel page
+            ${md}:page-desktop>
 
-    <TextBlock Text="About"
-               text-3xl
-               font-bold
-               text-slate-100/>
+    <StackPanel page-header>
 
-    <TextBlock
-        Text="Akbura Feature Gallery demonstrates available components and markup features."
-        text-base
-        text-slate-300
-        whitespace-normal/>
+        <TextBlock Text="About"
+                   page-title
+                   ${md}:page-title-desktop/>
+
+        <TextBlock
+            Text="Akbura Feature Gallery demonstrates available components and markup features."
+            page-description
+            ${md}:page-description-desktop/>
+
+    </StackPanel>
 
 </StackPanel>

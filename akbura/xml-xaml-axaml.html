@@ -1,0 +1,575 @@
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+    <title>Differences between XML, XAML and AXAML</title>
+
+    <script>
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
+    </script>
+
+    <link rel="stylesheet" href="css/app.css">
+
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+  <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+	<div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+	  <div class="flex h-16 justify-between">
+		<div class="flex">
+		  <div class="flex flex-shrink-0 items-center">
+			<a class="mr-2 lg:mr-8 flex items-center" href="./">
+				<svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13"/></svg>
+				<span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+			</a>
+		  </div>
+			<div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+				<!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+						<a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+							Akbura
+						</a>
+						<a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							Akcss
+						</a>
+						<a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+							What's New
+						</a>
+			</div>
+		</div>
+		<div class="hidden sm:ml-6 sm:flex sm:items-center">
+			<dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+		</div>
+		<div class="-mr-2 flex items-center sm:hidden">
+		  <!-- Mobile menu button -->
+		  <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+			<span class="sr-only">Open main menu</span>
+			<!-- Menu open: "hidden", Menu closed: "block" -->
+			<svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+			</svg>
+			<!-- Menu open: "block", Menu closed: "hidden" -->
+			<svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+			  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+			</svg>
+		  </button>
+		</div>
+	  </div>
+	</div>
+
+	<!-- Mobile menu, show/hide based on menu state. -->
+	<div v-cloak v-if="open" class="sm:hidden">
+		<div class="space-y-1 pb-3 pt-2">
+			<!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+					<a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+						Akbura
+					</a>
+					<a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						Akcss
+					</a>
+					<a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+						What's New
+					</a>
+		</div>
+	</div>
+  </nav>
+</header>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+const Header = {
+	setup() {
+		const open = ref(false)
+		return { open }
+	}
+}
+mount('#header', Header)
+</script>
+
+
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            
+
+
+
+
+<style>
+.active {
+	color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="css/highlight.css">
+<link rel="stylesheet" href="css/typography.css">
+<link rel="stylesheet" href="css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+	<div class="flex flex-wrap">
+		<div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+			<button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+				<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+			</button>
+			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+								<a href="https://asaicraft.github.io/Akbura/akbura/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+AKBURA									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Using Akbura Components in AXAML
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Grid
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/items-control" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										ItemsControl
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/xml-xaml-axaml" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Differences between XML, XAML and AXAML
+									</a>
+								</li>
+						</ul>
+				</nav>
+			</div>
+		</div>
+		<div id="doc" class="mx-auto flex">
+			<div class="mt-8 mx-auto prose lg:prose-lg">
+				
+					<section class="not-prose mb-16 md:mb-12">
+						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+							Differences between XML, XAML and AXAML
+						</h1>
+					</section>
+
+				<div class="not-prose"></div>
+
+				<div class="content">
+					<p>Akbura uses an XML-like element structure, but an <code>.akbura</code> file is not an XML, XAML or AXAML document. It is an Akbura component that can contain normal C# declarations and expressions.</p>
+<p>This distinction matters when syntax from XML or AXAML is copied into an Akbura component.</p>
+<h2 id="xml-xaml-and-axaml">XML, XAML and AXAML<a class="header-anchor" href="javascript:;" onclick="location.hash='#xml-xaml-and-axaml'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><strong>XML</strong> is a general-purpose markup format.</p>
+<p><strong>XAML</strong> is an XML-based language for declaring .NET object graphs and user interfaces.</p>
+<p><strong>AXAML</strong> means Avalonia XAML. Avalonia uses the <code>.axaml</code> extension to distinguish its XAML dialect from XAML files used by other frameworks.</p>
+<p>Akbura keeps familiar concepts such as elements, attributes and property elements, but it is compiled by the Akbura compiler rather than treated as an XML document.</p>
+<h2 id="whitespace-and-xmlspace">Whitespace and <code>xml:space</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#whitespace-and-xmlspace'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>CDATA and <code>xml:space</code> solve different problems.</p>
+<p>CDATA prevents its contents from being interpreted as XML markup:</p>
+<pre><code class="language-xml">&lt;![CDATA[
+&lt;Button Content=&quot;Hello&quot; /&gt;
+]]&gt;
+</code></pre>
+<p>The <code>xml:space</code> attribute controls how whitespace inside an XML element should be handled:</p>
+<pre><code class="language-xml">&lt;poem xml:space=&quot;preserve&quot;&gt;
+    First line
+        Indented line
+    Last line
+&lt;/poem&gt;
+</code></pre>
+<p>XML defines two values:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>default</code></td>
+<td>The application's default whitespace processing is acceptable</td>
+</tr>
+<tr>
+<td><code>preserve</code></td>
+<td>The application should preserve the whitespace</td>
+</tr>
+</tbody>
+</table>
+<p>The value is inherited by descendant elements until it is overridden:</p>
+<pre><code class="language-xml">&lt;root xml:space=&quot;preserve&quot;&gt;
+    &lt;first&gt;
+        Whitespace is preserved here.
+    &lt;/first&gt;
+
+    &lt;second xml:space=&quot;default&quot;&gt;
+        Default processing is restored here.
+    &lt;/second&gt;
+&lt;/root&gt;
+</code></pre>
+<h3 id="xmlspace-in-xaml-and-axaml"><code>xml:space</code> in XAML and AXAML<a class="header-anchor" href="javascript:;" onclick="location.hash='#xmlspace-in-xaml-and-axaml'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>XAML processors normally normalize whitespace found in element content. Depending on the content model, line breaks and tabs may be converted to spaces, repeated spaces may be collapsed, and whitespace near element boundaries may be removed.</p>
+<p>Use <code>xml:space=&quot;preserve&quot;</code> when the text must retain its authored whitespace:</p>
+<pre><code class="language-xml">&lt;TextBlock xml:space=&quot;preserve&quot;&gt;
+    First line
+        Indented line
+    Last line
+&lt;/TextBlock&gt;
+</code></pre>
+<h3 id="whitespace-in-akbura">Whitespace in Akbura<a class="header-anchor" href="javascript:;" onclick="location.hash='#whitespace-in-akbura'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Akbura files are not XML documents, so <code>xml:space</code> has no special meaning.</p>
+<p>Use a C# raw string to define the exact text value:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text={&quot;&quot;&quot;
+First line
+    Indented line
+Last line
+&quot;&quot;&quot;}/&gt;
+</code></pre>
+<p>The indentation of the closing delimiter determines the common indentation removed from every content line:</p>
+<pre><code class="language-akbura">&lt;Border&gt;
+    &lt;TextBlock Text={&quot;&quot;&quot;
+        First line
+            Indented line
+        Last line
+        &quot;&quot;&quot;}/&gt;
+&lt;/Border&gt;
+</code></pre>
+<p>The indentation needed to align the raw string with the surrounding component is removed. Additional indentation inside the content remains in the resulting string.</p>
+<h3 id="comparison">Comparison<a class="header-anchor" href="javascript:;" onclick="location.hash='#comparison'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Construct</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;![CDATA[ ... ]]&gt;</code></td>
+<td>Prevent XML content from being parsed as markup</td>
+</tr>
+<tr>
+<td><code>xml:space=&quot;preserve&quot;</code></td>
+<td>Request preservation of whitespace in XML or XAML content</td>
+</tr>
+<tr>
+<td><code>{&quot;&quot;&quot; ... &quot;&quot;&quot;}</code></td>
+<td>Produce a C# string value inside an Akbura expression</td>
+</tr>
+</tbody>
+</table>
+<p>Raw strings replace CDATA in Akbura. They also make <code>xml:space</code> unnecessary for defining multiline text because whitespace belongs directly to the resulting C# string.</p>
+<h2 id="cdata-is-not-supported">CDATA is not supported<a class="header-anchor" href="javascript:;" onclick="location.hash='#cdata-is-not-supported'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>XML can use a CDATA section when text must contain characters that would otherwise be interpreted as markup:</p>
+<pre><code class="language-xml">&lt;FeatureView.Code&gt;
+    &lt;![CDATA[
+    &lt;Button Content=&quot;Hello&quot; /&gt;
+    ]]&gt;
+&lt;/FeatureView.Code&gt;
+</code></pre>
+<p>Akbura does not use CDATA. Place a C# raw string inside an Akbura expression instead:</p>
+<pre><code class="language-akbura">&lt;FeatureView.Code&gt;
+    {&quot;&quot;&quot;
+    &lt;Button Content=&quot;Hello&quot; /&gt;
+    &quot;&quot;&quot;}
+&lt;/FeatureView.Code&gt;
+</code></pre>
+<p>The outer <code>{ ... }</code> is an Akbura C# expression. The <code>&quot;&quot;&quot; ... &quot;&quot;&quot;</code> part is a standard <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/raw-string">C# raw string literal</a>.</p>
+<h2 id="why-raw-strings-are-preferable-in-akbura">Why raw strings are preferable in Akbura<a class="header-anchor" href="javascript:;" onclick="location.hash='#why-raw-strings-are-preferable-in-akbura'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<h3 id="indentation-is-normalized">Indentation is normalized<a class="header-anchor" href="javascript:;" onclick="location.hash='#indentation-is-normalized'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>A multiline raw string uses the indentation of its closing delimiter to determine which leading whitespace should be removed.</p>
+<p>This lets the embedded text stay aligned with the surrounding component:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text={&quot;&quot;&quot;
+    First line
+        Nested line
+    Last line
+    &quot;&quot;&quot;}/&gt;
+</code></pre>
+<p>The indentation required by the component source is not included in the resulting string.</p>
+<h3 id="quotes-and-backslashes-need-less-escaping">Quotes and backslashes need less escaping<a class="header-anchor" href="javascript:;" onclick="location.hash='#quotes-and-backslashes-need-less-escaping'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>A raw string can contain ordinary quote characters and backslashes without the escaping required by a regular C# string:</p>
+<pre><code class="language-akbura">&lt;TextBlock Text={&quot;&quot;&quot;
+Path: C:\Projects\Akbura
+Message: &quot;Hello&quot;
+&quot;&quot;&quot;}/&gt;
+</code></pre>
+<p>When the content itself contains three consecutive quote characters, use a longer delimiter:</p>
+<pre><code class="language-csharp">var text = &quot;&quot;&quot;&quot;
+The content may contain &quot;&quot;&quot; without ending the string.
+&quot;&quot;&quot;&quot;;
+</code></pre>
+<p>The opening and closing delimiters must contain more consecutive quote characters than any quote sequence inside the content.</p>
+<h3 id="raw-strings-support-interpolation">Raw strings support interpolation<a class="header-anchor" href="javascript:;" onclick="location.hash='#raw-strings-support-interpolation'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Add <code>$</code> before the delimiter to create an interpolated raw string:</p>
+<pre><code class="language-akbura">param string name = &quot;Akbura&quot;;
+
+&lt;TextBlock Text={$&quot;&quot;&quot;
+Hello, {name}!
+&quot;&quot;&quot;}/&gt;
+</code></pre>
+<p>The interpolation expression is normal C# and can use:</p>
+<ul>
+<li>component state;</li>
+<li>parameters;</li>
+<li>injected services;</li>
+<li>local variables;</li>
+<li>method calls;</li>
+<li>other C# expressions.</li>
+</ul>
+<p>For example:</p>
+<pre><code class="language-akbura">state int count = 3;
+
+&lt;TextBlock Text={$&quot;&quot;&quot;
+The current count is {count}.
+The next value is {count + 1}.
+&quot;&quot;&quot;}/&gt;
+</code></pre>
+<h3 id="literal-braces-can-be-preserved">Literal braces can be preserved<a class="header-anchor" href="javascript:;" onclick="location.hash='#literal-braces-can-be-preserved'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Interpolated raw strings can use multiple <code>$</code> characters. The number of <code>$</code> characters determines how many braces start an interpolation.</p>
+<p>This is useful when the resulting text itself contains braces:</p>
+<pre><code class="language-csharp">var json = $$&quot;&quot;&quot;
+{
+    &quot;name&quot;: &quot;{‎{name}‎}&quot;
+}
+&quot;&quot;&quot;;
+</code></pre>
+<p>Here, single braces remain part of the text, while <code>{‎{name}‎}</code> is the interpolation.</p>
+<h2 id="comparison-1">Comparison<a class="header-anchor" href="javascript:;" onclick="location.hash='#comparison-1'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<table>
+<thead>
+<tr>
+<th>XML or AXAML</th>
+<th>Akbura</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;![CDATA[ ... ]]&gt;</code></td>
+<td><code>{&quot;&quot;&quot; ... &quot;&quot;&quot;}</code></td>
+</tr>
+<tr>
+<td>XML text container</td>
+<td>C# string expression</td>
+</tr>
+<tr>
+<td>No C# interpolation</td>
+<td>Supports C# interpolation with <code>$&quot;&quot;&quot;</code></td>
+</tr>
+<tr>
+<td>XML whitespace rules</td>
+<td>C# raw-string indentation rules</td>
+</tr>
+<tr>
+<td>XML escaping model</td>
+<td>Raw-string delimiter rules</td>
+</tr>
+</tbody>
+</table>
+<h2 id="summary">Summary<a class="header-anchor" href="javascript:;" onclick="location.hash='#summary'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Do not copy CDATA sections into <code>.akbura</code> files.</p>
+<p>Use:</p>
+<pre><code class="language-akbura">{&quot;&quot;&quot;
+Raw text
+&quot;&quot;&quot;}
+</code></pre>
+<p>Use an interpolated raw string when the text depends on component data:</p>
+<pre><code class="language-akbura">{$&quot;&quot;&quot;
+Value: {value}
+&quot;&quot;&quot;}
+</code></pre>
+
+				</div>
+
+				<div class="not-prose"></div>
+				
+					<div class="not-prose py-8">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akbura/xml-xaml-axaml.md" target="_blank" rel="noopener noreferrer">
+							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+						</a>
+					</div>
+
+					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akbura/items-control" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												ItemsControl
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+									</div>
+								</nav>
+					</div>
+			</div>
+				
+				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+						<div>
+							<h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+								On This Page
+							</h5>
+							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#xml-xaml-and-axaml'" data-id="xml-xaml-and-axaml" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											XML, XAML and AXAML
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#whitespace-and-xmlspace'" data-id="whitespace-and-xmlspace" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Whitespace and 
+										</span>
+											<ul class="ml-4">
+													<li data-id="whitespace-in-akbura" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#whitespace-in-akbura'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Whitespace in Akbura
+														</span>
+													</li>
+													<li data-id="comparison" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#comparison'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Comparison
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#cdata-is-not-supported'" data-id="cdata-is-not-supported" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											CDATA is not supported
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#why-raw-strings-are-preferable-in-akbura'" data-id="why-raw-strings-are-preferable-in-akbura" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Why raw strings are preferable in Akbura
+										</span>
+											<ul class="ml-4">
+													<li data-id="indentation-is-normalized" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#indentation-is-normalized'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Indentation is normalized
+														</span>
+													</li>
+													<li data-id="quotes-and-backslashes-need-less-escaping" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#quotes-and-backslashes-need-less-escaping'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Quotes and backslashes need less escaping
+														</span>
+													</li>
+													<li data-id="raw-strings-support-interpolation" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#raw-strings-support-interpolation'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Raw strings support interpolation
+														</span>
+													</li>
+													<li data-id="literal-braces-can-be-preserved" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#literal-braces-can-be-preserved'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Literal braces can be preserved
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#comparison-1'" data-id="comparison-1" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Comparison
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#summary'" data-id="summary" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Summary
+										</span>
+									</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				
+		</div>
+	</div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+	const el = document.querySelector('#doc section h1') 
+	if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+	const App = {
+		setup() {
+			function nav(url) {
+				window.open(url)
+			}
+			return { nav }
+		}
+	}
+	
+const Sidebar = {
+	setup() {
+		const open = ref(true)
+		return { open }
+	}
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="lib/js/lite-yt-embed.js"></script>
+<script src="mjs/docs.mjs" type="module"></script>
+
+        </main>
+    </div>
+
+    
+
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
+
+    
+</body>
+</html>

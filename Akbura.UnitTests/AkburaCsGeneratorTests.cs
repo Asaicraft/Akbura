@@ -2902,7 +2902,10 @@ public sealed class AkburaCsGeneratorTests
             static source => source.HintName.StartsWith("Akbura.Component.", StringComparison.Ordinal));
         var componentText = generatedComponent.SourceText.ToString();
         Assert.Contains("AkcssClassActivator", componentText, StringComparison.Ordinal);
-        Assert.Contains("AkcssUtilityActivator", componentText, StringComparison.Ordinal);
+        Assert.Contains(
+            "AkcssUtilityCandidateActivator",
+            componentText,
+            StringComparison.Ordinal);
         Assert.Contains("ExecuteAkcssStyles", componentText, StringComparison.Ordinal);
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
@@ -2936,6 +2939,557 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Equal(72d, border.Width);
 
                 window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_AkcssUtilityMarkupExtension_RecreatesDynamicValueOnUpdate()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            param double Spacing = 4;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.p-(double value) {
+                        Width: value;
+                    }
+                }
+            }
+
+            <Border p-${GalleryPadding {Spacing + 1}} />
+            """;
+        const string csharp =
+            """
+            namespace Demo.Extensions
+            {
+                public sealed class GalleryPaddingExtension
+                {
+                    private readonly double _value;
+
+                    public GalleryPaddingExtension(double value)
+                    {
+                        _value = value;
+                        CreationCount++;
+                    }
+
+                    public static int CreationCount { get; private set; }
+
+                    public double ProvideValue(
+                        System.IServiceProvider services)
+                        => _value;
+                }
+            }
+
+            public partial class MarkupUtilityView
+            {
+                public MarkupUtilityView()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedUtilityMarkupExtensionTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "MarkupUtilityView.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        var generated = Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Component.",
+                    StringComparison.Ordinal));
+        var generatedText = generated.SourceText.ToString();
+
+        Assert.Contains(
+            "AkcssUtilityCandidateActivator",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AkcssUtilityValueSource.Create<double>",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RegisterAttached<MarkupUtilityView",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "__CreateAkcssMarkupExtension_",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "#line (",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            sourcePath,
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType =
+                    assembly.GetType("MarkupUtilityView");
+                Assert.NotNull(componentType);
+                var component =
+                    Assert.IsAssignableFrom<AkburaControl>(
+                        Activator.CreateInstance(componentType));
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                window.Show();
+
+                var border =
+                    Assert.IsType<Border>(component.Child);
+                var extensionType = assembly.GetType(
+                    "Demo.Extensions.GalleryPaddingExtension");
+                Assert.NotNull(extensionType);
+                var creationCount =
+                    extensionType.GetProperty("CreationCount");
+                Assert.NotNull(creationCount);
+
+                Assert.Equal(5d, border.Width);
+                var beforeUpdate =
+                    Assert.IsType<int>(
+                        creationCount.GetValue(null));
+
+                componentType
+                    .GetProperty("Spacing")!
+                    .SetValue(component, 10d);
+
+                Assert.Equal(11d, border.Width);
+                Assert.True(
+                    Assert.IsType<int>(
+                        creationCount.GetValue(null)) >
+                    beforeUpdate);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Generator_AkcssUtilityMarkupExtensions_SupportReactiveValuesBindingsAndLifecycle()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.typed-(double value) {
+                        Width: value;
+                    }
+
+                    Control.object-(double value) {
+                        Height: value;
+                    }
+
+                    Control.bound-(double value) {
+                        MinWidth: value;
+                    }
+
+                    Control.variant-(double value) {
+                        MaxWidth: value;
+                    }
+                }
+            }
+
+            <Border
+                typed-${TypedSignal}
+                object-${ObjectSignal}
+                bound-${BoundValue}
+                variant-1
+                ${ReactiveVariant}:variant-2 />
+            """;
+        const string csharp =
+            """
+            using Akbura.Markup;
+            using Avalonia;
+            using Avalonia.Data;
+            using System;
+            using System.Collections.Generic;
+
+            namespace Demo.Extensions
+            {
+                public sealed class TestSignal<T> : IObservable<T>
+                {
+                    private readonly List<IObserver<T>> _observers = new();
+                    private T _value;
+
+                    public TestSignal(T value)
+                    {
+                        _value = value;
+                    }
+
+                    public int SubscriberCount => _observers.Count;
+
+                    public IDisposable Subscribe(IObserver<T> observer)
+                    {
+                        _observers.Add(observer);
+                        observer.OnNext(_value);
+                        return new Subscription(_observers, observer);
+                    }
+
+                    public void Emit(T value)
+                    {
+                        _value = value;
+                        foreach (var observer in _observers.ToArray())
+                        {
+                            observer.OnNext(value);
+                        }
+                    }
+
+                    private sealed class Subscription : IDisposable
+                    {
+                        private readonly List<IObserver<T>> _observers;
+                        private IObserver<T>? _observer;
+
+                        public Subscription(
+                            List<IObserver<T>> observers,
+                            IObserver<T> observer)
+                        {
+                            _observers = observers;
+                            _observer = observer;
+                        }
+
+                        public void Dispose()
+                        {
+                            if (_observer is { } observer)
+                            {
+                                _observers.Remove(observer);
+                                _observer = null;
+                            }
+                        }
+                    }
+                }
+
+                public static class TestSources
+                {
+                    public static TestSignal<double> Typed { get; } = new(12d);
+
+                    public static TestSignal<object> Object { get; } = new(25d);
+
+                    public static TestSignal<bool> Variant { get; } = new(false);
+                }
+
+                public sealed class TypedSignalExtension
+                {
+                    public IObservable<double> ProvideValue(IServiceProvider services)
+                        => TestSources.Typed;
+                }
+
+                public sealed class ObjectSignalExtension
+                {
+                    public IObservable<object> ProvideValue(IServiceProvider services)
+                        => TestSources.Object;
+                }
+
+                public sealed class BoundValueExtension
+                {
+                    public BindingBase ProvideValue(IServiceProvider services)
+                        => new Binding(nameof(BindingModel.Value));
+                }
+
+                [UtilityVariant(
+                    10d,
+                    ConflictGroup = "Tests",
+                    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+                public sealed class ReactiveVariantExtension
+                {
+                    public IObservable<bool> ProvideValue(IServiceProvider services)
+                        => TestSources.Variant;
+                }
+
+                public sealed class BindingModel : AvaloniaObject
+                {
+                    public static readonly StyledProperty<double> ValueProperty =
+                        AvaloniaProperty.Register<BindingModel, double>(
+                            nameof(Value));
+
+                    public double Value
+                    {
+                        get => GetValue(ValueProperty);
+                        set => SetValue(ValueProperty, value);
+                    }
+                }
+            }
+
+            public partial class MarkupUtilitySourcesView
+            {
+                public MarkupUtilitySourcesView()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedUtilityMarkupExtensionSourceTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "MarkupUtilitySourcesView.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        var generated = Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Component.",
+                    StringComparison.Ordinal));
+        var generatedText = generated.SourceText.ToString();
+
+        Assert.Contains(
+            "AkcssUtilityValueSource.CreateObservable<double, double>",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AkcssUtilityValueSource.CreateObservableObject<double>",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AkcssUtilityValueSource.CreateBinding<double>",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "variant:",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType =
+                    assembly.GetType("MarkupUtilitySourcesView");
+                var modelType =
+                    assembly.GetType("Demo.Extensions.BindingModel");
+                var sourcesType =
+                    assembly.GetType("Demo.Extensions.TestSources");
+                Assert.NotNull(componentType);
+                Assert.NotNull(modelType);
+                Assert.NotNull(sourcesType);
+
+                var component =
+                    Assert.IsAssignableFrom<AkburaControl>(
+                        Activator.CreateInstance(componentType));
+                var model = Assert.IsAssignableFrom<AvaloniaObject>(
+                    Activator.CreateInstance(modelType));
+                modelType.GetProperty("Value")!.SetValue(model, 73d);
+                component.DataContext = model;
+
+                var window = new Window
+                {
+                    Content = component,
+                };
+                window.Show();
+
+                var border =
+                    Assert.IsType<Border>(component.Child);
+                var typed = sourcesType
+                    .GetProperty("Typed")!
+                    .GetValue(null)!;
+                var objectSource = sourcesType
+                    .GetProperty("Object")!
+                    .GetValue(null)!;
+                var variant = sourcesType
+                    .GetProperty("Variant")!
+                    .GetValue(null)!;
+
+                Assert.Equal(12d, border.Width);
+                Assert.Equal(25d, border.Height);
+                Assert.Equal(73d, border.MinWidth);
+                Assert.Equal(1d, border.MaxWidth);
+                Assert.Equal(
+                    1,
+                    typed.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(typed));
+                Assert.Equal(
+                    1,
+                    objectSource.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(objectSource));
+                Assert.Equal(
+                    1,
+                    variant.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(variant));
+
+                typed.GetType()
+                    .GetMethod("Emit")!
+                    .Invoke(typed, [24d]);
+                objectSource.GetType()
+                    .GetMethod("Emit")!
+                    .Invoke(objectSource, [44d]);
+                variant.GetType()
+                    .GetMethod("Emit")!
+                    .Invoke(variant, [true]);
+                modelType.GetProperty("Value")!.SetValue(model, 91d);
+
+                Assert.Equal(24d, border.Width);
+                Assert.Equal(44d, border.Height);
+                Assert.Equal(91d, border.MinWidth);
+                Assert.Equal(2d, border.MaxWidth);
+
+                window.Content = null;
+                Assert.Equal(
+                    0,
+                    typed.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(typed));
+                Assert.Equal(
+                    0,
+                    objectSource.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(objectSource));
+                Assert.Equal(
+                    0,
+                    variant.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(variant));
+
+                typed.GetType()
+                    .GetMethod("Emit")!
+                    .Invoke(typed, [31d]);
+                objectSource.GetType()
+                    .GetMethod("Emit")!
+                    .Invoke(objectSource, [45d]);
+                variant.GetType()
+                    .GetMethod("Emit")!
+                    .Invoke(variant, [false]);
+
+                window.Content = component;
+
+                Assert.Equal(31d, border.Width);
+                Assert.Equal(45d, border.Height);
+                Assert.Equal(91d, border.MinWidth);
+                Assert.Equal(1d, border.MaxWidth);
+                Assert.Equal(
+                    1,
+                    typed.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(typed));
+                Assert.Equal(
+                    1,
+                    objectSource.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(objectSource));
+                Assert.Equal(
+                    1,
+                    variant.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(variant));
+
+                window.Close();
+                Assert.Equal(
+                    0,
+                    typed.GetType()
+                        .GetProperty("SubscriberCount")!
+                        .GetValue(typed));
             },
             CancellationToken.None);
     }

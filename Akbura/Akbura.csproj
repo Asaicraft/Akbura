@@ -8,6 +8,7 @@
     <AkburaBuildTasksOutputDirectory>$(MSBuildThisFileDirectory)..\Akbura.Build.Tasks\bin\$(Configuration)\net10.0</AkburaBuildTasksOutputDirectory>
     <AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAkburaBuildTasks</TargetsForTfmSpecificContentInPackage>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

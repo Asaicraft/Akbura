@@ -49,6 +49,9 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_TailwindUtilityNotFound = nameof(AKBURA_SEMANTIC_TailwindUtilityNotFound);
     public const string AKBURA_SEMANTIC_TailwindUtilityAmbiguous = nameof(AKBURA_SEMANTIC_TailwindUtilityAmbiguous);
     public const string AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch = nameof(AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch);
+    public const string AKBURA_SEMANTIC_TailwindMarkupExtensionResultMismatch = nameof(AKBURA_SEMANTIC_TailwindMarkupExtensionResultMismatch);
+    public const string AKBURA_SEMANTIC_TailwindVariantResultMismatch = nameof(AKBURA_SEMANTIC_TailwindVariantResultMismatch);
+    public const string AKBURA_SEMANTIC_TailwindLegacyPrefix = nameof(AKBURA_SEMANTIC_TailwindLegacyPrefix);
     public const string AKBURA_SEMANTIC_AkcssImportNotFound = nameof(AKBURA_SEMANTIC_AkcssImportNotFound);
     public const string AKBURA_SEMANTIC_AkcssApplyItemNotFound = nameof(AKBURA_SEMANTIC_AkcssApplyItemNotFound);
     public const string AKBURA_SEMANTIC_AkcssApplyItemAmbiguous = nameof(AKBURA_SEMANTIC_AkcssApplyItemAmbiguous);

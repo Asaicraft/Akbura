@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
@@ -14,13 +15,15 @@ internal readonly struct BoundTailwindUtilityArgument
         string text,
         CSharpSymbolDefinition type,
         CSharpOperationDefinition valueOperation,
-        object? constantValue)
+        object? constantValue,
+        MarkupExtensionValue? markupExtension = null)
     {
         Syntax = syntax;
         Text = text;
         Type = type;
         ValueOperation = valueOperation;
         ConstantValue = constantValue;
+        MarkupExtension = markupExtension;
     }
 
     public TailwindSegmentSyntax Syntax { get; }
@@ -32,6 +35,8 @@ internal readonly struct BoundTailwindUtilityArgument
     public CSharpOperationDefinition ValueOperation { get; }
 
     public object? ConstantValue { get; }
+
+    public MarkupExtensionValue? MarkupExtension { get; }
 }
 
 internal abstract class BoundMarkupAttribute : BoundNode
@@ -453,6 +458,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         string? conditionText,
         CSharpSymbolDefinition conditionType,
         CSharpOperationDefinition conditionOperation,
+        MarkupExtensionValue? conditionMarkupExtension = null,
+        TailwindUtilityVariant variant = default,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
         bool hasErrors = false)
         : base(
@@ -476,6 +483,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         ConditionText = conditionText;
         ConditionType = conditionType;
         ConditionOperation = conditionOperation;
+        ConditionMarkupExtension = conditionMarkupExtension;
+        Variant = variant;
     }
 
     public new TailwindAttributeSyntax Syntax => (TailwindAttributeSyntax)base.Syntax;
@@ -496,6 +505,10 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
 
     public CSharpOperationDefinition ConditionOperation { get; }
 
+    public MarkupExtensionValue? ConditionMarkupExtension { get; }
+
+    public TailwindUtilityVariant Variant { get; }
+
     public BoundTailwindUtilityAttribute Update(
         IMarkupComponentSymbol? containingComponent,
         string utilityName,
@@ -505,7 +518,9 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         bool hasCondition,
         string? conditionText,
         CSharpSymbolDefinition conditionType,
-        CSharpOperationDefinition conditionOperation)
+        CSharpOperationDefinition conditionOperation,
+        MarkupExtensionValue? conditionMarkupExtension,
+        TailwindUtilityVariant variant)
     {
         if (ReferenceEquals(containingComponent, ContainingComponent) &&
             utilityName == UtilityName &&
@@ -515,7 +530,9 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
             hasCondition == HasCondition &&
             conditionText == ConditionText &&
             conditionType.Equals(ConditionType) &&
-            conditionOperation.Equals(ConditionOperation))
+            conditionOperation.Equals(ConditionOperation) &&
+            ReferenceEquals(conditionMarkupExtension, ConditionMarkupExtension) &&
+            variant.Equals(Variant))
         {
             return this;
         }
@@ -532,6 +549,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
             conditionText,
             conditionType,
             conditionOperation,
+            conditionMarkupExtension,
+            variant,
             Diagnostics,
             HasErrors);
     }

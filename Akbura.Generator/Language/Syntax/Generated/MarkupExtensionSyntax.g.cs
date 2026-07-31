@@ -258,7 +258,11 @@ namespace Akbura.Language.Syntax
             get
             {
                 var red = GetRed(ref _arguments, 3);
-                return new SeparatedSyntaxList<MarkupExtensionArgumentSyntax>(red!, GetChildIndex(3));
+                return red != null
+                    ? new SeparatedSyntaxList<MarkupExtensionArgumentSyntax>(
+                        red,
+                        GetChildIndex(3))
+                    : default;
             }
         }
 

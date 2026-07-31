@@ -402,6 +402,90 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void TailwindMarkupExtensionEdit_ReusesUtilityName()
+    {
+        const string oldCode =
+            "<Border p-${GalleryPadding 1, Value={spacing + 1}, Other=2} rounded-xl/>";
+        const string newCode =
+            "<Border p-${GalleryPadding 1, Value={spacing + 2}, Other=2} rounded-xl/>";
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            oldCode.IndexOf("spacing + 1", StringComparison.Ordinal),
+            oldLength: "spacing + 1".Length,
+            newLength: "spacing + 2".Length);
+        var oldAttribute =
+            Assert.IsType<GreenTailwindFullAttributeSyntax>(
+                oldMarkup.Element.StartTag!.Attributes[0]);
+        var newAttribute =
+            Assert.IsType<GreenTailwindFullAttributeSyntax>(
+                newMarkup.Element.StartTag!.Attributes[0]);
+        var oldSegment =
+            Assert.IsType<GreenTailwindMarkupExtensionSegmentSyntax>(
+                oldAttribute.Segments[0]);
+        var newSegment =
+            Assert.IsType<GreenTailwindMarkupExtensionSegmentSyntax>(
+                newAttribute.Segments[0]);
+
+        Assert.Same(
+            oldAttribute.Name.Identifier,
+            newAttribute.Name.Identifier);
+        Assert.Same(
+            oldSegment.Extension.Arguments[0],
+            newSegment.Extension.Arguments[0]);
+        Assert.NotSame(
+            oldSegment.Extension.Arguments[2],
+            newSegment.Extension.Arguments[2]);
+        Assert.Same(
+            oldSegment.Extension.Arguments[4],
+            newSegment.Extension.Arguments[4]);
+        Assert.NotSame(oldSegment, newSegment);
+        Assert.Same(
+            oldMarkup.Element.StartTag.Attributes[1],
+            newMarkup.Element.StartTag.Attributes[1]);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void TailwindMarkupExtensionPrefixEdit_ReusesUtilityBody()
+    {
+        const string oldCode = "<Border ${md}:p-5 rounded-xl/>";
+        const string newCode = "<Border ${lg}:p-5 rounded-xl/>";
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            oldCode.IndexOf("md", StringComparison.Ordinal),
+            oldLength: 2,
+            newLength: 2);
+        var oldAttribute =
+            Assert.IsType<GreenTailwindFullAttributeSyntax>(
+                oldMarkup.Element.StartTag!.Attributes[0]);
+        var newAttribute =
+            Assert.IsType<GreenTailwindFullAttributeSyntax>(
+                newMarkup.Element.StartTag!.Attributes[0]);
+        var oldPrefix =
+            Assert.IsType<GreenMarkupExtensionConditionalPrefixSyntax>(
+                oldAttribute.Prefix);
+        var newPrefix =
+            Assert.IsType<GreenMarkupExtensionConditionalPrefixSyntax>(
+                newAttribute.Prefix);
+
+        Assert.NotSame(oldPrefix, newPrefix);
+        Assert.Same(
+            oldAttribute.Name,
+            newAttribute.Name);
+        Assert.Same(
+            oldAttribute.Segments[0],
+            newAttribute.Segments[0]);
+        Assert.Same(
+            oldMarkup.Element.StartTag.Attributes[1],
+            newMarkup.Element.StartTag.Attributes[1]);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void QualifiedComponentNameEdit_ReusesAliasQualifierTokensAndAttributes()
     {
         const string oldCode = "<ak::Demo.Controls.Button Text=\"Hi\"/>";

@@ -6,6 +6,7 @@ using Akbura;
 using Akbura.FeatureGallery.Components;
 using Akbura.FeatureGallery.Pages;
 using Akbura.Hooks;
+using Akbura.Markup;
 
 using Avalonia;
 using Avalonia.Controls;

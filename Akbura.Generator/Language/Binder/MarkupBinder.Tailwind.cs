@@ -29,12 +29,25 @@ internal sealed partial class MarkupBinder
         var componentName = containingComponent?.Name ?? "<unknown>";
         var requestedUtilityName = AkburaSemanticModel.GetTailwindUtilityName(attribute);
         var utilityName = requestedUtilityName;
-        var arguments = CreateTailwindUtilityArguments(attribute);
+        var arguments = ImmutableArray<BoundTailwindUtilityArgument>.Empty;
         var validatedArguments = arguments;
-        var condition = CreateTailwindCondition(attribute);
+        var condition = (
+            HasCondition: false,
+            Text: (string?)null,
+            Type: default(CSharpSymbolDefinition),
+            Operation: default(CSharpOperationDefinition),
+            MarkupExtension: (MarkupExtensionValue?)null,
+            Variant: default(TailwindUtilityVariant));
         var utilities = ImmutableArray<ITailwindUtilitySymbol>.Empty;
         {
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+            arguments = CreateTailwindUtilityArguments(
+                attribute,
+                diagnosticsBuilder);
+            validatedArguments = arguments;
+            condition = CreateTailwindCondition(
+                attribute,
+                diagnosticsBuilder);
             utilities = ResolveTailwindUtilitiesForAttribute(
                 attribute,
                 requestedUtilityName,
@@ -61,11 +74,15 @@ internal sealed partial class MarkupBinder
             condition.Text,
             condition.Type,
             condition.Operation,
+            condition.MarkupExtension,
+            condition.Variant,
             diagnostics,
             hasErrors: utilities.Length == 0 || diagnostics.Length > 0 || componentName.Length == 0);
     }
 
-    private ImmutableArray<BoundTailwindUtilityArgument> CreateTailwindUtilityArguments(TailwindAttributeSyntax attribute)
+    private ImmutableArray<BoundTailwindUtilityArgument> CreateTailwindUtilityArguments(
+        TailwindAttributeSyntax attribute,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
         {
@@ -81,7 +98,10 @@ internal sealed partial class MarkupBinder
         using var builder = ImmutableArrayBuilder<BoundTailwindUtilityArgument>.Rent();
         foreach (var segment in fullAttribute.Segments)
         {
-            builder.Add(CreateTailwindUtilityArgument(segment));
+            builder.Add(CreateTailwindUtilityArgument(
+                attribute,
+                segment,
+                diagnosticsBuilder));
         }
 
         return builder.ToImmutable();
@@ -137,8 +157,32 @@ internal sealed partial class MarkupBinder
             argument.ConstantValue != null;
     }
 
-    private BoundTailwindUtilityArgument CreateTailwindUtilityArgument(TailwindSegmentSyntax segment)
+    private BoundTailwindUtilityArgument CreateTailwindUtilityArgument(
+        TailwindAttributeSyntax attribute,
+        TailwindSegmentSyntax segment,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
+        if (segment.Kind ==
+            AkburaSyntaxKind.TailwindMarkupExtensionSegmentSyntax)
+        {
+            var extensionSyntax =
+                Unsafe.As<TailwindMarkupExtensionSegmentSyntax>(segment)
+                    .Extension;
+            var extensionBinding =
+                SemanticModel.BindTailwindMarkupExtension(
+                    attribute,
+                    extensionSyntax);
+            diagnosticsBuilder.AddRange(extensionBinding.Diagnostics);
+
+            return new BoundTailwindUtilityArgument(
+                segment,
+                segment.ToFullString().Trim(),
+                extensionBinding.ResultType,
+                default,
+                constantValue: null,
+                extensionBinding.Value);
+        }
+
         CSharp.ExpressionSyntax? expression = segment.Kind switch
         {
             AkburaSyntaxKind.TailwindNumericSegmentSyntax => CSharpSyntaxFactory.ParseExpression(
@@ -165,25 +209,94 @@ internal sealed partial class MarkupBinder
                 : null);
     }
 
-    private (bool HasCondition, string? Text, CSharpSymbolDefinition Type, CSharpOperationDefinition Operation)
-        CreateTailwindCondition(TailwindAttributeSyntax attribute)
+    private (
+        bool HasCondition,
+        string? Text,
+        CSharpSymbolDefinition Type,
+        CSharpOperationDefinition Operation,
+        MarkupExtensionValue? MarkupExtension,
+        TailwindUtilityVariant Variant)
+        CreateTailwindCondition(
+            TailwindAttributeSyntax attribute,
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
         {
-            return (false, null, default, default);
+            return (false, null, default, default, null, default);
         }
 
         var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
-        if (fullAttribute.Prefix?.Kind != AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        var prefix = fullAttribute.Prefix;
+        if (prefix == null)
         {
-            return (false, null, default, default);
+            return (false, null, default, default, null, default);
         }
 
-        var expressionPrefix = Unsafe.As<ExpressionConditionalPrefixSyntax>(fullAttribute.Prefix);
+        if (prefix.Kind == AkburaSyntaxKind.SimpleConditionalPrefixSyntax)
+        {
+            var simplePrefix = Unsafe.As<SimpleConditionalPrefixSyntax>(prefix);
+            var prefixName = simplePrefix.Name.Identifier.ValueText;
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateTailwindLegacyPrefixDiagnostic(
+                    simplePrefix));
+
+            return (
+                true,
+                prefixName,
+                default,
+                default,
+                null,
+                new TailwindUtilityVariant(isPrefixed: true));
+        }
+
+        if (prefix.Kind ==
+            AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
+        {
+            var extensionPrefix =
+                Unsafe.As<MarkupExtensionConditionalPrefixSyntax>(prefix);
+            var extensionBinding =
+                SemanticModel.BindTailwindMarkupExtension(
+                    attribute,
+                    extensionPrefix.Extension);
+            diagnosticsBuilder.AddRange(extensionBinding.Diagnostics);
+
+            if (extensionBinding.Value != null &&
+                !IsValidTailwindVariantResult(
+                    extensionBinding.ResultType.Symbol as ITypeSymbol))
+            {
+                diagnosticsBuilder.Add(
+                    AkburaSemanticModel.CreateTailwindVariantResultMismatchDiagnostic(
+                        extensionPrefix.Extension,
+                        extensionBinding.ResultType.Symbol as ITypeSymbol));
+            }
+
+            return (
+                true,
+                extensionPrefix.Extension.ToFullString().Trim(),
+                extensionBinding.ResultType,
+                default,
+                extensionBinding.Value,
+                CreateTailwindUtilityVariant(extensionBinding.Value));
+        }
+
+        if (prefix.Kind !=
+            AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        {
+            return (false, null, default, default, null, default);
+        }
+
+        var expressionPrefix =
+            Unsafe.As<ExpressionConditionalPrefixSyntax>(prefix);
         var expression = AkburaSemanticModel.ParseInlineExpression(expressionPrefix.Expression);
         if (expression == null)
         {
-            return (true, expressionPrefix.Expression.ToFullString(), default, default);
+            return (
+                true,
+                expressionPrefix.Expression.ToFullString(),
+                default,
+                default,
+                null,
+                new TailwindUtilityVariant(isPrefixed: true));
         }
 
         var binding = SemanticModel.BindMarkupAttributeExpression(attribute, expression);
@@ -191,7 +304,9 @@ internal sealed partial class MarkupBinder
             true,
             expressionPrefix.Expression.Expression.ToFullString(),
             binding.TypeSymbol == null ? default : new CSharpSymbolDefinition(binding.TypeSymbol),
-            binding.OperationDefinition);
+            binding.OperationDefinition,
+            null,
+            new TailwindUtilityVariant(isPrefixed: true));
     }
 
     private ImmutableArray<ITailwindUtilitySymbol> ResolveTailwindUtilitiesForAttribute(
@@ -475,6 +590,24 @@ internal sealed partial class MarkupBinder
                 continue;
             }
 
+            if (argument.MarkupExtension != null)
+            {
+                if (CanTailwindMarkupExtensionProvide(
+                    argumentType,
+                    parameterType))
+                {
+                    validatedBuilder.Add(argument);
+                    continue;
+                }
+
+                diagnosticsBuilder.Add(
+                    AkburaSemanticModel.CreateTailwindMarkupExtensionResultMismatchDiagnostic(
+                        argument.Syntax,
+                        argumentType,
+                        parameterType));
+                return null;
+            }
+
             if (TryCreateEnumTailwindUtilityArgument(
                 argument,
                 parameterType,
@@ -500,6 +633,182 @@ internal sealed partial class MarkupBinder
 
         validatedArguments = validatedBuilder.ToImmutable();
         return utility;
+    }
+
+    private bool CanTailwindMarkupExtensionProvide(
+        ITypeSymbol? resultType,
+        ITypeSymbol expectedType)
+    {
+        if (resultType == null)
+        {
+            return false;
+        }
+
+        var bindingBaseType =
+            Compilation.CSharpCompilation.GetTypeByMetadataName(
+                "Avalonia.Data.BindingBase");
+        if (bindingBaseType != null &&
+            AkburaSemanticModel.IsAssignableTo(
+                resultType,
+                bindingBaseType))
+        {
+            return true;
+        }
+
+        if (TryGetObservableElementType(
+            resultType,
+            out var observableElementType))
+        {
+            return observableElementType.SpecialType ==
+                    SpecialType.System_Object ||
+                Compilation.CSharpCompilation
+                    .ClassifyConversion(
+                        observableElementType,
+                        expectedType)
+                    .IsImplicit;
+        }
+
+        return Compilation.CSharpCompilation
+            .ClassifyConversion(resultType, expectedType)
+            .IsImplicit;
+    }
+
+    private bool IsValidTailwindVariantResult(ITypeSymbol? resultType)
+    {
+        if (resultType == null)
+        {
+            return false;
+        }
+
+        if (resultType.SpecialType == SpecialType.System_Boolean)
+        {
+            return true;
+        }
+
+        return TryGetObservableElementType(
+                resultType,
+                out var observableElementType) &&
+            observableElementType.SpecialType ==
+                SpecialType.System_Boolean;
+    }
+
+    private bool TryGetObservableElementType(
+        ITypeSymbol type,
+        out ITypeSymbol elementType)
+    {
+        var observableType =
+            Compilation.CSharpCompilation.GetTypeByMetadataName(
+                "System.IObservable`1");
+        if (observableType != null)
+        {
+            if (type is INamedTypeSymbol namedType &&
+                SymbolEqualityComparer.Default.Equals(
+                    namedType.OriginalDefinition,
+                    observableType))
+            {
+                elementType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            foreach (var interfaceType in type.AllInterfaces)
+            {
+                if (SymbolEqualityComparer.Default.Equals(
+                    interfaceType.OriginalDefinition,
+                    observableType))
+                {
+                    elementType = interfaceType.TypeArguments[0];
+                    return true;
+                }
+            }
+        }
+
+        elementType = null!;
+        return false;
+    }
+
+    private static TailwindUtilityVariant CreateTailwindUtilityVariant(
+        MarkupExtensionValue? extension)
+    {
+        if (extension?.ExtensionType.Symbol is not INamedTypeSymbol
+            extensionType)
+        {
+            return new TailwindUtilityVariant(isPrefixed: true);
+        }
+
+        var attribute = extensionType
+            .GetAttributes()
+            .FirstOrDefault(static attribute =>
+                attribute.AttributeClass?.ToDisplayString() ==
+                    "Akbura.Markup.UtilityVariantAttribute");
+        if (attribute == null)
+        {
+            return new TailwindUtilityVariant(isPrefixed: true);
+        }
+
+        var order = 0d;
+        if (attribute.ConstructorArguments.Length > 0 &&
+            attribute.ConstructorArguments[0].Value is object orderValue)
+        {
+            try
+            {
+                order = Convert.ToDouble(
+                    orderValue,
+                    System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch (FormatException)
+            {
+            }
+            catch (InvalidCastException)
+            {
+            }
+            catch (OverflowException)
+            {
+            }
+        }
+
+        string? conflictGroup = null;
+        var precedence =
+            TailwindUtilityUnprefixedPrecedence.SourceOrder;
+        foreach (var namedArgument in attribute.NamedArguments)
+        {
+            switch (namedArgument.Key)
+            {
+                case "ConflictGroup":
+                    conflictGroup =
+                        namedArgument.Value.Value as string;
+                    break;
+
+                case "UnprefixedPrecedence":
+                    if (namedArgument.Value.Value is object
+                        precedenceValue)
+                    {
+                        try
+                        {
+                            precedence =
+                                (TailwindUtilityUnprefixedPrecedence)
+                                Convert.ToInt32(
+                                    precedenceValue,
+                                    System.Globalization.CultureInfo.InvariantCulture);
+                        }
+                        catch (FormatException)
+                        {
+                        }
+                        catch (InvalidCastException)
+                        {
+                        }
+                        catch (OverflowException)
+                        {
+                        }
+                    }
+                    break;
+            }
+        }
+
+        return new TailwindUtilityVariant(
+            isPrefixed: true,
+            order,
+            conflictGroup,
+            precedence);
     }
 
     private bool TryCreateEnumTailwindUtilityArgument(

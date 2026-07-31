@@ -95,6 +95,56 @@ internal partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(markupAttribute);
 
+        if (markupAttribute.Kind ==
+            AkburaSyntaxKind.TailwindFullAttributeSyntax)
+        {
+            var tailwindAttribute =
+                Unsafe.As<TailwindFullAttributeSyntax>(markupAttribute);
+            using var builder =
+                ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
+
+            if (tailwindAttribute.Prefix?.Kind ==
+                AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+            {
+                builder.AddRange(GetCSharpSymbolReferences(
+                    Unsafe.As<ExpressionConditionalPrefixSyntax>(
+                            tailwindAttribute.Prefix)
+                        .Expression));
+            }
+            else if (tailwindAttribute.Prefix?.Kind ==
+                AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
+            {
+                AddMarkupExtensionCSharpSymbolReferences(
+                    Unsafe.As<MarkupExtensionConditionalPrefixSyntax>(
+                            tailwindAttribute.Prefix)
+                        .Extension,
+                    builder);
+            }
+
+            foreach (var segment in tailwindAttribute.Segments)
+            {
+                switch (segment.Kind)
+                {
+                    case AkburaSyntaxKind.TailwindExpressionSegmentSyntax:
+                        builder.AddRange(GetCSharpSymbolReferences(
+                            Unsafe.As<TailwindExpressionSegmentSyntax>(
+                                    segment)
+                                .Expression));
+                        break;
+
+                    case AkburaSyntaxKind.TailwindMarkupExtensionSegmentSyntax:
+                        AddMarkupExtensionCSharpSymbolReferences(
+                            Unsafe.As<TailwindMarkupExtensionSegmentSyntax>(
+                                    segment)
+                                .Extension,
+                            builder);
+                        break;
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
         var value = GetMarkupAttributeValue(markupAttribute);
         if (value == null)
         {

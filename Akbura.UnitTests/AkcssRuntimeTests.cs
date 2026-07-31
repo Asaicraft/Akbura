@@ -1,8 +1,10 @@
 using Akbura.Akcss;
 using Akbura.CompilerAnotations;
+using Akbura.Markup;
 using Avalonia;
 using Avalonia.Controls;
 using System.Collections.Immutable;
+using System.Reflection;
 
 namespace Akbura.UnitTests;
 
@@ -115,6 +117,398 @@ public sealed class AkcssRuntimeTests
             () => AkburaControl.SetAkcssStyles(control, styles));
     }
 
+    [Fact]
+    public void UtilityCandidates_ResolveBreakpointGroupAndFallback()
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var smSignal = new TestSignal<bool>();
+        var mdSignal = new TestSignal<bool>();
+        var fallback = CreateCandidate(
+            "p",
+            sourceOrder: 3,
+            "fallback",
+            events);
+        var sm = CreateCandidate(
+            "p",
+            sourceOrder: 0,
+            "sm",
+            events,
+            CreateVariantSource(smSignal),
+            order: 1d,
+            conflictGroup: "Breakpoints",
+            UnprefixedUtilityPrecedence.Above);
+        var md = CreateCandidate(
+            "p",
+            sourceOrder: 1,
+            "md",
+            events,
+            CreateVariantSource(mdSignal),
+            order: 10d,
+            conflictGroup: "Breakpoints",
+            UnprefixedUtilityPrecedence.Above);
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [sm, md, fallback]);
+
+        Assert.Equal("fallback:update", events[^1]);
+
+        events.Clear();
+        smSignal.Emit(true);
+        Assert.Equal("sm:update", events[^1]);
+
+        events.Clear();
+        mdSignal.Emit(true);
+        Assert.Equal("md:update", events[^1]);
+
+        events.Clear();
+        mdSignal.Emit(false);
+        Assert.Equal("sm:update", events[^1]);
+
+        events.Clear();
+        smSignal.Emit(false);
+        Assert.Equal("fallback:update", events[^1]);
+    }
+
+    [Fact]
+    public void UtilityCandidateChange_RecalculatesOnlyItsConflictKey()
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var classSignal = new TestSignal<object?>();
+        var style = new LoggingClass(events, classSignal);
+        var variantSignal = new TestSignal<bool>();
+        var padding = CreateCandidate(
+            "p",
+            sourceOrder: 0,
+            "padding",
+            events,
+            CreateVariantSource(variantSignal));
+        var background = CreateCandidate(
+            "bg",
+            sourceOrder: 1,
+            "background",
+            events);
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [
+                new AkcssClassActivator(style),
+                padding,
+                background,
+            ]);
+
+        events.Clear();
+        variantSignal.Emit(true);
+
+        Assert.Contains("padding:update", events);
+        Assert.DoesNotContain("class:reset", events);
+        Assert.DoesNotContain("class:update", events);
+        Assert.DoesNotContain("background:reset", events);
+        Assert.DoesNotContain("background:update", events);
+    }
+
+    [Fact]
+    public void UtilityCandidates_UseOrderOnlyWithinSameConflictGroup()
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var firstSignal = new TestSignal<bool>();
+        var secondSignal = new TestSignal<bool>();
+        var highOrderEarlier = CreateCandidate(
+            "p",
+            sourceOrder: 0,
+            "high-order",
+            events,
+            CreateVariantSource(firstSignal),
+            order: 100d,
+            conflictGroup: "First");
+        var lowOrderLater = CreateCandidate(
+            "p",
+            sourceOrder: 1,
+            "later-group",
+            events,
+            CreateVariantSource(secondSignal),
+            order: 1d,
+            conflictGroup: "Second");
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [highOrderEarlier, lowOrderLater]);
+        firstSignal.Emit(true);
+        events.Clear();
+        secondSignal.Emit(true);
+
+        Assert.Equal("later-group:update", events[^1]);
+    }
+
+    [Theory]
+    [InlineData(
+        UnprefixedUtilityPrecedence.Below,
+        10,
+        0,
+        "unprefixed:update")]
+    [InlineData(
+        UnprefixedUtilityPrecedence.Above,
+        0,
+        10,
+        "prefixed:update")]
+    [InlineData(
+        UnprefixedUtilityPrecedence.SourceOrder,
+        0,
+        10,
+        "unprefixed:update")]
+    [InlineData(
+        UnprefixedUtilityPrecedence.SourceOrder,
+        10,
+        0,
+        "prefixed:update")]
+    public void UtilityCandidates_RespectUnprefixedPrecedence(
+        UnprefixedUtilityPrecedence precedence,
+        int prefixedSourceOrder,
+        int unprefixedSourceOrder,
+        string expected)
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var prefixed = CreateCandidate(
+            "p",
+            prefixedSourceOrder,
+            "prefixed",
+            events,
+            AkcssUtilityValueSource.Create<bool>(
+                static _ => true),
+            precedence: precedence);
+        var unprefixed = CreateCandidate(
+            "p",
+            unprefixedSourceOrder,
+            "unprefixed",
+            events);
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [prefixed, unprefixed]);
+
+        Assert.Equal(expected, events[^1]);
+    }
+
+    [Fact]
+    public void UtilityCandidates_WithEqualOrder_UseLaterSourceOrder()
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var first = CreateCandidate(
+            "p",
+            sourceOrder: 0,
+            "first",
+            events,
+            AkcssUtilityValueSource.Create<bool>(
+                static _ => true),
+            order: 10d,
+            conflictGroup: "Group");
+        var second = CreateCandidate(
+            "p",
+            sourceOrder: 1,
+            "second",
+            events,
+            AkcssUtilityValueSource.Create<bool>(
+                static _ => true),
+            order: 10d,
+            conflictGroup: "Group");
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [first, second]);
+
+        Assert.Equal("second:update", events[^1]);
+    }
+
+    [Fact]
+    public void UtilityCandidates_WithoutConflictGroup_IgnoreOrder()
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var highOrder = CreateCandidate(
+            "p",
+            sourceOrder: 0,
+            "high-order",
+            events,
+            AkcssUtilityValueSource.Create<bool>(
+                static _ => true),
+            order: 100d);
+        var later = CreateCandidate(
+            "p",
+            sourceOrder: 1,
+            "later",
+            events,
+            AkcssUtilityValueSource.Create<bool>(
+                static _ => true),
+            order: 1d);
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [highOrder, later]);
+
+        Assert.Equal("later:update", events[^1]);
+    }
+
+    [Fact]
+    public void UpdateDependentUtilityValue_IsRecreatedOnRefresh()
+    {
+        var control = new Border();
+        var values = new List<int>();
+        var created = 0;
+        var source = AkcssUtilityValueSource.Create<int>(
+            _ => ++created,
+            recreateOnRefresh: true);
+        var utility = new ValueUtility(values);
+        var candidate = new AkcssUtilityCandidateActivator(
+            "p",
+            sourceOrder: 0,
+            applications:
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    (_, arguments) =>
+                        utility.Update(
+                            control,
+                            (int)arguments[0]!)),
+            ],
+            arguments: [source]);
+
+        AkburaControl.SetAkcssStyles(control, [candidate]);
+        AkburaControl.ExecuteAkcssStyles(control);
+
+        Assert.Equal([1, 2], values);
+        Assert.Equal(2, created);
+    }
+
+    [Fact]
+    public void ObservableUtilityValue_RetainsLastValueAfterCompletion()
+    {
+        var control = new Border();
+        var values = new List<int>();
+        var signal = new TestSignal<int>();
+        var source =
+            AkcssUtilityValueSource.CreateObservable<int, int>(
+                _ => signal,
+                static value => value);
+        var utility = new ValueUtility(values);
+        var candidate = new AkcssUtilityCandidateActivator(
+            "p",
+            sourceOrder: 0,
+            applications:
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    (_, arguments) =>
+                        utility.Update(
+                            control,
+                            (int)arguments[0]!)),
+            ],
+            arguments: [source]);
+
+        AkburaControl.SetAkcssStyles(control, [candidate]);
+        signal.Emit(7);
+        signal.Complete();
+        AkburaControl.ExecuteAkcssStyles(control);
+
+        Assert.Equal([7, 7], values);
+    }
+
+    [Fact]
+    public void ObservableUtilityValue_ErrorIsFailFast()
+    {
+        var control = new Border();
+        var signal = new TestSignal<int>();
+        var source =
+            AkcssUtilityValueSource.CreateObservable<int, int>(
+                _ => signal,
+                static value => value);
+        var utility = new ValueUtility([]);
+        var candidate = new AkcssUtilityCandidateActivator(
+            "p",
+            sourceOrder: 0,
+            applications:
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    (_, arguments) =>
+                        utility.Update(
+                            control,
+                            (int)arguments[0]!)),
+            ],
+            arguments: [source]);
+
+        AkburaControl.SetAkcssStyles(control, [candidate]);
+        var error = new InvalidOperationException("Observable failed.");
+
+        Assert.Same(
+            error,
+            Assert.Throws<InvalidOperationException>(
+                () => signal.Error(error)));
+    }
+
+    [Theory]
+    [InlineData(typeof(smExtension), 640d)]
+    [InlineData(typeof(mdExtension), 768d)]
+    [InlineData(typeof(lgExtension), 1024d)]
+    [InlineData(typeof(xlExtension), 1280d)]
+    [InlineData(typeof(xxlExtension), 1536d)]
+    public void BreakpointVariants_UseExpectedThreshold(
+        Type extensionType,
+        double threshold)
+    {
+        Assert.NotNull(Activator.CreateInstance(extensionType));
+        var method = extensionType.GetMethod(
+            "IsActivated",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        Assert.False(
+            Assert.IsType<bool>(
+                method.Invoke(null, [threshold - 0.01d])));
+        Assert.True(
+            Assert.IsType<bool>(
+                method.Invoke(null, [threshold])));
+    }
+
+    private static AkcssUtilityCandidateActivator CreateCandidate(
+        string conflictKey,
+        int sourceOrder,
+        string name,
+        List<string> events,
+        AkcssUtilityValueSource? variant = null,
+        double order = 0d,
+        string? conflictGroup = null,
+        UnprefixedUtilityPrecedence precedence =
+            UnprefixedUtilityPrecedence.SourceOrder)
+    {
+        var utility = new NamedUtility(name, events);
+        return new AkcssUtilityCandidateActivator(
+            conflictKey,
+            sourceOrder,
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    (target, _) => utility.Update(target)),
+            ],
+            variant: variant,
+            order: order,
+            conflictGroup: conflictGroup,
+            unprefixedPrecedence: precedence);
+    }
+
+    private static AkcssUtilityValueSource CreateVariantSource(
+        IObservable<bool> signal)
+    {
+        return AkcssUtilityValueSource
+            .CreateObservable<bool, bool>(
+                _ => signal,
+                static value => value);
+    }
+
     private sealed class LoggingClass : AkcssClass
     {
         private readonly List<string> _events;
@@ -196,6 +590,45 @@ public sealed class AkcssRuntimeTests
         }
     }
 
+    private sealed class NamedUtility : ZeroAkcssUtility
+    {
+        private readonly string _name;
+        private readonly List<string> _events;
+
+        public NamedUtility(
+            string name,
+            List<string> events)
+        {
+            _name = name;
+            _events = events;
+        }
+
+        public override void Update(object target)
+        {
+            _events.Add(_name + ":update");
+        }
+
+        public override void Reset(object target)
+        {
+            _events.Add(_name + ":reset");
+        }
+    }
+
+    private sealed class ValueUtility : AkcssUtility<int>
+    {
+        private readonly List<int> _values;
+
+        public ValueUtility(List<int> values)
+        {
+            _values = values;
+        }
+
+        public override void Update(object target, int value)
+        {
+            _values.Add(value);
+        }
+    }
+
     private sealed class ArgumentUtility : AkcssUtility<int>
     {
         public override void Update(object target, int value)
@@ -268,6 +701,22 @@ public sealed class AkcssRuntimeTests
             foreach (var observer in _observers.ToArray())
             {
                 observer.OnNext(value);
+            }
+        }
+
+        public void Error(Exception error)
+        {
+            foreach (var observer in _observers.ToArray())
+            {
+                observer.OnError(error);
+            }
+        }
+
+        public void Complete()
+        {
+            foreach (var observer in _observers.ToArray())
+            {
+                observer.OnCompleted();
             }
         }
 

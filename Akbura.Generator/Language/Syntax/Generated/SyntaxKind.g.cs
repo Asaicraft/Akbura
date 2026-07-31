@@ -191,31 +191,33 @@ namespace Akbura.Language.Syntax
 		SimpleConditionalPrefixSyntax = 554,
 		ExpressionConditionalPrefixSyntax = 555,
 		TailwindFullAttributeSyntax = 556,
+		TailwindMarkupExtensionSegmentSyntax = 557,
+		MarkupExtensionConditionalPrefixSyntax = 558,
 
 		// AKCSS root
-		AkcssDocumentSyntax = 557,
-		AkcssTopLevelMember = 558,
-		AkcssUsingDirectiveSyntax = 559,
+		AkcssDocumentSyntax = 559,
+		AkcssTopLevelMember = 560,
+		AkcssUsingDirectiveSyntax = 561,
 
 		// Shared body members
-		AkcssBodyMemberSyntax = 560,
-		AkcssAssignmentSyntax = 561,
-		AkcssApplyDirectiveSyntax = 562,
-		AkcssInterceptDirectiveSyntax = 563,
-		AkcssIfDirectiveSyntax = 564,
-		AkcssAdditionalPseudoStateSyntax = 565,
-		AkcssPseudoSelectorSyntax = 566,
-		AkcssPseudoBlockSyntax = 567,
+		AkcssBodyMemberSyntax = 562,
+		AkcssAssignmentSyntax = 563,
+		AkcssApplyDirectiveSyntax = 564,
+		AkcssInterceptDirectiveSyntax = 565,
+		AkcssIfDirectiveSyntax = 566,
+		AkcssAdditionalPseudoStateSyntax = 567,
+		AkcssPseudoSelectorSyntax = 568,
+		AkcssPseudoBlockSyntax = 569,
 
 		// AKCSS style rules
-		AkcssStyleRuleSyntax = 568,
-		AkcssStyleSelectorSyntax = 569,
+		AkcssStyleRuleSyntax = 570,
+		AkcssStyleSelectorSyntax = 571,
 
 		// AKCSS utilities
-		AkcssUtilitiesSectionSyntax = 570,
-		AkcssUtilityParameterSyntax = 571,
-		AkcssUtilitySelectorSyntax = 572,
-		AkcssUtilityDeclarationSyntax = 573,
+		AkcssUtilitiesSectionSyntax = 572,
+		AkcssUtilityParameterSyntax = 573,
+		AkcssUtilitySelectorSyntax = 574,
+		AkcssUtilityDeclarationSyntax = 575,
 
 		// Identifiers and types
 		Type = 700,

@@ -163,6 +163,29 @@ state double scale = 2;
 <Button square-{width * scale} />
 ```
 
+## Markup extension arguments
+
+Use `${...}` when a markup extension supplies a utility argument:
+
+```akbura
+using Demo.Markup;
+
+state double spacing = 4;
+
+<Border p-${GalleryPadding {spacing + 1}} />
+```
+
+The extension is resolved and bound at compile time. For a utility parameter
+`T`, its `ProvideValue` method may return `T`, `IObservable<T>`,
+`IObservable<object>`, or `BindingBase`.
+
+Observable and binding results reapply only the affected utility conflict.
+When an extension argument contains a C# expression, it is recreated on each
+component update so it sees the current state and parameter values.
+
+See [Markup Extensions](markup-extensions.md) for the full value and lifecycle
+contract.
+
 ## Conditional utilities
 
 A utility can be applied conditionally with an expression prefix:
@@ -194,6 +217,95 @@ The condition must be a valid boolean expression:
 <Button {count > 10}:hidden />
 <Button {user.IsAdmin}:visible />
 ```
+
+## Markup extension prefixes
+
+A markup extension can act as a reactive utility condition:
+
+```akbura
+using Akbura.Markup;
+using Akbura.Styles.akcss;
+
+<Border p-1
+        ${sm}:p-2
+        ${md}:p-3
+        ${lg}:p-4
+        ${xl}:p-5
+        ${xxl}:p-6 />
+```
+
+The extension must return `bool` or `IObservable<bool>`. A false or not-yet-
+available value removes that candidate from conflict resolution, allowing the
+next matching utility to apply.
+
+The braces are required. `md:p-3` is retained only for parser recovery and
+produces a diagnostic that suggests `${md}:p-3`.
+
+## Variant priority
+
+Utilities conflict by their resolved utility name. For example, `p-1`,
+`p-2`, and `${md}:p-3` all use the conflict key `p`. Only one candidate wins
+for that key. Unrelated keys such as `p` and `bg` are resolved independently.
+
+The runtime resolves active candidates in this order:
+
+1. For each non-empty `ConflictGroup`, choose the candidate with the greatest
+   `Order`.
+2. If `Order` is equal, choose the candidate written later.
+3. Candidates from different groups, and candidates without a group, are
+   compared by source order rather than by `Order`.
+4. Compare the winning prefixed candidate with the last unprefixed candidate
+   according to `UnprefixedPrecedence`.
+
+The three unprefixed precedence modes are:
+
+| Mode | Result |
+| --- | --- |
+| `Below` | The unprefixed utility always wins. |
+| `SourceOrder` | The candidate written later wins. |
+| `Above` | The active prefixed utility always wins. |
+
+Custom variants declare these values on their extension type:
+
+```csharp
+using Akbura.Markup;
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = "WindowBreakpoints",
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class WideExtension
+{
+    public IObservable<bool> ProvideValue(IServiceProvider services)
+    {
+        // Return an observable condition for the target.
+    }
+}
+```
+
+`UtilityVariantAttribute` decides priority only after utilities are known to
+conflict. Sharing a `ConflictGroup` never creates a conflict between unrelated
+utilities.
+
+## Built-in breakpoints
+
+The built-in variants are available through an explicit import:
+
+```akbura
+using Akbura.Markup;
+```
+
+| Variant | Active width | Order |
+| --- | ---: | ---: |
+| `${sm}` | `>= 640` | `1` |
+| `${md}` | `>= 768` | `10` |
+| `${lg}` | `>= 1024` | `20` |
+| `${xl}` | `>= 1280` | `30` |
+| `${xxl}` | `>= 1536` | `40` |
+
+All built-in breakpoints belong to one conflict group and use
+`UnprefixedUtilityPrecedence.Above`. Therefore the largest active breakpoint
+wins even when an unprefixed utility appears later.
 
 ## Conditional declarations inside utilities
 

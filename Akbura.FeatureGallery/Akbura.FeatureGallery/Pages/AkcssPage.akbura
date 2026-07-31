@@ -218,6 +218,85 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     <StackPanel gap-4>
 
+        <StackPanel gap-1>
+
+            <TextBlock Text="Markup extension utilities"
+                       text-3xl
+                       font-bold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="Utility arguments can come from markup extensions, while reactive extension prefixes participate in the AKCSS cascade."
+                text-base
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/MarkupExtensionUtilityDemo.akbura">
+
+            <FeatureView.Code>
+                {"""
+                using Akbura.FeatureGallery.Markup;
+                using Akbura.FeatureGallery.Styles.akcss;
+
+                state double spacing = 3;
+
+                <StackPanel gap-3>
+                    <StackPanel Orientation="Horizontal"
+                                gap-2>
+                        <Button Content="-"
+                                Click={() =>
+                                    spacing = Math.Max(1, spacing - 1)}/>
+
+                        <Button Content="+"
+                                Click={() =>
+                                    spacing = Math.Min(8, spacing + 1)}/>
+                    </StackPanel>
+
+                    <Border p-${GalleryPadding {spacing}}
+                            bg-blue-600
+                            rounded-lg>
+                        Dynamic utility argument
+                    </Border>
+                </StackPanel>
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <MarkupExtensionUtilityDemo/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+        <FeatureView Path="Components/BreakpointUtilityDemo.akbura">
+
+            <FeatureView.Code>
+                {"""
+                using Akbura.FeatureGallery.Styles.akcss;
+                using Akbura.Markup;
+
+                <Border p-1
+                        ${sm}:p-2
+                        ${md}:p-3
+                        ${lg}:p-4
+                        ${xl}:p-5
+                        ${xxl}:p-6>
+                    Resize the window
+                </Border>
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <BreakpointUtilityDemo/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+    </StackPanel>
+
+    <StackPanel gap-4>
+
         <TextBlock Text="Classes and utilities"
                    text-3xl
                    font-bold

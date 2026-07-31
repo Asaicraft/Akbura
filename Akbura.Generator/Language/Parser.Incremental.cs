@@ -870,11 +870,6 @@ internal sealed partial class Parser
             return attribute;
         }
 
-        if (IsIncrementalTailwindPrefixSegmentStart())
-        {
-            return ParseTailwindAttributeSyntax();
-        }
-
         var prefix = TryParseIncrementalTailwindPrefixSegmentSyntax();
         var name = ParseIncrementalTailwindSimpleName();
 
@@ -921,6 +916,18 @@ internal sealed partial class Parser
             return prefix;
         }
 
+        if (PeekIncrementalTokenKind() == SyntaxKind.DollarToken &&
+            PeekIncrementalTokenKind(1) == SyntaxKind.OpenBraceToken)
+        {
+            var extension =
+                ParseIncrementalMarkupExtensionSyntax(
+                    tryReuseWholeNode: false);
+            var colon = ReadRequiredIncrementalToken(SyntaxKind.ColonToken);
+            return GreenSyntaxFactory.MarkupExtensionConditionalPrefixSyntax(
+                extension,
+                colon);
+        }
+
         if (PeekIncrementalTokenKind() == SyntaxKind.OpenBraceToken)
         {
             var expression = ParseIncrementalInlineExpressionSyntax();
@@ -942,7 +949,8 @@ internal sealed partial class Parser
 
     private bool IsIncrementalTailwindPrefixSegmentStart()
     {
-        return PeekIncrementalTokenKind() == SyntaxKind.OpenBraceToken ||
+        return PeekIncrementalTokenKind() == SyntaxKind.DollarToken ||
+            PeekIncrementalTokenKind() == SyntaxKind.OpenBraceToken ||
             (IsIncrementalTailwindNameToken(PeekIncrementalTokenKind()) &&
              PeekIncrementalTokenKind(1) == SyntaxKind.ColonToken &&
              !IsIncrementalMarkupPrefixedAttributeStart());
@@ -950,6 +958,13 @@ internal sealed partial class Parser
 
     private GreenTailwindSegmentSyntax ParseIncrementalTailwindSegmentSyntax()
     {
+        if (PeekIncrementalTokenKind() == SyntaxKind.DollarToken)
+        {
+            return GreenSyntaxFactory.TailwindMarkupExtensionSegmentSyntax(
+                ParseIncrementalMarkupExtensionSyntax(
+                    tryReuseWholeNode: false));
+        }
+
         if (TryReadReusableIncrementalNode<GreenTailwindSegmentSyntax>(out var segment))
         {
             return segment;
@@ -1115,9 +1130,12 @@ internal sealed partial class Parser
             : ParseQuotedMarkupTextLiteralSyntax();
     }
 
-    private GreenMarkupExtensionSyntax ParseIncrementalMarkupExtensionSyntax()
+    private GreenMarkupExtensionSyntax ParseIncrementalMarkupExtensionSyntax(
+        bool tryReuseWholeNode = true)
     {
-        if (TryReadReusableIncrementalNode<GreenMarkupExtensionSyntax>(out var extension))
+        if (tryReuseWholeNode &&
+            TryReadReusableIncrementalNode<GreenMarkupExtensionSyntax>(
+                out var extension))
         {
             return extension;
         }
@@ -1621,7 +1639,8 @@ internal sealed partial class Parser
 
         var name = ParseIncrementalMarkupSimpleName();
 
-        if (PeekIncrementalTokenKind() != SyntaxKind.OpenBraceToken)
+        if (PeekIncrementalTokenKind() != SyntaxKind.OpenBraceToken ||
+            !AreAdjacent(name.Identifier, PeekIncrementalToken()))
         {
             return GreenSyntaxFactory.MarkupIdentifierNameSegmentSyntax(name);
         }
@@ -2075,7 +2094,9 @@ internal sealed partial class Parser
     private bool IsIncrementalTailwindAttributeStart()
     {
         var kind = PeekIncrementalTokenKind();
-        return kind is SyntaxKind.OpenBraceToken or SyntaxKind.MinusToken ||
+        return kind is SyntaxKind.DollarToken or
+            SyntaxKind.OpenBraceToken or
+            SyntaxKind.MinusToken ||
             IsIncrementalTailwindNameToken(kind);
     }
 

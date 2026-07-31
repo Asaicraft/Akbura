@@ -319,7 +319,9 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             node.HasCondition,
             node.ConditionText,
             conditionType,
-            conditionOperation);
+            conditionOperation,
+            node.ConditionMarkupExtension,
+            node.Variant);
     }
 
     public override BoundNode? VisitAkcssPropertySetter(BoundAkcssPropertySetter node)
@@ -731,7 +733,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             argument.Text,
             type,
             valueOperation,
-            argument.ConstantValue);
+            argument.ConstantValue,
+            argument.MarkupExtension);
     }
 
     protected virtual ImmutableArray<BoundNode> VisitList(ImmutableArray<BoundNode> nodes)

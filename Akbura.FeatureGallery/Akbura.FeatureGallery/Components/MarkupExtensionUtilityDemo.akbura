@@ -1,0 +1,34 @@
+using Akbura.FeatureGallery.Markup;
+using Akbura.FeatureGallery.Styles.akcss;
+
+state double spacing = 3;
+
+<StackPanel gap-3>
+
+    <StackPanel Orientation="Horizontal"
+                gap-2>
+
+        <Button Content="-"
+                Click={() => spacing = Math.Max(1, spacing - 1)}/>
+
+        <Button Content="+"
+                Click={() => spacing = Math.Min(8, spacing + 1)}/>
+
+        <TextBlock Text={$"Utility argument: {spacing}"}
+                   self-center
+                   text-slate-300/>
+
+    </StackPanel>
+
+    <Border p-${GalleryPadding {spacing}}
+            bg-blue-600
+            rounded-lg>
+
+        <TextBlock
+            Text="The padding extension is recreated after each state change."
+            text-white
+            whitespace-normal/>
+
+    </Border>
+
+</StackPanel>

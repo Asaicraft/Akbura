@@ -1440,7 +1440,7 @@ partial class Parser
 
 	private bool IsTailwindAttributeStart()
 	{
-		return CurrentToken.Kind is SyntaxKind.OpenBraceToken or SyntaxKind.MinusToken ||
+		return CurrentToken.Kind is SyntaxKind.DollarToken or SyntaxKind.OpenBraceToken or SyntaxKind.MinusToken ||
 			IsTailwindNameToken(CurrentToken);
 	}
 
@@ -1791,6 +1791,16 @@ partial class Parser
 
 	private GreenTailwindPrefixSegmentSyntax? TryParseTailwindPrefixSegmentSyntax()
 	{
+		if (CurrentToken.Kind == SyntaxKind.DollarToken &&
+			PeekToken(1).Kind == SyntaxKind.OpenBraceToken)
+		{
+			var extension = ParseMarkupExtensionSyntax();
+			var colon = EatToken(SyntaxKind.ColonToken);
+			return GreenSyntaxFactory.MarkupExtensionConditionalPrefixSyntax(
+				extension,
+				colon);
+		}
+
 		if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
 		{
 			var expression = ParseInlineExpressionSyntax();
@@ -1815,6 +1825,8 @@ partial class Parser
 		return CurrentToken.Kind switch
 		{
 			SyntaxKind.NumericLiteralToken => ParseTailwindNumericOrIdentifierSegmentSyntax(),
+			SyntaxKind.DollarToken => GreenSyntaxFactory.TailwindMarkupExtensionSegmentSyntax(
+				ParseMarkupExtensionSyntax()),
 			SyntaxKind.OpenBraceToken => GreenSyntaxFactory.TailwindExpressionSegmentSyntax(
 				ParseInlineExpressionSyntax()),
 			_ => GreenSyntaxFactory.TailwindIdentifierSegmentSyntax(
@@ -1943,7 +1955,8 @@ partial class Parser
 	{
 		var name = ParseMarkupSimpleName();
 
-		if (CurrentToken.Kind != SyntaxKind.OpenBraceToken)
+		if (CurrentToken.Kind != SyntaxKind.OpenBraceToken ||
+			!AreAdjacent(name.Identifier, CurrentToken))
 		{
 			return GreenSyntaxFactory.MarkupIdentifierNameSegmentSyntax(name);
 		}

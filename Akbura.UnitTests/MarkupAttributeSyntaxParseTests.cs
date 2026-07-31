@@ -1,3 +1,4 @@
+using Akbura.Language;
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using static Akbura.UnitTests.ParserHelper;
@@ -42,6 +43,98 @@ public class MarkupAttributeSyntaxParseTests
 
         Assert.Equal("text", syntax.Name.Identifier.ValueText);
         Assert.Equal("2xl", segment.Name.Identifier.ValueText);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void TailwindAttribute_ParsesMarkupExtensionArgumentSegment()
+    {
+        const string code =
+            "p-${GalleryPadding {spacing + 1}}";
+        var parser = MakeParser(code);
+
+        var syntax =
+            Assert.IsType<GreenTailwindFullAttributeSyntax>(
+                parser.ParseMarkupAttributeSyntax());
+        Assert.Equal(1, syntax.Segments.Count);
+        var segment =
+            Assert.IsType<GreenTailwindMarkupExtensionSegmentSyntax>(
+                syntax.Segments[0]);
+        Assert.True(segment.Extension.Arguments.Count == 1);
+        var argument =
+            Assert.IsType<GreenMarkupExtensionPositionalArgumentSyntax>(
+                segment.Extension.Arguments[0]);
+
+        Assert.Equal("p", syntax.Name.Identifier.ValueText);
+        Assert.Equal(
+            "GalleryPadding",
+            segment.Extension.Type.ToFullString().Trim());
+        Assert.IsType<GreenMarkupExtensionExpressionValueSyntax>(
+            argument.Value);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void TailwindAttribute_ParsesMarkupExtensionExpressionInsideDocument()
+    {
+        const string code =
+            """
+            <Border p-${GalleryPadding {spacing + 1}} />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var attribute = Assert.Single(
+            syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<TailwindFullAttributeSyntax>());
+        var segment =
+            Assert.IsType<TailwindMarkupExtensionSegmentSyntax>(
+                attribute.Segments[0]);
+
+        Assert.True(segment.Extension.Arguments.Count == 1);
+        Assert.IsType<MarkupExtensionExpressionValueSyntax>(
+            Assert.IsType<MarkupExtensionPositionalArgumentSyntax>(
+                segment.Extension.Arguments[0])
+                .Value);
+    }
+
+    [Fact]
+    public void TailwindAttribute_ParsesMarkupExtensionPrefix()
+    {
+        const string code = "${md}:p-5";
+        var parser = MakeParser(code);
+
+        var syntax =
+            Assert.IsType<GreenTailwindFullAttributeSyntax>(
+                parser.ParseMarkupAttributeSyntax());
+        var prefix =
+            Assert.IsType<GreenMarkupExtensionConditionalPrefixSyntax>(
+                syntax.Prefix);
+
+        Assert.Equal(
+            "md",
+            prefix.Extension.Type.ToFullString().Trim());
+        Assert.Equal("p", syntax.Name.Identifier.ValueText);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void TailwindAttribute_RecoversFromUnterminatedMarkupExtension()
+    {
+        const string code = "p-${GalleryPadding";
+        var parser = MakeParser(code);
+
+        var syntax =
+            Assert.IsType<GreenTailwindFullAttributeSyntax>(
+                parser.ParseMarkupAttributeSyntax());
+        var segment =
+            Assert.IsType<GreenTailwindMarkupExtensionSegmentSyntax>(
+                syntax.Segments[0]);
+
+        Assert.True(segment.Extension.ContainsDiagnostics);
+        Assert.Equal(
+            "GalleryPadding",
+            segment.Extension.Type.ToFullString().Trim());
         Assert.Equal(code, syntax.ToFullString());
     }
 

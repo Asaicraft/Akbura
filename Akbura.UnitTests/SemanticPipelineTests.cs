@@ -5182,6 +5182,350 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_TailwindUtilityMarkupExtensions_BindSupportedResultShapes()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.direct-(double value) { Width: value; }
+                    Control.observable-(double value) { Width: value; }
+                    Control.object-observable-(double value) { Width: value; }
+                    Control.binding-(double value) { Width: value; }
+                }
+            }
+
+            state double spacing = 4;
+
+            <Border
+                direct-${DirectPadding {spacing + 1}}
+                observable-${ObservablePadding}
+                object-observable-${ObjectObservablePadding}
+                binding-${BindingPadding} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public sealed class DirectPaddingExtension
+            {
+                public DirectPaddingExtension(double value)
+                {
+                }
+
+                public double ProvideValue(System.IServiceProvider services)
+                    => 0;
+            }
+
+            public sealed class ObservablePaddingExtension
+            {
+                public System.IObservable<double> ProvideValue(
+                    System.IServiceProvider services)
+                    => null!;
+            }
+
+            public sealed class ObjectObservablePaddingExtension
+            {
+                public System.IObservable<object> ProvideValue(
+                    System.IServiceProvider services)
+                    => null!;
+            }
+
+            public sealed class BindingPaddingExtension
+            {
+                public Avalonia.Data.BindingBase ProvideValue(
+                    System.IServiceProvider services)
+                    => null!;
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attributes = GetOnlyMarkupElement(syntaxTree)
+            .StartTag!
+            .Attributes
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(4, attributes.Length);
+        var directSegment =
+            Assert.IsType<TailwindMarkupExtensionSegmentSyntax>(
+                attributes[0].Segments[0]);
+        Assert.Equal(
+            "${DirectPadding {spacing + 1}}",
+            directSegment.Extension.ToFullString().Trim());
+        Assert.Equal(
+            "DirectPadding",
+            directSegment.Extension.Type.ToFullString().Trim());
+        Assert.Equal(1, directSegment.Extension.Green.Arguments.Count);
+        Assert.True(directSegment.Extension.Arguments.Count == 1);
+        var directSyntaxArgument =
+            Assert.IsType<MarkupExtensionPositionalArgumentSyntax>(
+                directSegment.Extension.Arguments[0]);
+        Assert.IsType<MarkupExtensionExpressionValueSyntax>(
+            directSyntaxArgument.Value);
+
+        var operations = attributes
+            .Select(attribute =>
+                Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                    semanticModel.GetOperation(attribute)))
+            .ToArray();
+
+        Assert.Equal(
+            SpecialType.System_Double,
+            Assert.IsAssignableFrom<ITypeSymbol>(
+                Assert.Single(operations[0].Arguments)
+                    .MarkupExtension!
+                    .ResultType
+                    .Symbol)
+                .SpecialType);
+        Assert.Equal(
+            "System.IObservable<double>",
+            Assert.Single(operations[1].Arguments)
+                .MarkupExtension!
+                .ResultType
+                .Symbol!
+                .ToDisplayString());
+        Assert.Equal(
+            "System.IObservable<object>",
+            Assert.Single(operations[2].Arguments)
+                .MarkupExtension!
+                .ResultType
+                .Symbol!
+                .ToDisplayString());
+        Assert.Equal(
+            "Avalonia.Data.BindingBase",
+            Assert.Single(operations[3].Arguments)
+                .MarkupExtension!
+                .ResultType
+                .Symbol!
+                .ToDisplayString());
+
+        Assert.True(
+            Assert.Single(operations[0].Arguments)
+                .MarkupExtension!
+                .IsUpdateDependent);
+        Assert.All(
+            operations.Skip(1),
+            operation =>
+                Assert.False(
+                    Assert.Single(operation.Arguments)
+                        .MarkupExtension!
+                        .IsUpdateDependent));
+        Assert.All(operations, operation => Assert.False(operation.HasErrors));
+        Assert.All(
+            attributes,
+            attribute =>
+                Assert.True(
+                    semanticModel
+                        .GetSemanticDiagnostics(attribute)
+                        .IsEmpty));
+
+        var references =
+            semanticModel.GetCSharpSymbolReferences(attributes[0]);
+        Assert.Contains(
+            references,
+            reference =>
+                reference.AkburaSymbol is IStateSymbol
+                {
+                    Name: "spacing",
+                });
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityMarkupExtensionPrefix_BindsVariantMetadata()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Akbura.Markup;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.p-(double value) { Width: value; }
+                }
+            }
+
+            <Border p-1 ${md}:p-2 />
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var attributes = GetOnlyMarkupElement(syntaxTree)
+            .StartTag!
+            .Attributes
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(2, attributes.Length);
+        var prefixed =
+            Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                semanticModel.GetOperation(attributes[1]));
+
+        Assert.NotNull(prefixed.ConditionMarkupExtension);
+        Assert.Equal(
+            "System.IObservable<bool>",
+            Assert.IsAssignableFrom<INamedTypeSymbol>(
+                    prefixed.ConditionMarkupExtension!
+                        .ResultType
+                        .Symbol)
+                .WithNullableAnnotation(
+                    NullableAnnotation.NotAnnotated)
+                .ToDisplayString());
+        Assert.True(prefixed.Variant.IsPrefixed);
+        Assert.Equal(10d, prefixed.Variant.Order);
+        Assert.Equal("BreakpointsGroup", prefixed.Variant.ConflictGroup);
+        Assert.Equal(
+            TailwindUtilityUnprefixedPrecedence.Above,
+            prefixed.Variant.UnprefixedPrecedence);
+        Assert.False(prefixed.HasErrors);
+        Assert.True(
+            semanticModel
+                .GetSemanticDiagnostics(attributes[1])
+                .IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityMarkupExtensions_ReportInvalidResultsAndLegacyPrefix()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.p-(double value) { Width: value; }
+                }
+            }
+
+            <Border
+                p-${WrongArgument}
+                ${WrongVariant}:p-1
+                md:p-2 />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public sealed class WrongArgumentExtension
+            {
+                public string ProvideValue(
+                    System.IServiceProvider services)
+                    => "";
+            }
+
+            public sealed class WrongVariantExtension
+            {
+                public System.IObservable<object> ProvideValue(
+                    System.IServiceProvider services)
+                    => null!;
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attributes = GetOnlyMarkupElement(syntaxTree)
+            .StartTag!
+            .Attributes
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(3, attributes.Length);
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(attributes[0]),
+            diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes
+                    .AKBURA_SEMANTIC_TailwindMarkupExtensionResultMismatch);
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(attributes[1]),
+            diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes
+                    .AKBURA_SEMANTIC_TailwindVariantResultMismatch);
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(attributes[2]),
+            diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_TailwindLegacyPrefix);
+    }
+
+    [Fact]
+    public void SemanticModel_TailwindUtilityMarkupExtensions_RequireExplicitUsingAndProvideValue()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.p-(double value) { Width: value; }
+                }
+            }
+
+            <Border
+                ${md}:p-1
+                p-${NoProvideValue} />
+            """;
+        const string csharpCode =
+            """
+            namespace Demo.Extensions;
+
+            public sealed class NoProvideValueExtension
+            {
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attributes = GetOnlyMarkupElement(syntaxTree)
+            .StartTag!
+            .Attributes
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(2, attributes.Length);
+        var missingUsingDiagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(attributes[0]),
+            diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+        var missingProvideValueDiagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(attributes[1]),
+            diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+
+        Assert.Contains(
+            "Markup extension type 'md' was not found",
+            missingUsingDiagnostic.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "does not contain a public ProvideValue method",
+            missingProvideValueDiagnostic.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SemanticModel_TailwindUtilityAttribute_BindsEnumIdentifierSegments()
     {
         const string code =

@@ -129,7 +129,13 @@ internal static class ComponentGenerator
             AppendCommandMembers(source, classIndentation + 1);
             AppendStateMembers(source, classIndentation + 1);
             AppendElementFields(source, classIndentation + 1);
+            AppendAkcssMarkupExtensionFields(
+                source,
+                classIndentation + 1);
             AppendMarkupContextMembers(source, classIndentation + 1);
+            AppendAkcssMarkupExtensionFactoryMethods(
+                source,
+                classIndentation + 1);
             AppendUserMembers(source, document, classIndentation + 1);
             AppendDeferredContentBuilders(source,classIndentation + 1);
             AppendLifecycleMembers(source, roots, classIndentation + 1);
@@ -747,6 +753,80 @@ internal static class ComponentGenerator
             }
         }
 
+        private void AppendAkcssMarkupExtensionFields(
+            StringBuilder source,
+            int indentation)
+        {
+            var hasFields = false;
+            foreach (var element in _elements)
+            {
+                foreach (var operation in
+                    element.Symbol.AttributeOperations
+                        .OfType<ITailwindUtilityAttributeOperation>())
+                {
+                    if (operation.HasErrors)
+                    {
+                        continue;
+                    }
+
+                    if (operation.ConditionMarkupExtension != null)
+                    {
+                        AppendAkcssMarkupExtensionField(
+                            source,
+                            indentation,
+                            GetAkcssMarkupExtensionPropertyName(
+                                element,
+                                operation,
+                                argumentIndex: -1));
+                        hasFields = true;
+                    }
+
+                    for (var index = 0;
+                         index < operation.Arguments.Length;
+                         index++)
+                    {
+                        if (operation.Arguments[index]
+                                .MarkupExtension == null)
+                        {
+                            continue;
+                        }
+
+                        AppendAkcssMarkupExtensionField(
+                            source,
+                            indentation,
+                            GetAkcssMarkupExtensionPropertyName(
+                                element,
+                                operation,
+                                index));
+                        hasFields = true;
+                    }
+                }
+            }
+
+            if (hasFields)
+            {
+                source.AppendLine();
+            }
+        }
+
+        private void AppendAkcssMarkupExtensionField(
+            StringBuilder source,
+            int indentation,
+            string fieldName)
+        {
+            AppendIndented(source, indentation)
+                .Append("private static readonly ")
+                .Append("global::Avalonia.AttachedProperty<object?> ")
+                .Append(fieldName)
+                .AppendLine(" =");
+            AppendIndented(source, indentation + 1)
+                .Append("global::Avalonia.AvaloniaProperty.RegisterAttached<")
+                .Append(EscapeIdentifier(_symbol.Name))
+                .Append(", global::Avalonia.Controls.Control, object?>(")
+                .Append(ToStringLiteral(fieldName))
+                .AppendLine(");");
+        }
+
         private void AppendMarkupContextMembers(
             StringBuilder source,
             int indentation)
@@ -766,6 +846,119 @@ internal static class ComponentGenerator
                 .Append(normalizedPath.Replace("\"", "\\\""))
                 .AppendLine("\", global::System.UriKind.Absolute);");
 
+            source.AppendLine();
+        }
+
+        private void AppendAkcssMarkupExtensionFactoryMethods(
+            StringBuilder source,
+            int indentation)
+        {
+            foreach (var element in _elements)
+            {
+                foreach (var operation in
+                    element.Symbol.AttributeOperations
+                        .OfType<ITailwindUtilityAttributeOperation>())
+                {
+                    if (operation.HasErrors)
+                    {
+                        continue;
+                    }
+
+                    if (operation.ConditionMarkupExtension is { } condition)
+                    {
+                        AkburaSyntax syntax =
+                            operation.Syntax is TailwindFullAttributeSyntax
+                            {
+                                Prefix:
+                                    MarkupExtensionConditionalPrefixSyntax
+                                        prefix,
+                            }
+                                ? prefix.Extension
+                                : operation.Syntax;
+
+                        AppendAkcssMarkupExtensionFactoryMethod(
+                            source,
+                            indentation,
+                            element,
+                            operation,
+                            argumentIndex: -1,
+                            condition,
+                            syntax);
+                    }
+
+                    for (var index = 0;
+                         index < operation.Arguments.Length;
+                         index++)
+                    {
+                        var argument = operation.Arguments[index];
+                        if (argument.MarkupExtension is not { } extension)
+                        {
+                            continue;
+                        }
+
+                        AkburaSyntax syntax =
+                            argument.Syntax is
+                                TailwindMarkupExtensionSegmentSyntax segment
+                                ? segment.Extension
+                                : argument.Syntax;
+
+                        AppendAkcssMarkupExtensionFactoryMethod(
+                            source,
+                            indentation,
+                            element,
+                            operation,
+                            index,
+                            extension,
+                            syntax);
+                    }
+                }
+            }
+        }
+
+        private void AppendAkcssMarkupExtensionFactoryMethod(
+            StringBuilder source,
+            int indentation,
+            ElementPlan element,
+            ITailwindUtilityAttributeOperation operation,
+            int argumentIndex,
+            MarkupExtensionValue extension,
+            AkburaSyntax syntax)
+        {
+            if (extension.ResultType.Symbol is not ITypeSymbol resultType)
+            {
+                return;
+            }
+
+            AppendIndented(source, indentation)
+                .Append("private ")
+                .Append(GetTypeNameWithNullableAnnotation(resultType))
+                .Append(' ')
+                .Append(GetAkcssMarkupExtensionFactoryName(
+                    element,
+                    operation,
+                    argumentIndex))
+                .AppendLine(
+                    "(global::Avalonia.Controls.Control __target)");
+            AppendIndentedLine(source, indentation, "{");
+
+            var expression = GetMarkupExtensionExpression(
+                extension,
+                element,
+                GetAkcssMarkupExtensionPropertyName(
+                    element,
+                    operation,
+                    argumentIndex));
+            var statement = "return " + expression + ";";
+            AppendLineDirective(
+                source,
+                indentation + 1,
+                syntax,
+                statement,
+                statement.IndexOf(
+                    expression,
+                    StringComparison.Ordinal));
+
+            AppendIndentedLine(source, indentation, "}");
             source.AppendLine();
         }
 
@@ -1630,6 +1823,43 @@ internal static class ComponentGenerator
                 .IsImplicit;
         }
 
+        private bool TryGetObservableElementType(
+            ITypeSymbol type,
+            out ITypeSymbol elementType)
+        {
+            var observableType =
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetTypeByMetadataName(
+                        "System.IObservable`1");
+            if (observableType != null)
+            {
+                if (type is INamedTypeSymbol namedType &&
+                    SymbolEqualityComparer.Default.Equals(
+                        namedType.OriginalDefinition,
+                        observableType))
+                {
+                    elementType =
+                        namedType.TypeArguments[0];
+                    return true;
+                }
+
+                foreach (var interfaceType in type.AllInterfaces)
+                {
+                    if (SymbolEqualityComparer.Default.Equals(
+                        interfaceType.OriginalDefinition,
+                        observableType))
+                    {
+                        elementType =
+                            interfaceType.TypeArguments[0];
+                        return true;
+                    }
+                }
+            }
+
+            elementType = null!;
+            return false;
+        }
+
         private static bool IsObjectResultType(ITypeSymbol type)
         {
             return type.SpecialType == SpecialType.System_Object ||
@@ -1834,8 +2064,13 @@ internal static class ComponentGenerator
         private List<string> GetAkcssActivatorExpressions(ElementPlan element)
         {
             var result = new List<string>();
-            foreach (var operation in element.Symbol.AttributeOperations)
+            for (var sourceOrder = 0;
+                 sourceOrder <
+                    element.Symbol.AttributeOperations.Length;
+                 sourceOrder++)
             {
+                var operation =
+                    element.Symbol.AttributeOperations[sourceOrder];
                 if (operation.HasErrors)
                 {
                     continue;
@@ -1859,47 +2094,336 @@ internal static class ComponentGenerator
                     continue;
                 }
 
+                var applications = new List<(
+                    ITailwindUtilitySymbol Utility,
+                    string Reference)>();
                 foreach (var utility in utilityOperation.Utilities)
                 {
                     if (TryGetAkcssStyleReference(utility, out var utilityReference))
                     {
-                        result.Add(GetAkcssUtilityActivatorExpression(
-                            utilityOperation,
+                        applications.Add((
                             utility,
                             utilityReference));
                     }
+                }
+
+                if (applications.Count > 0)
+                {
+                    result.Add(
+                        GetAkcssUtilityCandidateExpression(
+                            element,
+                            utilityOperation,
+                            sourceOrder,
+                            applications));
                 }
             }
 
             return result;
         }
 
-        private string GetAkcssUtilityActivatorExpression(
+        private string GetAkcssUtilityCandidateExpression(
+            ElementPlan element,
             ITailwindUtilityAttributeOperation operation,
-            ITailwindUtilitySymbol utility,
-            string utilityReference)
+            int sourceOrder,
+            List<(ITailwindUtilitySymbol Utility, string Reference)>
+                applications)
         {
-            var runtimeUtilityType = GetRuntimeUtilityType(utility);
-            var result = new StringBuilder("new global::Akbura.Akcss.AkcssUtilityActivator(")
-                .Append("(global::Akbura.Akcss.AkcssUtility)")
-                .Append(utilityReference)
-                .Append(", __target => ((")
-                .Append(runtimeUtilityType)
-                .Append(')')
-                .Append(utilityReference)
-                .Append(").Update(__target");
-            foreach (var argument in operation.Arguments)
+            var result = new StringBuilder(
+                    "new global::Akbura.Akcss." +
+                    "AkcssUtilityCandidateActivator(")
+                .Append("conflictKey: ")
+                .Append(ToStringLiteral(operation.UtilityName))
+                .Append(", sourceOrder: ")
+                .Append(sourceOrder.ToString(
+                    CultureInfo.InvariantCulture))
+                .Append(", applications: ")
+                .Append("global::System.Collections.Immutable." +
+                    "ImmutableArray.Create<global::Akbura.Akcss." +
+                    "AkcssUtilityApplication>(");
+
+            for (var applicationIndex = 0;
+                 applicationIndex < applications.Count;
+                 applicationIndex++)
             {
-                result.Append(", ").Append(GetTailwindUtilityArgumentExpression(argument));
+                if (applicationIndex > 0)
+                {
+                    result.Append(", ");
+                }
+
+                var application = applications[applicationIndex];
+                result.Append(
+                        "new global::Akbura.Akcss." +
+                        "AkcssUtilityApplication(")
+                    .Append("(global::Akbura.Akcss.AkcssUtility)")
+                    .Append(application.Reference)
+                    .Append(", (__target, __arguments) => ((")
+                    .Append(GetRuntimeUtilityType(
+                        application.Utility))
+                    .Append(')')
+                    .Append(application.Reference)
+                    .Append(").Update(__target");
+
+                var valueSourceIndex = 0;
+                for (var argumentIndex = 0;
+                     argumentIndex < operation.Arguments.Length;
+                     argumentIndex++)
+                {
+                    var argument =
+                        operation.Arguments[argumentIndex];
+                    result.Append(", ");
+                    if (argument.MarkupExtension != null)
+                    {
+                        var parameterType =
+                            application.Utility.Parameters[
+                                argumentIndex].Type.Symbol;
+                        result.Append('(')
+                            .Append(GetTypeName(parameterType))
+                            .Append(")__arguments[")
+                            .Append(valueSourceIndex.ToString(
+                                CultureInfo.InvariantCulture))
+                            .Append("]!");
+                        valueSourceIndex++;
+                    }
+                    else
+                    {
+                        result.Append(
+                            GetTailwindUtilityArgumentExpression(
+                                argument));
+                    }
+                }
+
+                result.Append("))");
             }
 
             result.Append(')');
-            if (operation.HasCondition)
+
+            var valueSources =
+                GetAkcssUtilityValueSourceExpressions(
+                    element,
+                    operation,
+                    applications[0].Utility);
+            if (valueSources.Count > 0)
             {
-                result.Append(", () => ").Append(GetTailwindConditionExpression(operation));
+                result.Append(", arguments: ")
+                    .Append("global::System.Collections.Immutable." +
+                        "ImmutableArray.Create<global::Akbura.Akcss." +
+                        "AkcssUtilityValueSource>(")
+                    .Append(string.Join(", ", valueSources))
+                    .Append(')');
+            }
+
+            if (operation.HasCondition &&
+                operation.ConditionMarkupExtension == null)
+            {
+                result.Append(", condition: () => ")
+                    .Append(
+                        GetTailwindConditionExpression(
+                            operation));
+            }
+
+            if (operation.ConditionMarkupExtension != null)
+            {
+                result.Append(", variant: ")
+                    .Append(
+                        GetAkcssUtilityValueSourceExpression(
+                            operation.ConditionMarkupExtension,
+                            _semanticModel.Compilation
+                                .CSharpCompilation
+                                .GetSpecialType(
+                                    SpecialType.System_Boolean),
+                            element,
+                            GetAkcssMarkupExtensionPropertyName(
+                                element,
+                                operation,
+                                argumentIndex: -1),
+                            GetAkcssMarkupExtensionFactoryName(
+                                element,
+                                operation,
+                                argumentIndex: -1)));
+            }
+
+            if (operation.Variant.IsPrefixed)
+            {
+                result.Append(", order: ")
+                    .Append(operation.Variant.Order.ToString(
+                        "R",
+                        CultureInfo.InvariantCulture));
+
+                if (operation.Variant.ConflictGroup != null)
+                {
+                    result.Append(", conflictGroup: ")
+                        .Append(ToStringLiteral(
+                            operation.Variant.ConflictGroup));
+                }
+
+                result.Append(", unprefixedPrecedence: ")
+                    .Append("global::Akbura.Markup." +
+                        "UnprefixedUtilityPrecedence.")
+                    .Append(operation.Variant
+                        .UnprefixedPrecedence
+                        .ToString());
             }
 
             return result.Append(')').ToString();
+        }
+
+        private List<string>
+            GetAkcssUtilityValueSourceExpressions(
+                ElementPlan element,
+                ITailwindUtilityAttributeOperation operation,
+                ITailwindUtilitySymbol utility)
+        {
+            var result = new List<string>();
+            for (var index = 0;
+                 index < operation.Arguments.Length;
+                 index++)
+            {
+                var extension =
+                    operation.Arguments[index].MarkupExtension;
+                if (extension == null ||
+                    index >= utility.Parameters.Length ||
+                    utility.Parameters[index].Type.Symbol is not
+                        ITypeSymbol expectedType)
+                {
+                    continue;
+                }
+
+                result.Add(
+                    GetAkcssUtilityValueSourceExpression(
+                        extension,
+                        expectedType,
+                        element,
+                        GetAkcssMarkupExtensionPropertyName(
+                            element,
+                            operation,
+                            index),
+                        GetAkcssMarkupExtensionFactoryName(
+                            element,
+                            operation,
+                            index)));
+            }
+
+            return result;
+        }
+
+        private string GetAkcssUtilityValueSourceExpression(
+            MarkupExtensionValue extension,
+            ITypeSymbol expectedType,
+            ElementPlan element,
+            string targetProperty,
+            string factoryName)
+        {
+            var expectedTypeName =
+                GetTypeName(expectedType);
+            var valueExpression =
+                factoryName + "(__target)";
+            var recreate =
+                extension.IsUpdateDependent
+                    ? "true"
+                    : "false";
+
+            if (extension.ResultType.Symbol is
+                    ITypeSymbol resultType &&
+                IsBindingBaseType(resultType))
+            {
+                return new StringBuilder(
+                        "global::Akbura.Akcss." +
+                        "AkcssUtilityValueSource.CreateBinding<")
+                    .Append(expectedTypeName)
+                    .Append(">(__target => ")
+                    .Append(valueExpression)
+                    .Append(", ")
+                    .Append(targetProperty)
+                    .Append(", static __value => (")
+                    .Append(expectedTypeName)
+                    .Append(")__value!, recreateOnRefresh: ")
+                    .Append(recreate)
+                    .Append(')')
+                    .ToString();
+            }
+
+            if (extension.ResultType.Symbol is
+                    ITypeSymbol observableResult &&
+                TryGetObservableElementType(
+                    observableResult,
+                    out var observableElementType))
+            {
+                var observableElementTypeName =
+                    GetTypeName(observableElementType);
+                if (observableElementType.SpecialType ==
+                    SpecialType.System_Object)
+                {
+                    return new StringBuilder(
+                            "global::Akbura.Akcss." +
+                            "AkcssUtilityValueSource." +
+                            "CreateObservableObject<")
+                        .Append(expectedTypeName)
+                        .Append(">(__target => ")
+                        .Append(valueExpression)
+                        .Append(", static __value => (")
+                        .Append(expectedTypeName)
+                        .Append(")__value!, recreateOnRefresh: ")
+                        .Append(recreate)
+                        .Append(')')
+                        .ToString();
+                }
+
+                return new StringBuilder(
+                        "global::Akbura.Akcss." +
+                        "AkcssUtilityValueSource.CreateObservable<")
+                    .Append(observableElementTypeName)
+                    .Append(", ")
+                    .Append(expectedTypeName)
+                    .Append(">(__target => ")
+                    .Append(valueExpression)
+                    .Append(", static __value => (")
+                    .Append(expectedTypeName)
+                    .Append(")__value, recreateOnRefresh: ")
+                    .Append(recreate)
+                    .Append(')')
+                    .ToString();
+            }
+
+            return new StringBuilder(
+                    "global::Akbura.Akcss." +
+                    "AkcssUtilityValueSource.Create<")
+                .Append(expectedTypeName)
+                .Append(">(__target => ")
+                .Append(valueExpression)
+                .Append(", recreateOnRefresh: ")
+                .Append(recreate)
+                .Append(')')
+                .ToString();
+        }
+
+        private static string GetAkcssMarkupExtensionPropertyName(
+            ElementPlan element,
+            ITailwindUtilityAttributeOperation operation,
+            int argumentIndex)
+        {
+            return "__akcssMarkupExtension_" +
+                element.Id.ToString(CultureInfo.InvariantCulture) +
+                "_" +
+                operation.Syntax.Span.Start.ToString(
+                    CultureInfo.InvariantCulture) +
+                "_" +
+                (argumentIndex + 1).ToString(
+                    CultureInfo.InvariantCulture);
+        }
+
+        private static string GetAkcssMarkupExtensionFactoryName(
+            ElementPlan element,
+            ITailwindUtilityAttributeOperation operation,
+            int argumentIndex)
+        {
+            return "__CreateAkcssMarkupExtension_" +
+                element.Id.ToString(CultureInfo.InvariantCulture) +
+                "_" +
+                operation.Syntax.Span.Start.ToString(
+                    CultureInfo.InvariantCulture) +
+                "_" +
+                (argumentIndex + 1).ToString(
+                    CultureInfo.InvariantCulture);
         }
 
         private bool TryGetAkcssStyleReference(
@@ -2522,9 +3046,25 @@ internal static class ComponentGenerator
             ElementPlan element,
             AkburaPropertySymbol targetProperty)
         {
+            return GetMarkupExtensionExpression(
+                extension,
+                element,
+                GetProvideValueTargetPropertyExpression(
+                    targetProperty));
+        }
+
+        private string GetMarkupExtensionExpression(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            string targetPropertyExpression)
+        {
             if (extension.Binding is { } binding)
             {
-                return GetBindingExpression(extension, binding, element, targetProperty);
+                return GetBindingExpression(
+                    extension,
+                    binding,
+                    element,
+                    targetPropertyExpression);
             }
 
             var type = GetTypeName(extension.ExtensionType.Symbol);
@@ -2535,7 +3075,7 @@ internal static class ComponentGenerator
                     GetMarkupExtensionArgument(
                         argument,
                         element,
-                        targetProperty)));
+                        targetPropertyExpression)));
 
             var creation = new StringBuilder("new ")
                 .Append(type)
@@ -2564,7 +3104,7 @@ internal static class ComponentGenerator
                         .Append(GetMarkupExtensionProperty(
                             property,
                             element,
-                            targetProperty));
+                            targetPropertyExpression));
                 }
 
                 creation.Append(" }");
@@ -2582,9 +3122,6 @@ internal static class ComponentGenerator
 
                 if (provideValue.Parameters.Length == 1)
                 {
-                    var propertyExpression =
-                        GetProvideValueTargetPropertyExpression(targetProperty);
-
                     var parentStackExpression =
                         GetDirectParentsStackExpression(element);
 
@@ -2600,7 +3137,7 @@ internal static class ComponentGenerator
                         .Append("targetObject: ")
                         .Append(element.FieldName)
                         .Append(", targetProperty: ")
-                        .Append(propertyExpression)
+                        .Append(targetPropertyExpression)
                         .Append(", intermediateRootObject: ")
                         .Append(intermediateRoot)
                         .Append(", baseUri: __akburaBaseUri")
@@ -2626,7 +3163,7 @@ internal static class ComponentGenerator
             MarkupExtensionValue extension,
             MarkupBindingValue binding,
             ElementPlan element,
-            AkburaPropertySymbol targetProperty)
+            string targetPropertyExpression)
         {
             if (binding.Kind == MarkupBindingKind.Compiled &&
                 TryGetSingleFieldBindingPath(
@@ -2655,7 +3192,7 @@ internal static class ComponentGenerator
                     compiledField,
                     extension.Properties,
                     element,
-                    targetProperty);
+                    targetPropertyExpression);
 
                 return compiledField.Append(')').ToString();
             }
@@ -2678,7 +3215,7 @@ internal static class ComponentGenerator
                     compiledResult,
                     extension.Properties,
                     element,
-                    targetProperty);
+                    targetPropertyExpression);
 
                 return compiledResult.Append(')').ToString();
             }
@@ -2710,7 +3247,7 @@ internal static class ComponentGenerator
                         .Append(GetMarkupExtensionProperty(
                             property,
                             element,
-                            targetProperty));
+                            targetPropertyExpression));
                 }
 
                 result.Append(" }");
@@ -2803,7 +3340,7 @@ internal static class ComponentGenerator
             StringBuilder result,
             ImmutableArray<MarkupExtensionPropertyValue> properties,
             ElementPlan element,
-            AkburaPropertySymbol targetProperty)
+            string targetPropertyExpression)
         {
             foreach (var property in properties)
             {
@@ -2832,7 +3369,7 @@ internal static class ComponentGenerator
                         .Append(GetMarkupExtensionProperty(
                             property,
                             element,
-                            targetProperty));
+                            targetPropertyExpression));
                 }
             }
         }
@@ -2840,14 +3377,14 @@ internal static class ComponentGenerator
         private string GetMarkupExtensionArgument(
             MarkupExtensionArgumentValue argument,
             ElementPlan element,
-            AkburaPropertySymbol targetProperty)
+            string targetPropertyExpression)
         {
             if (argument.NestedValue != null)
             {
                 return GetMarkupExtensionExpression(
                     argument.NestedValue,
                     element,
-                    targetProperty);
+                    targetPropertyExpression);
             }
 
             if (!argument.Operation.IsDefault)
@@ -2867,14 +3404,14 @@ internal static class ComponentGenerator
         private string GetMarkupExtensionProperty(
             MarkupExtensionPropertyValue property,
             ElementPlan element,
-            AkburaPropertySymbol targetProperty)
+            string targetPropertyExpression)
         {
             if (property.NestedValue != null)
             {
                 return GetMarkupExtensionExpression(
                     property.NestedValue,
                     element,
-                    targetProperty);
+                    targetPropertyExpression);
             }
 
             if (property.ConvertedValue != null)
@@ -3631,6 +4168,21 @@ internal static class ComponentGenerator
         return symbol is ITypeSymbol type &&
             !ContainsErrorType(type)
             ? type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            : "global::System.Object";
+    }
+
+    private static string GetTypeNameWithNullableAnnotation(
+        ITypeSymbol type)
+    {
+        var format =
+            SymbolDisplayFormat.FullyQualifiedFormat
+                .WithMiscellaneousOptions(
+                    SymbolDisplayFormat.FullyQualifiedFormat
+                        .MiscellaneousOptions |
+                    SymbolDisplayMiscellaneousOptions
+                        .IncludeNullableReferenceTypeModifier);
+        return !ContainsErrorType(type)
+            ? type.ToDisplayString(format)
             : "global::System.Object";
     }
 

@@ -23,4 +23,8 @@ internal interface ITailwindUtilityAttributeOperation : IMarkupAttributeOperatio
     CSharpOperationDefinition ConditionOperation { get; }
 
     ICSharpOperation? ConditionOperationTree { get; }
+
+    MarkupExtensionValue? ConditionMarkupExtension { get; }
+
+    TailwindUtilityVariant Variant { get; }
 }

@@ -252,6 +252,15 @@
   <data name="AKBURA_SEMANTIC_TailwindUtilityArgumentMismatch" xml:space="preserve">
     <value>Tailwind utility '{0}' expects {1} argument(s), but {2} were provided.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_TailwindMarkupExtensionResultMismatch" xml:space="preserve">
+    <value>Utility markup extension result '{0}' cannot provide '{1}'. Expected the value type, IObservable&lt;T&gt;, IObservable&lt;object&gt;, or BindingBase.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_TailwindVariantResultMismatch" xml:space="preserve">
+    <value>Utility prefix markup extension result '{0}' is not supported. Expected bool or IObservable&lt;bool&gt;.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_TailwindLegacyPrefix" xml:space="preserve">
+    <value>Utility prefix '{0}:' is not supported. Use '${{{0}}}:' instead.</value>
+  </data>
   <data name="AKBURA_SEMANTIC_AkcssImportNotFound" xml:space="preserve">
     <value>AKCSS import '{0}' was not found.</value>
   </data>

@@ -21,6 +21,8 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         string? conditionText,
         CSharpSymbolDefinition conditionType,
         CSharpOperationDefinition conditionOperation,
+        MarkupExtensionValue? conditionMarkupExtension,
+        TailwindUtilityVariant variant,
         bool hasErrors,
         ICSharpOperation? conditionOperationTree = null)
     {
@@ -38,6 +40,8 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         ConditionText = conditionText;
         ConditionType = conditionType;
         ConditionOperation = conditionOperation;
+        ConditionMarkupExtension = conditionMarkupExtension;
+        Variant = variant;
         HasErrors = hasErrors;
         ConditionOperationTree = conditionOperationTree;
         AdoptCSharpOperationTree(ConditionOperationTree);
@@ -88,6 +92,10 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
     public CSharpOperationDefinition ConditionOperation { get; }
 
     public ICSharpOperation? ConditionOperationTree { get; }
+
+    public MarkupExtensionValue? ConditionMarkupExtension { get; }
+
+    public TailwindUtilityVariant Variant { get; }
 
     private static ImmutableArray<IOperation> CreateChildren(
         ICSharpOperation? conditionOperationTree,

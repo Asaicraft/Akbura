@@ -12,7 +12,8 @@ internal readonly struct TailwindUtilityArgument
         CSharpSymbolDefinition type,
         CSharpOperationDefinition valueOperation,
         object? constantValue,
-        ICSharpOperation? valueOperationTree = null)
+        ICSharpOperation? valueOperationTree = null,
+        MarkupExtensionValue? markupExtension = null)
     {
         Syntax = syntax;
         Text = text;
@@ -20,6 +21,7 @@ internal readonly struct TailwindUtilityArgument
         ValueOperation = valueOperation;
         ConstantValue = constantValue;
         ValueOperationTree = valueOperationTree;
+        MarkupExtension = markupExtension;
     }
 
     public TailwindSegmentSyntax Syntax { get; }
@@ -34,6 +36,8 @@ internal readonly struct TailwindUtilityArgument
 
     public object? ConstantValue { get; }
 
+    public MarkupExtensionValue? MarkupExtension { get; }
+
     public TailwindUtilityArgument WithValueOperationTree(ICSharpOperation? valueOperationTree)
     {
         return new TailwindUtilityArgument(
@@ -42,6 +46,7 @@ internal readonly struct TailwindUtilityArgument
             Type,
             ValueOperation,
             ConstantValue,
-            valueOperationTree);
+            valueOperationTree,
+            MarkupExtension);
     }
 }

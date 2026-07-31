@@ -17,7 +17,8 @@ internal sealed class MarkupExtensionValue
         CSharpSymbolDefinition resultType,
         ImmutableArray<MarkupExtensionArgumentValue> arguments,
         ImmutableArray<MarkupExtensionPropertyValue> properties,
-        MarkupBindingValue? binding = null)
+        MarkupBindingValue? binding = null,
+        bool isUpdateDependent = false)
     {
         RawText = rawText ?? throw new ArgumentNullException(nameof(rawText));
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -32,6 +33,7 @@ internal sealed class MarkupExtensionValue
             ? ImmutableArray<MarkupExtensionPropertyValue>.Empty
             : properties;
         Binding = binding;
+        IsUpdateDependent = isUpdateDependent;
     }
 
     public string RawText { get; }
@@ -51,6 +53,8 @@ internal sealed class MarkupExtensionValue
     public ImmutableArray<MarkupExtensionPropertyValue> Properties { get; }
 
     public MarkupBindingValue? Binding { get; }
+
+    public bool IsUpdateDependent { get; }
 }
 
 internal enum MarkupBindingKind

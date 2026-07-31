@@ -338,6 +338,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             boundNode.ConditionText,
             boundNode.ConditionType,
             boundNode.ConditionOperation,
+            boundNode.ConditionMarkupExtension,
+            boundNode.Variant,
             boundNode.HasErrors,
             CreateCSharpOperationTree(
                 boundNode.Syntax,
@@ -429,7 +431,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
                 CreateCSharpOperationTree(
                     argument.Syntax,
                     argument.ValueOperation,
-                    mapper)));
+                    mapper),
+                argument.MarkupExtension));
         }
 
         return builder.ToImmutableAndFree();

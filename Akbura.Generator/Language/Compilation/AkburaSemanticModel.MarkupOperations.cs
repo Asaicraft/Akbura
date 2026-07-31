@@ -113,6 +113,20 @@ internal partial class AkburaSemanticModel
             result.Conversion);
     }
 
+    internal MarkupExtensionBindingResult BindTailwindMarkupExtension(
+        MarkupAttributeSyntax markupAttribute,
+        MarkupExtensionSyntax extensionSyntax)
+    {
+        using var diagnosticsBuilder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+
+        return BindMarkupExtensionSyntax(
+            markupAttribute,
+            extensionSyntax,
+            targetType: null,
+            diagnosticsBuilder);
+    }
+
     private static bool SupportsAvaloniaSpecialMarkupExtensionResults(Symbols.IPropertySymbol? property)
     {
         if (property == null)
@@ -269,7 +283,9 @@ internal partial class AkburaSemanticModel
             new CSharpSymbolDefinition(provideValueMethod),
             resultType,
             argumentsBuilder.ToImmutable(),
-            propertiesBuilder.ToImmutable());
+            propertiesBuilder.ToImmutable(),
+            isUpdateDependent:
+                IsUpdateDependentMarkupExtension(extensionSyntax));
 
         if (targetType != null &&
             !CanMarkupExtensionResultConvertToTarget(
@@ -417,8 +433,17 @@ internal partial class AkburaSemanticModel
         MarkupExtensionSyntax extensionSyntax)
     {
         using var candidates = ImmutableArrayBuilder<IMethodSymbol>.Rent();
-        var positionalArgumentCount = extensionSyntax.Arguments
-            .Count(static argument => argument.Kind == AkburaSyntaxKind.MarkupExtensionPositionalArgumentSyntax);
+        var positionalArgumentCount = 0;
+        foreach (var argument in extensionSyntax.Arguments)
+        {
+            if (argument.Kind ==
+                AkburaSyntaxKind
+                    .MarkupExtensionPositionalArgumentSyntax)
+            {
+                positionalArgumentCount++;
+            }
+        }
+
         foreach (var constructor in extensionType.InstanceConstructors)
         {
             if (constructor.DeclaredAccessibility != Accessibility.Public ||
@@ -870,7 +895,8 @@ internal partial class AkburaSemanticModel
             new CSharpSymbolDefinition(resultType),
             argumentsBuilder.ToImmutable(),
             propertiesBuilder.ToImmutable(),
-            bindingValue);
+            bindingValue,
+            IsUpdateDependentMarkupExtension(extensionSyntax));
 
         result = new MarkupExtensionBindingResult(
             value,
@@ -3662,6 +3688,49 @@ internal partial class AkburaSemanticModel
             [utility.Name, utility.Parameters.Length, actualCount]);
     }
 
+    internal static AkburaSemanticDiagnostic
+        CreateTailwindMarkupExtensionResultMismatchDiagnostic(
+            AkburaSyntax syntax,
+            ITypeSymbol? resultType,
+            ITypeSymbol expectedType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_TailwindMarkupExtensionResultMismatch,
+            [
+                resultType?.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat) ??
+                    "<unknown>",
+                expectedType.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat),
+            ]);
+    }
+
+    internal static AkburaSemanticDiagnostic
+        CreateTailwindVariantResultMismatchDiagnostic(
+            AkburaSyntax syntax,
+            ITypeSymbol? resultType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_TailwindVariantResultMismatch,
+            [
+                resultType?.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat) ??
+                    "<unknown>",
+            ]);
+    }
+
+    internal static AkburaSemanticDiagnostic
+        CreateTailwindLegacyPrefixDiagnostic(
+            SimpleConditionalPrefixSyntax syntax)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_TailwindLegacyPrefix,
+            [syntax.Name.Identifier.ValueText]);
+    }
+
     private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(
         MarkupAttributeSyntax syntax,
         Diagnostic diagnostic)
@@ -3700,6 +3769,49 @@ internal partial class AkburaSemanticModel
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError,
             ["${" + expressionText + "}", message]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateTailwindMarkupExtensionDiagnostic(
+        AkburaSyntax syntax,
+        string expressionText,
+        string message)
+    {
+        return CreateMarkupExtensionErrorDiagnostic(
+            syntax,
+            expressionText,
+            message);
+    }
+
+    private static bool IsUpdateDependentMarkupExtension(
+        MarkupExtensionSyntax extensionSyntax)
+    {
+        foreach (var argument in extensionSyntax.Arguments)
+        {
+            var value = argument.Kind switch
+            {
+                AkburaSyntaxKind.MarkupExtensionPositionalArgumentSyntax =>
+                    Unsafe.As<MarkupExtensionPositionalArgumentSyntax>(argument).Value,
+                AkburaSyntaxKind.MarkupExtensionPropertyArgumentSyntax =>
+                    Unsafe.As<MarkupExtensionPropertyArgumentSyntax>(argument).Value,
+                _ => null,
+            };
+
+            if (value?.Kind ==
+                AkburaSyntaxKind.MarkupExtensionExpressionValueSyntax)
+            {
+                return true;
+            }
+
+            if (value?.Kind ==
+                    AkburaSyntaxKind.MarkupExtensionNestedValueSyntax &&
+                IsUpdateDependentMarkupExtension(
+                    Unsafe.As<MarkupExtensionNestedValueSyntax>(value).Extension))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static AkburaSemanticDiagnostic CreateMarkupWhitespaceValueInvalidDiagnostic(

@@ -603,6 +603,25 @@ node TailwindFullAttributeSyntax : TailwindAttributeSyntax {
 	Segments  : syntaxlist<TailwindSegmentSyntax, MinusToken>; // may contain binding segments, e.g. {width}
 }
 
+/// <summary>
+/// Markup extension argument segment:
+///   p-${DynamicSpacing}
+///   p-${DynamicSpacing {state + 1}}
+/// </summary>
+node TailwindMarkupExtensionSegmentSyntax : TailwindSegmentSyntax {
+	Extension : MarkupExtensionSyntax;
+}
+
+/// <summary>
+/// Markup extension conditional prefix:
+///   ${md}:p-4
+///   ${CustomVariant Value={state}}:opacity-50
+/// </summary>
+node MarkupExtensionConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
+	Extension : MarkupExtensionSyntax;
+	Colon     : ColonToken;
+}
+
 // ─────────────────────────────────────────────────────────────
 // AKCSS ROOT
 // ─────────────────────────────────────────────────────────────

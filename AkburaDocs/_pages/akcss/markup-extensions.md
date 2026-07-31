@@ -1,13 +1,159 @@
 ---
 title: Markup Extensions
-summary: Use static and dynamic Avalonia resources from AKCSS expressions.
+summary: Supply utility arguments and variants through typed, reactive markup extensions.
 ---
 
-::: warning
-Akbura does not currently support general Avalonia `MarkupExtension` types. Custom markup extensions cannot yet be instantiated and evaluated from Akbura markup or AKCSS.
-:::
+Akbura can evaluate markup extension classes in regular attributes and in
+AKCSS utility attributes. A markup extension is a class with a public instance
+`ProvideValue()` or `ProvideValue(IServiceProvider)` method.
 
-AKCSS currently provides two compiler-supported resource extensions:
+The `Extension` suffix is optional:
+
+```akbura
+using Demo.Markup;
+
+<Border p-${GalleryPadding 4} />
+```
+
+Both `GalleryPadding` and `GalleryPaddingExtension` resolve this class:
+
+```csharp
+namespace Demo.Markup;
+
+public sealed class GalleryPaddingExtension
+{
+    public GalleryPaddingExtension(double value)
+    {
+        Value = value;
+    }
+
+    public double Value { get; }
+
+    public double ProvideValue(IServiceProvider services)
+    {
+        return Value;
+    }
+}
+```
+
+The extension namespace must be imported explicitly. `Akbura.Markup` is not
+added implicitly either:
+
+```akbura
+using Akbura.Markup;
+
+<Border p-1 ${md}:p-3 />
+```
+
+## Utility arguments
+
+A markup extension can supply an argument to a parameterized utility:
+
+```akcss
+@using Avalonia;
+@using Avalonia.Controls;
+
+@utilities {
+    Decorator.p-(double value) {
+        Padding: new Thickness(value);
+    }
+}
+```
+
+```akbura
+using Demo.Markup;
+
+state double spacing = 12;
+
+<Border p-${GalleryPadding {spacing}} />
+```
+
+For a utility parameter of type `T`, `ProvideValue` may return:
+
+| Result | Behavior |
+| --- | --- |
+| `T` | Applies the value immediately. |
+| `IObservable<T>` | Reapplies the utility whenever the observable publishes a value. |
+| `IObservable<object>` | Converts each published value to `T` at runtime. |
+| `BindingBase` | Binds a hidden attached property on the actual utility target and reapplies the utility when the binding changes. |
+
+An observable that has not published a value does not participate in the
+utility cascade. This lets an earlier utility with the same conflict key act as
+a fallback. Completion keeps the last value. An observable error is reported
+immediately.
+
+The `IObservable<object>` form is useful when an extension cannot expose a
+generic result type. Every published value still has to be compatible with the
+utility parameter type.
+
+## Dynamic arguments
+
+If an extension contains a component expression, Akbura recreates it during
+each component update:
+
+```akbura
+<Border p-${GalleryPadding {spacing + 1}} />
+```
+
+Expressions inside the extension are bound as normal C# expressions. They are
+included in `GetCSharpSymbolReferences` and preserve source locations through
+generated `#line` directives.
+
+Literal or otherwise component-independent extensions are created when their
+runtime source is attached. They are not recreated by every component update.
+
+## Utility variants
+
+A markup extension before a colon controls whether a utility candidate is
+active:
+
+```akbura
+using Akbura.Markup;
+
+<Border p-1
+        ${sm}:p-2
+        ${md}:p-3 />
+```
+
+A variant extension must return either `bool` or `IObservable<bool>`.
+The observable form reevaluates only the affected element and utility conflict
+key.
+
+The older form:
+
+```akbura
+<Border md:p-3 />
+```
+
+is parsed only for error recovery and produces a diagnostic. Use:
+
+```akbura
+<Border ${md}:p-3 />
+```
+
+Variant ordering is configured with `UtilityVariantAttribute`. See
+[AKCSS Utilities](utilities.md#variant-priority) for the complete
+conflict-resolution rules.
+
+## Lifecycle
+
+Akbura owns every subscription and binding created for utility markup
+extensions.
+
+1. Sources are attached to the actual target control.
+2. A new observable or binding value reevaluates only its utility conflict.
+3. A component update performs the complete AKCSS cascade and recreates
+   extensions that contain C# expressions.
+4. Detaching the target disposes subscriptions and bindings.
+5. Attaching it again evaluates the extensions and subscribes again.
+
+`BindingBase` may temporarily produce no value while `DataContext` is being
+inherited. During that period the utility candidate is excluded and its
+fallback can apply.
+
+## AKCSS resource helpers
+
+AKCSS also provides two compiler-supported resource methods:
 
 ```csharp
 Amx.StaticResource<T>(object? key);
@@ -21,40 +167,13 @@ They provide typed access to resources from AKCSS expressions.
 | `Amx.StaticResource<T>(key)` | Resolves the resource as `T` without creating a dynamic resource binding. |
 | `Amx.DynamicResource<T>(key)` | Observes the resource and updates the target property when its value changes. |
 
-## Compiler-intercepted methods
+These methods are compiler interception points. They throw if called directly
+from ordinary C# code.
 
-The methods are declared by the `Amx` class:
+### Static resources
 
-```csharp
-/// <summary>
-/// All methods in this class shoud be intercepted
-/// </summary>
-public static class Amx
-{
-    public static object? Extend<T>(params object[] args)
-    {
-        throw new InvalidOperationException("This method shoud be intercepted!");
-    }
-
-    public static T StaticResource<T>(object? key)
-    {
-        throw new InvalidOperationException("This method shoud be intercepted!");
-    }
-
-    public static T DynamicResource<T>(object? key)
-    {
-        throw new InvalidOperationException("This method shoud be intercepted!");
-    }
-}
-```
-
-These methods must not execute at runtime. The AKCSS compiler recognizes their invocations and replaces them with generated Avalonia resource lookup or binding code. Calling them directly from ordinary C# code throws `InvalidOperationException`.
-
-`Amx.Extend<T>` is an interception placeholder for general markup extensions. It is not currently supported for use in AKCSS; only `StaticResource<T>` and `DynamicResource<T>` are available.
-
-## Static resources
-
-Use `StaticResource<T>` when the resource does not need to update the target after it has been resolved:
+Use `StaticResource<T>` when the resource does not need to update after it has
+been resolved:
 
 ```akcss
 @using Avalonia.Media;
@@ -64,11 +183,10 @@ Button.brand {
 }
 ```
 
-The generic type argument tells the compiler which type the resource value must have.
+### Dynamic resources
 
-## Dynamic resources
-
-Use `DynamicResource<T>` when changing the resource should update the styled property:
+Use `DynamicResource<T>` when changing the resource should update the styled
+property:
 
 ```akcss
 Control.w-(double width) {
@@ -76,60 +194,22 @@ Control.w-(double width) {
 }
 ```
 
-```akbura
-using Akbura.Styles.akcss;
+With the default `--spacing` value of `4`, `w-10` produces a width of `40`.
+The generated utility obtains the resource observable, converts every new
+value using the original expression, binds the result, and tracks the binding
+for disposal.
 
-<Button w-10>
-    Continue
-</Button>
-```
+`Amx.Extend<T>` remains an interception placeholder. Utility markup extensions
+use `${...}` and do not call it.
 
-With the default `--spacing` value of `4`, `w-10` produces a width of `40`. If `--spacing` changes, the `Width` property is recalculated automatically.
+## Diagnostics
 
-The resource invocation may be part of a larger expression. In this example, the generated converter captures the `width` utility parameter and multiplies it by every new resource value.
+Akbura reports diagnostics before code generation when:
 
-## Generated code
-
-The `w-` utility above generates code equivalent to:
-
-```csharp
-[global::Akbura.CompilerAnotations.StyleNameAttribute("w")] 
-private sealed class Style_0 : global::Akbura.Akcss.AkcssUtility<double>
-{
-    public override void Update(object __target, double width)
-    {
-        global::System.ArgumentNullException.ThrowIfNull(__target);
-        if (__target is global::Avalonia.Layout.Layoutable && __target is global::Avalonia.Controls.IResourceHost)
-        {
-            #line 11 "D:\\Repos\\Akbura\\Akbura\\Styles.akcss"
-            TrackSubscription(__target, ((global::Avalonia.AvaloniaObject)__target).Bind(global::Avalonia.Layout.Layoutable.WidthProperty, global::Avalonia.Controls.ResourceNodeExtensions.GetResourceObservable((global::Avalonia.Controls.IResourceHost)__target, "--spacing", converter: __resourceValue => global::System.Object.ReferenceEquals(__resourceValue, global::Avalonia.AvaloniaProperty.UnsetValue) ? global::Avalonia.AvaloniaProperty.UnsetValue : (object?)(width * (double)__resourceValue!))));
-            #line default
-        }
-    }
-
-    public override void Reset(object __target)
-    {
-        global::System.ArgumentNullException.ThrowIfNull(__target);
-        base.Reset(__target);
-        if (__target is global::Avalonia.AvaloniaObject && __target is global::Avalonia.Layout.Layoutable)
-        {
-            ((global::Avalonia.AvaloniaObject)__target).ClearValue(global::Avalonia.Layout.Layoutable.WidthProperty);
-        }
-    }
-}
-```
-
-The generated utility:
-
-1. Checks that the target supports the property and implements `IResourceHost`.
-2. Obtains an observable for the `--spacing` resource.
-3. Converts every resource value using the original AKCSS expression.
-4. Binds the result to `Width` and tracks the subscription.
-5. Disposes the tracked binding and clears the property when the utility is reset.
-
-## Current limitations
-
-- Custom Avalonia `MarkupExtension` implementations are not supported yet.
-- `Amx.Extend<T>` is not available for application code.
-- Resource methods are supported only where the Akbura compiler can intercept the expression.
-- The target must be an Avalonia resource host for dynamic resource observation.
+- the extension type is missing or ambiguous;
+- a public constructor cannot accept the positional arguments;
+- a named extension property is missing or inaccessible;
+- `ProvideValue` is missing;
+- a utility argument cannot produce its declared parameter type;
+- a utility variant does not produce `bool` or `IObservable<bool>`;
+- a nested C# expression or its conversion is invalid.

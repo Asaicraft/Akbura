@@ -1,0 +1,182 @@
+@using Akbura.FeatureGallery.Styles.akcss;
+
+@utilities {
+
+    StackPanel.page {
+        @apply gap-8;
+    }
+
+    StackPanel.page-header {
+        @apply gap-2;
+    }
+
+    TextBlock.page-title {
+        @apply text-4xl
+               font-bold
+               text-slate-100;
+    }
+
+    TextBlock.page-description {
+        @apply text-lg
+               text-slate-400
+               whitespace-normal
+               self-start;
+
+        MaxWidth: 840;
+    }
+
+    Border.page-hero {
+        @apply p-8
+               bg-slate-950
+               border-1
+               border-slate-800
+               rounded-2xl
+               overflow-hidden;
+    }
+
+    TextBlock.page-hero-title {
+        @apply text-5xl
+               font-bold
+               text-slate-100
+               whitespace-normal;
+    }
+
+    TextBlock.page-hero-description {
+        @apply text-lg
+               text-slate-400
+               whitespace-normal
+               self-start;
+
+        MaxWidth: 720;
+    }
+
+    StackPanel.page-section {
+        @apply gap-4;
+    }
+
+    StackPanel.page-section-header {
+        @apply gap-1;
+    }
+
+    TextBlock.page-section-title {
+        @apply text-3xl
+               font-bold
+               text-slate-100;
+    }
+
+    TextBlock.page-section-description {
+        @apply text-base
+               text-slate-400
+               whitespace-normal;
+    }
+
+    Border.page-card {
+        @apply p-5
+               bg-slate-900
+               border-1
+               border-slate-800
+               rounded-xl;
+    }
+
+    Border.page-card-accent {
+        @apply p-5
+               bg-slate-900
+               border-1
+               border-blue-600
+               rounded-xl;
+    }
+
+    Border.page-card-compact {
+        @apply p-4
+               bg-slate-900
+               border-1
+               border-slate-700
+               rounded-xl;
+    }
+
+    Border.page-callout {
+        @apply p-5
+               bg-slate-950
+               border-1
+               border-slate-700
+               rounded-xl;
+    }
+
+    Border.page-note {
+        @apply p-4
+               bg-slate-950
+               border-1
+               border-slate-700
+               rounded-xl;
+    }
+
+    TextBlock.page-card-title {
+        @apply text-xl
+               font-semibold
+               text-slate-100;
+    }
+
+    TextBlock.page-card-small-title {
+        @apply text-lg
+               font-semibold
+               text-slate-100;
+    }
+
+    TextBlock.page-card-description {
+        @apply text-sm
+               text-slate-400
+               whitespace-normal;
+    }
+
+    TextBlock.page-note-text {
+        @apply text-sm
+               text-slate-300
+               whitespace-normal;
+    }
+
+    Border.page-code-surface {
+        @apply p-3
+               bg-slate-950
+               rounded-lg;
+    }
+
+    Border.page-code-surface-inline {
+        @apply px-3
+               py-2
+               bg-slate-950
+               rounded-lg;
+    }
+
+    TextBlock.page-code {
+        @apply text-sm
+               text-blue-400;
+
+        FontFamily: "Cascadia Code,Consolas,Monospace";
+    }
+
+    Border.page-badge {
+        @apply px-3
+               py-2
+               bg-slate-800
+               rounded-lg;
+    }
+
+    Border.page-badge-primary {
+        @apply px-3
+               py-2
+               bg-blue-600
+               rounded-lg;
+    }
+
+    TextBlock.page-badge-text {
+        @apply text-sm
+               font-semibold
+               text-slate-200;
+    }
+
+    TextBlock.page-badge-text-primary {
+        @apply text-sm
+               font-semibold
+               text-slate-100;
+    }
+}

@@ -1,108 +1,72 @@
-using Akbura.FeatureGallery.Styles.akcss;
+using Akbura.FeatureGallery.Pages.Page.akcss;
 
-<StackPanel gap-8>
+<StackPanel page>
 
-    <StackPanel gap-2>
+    <StackPanel page-header>
 
         <TextBlock Text="AKCSS"
-                   text-4xl
-                   font-bold
-                   text-slate-100/>
+                   page-title/>
 
         <TextBlock
             Text="Typed, reactive styles and reusable utilities for Akbura components and Avalonia controls."
-            text-lg
-            text-slate-400
-            whitespace-normal
-            self-start
-            MaxWidth="840"/>
+            page-description/>
 
     </StackPanel>
 
     <Grid ColumnDefinitions="*,*,*"
           gap-x-4>
 
-        <Border p-5
-                bg-slate-900
-                border-1
-                border-slate-800
-                rounded-xl>
+        <Border page-card>
 
             <StackPanel gap-3>
 
                 <TextBlock Text="Typed"
-                           text-xl
-                           font-semibold
-                           text-slate-100/>
+                           page-card-title/>
 
                 <TextBlock
                     Text="Selectors, properties, values and utility parameters are checked against their target types."
-                    text-sm
-                    text-slate-400
-                    whitespace-normal/>
+                    page-card-description/>
 
                 <TextBlock Text="Button.primary"
-                           FontFamily="Cascadia Code,Consolas,Monospace"
-                           text-sm
-                           text-blue-400/>
+                           page-code/>
 
             </StackPanel>
 
         </Border>
 
         <Border col-1
-                p-5
-                bg-slate-900
-                border-1
-                border-slate-800
-                rounded-xl>
+                page-card>
 
             <StackPanel gap-3>
 
                 <TextBlock Text="Reactive"
-                           text-xl
-                           font-semibold
-                           text-slate-100/>
+                           page-card-title/>
 
                 <TextBlock
                     Text="Expressions and conditions are reevaluated when their observable dependencies change."
-                    text-sm
-                    text-slate-400
-                    whitespace-normal/>
+                    page-card-description/>
 
                 <TextBlock Text="@if(IsPointerOver)"
-                           FontFamily="Cascadia Code,Consolas,Monospace"
-                           text-sm
-                           text-blue-400/>
+                           page-code/>
 
             </StackPanel>
 
         </Border>
 
         <Border col-2
-                p-5
-                bg-slate-900
-                border-1
-                border-slate-800
-                rounded-xl>
+                page-card>
 
             <StackPanel gap-3>
 
                 <TextBlock Text="Composable"
-                           text-xl
-                           font-semibold
-                           text-slate-100/>
+                           page-card-title/>
 
                 <TextBlock
                     Text="Small utilities can be combined directly in markup or reused inside styles through @apply."
-                    text-sm
-                    text-slate-400
-                    whitespace-normal/>
+                    page-card-description/>
 
                 <TextBlock Text="p-4 rounded-xl bg-blue-600"
-                           FontFamily="Cascadia Code,Consolas,Monospace"
-                           text-sm
-                           text-blue-400/>
+                           page-code/>
 
             </StackPanel>
 
@@ -110,20 +74,16 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </Grid>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
-        <StackPanel gap-1>
+        <StackPanel page-section-header>
 
             <TextBlock Text="Try AKCSS"
-                       text-3xl
-                       font-bold
-                       text-slate-100/>
+                       page-section-title/>
 
             <TextBlock
                 Text="This example demonstrates a reactive class, @apply, custom utilities, typed parameters and conditional utilities."
-                text-base
-                text-slate-400
-                whitespace-normal/>
+                page-section-description/>
 
         </StackPanel>
 
@@ -216,20 +176,16 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
-        <StackPanel gap-1>
+        <StackPanel page-section-header>
 
             <TextBlock Text="Markup extension utilities"
-                       text-3xl
-                       font-bold
-                       text-slate-100/>
+                       page-section-title/>
 
             <TextBlock
                 Text="Utility arguments can come from markup extensions, while reactive extension prefixes participate in the AKCSS cascade."
-                text-base
-                text-slate-400
-                whitespace-normal/>
+                page-section-description/>
 
         </StackPanel>
 
@@ -295,44 +251,30 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
         <TextBlock Text="Classes and utilities"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+                   page-section-title/>
 
         <Grid ColumnDefinitions="*,*"
               gap-x-4>
 
-            <Border p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+            <Border page-card>
 
                 <StackPanel gap-3>
 
                     <TextBlock Text="AKCSS class"
-                               text-xl
-                               font-semibold
-                               text-slate-100/>
+                               page-card-title/>
 
                     <TextBlock
                         Text="A named collection of declarations applied through the lowercase class attribute."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
-                    <Border p-3
-                            bg-slate-950
-                            rounded-lg>
+                    <Border page-code-surface>
 
                         <TextBlock
                             Text={"<Button class=\"primary\" />"}
-                            FontFamily="Cascadia Code,Consolas,Monospace"
-                            text-sm
-                            text-blue-400/>
+                            page-code/>
 
                     </Border>
 
@@ -341,34 +283,22 @@ using Akbura.FeatureGallery.Styles.akcss;
             </Border>
 
             <Border col-1
-                    p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+                    page-card>
 
                 <StackPanel gap-3>
 
                     <TextBlock Text="AKCSS utility"
-                               text-xl
-                               font-semibold
-                               text-slate-100/>
+                               page-card-title/>
 
                     <TextBlock
                         Text="A small typed style applied directly as a markup attribute without class."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
-                    <Border p-3
-                            bg-slate-950
-                            rounded-lg>
+                    <Border page-code-surface>
 
                         <TextBlock
                             Text={"<Button p-4 rounded-lg />"}
-                            FontFamily="Cascadia Code,Consolas,Monospace"
-                            text-sm
-                            text-blue-400/>
+                            page-code/>
 
                     </Border>
 
@@ -378,34 +308,22 @@ using Akbura.FeatureGallery.Styles.akcss;
 
         </Grid>
 
-        <Border p-4
-                bg-slate-950
-                border-1
-                border-slate-700
-                rounded-xl>
+        <Border page-note>
 
             <TextBlock
                 Text="The lowercase class attribute applies AKCSS classes. Avalonia's Classes property continues to use standard Avalonia style classes."
-                text-sm
-                text-slate-300
-                whitespace-normal/>
+                page-note-text/>
 
         </Border>
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
         <TextBlock Text="Composing styles with @apply"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+                   page-section-title/>
 
-        <Border p-5
-                bg-slate-900
-                border-1
-                border-slate-800
-                rounded-xl>
+        <Border page-card>
 
             <Grid ColumnDefinitions="*,Auto,*"
                   gap-x-5>
@@ -413,15 +331,11 @@ using Akbura.FeatureGallery.Styles.akcss;
                 <StackPanel gap-2>
 
                     <TextBlock Text="Utilities"
-                               text-lg
-                               font-semibold
-                               text-slate-100/>
+                               page-card-small-title/>
 
                     <TextBlock
                         Text="bg-blue-600 text-white px-4 py-2 rounded-lg"
-                        FontFamily="Cascadia Code,Consolas,Monospace"
-                        text-sm
-                        text-blue-400
+                        page-code
                         whitespace-normal/>
 
                 </StackPanel>
@@ -436,15 +350,11 @@ using Akbura.FeatureGallery.Styles.akcss;
                             gap-2>
 
                     <TextBlock Text="Reusable class"
-                               text-lg
-                               font-semibold
-                               text-slate-100/>
+                               page-card-small-title/>
 
                     <TextBlock
                         Text="@apply bg-blue-600 text-white px-4 py-2 rounded-lg;"
-                        FontFamily="Cascadia Code,Consolas,Monospace"
-                        text-sm
-                        text-blue-400
+                        page-code
                         whitespace-normal/>
 
                 </StackPanel>
@@ -455,43 +365,30 @@ using Akbura.FeatureGallery.Styles.akcss;
 
         <TextBlock
             Text="@apply copies compatible declarations from existing classes and utilities into the current AKCSS rule."
-            text-sm
-            text-slate-400
-            whitespace-normal/>
+            page-card-description/>
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
         <TextBlock Text="Reactive cascade"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+                   page-section-title/>
 
         <Grid ColumnDefinitions="*,Auto,*"
               gap-x-4>
 
-            <Border p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+            <Border page-card>
 
                 <StackPanel gap-2>
 
                     <TextBlock Text="Regular declaration"
-                               text-lg
-                               font-semibold
-                               text-slate-100/>
+                               page-card-small-title/>
 
                     <TextBlock Text="@apply bg-blue-600;"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
-                               text-sm
-                               text-blue-400/>
+                               page-code/>
 
                     <TextBlock Text="BindingPriority.Style"
-                               text-sm
-                               text-slate-400/>
+                               page-card-description/>
 
                 </StackPanel>
 
@@ -504,27 +401,18 @@ using Akbura.FeatureGallery.Styles.akcss;
                        self-center/>
 
             <Border col-2
-                    p-5
-                    bg-slate-900
-                    border-1
-                    border-blue-600
-                    rounded-xl>
+                    page-card-accent>
 
                 <StackPanel gap-2>
 
                     <TextBlock Text="Active @if declaration"
-                               text-lg
-                               font-semibold
-                               text-slate-100/>
+                               page-card-small-title/>
 
                     <TextBlock Text="@apply bg-blue-500;"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
-                               text-sm
-                               text-blue-400/>
+                               page-code/>
 
                     <TextBlock Text="BindingPriority.StyleTrigger"
-                               text-sm
-                               text-slate-400/>
+                               page-card-description/>
 
                 </StackPanel>
 
@@ -534,57 +422,40 @@ using Akbura.FeatureGallery.Styles.akcss;
 
         <TextBlock
             Text="When the condition becomes false, AKCSS removes the trigger values and exposes the regular style values again."
-            text-sm
-            text-slate-400
-            whitespace-normal/>
+            page-card-description/>
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
         <TextBlock Text="Utility arguments"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+                   page-section-title/>
 
         <Grid ColumnDefinitions="*,*"
               gap-x-4>
 
-            <Border p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+            <Border page-card>
 
                 <StackPanel gap-3>
 
                     <TextBlock Text="Parameterized utility"
-                               text-xl
-                               font-semibold
-                               text-slate-100/>
+                               page-card-title/>
 
                     <TextBlock
                         Text="Parameters are declared using normal C# types and passed through utility name segments."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
-                    <Border p-3
-                            bg-slate-950
-                            rounded-lg>
+                    <Border page-code-surface>
 
                         <StackPanel gap-2>
 
                             <TextBlock
                                 Text="Control.square-(double size)"
-                                FontFamily="Cascadia Code,Consolas,Monospace"
-                                text-sm
-                                text-blue-400/>
+                                page-code/>
 
                             <TextBlock
                                 Text={"<Border square-48 />"}
-                                FontFamily="Cascadia Code,Consolas,Monospace"
-                                text-sm
+                                page-code
                                 text-slate-300/>
 
                         </StackPanel>
@@ -596,34 +467,22 @@ using Akbura.FeatureGallery.Styles.akcss;
             </Border>
 
             <Border col-1
-                    p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+                    page-card>
 
                 <StackPanel gap-3>
 
                     <TextBlock Text="Conditional utility"
-                               text-xl
-                               font-semibold
-                               text-slate-100/>
+                               page-card-title/>
 
                     <TextBlock
                         Text="A boolean C# expression before the colon controls whether a utility is applied."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
-                    <Border p-3
-                            bg-slate-950
-                            rounded-lg>
+                    <Border page-code-surface>
 
                         <TextBlock
                             Text={"<Border {isActive}:border-blue-500 />"}
-                            FontFamily="Cascadia Code,Consolas,Monospace"
-                            text-sm
-                            text-blue-400
+                            page-code
                             whitespace-normal/>
 
                     </Border>
@@ -636,21 +495,15 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
         <TextBlock Text="Where styles are resolved"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+                   page-section-title/>
 
         <Grid ColumnDefinitions="*,Auto,*,Auto,*"
               gap-x-3>
 
-            <Border p-4
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+            <Border page-card-compact>
 
                 <StackPanel gap-1>
 
@@ -663,8 +516,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                                text-slate-100/>
 
                     <TextBlock Text="Current component"
-                               text-sm
-                               text-slate-400/>
+                               page-card-description/>
 
                 </StackPanel>
 
@@ -677,11 +529,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                        self-center/>
 
             <Border col-2
-                    p-4
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+                    page-card-compact>
 
                 <StackPanel gap-1>
 
@@ -694,8 +542,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                                text-slate-100/>
 
                     <TextBlock Text="ComponentName.akcss"
-                               text-sm
-                               text-slate-400/>
+                               page-card-description/>
 
                 </StackPanel>
 
@@ -708,11 +555,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                        self-center/>
 
             <Border col-4
-                    p-4
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+                    page-card-compact>
 
                 <StackPanel gap-1>
 
@@ -725,9 +568,7 @@ using Akbura.FeatureGallery.Styles.akcss;
                                text-slate-100/>
 
                     <TextBlock Text="Resolved in using order"
-                               text-sm
-                               text-slate-400
-                               whitespace-normal/>
+                               page-card-description/>
 
                 </StackPanel>
 
@@ -737,18 +578,12 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
         <TextBlock Text="Composable spacing"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+                   page-section-title/>
 
-        <Border p-5
-                bg-slate-900
-                border-1
-                border-slate-800
-                rounded-xl>
+        <Border page-card>
 
             <Grid ColumnDefinitions="Auto,Auto,*"
                   gap-x-5>
@@ -756,13 +591,12 @@ using Akbura.FeatureGallery.Styles.akcss;
                 <StackPanel gap-1>
 
                     <TextBlock Text="p-3"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
                                text-lg
-                               text-blue-400/>
+                               text-blue-400
+                               FontFamily="Cascadia Code,Consolas,Monospace"/>
 
                     <TextBlock Text="12 on every side"
-                               text-sm
-                               text-slate-400/>
+                               page-card-description/>
 
                 </StackPanel>
 
@@ -776,15 +610,13 @@ using Akbura.FeatureGallery.Styles.akcss;
                             gap-1>
 
                     <TextBlock Text="pt-2"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
                                text-lg
-                               text-blue-400/>
+                               text-blue-400
+                               FontFamily="Cascadia Code,Consolas,Monospace"/>
 
                     <TextBlock
                         Text="Top becomes 8 while left, right and bottom remain 12."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
                 </StackPanel>
 

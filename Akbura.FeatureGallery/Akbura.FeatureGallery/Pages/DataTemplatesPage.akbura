@@ -1,55 +1,36 @@
-using Akbura.FeatureGallery.Styles.akcss;
+using Akbura.FeatureGallery.Pages.Page.akcss;
 
-<StackPanel gap-8>
+<StackPanel page>
 
-    <StackPanel gap-2>
+    <StackPanel page-header>
 
         <TextBlock Text="Data templates"
-                   text-4xl
-                   font-bold
-                   text-slate-100/>
+                   page-title/>
 
         <TextBlock
             Text="Create strongly typed visual templates using compiled bindings, direct C# expressions and deferred content."
-            text-lg
-            text-slate-400
-            whitespace-normal
-            self-start
-            MaxWidth="840"/>
+            page-description/>
 
     </StackPanel>
 
     <Grid ColumnDefinitions="*,*"
           gap-x-4>
 
-        <Border p-5
-                bg-slate-900
-                border-1
-                border-slate-800
-                rounded-xl>
+        <Border page-card>
 
             <StackPanel gap-3>
 
                 <TextBlock Text="IDataTemplate"
-                           text-xl
-                           font-semibold
-                           text-slate-100/>
+                           page-card-title/>
 
                 <TextBlock
                     Text="Describes how one data item is converted into a new control tree."
-                    text-sm
-                    text-slate-400
-                    whitespace-normal/>
+                    page-card-description/>
 
-                <Border px-3
-                        py-2
-                        bg-slate-950
-                        rounded-lg>
+                <Border page-code-surface-inline>
 
                     <TextBlock Text="item -> Build(item) -> Control"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
-                               text-sm
-                               text-blue-400/>
+                               page-code/>
 
                 </Border>
 
@@ -58,34 +39,21 @@ using Akbura.FeatureGallery.Styles.akcss;
         </Border>
 
         <Border col-1
-                p-5
-                bg-slate-900
-                border-1
-                border-slate-800
-                rounded-xl>
+                page-card>
 
             <StackPanel gap-3>
 
                 <TextBlock Text="IDeferredContent"
-                           text-xl
-                           font-semibold
-                           text-slate-100/>
+                           page-card-title/>
 
                 <TextBlock
                     Text="Stores a control factory so the markup can be created later rather than immediately."
-                    text-sm
-                    text-slate-400
-                    whitespace-normal/>
+                    page-card-description/>
 
-                <Border px-3
-                        py-2
-                        bg-slate-950
-                        rounded-lg>
+                <Border page-code-surface-inline>
 
                     <TextBlock Text="markup -> factory -> Build later"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
-                               text-sm
-                               text-blue-400/>
+                               page-code/>
 
                 </Border>
 
@@ -95,20 +63,16 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </Grid>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
-        <StackPanel gap-1>
+        <StackPanel page-section-header>
 
             <TextBlock Text="Implicit and explicit templates"
-                       text-3xl
-                       font-bold
-                       text-slate-100/>
+                       page-section-title/>
 
             <TextBlock
                 Text="Both forms create the same visible result, but they use different generated representations."
-                text-base
-                text-slate-400
-                whitespace-normal/>
+                page-section-description/>
 
         </StackPanel>
 
@@ -176,98 +140,66 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
         <TextBlock Text="What Akbura generates"
-                   text-3xl
-                   font-bold
-                   text-slate-100/>
+                   page-section-title/>
 
         <Grid ColumnDefinitions="*,*,*"
               gap-x-4>
 
-            <Border p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+            <Border page-card>
 
                 <StackPanel gap-2>
 
                     <TextBlock Text="1. Infer the item type"
-                               text-lg
-                               font-semibold
-                               text-slate-100/>
+                               page-card-small-title/>
 
                     <TextBlock
                         Text="The compiler examines the static type of ItemsSource and obtains the collection item type."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
                     <TextBlock
                         Text="ImmutableArray<(string, int)>"
-                        FontFamily="Cascadia Code,Consolas,Monospace"
-                        text-sm
-                        text-blue-400/>
+                        page-code/>
 
                 </StackPanel>
 
             </Border>
 
             <Border col-1
-                    p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+                    page-card>
 
                 <StackPanel gap-2>
 
                     <TextBlock Text="2. Create a template"
-                               text-lg
-                               font-semibold
-                               text-slate-100/>
+                               page-card-small-title/>
 
                     <TextBlock
                         Text="A direct control is wrapped in FuncDataTemplate. An explicit DataTemplate remains an Avalonia DataTemplate."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
                     <TextBlock Text="FuncDataTemplate"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
-                               text-sm
-                               text-blue-400/>
+                               page-code/>
 
                 </StackPanel>
 
             </Border>
 
             <Border col-2
-                    p-5
-                    bg-slate-900
-                    border-1
-                    border-slate-800
-                    rounded-xl>
+                    page-card>
 
                 <StackPanel gap-2>
 
                     <TextBlock Text="3. Build each item"
-                               text-lg
-                               font-semibold
-                               text-slate-100/>
+                               page-card-small-title/>
 
                     <TextBlock
                         Text="ItemsControl calls the template for every item and receives a fresh control tree."
-                        text-sm
-                        text-slate-400
-                        whitespace-normal/>
+                        page-card-description/>
 
                     <TextBlock Text="template.Build(item)"
-                               FontFamily="Cascadia Code,Consolas,Monospace"
-                               text-sm
-                               text-blue-400/>
+                               page-code/>
 
                 </StackPanel>
 
@@ -277,20 +209,16 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
-    <StackPanel gap-4>
+    <StackPanel page-section>
 
-        <StackPanel gap-1>
+        <StackPanel page-section-header>
 
             <TextBlock Text="How IDeferredContent works"
-                       text-3xl
-                       font-bold
-                       text-slate-100/>
+                       page-section-title/>
 
             <TextBlock
                 Text="IDeferredContent prevents a template body from being instantiated before it is actually needed."
-                text-base
-                text-slate-400
-                whitespace-normal/>
+                page-section-description/>
 
         </StackPanel>
 
@@ -325,24 +253,16 @@ using Akbura.FeatureGallery.Styles.akcss;
                       gap-x-3
                       self-center>
 
-                    <Border p-4
-                            bg-slate-900
-                            border-1
-                            border-slate-700
-                            rounded-xl>
+                    <Border page-card-compact>
 
                         <StackPanel gap-2>
 
                             <TextBlock Text="Markup"
-                                       text-lg
-                                       font-semibold
-                                       text-slate-100
+                                       page-card-small-title
                                        text-center/>
 
                             <TextBlock Text="<AboutPage/>"
-                                       FontFamily="Cascadia Code,Consolas,Monospace"
-                                       text-sm
-                                       text-blue-400
+                                       page-code
                                        text-center/>
 
                         </StackPanel>
@@ -356,24 +276,16 @@ using Akbura.FeatureGallery.Styles.akcss;
                                self-center/>
 
                     <Border col-2
-                            p-4
-                            bg-slate-900
-                            border-1
-                            border-slate-700
-                            rounded-xl>
+                            page-card-compact>
 
                         <StackPanel gap-2>
 
                             <TextBlock Text="Deferred factory"
-                                       text-lg
-                                       font-semibold
-                                       text-slate-100
+                                       page-card-small-title
                                        text-center/>
 
                             <TextBlock Text="IDeferredContent"
-                                       FontFamily="Cascadia Code,Consolas,Monospace"
-                                       text-sm
-                                       text-blue-400
+                                       page-code
                                        text-center/>
 
                         </StackPanel>
@@ -387,24 +299,16 @@ using Akbura.FeatureGallery.Styles.akcss;
                                self-center/>
 
                     <Border col-4
-                            p-4
-                            bg-slate-900
-                            border-1
-                            border-slate-700
-                            rounded-xl>
+                            page-card-compact>
 
                         <StackPanel gap-2>
 
                             <TextBlock Text="Built later"
-                                       text-lg
-                                       font-semibold
-                                       text-slate-100
+                                       page-card-small-title
                                        text-center/>
 
                             <TextBlock Text="TemplateContent.Load"
-                                       FontFamily="Cascadia Code,Consolas,Monospace"
-                                       text-sm
-                                       text-blue-400
+                                       page-code
                                        text-center/>
 
                         </StackPanel>
@@ -419,24 +323,16 @@ using Akbura.FeatureGallery.Styles.akcss;
 
     </StackPanel>
 
-    <Border p-5
-            bg-slate-950
-            border-1
-            border-slate-700
-            rounded-xl>
+    <Border page-callout>
 
         <StackPanel gap-2>
 
             <TextBlock Text="IDataTemplate and IDeferredContent are not the same thing"
-                       text-xl
-                       font-semibold
-                       text-slate-100/>
+                       page-card-title/>
 
             <TextBlock
                 Text="IDataTemplate describes how data becomes a control. IDeferredContent stores the factory for a deferred section of markup. An explicit DataTemplate uses both: the DataTemplate itself implements IDataTemplate, while its Content is represented by IDeferredContent."
-                text-sm
-                text-slate-400
-                whitespace-normal/>
+                page-card-description/>
 
         </StackPanel>
 

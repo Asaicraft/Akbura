@@ -1,258 +1,195 @@
-using Akbura.FeatureGallery.Styles.akcss;
+using Akbura.FeatureGallery.Pages.Page.akcss;
 
-<StackPanel gap-8>
+<StackPanel page>
 
-	<Border p-8
-			bg-slate-950
-			border-1
-			border-slate-800
-			rounded-2xl
-			overflow-hidden>
+    <Border page-hero>
 
-		<Grid ColumnDefinitions="*,Auto"
-			  gap-x-8>
+        <Grid ColumnDefinitions="*,Auto"
+              gap-x-8>
 
-			<StackPanel gap-4>
+            <StackPanel gap-4>
 
-				<TextBlock Text="Build Avalonia interfaces with C#"
-						   text-5xl
-						   font-bold
-						   text-slate-100
-						   whitespace-normal/>
+                <TextBlock Text="Build Avalonia interfaces with C#"
+                           page-hero-title/>
 
-				<TextBlock
-					Text="Akbura combines declarative markup, reactive state and strongly typed C# in a single component."
-					text-lg
-					text-slate-400
-					whitespace-normal
-					self-start
-					MaxWidth="720"/>
+                <TextBlock
+                    Text="Akbura combines declarative markup, reactive state and strongly typed C# in a single component."
+                    page-hero-description/>
 
-				<StackPanel Orientation="Horizontal"
-							gap-3>
+                <StackPanel Orientation="Horizontal"
+                            gap-3>
 
-					<Border px-3
-							py-2
-							bg-blue-600
-							rounded-lg>
+                    <Border page-badge-primary>
 
-						<TextBlock Text="Compiled"
-								   text-sm
-								   font-semibold
-								   text-slate-100/>
+                        <TextBlock Text="Compiled"
+                                   page-badge-text-primary/>
 
-					</Border>
+                    </Border>
 
-					<Border px-3
-							py-2
-							bg-slate-800
-							rounded-lg>
+                    <Border page-badge>
 
-						<TextBlock Text="Reactive"
-								   text-sm
-								   font-semibold
-								   text-slate-200/>
+                        <TextBlock Text="Reactive"
+                                   page-badge-text/>
 
-					</Border>
+                    </Border>
 
-					<Border px-3
-							py-2
-							bg-slate-800
-							rounded-lg>
+                    <Border page-badge>
 
-						<TextBlock Text="Type-safe"
-								   text-sm
-								   font-semibold
-								   text-slate-200/>
+                        <TextBlock Text="Type-safe"
+                                   page-badge-text/>
 
-					</Border>
+                    </Border>
 
-				</StackPanel>
+                </StackPanel>
 
-			</StackPanel>
+            </StackPanel>
 
-			<Border col-1
-					p-6
-					bg-slate-900
-					border-1
-					border-slate-700
-					rounded-xl
-					self-center>
+            <Border col-1
+                    p-6
+                    bg-slate-900
+                    border-1
+                    border-slate-700
+                    rounded-xl
+                    self-center>
 
-				<StackPanel gap-2>
+                <StackPanel gap-2>
 
-					<TextBlock Text="Akbura"
-							   text-3xl
-							   font-bold
-							   text-blue-400
-							   text-center/>
+                    <TextBlock Text="Akbura"
+                               text-3xl
+                               font-bold
+                               text-blue-400
+                               text-center/>
 
-					<TextBlock Text=".akbura"
-							   text-sm
-							   text-slate-500
-							   text-center/>
-
-				</StackPanel>
+                    <TextBlock Text=".akbura"
+                               text-sm
+                               text-slate-500
+                               text-center/>
 
-			</Border>
+                </StackPanel>
 
-		</Grid>
+            </Border>
 
-	</Border>
+        </Grid>
 
-	<StackPanel gap-4>
+    </Border>
 
-		<TextBlock Text="Why Akbura?"
-				   text-3xl
-				   font-bold
-				   text-slate-100/>
+    <StackPanel page-section>
 
-		<Grid ColumnDefinitions="*,*,*"
-			  gap-x-4>
+        <TextBlock Text="Why Akbura?"
+                   page-section-title/>
 
-			<Border p-5
-					bg-slate-900
-					border-1
-					border-slate-800
-					rounded-xl>
+        <Grid ColumnDefinitions="*,*,*"
+              gap-x-4>
 
-				<StackPanel gap-3>
+            <Border page-card>
 
-					<TextBlock Text="Reactive state"
-							   text-xl
-							   font-semibold
-							   text-slate-100/>
+                <StackPanel gap-3>
 
-					<TextBlock
-						Text="Declare state directly inside the component. The interface updates when its value changes."
-						text-sm
-						text-slate-400
-						whitespace-normal/>
+                    <TextBlock Text="Reactive state"
+                               page-card-title/>
 
-					<TextBlock Text="state int count = 0;"
-							   FontFamily="Consolas"
-							   text-sm
-							   text-blue-400/>
+                    <TextBlock
+                        Text="Declare state directly inside the component. The interface updates when its value changes."
+                        page-card-description/>
 
-				</StackPanel>
+                    <TextBlock Text="state int count = 0;"
+                               page-code/>
 
-			</Border>
+                </StackPanel>
 
-			<Border col-1
-					p-5
-					bg-slate-900
-					border-1
-					border-slate-800
-					rounded-xl>
+            </Border>
 
-				<StackPanel gap-3>
+            <Border col-1
+                    page-card>
 
-					<TextBlock Text="Native C#"
-							   text-xl
-							   font-semibold
-							   text-slate-100/>
+                <StackPanel gap-3>
 
-					<TextBlock
-						Text="Use normal C# expressions, methods, types and lambdas without introducing a separate scripting language."
-						text-sm
-						text-slate-400
-						whitespace-normal/>
+                    <TextBlock Text="Native C#"
+                               page-card-title/>
 
-					<TextBlock Text="Click={() => count++}"
-							   FontFamily="Consolas"
-							   text-sm
-							   text-blue-400/>
+                    <TextBlock
+                        Text="Use normal C# expressions, methods, types and lambdas without introducing a separate scripting language."
+                        page-card-description/>
 
-				</StackPanel>
+                    <TextBlock Text="Click={() => count++}"
+                               page-code/>
 
-			</Border>
+                </StackPanel>
 
-			<Border col-2
-					p-5
-					bg-slate-900
-					border-1
-					border-slate-800
-					rounded-xl>
+            </Border>
 
-				<StackPanel gap-3>
+            <Border col-2
+                    page-card>
 
-					<TextBlock Text="AKCSS utilities"
-							   text-xl
-							   font-semibold
-							   text-slate-100/>
+                <StackPanel gap-3>
 
-					<TextBlock
-						Text="Compose reusable styles with compact utilities while keeping access to Avalonia properties."
-						text-sm
-						text-slate-400
-						whitespace-normal/>
+                    <TextBlock Text="AKCSS utilities"
+                               page-card-title/>
 
-					<TextBlock Text="p-4 rounded-xl text-lg"
-							   FontFamily="Consolas"
-							   text-sm
-							   text-blue-400/>
+                    <TextBlock
+                        Text="Compose reusable styles with compact utilities while keeping access to Avalonia properties."
+                        page-card-description/>
 
-				</StackPanel>
+                    <TextBlock Text="p-4 rounded-xl text-lg"
+                               page-code/>
 
-			</Border>
+                </StackPanel>
 
-		</Grid>
+            </Border>
 
-	</StackPanel>
+        </Grid>
 
-	<StackPanel gap-4>
+    </StackPanel>
 
-		<StackPanel gap-1>
+    <StackPanel page-section>
 
-			<TextBlock Text="Try it"
-					   text-3xl
-					   font-bold
-					   text-slate-100/>
+        <StackPanel page-section-header>
 
-			<TextBlock
-				Text="Switch between the live preview and its Akbura source code."
-				text-base
-				text-slate-400
-				whitespace-normal/>
+            <TextBlock Text="Try it"
+                       page-section-title/>
 
-		</StackPanel>
+            <TextBlock
+                Text="Switch between the live preview and its Akbura source code."
+                page-section-description/>
 
-		<FeatureView Path="Components/Counter.akbura">
+        </StackPanel>
 
-			<FeatureView.Code>
-				{"""
-				state int count = 0;
+        <FeatureView Path="Components/Counter.akbura">
 
-				<StackPanel gap-3>
-					<TextBlock Text="Akbura Counter"
-							   text-2xl
-							   font-bold/>
+            <FeatureView.Code>
+                {"""
+                state int count = 0;
 
-					<TextBlock Text={$"Current value: {count}"}
-							   text-base/>
+                <StackPanel gap-3>
+                    <TextBlock Text="Akbura Counter"
+                               text-2xl
+                               font-bold/>
 
-					<StackPanel Orientation="Horizontal"
-								gap-2>
+                    <TextBlock Text={$"Current value: {count}"}
+                               text-base/>
 
-						<Button Content="Decrease"
-								Click={count--}/>
+                    <StackPanel Orientation="Horizontal"
+                                gap-2>
 
-						<Button Content="Increase"
-								Click={count++}/>
+                        <Button Content="Decrease"
+                                Click={count--}/>
 
-					</StackPanel>
-				</StackPanel>
-				"""}
-			</FeatureView.Code>
+                        <Button Content="Increase"
+                                Click={count++}/>
 
-			<FeatureView.View>
-				<Counter/>
-			</FeatureView.View>
+                    </StackPanel>
+                </StackPanel>
+                """}
+            </FeatureView.Code>
 
-		</FeatureView>
+            <FeatureView.View>
+                <Counter/>
+            </FeatureView.View>
 
-	</StackPanel>
+        </FeatureView>
 
-	<ViewThisPageInGithub/>
+    </StackPanel>
+
+    <ViewThisPageInGithub/>
 
 </StackPanel>

@@ -319,6 +319,22 @@ state double scale = 2;
 
 &lt;Button square-{width * scale} /&gt;
 </code></pre>
+<h2 id="markup-extension-arguments">Markup extension arguments<a class="header-anchor" href="javascript:;" onclick="location.hash='#markup-extension-arguments'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>${...}</code> when a markup extension supplies a utility argument:</p>
+<pre><code class="language-akbura">using Demo.Markup;
+
+state double spacing = 4;
+
+&lt;Border p-${GalleryPadding {spacing + 1}‎} /&gt;
+</code></pre>
+<p>The extension is resolved and bound at compile time. For a utility parameter
+<code>T</code>, its <code>ProvideValue</code> method may return <code>T</code>, <code>IObservable&lt;T&gt;</code>,
+<code>IObservable&lt;object&gt;</code>, or <code>BindingBase</code>.</p>
+<p>Observable and binding results reapply only the affected utility conflict.
+When an extension argument contains a C# expression, it is recreated on each
+component update so it sees the current state and parameter values.</p>
+<p>See <a href="markup-extensions.md">Markup Extensions</a> for the full value and lifecycle
+contract.</p>
 <h2 id="conditional-utilities">Conditional utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>A utility can be applied conditionally with an expression prefix:</p>
 <pre><code class="language-akbura">using Avalonia.Controls;
@@ -340,6 +356,121 @@ state bool isBusy = false;
 <pre><code class="language-akbura">&lt;Button {count &gt; 10}:hidden /&gt;
 &lt;Button {user.IsAdmin}:visible /&gt;
 </code></pre>
+<h2 id="markup-extension-prefixes">Markup extension prefixes<a class="header-anchor" href="javascript:;" onclick="location.hash='#markup-extension-prefixes'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A markup extension can act as a reactive utility condition:</p>
+<pre><code class="language-akbura">using Akbura.Markup;
+using Akbura.Styles.akcss;
+
+&lt;Border p-1
+        ${sm}:p-2
+        ${md}:p-3
+        ${lg}:p-4
+        ${xl}:p-5
+        ${xxl}:p-6 /&gt;
+</code></pre>
+<p>The extension must return <code>bool</code> or <code>IObservable&lt;bool&gt;</code>. A false or not-yet-
+available value removes that candidate from conflict resolution, allowing the
+next matching utility to apply.</p>
+<p>The braces are required. <code>md:p-3</code> is retained only for parser recovery and
+produces a diagnostic that suggests <code>${md}:p-3</code>.</p>
+<h2 id="variant-priority">Variant priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#variant-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Utilities conflict by their resolved utility name. For example, <code>p-1</code>,
+<code>p-2</code>, and <code>${md}:p-3</code> all use the conflict key <code>p</code>. Only one candidate wins
+for that key. Unrelated keys such as <code>p</code> and <code>bg</code> are resolved independently.</p>
+<p>The runtime resolves active candidates in this order:</p>
+<ol>
+<li>For each non-empty <code>ConflictGroup</code>, choose the candidate with the greatest
+<code>Order</code>.</li>
+<li>If <code>Order</code> is equal, choose the candidate written later.</li>
+<li>Candidates from different groups, and candidates without a group, are
+compared by source order rather than by <code>Order</code>.</li>
+<li>Compare the winning prefixed candidate with the last unprefixed candidate
+according to <code>UnprefixedPrecedence</code>.</li>
+</ol>
+<p>The three unprefixed precedence modes are:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Below</code></td>
+<td>The unprefixed utility always wins.</td>
+</tr>
+<tr>
+<td><code>SourceOrder</code></td>
+<td>The candidate written later wins.</td>
+</tr>
+<tr>
+<td><code>Above</code></td>
+<td>The active prefixed utility always wins.</td>
+</tr>
+</tbody>
+</table>
+<p>Custom variants declare these values on their extension type:</p>
+<pre><code class="language-csharp">using Akbura.Markup;
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = &quot;WindowBreakpoints&quot;,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class WideExtension
+{
+    public IObservable&lt;bool&gt; ProvideValue(IServiceProvider services)
+    {
+        // Return an observable condition for the target.
+    }
+}
+</code></pre>
+<p><code>UtilityVariantAttribute</code> decides priority only after utilities are known to
+conflict. Sharing a <code>ConflictGroup</code> never creates a conflict between unrelated
+utilities.</p>
+<h2 id="built-in-breakpoints">Built-in breakpoints<a class="header-anchor" href="javascript:;" onclick="location.hash='#built-in-breakpoints'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The built-in variants are available through an explicit import:</p>
+<pre><code class="language-akbura">using Akbura.Markup;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th style="text-align: right;">Active width</th>
+<th style="text-align: right;">Order</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>${sm}</code></td>
+<td style="text-align: right;"><code>&gt;= 640</code></td>
+<td style="text-align: right;"><code>1</code></td>
+</tr>
+<tr>
+<td><code>${md}</code></td>
+<td style="text-align: right;"><code>&gt;= 768</code></td>
+<td style="text-align: right;"><code>10</code></td>
+</tr>
+<tr>
+<td><code>${lg}</code></td>
+<td style="text-align: right;"><code>&gt;= 1024</code></td>
+<td style="text-align: right;"><code>20</code></td>
+</tr>
+<tr>
+<td><code>${xl}</code></td>
+<td style="text-align: right;"><code>&gt;= 1280</code></td>
+<td style="text-align: right;"><code>30</code></td>
+</tr>
+<tr>
+<td><code>${xxl}</code></td>
+<td style="text-align: right;"><code>&gt;= 1536</code></td>
+<td style="text-align: right;"><code>40</code></td>
+</tr>
+</tbody>
+</table>
+<p>All built-in breakpoints belong to one conflict group and use
+<code>UnprefixedUtilityPrecedence.Above</code>. Therefore the largest active breakpoint
+wins even when an unprefixed utility appears later.</p>
 <h2 id="conditional-declarations-inside-utilities">Conditional declarations inside utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-declarations-inside-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Utilities may also contain reactive <code>@if</code> declarations:</p>
 <pre><code class="language-akcss">@using Avalonia.Controls;
@@ -607,8 +738,28 @@ gap-4 → Spacing = 4 × 4 = 16
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#markup-extension-arguments'" data-id="markup-extension-arguments" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Markup extension arguments
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#conditional-utilities'" data-id="conditional-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Conditional utilities
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#markup-extension-prefixes'" data-id="markup-extension-prefixes" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Markup extension prefixes
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#variant-priority'" data-id="variant-priority" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Variant priority
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#built-in-breakpoints'" data-id="built-in-breakpoints" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Built-in breakpoints
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

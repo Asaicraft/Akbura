@@ -1,0 +1,418 @@
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+state string projectName = "Akbura";
+
+<StackPanel page>
+
+    <StackPanel page-header>
+
+        <TextBlock
+            Text="Differences between XML, XAML and AXAML"
+            page-title/>
+
+        <TextBlock
+            Text="Akbura uses familiar XML-like markup, but .akbura files are not XML documents. Some XML and XAML constructs are therefore replaced by native C# syntax."
+            page-description/>
+
+    </StackPanel>
+
+    <Border page-note>
+
+        <TextBlock
+            Text="AXAML is Avalonia XAML: an XML-based UI language stored in .axaml files. Akbura keeps the familiar element structure while allowing C# expressions directly inside the component."
+            page-note-text/>
+
+    </Border>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock
+                Text="CDATA is replaced by raw strings"
+                page-section-title/>
+
+            <TextBlock
+                Text="Akbura does not support XML CDATA sections. Use a C# raw string expression when markup must contain unescaped text, source code or another markup fragment."
+                page-section-description/>
+
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,*"
+              gap-x-4>
+
+            <Border page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock
+                        Text="XML / AXAML"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="XML can protect text from markup parsing with a CDATA section."
+                        page-card-description/>
+
+                    <Border page-code-surface>
+
+                        <TextBlock
+                            Text={"""
+                            <FeatureView.Code>
+                                <![CDATA[
+                                <Button Content="Hello" />
+                                ]]>
+                            </FeatureView.Code>
+                            """}
+                            page-code
+                            whitespace-normal/>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-1
+                    page-card-accent>
+
+                <StackPanel gap-3>
+
+                    <TextBlock
+                        Text="Akbura"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="Place a C# raw string inside an Akbura expression."
+                        page-card-description/>
+
+                    <Border page-code-surface>
+
+                        <TextBlock
+                            Text={""""
+                            <FeatureView.Code>
+                                {"""
+                                <Button Content="Hello" />
+                                """}
+                            </FeatureView.Code>
+                            """"}
+                            page-code
+                            whitespace-normal/>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <TextBlock
+            Text="Why raw strings are useful"
+            page-section-title/>
+
+        <Grid ColumnDefinitions="*,*,*"
+              gap-x-4>
+
+            <Border page-card>
+
+                <StackPanel gap-2>
+
+                    <TextBlock
+                        Text="Indentation-aware"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="The indentation shared with the closing delimiter is removed, so embedded code can remain aligned with the surrounding component."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-1
+                    page-card>
+
+                <StackPanel gap-2>
+
+                    <TextBlock
+                        Text="Less escaping"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="Quotes and backslashes normally remain unchanged. When the content contains triple quotes, the delimiter can simply use more quote characters."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-2
+                    page-card>
+
+                <StackPanel gap-2>
+
+                    <TextBlock
+                        Text="C# interpolation"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="Add $ before the opening delimiter to insert component state, parameters and any other C# expression directly into the text."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock
+                Text="Interpolated raw strings"
+                page-section-title/>
+
+            <TextBlock
+                Text="Edit the value below. The output is produced by a normal C# interpolated raw string."
+                page-section-description/>
+
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,*"
+              gap-x-4>
+
+            <Border page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock
+                        Text="Source"
+                        page-card-title/>
+
+                    <Border page-code-surface>
+
+                        <TextBlock
+                            Text={""""
+                            state string projectName = "Akbura";
+
+                            <TextBlock Text={$"""
+                            Welcome to {projectName}.
+                            """}/>
+                            """"}
+                            page-code
+                            whitespace-normal/>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-1
+                    page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock
+                        Text="Live result"
+                        page-card-title/>
+
+                    <TextBox
+                        bind:Text={projectName}
+                        Watermark="Project name"/>
+
+                    <Border page-code-surface>
+
+                        <TextBlock
+                            Text={$"""
+                            Welcome to {projectName}.
+                            This text is created by an interpolated raw string.
+                            """}
+                            page-code
+                            whitespace-normal/>
+
+                    </Border>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock
+                Text="Whitespace and xml:space"
+                page-section-title/>
+
+            <TextBlock
+                Text="CDATA and xml:space solve different problems. CDATA prevents text from being interpreted as XML markup, while xml:space controls how whitespace inside an element should be processed."
+                page-section-description/>
+
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,*,*"
+              gap-x-4>
+
+            <Border page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock
+                        Text="XML"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="In XML, xml:space declares whether an application may use its default whitespace handling or should preserve every whitespace character."
+                        page-card-description/>
+
+                    <Border page-code-surface>
+
+                        <TextBlock
+                            Text={"""
+                            <poem xml:space="preserve">
+                                First line
+                                    Indented line
+                                Last line
+                            </poem>
+                            """}
+                            page-code
+                            whitespace-normal/>
+
+                    </Border>
+
+                    <TextBlock
+                        Text="The allowed values are default and preserve. The value is inherited by descendant elements until another xml:space attribute overrides it."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-1
+                    page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock
+                        Text="XAML / AXAML"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="XAML normally normalizes inner whitespace. Line breaks and tabs may become spaces, repeated spaces may be collapsed, and whitespace near element boundaries may be removed."
+                        page-card-description/>
+
+                    <Border page-code-surface>
+
+                        <TextBlock
+                            Text={"""
+                            <TextBlock xml:space="preserve">
+                                First line
+                                    Indented line
+                                Last line
+                            </TextBlock>
+                            """}
+                            page-code
+                            whitespace-normal/>
+
+                    </Border>
+
+                    <TextBlock
+                        Text="xml:space=&quot;preserve&quot; tells the AXAML processor to preserve line breaks and whitespace in the element content."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border col-2
+                    page-card-accent>
+
+                <StackPanel gap-3>
+
+                    <TextBlock
+                        Text="Akbura"
+                        page-card-title/>
+
+                    <TextBlock
+                        Text="Akbura is not XML, so xml:space has no special meaning. Whitespace is defined directly by the resulting C# string."
+                        page-card-description/>
+
+                    <Border page-code-surface>
+
+                        <TextBlock
+                            Text={""""
+                            <TextBlock Text={"""
+                            First line
+                                Indented line
+                            Last line
+                            """}/>
+                            """"}
+                            page-code
+                            whitespace-normal/>
+
+                    </Border>
+
+                    <TextBlock
+                        Text="The closing raw-string delimiter defines the common indentation that is removed. Additional indentation inside the string remains part of the resulting value."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+        <Border page-note>
+
+            <StackPanel gap-2>
+
+                <TextBlock
+                    Text="CDATA, xml:space and raw strings are not equivalents"
+                    page-card-small-title/>
+
+                <TextBlock
+                    Text="CDATA changes how XML recognizes markup. xml:space changes how whitespace in XML or XAML content should be handled. A C# raw string creates the actual string value used by an Akbura component."
+                    page-note-text/>
+
+            </StackPanel>
+
+        </Border>
+
+    </StackPanel>
+
+    <Border page-callout>
+
+        <StackPanel gap-2>
+
+            <TextBlock
+                Text="Raw strings are C# expressions"
+                page-card-title/>
+
+            <TextBlock
+                Text="They are checked by the C# compiler, support interpolation and follow C# indentation rules. They are not an Akbura-specific replacement string format."
+                page-card-description/>
+
+            <HyperlinkButton
+                NavigateUri={new Uri("https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/raw-string")}
+                Content="Read the C# raw string documentation"
+                self-start/>
+
+        </StackPanel>
+
+    </Border>
+
+    <ViewThisPageInGithub/>
+
+</StackPanel>

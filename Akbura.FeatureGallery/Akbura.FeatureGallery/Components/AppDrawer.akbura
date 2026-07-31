@@ -32,6 +32,10 @@ param string CurrentUrl = "";
                   Url="/data-templates"
                   Router={Router}/>
 
+            <Link Content="XML / XAML / AXAML"
+                  Url="/xml-xaml-axaml"
+                  Router={Router}/>
+
             <Link Content="AKCSS"
                   Url="/akcss"
                   Router={Router}/>

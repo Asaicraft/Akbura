@@ -46,6 +46,10 @@ state string url = "/overview";
                                 <DataTemplatesPage/>
                             </Page>
 
+                            <Page Url="/xml-xaml-axaml">
+                                <XmlXamlAxamlPage/>
+                            </Page>
+
                             <Page Url="/about">
                                 <AboutPage/>
                             </Page>

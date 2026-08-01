@@ -133,11 +133,28 @@ internal static class AkcssGenerator
 
         for (var index = 0; index < symbol.AkcssSymbols.Length; index++)
         {
-            var akcssSymbol = symbol.AkcssSymbols[index];
-            if (!akcssSymbol.IsIntercepted)
+            var akcssSymbol =
+                symbol.AkcssSymbols[index];
+
+            source.AppendLine();
+
+            if (akcssSymbol.IsIntercepted)
             {
-                source.AppendLine();
-                AppendStyleType(source, symbol, akcssSymbol, index, sourceMap);
+                AppendInterceptMetadataType(
+                    source,
+                    symbol,
+                    akcssSymbol,
+                    index,
+                    sourceMap);
+            }
+            else
+            {
+                AppendStyleType(
+                    source,
+                    symbol,
+                    akcssSymbol,
+                    index,
+                    sourceMap);
             }
         }
 
@@ -294,6 +311,40 @@ internal static class AkcssGenerator
         }
     }
 
+    private static void AppendInterceptMetadataType(
+        StringBuilder source,
+        IAkcssModuleSymbol module,
+        IAkcssSymbol symbol,
+        int index,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        source.Append("        [")
+            .Append(StyleNameAttribute)
+            .Append('(')
+            .Append(ToStringLiteral(symbol.Name))
+            .AppendLine(")]");
+
+        if (module.IsInlined)
+        {
+            source.Append("        [")
+                .Append(InlinedStyleAttribute)
+                .AppendLine("]");
+        }
+
+        AppendOperationAttributes(
+            source,
+            symbol,
+            sourceMap);
+
+        source.Append("        private sealed class ")
+            .Append("InterceptMetadata_")
+            .Append(index)
+            .AppendLine();
+
+        source.AppendLine("        {");
+        source.AppendLine("        }");
+    }
+
     private static void AppendObservedPropertyAttributes(
         StringBuilder source,
         IAkcssSymbol symbol,
@@ -325,6 +376,12 @@ internal static class AkcssGenerator
             symbol.Operations,
             sourceMap,
             context,
+            new HashSet<AkburaSyntax>
+            {
+                symbol.DeclarationSyntax,
+            },
+            AkcssOperationMetadataScope.Direct,
+            GeneratedAkcssOperationPriority.Style,
             parentOrder: -1,
             depth: 0);
     }
@@ -334,6 +391,9 @@ internal static class AkcssGenerator
         ImmutableArray<IAkcssOperation> operations,
         AkcssGenerationSourceMap sourceMap,
         AkcssOperationMetadataContext context,
+        HashSet<AkburaSyntax> expansionPath,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority,
         int parentOrder,
         int depth)
     {
@@ -347,7 +407,9 @@ internal static class AkcssGenerator
                         setter,
                         context.NextOrder++,
                         parentOrder,
-                        depth);
+                        depth,
+                        scope,
+                        priority);
                     break;
 
                 case IAkcssIfOperation ifOperation:
@@ -356,11 +418,35 @@ internal static class AkcssGenerator
                         ifOperation,
                         sourceMap,
                         context,
+                        expansionPath,
+                        scope,
+                        priority,
                         parentOrder,
                         depth);
                     break;
 
                 case IAkcssApplyOperation applyOperation:
+                    AppendApplyOperationAttributes(
+                        source,
+                        applyOperation,
+                        sourceMap,
+                        context,
+                        expansionPath,
+                        scope,
+                        priority,
+                        parentOrder,
+                        depth);
+                    break;
+
+                case IAkcssInterceptOperation interceptOperation:
+                    AppendInterceptOperationAttribute(
+                        source,
+                        interceptOperation,
+                        context.NextOrder++,
+                        parentOrder,
+                        depth,
+                        scope,
+                        priority);
                     break;
 
                 default:
@@ -377,13 +463,17 @@ internal static class AkcssGenerator
         IAkcssPropertySetterOperation operation,
         int order,
         int parentOrder,
-        int depth)
+        int depth,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority)
     {
         var metadata = CreatePropertySetterMetadata(
             operation,
             order,
             parentOrder,
-            depth);
+            depth,
+            scope,
+            priority);
 
         AppendOperationAttribute(
             source,
@@ -530,6 +620,60 @@ internal static class AkcssGenerator
                 "RequiresBrushConversion = true");
         }
 
+        if (metadata.ExpansionStartOrder >= 0)
+        {
+            arguments.Add(
+                $"ExpansionStartOrder = " +
+                metadata.ExpansionStartOrder.ToString(
+                    CultureInfo.InvariantCulture));
+        }
+
+        if (metadata.ExpansionEndOrder >= 0)
+        {
+            arguments.Add(
+                $"ExpansionEndOrder = " +
+                metadata.ExpansionEndOrder.ToString(
+                    CultureInfo.InvariantCulture));
+        }
+
+        if (metadata.ExpandedFromOrder >= 0)
+        {
+            arguments.Add(
+                $"ExpandedFromOrder = " +
+                metadata.ExpandedFromOrder.ToString(
+                    CultureInfo.InvariantCulture));
+        }
+
+        if (metadata.DeclaringSymbol != null)
+        {
+            arguments.Add(
+                $"DeclaringSymbol = " +
+                ToStringLiteral(metadata.DeclaringSymbol));
+        }
+
+        if (!metadata.ApplyItems.IsDefaultOrEmpty)
+        {
+            arguments.Add(
+                $"ApplyItems = " +
+                CreateStringArrayExpression(
+                    metadata.ApplyItems));
+        }
+
+        if (!metadata.AppliedSymbols.IsDefaultOrEmpty)
+        {
+            arguments.Add(
+                $"AppliedSymbols = " +
+                CreateStringArrayExpression(
+                    metadata.AppliedSymbols));
+        }
+
+        if (metadata.InterceptType != null)
+        {
+            arguments.Add(
+                $"InterceptType = typeof(" +
+                $"{GetTypeName(metadata.InterceptType)})");
+        }
+
         if (metadata.HasErrors)
         {
             arguments.Add(
@@ -562,12 +706,15 @@ internal static class AkcssGenerator
     }
 
     private static void AppendIfOperationAttributes(
-    StringBuilder source,
-    IAkcssIfOperation operation,
-    AkcssGenerationSourceMap sourceMap,
-    AkcssOperationMetadataContext context,
-    int parentOrder,
-    int depth)
+        StringBuilder source,
+        IAkcssIfOperation operation,
+        AkcssGenerationSourceMap sourceMap,
+        AkcssOperationMetadataContext context,
+        HashSet<AkburaSyntax> expansionPath,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority,
+        int parentOrder,
+        int depth)
     {
         var order = context.NextOrder++;
 
@@ -579,6 +726,9 @@ internal static class AkcssGenerator
             operation.Operations,
             sourceMap,
             context,
+            expansionPath,
+            scope,
+            GeneratedAkcssOperationPriority.StyleTrigger,
             parentOrder: order,
             depth: depth + 1);
 
@@ -590,6 +740,8 @@ internal static class AkcssGenerator
             order,
             parentOrder,
             depth,
+            scope,
+            priority,
             ifStartOrder: hasChildren
                 ? firstChildOrder
                 : -1,
@@ -604,18 +756,182 @@ internal static class AkcssGenerator
         source.Append(childSource);
     }
 
+    private static void AppendApplyOperationAttributes(
+        StringBuilder source,
+        IAkcssApplyOperation operation,
+        AkcssGenerationSourceMap sourceMap,
+        AkcssOperationMetadataContext context,
+        HashSet<AkburaSyntax> expansionPath,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority,
+        int parentOrder,
+        int depth)
+    {
+        var order = context.NextOrder++;
+
+        var childSource = new StringBuilder();
+        var firstExpansionOrder = context.NextOrder;
+        var hasExpansionErrors = false;
+
+        for (var index = 0;
+             index < operation.AppliedSymbols.Length;
+             index++)
+        {
+            var appliedSymbol =
+                operation.AppliedSymbols[index];
+
+            var declarationSyntax =
+                appliedSymbol.DeclarationSyntax;
+
+            if (!expansionPath.Add(declarationSyntax))
+            {
+                hasExpansionErrors = true;
+                continue;
+            }
+
+            var generationSymbol =
+                sourceMap.GetGenerationSymbol(appliedSymbol);
+
+            IReadOnlyDictionary<string, CSharpExpressionSyntax>?
+                parameterValues = null;
+
+            if (generationSymbol is
+                ITailwindUtilitySymbol
+                {
+                    Parameters.Length: > 0,
+                } utility)
+            {
+                var item = index < operation.Items.Length
+                    ? operation.Items[index]
+                    : string.Empty;
+
+                if (!TryCreateApplyMetadataParameterValues(
+                        item,
+                        utility,
+                        operation,
+                        scope,
+                        out parameterValues))
+                {
+                    hasExpansionErrors = true;
+                    expansionPath.Remove(declarationSyntax);
+                    continue;
+                }
+            }
+
+            var expansionScope =
+                new AkcssOperationMetadataScope(
+                    GeneratedAkcssOperationOriginKind
+                        .ApplyExpansion,
+                    expandedFromOrder: order,
+                    declaringSymbol:
+                        generationSymbol.MetadataName,
+                    parameterValues);
+
+            AppendOperationAttributes(
+                childSource,
+                generationSymbol.Operations,
+                sourceMap,
+                context,
+                expansionPath,
+                expansionScope,
+                priority,
+                parentOrder: order,
+                depth: depth + 1);
+
+            expansionPath.Remove(declarationSyntax);
+        }
+
+        var hasExpansion =
+            context.NextOrder > firstExpansionOrder;
+
+        var metadata = CreateApplyOperationMetadata(
+            operation,
+            order,
+            parentOrder,
+            depth,
+            scope,
+            priority,
+            expansionStartOrder: hasExpansion
+                ? firstExpansionOrder
+                : -1,
+            expansionEndOrder: hasExpansion
+                ? context.NextOrder - 1
+                : -1,
+            hasExpansionErrors);
+
+        AppendOperationAttribute(source, metadata);
+
+        source.Append(childSource);
+    }
+
+    private static void AppendInterceptOperationAttribute(
+        StringBuilder source,
+        IAkcssInterceptOperation operation,
+        int order,
+        int parentOrder,
+        int depth,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority)
+    {
+        var metadata =
+            new AkcssOperationMetadata
+            {
+                Order = order,
+                ParentOrder = parentOrder,
+                Depth = depth,
+
+                Kind =
+                    GeneratedAkcssOperationKind.Intercept,
+
+                Origin = scope.Origin,
+
+                TargetType = GetAkcssTargetType(
+                    operation.ContainingAkcssSymbol),
+
+                PropertyAccessKind =
+                    GeneratedAkcssPropertyAccessKind.None,
+
+                ValueKind =
+                    GeneratedAkcssPropertyValueKind.None,
+
+                Priority = priority,
+
+                DeclaringSymbol =
+                    scope.DeclaringSymbol,
+
+                ExpandedFromOrder =
+                    scope.ExpandedFromOrder,
+
+                InterceptType =
+                    operation.InterceptType.Symbol
+                        as ITypeSymbol,
+
+                HasErrors =
+                    operation.HasErrors ||
+                    operation.InterceptType.Symbol
+                        is not ITypeSymbol,
+            };
+
+        AppendOperationAttribute(
+            source,
+            metadata);
+    }
+
     private static AkcssOperationMetadata CreatePropertySetterMetadata(
         IAkcssPropertySetterOperation operation,
         int order,
         int parentOrder,
-        int depth)
+        int depth,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority)
     {
         var property = operation.Property;
 
         var generatedValue = GetValueExpression(
             operation,
             RuntimeMetadataTargetName,
-            observeDynamicResource: false);
+            observeDynamicResource: false,
+            scope.ParameterValues);
 
         return new AkcssOperationMetadata
         {
@@ -624,7 +940,13 @@ internal static class AkcssGenerator
             Depth = depth,
 
             Kind = GeneratedAkcssOperationKind.Set,
-            Origin = GeneratedAkcssOperationOriginKind.Direct,
+            Origin = scope.Origin,
+
+            DeclaringSymbol = scope.DeclaringSymbol,
+
+            ExpandedFromOrder = scope.ExpandedFromOrder,
+
+            Priority = priority,
 
             TargetType = GetAkcssTargetType(operation.ContainingAkcssSymbol),
 
@@ -655,10 +977,6 @@ internal static class AkcssGenerator
 
             RequiresBrushConversion = operation.RequiresBrushConversion,
 
-            Priority = depth == 0
-                ? GeneratedAkcssOperationPriority.Style
-                : GeneratedAkcssOperationPriority.StyleTrigger,
-
             HasErrors =
                 operation.HasErrors ||
                 property == null ||
@@ -671,6 +989,8 @@ internal static class AkcssGenerator
         int order,
         int parentOrder,
         int depth,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority,
         int ifStartOrder,
         int ifEndOrder)
     {
@@ -685,7 +1005,8 @@ internal static class AkcssGenerator
                 RuntimeMetadataTargetName,
                 observeDynamicResource: false,
                 GetTargetParameterName(
-                    operation.ContainingAkcssSymbol));
+                    operation.ContainingAkcssSymbol),
+                scope.ParameterValues);
 
         var condition = RewriteExpression(
             conditionSyntax,
@@ -698,10 +1019,16 @@ internal static class AkcssGenerator
             Depth = depth,
 
             Kind = GeneratedAkcssOperationKind.If,
-            Origin = GeneratedAkcssOperationOriginKind.Direct,
 
-            TargetType = GetAkcssTargetType(
-                operation.ContainingAkcssSymbol),
+            Origin = scope.Origin,
+
+            DeclaringSymbol = scope.DeclaringSymbol,
+
+            ExpandedFromOrder = scope.ExpandedFromOrder,
+
+            Priority = priority,
+
+            TargetType = GetAkcssTargetType(operation.ContainingAkcssSymbol),
 
             PropertyAccessKind =
                 GeneratedAkcssPropertyAccessKind.None,
@@ -714,15 +1041,75 @@ internal static class AkcssGenerator
             ExpressionType =
                 operation.ConditionType.Symbol as ITypeSymbol,
 
-            Priority = depth == 0
-                ? GeneratedAkcssOperationPriority.Style
-                : GeneratedAkcssOperationPriority.StyleTrigger,
-
             IfStartOrder = ifStartOrder,
             IfEndOrder = ifEndOrder,
 
             HasErrors = operation.HasErrors,
         };
+    }
+
+    private static AkcssOperationMetadata CreateApplyOperationMetadata(
+        IAkcssApplyOperation operation,
+        int order,
+        int parentOrder,
+        int depth,
+        AkcssOperationMetadataScope scope,
+        GeneratedAkcssOperationPriority priority,
+        int expansionStartOrder,
+        int expansionEndOrder,
+        bool hasExpansionErrors)
+    {
+        return new AkcssOperationMetadata
+        {
+            Order = order,
+            ParentOrder = parentOrder,
+            Depth = depth,
+
+            Kind = GeneratedAkcssOperationKind.Apply,
+            Origin = scope.Origin,
+
+            TargetType = GetAkcssTargetType(
+                operation.ContainingAkcssSymbol),
+
+            PropertyAccessKind =
+                GeneratedAkcssPropertyAccessKind.None,
+
+            ValueKind =
+                GeneratedAkcssPropertyValueKind.None,
+
+            Priority = priority,
+
+            DeclaringSymbol = scope.DeclaringSymbol,
+            ExpandedFromOrder = scope.ExpandedFromOrder,
+
+            ApplyItems = operation.Items,
+
+            AppliedSymbols = GetAppliedSymbolNames(operation),
+
+            ExpansionStartOrder = expansionStartOrder,
+            ExpansionEndOrder = expansionEndOrder,
+
+            HasErrors =
+                operation.HasErrors ||
+                hasExpansionErrors,
+        };
+    }
+
+    private static ImmutableArray<string> GetAppliedSymbolNames(IAkcssApplyOperation operation)
+    {
+        if (operation.AppliedSymbols.IsDefaultOrEmpty)
+        {
+            return [];
+        }
+
+        var builder = ImmutableArray.CreateBuilder<string>(operation.AppliedSymbols.Length);
+
+        foreach (var symbol in operation.AppliedSymbols)
+        {
+            builder.Add(symbol.MetadataName);
+        }
+
+        return builder.MoveToImmutable();
     }
 
     private static GeneratedAkcssPropertyValueKind GetPropertyValueKind(AkcssPropertyValueKind valueKind)
@@ -1423,6 +1810,71 @@ internal static class AkcssGenerator
         return expression.Length > 0;
     }
 
+    private static bool TryCreateApplyMetadataParameterValues(
+        string item,
+        ITailwindUtilitySymbol utility,
+        IAkcssApplyOperation operation,
+        AkcssOperationMetadataScope currentScope,
+        out IReadOnlyDictionary<string, CSharpExpressionSyntax>? parameterValues)
+    {
+        parameterValues = null;
+
+        if (utility.Parameters.Length == 0)
+        {
+            return true;
+        }
+
+        if (!TryCreateApplyArgumentExpressions(
+                item,
+                utility,
+                operation.ContainingAkcssSymbol,
+                out var arguments))
+        {
+            return false;
+        }
+
+        var values =
+            new Dictionary<string, CSharpExpressionSyntax>(
+                StringComparer.Ordinal);
+
+        for (var index = 0;
+             index < utility.Parameters.Length;
+             index++)
+        {
+            var parameter = utility.Parameters[index];
+
+            var expression =
+                CSharpSyntaxFactory.ParseExpression(
+                    arguments[index]);
+
+            if (currentScope.ParameterValues != null)
+            {
+                var rewriter = new AmxExpressionRewriter(
+                    RuntimeMetadataTargetName,
+                    observeDynamicResource: false,
+                    GetTargetParameterName(
+                        operation.ContainingAkcssSymbol),
+                    currentScope.ParameterValues);
+
+                expression =
+                    rewriter.Visit(expression)
+                        as CSharpExpressionSyntax ??
+                    expression;
+            }
+
+            values[parameter.Name] = expression;
+
+            if (parameter.CSharpParameter?.Name is
+                { Length: > 0 } csharpName)
+            {
+                values[csharpName] = expression;
+            }
+        }
+
+        parameterValues = values;
+        return true;
+    }
+
     private static void AppendPropertySetter(
         StringBuilder source,
         IAkcssPropertySetterOperation operation,
@@ -1623,12 +2075,15 @@ internal static class AkcssGenerator
     private static GeneratedValue GetValueExpression(
         IAkcssPropertySetterOperation operation,
         string targetName,
-        bool observeDynamicResource)
+        bool observeDynamicResource,
+        IReadOnlyDictionary<string, CSharpExpressionSyntax>? identifierValues = null)
     {
         var rewriter = new AmxExpressionRewriter(
             targetName,
             observeDynamicResource,
-            GetTargetParameterName(operation.ContainingAkcssSymbol));
+            GetTargetParameterName(operation.ContainingAkcssSymbol),
+            identifierValues);
+
         string value = operation.ConvertedValue switch
         {
             AkcssColorValue color =>
@@ -1936,6 +2391,27 @@ internal static class AkcssGenerator
         return result.Length == 0 ? "module" : result.ToString();
     }
 
+    private static string CreateStringArrayExpression(ImmutableArray<string> values)
+    {
+        var result = new StringBuilder(
+            "new global::System.String[] { ");
+
+        for (var index = 0;
+             index < values.Length;
+             index++)
+        {
+            if (index > 0)
+            {
+                result.Append(", ");
+            }
+
+            result.Append(
+                ToStringLiteral(values[index]));
+        }
+
+        return result.Append(" }").ToString();
+    }
+
     private static string ToStringLiteral(string value)
     {
         return SymbolDisplay.FormatLiteral(value, quote: true);
@@ -2000,33 +2476,81 @@ internal static class AkcssGenerator
         public int NextOrder { get; set; }
     }
 
+    private sealed class AkcssOperationMetadataScope
+    {
+        public static AkcssOperationMetadataScope Direct { get; } =
+            new(
+                GeneratedAkcssOperationOriginKind.Direct,
+                expandedFromOrder: -1,
+                declaringSymbol: null,
+                parameterValues: null);
+
+        public AkcssOperationMetadataScope(
+            GeneratedAkcssOperationOriginKind origin,
+            int expandedFromOrder,
+            string? declaringSymbol,
+            IReadOnlyDictionary<string, CSharpExpressionSyntax>?
+                parameterValues)
+        {
+            Origin = origin;
+            ExpandedFromOrder = expandedFromOrder;
+            DeclaringSymbol = declaringSymbol;
+            ParameterValues = parameterValues;
+        }
+
+        public GeneratedAkcssOperationOriginKind Origin { get; }
+
+        public int ExpandedFromOrder { get; }
+
+        public string? DeclaringSymbol { get; }
+
+        public IReadOnlyDictionary<string, CSharpExpressionSyntax>?
+            ParameterValues
+        { get; }
+    }
+
     private sealed class AmxExpressionRewriter : CSharpSyntaxRewriter
     {
         private const string ResourceValueParameter = "__resourceValue";
         private readonly string _targetName;
         private readonly bool _observeDynamicResource;
         private readonly string _sourceTargetName;
+        private readonly IReadOnlyDictionary<string, CSharpExpressionSyntax>? _identifierValues;
 
         public AmxExpressionRewriter(
             string targetName,
             bool observeDynamicResource,
-            string? sourceTargetName = null)
+            string? sourceTargetName = null,
+            IReadOnlyDictionary<string, CSharpExpressionSyntax>? identifierValues = null)
         {
             _targetName = targetName;
             _observeDynamicResource = observeDynamicResource;
             _sourceTargetName = sourceTargetName ?? targetName;
+            _identifierValues = identifierValues;
         }
 
         public DynamicResourceBinding? DynamicResource { get; private set; }
 
         public bool RequiresResourceHost { get; private set; }
 
-        public override Microsoft.CodeAnalysis.SyntaxNode? VisitIdentifierName(
-            CSharpIdentifierNameSyntax node)
+        public override Microsoft.CodeAnalysis.SyntaxNode? VisitIdentifierName(CSharpIdentifierNameSyntax node)
         {
-            return !string.Equals(_sourceTargetName, _targetName, StringComparison.Ordinal) &&
-                string.Equals(node.Identifier.ValueText, _sourceTargetName, StringComparison.Ordinal)
-                ? CSharpSyntaxFactory.IdentifierName(_targetName).WithTriviaFrom(node)
+            if (_identifierValues != null && _identifierValues.TryGetValue(node.Identifier.ValueText, out var value))
+            {
+                return value.WithTriviaFrom(node);
+            }
+
+            return !string.Equals(
+                       _sourceTargetName,
+                       _targetName,
+                       StringComparison.Ordinal) &&
+                   string.Equals(
+                       node.Identifier.ValueText,
+                       _sourceTargetName,
+                       StringComparison.Ordinal)
+                ? CSharpSyntaxFactory
+                    .IdentifierName(_targetName)
+                    .WithTriviaFrom(node)
                 : base.VisitIdentifierName(node);
         }
 

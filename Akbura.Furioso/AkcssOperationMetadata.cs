@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace Akbura.Furioso;
@@ -54,6 +55,20 @@ internal sealed class AkcssOperationMetadata
     public int IfStartOrder { get; init; } = -1;
 
     public int IfEndOrder { get; init; } = -1;
+
+    public string? DeclaringSymbol { get; init; }
+
+    public ImmutableArray<string> ApplyItems { get; init; } = [];
+
+    public ImmutableArray<string> AppliedSymbols { get; init; } = [];
+
+    public int ExpansionStartOrder { get; init; } = -1;
+
+    public int ExpansionEndOrder { get; init; } = -1;
+
+    public int ExpandedFromOrder { get; init; } = -1;
+
+    public ITypeSymbol? InterceptType { get; init; }
 }
 
 internal enum GeneratedAkcssOperationKind

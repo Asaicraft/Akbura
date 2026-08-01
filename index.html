@@ -335,7 +335,38 @@ state int count = 0;
         </div></div>
 
 				<div class="content">
-					<h2 id="quick-start">Quick Start<a class="header-anchor" href="javascript:;" onclick="location.hash='#quick-start'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+					<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th style="text-align: center;">Support level</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compatibility with Avalonia</td>
+<td style="text-align: center;">Full</td>
+<td>Akbura components can be used directly in AXAML views and vice versa – any Avalonia control (including custom controls) works without extra attributes or imports.</td>
+</tr>
+<tr>
+<td>MarkupExtensions</td>
+<td style="text-align: center;">Partial</td>
+<td>Common markup extensions (<code>StaticResource</code>, <code>DynamicResource</code>, <code>Binding</code>) work exactly as in Avalonia. The <code>IServiceProvider</code> supplies <code>IProvideValueTarget</code>, <code>IRootObjectProvider</code>, <code>IUriContext</code>, <code>IXamlTypeResolver</code>, and <code>IAvaloniaXamlIlEagerParentStackProvider</code>. The old <code>{}</code> syntax is replaced by <code>${}</code> (no quotes). XML‑element syntax for markup extensions, <code>MarkupExtensionOptionAttribute</code>, and some advanced scenarios are not supported.</td>
+</tr>
+<tr>
+<td>Binding</td>
+<td style="text-align: center;">Full</td>
+<td>Bindings are fully supported: both <code>ReflectionBinding</code> and <code>CompiledBinding</code> work, including <code>BindingPath</code> parsing, mode selection, converters, etc.</td>
+</tr>
+<tr>
+<td>TemplateContent</td>
+<td style="text-align: center;">Full</td>
+<td>Properties decorated with <code>[TemplateContent]</code> are automatically handled – Akbura generates an <code>IDeferredContent</code> implementation, so templates work out of the box.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="quick-start">Quick Start<a class="header-anchor" href="javascript:;" onclick="location.hash='#quick-start'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <div class="warning custom-block">
             <p class="custom-block-title">Experimental</p><p>Akbura is under active development. Syntax, generated code, and runtime APIs may change between releases.</p>
 </div>

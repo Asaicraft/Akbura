@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>Using Akbura Components in AXAML</title>
+    <title>Dependency Injection</title>
 
     <script>
             if (location.search === "?dark") {
@@ -151,12 +151,12 @@ AKBURA									</span>
 								</a>
 						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+									<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Using Akbura Components in AXAML
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/dependency-injection" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akbura/dependency-injection" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
 										Dependency Injection
 									</a>
 								</li>
@@ -184,233 +184,223 @@ AKBURA									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							Using Akbura Components in AXAML
+							Dependency Injection
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>Akbura components can be used directly inside regular Avalonia AXAML.</p>
-<p>A separate host control is not required. Every generated Akbura component is an Avalonia control, so it can be referenced through an XML namespace and placed in the visual tree like any other custom control.</p>
-<h2 id="basic-usage">Basic usage<a class="header-anchor" href="javascript:;" onclick="location.hash='#basic-usage'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Suppose the project contains the following component:</p>
-<pre><code class="language-akbura">// Counter.akbura
-
-namespace MyControls;
-
-state int count = 0;
-
-&lt;Button Click={count++}&gt;
-    Count: {count}
-&lt;/Button&gt;
+					<p>Akbura components can request application services with the <code>inject</code> declaration.</p>
+<pre><code class="language-akbura">inject IUserService UserService;
 </code></pre>
-<p>Import its namespace in AXAML:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
+<p>The generated component exposes <code>UserService</code> as a public Avalonia property and asks the configured service provider for an <code>IUserService</code> when the component is initialized.</p>
+<h2 id="register-a-service-provider">Register a service provider<a class="header-anchor" href="javascript:;" onclick="location.hash='#register-a-service-provider'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura accepts any standard <code>IServiceProvider</code>.</p>
+<p>The following example uses <code>Microsoft.Extensions.DependencyInjection</code>:</p>
+<pre><code class="language-csharp">using Akbura.Engine;
+using Microsoft.Extensions.DependencyInjection;
 
-    &lt;myControls:Counter /&gt;
+var services = new ServiceCollection()
+    .AddSingleton&lt;IUserService, UserService&gt;()
+    .BuildServiceProvider();
 
-&lt;/UserControl&gt;
+AppBuilder.Configure&lt;App&gt;()
+    .UsePlatformDetect()
+    .UseAkbura(akbura =&gt;
+    {
+        akbura.WithServiceProvider(services);
+    });
 </code></pre>
-<p>The XML namespace points to the C# namespace declared by the <code>.akbura</code> component:</p>
-<pre><code class="language-xml">xmlns:myControls=&quot;using:MyControls&quot;
-</code></pre>
-<p>The component can then be created directly:</p>
-<pre><code class="language-xml">&lt;myControls:Counter /&gt;
-</code></pre>
-<h2 id="passing-parameters">Passing parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#passing-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Akbura parameters are exposed as Avalonia properties and can be assigned through AXAML attributes.</p>
-<p>Consider this component:</p>
-<pre><code class="language-akbura">// AkParams.akbura
+<p><code>WithServiceProvider</code> adds the provider to the Akbura engine. Service lifetimes such as singleton, scoped, and transient are controlled by the registered provider.</p>
+<h2 id="inject-a-required-service">Inject a required service<a class="header-anchor" href="javascript:;" onclick="location.hash='#inject-a-required-service'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A non-nullable injected type is required:</p>
+<pre><code class="language-akbura">inject IUserService UserService;
 
-namespace MyControls;
+state string userName = &quot;Loading...&quot;;
 
-param int Count = 1;
-param int B;
+useEffect(async () =&gt;
+{
+    var user = await UserService.GetCurrentUser();
+    userName = user.Name;
+}, []);
 
 &lt;StackPanel&gt;
-    &lt;TextBlock Text={$&quot;Count: {Count}&quot;} /&gt;
-    &lt;TextBlock Text={$&quot;B: {B}&quot;} /&gt;
+    &lt;TextBlock Text=&quot;Current user&quot; /&gt;
+    &lt;TextBlock Text={userName} /&gt;
 &lt;/StackPanel&gt;
 </code></pre>
-<p>The component declares two parameters:</p>
+<p>Akbura resolves required services before the component performs its first update. If the provider cannot return the requested service, Akbura throws <code>AkburaServiceNotFoundException</code>.</p>
+<h2 id="inject-an-optional-service">Inject an optional service<a class="header-anchor" href="javascript:;" onclick="location.hash='#inject-an-optional-service'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Add <code>?</code> to the injected type to make the dependency optional:</p>
+<pre><code class="language-akbura">inject IClipboardService? Clipboard;
+
+&lt;Button
+    Content=&quot;Copy&quot;
+    IsEnabled={Clipboard != null}
+    Click={() =&gt; Clipboard?.SetTextAsync(&quot;Akbura&quot;)} /&gt;
+</code></pre>
+<p>When an optional service is not registered, the generated property remains <code>null</code> and component initialization continues normally.</p>
+<h2 id="explicit-values-take-priority">Explicit values take priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#explicit-values-take-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>An injected service is also a public Avalonia property. It may be supplied directly instead of being resolved from the configured provider.</p>
+<p>From another Akbura component:</p>
+<pre><code class="language-akbura">&lt;UserCard UserService={previewUserService} /&gt;
+</code></pre>
+<p>From AXAML:</p>
+<pre><code class="language-xml">&lt;components:UserCard
+    UserService=&quot;{Binding UserService}&quot; /&gt;
+</code></pre>
+<p>From C#:</p>
+<pre><code class="language-csharp">var card = new UserCard
+{
+    UserService = previewUserService
+};
+</code></pre>
+<p>When the property already contains a non-null value, Akbura keeps that value and does not call the service provider for that dependency. This is useful for previews, tests, and local overrides.</p>
+<h2 id="configuration-object-example">Configuration object example<a class="header-anchor" href="javascript:;" onclick="location.hash='#configuration-object-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A service does not need to contain behavior. Configuration objects can also be injected.</p>
+<pre><code class="language-csharp">public sealed class GalleryOptions
+{
+    public string RepositoryUrl { get; set; } =
+        &quot;https://github.com/Asaicraft/Akbura&quot;;
+
+    public string MainBranchName { get; set; } =
+        &quot;master&quot;;
+
+    public string PathToGallery { get; set; } =
+        &quot;Akbura.FeatureGallery/Akbura.FeatureGallery&quot;;
+}
+</code></pre>
+<p>Register one shared instance:</p>
+<pre><code class="language-csharp">var services = new ServiceCollection()
+    .AddSingleton(new GalleryOptions())
+    .BuildServiceProvider();
+
+builder.UseAkbura(akbura =&gt;
+{
+    akbura.WithServiceProvider(services);
+});
+</code></pre>
+<p>Use it from a component:</p>
+<pre><code class="language-akbura">inject GalleryOptions GalleryOptions;
+
+param object Content;
+param string Url;
+
+&lt;HyperlinkButton
+    NavigateUri={new Uri(
+        $&quot;{GalleryOptions.RepositoryUrl}/blob/&quot; +
+        $&quot;{GalleryOptions.MainBranchName}/&quot; +
+        $&quot;{GalleryOptions.PathToGallery}/{Url}&quot;)}
+    Content={Content} /&gt;
+</code></pre>
+<p>The component only declares what it needs. Creation and lifetime of <code>GalleryOptions</code> remain outside the component.</p>
+<h2 id="resolution-process">Resolution process<a class="header-anchor" href="javascript:;" onclick="location.hash='#resolution-process'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For every <code>inject</code> declaration, Akbura follows this process:</p>
+<ol>
+<li>Check whether the generated service property already contains a value.</li>
+<li>If it does, keep that value.</li>
+<li>Otherwise, request the service from the configured providers.</li>
+<li>Assign the resolved object to the generated property.</li>
+<li>Leave an unresolved optional dependency as <code>null</code>.</li>
+<li>Throw <code>AkburaServiceNotFoundException</code> for an unresolved required dependency.</li>
+</ol>
+<p>Injection happens before the first component update, so the dependency is available to the initial markup and subsequent effects.</p>
+<h2 id="multiple-service-providers">Multiple service providers<a class="header-anchor" href="javascript:;" onclick="location.hash='#multiple-service-providers'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>More than one provider may be registered:</p>
+<pre><code class="language-csharp">builder.UseAkbura(akbura =&gt;
+{
+    akbura
+        .WithServiceProvider(featureProvider)
+        .WithServiceProvider(applicationProvider);
+});
+</code></pre>
+<p>Providers are queried in registration order. Standard <code>IServiceProvider</code> instances automatically continue to the next provider when they return <code>null</code>.</p>
+<h2 id="custom-akbura-service-providers">Custom Akbura service providers<a class="header-anchor" href="javascript:;" onclick="location.hash='#custom-akbura-service-providers'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For contextual resolution, implement <code>IAkburaServiceProvider</code>:</p>
+<pre><code class="language-csharp">using Akbura.Engine;
+
+public sealed class FeatureServiceProvider : IAkburaServiceProvider
+{
+    private readonly FeatureState _state = new();
+
+    public object? GetService(
+        ref readonly InjectionInfo injectionInfo)
+    {
+        if (injectionInfo.RequestedService ==
+            typeof(FeatureState))
+        {
+            return _state;
+        }
+
+        return injectionInfo.NextProvider?
+            .GetService(in injectionInfo);
+    }
+}
+</code></pre>
+<p><code>InjectionInfo</code> provides:</p>
 <table>
 <thead>
 <tr>
-<th>Parameter</th>
-<th>Required</th>
-<th>Reason</th>
+<th>Property</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>Count</code></td>
-<td>No</td>
-<td>It has the default value <code>1</code></td>
+<td><code>RequestedService</code></td>
+<td>The requested service type</td>
 </tr>
 <tr>
-<td><code>B</code></td>
-<td>Yes</td>
-<td>It has no default value</td>
+<td><code>TargetControl</code></td>
+<td>The Akbura component requesting the service</td>
+</tr>
+<tr>
+<td><code>FieldName</code></td>
+<td>The name declared after <code>inject</code></td>
+</tr>
+<tr>
+<td><code>IsOptional</code></td>
+<td>Whether the injected type is nullable</td>
+</tr>
+<tr>
+<td><code>NextProvider</code></td>
+<td>The next provider in the configured chain</td>
 </tr>
 </tbody>
 </table>
-<p>You can use the component from AXAML:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
+<p>A custom provider must call <code>NextProvider</code> when it wants resolution to continue. Returning a value or returning <code>null</code> without forwarding stops the chain.</p>
+<h2 id="what-akbura-generates">What Akbura generates<a class="header-anchor" href="javascript:;" onclick="location.hash='#what-akbura-generates'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For a declaration such as:</p>
+<pre><code class="language-akbura">inject IUserService UserService;
+</code></pre>
+<p>Akbura generates the equivalent of:</p>
+<pre><code class="language-csharp">private IUserService? __service_UserService;
 
-    &lt;StackPanel&gt;
-        &lt;myControls:AkParams Count=&quot;10&quot; /&gt;
+public static readonly
+    InjectService&lt;MyComponent, IUserService&gt;
+    UserServiceProperty =
+        InjectService.Create&lt;MyComponent, IUserService&gt;(
+            &quot;UserService&quot;,
+            static owner =&gt; owner.__service_UserService,
+            static (owner, value) =&gt;
+                owner.__SetService_UserService(value),
+            isOptional: false);
 
-        &lt;myControls:AkParams B=&quot;10&quot; /&gt;
-
-        &lt;myControls:AkParams
-            Count=&quot;1&quot;
-            B=&quot;10&quot; /&gt;
-    &lt;/StackPanel&gt;
-
-&lt;/UserControl&gt;
-</code></pre>
-<p>The first component is invalid:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams Count=&quot;10&quot; /&gt;
-</code></pre>
-<p>Although <code>Count</code> is set, the required <code>B</code> parameter is missing.</p>
-<p>When the component is initialized, Akbura throws:</p>
-<pre><code class="language-text">AkburaParameterNotSettedException
-</code></pre>
-<p>The following component is valid:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams B=&quot;10&quot; /&gt;
-</code></pre>
-<p><code>B</code> is explicitly set, while <code>Count</code> uses its default value of <code>1</code>.</p>
-<p>Both parameters may also be set explicitly:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams
-    Count=&quot;10&quot;
-    B=&quot;20&quot; /&gt;
-</code></pre>
-<h2 id="binding-parameters">Binding parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#binding-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Because parameters are Avalonia properties, normal AXAML bindings can be used:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams
-    Count=&quot;{Binding CurrentCount}&quot;
-    B=&quot;{Binding RequiredValue}&quot; /&gt;
-</code></pre>
-<p>The binding result must be compatible with the parameter type.</p>
-<p>For example, the view model may expose:</p>
-<pre><code class="language-csharp">public sealed class MyViewModel
+public IUserService UserService
 {
-    public int CurrentCount { get; set; }
-
-    public int RequiredValue { get; set; }
+    get =&gt; __service_UserService!;
+    set =&gt; __SetService_UserService(value);
 }
 </code></pre>
-<h2 id="passing-injected-services">Passing injected services<a class="header-anchor" href="javascript:;" onclick="location.hash='#passing-injected-services'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Services declared with <code>inject</code> are also exposed as Avalonia properties.</p>
-<p>Consider the following component:</p>
-<pre><code class="language-akbura">// Counter.akbura
-
-namespace MyControls;
-
-inject ILogger&lt;Counter&gt; Logger;
-
-state int count = 0;
-
-useEffect(() =&gt;
-{
-    Logger.LogInformation(&quot;Count changed to {Count}&quot;, count);
-}, [count]);
-
-&lt;Button Click={count++}&gt;
-    Count: {count}
-&lt;/Button&gt;
-</code></pre>
-<p>Normally, Akbura attempts to resolve <code>Logger</code> through its service provider.</p>
-<p>The service may instead be passed directly from AXAML:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
-
-    &lt;myControls:Counter
-        Logger=&quot;{Binding Logger}&quot; /&gt;
-
-&lt;/UserControl&gt;
-</code></pre>
-<p>The AXAML view model must expose a compatible service:</p>
-<pre><code class="language-csharp">public sealed class MyViewModel
-{
-    public ILogger&lt;Counter&gt; Logger { get; }
-
-    public MyViewModel(ILogger&lt;Counter&gt; logger)
-    {
-        Logger = logger;
-    }
-}
-</code></pre>
-<p>When an injected service property already contains a value, Akbura keeps that value and does not replace it through dependency injection.</p>
-<p>This makes it possible to provide services through:</p>
-<ul>
-<li>an AXAML binding;</li>
-<li>a property assignment in C#;</li>
-<li>Akbura's configured service provider.</li>
-</ul>
-<h2 id="setting-services-from-code">Setting services from code<a class="header-anchor" href="javascript:;" onclick="location.hash='#setting-services-from-code'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>An injected service can also be assigned when creating the component from C#:</p>
-<pre><code class="language-csharp">var counter = new Counter
-{
-    Logger = logger
-};
-</code></pre>
-<p>The explicitly assigned service is used when the component initializes.</p>
-<h2 id="complete-example">Complete example<a class="header-anchor" href="javascript:;" onclick="location.hash='#complete-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Akbura component:</p>
-<pre><code class="language-akbura">// UserCard.akbura
-
-namespace MyControls;
-
-param int UserId;
-param string Title = &quot;User&quot;;
-
-inject IUserService UserService;
-
-state string userName = &quot;&quot;;
-
-useEffect(async () =&gt;
-{
-    var user = await UserService.GetUser(UserId);
-    userName = user.Name;
-}, [UserId]);
-
-&lt;StackPanel&gt;
-    &lt;TextBlock Text={Title} /&gt;
-    &lt;TextBlock Text={userName} /&gt;
-&lt;/StackPanel&gt;
-</code></pre>
-<p>Avalonia view:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
-
-    &lt;StackPanel&gt;
-        &lt;myControls:UserCard
-            UserId=&quot;{Binding SelectedUserId}&quot;
-            Title=&quot;Profile&quot;
-            UserService=&quot;{Binding UserService}&quot; /&gt;
-    &lt;/StackPanel&gt;
-
-&lt;/UserControl&gt;
-</code></pre>
+<p>The exact generated names are implementation details, but the important result is that every injected dependency becomes a settable Avalonia property backed by an <code>InjectService</code> descriptor.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akbura/axaml-integration.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akbura/dependency-injection.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -418,18 +408,18 @@ useEffect(async () =&gt;
 					<div class="not-prose my-20">
 								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
 									<div class="-mt-px flex w-0 flex-1">
-											<a href="https://asaicraft.github.io/Akbura/akbura/" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+											<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
 												<!-- Heroicon name: mini/arrow-long-left -->
 												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
 												</svg>
-												AKBURA
+												Using Akbura Components in AXAML
 											</a>
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
-											<a href="https://asaicraft.github.io/Akbura/akbura/dependency-injection" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
-												Dependency Injection
+											<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Grid
 												<!-- Heroicon name: mini/arrow-long-right -->
 												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
@@ -448,33 +438,48 @@ useEffect(async () =&gt;
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#basic-usage'" data-id="basic-usage" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Basic usage
+										<span v-hash="'#register-a-service-provider'" data-id="register-a-service-provider" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Register a service provider
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#passing-parameters'" data-id="passing-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Passing parameters
+										<span v-hash="'#inject-a-required-service'" data-id="inject-a-required-service" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Inject a required service
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#binding-parameters'" data-id="binding-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Binding parameters
+										<span v-hash="'#inject-an-optional-service'" data-id="inject-an-optional-service" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Inject an optional service
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#passing-injected-services'" data-id="passing-injected-services" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Passing injected services
+										<span v-hash="'#explicit-values-take-priority'" data-id="explicit-values-take-priority" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Explicit values take priority
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#setting-services-from-code'" data-id="setting-services-from-code" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Setting services from code
+										<span v-hash="'#configuration-object-example'" data-id="configuration-object-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Configuration object example
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#complete-example'" data-id="complete-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Complete example
+										<span v-hash="'#resolution-process'" data-id="resolution-process" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Resolution process
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#multiple-service-providers'" data-id="multiple-service-providers" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Multiple service providers
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#custom-akbura-service-providers'" data-id="custom-akbura-service-providers" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Custom Akbura service providers
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#what-akbura-generates'" data-id="what-akbura-generates" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											What Akbura generates
 										</span>
 									</li>
 							</ul>

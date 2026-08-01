@@ -2449,7 +2449,27 @@ internal static class ComponentGenerator
             out string reference)
         {
             reference = string.Empty;
-            var moduleSyntax = GetAkcssModuleSyntax(style.DeclarationSyntax);
+            if (style is IMetadataAkcssSymbol metadataStyle)
+            {
+                if (metadataStyle.RuntimeStyleIndex < 0)
+                {
+                    return false;
+                }
+
+                reference = metadataStyle.MetadataModule.RuntimeModuleType
+                    .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                    ".Styles[" +
+                    metadataStyle.RuntimeStyleIndex.ToString(CultureInfo.InvariantCulture) +
+                    "]";
+                return true;
+            }
+
+            if (style.DeclarationSyntax is not { } declarationSyntax)
+            {
+                return false;
+            }
+
+            var moduleSyntax = GetAkcssModuleSyntax(declarationSyntax);
             if (moduleSyntax == null ||
                 _semanticModel.GetDeclaredSymbol(moduleSyntax) is not IAkcssModuleSymbol module)
             {
@@ -2460,10 +2480,11 @@ internal static class ComponentGenerator
             for (var index = 0; index < module.AkcssSymbols.Length; index++)
             {
                 var candidate = module.AkcssSymbols[index];
-                if (ReferenceEquals(candidate.DeclarationSyntax, style.DeclarationSyntax) ||
-                    ReferenceEquals(candidate.DeclarationSyntax.Root, style.DeclarationSyntax.Root) &&
-                    candidate.DeclarationSyntax.Kind == style.DeclarationSyntax.Kind &&
-                    candidate.DeclarationSyntax.FullSpan == style.DeclarationSyntax.FullSpan)
+                if (candidate.DeclarationSyntax is { } candidateSyntax &&
+                    (ReferenceEquals(candidateSyntax, declarationSyntax) ||
+                     ReferenceEquals(candidateSyntax.Root, declarationSyntax.Root) &&
+                     candidateSyntax.Kind == declarationSyntax.Kind &&
+                     candidateSyntax.FullSpan == declarationSyntax.FullSpan))
                 {
                     styleIndex = index;
                     break;
@@ -2484,7 +2505,13 @@ internal static class ComponentGenerator
             IAkcssModuleSymbol module,
             out string typeName)
         {
-            if (_akcssModuleTypeNames.TryGetValue(module.DeclaringSyntax, out typeName!))
+            if (module.DeclaringSyntax is not { } declarationSyntax)
+            {
+                typeName = string.Empty;
+                return false;
+            }
+
+            if (_akcssModuleTypeNames.TryGetValue(declarationSyntax, out typeName!))
             {
                 return true;
             }
@@ -2497,7 +2524,7 @@ internal static class ComponentGenerator
 
             foreach (var syntaxTree in _semanticModel.Compilation.GetAkcssSyntaxTreesByLogicalName(module.Path!))
             {
-                if (!ReferenceEquals(syntaxTree.GetRootSyntax(), module.DeclaringSyntax.Root))
+                if (!ReferenceEquals(syntaxTree.GetRootSyntax(), declarationSyntax.Root))
                 {
                     continue;
                 }

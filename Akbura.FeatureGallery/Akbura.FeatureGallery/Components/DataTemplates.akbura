@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Akbura.FeatureGallery.Styles.akcss;
 
 state ImmutableArray<(string Name, int Age)> persons =
 [

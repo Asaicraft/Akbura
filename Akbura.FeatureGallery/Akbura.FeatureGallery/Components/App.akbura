@@ -1,5 +1,3 @@
-using Akbura.FeatureGallery.Styles.akcss;
-
 state string url = "/overview";
 
 <DrawerPage Header="Akbura Feature Gallery"

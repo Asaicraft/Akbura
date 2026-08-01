@@ -5,7 +5,7 @@ namespace Akbura.Language.Operations;
 
 internal interface IAkcssPropertySetterOperation : IPropertySetterOperation, IAkcssOperation
 {
-    new AkcssAssignmentSyntax Syntax { get; }
+    new AkcssAssignmentSyntax? Syntax { get; }
 
     AkcssPropertyValueKind ValueKind { get; }
 

@@ -1,4 +1,4 @@
-@using Akbura.FeatureGallery.Styles.akcss;
+@using Akbura.Styles.akcss;
 @using Avalonia.Controls;
 
 @utilities {

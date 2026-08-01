@@ -210,6 +210,88 @@ public sealed class AkcssRuntimeTests
     }
 
     [Fact]
+    public void UtilityCandidates_ResolveEachPropertyOperationIndependently()
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var first = CreateOperationCandidate(
+            "my-w",
+            sourceOrder: 0,
+            events,
+            ("property:Width", "first-width"),
+            ("property:Background", "first-background"),
+            ("property:Padding", "first-padding"));
+        var second = CreateOperationCandidate(
+            "square",
+            sourceOrder: 1,
+            events,
+            ("property:Width", "second-width"),
+            ("property:Height", "second-height"));
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [first, second]);
+
+        Assert.Equal(
+            [
+                "first-background:update",
+                "first-padding:update",
+                "second-width:update",
+                "second-height:update",
+            ],
+            events.Where(static item =>
+                item.EndsWith(
+                    ":update",
+                    StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void UtilityVariants_CompareDifferentUtilityNamesByPropertyOperation()
+    {
+        var control = new Border();
+        var events = new List<string>();
+        var lgSignal = new TestSignal<bool>();
+        var mdSignal = new TestSignal<bool>();
+        var lg = CreateOperationCandidate(
+            "lg-w",
+            sourceOrder: 0,
+            events,
+            [("property:Width", "lg")],
+            CreateVariantSource(lgSignal),
+            order: 20d,
+            conflictGroup: "Breakpoints",
+            UnprefixedUtilityPrecedence.Above);
+        var fallback = CreateOperationCandidate(
+            "w",
+            sourceOrder: 1,
+            events,
+            ("property:Width", "fallback"));
+        var md = CreateOperationCandidate(
+            "md-w",
+            sourceOrder: 2,
+            events,
+            [("property:Width", "md")],
+            CreateVariantSource(mdSignal),
+            order: 10d,
+            conflictGroup: "Breakpoints",
+            UnprefixedUtilityPrecedence.Above);
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [lg, fallback, md]);
+        Assert.Equal("fallback:update", events[^1]);
+
+        mdSignal.Emit(true);
+        Assert.Equal("md:update", events[^1]);
+
+        lgSignal.Emit(true);
+        Assert.Equal("lg:update", events[^1]);
+
+        lgSignal.Emit(false);
+        Assert.Equal("md:update", events[^1]);
+    }
+
+    [Fact]
     public void UtilityCandidates_UseOrderOnlyWithinSameConflictGroup()
     {
         var control = new Border();
@@ -500,6 +582,46 @@ public sealed class AkcssRuntimeTests
             unprefixedPrecedence: precedence);
     }
 
+    private static AkcssUtilityCandidateActivator CreateOperationCandidate(
+        string legacyConflictKey,
+        int sourceOrder,
+        List<string> events,
+        params (string ConflictKey, string Name)[] operations)
+    {
+        return CreateOperationCandidate(
+            legacyConflictKey,
+            sourceOrder,
+            events,
+            operations,
+            variant: null);
+    }
+
+    private static AkcssUtilityCandidateActivator CreateOperationCandidate(
+        string legacyConflictKey,
+        int sourceOrder,
+        List<string> events,
+        (string ConflictKey, string Name)[] operations,
+        AkcssUtilityValueSource? variant,
+        double order = 0d,
+        string? conflictGroup = null,
+        UnprefixedUtilityPrecedence precedence =
+            UnprefixedUtilityPrecedence.SourceOrder)
+    {
+        var utility = new OperationUtility(events, operations);
+        return new AkcssUtilityCandidateActivator(
+            legacyConflictKey,
+            sourceOrder,
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    (target, _) => utility.Update(target)),
+            ],
+            variant: variant,
+            order: order,
+            conflictGroup: conflictGroup,
+            unprefixedPrecedence: precedence);
+    }
+
     private static AkcssUtilityValueSource CreateVariantSource(
         IObservable<bool> signal)
     {
@@ -604,6 +726,77 @@ public sealed class AkcssRuntimeTests
         }
 
         public override void Update(object target)
+        {
+            _events.Add(_name + ":update");
+        }
+
+        public override void Reset(object target)
+        {
+            _events.Add(_name + ":reset");
+        }
+    }
+
+    private sealed class OperationUtility : ZeroAkcssUtility
+    {
+        private readonly ImmutableArray<AkcssUtilityOperation> _operations;
+
+        public OperationUtility(
+            List<string> events,
+            IEnumerable<(string ConflictKey, string Name)> operations)
+        {
+            _operations =
+            [
+                .. operations.Select(
+                    (operation, index) =>
+                        (AkcssUtilityOperation)new LoggingUtilityOperation(
+                            this,
+                            operation.ConflictKey,
+                            index,
+                            operation.Name,
+                            events)),
+            ];
+        }
+
+        public override ImmutableArray<AkcssUtilityOperation> Operations =>
+            _operations;
+
+        public override void Update(object target)
+        {
+        }
+    }
+
+    private sealed class LoggingUtilityOperation
+        : AkcssUtilityOperation
+    {
+        private readonly string _name;
+        private readonly List<string> _events;
+
+        public LoggingUtilityOperation(
+            AkcssUtility utility,
+            string conflictKey,
+            int order,
+            string name,
+            List<string> events)
+            : base(
+                utility,
+                conflictKey,
+                AkcssOperationPriority.Style,
+                order)
+        {
+            _name = name;
+            _events = events;
+        }
+
+        public override bool IsActive(
+            object target,
+            IReadOnlyList<object?> arguments)
+        {
+            return true;
+        }
+
+        public override void Update(
+            object target,
+            IReadOnlyList<object?> arguments)
         {
             _events.Add(_name + ":update");
         }

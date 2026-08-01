@@ -2174,33 +2174,20 @@ internal static class ComponentGenerator
                     .Append(application.Reference)
                     .Append(").Update(__target");
 
-                var valueSourceIndex = 0;
                 for (var argumentIndex = 0;
                      argumentIndex < operation.Arguments.Length;
                      argumentIndex++)
                 {
-                    var argument =
-                        operation.Arguments[argumentIndex];
                     result.Append(", ");
-                    if (argument.MarkupExtension != null)
-                    {
-                        var parameterType =
-                            application.Utility.Parameters[
-                                argumentIndex].Type.Symbol;
-                        result.Append('(')
-                            .Append(GetTypeName(parameterType))
-                            .Append(")__arguments[")
-                            .Append(valueSourceIndex.ToString(
-                                CultureInfo.InvariantCulture))
-                            .Append("]!");
-                        valueSourceIndex++;
-                    }
-                    else
-                    {
-                        result.Append(
-                            GetTailwindUtilityArgumentExpression(
-                                argument));
-                    }
+                    var parameterType =
+                        application.Utility.Parameters[
+                            argumentIndex].Type.Symbol;
+                    result.Append('(')
+                        .Append(GetTypeName(parameterType))
+                        .Append(")__arguments[")
+                        .Append(argumentIndex.ToString(
+                            CultureInfo.InvariantCulture))
+                        .Append("]!");
                 }
 
                 result.Append("))");
@@ -2288,13 +2275,22 @@ internal static class ComponentGenerator
                  index < operation.Arguments.Length;
                  index++)
             {
-                var extension =
-                    operation.Arguments[index].MarkupExtension;
-                if (extension == null ||
-                    index >= utility.Parameters.Length ||
+                if (index >= utility.Parameters.Length ||
                     utility.Parameters[index].Type.Symbol is not
                         ITypeSymbol expectedType)
                 {
+                    continue;
+                }
+
+                var argument = operation.Arguments[index];
+                var extension =
+                    argument.MarkupExtension;
+                if (extension == null)
+                {
+                    result.Add(
+                        GetAkcssUtilityArgumentValueSourceExpression(
+                            argument,
+                            expectedType));
                     continue;
                 }
 
@@ -2314,6 +2310,32 @@ internal static class ComponentGenerator
             }
 
             return result;
+        }
+
+        private static string GetAkcssUtilityArgumentValueSourceExpression(
+            TailwindUtilityArgument argument,
+            ITypeSymbol expectedType)
+        {
+            var isConstant =
+                argument.ValueOperation.ConstantValue.HasValue;
+            var result = new StringBuilder(
+                    "global::Akbura.Akcss." +
+                    "AkcssUtilityValueSource.Create<")
+                .Append(GetTypeName(expectedType))
+                .Append(">(");
+            if (isConstant)
+            {
+                result.Append("static ");
+            }
+
+            result.Append("__target => ")
+                .Append(
+                    GetTailwindUtilityArgumentExpression(
+                        argument))
+                .Append(", recreateOnRefresh: ")
+                .Append(isConstant ? "false" : "true")
+                .Append(')');
+            return result.ToString();
         }
 
         private string GetAkcssUtilityValueSourceExpression(

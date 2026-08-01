@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Immutable;
+using System.ComponentModel;
 
 namespace Akbura.Akcss;
 
@@ -14,6 +15,17 @@ public abstract class AkcssUtility : AkcssStyle
     {
         get;
     }
+
+    /// <summary>
+    /// Gets independently resolved property writes emitted for this utility.
+    /// </summary>
+    /// <remarks>
+    /// Hand-written and previously compiled utilities can leave this collection empty;
+    /// the runtime then applies the utility as one legacy operation.
+    /// </remarks>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public virtual ImmutableArray<AkcssUtilityOperation> Operations => [];
 
     public abstract void Update(object target, params object[] parameters);
 }

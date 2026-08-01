@@ -3,6 +3,13 @@ title: Akbura Documentation
 summary: Learn how to build declarative, reactive Avalonia interfaces with Akbura.
 ---
 
+| Feature | Support level | Notes |
+|---------|:------------:|-------|
+| Compatibility with Avalonia | Full | Akbura components can be used directly in AXAML views and vice versa – any Avalonia control (including custom controls) works without extra attributes or imports. |
+| MarkupExtensions | Partial | Common markup extensions (`StaticResource`, `DynamicResource`, `Binding`) work exactly as in Avalonia. The `IServiceProvider` supplies `IProvideValueTarget`, `IRootObjectProvider`, `IUriContext`, `IXamlTypeResolver`, and `IAvaloniaXamlIlEagerParentStackProvider`. The old `{}` syntax is replaced by `${}` (no quotes). XML‑element syntax for markup extensions, `MarkupExtensionOptionAttribute`, and some advanced scenarios are not supported. |
+| Binding | Full | Bindings are fully supported: both `ReflectionBinding` and `CompiledBinding` work, including `BindingPath` parsing, mode selection, converters, etc. |
+| TemplateContent | Full | Properties decorated with `[TemplateContent]` are automatically handled – Akbura generates an `IDeferredContent` implementation, so templates work out of the box. |
+
 ## Quick Start
 
 ::: warning Experimental

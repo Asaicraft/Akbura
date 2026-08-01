@@ -14,5 +14,9 @@
   {
     "text": "ItemsControl",
     "link": "/akbura/items-control"
+  },
+  {
+    "text": "Dependency Injection",
+    "link": "/akbura/dependency-injection"
   }
 ]

@@ -323,7 +323,6 @@ internal static class AkcssGenerator
         AppendOperationAttributes(
             source,
             symbol.Operations,
-            symbol,
             sourceMap,
             context,
             parentOrder: -1,
@@ -333,7 +332,6 @@ internal static class AkcssGenerator
     private static void AppendOperationAttributes(
         StringBuilder source,
         ImmutableArray<IAkcssOperation> operations,
-        IAkcssSymbol rootSymbol,
         AkcssGenerationSourceMap sourceMap,
         AkcssOperationMetadataContext context,
         int parentOrder,
@@ -353,6 +351,13 @@ internal static class AkcssGenerator
                     break;
 
                 case IAkcssIfOperation ifOperation:
+                    AppendIfOperationAttributes(
+                        source,
+                        ifOperation,
+                        sourceMap,
+                        context,
+                        parentOrder,
+                        depth);
                     break;
 
                 case IAkcssApplyOperation applyOperation:
@@ -423,6 +428,22 @@ internal static class AkcssGenerator
                     CultureInfo.InvariantCulture));
         }
 
+        if (metadata.IfStartOrder >= 0)
+        {
+            arguments.Add(
+                $"IfStartOrder = " +
+                metadata.IfStartOrder.ToString(
+                    CultureInfo.InvariantCulture));
+        }
+
+        if (metadata.IfEndOrder >= 0)
+        {
+            arguments.Add(
+                $"IfEndOrder = " +
+                metadata.IfEndOrder.ToString(
+                    CultureInfo.InvariantCulture));
+        }
+
         if (metadata.TargetType != null)
         {
             arguments.Add(
@@ -478,13 +499,16 @@ internal static class AkcssGenerator
                 $"{GetTypeName(metadata.AttachedTargetType)})");
         }
 
-        arguments.Add(
-            $"CanRead = " +
-            (metadata.CanRead ? "true" : "false"));
+        if (metadata.Kind == GeneratedAkcssOperationKind.Set)
+        {
+            arguments.Add(
+                $"CanRead = " +
+                (metadata.CanRead ? "true" : "false"));
 
-        arguments.Add(
-            $"CanWrite = " +
-            (metadata.CanWrite ? "true" : "false"));
+            arguments.Add(
+                $"CanWrite = " +
+                (metadata.CanWrite ? "true" : "false"));
+        }
 
         if (metadata.Expression != null)
         {
@@ -535,6 +559,49 @@ internal static class AkcssGenerator
             source,
             2,
             ")]");
+    }
+
+    private static void AppendIfOperationAttributes(
+    StringBuilder source,
+    IAkcssIfOperation operation,
+    AkcssGenerationSourceMap sourceMap,
+    AkcssOperationMetadataContext context,
+    int parentOrder,
+    int depth)
+    {
+        var order = context.NextOrder++;
+
+        var childSource = new StringBuilder();
+        var firstChildOrder = context.NextOrder;
+
+        AppendOperationAttributes(
+            childSource,
+            operation.Operations,
+            sourceMap,
+            context,
+            parentOrder: order,
+            depth: depth + 1);
+
+        var hasChildren =
+            context.NextOrder > firstChildOrder;
+
+        var metadata = CreateIfOperationMetadata(
+            operation,
+            order,
+            parentOrder,
+            depth,
+            ifStartOrder: hasChildren
+                ? firstChildOrder
+                : -1,
+            ifEndOrder: hasChildren
+                ? context.NextOrder - 1
+                : -1);
+
+        AppendOperationAttribute(
+            source,
+            metadata);
+
+        source.Append(childSource);
     }
 
     private static AkcssOperationMetadata CreatePropertySetterMetadata(
@@ -596,6 +663,65 @@ internal static class AkcssGenerator
                 operation.HasErrors ||
                 property == null ||
                 !property.CanWrite,
+        };
+    }
+
+    private static AkcssOperationMetadata CreateIfOperationMetadata(
+        IAkcssIfOperation operation,
+        int order,
+        int parentOrder,
+        int depth,
+        int ifStartOrder,
+        int ifEndOrder)
+    {
+        var conditionSyntax =
+            operation.ConditionOperation.Syntax
+                as CSharpExpressionSyntax ??
+            operation.Syntax.Condition
+                .GetRawCSharpExpression();
+
+        var conditionRewriter =
+            new AmxExpressionRewriter(
+                RuntimeMetadataTargetName,
+                observeDynamicResource: false,
+                GetTargetParameterName(
+                    operation.ContainingAkcssSymbol));
+
+        var condition = RewriteExpression(
+            conditionSyntax,
+            conditionRewriter);
+
+        return new AkcssOperationMetadata
+        {
+            Order = order,
+            ParentOrder = parentOrder,
+            Depth = depth,
+
+            Kind = GeneratedAkcssOperationKind.If,
+            Origin = GeneratedAkcssOperationOriginKind.Direct,
+
+            TargetType = GetAkcssTargetType(
+                operation.ContainingAkcssSymbol),
+
+            PropertyAccessKind =
+                GeneratedAkcssPropertyAccessKind.None,
+
+            ValueKind =
+                GeneratedAkcssPropertyValueKind.CSharpExpression,
+
+            Expression = condition,
+
+            ExpressionType =
+                operation.ConditionType.Symbol as ITypeSymbol,
+
+            Priority = depth == 0
+                ? GeneratedAkcssOperationPriority.Style
+                : GeneratedAkcssOperationPriority.StyleTrigger,
+
+            IfStartOrder = ifStartOrder,
+            IfEndOrder = ifEndOrder,
+
+            HasErrors = operation.HasErrors,
         };
     }
 

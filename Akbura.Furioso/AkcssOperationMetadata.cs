@@ -50,6 +50,10 @@ internal sealed class AkcssOperationMetadata
     public GeneratedAkcssOperationPriority Priority { get; init; }
 
     public bool HasErrors { get; init; }
+
+    public int IfStartOrder { get; init; } = -1;
+
+    public int IfEndOrder { get; init; } = -1;
 }
 
 internal enum GeneratedAkcssOperationKind

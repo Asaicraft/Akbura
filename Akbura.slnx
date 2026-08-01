@@ -29,6 +29,30 @@
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
   </Folder>
+  <Folder Name="/Akbura.SyntaxViewer/">
+    <Project Path="Akbura.SyntaxViewer/Akbura.SyntaxViewer/Akbura.SyntaxViewer.Android/Akbura.SyntaxViewer.Android.csproj" Id="04ba6587-7005-4f3b-872c-812b86c9d125">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+      <Deploy />
+    </Project>
+    <Project Path="Akbura.SyntaxViewer/Akbura.SyntaxViewer/Akbura.SyntaxViewer.Browser/Akbura.SyntaxViewer.Browser.csproj" Id="2ffad8f9-08ea-43fc-a60c-90af2aa3a252">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Akbura.SyntaxViewer/Akbura.SyntaxViewer/Akbura.SyntaxViewer.Desktop/Akbura.SyntaxViewer.Desktop.csproj" Id="0dcd7aa7-5924-432f-b384-faea91241280">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Akbura.SyntaxViewer/Akbura.SyntaxViewer/Akbura.SyntaxViewer.iOS/Akbura.SyntaxViewer.iOS.csproj" Id="2f47f283-ab51-4e0c-a222-7f392e44334a">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+      <Deploy />
+    </Project>
+    <Project Path="Akbura.SyntaxViewer/Akbura.SyntaxViewer/Akbura.SyntaxViewer/Akbura.SyntaxViewer.csproj" Id="c536f4a3-abc6-4c1f-bec1-c0ce93ca5af7">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/draft-concepts/">
     <File Path="draft-concepts/Dependecy Injection.md" />
     <File Path="draft-concepts/User defined hook.md" />

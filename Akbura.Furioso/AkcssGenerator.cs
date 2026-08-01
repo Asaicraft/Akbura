@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -8,20 +9,21 @@ using Microsoft.CodeAnalysis.Operations;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using AkburaSyntaxList = Akbura.Language.Syntax.SyntaxList<Akbura.Language.Syntax.AkcssTopLevelMemberSyntax>;
-using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using CSharpExpressionSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax;
 using CSharpGenericNameSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.GenericNameSyntax;
 using CSharpIdentifierNameSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax;
 using CSharpInvocationExpressionSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax;
 using CSharpMemberAccessExpressionSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax;
-using CSharpUsingDirectiveSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
+using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using CSharpSyntaxRewriter = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxRewriter;
+using CSharpUsingDirectiveSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax;
 using RoslynFieldSymbol = Microsoft.CodeAnalysis.IFieldSymbol;
 using RoslynMethodSymbol = Microsoft.CodeAnalysis.IMethodSymbol;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
@@ -40,6 +42,13 @@ internal static class AkcssGenerator
     private const string AkcssModuleAttribute = "global::Akbura.CompilerAnotations.AkcssModuleAttribute";
     private const string EditorBrowsableAttribute = "global::System.ComponentModel.EditorBrowsableAttribute";
     private const string BrowsableAttribute = "global::System.ComponentModel.BrowsableAttribute";
+    private const string RuntimeAkcssOperationAttribute = "global::Akbura.CompilerAnotations.AkcssOperationAttribute";
+    private const string RuntimeAkcssOperationKind = "global::Akbura.CompilerAnotations.AkcssOperationKind";
+    private const string RuntimeAkcssOperationOriginKind = "global::Akbura.CompilerAnotations.AkcssOperationOriginKind";
+    private const string RuntimeAkcssPropertyAccessKind = "global::Akbura.CompilerAnotations.AkcssPropertyAccessKind";
+    private const string RuntimeAkcssPropertyValueKind = "global::Akbura.CompilerAnotations.AkcssPropertyValueKind";
+    private const string RuntimeAkcssOperationPriority = "global::Akbura.CompilerAnotations.AkcssOperationPriority";
+    private const string RuntimeMetadataTargetName = "__target";
 
     public static string GetHintName(
         IAkcssModuleSymbol symbol,
@@ -273,6 +282,7 @@ internal static class AkcssGenerator
         }
 
         AppendObservedPropertyAttributes(source, symbol, sourceMap);
+        AppendOperationAttributes(source, symbol, sourceMap);
 
         if (symbol is ITailwindUtilitySymbol utility)
         {
@@ -301,6 +311,406 @@ internal static class AkcssGenerator
             source.Append("        [").Append(ObservesPropertyAttribute).Append('(')
                 .Append(ToStringLiteral(propertyName)).AppendLine(")]");
         }
+    }
+
+    private static void AppendOperationAttributes(
+        StringBuilder source,
+        IAkcssSymbol symbol,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        var context = new AkcssOperationMetadataContext();
+
+        AppendOperationAttributes(
+            source,
+            symbol.Operations,
+            symbol,
+            sourceMap,
+            context,
+            parentOrder: -1,
+            depth: 0);
+    }
+
+    private static void AppendOperationAttributes(
+        StringBuilder source,
+        ImmutableArray<IAkcssOperation> operations,
+        IAkcssSymbol rootSymbol,
+        AkcssGenerationSourceMap sourceMap,
+        AkcssOperationMetadataContext context,
+        int parentOrder,
+        int depth)
+    {
+        foreach (var operation in operations)
+        {
+            switch (operation)
+            {
+                case IAkcssPropertySetterOperation setter:
+                    AppendPropertySetterAttribute(
+                        source,
+                        setter,
+                        context.NextOrder++,
+                        parentOrder,
+                        depth);
+                    break;
+
+                case IAkcssIfOperation ifOperation:
+                    break;
+
+                case IAkcssApplyOperation applyOperation:
+                    break;
+
+                default:
+                    Debug.Fail(
+                        $"Unsupported AKCSS operation: " +
+                        $"{operation.GetType().FullName}");
+                    break;
+            }
+        }
+    }
+
+    private static void AppendPropertySetterAttribute(
+        StringBuilder source,
+        IAkcssPropertySetterOperation operation,
+        int order,
+        int parentOrder,
+        int depth)
+    {
+        var metadata = CreatePropertySetterMetadata(
+            operation,
+            order,
+            parentOrder,
+            depth);
+
+        AppendOperationAttribute(
+            source,
+            metadata);
+    }
+
+    private static void AppendOperationAttribute(
+        StringBuilder source,
+        AkcssOperationMetadata metadata)
+    {
+        var arguments = new List<string>
+        {
+            $"Order = {metadata.Order.ToString(CultureInfo.InvariantCulture)}",
+
+            $"Kind = {RuntimeAkcssOperationKind}.{metadata.Kind}",
+
+            $"Origin = {RuntimeAkcssOperationOriginKind}.{metadata.Origin}",
+
+            $"PropertyAccessKind = " +
+            $"{RuntimeAkcssPropertyAccessKind}.{metadata.PropertyAccessKind}",
+
+            $"ValueKind = " +
+            $"{RuntimeAkcssPropertyValueKind}.{metadata.ValueKind}",
+
+            $"Priority = " +
+            $"{RuntimeAkcssOperationPriority}.{metadata.Priority}",
+        };
+
+        if (metadata.ParentOrder >= 0)
+        {
+            arguments.Add(
+                $"ParentOrder = " +
+                metadata.ParentOrder.ToString(
+                    CultureInfo.InvariantCulture));
+        }
+
+        if (metadata.Depth != 0)
+        {
+            arguments.Add(
+                $"Depth = " +
+                metadata.Depth.ToString(
+                    CultureInfo.InvariantCulture));
+        }
+
+        if (metadata.TargetType != null)
+        {
+            arguments.Add(
+                $"TargetType = typeof(" +
+                $"{GetTypeName(metadata.TargetType)})");
+        }
+
+        if (metadata.Property != null)
+        {
+            arguments.Add(
+                $"Property = {ToStringLiteral(metadata.Property)}");
+        }
+
+        if (metadata.AvaloniaProperty != null)
+        {
+            arguments.Add(
+                $"AvaloniaProperty = " +
+                ToStringLiteral(metadata.AvaloniaProperty));
+        }
+
+        if (metadata.AttachedGetter != null)
+        {
+            arguments.Add(
+                $"AttachedGetter = " +
+                ToStringLiteral(metadata.AttachedGetter));
+        }
+
+        if (metadata.AttachedSetter != null)
+        {
+            arguments.Add(
+                $"AttachedSetter = " +
+                ToStringLiteral(metadata.AttachedSetter));
+        }
+
+        if (metadata.PropertyOwnerType != null)
+        {
+            arguments.Add(
+                $"PropertyOwnerType = typeof(" +
+                $"{GetTypeName(metadata.PropertyOwnerType)})");
+        }
+
+        if (metadata.PropertyType != null)
+        {
+            arguments.Add(
+                $"PropertyType = typeof(" +
+                $"{GetTypeName(metadata.PropertyType)})");
+        }
+
+        if (metadata.AttachedTargetType != null)
+        {
+            arguments.Add(
+                $"AttachedTargetType = typeof(" +
+                $"{GetTypeName(metadata.AttachedTargetType)})");
+        }
+
+        arguments.Add(
+            $"CanRead = " +
+            (metadata.CanRead ? "true" : "false"));
+
+        arguments.Add(
+            $"CanWrite = " +
+            (metadata.CanWrite ? "true" : "false"));
+
+        if (metadata.Expression != null)
+        {
+            arguments.Add(
+                $"Expression = " +
+                ToStringLiteral(metadata.Expression));
+        }
+
+        if (metadata.ExpressionType != null)
+        {
+            arguments.Add(
+                $"ExpressionType = typeof(" +
+                $"{GetTypeName(metadata.ExpressionType)})");
+        }
+
+        if (metadata.RequiresBrushConversion)
+        {
+            arguments.Add(
+                "RequiresBrushConversion = true");
+        }
+
+        if (metadata.HasErrors)
+        {
+            arguments.Add(
+                "HasErrors = true");
+        }
+
+        AppendIndentedLine(
+            source,
+            2,
+            $"[{RuntimeAkcssOperationAttribute}(");
+
+        for (var index = 0;
+             index < arguments.Count;
+             index++)
+        {
+            var suffix = index == arguments.Count - 1
+                ? string.Empty
+                : ",";
+
+            AppendIndentedLine(
+                source,
+                3,
+                arguments[index] + suffix);
+        }
+
+        AppendIndentedLine(
+            source,
+            2,
+            ")]");
+    }
+
+    private static AkcssOperationMetadata CreatePropertySetterMetadata(
+        IAkcssPropertySetterOperation operation,
+        int order,
+        int parentOrder,
+        int depth)
+    {
+        var property = operation.Property;
+
+        var generatedValue = GetValueExpression(
+            operation,
+            RuntimeMetadataTargetName,
+            observeDynamicResource: false);
+
+        return new AkcssOperationMetadata
+        {
+            Order = order,
+            ParentOrder = parentOrder,
+            Depth = depth,
+
+            Kind = GeneratedAkcssOperationKind.Set,
+            Origin = GeneratedAkcssOperationOriginKind.Direct,
+
+            TargetType = GetAkcssTargetType(operation.ContainingAkcssSymbol),
+
+            PropertyAccessKind = GetPropertyAccessKind(property),
+
+            Property = property?.Name,
+
+            AvaloniaProperty = GetAvaloniaPropertyName(property),
+
+            AttachedGetter = GetAttachedGetterName(property),
+
+            AttachedSetter = GetAttachedSetterName(property),
+
+            PropertyOwnerType = GetPropertyOwnerType(property),
+
+            PropertyType = property?.Type.Symbol as ITypeSymbol,
+
+            AttachedTargetType = GetAttachedTargetType(property),
+
+            CanRead = property?.CanRead ?? false,
+            CanWrite = property?.CanWrite ?? false,
+
+            ValueKind = GetPropertyValueKind(operation.ValueKind),
+
+            Expression = generatedValue.Expression,
+
+            ExpressionType = operation.ValueType.Symbol as ITypeSymbol,
+
+            RequiresBrushConversion = operation.RequiresBrushConversion,
+
+            Priority = depth == 0
+                ? GeneratedAkcssOperationPriority.Style
+                : GeneratedAkcssOperationPriority.StyleTrigger,
+
+            HasErrors =
+                operation.HasErrors ||
+                property == null ||
+                !property.CanWrite,
+        };
+    }
+
+    private static GeneratedAkcssPropertyValueKind GetPropertyValueKind(AkcssPropertyValueKind valueKind)
+    {
+        return valueKind switch
+        {
+            AkcssPropertyValueKind.CSharpExpression =>
+                GeneratedAkcssPropertyValueKind.CSharpExpression,
+
+            AkcssPropertyValueKind.ColorLiteral =>
+                GeneratedAkcssPropertyValueKind.ColorLiteral,
+
+            AkcssPropertyValueKind.ThicknessTuple =>
+                GeneratedAkcssPropertyValueKind.ThicknessTuple,
+
+            AkcssPropertyValueKind.AmxInvocation =>
+                GeneratedAkcssPropertyValueKind.AmxInvocation,
+
+            AkcssPropertyValueKind.Error =>
+                GeneratedAkcssPropertyValueKind.Error,
+
+            _ =>
+                GeneratedAkcssPropertyValueKind.None,
+        };
+    }
+
+    private static ITypeSymbol? GetAkcssTargetType(IAkcssSymbol symbol)
+    {
+        if (symbol == null)
+        {
+            throw new ArgumentNullException(nameof(symbol));
+        }
+
+        if (!symbol.HasTargetType)
+        {
+            return null;
+        }
+
+        if (symbol.TargetType.Symbol is ITypeSymbol targetType)
+        {
+            return targetType;
+        }
+
+        throw new InvalidOperationException(
+            $"AKCSS symbol '{symbol.MetadataName}' has a target symbol " +
+            $"that is not a C# type.");
+    }
+
+    private static GeneratedAkcssPropertyAccessKind GetPropertyAccessKind(AkburaPropertySymbol? property)
+    {
+        if (property == null)
+        {
+            return GeneratedAkcssPropertyAccessKind.None;
+        }
+
+        return property.WriteKind switch
+        {
+            PropertyAccessKind.AvaloniaProperty =>
+                GeneratedAkcssPropertyAccessKind.AvaloniaProperty,
+
+            PropertyAccessKind.AttachedAccessor =>
+                GeneratedAkcssPropertyAccessKind.AttachedAccessor,
+
+            PropertyAccessKind.ClrProperty =>
+                GeneratedAkcssPropertyAccessKind.ClrProperty,
+
+            PropertyAccessKind.Parameter =>
+                GeneratedAkcssPropertyAccessKind.Parameter,
+
+            PropertyAccessKind.Command =>
+                GeneratedAkcssPropertyAccessKind.Command,
+
+            _ => GeneratedAkcssPropertyAccessKind.None,
+        };
+    }
+
+    private static string? GetAvaloniaPropertyName(AkburaPropertySymbol? property)
+    {
+        if (property == null)
+        {
+            return null;
+        }
+
+        var definition = !property.AvaloniaPropertyDefinition.IsDefault
+            ? property.AvaloniaPropertyDefinition
+            : property.AttachedPropertyDefinition;
+
+        return definition.Symbol is RoslynFieldSymbol field
+            ? field.Name
+            : null;
+    }
+
+    private static ITypeSymbol? GetPropertyOwnerType(AkburaPropertySymbol? property)
+    {
+        return property?
+            .WriteDefinition
+            .Symbol?
+            .ContainingType;
+    }
+
+    private static string? GetAttachedGetterName(AkburaPropertySymbol? property)
+    {
+        return property?.AttachedGetterDefinition.Symbol
+            is RoslynMethodSymbol getter
+                ? getter.Name
+                : null;
+    }
+
+    private static string? GetAttachedSetterName(AkburaPropertySymbol? property)
+    {
+        return property?.AttachedSetterDefinition.Symbol
+            is RoslynMethodSymbol setter
+                ? setter.Name
+                : null;
     }
 
     private static void CollectObservedPropertyNames(
@@ -1248,16 +1658,25 @@ internal static class AkcssGenerator
         };
     }
 
-    private static ITypeSymbol? GetAttachedTargetType(AkburaPropertySymbol property)
+    private static ITypeSymbol? GetAttachedTargetType(AkburaPropertySymbol? property)
     {
+        if (property == null)
+        {
+            return null;
+        }
+
         if (property.AttachedTargetType.Symbol is ITypeSymbol targetType)
         {
             return targetType;
         }
 
-        var setter = property.WriteDefinition.Symbol as RoslynMethodSymbol ??
-                     property.AttachedSetterDefinition.Symbol as RoslynMethodSymbol;
-        return setter is { Parameters.Length: > 0 } ? setter.Parameters[0].Type : null;
+        var setter =
+            property.WriteDefinition.Symbol as RoslynMethodSymbol ??
+            property.AttachedSetterDefinition.Symbol as RoslynMethodSymbol;
+
+        return setter is { Parameters.Length: > 0 }
+            ? setter.Parameters[0].Type
+            : null;
     }
 
     private static string? GetStaticMemberReference(Microsoft.CodeAnalysis.ISymbol? symbol)
@@ -1448,6 +1867,11 @@ internal static class AkcssGenerator
         public string KeyExpression { get; }
 
         public string ValueParameterName { get; }
+    }
+
+    private sealed class AkcssOperationMetadataContext
+    {
+        public int NextOrder { get; set; }
     }
 
     private sealed class AmxExpressionRewriter : CSharpSyntaxRewriter

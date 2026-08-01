@@ -1,11 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System.ComponentModel;
 
 namespace Akbura.CompilerAnotations;
 
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+[Browsable(false)]
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class AkcssModuleAttribute : Attribute
 {
     public AkcssModuleAttribute(string path)
@@ -17,4 +18,8 @@ public sealed class AkcssModuleAttribute : Attribute
     {
         get; 
     }
+
+    public string MetadataName { get; init; } = string.Empty;
+
+    public int FormatVersion { get; init; }
 }

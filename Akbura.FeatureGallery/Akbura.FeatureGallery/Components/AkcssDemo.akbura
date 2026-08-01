@@ -1,9 +1,7 @@
-using Akbura.FeatureGallery.Styles.akcss;
-
 state bool isHighlighted = false;
 
 @akcss {
-    @using Akbura.FeatureGallery.Styles.akcss;
+    @using Akbura.Styles.akcss;
 
     Button.reactive-button {
         @apply bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold;

@@ -219,8 +219,13 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             for (var moduleIndex = 0; moduleIndex < symbol.AkcssModules.Length; moduleIndex++)
             {
                 var module = symbol.AkcssModules[moduleIndex];
+                if (module.DeclaringSyntax is not { } moduleSyntax)
+                {
+                    continue;
+                }
+
                 var moduleIdentity = GetInlineAkcssModuleIdentity(sourcePath, moduleIndex);
-                akcssModuleTypeNames[module.DeclaringSyntax] =
+                akcssModuleTypeNames[moduleSyntax] =
                     AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
                         projectOptions.RootNamespace,
                         moduleIdentity);
@@ -243,13 +248,18 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             }
 
             var sourcePath = GetSourcePath(syntaxTree, projectOptions.ProjectDirectory);
+            if (symbol.DeclaringSyntax is not { } declaringSyntax)
+            {
+                continue;
+            }
+
             externalAkcssInputs[index] = new AkcssGenerationInput(
                 symbol,
                 sourcePath,
                 sourcePath,
                 semanticModel.GetAkcssCSharpUsingDirectives(symbol));
 
-            akcssModuleTypeNames[symbol.DeclaringSyntax] =
+            akcssModuleTypeNames[declaringSyntax] =
                 AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
                     projectOptions.RootNamespace,
                     sourcePath);

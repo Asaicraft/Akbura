@@ -98,12 +98,12 @@ using Akbura.Markup;
 
             <FeatureView.Code>
                 {"""
-                using Akbura.FeatureGallery.Styles.akcss;
+                using Akbura.Styles.akcss;
 
                 state bool isHighlighted = false;
 
                 @akcss {
-                    @using Akbura.FeatureGallery.Styles.akcss;
+                    @using Akbura.Styles.akcss;
 
                     Button.reactive-button {
                         @apply bg-blue-600 text-white
@@ -202,7 +202,7 @@ using Akbura.Markup;
             <FeatureView.Code>
                 {"""
                 using Akbura.FeatureGallery.Markup;
-                using Akbura.FeatureGallery.Styles.akcss;
+                using Akbura.Styles.akcss;
 
                 state double spacing = 3;
 
@@ -237,7 +237,7 @@ using Akbura.Markup;
 
             <FeatureView.Code>
                 {"""
-                using Akbura.FeatureGallery.Styles.akcss;
+                using Akbura.Styles.akcss;
                 using Akbura.Markup;
 
                 <Border p-1

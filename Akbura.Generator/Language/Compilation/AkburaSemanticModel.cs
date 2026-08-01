@@ -1081,7 +1081,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         var localCandidates = FindAkcssApplyItemCandidates(
-            GetContainingAkcssLayer(containingSymbol.DeclarationSyntax),
+            GetContainingAkcssLayer(applyDirective),
             text,
             containingSymbol);
         if (localCandidates.Length > 1)
@@ -1095,7 +1095,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return localCandidates[0];
         }
 
-        foreach (var layer in GetImportedAkcssSymbolLayers(containingSymbol.DeclarationSyntax, diagnosticsBuilder))
+        foreach (var layer in GetImportedAkcssSymbolLayers(applyDirective, diagnosticsBuilder))
         {
             var candidates = FindAkcssApplyItemCandidates(
                 layer,
@@ -1176,8 +1176,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 continue;
             }
 
-            if (symbol is AkcssStyleSymbol style &&
-                style.ClassName == name &&
+            if (symbol is not ITailwindUtilitySymbol &&
+                symbol.ClassName == name &&
                 argumentCount == 0)
             {
                 builder.Add(symbol);
@@ -1221,7 +1221,25 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<IAkcssSymbol>>.Rent();
         foreach (var importName in GetAkcssImportNames(syntax))
         {
-            var matches = Compilation.GetAkcssSyntaxTreesByLogicalName(importName);
+            var matches = Compilation.GetLocalAkcssSyntaxTreesByLogicalName(importName);
+            if (matches.Length == 0)
+            {
+                var modules = Compilation.GetAkcssModuleSymbolsByLogicalName(importName);
+                if (modules.Length > 0)
+                {
+                    using var metadataLayer = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
+                    foreach (var module in modules)
+                    {
+                        metadataLayer.AddRange(module.AkcssSymbols);
+                    }
+
+                    layersBuilder.Add(metadataLayer.ToImmutable());
+                    continue;
+                }
+
+                matches = Compilation.GetAkcssSyntaxTreesByLogicalName(importName);
+            }
+
             if (matches.Length == 0)
             {
                 diagnosticsBuilder.Add(CreateAkcssImportNotFoundDiagnostic(importName));
@@ -5211,8 +5229,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             probeClass,
             GetAkcssCSharpUsingDirectives(containingSymbol));
 
+        if (containingSymbol.DeclarationSyntax is not { } declarationSyntax)
+        {
+            throw new InvalidOperationException(
+                "Binding an AKCSS source expression requires declaration syntax.");
+        }
+
         var binder = BindingSession.GetCSharpProbeBinder(
-            containingSymbol.DeclarationSyntax,
+            declarationSyntax,
             BinderUsage.Akcss);
         return binder.BindReturnExpression(
             compilationUnit,

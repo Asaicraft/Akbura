@@ -1,5 +1,3 @@
-using Akbura.FeatureGallery.Styles.akcss;
-
 param Router Router;
 param string CurrentUrl = "";
 

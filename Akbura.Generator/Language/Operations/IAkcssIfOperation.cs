@@ -7,7 +7,7 @@ namespace Akbura.Language.Operations;
 
 internal interface IAkcssIfOperation : IAkcssOperation
 {
-    new AkcssIfDirectiveSyntax Syntax { get; }
+    new AkcssIfDirectiveSyntax? Syntax { get; }
 
     CSharpSymbolDefinition ConditionType { get; }
 

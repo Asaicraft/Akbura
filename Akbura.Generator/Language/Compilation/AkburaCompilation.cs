@@ -1,5 +1,6 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Concurrent;
@@ -365,12 +366,51 @@ internal sealed partial class AkburaCompilation
 
     internal ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
     {
-        var localMatches = AkcssSyntaxTrees
-            .Where(tree => string.Equals(tree.LogicalName, logicalName, StringComparison.Ordinal))
-            .ToImmutableArray();
+        var localMatches = GetLocalAkcssSyntaxTreesByLogicalName(logicalName);
         return localMatches.Length > 0
             ? localMatches
             : _referenceManager.GetAkcssSyntaxTreesByLogicalName(logicalName);
+    }
+
+    internal ImmutableArray<AkcssSyntaxTree> GetLocalAkcssSyntaxTreesByLogicalName(
+        string logicalName)
+    {
+        return AkcssSyntaxTrees
+            .Where(tree => string.Equals(tree.LogicalName, logicalName, StringComparison.Ordinal))
+            .ToImmutableArray();
+    }
+
+    internal ImmutableArray<IAkcssModuleSymbol> GetAkcssModuleSymbolsByLogicalName(
+        string logicalName)
+    {
+        return _referenceManager.GetAkcssModuleSymbolsByLogicalName(logicalName);
+    }
+
+    internal ImmutableArray<IAkcssModuleSymbol> GetExportedAkcssModuleSymbolsByLogicalName(
+        string logicalName)
+    {
+        using var localModules = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+        foreach (var syntaxTree in AkcssSyntaxTrees)
+        {
+            if (!string.Equals(
+                    syntaxTree.LogicalName,
+                    logicalName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var semanticModel = GetSemanticModel(syntaxTree);
+            if (semanticModel.GetDeclaredSymbol(syntaxTree.GetRoot()) is IAkcssModuleSymbol module)
+            {
+                localModules.Add(module);
+            }
+        }
+
+        var local = localModules.ToImmutable();
+        return local.Length > 0
+            ? local
+            : GetAkcssModuleSymbolsByLogicalName(logicalName);
     }
 
     internal bool TryGetReferencedComponentDeclaration(

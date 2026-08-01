@@ -1,3 +1,4 @@
+using Akbura.CompilerAnotations;
 using Akbura.Markup;
 using Avalonia.Controls;
 using System.Collections.Immutable;
@@ -15,12 +16,14 @@ public sealed class AkcssUtilityCandidateActivator
     : AkcssStyleActivator
 {
     private readonly ImmutableArray<AkcssUtilityApplication> _applications;
+    private readonly ImmutableArray<CandidateOperation> _operations;
+    private readonly ImmutableArray<string> _conflictKeys;
     private readonly ImmutableArray<AkcssUtilityValueSource> _arguments;
     private readonly Func<bool>? _condition;
     private readonly AkcssUtilityValueSource? _variant;
     private readonly List<IDisposable> _subscriptions = [];
     private readonly object?[] _values;
-    private Action<string>? _changed;
+    private Action<AkcssUtilityCandidateActivator>? _changed;
 
     public AkcssUtilityCandidateActivator(
         string conflictKey,
@@ -54,8 +57,20 @@ public sealed class AkcssUtilityCandidateActivator
             : conflictGroup;
         UnprefixedPrecedence = unprefixedPrecedence;
         _values = new object?[_arguments.Length];
+        _operations = CreateOperations(
+            conflictKey,
+            applications,
+            _arguments.Length);
+        _conflictKeys = GetConflictKeys(_operations);
     }
 
+    /// <summary>
+    /// Gets the legacy utility-name conflict key.
+    /// </summary>
+    /// <remarks>
+    /// Newly generated utilities resolve their individual operations by property key.
+    /// This value remains available for hand-written and previously compiled utilities.
+    /// </remarks>
     public string ConflictKey { get; }
 
     public int SourceOrder { get; }
@@ -71,6 +86,10 @@ public sealed class AkcssUtilityCandidateActivator
     public override bool IsConditional => IsPrefixed;
 
     public override bool Condition => IsReady && IsActive;
+
+    internal ImmutableArray<string> ConflictKeys => _conflictKeys;
+
+    internal int OperationCount => _operations.Length;
 
     internal bool IsReady
     {
@@ -110,39 +129,98 @@ public sealed class AkcssUtilityCandidateActivator
     public override void Execute(object target)
     {
         var control = GetControl(target);
-        for (var index = 0;
-             index < _arguments.Length;
-             index++)
+        if (!IsReady || !IsActive)
         {
-            _values[index] = _arguments[index].Value;
+            return;
         }
 
-        foreach (var application in _applications)
+        CopyArgumentValues();
+        for (var index = 0; index < _operations.Length; index++)
         {
-            application.Execute(control, _values);
+            if (_operations[index].IsActive(control, _values))
+            {
+                _operations[index].Execute(control, _values);
+            }
         }
     }
 
     public override void Reset(object target)
     {
         var control = GetControl(target);
-        for (var index = _applications.Length - 1;
+        for (var index = _operations.Length - 1;
              index >= 0;
              index--)
         {
-            _applications[index].Utility.Reset(control);
+            _operations[index].Reset(control);
         }
+    }
+
+    internal string GetOperationConflictKey(int index)
+    {
+        return _operations[index].ConflictKey;
+    }
+
+    internal AkcssOperationPriority GetOperationPriority(int index)
+    {
+        return _operations[index].Priority;
+    }
+
+    internal int GetOperationApplicationOrder(int index)
+    {
+        return _operations[index].ApplicationOrder;
+    }
+
+    internal int GetOperationOrder(int index)
+    {
+        return _operations[index].Order;
+    }
+
+    internal bool IsOperationActive(
+        int index,
+        Control target)
+    {
+        if (!IsReady || !IsActive)
+        {
+            return false;
+        }
+
+        CopyArgumentValues();
+        return _operations[index].IsActive(target, _values);
+    }
+
+    internal void ExecuteOperation(
+        int index,
+        Control target)
+    {
+        CopyArgumentValues();
+        _operations[index].Execute(target, _values);
+    }
+
+    internal void ResetOperation(
+        int index,
+        Control target)
+    {
+        _operations[index].Reset(target);
     }
 
     internal void Attach(
         Control target,
-        Action<string> changed)
+        Action<AkcssUtilityCandidateActivator> changed)
     {
         _changed = changed ??
             throw new ArgumentNullException(nameof(changed));
 
+        var watchedUtilities = new List<AkcssUtility>();
         foreach (var application in _applications)
         {
+            if (ContainsReference(
+                    watchedUtilities,
+                    application.Utility))
+            {
+                continue;
+            }
+
+            watchedUtilities.Add(application.Utility);
             var signal = application.Utility.Watch(target) ??
                 throw new InvalidOperationException(
                     $"AKCSS utility '{application.Utility.Name}' returned a null Watch signal.");
@@ -187,9 +265,87 @@ public sealed class AkcssUtilityCandidateActivator
         _changed = null;
     }
 
+    private void CopyArgumentValues()
+    {
+        for (var index = 0;
+             index < _arguments.Length;
+             index++)
+        {
+            _values[index] = _arguments[index].Value;
+        }
+    }
+
     private void OnChanged()
     {
-        _changed?.Invoke(ConflictKey);
+        _changed?.Invoke(this);
+    }
+
+    private static ImmutableArray<CandidateOperation> CreateOperations(
+        string legacyConflictKey,
+        ImmutableArray<AkcssUtilityApplication> applications,
+        int argumentCount)
+    {
+        var builder = ImmutableArray.CreateBuilder<CandidateOperation>();
+        for (var applicationIndex = 0;
+             applicationIndex < applications.Length;
+             applicationIndex++)
+        {
+            var application = applications[applicationIndex];
+            var utility = application.Utility;
+            var operations = utility.Operations;
+            if (!operations.IsDefaultOrEmpty &&
+                utility.Parameters.Length == argumentCount)
+            {
+                foreach (var operation in operations)
+                {
+                    builder.Add(
+                        new CandidateOperation(
+                            applicationIndex,
+                            operation));
+                }
+
+                continue;
+            }
+
+            builder.Add(
+                new CandidateOperation(
+                    applicationIndex,
+                    legacyConflictKey,
+                    application));
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableArray<string> GetConflictKeys(
+        ImmutableArray<CandidateOperation> operations)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        var builder = ImmutableArray.CreateBuilder<string>();
+        foreach (var operation in operations)
+        {
+            if (keys.Add(operation.ConflictKey))
+            {
+                builder.Add(operation.ConflictKey);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static bool ContainsReference(
+        List<AkcssUtility> utilities,
+        AkcssUtility utility)
+    {
+        foreach (var candidate in utilities)
+        {
+            if (ReferenceEquals(candidate, utility))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static AkcssUtility GetFirstUtility(
@@ -211,6 +367,78 @@ public sealed class AkcssUtilityCandidateActivator
             throw new ArgumentException(
                 $"An AKCSS utility target must derive from '{typeof(Control)}'.",
                 nameof(target));
+    }
+
+    private readonly struct CandidateOperation
+    {
+        private readonly AkcssUtilityOperation? _operation;
+        private readonly AkcssUtilityApplication? _legacyApplication;
+
+        public CandidateOperation(
+            int applicationOrder,
+            AkcssUtilityOperation operation)
+        {
+            ApplicationOrder = applicationOrder;
+            _operation = operation ??
+                throw new ArgumentNullException(nameof(operation));
+            _legacyApplication = null;
+            ConflictKey = operation.ConflictKey;
+            Priority = operation.Priority;
+            Order = operation.Order;
+        }
+
+        public CandidateOperation(
+            int applicationOrder,
+            string conflictKey,
+            AkcssUtilityApplication legacyApplication)
+        {
+            ApplicationOrder = applicationOrder;
+            _operation = null;
+            _legacyApplication = legacyApplication ??
+                throw new ArgumentNullException(nameof(legacyApplication));
+            ConflictKey = conflictKey;
+            Priority = AkcssOperationPriority.Style;
+            Order = 0;
+        }
+
+        public string ConflictKey { get; }
+
+        public AkcssOperationPriority Priority { get; }
+
+        public int ApplicationOrder { get; }
+
+        public int Order { get; }
+
+        public bool IsActive(
+            Control target,
+            IReadOnlyList<object?> arguments)
+        {
+            return _operation?.IsActive(target, arguments) ?? true;
+        }
+
+        public void Execute(
+            Control target,
+            IReadOnlyList<object?> arguments)
+        {
+            if (_operation != null)
+            {
+                _operation.Update(target, arguments);
+                return;
+            }
+
+            _legacyApplication!.Execute(target, arguments);
+        }
+
+        public void Reset(Control target)
+        {
+            if (_operation != null)
+            {
+                _operation.Reset(target);
+                return;
+            }
+
+            _legacyApplication!.Utility.Reset(target);
+        }
     }
 
     private sealed class CandidateObserver

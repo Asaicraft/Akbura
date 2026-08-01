@@ -41,6 +41,7 @@ internal static class AkcssGenerator
     private const string RuntimeStyleType = "global::Akbura.Akcss.AkcssStyle";
     private const string RuntimeClassType = "global::Akbura.Akcss.AkcssClass";
     private const string RuntimeUtilityType = "global::Akbura.Akcss.AkcssUtility";
+    private const string RuntimeUtilityOperationType = "global::Akbura.Akcss.AkcssUtilityOperation";
     private const string RuntimeZeroUtilityType = "global::Akbura.Akcss.ZeroAkcssUtility";
     private const string StyleNameAttribute = "global::Akbura.CompilerAnotations.StyleNameAttribute";
     private const string InlinedStyleAttribute = "global::Akbura.CompilerAnotations.InlinedStyleAttribute";
@@ -1799,6 +1800,14 @@ internal static class AkcssGenerator
             .Append(" : ").AppendLine(baseType);
         source.AppendLine("        {");
 
+        var operationPlans = CreateUtilityOperationPlans(
+            symbol,
+            sourceMap);
+        AppendUtilityOperationCollection(
+            source,
+            index,
+            operationPlans);
+
         if (symbol.Parameters.Length <= 16)
         {
             source.Append("            public override void Update(object ").Append(targetName);
@@ -1828,7 +1837,648 @@ internal static class AkcssGenerator
             sourceMap);
         source.AppendLine("            }");
         AppendResetMethod(source, symbol, sourceMap);
+
+        for (var operationIndex = 0;
+             operationIndex < operationPlans.Count;
+             operationIndex++)
+        {
+            source.AppendLine();
+            AppendUtilityOperationType(
+                source,
+                symbol,
+                operationPlans[operationIndex],
+                operationIndex,
+                sourceMap);
+        }
+
         source.AppendLine("        }");
+    }
+
+    private static void AppendUtilityOperationCollection(
+        StringBuilder source,
+        int styleIndex,
+        List<UtilityOperationPlan> operations)
+    {
+        if (operations.Count == 0)
+        {
+            return;
+        }
+
+        source.Append("            private readonly global::System.Collections.Immutable.ImmutableArray<")
+            .Append(RuntimeUtilityOperationType)
+            .AppendLine("> __operations;");
+        source.AppendLine();
+        source.Append("            public Style_")
+            .Append(styleIndex)
+            .AppendLine("()");
+        source.AppendLine("            {");
+        source.Append("                __operations = global::System.Collections.Immutable.ImmutableArray.Create<")
+            .Append(RuntimeUtilityOperationType)
+            .AppendLine(">");
+        source.AppendLine("                (");
+        for (var index = 0; index < operations.Count; index++)
+        {
+            source.Append("                    new Operation_")
+                .Append(index)
+                .Append("(this)")
+                .AppendLine(index == operations.Count - 1 ? string.Empty : ",");
+        }
+
+        source.AppendLine("                );");
+        source.AppendLine("            }");
+        source.AppendLine();
+        source.Append("            public override global::System.Collections.Immutable.ImmutableArray<")
+            .Append(RuntimeUtilityOperationType)
+            .AppendLine("> Operations => __operations;");
+        source.AppendLine();
+    }
+
+    private static List<UtilityOperationPlan> CreateUtilityOperationPlans(
+        ITailwindUtilitySymbol symbol,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        var result = new List<UtilityOperationPlan>();
+        var frames = new List<UtilityOperationFrame>();
+        var order = 0;
+        CollectUtilityOperationPlans(
+            symbol.Operations,
+            result,
+            frames,
+            ref order,
+            GeneratedAkcssOperationPriority.Style,
+            new HashSet<IAkcssSymbol>
+            {
+                sourceMap.GetGenerationSymbol(symbol),
+            },
+            sourceMap);
+        return result;
+    }
+
+    private static void CollectUtilityOperationPlans(
+        ImmutableArray<IAkcssOperation> operations,
+        List<UtilityOperationPlan> result,
+        List<UtilityOperationFrame> frames,
+        ref int order,
+        GeneratedAkcssOperationPriority priority,
+        HashSet<IAkcssSymbol> expansionPath,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        foreach (var operation in operations)
+        {
+            if (operation.HasErrors)
+            {
+                continue;
+            }
+
+            switch (operation)
+            {
+                case IAkcssPropertySetterOperation
+                {
+                    Property: { CanWrite: true } property,
+                } setter when GetUtilityOperationConflictKey(property) is { } conflictKey:
+                    result.Add(
+                        new UtilityOperationPlan(
+                            setter,
+                            conflictKey,
+                            GetEffectiveOperationPriority(
+                                setter,
+                                priority),
+                            order++,
+                            [.. frames]));
+                    break;
+
+                case IAkcssIfOperation ifOperation:
+                    frames.Add(
+                        new UtilityIfOperationFrame(
+                            ifOperation));
+                    CollectUtilityOperationPlans(
+                        ifOperation.Operations,
+                        result,
+                        frames,
+                        ref order,
+                        GeneratedAkcssOperationPriority.StyleTrigger,
+                        expansionPath,
+                        sourceMap);
+                    frames.RemoveAt(frames.Count - 1);
+                    break;
+
+                case IAkcssApplyOperation applyOperation:
+                    CollectAppliedUtilityOperationPlans(
+                        applyOperation,
+                        result,
+                        frames,
+                        ref order,
+                        priority,
+                        expansionPath,
+                        sourceMap);
+                    break;
+            }
+        }
+    }
+
+    private static void CollectAppliedUtilityOperationPlans(
+        IAkcssApplyOperation operation,
+        List<UtilityOperationPlan> result,
+        List<UtilityOperationFrame> frames,
+        ref int order,
+        GeneratedAkcssOperationPriority priority,
+        HashSet<IAkcssSymbol> expansionPath,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        if (operation is IMetadataAkcssApplyOperation metadataApply)
+        {
+            CollectUtilityOperationPlans(
+                metadataApply.ExpandedOperations,
+                result,
+                frames,
+                ref order,
+                priority,
+                expansionPath,
+                sourceMap);
+            return;
+        }
+
+        for (var index = 0;
+             index < operation.AppliedSymbols.Length;
+             index++)
+        {
+            var generationSymbol = sourceMap.GetGenerationSymbol(
+                operation.AppliedSymbols[index]);
+            if (!expansionPath.Add(generationSymbol))
+            {
+                continue;
+            }
+
+            var hasFrame = false;
+            if (generationSymbol is ITailwindUtilitySymbol
+                {
+                    Parameters.Length: > 0,
+                } utility)
+            {
+                var item = index < operation.Items.Length
+                    ? operation.Items[index]
+                    : string.Empty;
+                if (!TryCreateApplyArgumentExpressions(
+                        item,
+                        utility,
+                        operation.ContainingAkcssSymbol,
+                        out var arguments))
+                {
+                    expansionPath.Remove(generationSymbol);
+                    continue;
+                }
+
+                frames.Add(
+                    new UtilityApplyOperationFrame(
+                        utility,
+                        arguments));
+                hasFrame = true;
+            }
+
+            CollectUtilityOperationPlans(
+                generationSymbol.Operations,
+                result,
+                frames,
+                ref order,
+                priority,
+                expansionPath,
+                sourceMap);
+
+            if (hasFrame)
+            {
+                frames.RemoveAt(frames.Count - 1);
+            }
+
+            expansionPath.Remove(generationSymbol);
+        }
+    }
+
+    private static GeneratedAkcssOperationPriority GetEffectiveOperationPriority(
+        IAkcssPropertySetterOperation operation,
+        GeneratedAkcssOperationPriority priority)
+    {
+        if (priority == GeneratedAkcssOperationPriority.StyleTrigger ||
+            operation is IMetadataAkcssOperation
+            {
+                Priority: MetadataAkcssOperationPriority.StyleTrigger,
+            })
+        {
+            return GeneratedAkcssOperationPriority.StyleTrigger;
+        }
+
+        return GeneratedAkcssOperationPriority.Style;
+    }
+
+    private static string? GetUtilityOperationConflictKey(
+        AkburaPropertySymbol property)
+    {
+        var avaloniaProperty =
+            GetStaticMemberReference(
+                property.AvaloniaPropertyDefinition.Symbol) ??
+            GetStaticMemberReference(
+                property.AttachedPropertyDefinition.Symbol) ??
+            (property.WriteKind == PropertyAccessKind.AvaloniaProperty
+                ? GetStaticMemberReference(
+                    property.WriteDefinition.Symbol)
+                : null);
+        if (avaloniaProperty != null)
+        {
+            return "property:" + avaloniaProperty;
+        }
+
+        if (property.WriteKind == PropertyAccessKind.AttachedAccessor &&
+            (property.WriteDefinition.Symbol as RoslynMethodSymbol ??
+             property.AttachedSetterDefinition.Symbol as RoslynMethodSymbol)
+            is { } setter)
+        {
+            var targetType = setter.Parameters.Length > 0
+                ? GetTypeName(setter.Parameters[0].Type)
+                : "global::System.Object";
+            return "attached:" + GetMethodReference(setter) +
+                "(" + targetType + ")";
+        }
+
+        if (property.WriteKind == PropertyAccessKind.ClrProperty &&
+            property.WriteDefinition.Symbol is
+                RoslynPropertySymbol clrProperty)
+        {
+            while (clrProperty.OverriddenProperty != null)
+            {
+                clrProperty = clrProperty.OverriddenProperty;
+            }
+
+            return "clr:" +
+                GetTypeName(clrProperty.ContainingType) + "." +
+                clrProperty.MetadataName;
+        }
+
+        return null;
+    }
+
+    private static void AppendUtilityOperationType(
+        StringBuilder source,
+        ITailwindUtilitySymbol rootUtility,
+        UtilityOperationPlan plan,
+        int operationIndex,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        source.Append("            private sealed class Operation_")
+            .Append(operationIndex)
+            .Append(" : ")
+            .AppendLine(RuntimeUtilityOperationType);
+        source.AppendLine("            {");
+        source.Append("                public Operation_")
+            .Append(operationIndex)
+            .Append('(')
+            .Append(RuntimeUtilityType)
+            .AppendLine(" utility)");
+        source.Append("                    : base(utility, ")
+            .Append(ToStringLiteral(plan.ConflictKey))
+            .Append(", ")
+            .Append(RuntimeAkcssOperationPriority)
+            .Append('.')
+            .Append(plan.Priority)
+            .Append(", ")
+            .Append(plan.Order.ToString(CultureInfo.InvariantCulture))
+            .AppendLine(")");
+        source.AppendLine("                {");
+        source.AppendLine("                }");
+        source.AppendLine();
+
+        AppendUtilityOperationIsActive(
+            source,
+            rootUtility,
+            plan);
+        source.AppendLine();
+        AppendUtilityOperationUpdate(
+            source,
+            rootUtility,
+            plan,
+            sourceMap);
+        AppendUtilityOperationReset(
+            source,
+            plan);
+        source.AppendLine("            }");
+    }
+
+    private static void AppendUtilityOperationIsActive(
+        StringBuilder source,
+        ITailwindUtilitySymbol rootUtility,
+        UtilityOperationPlan plan)
+    {
+        source.AppendLine("                public override bool IsActive(");
+        source.AppendLine("                    object __target,");
+        source.AppendLine("                    global::System.Collections.Generic.IReadOnlyList<object?> __arguments)");
+        source.AppendLine("                {");
+        source.AppendLine("                    global::System.ArgumentNullException.ThrowIfNull(__target);");
+        source.AppendLine("                    global::System.ArgumentNullException.ThrowIfNull(__arguments);");
+        source.Append("                    if (__arguments.Count != ")
+            .Append(rootUtility.Parameters.Length.ToString(CultureInfo.InvariantCulture))
+            .AppendLine(")");
+        source.AppendLine("                    {");
+        source.AppendLine("                        return false;");
+        source.AppendLine("                    }");
+
+        AppendUtilityArgumentLocals(
+            source,
+            rootUtility,
+            indentation: 5);
+
+        var compatibility = GetUtilityOperationCompatibility(
+            plan);
+        if (!string.Equals(
+                compatibility,
+                "true",
+                StringComparison.Ordinal))
+        {
+            AppendIndentedLine(
+                source,
+                5,
+                $"if (!({compatibility}))");
+            AppendIndentedLine(source, 5, "{");
+            AppendIndentedLine(source, 6, "return false;");
+            AppendIndentedLine(source, 5, "}");
+        }
+
+        var indentation = 5;
+        var openBlocks = 0;
+        foreach (var frame in plan.Frames)
+        {
+            switch (frame)
+            {
+                case UtilityApplyOperationFrame applyFrame:
+                    AppendIndentedLine(source, indentation, "{");
+                    indentation++;
+                    openBlocks++;
+                    AppendApplyArgumentLocals(
+                        source,
+                        applyFrame,
+                        indentation);
+                    break;
+
+                case UtilityIfOperationFrame ifFrame:
+                    var condition = GetIfConditionExpression(
+                        ifFrame.Operation,
+                        "__target");
+                    AppendIndentedLine(
+                        source,
+                        indentation,
+                        $"if (!({condition}))");
+                    AppendIndentedLine(source, indentation, "{");
+                    AppendIndentedLine(
+                        source,
+                        indentation + 1,
+                        "return false;");
+                    AppendIndentedLine(source, indentation, "}");
+                    break;
+            }
+        }
+
+        AppendIndentedLine(source, indentation, "return true;");
+        for (var index = 0; index < openBlocks; index++)
+        {
+            indentation--;
+            AppendIndentedLine(source, indentation, "}");
+        }
+
+        source.AppendLine("                }");
+    }
+
+    private static void AppendUtilityOperationUpdate(
+        StringBuilder source,
+        ITailwindUtilitySymbol rootUtility,
+        UtilityOperationPlan plan,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        source.AppendLine("                public override void Update(");
+        source.AppendLine("                    object __target,");
+        source.AppendLine("                    global::System.Collections.Generic.IReadOnlyList<object?> __arguments)");
+        source.AppendLine("                {");
+        source.AppendLine("                    global::System.ArgumentNullException.ThrowIfNull(__target);");
+        source.AppendLine("                    global::System.ArgumentNullException.ThrowIfNull(__arguments);");
+        AppendUtilityArgumentLocals(
+            source,
+            rootUtility,
+            indentation: 5);
+
+        var indentation = 5;
+        var openBlocks = 0;
+        foreach (var frame in plan.Frames)
+        {
+            if (frame is not UtilityApplyOperationFrame applyFrame)
+            {
+                continue;
+            }
+
+            AppendIndentedLine(source, indentation, "{");
+            indentation++;
+            openBlocks++;
+            AppendApplyArgumentLocals(
+                source,
+                applyFrame,
+                indentation);
+        }
+
+        AppendPropertySetter(
+            source,
+            plan.Setter,
+            "__target",
+            indentation,
+            sourceMap);
+
+        for (var index = 0; index < openBlocks; index++)
+        {
+            indentation--;
+            AppendIndentedLine(source, indentation, "}");
+        }
+
+        source.AppendLine("                }");
+    }
+
+    private static void AppendUtilityOperationReset(
+        StringBuilder source,
+        UtilityOperationPlan plan)
+    {
+        source.AppendLine();
+        source.AppendLine("                public override void Reset(object __target)");
+        source.AppendLine("                {");
+        source.AppendLine("                    global::System.ArgumentNullException.ThrowIfNull(__target);");
+        source.AppendLine("                    base.Reset(__target);");
+
+        var property = plan.Setter.Property;
+        var propertyReference = property == null
+            ? null
+            : GetStaticMemberReference(
+                property.AvaloniaPropertyDefinition.Symbol) ??
+              GetStaticMemberReference(
+                property.AttachedPropertyDefinition.Symbol) ??
+              (property.WriteKind == PropertyAccessKind.AvaloniaProperty
+                  ? GetStaticMemberReference(
+                      property.WriteDefinition.Symbol)
+                  : null);
+        if (propertyReference != null)
+        {
+            var conditions = new List<string>
+            {
+                "__target is global::Avalonia.AvaloniaObject",
+            };
+            var receiverType = GetPropertyReceiverType(property!);
+            if (receiverType is
+                {
+                    SpecialType: not SpecialType.System_Object,
+                })
+            {
+                conditions.Add(
+                    "__target is " + GetTypeName(receiverType));
+            }
+
+            AppendIndentedLine(
+                source,
+                5,
+                $"if ({string.Join(" && ", conditions)})");
+            AppendIndentedLine(source, 5, "{");
+            AppendIndentedLine(
+                source,
+                6,
+                $"((global::Avalonia.AvaloniaObject)__target).ClearValue({propertyReference});");
+            AppendIndentedLine(source, 5, "}");
+        }
+
+        source.AppendLine("                }");
+    }
+
+    private static void AppendUtilityArgumentLocals(
+        StringBuilder source,
+        ITailwindUtilitySymbol utility,
+        int indentation)
+    {
+        foreach (var parameter in utility.Parameters)
+        {
+            var parameterName = GetParameterName(parameter);
+            AppendIndentedLine(
+                source,
+                indentation,
+                $"var {parameterName} = " +
+                $"({GetTypeName(parameter.Type.Symbol)})" +
+                $"__arguments[{parameter.Ordinal.ToString(CultureInfo.InvariantCulture)}]!;");
+            AppendIndentedLine(
+                source,
+                indentation,
+                $"_ = {parameterName};");
+        }
+    }
+
+    private static void AppendApplyArgumentLocals(
+        StringBuilder source,
+        UtilityApplyOperationFrame frame,
+        int indentation)
+    {
+        for (var index = 0;
+             index < frame.Utility.Parameters.Length;
+             index++)
+        {
+            var parameter = frame.Utility.Parameters[index];
+            var parameterName = GetParameterName(parameter);
+            AppendIndentedLine(
+                source,
+                indentation,
+                $"{GetTypeName(parameter.Type.Symbol)} " +
+                $"{parameterName} = " +
+                $"{frame.Arguments[index]};");
+            AppendIndentedLine(
+                source,
+                indentation,
+                $"_ = {parameterName};");
+        }
+    }
+
+    private static string GetUtilityOperationCompatibility(
+        UtilityOperationPlan plan)
+    {
+        var conditions = new List<string>();
+        var conditionSet = new HashSet<string>(StringComparer.Ordinal);
+
+        var operationTargetType = plan.Setter is
+            IMetadataAkcssOperation
+            {
+                MetadataTargetType.Symbol: ITypeSymbol metadataTarget,
+            }
+                ? metadataTarget
+                : GetAkcssTargetType(
+                    plan.Setter.ContainingAkcssSymbol);
+        AddTargetTypeCondition(
+            conditions,
+            conditionSet,
+            operationTargetType);
+        AddTargetTypeCondition(
+            conditions,
+            conditionSet,
+            plan.Setter.Property == null
+                ? null
+                : GetPropertyReceiverType(
+                    plan.Setter.Property));
+
+        var value = GetValueExpression(
+            plan.Setter,
+            "__target",
+            observeDynamicResource: true);
+        if (value.RequiresResourceHost &&
+            conditionSet.Add(
+                "__target is global::Avalonia.Controls.IResourceHost"))
+        {
+            conditions.Add(
+                "__target is global::Avalonia.Controls.IResourceHost");
+        }
+
+        return conditions.Count == 0
+            ? "true"
+            : string.Join(" && ", conditions);
+    }
+
+    private static void AddTargetTypeCondition(
+        List<string> conditions,
+        HashSet<string> conditionSet,
+        ITypeSymbol? targetType)
+    {
+        if (targetType is null or
+            {
+                SpecialType: SpecialType.System_Object,
+            })
+        {
+            return;
+        }
+
+        var condition = "__target is " +
+            GetTypeName(targetType);
+        if (conditionSet.Add(condition))
+        {
+            conditions.Add(condition);
+        }
+    }
+
+    private static string GetIfConditionExpression(
+        IAkcssIfOperation operation,
+        string targetName)
+    {
+        return operation is IMetadataAkcssOperation metadataIf
+            ? RewriteMetadataExpression(
+                metadataIf.Expression,
+                targetName,
+                operation.ContainingAkcssSymbol,
+                identifierValues: null,
+                observeDynamicResource: false).Expression
+            : RewriteExpression(
+                operation.ConditionOperation.Syntax as
+                    CSharpExpressionSyntax ??
+                operation.Syntax?.Condition
+                    .GetRawCSharpExpression(),
+                new AmxExpressionRewriter(
+                    targetName,
+                    observeDynamicResource: false,
+                    GetTargetParameterName(
+                        operation.ContainingAkcssSymbol)),
+                operation.ConditionOperation.Operation?
+                    .SemanticModel);
     }
 
     private static string GetUtilityBaseType(
@@ -2968,6 +3618,65 @@ internal static class AkcssGenerator
         public string KeyExpression { get; }
 
         public string ValueParameterName { get; }
+    }
+
+    private sealed class UtilityOperationPlan
+    {
+        public UtilityOperationPlan(
+            IAkcssPropertySetterOperation setter,
+            string conflictKey,
+            GeneratedAkcssOperationPriority priority,
+            int order,
+            ImmutableArray<UtilityOperationFrame> frames)
+        {
+            Setter = setter;
+            ConflictKey = conflictKey;
+            Priority = priority;
+            Order = order;
+            Frames = frames;
+        }
+
+        public IAkcssPropertySetterOperation Setter { get; }
+
+        public string ConflictKey { get; }
+
+        public GeneratedAkcssOperationPriority Priority { get; }
+
+        public int Order { get; }
+
+        public ImmutableArray<UtilityOperationFrame> Frames { get; }
+    }
+
+    private abstract class UtilityOperationFrame
+    {
+    }
+
+    private sealed class UtilityIfOperationFrame
+        : UtilityOperationFrame
+    {
+        public UtilityIfOperationFrame(
+            IAkcssIfOperation operation)
+        {
+            Operation = operation;
+        }
+
+        public IAkcssIfOperation Operation { get; }
+    }
+
+    private sealed class UtilityApplyOperationFrame
+        : UtilityOperationFrame
+    {
+        public UtilityApplyOperationFrame(
+            ITailwindUtilitySymbol utility,
+            ImmutableArray<string> arguments)
+        {
+            Utility = utility;
+            Arguments = arguments;
+        }
+
+        public ITailwindUtilitySymbol Utility { get; }
+
+        public ImmutableArray<string> Arguments { get; }
     }
 
     private sealed class AkcssOperationMetadataContext

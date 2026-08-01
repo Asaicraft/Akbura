@@ -2946,6 +2946,183 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public async Task Generator_ResolvesUtilityConflictsPerPropertyOperation()
+    {
+        const string component =
+            "using Avalonia.Controls;\n" +
+            "using Demo;\n" +
+            "\n" +
+            "@akcss {\n" +
+            "    @using Akbura;\n" +
+            "    @using Avalonia;\n" +
+            "    @using Avalonia.Controls;\n" +
+            "    @using Avalonia.Media;\n" +
+            "    @using Demo;\n" +
+            "\n" +
+            "    @utilities {\n" +
+            "        ProbeControl.my-w-(double value) {\n" +
+            "            Width: ProbeLog.Value(\"first-width\", Amx.DynamicResource<double>(\"--spacing\") * value);\n" +
+            "            Background: ProbeLog.Brush(\"first-background\", Brushes.Red);\n" +
+            "            Padding: new Thickness(ProbeLog.Value(\"first-padding\", value * 5));\n" +
+            "        }\n" +
+            "\n" +
+            "        ProbeControl.square-(double value) {\n" +
+            "            Width: ProbeLog.Value(\"second-width\", value);\n" +
+            "            @if(IsEnabled == false) {\n" +
+            "                Width: ProbeLog.Value(\"disabled-width\", value * 2);\n" +
+            "            }\n" +
+            "            Height: ProbeLog.Value(\"second-height\", value);\n" +
+            "        }\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "<ProbeControl my-w-10 square-15 />\n";
+        const string csharp =
+            "using Avalonia.Controls;\n" +
+            "using Avalonia.Media;\n" +
+            "using System.Collections.Generic;\n" +
+            "\n" +
+            "namespace Demo\n" +
+            "{\n" +
+            "    public sealed class ProbeControl : Border { }\n" +
+            "\n" +
+            "    public static class ProbeLog\n" +
+            "    {\n" +
+            "        public static List<string> Events { get; } = new();\n" +
+            "        public static double Value(string name, double value)\n" +
+            "        {\n" +
+            "            Events.Add(name);\n" +
+            "            return value;\n" +
+            "        }\n" +
+            "\n" +
+            "        public static IBrush Brush(string name, IBrush value)\n" +
+            "        {\n" +
+            "            Events.Add(name);\n" +
+            "            return value;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "public partial class OperationPriorityView\n" +
+            "{\n" +
+            "    public OperationPriorityView()\n" +
+            "        : base(global::Akbura.Engine.AkburaEngine.Empty) { }\n" +
+            "}\n";
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedOperationPriorityTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "OperationPriorityView.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedSources = Assert.Single(
+            driver.GetRunResult().Results).GeneratedSources;
+        var generatedAkcss = Assert.Single(
+            generatedSources,
+            static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Akcss.",
+                    StringComparison.Ordinal));
+        Assert.Contains(
+            "AkcssUtilityOperation",
+            generatedAkcss.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType = assembly.GetType(
+                    "OperationPriorityView");
+                Assert.NotNull(componentType);
+                var component = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(componentType));
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                window.Show();
+
+                var control = Assert.IsAssignableFrom<Border>(
+                    component.Child);
+                Assert.Equal(15d, control.Width);
+                Assert.Equal(15d, control.Height);
+                Assert.Equal(new Thickness(50d), control.Padding);
+                Assert.Same(
+                    Avalonia.Media.Brushes.Red,
+                    control.Background);
+
+                var logType = assembly.GetType("Demo.ProbeLog");
+                Assert.NotNull(logType);
+                var events = Assert.IsAssignableFrom<IEnumerable<string>>(
+                    logType.GetProperty("Events")!.GetValue(null));
+                Assert.DoesNotContain("first-width", events);
+                Assert.Contains("first-background", events);
+                Assert.Contains("first-padding", events);
+                Assert.Contains("second-width", events);
+                Assert.Contains("second-height", events);
+
+                control.Resources["--spacing"] = 2d;
+                Assert.Equal(15d, control.Width);
+                Assert.DoesNotContain("first-width", events);
+
+                control.IsEnabled = false;
+                Assert.Equal(30d, control.Width);
+                Assert.Contains("disabled-width", events);
+
+                control.IsEnabled = true;
+                Assert.Equal(15d, control.Width);
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Generator_AkcssUtilityMarkupExtension_RecreatesDynamicValueOnUpdate()
     {
         const string component =

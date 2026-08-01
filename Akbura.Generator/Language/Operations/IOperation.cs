@@ -12,7 +12,7 @@ internal interface IOperation : IEquatable<IOperation>
 
     OperationLanguage Language { get; }
 
-    AkburaSyntax Syntax { get; }
+    AkburaSyntax? Syntax { get; }
 
     IOperation? Parent { get; }
 

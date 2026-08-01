@@ -48,6 +48,10 @@ internal sealed class AkcssOperationMetadata
 
     public bool RequiresBrushConversion { get; init; }
 
+    public string? ConstantValue { get; init; }
+
+    public ITypeSymbol? ConstantValueType { get; init; }
+
     public GeneratedAkcssOperationPriority Priority { get; init; }
 
     public bool HasErrors { get; init; }
@@ -69,6 +73,12 @@ internal sealed class AkcssOperationMetadata
     public int ExpandedFromOrder { get; init; } = -1;
 
     public ITypeSymbol? InterceptType { get; init; }
+
+    public string? SourcePath { get; init; }
+
+    public int SourceStart { get; init; } = -1;
+
+    public int SourceLength { get; init; }
 }
 
 internal enum GeneratedAkcssOperationKind

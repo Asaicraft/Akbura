@@ -1,5 +1,4 @@
 using Akbura.FeatureGallery.Markup;
-using Akbura.FeatureGallery.Styles.akcss;
 
 state double spacing = 3;
 

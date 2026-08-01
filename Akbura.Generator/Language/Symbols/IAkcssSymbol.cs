@@ -6,7 +6,7 @@ namespace Akbura.Language.Symbols;
 
 internal interface IAkcssSymbol : ISymbol
 {
-    AkburaSyntax DeclarationSyntax { get; }
+    AkburaSyntax? DeclarationSyntax { get; }
 
     ImmutableArray<IAkcssOperation> Operations { get; }
 

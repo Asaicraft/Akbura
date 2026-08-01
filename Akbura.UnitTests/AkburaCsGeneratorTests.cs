@@ -3,6 +3,7 @@ using Akbura.CompilerAnotations;
 using Akbura.Furioso;
 using Akbura.Language;
 using Akbura.Language.Operations;
+using Akbura.Language.Symbols;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -11,6 +12,7 @@ using Avalonia.VisualTree;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
@@ -3665,7 +3667,10 @@ public sealed class AkburaCsGeneratorTests
         Assert.Contains("AkcssUtility<double>", text, StringComparison.Ordinal);
         Assert.Contains("ResourceNodeExtensions.GetResourceObservable", text, StringComparison.Ordinal);
         Assert.Contains("converter: __resourceValue =>", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("Amx.DynamicResource", text, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.Amx.DynamicResource<global::System.Double>",
+            text,
+            StringComparison.Ordinal);
         Assert.Contains("global::Avalonia.Layout.Layoutable.WidthProperty", text, StringComparison.Ordinal);
         Assert.Contains("global::Avalonia.Controls.Grid.SetColumn", text, StringComparison.Ordinal);
         Assert.Contains("ClearValue", text, StringComparison.Ordinal);
@@ -3737,6 +3742,388 @@ public sealed class AkburaCsGeneratorTests
                 Assert.True(double.IsNaN(target.Width));
             },
             CancellationToken.None);
+    }
+
+    [Fact]
+    public void Generator_AkcssMetadataCarriersSurviveReferenceAssembly()
+    {
+        const string akcss =
+            "@using System;\n" +
+            "@using Avalonia;\n" +
+            "@using Avalonia.Controls;\n" +
+            "@using Akbura;\n" +
+            "@using TestStyles;\n" +
+            "\n" +
+            "Border.surface { Opacity: 0.5; }\n" +
+            "\n" +
+            "Border.card {\n" +
+            "    @apply surface;\n" +
+            "    @if(IsEnabled) {\n" +
+            "        Padding: new Thickness(Math.Pow(2, 3));\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "Button.special { @intercept InterceptStyle; }\n" +
+            "\n" +
+            "@utilities {\n" +
+            "    Control.w-(double value) { Width: value * Amx.DynamicResource<double>(\"--spacing\"); }\n" +
+            "}\n";
+        const string libraryCSharp =
+            "namespace TestStyles;\n" +
+            "public sealed class InterceptStyle : global::Akbura.Akcss.AkcssClass\n" +
+            "{\n" +
+            "    public override void Update(object target) { }\n" +
+            "}\n";
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var references = SymbolTests.CreateAvaloniaReferences();
+        var libraryCompilation = CSharpCompilation.Create(
+            "AkcssMetadataLibrary",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(libraryCSharp, parseOptions),
+            ],
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "LibraryStyles.akcss");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(akcss)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            libraryCompilation,
+            out var generatedLibrary,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            generatedLibrary.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var generatedSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources)
+            .SourceText
+            .ToString();
+        Assert.Contains(
+            "AkcssModuleReferenceAttribute",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "public static class __AkcssMetadata_0",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "public static class __AkcssMetadata_3",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private sealed class Style_0",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains("global::System.Math.Pow(2, 3)", generatedSource, StringComparison.Ordinal);
+
+        using var referenceAssemblyStream = new MemoryStream();
+        var emitResult = generatedLibrary.Emit(
+            referenceAssemblyStream,
+            options: new Microsoft.CodeAnalysis.Emit.EmitOptions(
+                metadataOnly: true,
+                includePrivateMembers: false));
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+
+        var libraryReference = MetadataReference.CreateFromImage(
+            referenceAssemblyStream.ToArray());
+        var consumerCSharpCompilation = CSharpCompilation.Create(
+            "AkcssMetadataConsumer",
+            references: references.Append(libraryReference),
+            options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary)
+                .WithMetadataImportOptions(MetadataImportOptions.Public));
+        var referencedAssembly = Assert.IsAssignableFrom<IAssemblySymbol>(
+            consumerCSharpCompilation.GetAssemblyOrModuleSymbol(
+                libraryReference));
+        var moduleReferenceAttribute = Assert.Single(
+            referencedAssembly.GetAttributes(),
+            static attribute =>
+                attribute.AttributeClass?.ToDisplayString() ==
+                "Akbura.CompilerAnotations.AkcssModuleReferenceAttribute");
+        var moduleType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            Assert.Single(moduleReferenceAttribute.ConstructorArguments).Value);
+        var runtimeStyle = Assert.Single(moduleType.GetTypeMembers("Style_0"));
+        Assert.Equal(Accessibility.Private, runtimeStyle.DeclaredAccessibility);
+
+        var carriers = moduleType.GetTypeMembers()
+            .Where(static type =>
+                type.Name.StartsWith(
+                    "__AkcssMetadata_",
+                    StringComparison.Ordinal))
+            .OrderBy(static type => type.Name)
+            .ToArray();
+        Assert.Equal(4, carriers.Length);
+        Assert.All(
+            carriers,
+            static carrier =>
+                Assert.Equal(
+                    Accessibility.Public,
+                    carrier.DeclaredAccessibility));
+        Assert.All(
+            carriers,
+            static carrier =>
+                Assert.Contains(
+                    carrier.GetAttributes(),
+                    attribute =>
+                        attribute.AttributeClass?.ToDisplayString() ==
+                        "Akbura.CompilerAnotations.AkcssSymbolAttribute"));
+        var utilityCarrier = Assert.Single(
+            carriers,
+            static carrier =>
+                carrier.GetAttributes().Any(
+                    attribute =>
+                        attribute.AttributeClass?.ToDisplayString() ==
+                        "Akbura.CompilerAnotations.AkcssUtilityParameterAttribute"));
+        Assert.Contains(
+            utilityCarrier.GetAttributes(),
+            static attribute =>
+                attribute.AttributeClass?.ToDisplayString() ==
+                "Akbura.CompilerAnotations.AkcssOperationAttribute");
+
+        const string component =
+            "using Avalonia.Controls;\n" +
+            "using LibraryStyles.akcss;\n" +
+            "\n" +
+            "<Border class=\"card\" w-4 />\n";
+        var componentTree = ComponentSyntaxTree.ParseText(
+            component,
+            "Consumer.akbura");
+        var akburaCompilation = new AkburaCompilation(
+            consumerCSharpCompilation,
+            [componentTree]);
+        var semanticModel = akburaCompilation.GetSemanticModel(componentTree);
+        var root = Assert.IsType<Akbura.Language.Syntax.MarkupRootSyntax>(
+            Assert.Single(
+                componentTree.GetRoot().Members,
+                static member => member is Akbura.Language.Syntax.MarkupRootSyntax));
+        var attributes = root.Element.StartTag!.Attributes;
+
+        var classOperation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attributes[0]));
+        var style = Assert.Single(classOperation.AppliedAkcssSymbols);
+        var metadataStyle = Assert.IsAssignableFrom<IMetadataAkcssSymbol>(style);
+        Assert.Equal(1, metadataStyle.RuntimeStyleIndex);
+        Assert.Contains("IsEnabled", metadataStyle.ObservedProperties);
+        Assert.Collection(
+            style.Operations,
+            operation =>
+            {
+                var apply = Assert.IsAssignableFrom<IAkcssApplyOperation>(operation);
+                var metadataApply = Assert.IsAssignableFrom<IMetadataAkcssApplyOperation>(apply);
+                Assert.Equal("surface", Assert.Single(apply.Items));
+                Assert.Equal("Border.surface", Assert.Single(apply.AppliedSymbols).MetadataName);
+                var expandedSetter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+                    Assert.Single(metadataApply.ExpandedOperations));
+                Assert.Equal("Opacity", expandedSetter.Property!.Name);
+                Assert.Null(expandedSetter.Syntax);
+            },
+            operation =>
+            {
+                var condition = Assert.IsAssignableFrom<IAkcssIfOperation>(operation);
+                var metadataCondition = Assert.IsAssignableFrom<IMetadataAkcssOperation>(condition);
+                Assert.Contains("__target", metadataCondition.Expression, StringComparison.Ordinal);
+                Assert.Equal(
+                    SpecialType.System_Boolean,
+                    Assert.IsAssignableFrom<ITypeSymbol>(
+                        condition.ConditionType.Symbol).SpecialType);
+                var styleSetter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+                    Assert.Single(condition.Operations));
+                var metadataStyleSetter = Assert.IsAssignableFrom<IMetadataAkcssOperation>(
+                    styleSetter);
+                Assert.Null(styleSetter.Syntax);
+                Assert.NotNull(styleSetter.Property);
+                Assert.Equal("Padding", styleSetter.Property.Name);
+                Assert.Equal(PropertyAccessKind.AvaloniaProperty, styleSetter.Property.WriteKind);
+                Assert.True(styleSetter.ValueConversion.IsIdentity);
+                Assert.Equal(
+                    "new global::Avalonia.Thickness(global::System.Math.Pow(2, 3))",
+                    metadataStyleSetter.Expression);
+                Assert.EndsWith(
+                    "LibraryStyles.akcss",
+                    metadataStyleSetter.SourcePath,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.True(metadataStyleSetter.SourceSpan.Length > 0);
+            });
+
+        var utilityOperation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attributes[1]));
+        var utility = Assert.Single(utilityOperation.Utilities);
+        var metadataUtility = Assert.IsAssignableFrom<IMetadataAkcssSymbol>(utility);
+        Assert.Equal(3, metadataUtility.RuntimeStyleIndex);
+        var parameter = Assert.Single(utility.Parameters);
+        Assert.Equal("value", parameter.Name);
+        Assert.Equal(
+            SpecialType.System_Double,
+            Assert.IsAssignableFrom<ITypeSymbol>(parameter.Type.Symbol).SpecialType);
+        var utilitySetter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(utility.Operations));
+        var metadataUtilitySetter = Assert.IsAssignableFrom<IMetadataAkcssOperation>(
+            utilitySetter);
+        Assert.Equal("Width", utilitySetter.Property!.Name);
+        Assert.Null(utilitySetter.Syntax);
+        Assert.Equal(
+            "((global::System.Double)__arguments[0]) * global::Akbura.Amx.DynamicResource<global::System.Double>(\"--spacing\")",
+            metadataUtilitySetter.Expression);
+        Assert.False(metadataUtility.OperationAttributes.IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(root.Element).IsEmpty);
+
+        var metadataModule = Assert.Single(
+            akburaCompilation.GetAkcssModuleSymbolsByLogicalName(
+                "LibraryStyles.akcss"));
+        var interceptStyle = Assert.Single(
+            metadataModule.AkcssSymbols,
+            static symbol => symbol.Name == "special");
+        var intercept = Assert.IsAssignableFrom<IAkcssInterceptOperation>(
+            Assert.Single(interceptStyle.Operations));
+        Assert.Null(intercept.Syntax);
+        Assert.Equal(
+            "global::TestStyles.InterceptStyle",
+            intercept.InterceptType.Symbol?.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+
+        const string localComponent =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<Border class=\"local\" />\n";
+        const string localAkcss =
+            "@using Avalonia.Controls;\n" +
+            "@using LibraryStyles.akcss;\n" +
+            "\n" +
+            "Border.local { @apply card w-4; }\n";
+        var consumerDirectory = Path.Combine(
+            Environment.CurrentDirectory,
+            "AkcssMetadataConsumer");
+        GeneratorDriver consumerDriver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(consumerDirectory, "Consumer.akbura"),
+                    SourceText.From(localComponent)),
+                new TestAdditionalText(
+                    Path.Combine(consumerDirectory, "Consumer.akcss"),
+                    SourceText.From(localAkcss)),
+            ],
+            parseOptions: parseOptions);
+        consumerDriver = consumerDriver.RunGeneratorsAndUpdateCompilation(
+            consumerCSharpCompilation,
+            out var generatedConsumer,
+            out var consumerGeneratorDiagnostics);
+        Assert.DoesNotContain(
+            consumerGeneratorDiagnostics,
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            generatedConsumer.GetDiagnostics(),
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var localModuleSource = Assert.Single(
+            Assert.Single(consumerDriver.GetRunResult().Results).GeneratedSources,
+            static source => source.HintName.Contains(
+                "Consumer.akcss",
+                StringComparison.Ordinal));
+        var localModuleText = localModuleSource.SourceText.ToString();
+        Assert.Contains("OpacityProperty", localModuleText, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled", localModuleText, StringComparison.Ordinal);
+        Assert.Contains("PaddingProperty", localModuleText, StringComparison.Ordinal);
+        Assert.Contains("WidthProperty", localModuleText, StringComparison.Ordinal);
+        Assert.Contains("GetResourceObservable", localModuleText, StringComparison.Ordinal);
+        Assert.Contains(
+            "[global::Akbura.CompilerAnotations.ObservesPropertyAttribute(\"IsEnabled\")]",
+            localModuleText,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReferencedAkcssAnnotationsTakePriorityOverMalformedManifest()
+    {
+        const string source =
+            "[assembly: global::Akbura.CompilerAnotations.AkcssModuleReferenceAttribute(" +
+            "typeof(global::TestStyles.GeneratedStyles))]\n" +
+            "namespace TestStyles;\n" +
+            "[global::Akbura.CompilerAnotations.AkcssModuleAttribute(" +
+            "\"Broken.akcss\", MetadataName = \"TestStyles.Broken.akcss\", FormatVersion = 4)]\n" +
+            "public static class GeneratedStyles\n" +
+            "{\n" +
+            "    [global::Akbura.CompilerAnotations.AkcssSymbolAttribute(" +
+            "Name = \"card\", MetadataName = \"Border.card\", " +
+            "Kind = global::Akbura.CompilerAnotations.AkcssSymbolKind.Style, " +
+            "TargetType = typeof(global::Avalonia.Controls.Border), " +
+            "ClassName = \"card\", RuntimeStyleIndex = 0)]\n" +
+            "    public static class __AkcssMetadata_0 { }\n" +
+            "}\n";
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(ReferencedAkcssAnnotationsTakePriorityOverMalformedManifest),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var assemblyPath = Path.Combine(directory, "AnnotatedStyles.dll");
+
+        try
+        {
+            var parseOptions = CSharpParseOptions.Default
+                .WithLanguageVersion(LanguageVersion.Preview);
+            var references = SymbolTests.CreateAvaloniaReferences();
+            var library = CSharpCompilation.Create(
+                "AnnotatedStyles",
+                [CSharpSyntaxTree.ParseText(source, parseOptions)],
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var malformedManifest = new ResourceDescription(
+                AkburaModuleManifest.ResourceName,
+                static () => new MemoryStream(
+                    new byte[] { 1, 2, 3 },
+                    writable: false),
+                isPublic: true);
+            var emitResult = library.Emit(
+                assemblyPath,
+                manifestResources: [malformedManifest]);
+            Assert.True(
+                emitResult.Success,
+                string.Join(Environment.NewLine, emitResult.Diagnostics));
+
+            var libraryReference = MetadataReference.CreateFromFile(assemblyPath);
+            var consumer = CSharpCompilation.Create(
+                "Consumer",
+                references: references.Append(libraryReference),
+                options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+            var compilation = new AkburaCompilation(
+                consumer,
+                ImmutableArray<AkburaSyntaxTree>.Empty);
+
+            var module = Assert.Single(
+                compilation.GetAkcssModuleSymbolsByLogicalName("Broken.akcss"));
+            var style = Assert.Single(module.AkcssSymbols);
+            Assert.Equal("card", style.Name);
+            Assert.Equal("Border.card", style.MetadataName);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
     }
 
     [Fact]

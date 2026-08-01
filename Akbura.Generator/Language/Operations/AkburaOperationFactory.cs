@@ -168,7 +168,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         AkcssBodyMemberSyntax syntax,
         IAkcssSymbol containingSymbol)
     {
-        if (context.GetBinder(containingSymbol.DeclarationSyntax, BinderUsage.Akcss) is AkcssStyleBinder binder)
+        if (containingSymbol.DeclarationSyntax is { } declarationSyntax &&
+            context.GetBinder(declarationSyntax, BinderUsage.Akcss) is AkcssStyleBinder binder)
         {
             return binder.BindAkcssOperation(syntax, containingSymbol);
         }

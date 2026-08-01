@@ -93,6 +93,12 @@ internal sealed class AkburaCompilationReference
         return Compilation.GetAkcssSyntaxTreesByLogicalName(logicalName);
     }
 
+    internal ImmutableArray<IAkcssModuleSymbol> GetAkcssModuleSymbolsByLogicalName(
+        string logicalName)
+    {
+        return Compilation.GetExportedAkcssModuleSymbolsByLogicalName(logicalName);
+    }
+
     internal bool ContainsComponentSyntaxTree(AkburaSyntaxTree syntaxTree)
     {
         return Compilation.ContainsComponentSyntaxTree(syntaxTree);

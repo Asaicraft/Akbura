@@ -5,7 +5,7 @@ namespace Akbura.Language.Operations;
 
 internal interface IAkcssInterceptOperation : IAkcssOperation
 {
-    new AkcssInterceptDirectiveSyntax Syntax { get; }
+    new AkcssInterceptDirectiveSyntax? Syntax { get; }
 
     CSharpSymbolDefinition InterceptType { get; }
 }

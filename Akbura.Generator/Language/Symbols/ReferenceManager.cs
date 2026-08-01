@@ -228,6 +228,31 @@ internal sealed partial class AkburaCompilation
             return builder.ToImmutable();
         }
 
+        public ImmutableArray<IAkcssModuleSymbol> GetAkcssModuleSymbolsByLogicalName(
+            string logicalName)
+        {
+            using var builder = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+            foreach (var reference in _compilationReferences)
+            {
+                builder.AddRange(reference.GetAkcssModuleSymbolsByLogicalName(logicalName));
+            }
+
+            var referencedCompilations = builder.ToImmutable();
+            if (referencedCompilations.Length > 0)
+            {
+                return referencedCompilations;
+            }
+
+            using var metadataModules = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+            foreach (var module in Modules)
+            {
+                metadataModules.AddRange(
+                    module.GetAkcssModuleSymbolsByLogicalName(logicalName));
+            }
+
+            return metadataModules.ToImmutable();
+        }
+
         public bool TryGetComponentDeclaration(
             AkburaSyntaxTree syntaxTree,
             out AkburaModuleDeclaration declaration)

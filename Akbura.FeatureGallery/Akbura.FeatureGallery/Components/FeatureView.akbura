@@ -1,5 +1,4 @@
-﻿using Akbura.FeatureGallery.Styles.akcss;
-using Akbura.Hooks;
+﻿using Akbura.Hooks;
 using AvaloniaEdit;
 using AvaloniaEdit.Highlighting;
 

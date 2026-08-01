@@ -13,5 +13,5 @@ internal interface IAkcssModuleSymbol : ISymbol
 
     string? Path { get; }
 
-    AkburaSyntax DeclaringSyntax { get; }
+    AkburaSyntax? DeclaringSyntax { get; }
 }

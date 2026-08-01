@@ -27,22 +27,30 @@ internal sealed class AkcssGenerationSourceMap
     {
         foreach (var symbol in module.AkcssSymbols)
         {
-            _symbolsBySyntax[symbol.DeclarationSyntax] = symbol;
+            if (symbol.DeclarationSyntax is { } syntax)
+            {
+                _symbolsBySyntax[syntax] = symbol;
+            }
         }
     }
 
     public IAkcssSymbol GetGenerationSymbol(IAkcssSymbol symbol)
     {
-        if (_symbolsBySyntax.TryGetValue(symbol.DeclarationSyntax, out var registered))
+        if (symbol.DeclarationSyntax is not { } declarationSyntax)
+        {
+            return symbol;
+        }
+
+        if (_symbolsBySyntax.TryGetValue(declarationSyntax, out var registered))
         {
             return registered;
         }
 
         foreach (var pair in _symbolsBySyntax)
         {
-            if (ReferenceEquals(pair.Key.Root, symbol.DeclarationSyntax.Root) &&
-                pair.Key.Kind == symbol.DeclarationSyntax.Kind &&
-                pair.Key.FullSpan == symbol.DeclarationSyntax.FullSpan)
+            if (ReferenceEquals(pair.Key.Root, declarationSyntax.Root) &&
+                pair.Key.Kind == declarationSyntax.Kind &&
+                pair.Key.FullSpan == declarationSyntax.FullSpan)
             {
                 return pair.Value;
             }
@@ -56,9 +64,45 @@ internal sealed class AkcssGenerationSourceMap
         out LinePositionSpan lineSpan,
         out string path)
     {
-        if (!_syntaxTreesByRoot.TryGetValue(syntax.Root, out var syntaxTree))
+        if (!TryGetSourceSpan(syntax, out var sourceSpan, out path) ||
+            !_syntaxTreesByRoot.TryGetValue(syntax.Root, out var syntaxTree))
         {
             lineSpan = default;
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(path) ||
+            path.IndexOf('"') >= 0 ||
+            path.IndexOf('\r') >= 0 ||
+            path.IndexOf('\n') >= 0 ||
+            sourceSpan.Length == 0 ||
+            (uint)sourceSpan.Start > (uint)syntaxTree.Text.Length ||
+            (uint)sourceSpan.End > (uint)syntaxTree.Text.Length)
+        {
+            lineSpan = default;
+            path = string.Empty;
+            return false;
+        }
+
+        lineSpan = syntaxTree.Text.Lines.GetLinePositionSpan(sourceSpan);
+        if (!IsValidLineSpan(lineSpan))
+        {
+            lineSpan = default;
+            path = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool TryGetSourceSpan(
+        AkburaSyntax syntax,
+        out TextSpan span,
+        out string path)
+    {
+        if (!_syntaxTreesByRoot.TryGetValue(syntax.Root, out var syntaxTree))
+        {
+            span = default;
             path = string.Empty;
             return false;
         }
@@ -68,29 +112,11 @@ internal sealed class AkcssGenerationSourceMap
             AkcssSyntaxTree { FilePath.Length: 0 } akcssTree => akcssTree.LogicalName,
             _ => syntaxTree.FilePath,
         };
-        var span = syntax.Span;
-        if (string.IsNullOrWhiteSpace(path) ||
-            path.IndexOf('"') >= 0 ||
-            path.IndexOf('\r') >= 0 ||
-            path.IndexOf('\n') >= 0 ||
-            span.Length == 0 ||
-            (uint)span.Start > (uint)syntaxTree.Text.Length ||
-            (uint)span.End > (uint)syntaxTree.Text.Length)
-        {
-            lineSpan = default;
-            path = string.Empty;
-            return false;
-        }
-
-        lineSpan = syntaxTree.Text.Lines.GetLinePositionSpan(span);
-        if (!IsValidLineSpan(lineSpan))
-        {
-            lineSpan = default;
-            path = string.Empty;
-            return false;
-        }
-
-        return true;
+        span = syntax.Span;
+        return !string.IsNullOrWhiteSpace(path) &&
+            span.Length > 0 &&
+            (uint)span.Start <= (uint)syntaxTree.Text.Length &&
+            (uint)span.End <= (uint)syntaxTree.Text.Length;
     }
 
     private static bool IsValidLineSpan(LinePositionSpan lineSpan)

@@ -6,7 +6,7 @@ namespace Akbura.Language.Operations;
 
 internal interface IAkcssApplyOperation : IAkcssOperation
 {
-    new AkcssApplyDirectiveSyntax Syntax { get; }
+    new AkcssApplyDirectiveSyntax? Syntax { get; }
 
     ImmutableArray<string> Items { get; }
 

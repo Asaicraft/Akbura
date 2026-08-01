@@ -372,6 +372,11 @@ public sealed class AkcssOperationAttribute : Attribute
     /// <c>global::</c> prefix.
     /// </para>
     /// <para>
+    /// Generated metadata uses <c>__target</c> for the style target and
+    /// <c>__arguments[ordinal]</c> for utility arguments. Source-level target
+    /// and parameter names must not remain in this expression.
+    /// </para>
+    /// <para>
     /// The expression must not depend on AKCSS or C# <c>using</c> directives,
     /// aliases, or the namespace containing the generated code.
     /// </para>

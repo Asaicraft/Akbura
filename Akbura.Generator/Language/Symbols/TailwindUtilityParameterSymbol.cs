@@ -46,6 +46,10 @@ internal sealed class TailwindUtilityParameterSymbol : Symbol, ITailwindUtilityP
 
     public IParameterSymbol? CSharpParameter { get; }
 
+    public string CSharpName => CSharpParameter?.Name ?? Name;
+
+    public bool IsOptional => CSharpParameter?.IsOptional == true;
+
     public override CSharpSymbolDefinition CSharpDefinition => CSharpParameter == null
         ? default
         : new CSharpSymbolDefinition(CSharpParameter);

@@ -1,6 +1,4 @@
 using Akbura.Hooks;
-using Akbura.FeatureGallery.Styles.akcss;
-
 using Avalonia.Media;
 
 param string Content = "";

@@ -1,0 +1,1068 @@
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+    <title>Utility Variants</title>
+
+    <script>
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
+    </script>
+
+    <link rel="stylesheet" href="css/app.css">
+
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+    <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+        <div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+            <div class="flex h-16 justify-between">
+                <div class="flex">
+                    <div class="flex flex-shrink-0 items-center">
+                        <a class="mr-2 lg:mr-8 flex items-center" href="./">
+                            <svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13" /></svg>
+                            <span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+                        </a>
+                    </div>
+                    <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+                        <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+                                <a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                                    Akbura
+                                </a>
+                                <a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+                                    Akcss
+                                </a>
+                                <a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                                    What's New
+                                </a>
+                    </div>
+                </div>
+                <div class="hidden gap-8 sm:ml-6 sm:flex sm:items-center">
+                    <a href="https://asaicraft.github.io/Akbura/Gallery"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        Gallery
+                    </a>
+
+                    <a href="https://github.com/Asaicraft/Akbura"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       aria-label="Akbura on GitHub"
+                       title="GitHub"
+                       class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+                        <svg class="h-6 w-6"
+                             viewBox="0 0 24 24"
+                             fill="currentColor"
+                             aria-hidden="true">
+                            <path fill-rule="evenodd"
+                                  d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.167 6.839 9.49.5.092.682-.217.682-.482 0-.237-.009-.866-.014-1.7-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.461-1.11-1.461-.908-.62.069-.608.069-.608 1.003.071 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.091-.646.349-1.087.635-1.337-2.221-.253-4.555-1.111-4.555-4.944 0-1.092.39-1.985 1.029-2.684-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.748-1.025 2.748-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.684 0 3.842-2.337 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.337-.012 2.415-.012 2.744 0 .267.18.578.688.48A10.003 10.003 0 0 0 22 12c0-5.523-4.477-10-10-10Z"
+                                  clip-rule="evenodd" />
+                        </svg>
+                    </a>
+
+                    <dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+                </div>
+                <div class="-mr-2 flex items-center sm:hidden">
+                    <!-- Mobile menu button -->
+                    <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+                        <span class="sr-only">Open main menu</span>
+                        <!-- Menu open: "hidden", Menu closed: "block" -->
+                        <svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        </svg>
+                        <!-- Menu open: "block", Menu closed: "hidden" -->
+                        <svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile menu, show/hide based on menu state. -->
+        <div v-cloak v-if="open" class="sm:hidden">
+            <div class="space-y-1 pb-3 pt-2">
+                <!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+                        <a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                            Akbura
+                        </a>
+                        <a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+                            Akcss
+                        </a>
+                        <a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                            What's New
+                        </a>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<script type="module">
+    import { ref } from "vue"
+    import { mount } from "app.mjs"
+
+    const Header = {
+        setup() {
+            const open = ref(false)
+            return { open }
+        }
+    }
+    mount('#header', Header)
+</script>
+
+
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            
+
+
+
+
+<style>
+.active {
+	color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="css/highlight.css">
+<link rel="stylesheet" href="css/typography.css">
+<link rel="stylesheet" href="css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+	<div class="flex flex-wrap">
+		<div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+			<button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+				<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+			</button>
+			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+								<a href="https://asaicraft.github.io/Akbura/akcss/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+AKCSS									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/getting-started" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Getting Started
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/markup-extensions" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Markup Extensions
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Custom Class Styles
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/inline-akcss" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Inline AKCSS
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/utilities" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Utilities
+									</a>
+								</li>
+						</ul>
+								<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="block flex items-center whitespace-nowrap">
+									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+Built-in Styles									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/spacing" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Margin and Padding
+									</a>
+								</li>
+						</ul>
+				</nav>
+			</div>
+		</div>
+		<div id="doc" class="mx-auto flex">
+			<div class="mt-8 mx-auto prose lg:prose-lg">
+				
+					<section class="not-prose mb-16 md:mb-12">
+						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+							Utility Variants
+						</h1>
+					</section>
+
+				<div class="not-prose"></div>
+
+				<div class="content">
+					<h2 id="utility-variants">Utility variants<a class="header-anchor" href="javascript:;" onclick="location.hash='#utility-variants'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A utility variant is a markup extension that controls whether a prefixed AKCSS
+utility is currently active.</p>
+<pre><code class="language-akbura">using Akbura.Markup;
+
+&lt;Border p-1
+        ${sm}:p-2
+        ${md}:p-3
+        ${lg}:p-4 /&gt;
+</code></pre>
+<p>In this example, <code>${sm}</code>, <code>${md}</code>, and <code>${lg}</code> are utility variants.</p>
+<p>A variant extension must return one of these types from <code>ProvideValue</code>:</p>
+<ul>
+<li><code>bool</code></li>
+<li><code>IObservable&lt;bool&gt;</code></li>
+</ul>
+<p>A candidate participates in the AKCSS cascade only while the returned value is
+<code>true</code>.</p>
+<p>When an observable has not produced a value yet, or when its latest value is
+<code>false</code>, the candidate is excluded. Another utility can then provide the
+property value.</p>
+<h2 id="declaring-a-variant">Declaring a variant<a class="header-anchor" href="javascript:;" onclick="location.hash='#declaring-a-variant'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Mark the markup extension class with <code>UtilityVariantAttribute</code>:</p>
+<pre><code class="language-csharp">using Akbura.Markup;
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = &quot;WindowBreakpoints&quot;,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class WideExtension
+{
+    public IObservable&lt;bool&gt; ProvideValue(IServiceProvider services)
+    {
+        // Return whether the variant is currently active.
+    }
+}
+</code></pre>
+<p>The <code>Extension</code> suffix is omitted in markup:</p>
+<pre><code class="language-akbura">using Demo.Markup;
+
+&lt;Border p-2
+        ${Wide}:p-6 /&gt;
+</code></pre>
+<p>Variant names follow the normal markup extension lookup rules. The namespace
+containing the extension must be imported explicitly.</p>
+<h2 id="conflict-resolution-is-property-based">Conflict resolution is property-based<a class="header-anchor" href="javascript:;" onclick="location.hash='#conflict-resolution-is-property-based'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Utilities do not conflict simply because they have similar names, use the same
+variant, or belong to the same conflict group.</p>
+<p>Akbura expands every utility into individual property-writing operations and
+resolves each target property independently.</p>
+<p>For example, suppose one utility writes:</p>
+<pre><code class="language-text">Width
+Background
+Padding
+</code></pre>
+<p>and another utility writes:</p>
+<pre><code class="language-text">Width
+Height
+</code></pre>
+<p>Only the two <code>Width</code> operations compete.</p>
+<p>The following operations remain active independently:</p>
+<pre><code class="language-text">Background
+Padding
+Height
+</code></pre>
+<p>This also means that assigning two variants to the same <code>ConflictGroup</code> does
+not make unrelated utilities conflict.</p>
+<h2 id="resolution-algorithm">Resolution algorithm<a class="header-anchor" href="javascript:;" onclick="location.hash='#resolution-algorithm'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For each target property, Akbura resolves active utility operations in the
+following order.</p>
+<h3 id="exclude-inactive-candidates">1. Exclude inactive candidates<a class="header-anchor" href="javascript:;" onclick="location.hash='#exclude-inactive-candidates'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>A prefixed candidate is excluded when its variant returns <code>false</code> or when its
+observable has not produced a value yet.</p>
+<h3 id="respect-akcss-operation-priority">2. Respect AKCSS operation priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#respect-akcss-operation-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Variant ordering is considered only when candidates write the same target
+property and have the same AKCSS operation priority.</p>
+<p>For example, a regular style operation and an active style-trigger operation
+are not made equal merely because their variants share a conflict group.</p>
+<h3 id="resolve-candidates-inside-each-conflict-group">3. Resolve candidates inside each conflict group<a class="header-anchor" href="javascript:;" onclick="location.hash='#resolve-candidates-inside-each-conflict-group'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Active prefixed candidates with the same non-empty <code>ConflictGroup</code> are ordered
+by <code>Order</code>.</p>
+<p>The candidate with the greater value wins:</p>
+<pre><code class="language-text">Order 20 &gt; Order 10 &gt; Order 1
+</code></pre>
+<p>When two candidates have the same <code>Order</code>, the candidate written later in
+markup wins.</p>
+<h3 id="compare-different-groups-by-source-order">4. Compare different groups by source order<a class="header-anchor" href="javascript:;" onclick="location.hash='#compare-different-groups-by-source-order'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p><code>Order</code> is not a global priority.</p>
+<p>Winners from different conflict groups are compared by their position in
+markup.</p>
+<p>Candidates without a conflict group are also compared by source order.</p>
+<p>For example, an <code>Order</code> of <code>1000</code> in one group does not automatically beat an
+<code>Order</code> of <code>1</code> from another group.</p>
+<h3 id="compare-the-prefixed-winner-with-the-unprefixed-candidate">5. Compare the prefixed winner with the unprefixed candidate<a class="header-anchor" href="javascript:;" onclick="location.hash='#compare-the-prefixed-winner-with-the-unprefixed-candidate'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>After Akbura selects the winning prefixed candidate, it compares that candidate
+with the last unprefixed candidate writing the same property.</p>
+<p>This comparison is controlled by <code>UnprefixedPrecedence</code>.</p>
+<h2 id="utilityvariantattribute">UtilityVariantAttribute<a class="header-anchor" href="javascript:;" onclick="location.hash='#utilityvariantattribute'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<pre><code class="language-csharp">[AttributeUsage(
+    AttributeTargets.Class,
+    Inherited = false,
+    AllowMultiple = false)]
+public sealed class UtilityVariantAttribute : Attribute
+</code></pre>
+<p>The attribute can be applied once to a markup extension class.</p>
+<h3 id="order">Order<a class="header-anchor" href="javascript:;" onclick="location.hash='#order'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-csharp">public double Order { get; }
+</code></pre>
+<p><code>Order</code> controls priority between active prefixed candidates only when all of
+the following conditions are true:</p>
+<ol>
+<li>The candidates write the same target property.</li>
+<li>The operations have the same AKCSS operation priority.</li>
+<li>Both variants have the same non-empty <code>ConflictGroup</code>.</li>
+</ol>
+<p>The greater value wins.</p>
+<p>When values are equal, source order is used.</p>
+<p><code>Order</code> is ignored:</p>
+<ul>
+<li>between different conflict groups;</li>
+<li>when one or both variants have no group;</li>
+<li>when comparing a prefixed candidate with an unprefixed candidate.</li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-csharp">[UtilityVariant(
+    10d,
+    ConflictGroup = &quot;Breakpoints&quot;)]
+public sealed class MediumExtension
+{
+}
+</code></pre>
+<pre><code class="language-csharp">[UtilityVariant(
+    20d,
+    ConflictGroup = &quot;Breakpoints&quot;)]
+public sealed class LargeExtension
+{
+}
+</code></pre>
+<p>While both variants are active, <code>LargeExtension</code> wins conflicting property
+operations because <code>20</code> is greater than <code>10</code>.</p>
+<h3 id="conflictgroup">ConflictGroup<a class="header-anchor" href="javascript:;" onclick="location.hash='#conflictgroup'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-csharp">public string? ConflictGroup { get; init; }
+</code></pre>
+<p><code>ConflictGroup</code> identifies variants whose active candidates can be ordered by
+<code>Order</code>.</p>
+<pre><code class="language-csharp">[UtilityVariant(
+    10d,
+    ConflictGroup = &quot;Breakpoints&quot;)]
+</code></pre>
+<p>The group only affects operations that already conflict.</p>
+<p>It does not create a conflict between unrelated properties.</p>
+<p>A <code>null</code>, empty, or whitespace value means that the variant has no ordered
+group. Such candidates are compared with other groups by source order.</p>
+<p>Use the same group for variants that represent ordered alternatives, such as:</p>
+<ul>
+<li>minimum-width breakpoints;</li>
+<li>maximum-width breakpoints;</li>
+<li>mutually ordered interaction modes;</li>
+<li>ordered accessibility modes.</li>
+</ul>
+<p>Use different groups when the variants represent independent conditions whose
+relative priority should remain controlled by markup order.</p>
+<h3 id="unprefixedprecedence">UnprefixedPrecedence<a class="header-anchor" href="javascript:;" onclick="location.hash='#unprefixedprecedence'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-csharp">public UnprefixedUtilityPrecedence UnprefixedPrecedence
+{
+    get;
+    init;
+}
+</code></pre>
+<p>This setting controls how the winning active prefixed candidate competes with
+the last unprefixed candidate that writes the same property.</p>
+<p>The default is:</p>
+<pre><code class="language-csharp">UnprefixedUtilityPrecedence.SourceOrder
+</code></pre>
+<p>The setting is applied only after the prefixed winner has been selected.</p>
+<h2 id="unprefixedutilityprecedence">UnprefixedUtilityPrecedence<a class="header-anchor" href="javascript:;" onclick="location.hash='#unprefixedutilityprecedence'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<h3 id="below">Below<a class="header-anchor" href="javascript:;" onclick="location.hash='#below'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-csharp">UnprefixedUtilityPrecedence.Below
+</code></pre>
+<p>The unprefixed candidate always wins while both candidates are active.</p>
+<p>Markup order does not matter.</p>
+<pre><code class="language-akbura">&lt;Border ${custom}:p-6
+        p-2 /&gt;
+</code></pre>
+<pre><code class="language-akbura">&lt;Border p-2
+        ${custom}:p-6 /&gt;
+</code></pre>
+<p>In both cases, <code>p-2</code> wins.</p>
+<h3 id="sourceorder">SourceOrder<a class="header-anchor" href="javascript:;" onclick="location.hash='#sourceorder'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-csharp">UnprefixedUtilityPrecedence.SourceOrder
+</code></pre>
+<p>The candidate written later in markup wins.</p>
+<pre><code class="language-akbura">&lt;Border ${custom}:p-6
+        p-2 /&gt;
+</code></pre>
+<p>Here, <code>p-2</code> wins.</p>
+<pre><code class="language-akbura">&lt;Border p-2
+        ${custom}:p-6 /&gt;
+</code></pre>
+<p>Here, <code>${custom}:p-6</code> wins.</p>
+<h3 id="above">Above<a class="header-anchor" href="javascript:;" onclick="location.hash='#above'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-csharp">UnprefixedUtilityPrecedence.Above
+</code></pre>
+<p>The active prefixed candidate always wins.</p>
+<p>Markup order does not matter.</p>
+<pre><code class="language-akbura">&lt;Border ${md}:p-6
+        p-2 /&gt;
+</code></pre>
+<pre><code class="language-akbura">&lt;Border p-2
+        ${md}:p-6 /&gt;
+</code></pre>
+<p>While <code>${md}</code> is active, <code>p-6</code> wins in both cases.</p>
+<p>This behavior is used by the built-in breakpoint variants.</p>
+<h2 id="built-in-breakpoint-implementation">Built-in breakpoint implementation<a class="header-anchor" href="javascript:;" onclick="location.hash='#built-in-breakpoint-implementation'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The built-in <code>${sm}</code>, <code>${md}</code>, <code>${lg}</code>, <code>${xl}</code>, and <code>${xxl}</code> variants observe
+the current <code>TopLevel.ClientSize</code>.</p>
+<p>All variants belong to the same conflict group.</p>
+<p>Their increasing <code>Order</code> values ensure that the greatest active breakpoint
+wins. They also use <code>UnprefixedUtilityPrecedence.Above</code>, so an unprefixed
+utility cannot override an active breakpoint.</p>
+<pre><code class="language-csharp">using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Markup.Xaml;
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace Akbura.Markup;
+
+using static BreakpointsGroupKey;
+
+file static class BreakpointsGroupKey
+{
+    public const string BreakpointsGroup = nameof(BreakpointsGroup);
+}
+
+public abstract class BreakpointMarkupExtension
+{
+    protected BreakpointPredicate IsActivatedPredicate
+    {
+        get;
+        init;
+    }
+
+
+    public IObservable&lt;bool&gt;? ProvideValue(IServiceProvider? serviceProvider)
+    {
+        if (serviceProvider == null)
+        {
+            return null;
+        }
+
+        if (serviceProvider.GetService(typeof(IProvideValueTarget))
+            is not IProvideValueTarget provideValueTarget)
+        {
+            return null;
+        }
+
+        if (provideValueTarget.TargetObject is not Visual target)
+        {
+            return null;
+        }
+
+        var topLevel = TopLevel.GetTopLevel(target);
+
+        if (topLevel == null &amp;&amp;
+            serviceProvider.GetService(typeof(IRootObjectProvider))
+                is IRootObjectProvider rootObjectProvider)
+        {
+            topLevel = rootObjectProvider.IntermediateRootObject as TopLevel
+                ?? rootObjectProvider.RootObject as TopLevel;
+        }
+
+        if (topLevel == null)
+        {
+            return null;
+        }
+
+        return new BreakpointObservable(
+            topLevel.GetObservable(TopLevel.ClientSizeProperty),
+            IsActivatedPredicate);
+    }
+
+    protected readonly unsafe struct BreakpointPredicate
+    {
+        private readonly delegate*&lt;double, bool&gt; _pointer;
+
+        public BreakpointPredicate(delegate*&lt;double, bool&gt; pointer)
+        {
+            if (pointer == null)
+            {
+                throw new ArgumentNullException(nameof(pointer));
+            }
+
+            _pointer = pointer;
+        }
+
+        public bool Invoke(double width)
+        {
+            return _pointer(width);
+        }
+    }
+
+    private sealed class BreakpointObservable : IObservable&lt;bool&gt;
+    {
+        private readonly IObservable&lt;Size&gt; _source;
+        private readonly BreakpointPredicate _isActivated;
+
+        public BreakpointObservable(
+            IObservable&lt;Size&gt; source,
+            BreakpointPredicate isActivated)
+        {
+            _source = source;
+            _isActivated = isActivated;
+        }
+
+        public IDisposable Subscribe(IObserver&lt;bool&gt; observer)
+        {
+            ArgumentNullException.ThrowIfNull(observer);
+
+            return _source.Subscribe(
+                new BreakpointObserver(observer, _isActivated));
+        }
+    }
+
+    private sealed class BreakpointObserver : IObserver&lt;Size&gt;
+    {
+        private readonly IObserver&lt;bool&gt; _observer;
+        private readonly BreakpointPredicate _isActivated;
+
+        private bool _hasValue;
+        private bool _lastValue;
+        private bool _isStopped;
+
+        public BreakpointObserver(
+            IObserver&lt;bool&gt; observer,
+            BreakpointPredicate isActivated)
+        {
+            _observer = observer;
+            _isActivated = isActivated;
+        }
+
+        public void OnNext(Size size)
+        {
+            if (_isStopped)
+            {
+                return;
+            }
+
+            bool currentValue;
+
+            try
+            {
+                currentValue = _isActivated.Invoke(size.Width);
+            }
+            catch (Exception exception)
+            {
+                _isStopped = true;
+                _observer.OnError(exception);
+                return;
+            }
+
+            if (_hasValue &amp;&amp; currentValue == _lastValue)
+            {
+                return;
+            }
+
+            _hasValue = true;
+            _lastValue = currentValue;
+
+            _observer.OnNext(currentValue);
+        }
+
+        public void OnError(Exception error)
+        {
+            if (_isStopped)
+            {
+                return;
+            }
+
+            _isStopped = true;
+            _observer.OnError(error);
+        }
+
+        public void OnCompleted()
+        {
+            if (_isStopped)
+            {
+                return;
+            }
+
+            _isStopped = true;
+            _observer.OnCompleted();
+        }
+    }
+}
+
+
+#pragma warning disable IDE1006 // Naming Styles
+
+[UtilityVariant(
+    1,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class smExtension : BreakpointMarkupExtension
+{
+    public smExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&amp;IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width &gt;= 640d;
+    }
+}
+
+[UtilityVariant(
+    10,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class mdExtension : BreakpointMarkupExtension
+{
+    public mdExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&amp;IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width &gt;= 768d;
+    }
+}
+
+[UtilityVariant(
+    20,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class lgExtension : BreakpointMarkupExtension
+{
+    public lgExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&amp;IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width &gt;= 1024d;
+    }
+}
+
+[UtilityVariant(
+    30,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class xlExtension : BreakpointMarkupExtension
+{
+    public xlExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&amp;IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width &gt;= 1280d;
+    }
+}
+
+[UtilityVariant(
+    40,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class xxlExtension : BreakpointMarkupExtension
+{
+    public xxlExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&amp;IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width &gt;= 1536d;
+    }
+}
+
+
+#pragma warning restore IDE1006 // Naming Styles
+</code></pre>
+<h2 id="breakpoint-orders">Breakpoint orders<a class="header-anchor" href="javascript:;" onclick="location.hash='#breakpoint-orders'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th style="text-align: right;">Active width</th>
+<th style="text-align: right;">Order</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>${sm}</code></td>
+<td style="text-align: right;"><code>&gt;= 640</code></td>
+<td style="text-align: right;"><code>1</code></td>
+</tr>
+<tr>
+<td><code>${md}</code></td>
+<td style="text-align: right;"><code>&gt;= 768</code></td>
+<td style="text-align: right;"><code>10</code></td>
+</tr>
+<tr>
+<td><code>${lg}</code></td>
+<td style="text-align: right;"><code>&gt;= 1024</code></td>
+<td style="text-align: right;"><code>20</code></td>
+</tr>
+<tr>
+<td><code>${xl}</code></td>
+<td style="text-align: right;"><code>&gt;= 1280</code></td>
+<td style="text-align: right;"><code>30</code></td>
+</tr>
+<tr>
+<td><code>${xxl}</code></td>
+<td style="text-align: right;"><code>&gt;= 1536</code></td>
+<td style="text-align: right;"><code>40</code></td>
+</tr>
+</tbody>
+</table>
+<p>Consider this markup:</p>
+<pre><code class="language-akbura">&lt;Border ${lg}:w-10
+        w-5
+        ${md}:w-7 /&gt;
+</code></pre>
+<p>At a width of <code>1100</code>:</p>
+<ul>
+<li><code>${md}</code> is active;</li>
+<li><code>${lg}</code> is active;</li>
+<li><code>${lg}</code> has the greater <code>Order</code>;</li>
+<li><code>${lg}:w-10</code> wins even though it appears before <code>w-5</code>;</li>
+<li><code>w-5</code> cannot override it because breakpoint variants use
+<code>UnprefixedUtilityPrecedence.Above</code>.</li>
+</ul>
+<p>At a width of <code>800</code>:</p>
+<ul>
+<li><code>${md}</code> is active;</li>
+<li><code>${lg}</code> is inactive;</li>
+<li><code>${md}:w-7</code> wins.</li>
+</ul>
+<p>Below <code>768</code>:</p>
+<ul>
+<li>both <code>${md}</code> and <code>${lg}</code> are inactive;</li>
+<li><code>w-5</code> wins.</li>
+</ul>
+<h2 id="multiple-properties">Multiple properties<a class="header-anchor" href="javascript:;" onclick="location.hash='#multiple-properties'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Variant priority is resolved independently for every property-writing
+operation.</p>
+<pre><code class="language-akbura">&lt;Border p-2
+        bg-slate-800
+        ${md}:p-6
+        ${lg}:bg-blue-600 /&gt;
+</code></pre>
+<p>At the <code>md</code> breakpoint:</p>
+<pre><code class="language-text">Padding = p-6
+Background = bg-slate-800
+</code></pre>
+<p>At the <code>lg</code> breakpoint:</p>
+<pre><code class="language-text">Padding = p-6
+Background = bg-blue-600
+</code></pre>
+<p><code>${lg}:bg-blue-600</code> does not disable <code>${md}:p-6</code>, because the candidates write
+different properties.</p>
+<h2 id="equal-order">Equal order<a class="header-anchor" href="javascript:;" onclick="location.hash='#equal-order'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>When two active variants in the same group have equal <code>Order</code>, the candidate
+written later wins.</p>
+<pre><code class="language-csharp">[UtilityVariant(
+    10d,
+    ConflictGroup = &quot;Modes&quot;)]
+public sealed class FirstExtension
+{
+}
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = &quot;Modes&quot;)]
+public sealed class SecondExtension
+{
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Border ${First}:p-2
+        ${Second}:p-6 /&gt;
+</code></pre>
+<p>When both variants are active, <code>${Second}:p-6</code> wins.</p>
+<p>Reversing the markup reverses the result:</p>
+<pre><code class="language-akbura">&lt;Border ${Second}:p-6
+        ${First}:p-2 /&gt;
+</code></pre>
+<p>Now <code>${First}:p-2</code> wins.</p>
+<h2 id="practical-guidelines">Practical guidelines<a class="header-anchor" href="javascript:;" onclick="location.hash='#practical-guidelines'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use a shared <code>ConflictGroup</code> when variants represent an ordered scale.</p>
+<pre><code class="language-text">sm &lt; md &lt; lg &lt; xl &lt; xxl
+</code></pre>
+<p>Use increasing <code>Order</code> values to represent that scale.</p>
+<p>Use <code>UnprefixedUtilityPrecedence.Above</code> when an active variant must override
+the default value regardless of markup order.</p>
+<p>Use <code>SourceOrder</code> when the author should be able to override a variant by
+placing another utility later.</p>
+<p>Use <code>Below</code> when an unprefixed value must always remain authoritative.</p>
+<p>Do not use <code>Order</code> as a global priority. It is intentionally local to one
+non-empty conflict group and one conflicting property operation.</p>
+<p>See also:</p>
+<ul>
+<li><a href="akcss/utilities">AKCSS Utilities</a></li>
+<li><a href="akcss/markup-extensions">Markup Extensions</a></li>
+</ul>
+
+				</div>
+
+				<div class="not-prose"></div>
+				
+					<div class="not-prose py-8">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/utility-variants.md" target="_blank" rel="noopener noreferrer">
+							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+						</a>
+					</div>
+
+					<div class="not-prose my-20">
+					</div>
+			</div>
+				
+				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+						<div>
+							<h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+								On This Page
+							</h5>
+							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#utility-variants'" data-id="utility-variants" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Utility variants
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#declaring-a-variant'" data-id="declaring-a-variant" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Declaring a variant
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#conflict-resolution-is-property-based'" data-id="conflict-resolution-is-property-based" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Conflict resolution is property-based
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#resolution-algorithm'" data-id="resolution-algorithm" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Resolution algorithm
+										</span>
+											<ul class="ml-4">
+													<li data-id="exclude-inactive-candidates" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#exclude-inactive-candidates'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															1. Exclude inactive candidates
+														</span>
+													</li>
+													<li data-id="respect-akcss-operation-priority" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#respect-akcss-operation-priority'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															2. Respect AKCSS operation priority
+														</span>
+													</li>
+													<li data-id="resolve-candidates-inside-each-conflict-group" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#resolve-candidates-inside-each-conflict-group'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															3. Resolve candidates inside each conflict group
+														</span>
+													</li>
+													<li data-id="compare-different-groups-by-source-order" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#compare-different-groups-by-source-order'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															4. Compare different groups by source order
+														</span>
+													</li>
+													<li data-id="compare-the-prefixed-winner-with-the-unprefixed-candidate" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#compare-the-prefixed-winner-with-the-unprefixed-candidate'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															5. Compare the prefixed winner with the unprefixed candidate
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#utilityvariantattribute'" data-id="utilityvariantattribute" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											UtilityVariantAttribute
+										</span>
+											<ul class="ml-4">
+													<li data-id="order" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#order'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Order
+														</span>
+													</li>
+													<li data-id="conflictgroup" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#conflictgroup'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															ConflictGroup
+														</span>
+													</li>
+													<li data-id="unprefixedprecedence" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#unprefixedprecedence'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															UnprefixedPrecedence
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#unprefixedutilityprecedence'" data-id="unprefixedutilityprecedence" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											UnprefixedUtilityPrecedence
+										</span>
+											<ul class="ml-4">
+													<li data-id="below" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#below'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Below
+														</span>
+													</li>
+													<li data-id="sourceorder" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#sourceorder'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															SourceOrder
+														</span>
+													</li>
+													<li data-id="above" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#above'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Above
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#built-in-breakpoint-implementation'" data-id="built-in-breakpoint-implementation" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Built-in breakpoint implementation
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#breakpoint-orders'" data-id="breakpoint-orders" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Breakpoint orders
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#multiple-properties'" data-id="multiple-properties" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Multiple properties
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#equal-order'" data-id="equal-order" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Equal order
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#practical-guidelines'" data-id="practical-guidelines" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Practical guidelines
+										</span>
+									</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				
+		</div>
+	</div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+	const el = document.querySelector('#doc section h1') 
+	if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+	const App = {
+		setup() {
+			function nav(url) {
+				window.open(url)
+			}
+			return { nav }
+		}
+	}
+	
+const Sidebar = {
+	setup() {
+		const open = ref(true)
+		return { open }
+	}
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="lib/js/lite-yt-embed.js"></script>
+<script src="mjs/docs.mjs" type="module"></script>
+
+        </main>
+    </div>
+
+    
+
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
+
+    
+</body>
+</html>

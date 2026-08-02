@@ -336,9 +336,11 @@ key.</p>
 <p>is parsed only for error recovery and produces a diagnostic. Use:</p>
 <pre><code class="language-akbura">&lt;Border ${md}:p-3 /&gt;
 </code></pre>
-<p>Variant ordering is configured with <code>UtilityVariantAttribute</code>. See
-<a href="utilities.md#variant-priority">AKCSS Utilities</a> for the complete
-conflict-resolution rules.</p>
+<p>Variant ordering and unprefixed fallback behavior are configured with
+<code>UtilityVariantAttribute</code>.</p>
+<p>See <a href="akcss/utility-variants">Utility Variants</a> for the complete property-level
+conflict-resolution algorithm, <code>ConflictGroup</code>, <code>Order</code>, built-in breakpoint
+implementation, and <code>UnprefixedUtilityPrecedence</code> modes.</p>
 <h2 id="lifecycle">Lifecycle<a class="header-anchor" href="javascript:;" onclick="location.hash='#lifecycle'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Akbura owns every subscription and binding created for utility markup
 extensions.</p>

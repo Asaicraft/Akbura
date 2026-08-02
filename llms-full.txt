@@ -318,9 +318,12 @@ is parsed only for error recovery and produces a diagnostic. Use:
 <Border ${md}:p-3 />
 ```
 
-Variant ordering is configured with `UtilityVariantAttribute`. See
-[AKCSS Utilities](utilities.md#variant-priority) for the complete
-conflict-resolution rules.
+Variant ordering and unprefixed fallback behavior are configured with
+`UtilityVariantAttribute`.
+
+See [Utility Variants](akcss/utility-variants) for the complete property-level
+conflict-resolution algorithm, `ConflictGroup`, `Order`, built-in breakpoint
+implementation, and `UnprefixedUtilityPrecedence` modes.
 
 ## Lifecycle
 

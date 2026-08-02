@@ -37,6 +37,10 @@ param string CurrentUrl = "";
             <Link Content="AKCSS"
                   Url="/akcss"
                   Router={Router}/>
+                  
+            <Link Content="Utility variants"
+                  Url="/utility-variants"
+                  Router={Router}/>
 
             <Link Content="About"
                   Url="/about"

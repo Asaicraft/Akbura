@@ -58,6 +58,10 @@ state string url = "/overview";
                                 <AkcssPage/>
                             </Page>
 
+                            <Page Url="/utility-variants">
+                                <UtilityVariantsPage/>
+                            </Page>
+
                         </Router.Pages>
 
                     </Router>

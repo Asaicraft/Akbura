@@ -1,0 +1,430 @@
+using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
+
+<StackPanel page
+            ${md}:page-desktop>
+
+    <StackPanel page-header>
+
+        <TextBlock Text="Utility variants"
+                   page-title
+                   ${md}:page-title-desktop/>
+
+        <TextBlock
+            Text="Create reactive AKCSS prefixes from any observable control state."
+            page-description
+            ${md}:page-description-desktop/>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock Text="Interaction states"
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
+
+            <TextBlock
+                Text="Hover the control, click it to focus, then move the pointer away."
+                page-section-description/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/InteractionUtilityVariantDemo.akbura">
+
+            <FeatureView.Code>
+                {"""
+                using Akbura.FeatureGallery.Markup;
+                using Akbura.Styles.akcss;
+
+                <Button Focusable="True"
+                        HorizontalContentAlignment="Stretch"
+
+                        ${demoFocus}:bg-violet-600
+                        ${demoFocus}:p-8
+                        ${demoFocus}:border-violet-300
+
+                        ${demoHover}:bg-blue-600
+                        ${demoHover}:p-6
+                        ${demoHover}:shadow-lg
+
+                        bg-slate-800
+                        p-4
+                        border-slate-600
+
+                        border-2
+                        rounded-xl>
+
+                    <StackPanel gap-2>
+
+                        <TextBlock
+                            Text="Interactive utility variants"
+                            text-xl
+                            font-bold
+                            text-white/>
+
+                        <TextBlock
+                            Text="Hover is blue. Focus is violet."
+                            text-sm
+                            text-slate-100/>
+
+                    </StackPanel>
+
+                </Button>
+
+                //  Markup/UtilityVariantDemoExtensions.cs
+
+                public abstract class InputStateUtilityVariantExtension
+                {
+                    public IObservable<bool>? ProvideValue(
+                        IServiceProvider? serviceProvider)
+                    {
+                        if (serviceProvider?.GetService(
+                                typeof(IProvideValueTarget))
+                            is not IProvideValueTarget provideValueTarget)
+                        {
+                            return null;
+                        }
+
+                        if (provideValueTarget.TargetObject
+                            is not InputElement target)
+                        {
+                            return null;
+                        }
+
+                        return Observe(target);
+                    }
+
+                    protected abstract IObservable<bool> Observe(
+                        InputElement target);
+                }
+
+                #pragma warning disable IDE1006 // Naming Styles
+
+                [UtilityVariant(
+                    10d,
+                    ConflictGroup = Interaction,
+                    UnprefixedPrecedence =
+                        UnprefixedUtilityPrecedence.Above)]
+                public sealed class demoHoverExtension
+                    : InputStateUtilityVariantExtension
+                {
+                    protected override IObservable<bool> Observe(
+                        InputElement target)
+                    {
+                        return target.GetObservable(
+                            InputElement.IsPointerOverProperty);
+                    }
+                }
+
+                [UtilityVariant(
+                    20d,
+                    ConflictGroup = Interaction,
+                    UnprefixedPrecedence =
+                        UnprefixedUtilityPrecedence.Above)]
+                public sealed class demoFocusExtension
+                    : InputStateUtilityVariantExtension
+                {
+                    protected override IObservable<bool> Observe(
+                        InputElement target)
+                    {
+                        return target.GetObservable(
+                            InputElement.IsKeyboardFocusWithinProperty);
+                    }
+                }
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <InteractionUtilityVariantDemo/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock Text="Custom markup extensions"
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
+
+            <TextBlock
+                Text="Each extension exposes an observable condition for the actual target control."
+                page-section-description/>
+
+        </StackPanel>
+
+        <Border page-code-surface>
+
+            <TextBlock
+                Text={"""
+                [UtilityVariant(
+                    10d,
+                    ConflictGroup = "Interaction",
+                    UnprefixedPrecedence =
+                        UnprefixedUtilityPrecedence.Above)]
+                public sealed class demoHoverExtension
+                    : InputStateUtilityVariantExtension
+                {
+                    protected override IObservable<bool> Observe(
+                        InputElement target)
+                    {
+                        return target.GetObservable(
+                            InputElement.IsPointerOverProperty);
+                    }
+                }
+
+                [UtilityVariant(
+                    20d,
+                    ConflictGroup = "Interaction",
+                    UnprefixedPrecedence =
+                        UnprefixedUtilityPrecedence.Above)]
+                public sealed class demoFocusExtension
+                    : InputStateUtilityVariantExtension
+                {
+                    protected override IObservable<bool> Observe(
+                        InputElement target)
+                    {
+                        return target.GetObservable(
+                            InputElement.IsKeyboardFocusWithinProperty);
+                    }
+                }
+                """}
+                page-code/>
+
+        </Border>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <TextBlock Text="When both are active"
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
+
+        <Grid page-grid-3
+              ${lg}:page-grid-3-desktop>
+
+            <Border page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="Background"
+                               page-card-title/>
+
+                    <TextBlock Text="${demoFocus}"
+                               page-code/>
+
+                    <TextBlock
+                        Text="Focus has Order 20, so violet wins over the hover background."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
+                    page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="Padding"
+                               page-card-title/>
+
+                    <TextBlock Text="p-8"
+                               page-code/>
+
+                    <TextBlock
+                        Text="The focus candidate wins the conflicting padding operation."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border page-cell-3
+                    ${lg}:page-cell-3-desktop
+                    page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="Shadow"
+                               page-card-title/>
+
+                    <TextBlock Text="shadow-lg"
+                               page-code/>
+
+                    <TextBlock
+                        Text="The hover shadow remains because the focus variant does not write BoxShadow."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <TextBlock Text="Property-level cascade"
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
+
+        <Border page-card>
+
+            <Grid page-flow-3
+                  ${lg}:page-flow-3-desktop>
+
+                <Border page-card-compact>
+
+                    <StackPanel gap-2>
+
+                        <TextBlock Text="1"
+                                   text-sm
+                                   text-blue-400/>
+
+                        <TextBlock Text="Observe"
+                                   font-semibold
+                                   text-slate-100/>
+
+                        <TextBlock
+                            Text="The markup extension publishes true or false."
+                            page-card-description/>
+
+                    </StackPanel>
+
+                </Border>
+
+                <TextBlock Text="→"
+                           page-flow-arrow
+                           ${lg}:page-flow-arrow-1-desktop
+                           text-xl
+                           text-slate-500
+                           self-center/>
+
+                <Border page-flow-second
+                        ${lg}:page-flow-second-desktop
+                        page-card-compact>
+
+                    <StackPanel gap-2>
+
+                        <TextBlock Text="2"
+                                   text-sm
+                                   text-blue-400/>
+
+                        <TextBlock Text="Select"
+                                   font-semibold
+                                   text-slate-100/>
+
+                        <TextBlock
+                            Text="Order selects the winner inside the conflict group."
+                            page-card-description/>
+
+                    </StackPanel>
+
+                </Border>
+
+                <TextBlock Text="→"
+                           page-flow-arrow
+                           ${lg}:page-flow-arrow-2-desktop
+                           text-xl
+                           text-slate-500
+                           self-center/>
+
+                <Border page-flow-third
+                        ${lg}:page-flow-third-desktop
+                        page-card-compact>
+
+                    <StackPanel gap-2>
+
+                        <TextBlock Text="3"
+                                   text-sm
+                                   text-blue-400/>
+
+                        <TextBlock Text="Apply"
+                                   font-semibold
+                                   text-slate-100/>
+
+                        <TextBlock
+                            Text="Only conflicting property operations replace each other."
+                            page-card-description/>
+
+                    </StackPanel>
+
+                </Border>
+
+            </Grid>
+
+        </Border>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <TextBlock Text="Why Order matters"
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
+
+        <Grid page-grid-2
+              ${md}:page-grid-2-desktop>
+
+            <Border page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="${demoHover}"
+                               page-card-title/>
+
+                    <TextBlock Text="Order = 10"
+                               page-code/>
+
+                    <TextBlock
+                        Text="Activates while the pointer is over the target."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border page-cell-2
+                    ${md}:page-cell-2-desktop
+                    page-card-accent>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="${demoFocus}"
+                               page-card-title/>
+
+                    <TextBlock Text="Order = 20"
+                               page-code/>
+
+                    <TextBlock
+                        Text="Wins shared property conflicts when focus and hover are active together."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+        <Border page-note>
+
+            <TextBlock
+                Text="Order is compared only between active variants in the same non-empty ConflictGroup. It is not a global style priority."
+                page-note-text/>
+
+        </Border>
+
+    </StackPanel>
+
+    <ViewThisPageInGithub/>
+
+</StackPanel>

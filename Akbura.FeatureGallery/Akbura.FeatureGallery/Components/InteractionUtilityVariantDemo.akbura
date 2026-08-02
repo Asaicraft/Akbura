@@ -1,0 +1,124 @@
+using Akbura.FeatureGallery.Markup;
+
+<StackPanel gap-5>
+
+    <TextBlock
+        Text="Hover the control, click it, and then move the pointer away."
+        text-sm
+        text-slate-400/>
+
+    <Button Focusable="True"
+            HorizontalContentAlignment="Stretch"
+
+            ${demoFocus}:bg-violet-600
+            ${demoFocus}:p-8
+            ${demoFocus}:border-violet-300
+
+            ${demoHover}:bg-blue-600
+            ${demoHover}:p-6
+
+            bg-slate-800
+            p-4
+            border-slate-600
+
+            border-2
+            rounded-xl>
+
+        <StackPanel gap-2>
+
+            <TextBlock
+                Text="Interactive utility variants"
+                text-xl
+                font-bold
+                text-white/>
+
+            <TextBlock
+                Text="Hover is blue. Focus is violet."
+                text-sm
+                text-slate-100/>
+
+            <TextBlock
+                Text="When both are active, focus wins but the hover shadow remains."
+                text-xs
+                text-slate-200/>
+
+        </StackPanel>
+
+    </Button>
+
+    <Grid ColumnDefinitions="*,*,*"
+          gap-3>
+
+        <Border p-3
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg>
+
+            <StackPanel gap-1>
+
+                <TextBlock Text="Default"
+                           font-bold
+                           text-slate-200/>
+
+                <TextBlock Text="Slate · p-4"
+                           text-xs
+                           text-slate-500/>
+
+            </StackPanel>
+
+        </Border>
+
+        <Border col-1
+                p-3
+                bg-blue-950
+                border-1
+                border-blue-800
+                rounded-lg>
+
+            <StackPanel gap-1>
+
+                <TextBlock Text="${demoHover}"
+                           font-bold
+                           text-blue-400/>
+
+                <TextBlock Text="Order 10 · p-6"
+                           text-xs
+                           text-slate-400/>
+
+                <TextBlock Text="+ shadow"
+                           text-xs
+                           text-slate-500/>
+
+            </StackPanel>
+
+        </Border>
+
+        <Border col-2
+                p-3
+                bg-violet-950
+                border-1
+                border-violet-800
+                rounded-lg>
+
+            <StackPanel gap-1>
+
+                <TextBlock Text="${demoFocus}"
+                           font-bold
+                           text-violet-400/>
+
+                <TextBlock Text="Order 20 · p-8"
+                           text-xs
+                           text-slate-400/>
+
+                <TextBlock Text="Wins conflicts"
+                           text-xs
+                           text-slate-500/>
+
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+</StackPanel>

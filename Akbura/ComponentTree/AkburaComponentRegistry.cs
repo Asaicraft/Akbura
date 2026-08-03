@@ -40,6 +40,24 @@ internal static class AkburaComponentRegistry
         }
     }
 
+    internal static int GetAttachedComponentCount()
+    {
+        lock (s_gate)
+        {
+            for (var index = s_components.Count - 1;
+                 index >= 0;
+                 index--)
+            {
+                if (!s_components[index].TryGetTarget(out _))
+                {
+                    s_components.RemoveAt(index);
+                }
+            }
+
+            return s_components.Count;
+        }
+    }
+
     internal static void Attach(AkburaControl component)
     {
         ArgumentNullException.ThrowIfNull(component);

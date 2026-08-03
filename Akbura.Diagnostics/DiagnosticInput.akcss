@@ -18,6 +18,7 @@ Grid.diagnostic-input-stack {
 Grid.diagnostic-input-layout {
     MinWidth: 0d;
     ColumnSpacing: 8d;
+    RowSpacing: 6d;
     HorizontalAlignment: HorizontalAlignment.Stretch;
 }
 

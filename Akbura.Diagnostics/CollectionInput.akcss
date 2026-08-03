@@ -1,5 +1,7 @@
 Expander.collection-input {
     MinWidth: 0d;
+    Padding: new Thickness(8d);
+    Background: Brushes.Transparent;
     HorizontalAlignment: HorizontalAlignment.Stretch;
     HorizontalContentAlignment: HorizontalAlignment.Stretch;
 }
@@ -15,8 +17,8 @@ TextBlock.collection-input-summary {
 
 Grid.collection-input-content {
     MinWidth: 0d;
-    RowSpacing: 8d;
-    Margin: new Thickness(0d, 8d, 0d, 0d);
+    RowSpacing: 4d;
+    Margin: new Thickness(0d);
     HorizontalAlignment: HorizontalAlignment.Stretch;
 }
 
@@ -25,18 +27,24 @@ ItemsControl.collection-input-items {
     HorizontalAlignment: HorizontalAlignment.Stretch;
 }
 
-Grid.collection-input-item {
+Border.collection-input-item {
     MinWidth: 0d;
-    ColumnSpacing: 8d;
-    Margin: new Thickness(0d, 2d);
+    Margin: new Thickness(0d, 0d, 0d, 4d);
+    Padding: new Thickness(6d);
     HorizontalAlignment: HorizontalAlignment.Stretch;
+
+    @apply bg-slate-950
+        border-1
+        border-slate-800
+        rounded-md;
 }
 
 TextBlock.collection-input-index {
-    HorizontalAlignment: HorizontalAlignment.Center;
+    HorizontalAlignment: HorizontalAlignment.Left;
     VerticalAlignment: VerticalAlignment.Center;
 
-    @apply text-xs
+    @apply px-1
+        text-xs
         font-medium
         text-slate-500;
 }

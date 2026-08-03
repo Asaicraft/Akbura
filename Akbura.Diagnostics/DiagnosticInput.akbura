@@ -1,6 +1,7 @@
 param IInputBuilderProvider InputBuilders;
 param InputRequest Request;
 param object? Value;
+param bool IsCompact = false;
 param Action<object> CommitValue;
 
 state IReadOnlyList<InputBuilder> availableInputBuilders = [];
@@ -161,9 +162,15 @@ string GetBuilderName(InputBuilder? builder)
           RowDefinitions="Auto,Auto">
 
         <Grid class="diagnostic-input-layout"
-              ColumnDefinitions="Auto,*,Auto,Auto">
+              RowDefinitions={IsCompact ? new("Auto,Auto") : new("Auto")}
+              ColumnDefinitions={IsCompact
+                  ? new("*,Auto,Auto")
+                  : new("Auto,*,Auto,Auto")}>
 
             <ComboBox x.Name="builderSelector"
+                      Grid.Row="0"
+                      Grid.Column="0"
+                      Grid.ColumnSpan={IsCompact ? 3 : 1}
                       class="diagnostic-input-builder"
                       ItemsSource={availableInputBuilders}
                       SelectedItem={selectedInputBuilder}
@@ -197,7 +204,8 @@ string GetBuilderName(InputBuilder? builder)
 
             </ComboBox>
 
-            <Border Grid.Column="1"
+            <Border Grid.Row={IsCompact ? 1 : 0}
+                    Grid.Column={IsCompact ? 0 : 1}
                     class="diagnostic-input-editor"
                     {IsDirty()}:border-blue-500>
 
@@ -216,7 +224,8 @@ string GetBuilderName(InputBuilder? builder)
 
             </Border>
 
-            <Button Grid.Column="2"
+            <Button Grid.Row={IsCompact ? 1 : 0}
+                    Grid.Column={IsCompact ? 1 : 2}
                     class="diagnostic-input-apply"
                     IsVisible={IsDirty()}
                     ToolTip.Tip="Apply changes"
@@ -227,7 +236,8 @@ string GetBuilderName(InputBuilder? builder)
 
             </Button>
 
-            <Button Grid.Column="3"
+            <Button Grid.Row={IsCompact ? 1 : 0}
+                    Grid.Column={IsCompact ? 2 : 3}
                     class="diagnostic-input-reload"
                     IsEnabled={IsDirty()}
                     ToolTip.Tip="Reload current value"

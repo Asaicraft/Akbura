@@ -29,7 +29,15 @@ void UpdateItem(int index, object? value)
 
 string GetCollectionSummary()
 {
-    return $"[{items.Count}] {Request.EditorType.Name}";
+    var typeName = Request.EditorType.Name;
+    var genericMarker = typeName.IndexOf('`');
+
+    if (genericMarker >= 0)
+    {
+        typeName = typeName[..genericMarker];
+    }
+
+    return $"{typeName} · {items.Count} items";
 }
 
 <Expander class="collection-input"
@@ -46,28 +54,33 @@ string GetCollectionSummary()
           RowDefinitions="Auto,Auto">
 
         <ItemsControl class="collection-input-items"
-                      ItemsSource={items}>
+              ItemsSource={items}>
 
             <ItemsControl.ItemTemplate
                 x.DataType="CollectionInputItem"
                 x.ItemName="item">
 
-                <Grid class="collection-input-item"
-                      ColumnDefinitions="42,*">
+                <Border class="collection-input-item">
 
-                    <TextBlock class="collection-input-index"
-                               Text={$"[{item.Index}]"}/>
+                    <Grid RowDefinitions="Auto,Auto"
+                          RowSpacing="6">
 
-                    <DiagnosticInput Grid.Column="1"
-                                     InputBuilders={InputBuilders}
-                                     Request={item.Request}
-                                     Value={item.Value!}
-                                     CommitValue={value =>
-                                         UpdateItem(
-                                             item.Index,
-                                             value)}/>
+                        <TextBlock class="collection-input-index"
+                                   Text={$"[{item.Index}]"}/>
 
-                </Grid>
+                        <DiagnosticInput Grid.Row="1"
+                                         IsCompact="True"
+                                         InputBuilders={InputBuilders}
+                                         Request={item.Request}
+                                         Value={item.Value!}
+                                         CommitValue={value =>
+                                             UpdateItem(
+                                                 item.Index,
+                                                 value)}/>
+
+                    </Grid>
+
+                </Border>
 
             </ItemsControl.ItemTemplate>
 

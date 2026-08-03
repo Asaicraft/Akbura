@@ -3,6 +3,8 @@ using Akbura.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
@@ -29,6 +31,7 @@ public sealed class DiagnosticsTests
         { "second", typeof(SampleMode), SampleMode.Second },
         { "", typeof(int?), null },
         { "7", typeof(int?), 7 },
+        { "c56a4180-65aa-42ec-a945-5fd21dec0538", typeof(Guid), new Guid("c56a4180-65aa-42ec-a945-5fd21dec0538") },
     };
 
     [Theory]
@@ -128,6 +131,168 @@ public sealed class DiagnosticsTests
     }
 
     [Fact]
+    public async Task DiagnosticsWindow_DoesNotRegisterItsOwnComponentSubtree()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component = new InspectableComponent();
+                var applicationWindow = new Window { Content = component };
+                applicationWindow.Show();
+
+                var diagnosticsWindow = new DiagnosticsWindow();
+                diagnosticsWindow.Show(applicationWindow);
+
+                var diagnostics = Assert.IsType<DiagnosticsRoot>(
+                    diagnosticsWindow.Content);
+                Assert.Equal(1, diagnostics.VisibleComponentCount);
+
+                var registeredComponents =
+                    AkburaComponentRegistry.GetAttachedComponents();
+                Assert.Contains(component, registeredComponents);
+                Assert.DoesNotContain(
+                    registeredComponents,
+                    candidate =>
+                        TopLevel.GetTopLevel(candidate) is DiagnosticsWindow);
+
+                diagnosticsWindow.Close();
+                applicationWindow.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task AkburaControl_WithNoGeneratedChild_DoesNotCrashLayout()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component = new EmptyInspectableComponent();
+                var window = new Window { Content = component };
+
+                window.Show();
+                component.Measure(new Avalonia.Size(320, 200));
+                component.Arrange(new Avalonia.Rect(0, 0, 320, 200));
+
+                Assert.Null(component.Child);
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public void StateValueConverter_RoundTripsArbitraryObjectAsJson()
+    {
+        var expected = new EditableModel("Akbura", 3);
+        var text = StateValueConverter.FormatForEditor(
+            expected,
+            typeof(EditableModel));
+
+        Assert.Contains("\"Name\"", text, StringComparison.Ordinal);
+        Assert.True(StateValueConverter.TryParse(
+            text,
+            typeof(EditableModel),
+            out var value,
+            out var error));
+        Assert.Equal(string.Empty, error);
+        Assert.Equal(expected, Assert.IsType<EditableModel>(value));
+    }
+
+    [Fact]
+    public void StateValueConverter_ParsesObjectWithoutLosingNaturalClrValues()
+    {
+        Assert.True(StateValueConverter.TryParse(
+            "plain text",
+            typeof(object),
+            out var text,
+            out _));
+        Assert.Equal("plain text", text);
+
+        Assert.True(StateValueConverter.TryParse(
+            "{\"count\": 3, \"enabled\": true}",
+            typeof(object),
+            out var value,
+            out _));
+        var dictionary = Assert.IsType<Dictionary<string, object?>>(value);
+        Assert.Equal(3L, dictionary["count"]);
+        Assert.Equal(true, dictionary["enabled"]);
+    }
+
+    [Fact]
+    public void DiagnosticsOptions_PrioritizeCustomInputBuilderAndKeepFallback()
+    {
+        var custom = new EditableModelInputBuilder();
+        var options = new AkburaDiagnosticsOptions
+        {
+            ToggleGesture = new KeyGesture(
+                Key.D,
+                KeyModifiers.Control | KeyModifiers.Shift),
+        };
+        options.InputBuilders.Insert(0, custom);
+
+        var configuration = options.CreateConfiguration();
+        var request = new InputRequest
+        {
+            RequestedType = typeof(EditableModel),
+            ComponentType = typeof(InspectableComponent),
+            Variation = DataVariation.State,
+        };
+
+        Assert.Same(custom, configuration.InputBuilders.Provide(request));
+        Assert.IsType<UniversalInputBuilder>(
+            configuration.InputBuilders[^1]);
+        Assert.True(AkburaDiagnosticsExtensions.HasSameToggleGesture(
+            options.ToggleGesture,
+            configuration.ToggleGesture));
+    }
+
+    [Fact]
+    public void InputBuilderProvider_PreservesRuntimeTypeForObjectValues()
+    {
+        var configuration = new AkburaDiagnosticsOptions()
+            .CreateConfiguration();
+        var integerRequest = new InputRequest
+        {
+            RequestedType = typeof(object),
+            ExistingValue = 42,
+            ComponentType = typeof(InspectableComponent),
+            Variation = DataVariation.Parameter,
+        };
+        var nullRequest = integerRequest with { ExistingValue = null };
+
+        Assert.IsType<NumericInputBuilder<int>>(
+            configuration.InputBuilders.Provide(integerRequest));
+        Assert.IsType<UniversalInputBuilder>(
+            configuration.InputBuilders.Provide(nullRequest));
+    }
+
+    [Fact]
+    public async Task InputBuilderBinding_SynchronizesValuesInBothDirections()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var source = new Border();
+                var input = new TextBox();
+                InputBuilder.SetInputValue(source, "source");
+
+                using var binding = InputBuilder.BindInputValue(input, source);
+
+                Assert.Equal("source", InputBuilder.GetInputValue(input));
+
+                InputBuilder.SetInputValue(input, "edited");
+                Assert.Equal("edited", InputBuilder.GetInputValue(source));
+
+                InputBuilder.SetInputValue(source, "external");
+                Assert.Equal("external", InputBuilder.GetInputValue(input));
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
     public async Task DiagnosticsWindow_TracksExternalComponentAndStateChanges()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
@@ -161,11 +326,92 @@ public sealed class DiagnosticsTests
             CancellationToken.None);
     }
 
+    [Fact]
+    public async Task DiagnosticsWindow_EditsParametersAndStates()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var diagnosticsWindow = new DiagnosticsWindow();
+                diagnosticsWindow.Show();
+
+                var component = new InspectableComponent();
+                var applicationWindow = new Window { Content = component };
+                applicationWindow.Show();
+
+                var parameterEditor = FindEditor(
+                    diagnosticsWindow,
+                    DataVariation.Parameter,
+                    nameof(InspectableComponent.Title));
+                ApplyEditorValue(parameterEditor, "edited title");
+                Assert.Equal("edited title", component.Title);
+
+                var stateEditor = FindEditor(
+                    diagnosticsWindow,
+                    DataVariation.State,
+                    "counter");
+                ApplyEditorValue(stateEditor, 12);
+                Assert.Equal(12, component.Counter.Value);
+
+                var collectionEditor = FindEditor(
+                    diagnosticsWindow,
+                    DataVariation.Parameter,
+                    nameof(InspectableComponent.Items));
+                ApplyEditorValue(collectionEditor, new List<int> { 4, 8, 15 });
+                Assert.Equal([4, 8, 15], component.Items);
+
+                applicationWindow.Close();
+                diagnosticsWindow.Close();
+            },
+            CancellationToken.None);
+    }
+
+    private static DiagnosticInput FindEditor(
+        DiagnosticsWindow window,
+        DataVariation variation,
+        string memberName)
+    {
+        return window.GetVisualDescendants()
+            .OfType<DiagnosticInput>()
+            .Single(editor =>
+                editor.Request.Variation == variation &&
+                editor.Request.MemberName == memberName);
+    }
+
+    private static void ApplyEditorValue(
+        DiagnosticInput editor,
+        object? value)
+    {
+        InputBuilder.SetInputValue(editor, value);
+
+        var apply = editor.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button =>
+                string.Equals(
+                    ToolTip.GetTip(button) as string,
+                    "Apply changes",
+                    StringComparison.Ordinal));
+        apply.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    }
+
     private sealed class ThrowingValue
     {
         public override string ToString()
         {
             throw new InvalidOperationException();
+        }
+    }
+
+    public sealed record EditableModel(string Name, int Count);
+
+    private sealed class EditableModelInputBuilder : InputBuilder
+    {
+        public override Type OutputType => typeof(EditableModel);
+
+        protected override Control BuildCore(InputRequest request)
+        {
+            return new TextBox();
         }
     }
 
@@ -177,10 +423,16 @@ public sealed class DiagnosticsTests
             Parameter.Create<InspectableComponent, string>(
                 nameof(Title),
                 defaultValue: "sample");
-        private static readonly ImmutableArray<Parameter> s_parameters = [s_title];
+        private static readonly ReadOnlyParameter<InspectableComponent, IList<int>> s_items =
+            Parameter.CreateReadOnly<InspectableComponent, IList<int>>(
+                nameof(Items),
+                static owner => owner.Items);
+        private static readonly ImmutableArray<Parameter> s_parameters =
+            [s_title, s_items];
         private static readonly ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> s_commands = [];
         private static readonly ImmutableArray<InjectService> s_services = [];
         private readonly Border _root = new();
+        private readonly List<int> _items = [1, 2, 3];
         private ImmutableArray<State> _states;
         private State<int> _counter = null!;
 
@@ -196,6 +448,8 @@ public sealed class DiagnosticsTests
         }
 
         public State<int> Counter => _counter;
+
+        public IList<int> Items => _items;
 
         protected override Control Update() => _root;
 
@@ -217,5 +471,30 @@ public sealed class DiagnosticsTests
 
             return _states;
         }
+    }
+
+    private sealed class EmptyInspectableComponent : AkburaControl
+    {
+        private static readonly ImmutableArray<Parameter> s_parameters = [];
+        private static readonly ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> s_commands = [];
+        private static readonly ImmutableArray<InjectService> s_services = [];
+        private static readonly ImmutableArray<State> s_states = [];
+
+        public EmptyInspectableComponent()
+            : base(Akbura.Engine.AkburaEngine.Empty)
+        {
+        }
+
+        protected override Control Update() => null!;
+
+        protected override Control FirstUpdate() => null!;
+
+        protected override ImmutableArray<Parameter> GetParameters() => s_parameters;
+
+        protected override ImmutableArray<Avalonia.AvaloniaProperty<IAkburaCommand>> GetCommands() => s_commands;
+
+        protected override ImmutableArray<InjectService> GetServices() => s_services;
+
+        protected override ImmutableArray<State> GetStates() => s_states;
     }
 }

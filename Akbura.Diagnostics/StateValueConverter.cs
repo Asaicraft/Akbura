@@ -1,38 +1,94 @@
+using System.ComponentModel;
 using System.Globalization;
+using System.Reflection;
+using System.Text.Json;
 
 namespace Akbura.Diagnostics;
 
 internal static class StateValueConverter
 {
+    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    {
+        IncludeFields = true,
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+    };
+
     public static bool CanEdit(Type type)
     {
+        ArgumentNullException.ThrowIfNull(type);
+
+        return type != typeof(void) &&
+            !type.IsByRef &&
+            !type.IsPointer &&
+            !type.IsByRefLike &&
+            !type.ContainsGenericParameters;
+    }
+
+    public static bool ShouldUseJson(Type type)
+    {
         var valueType = Nullable.GetUnderlyingType(type) ?? type;
-        return valueType == typeof(string) ||
-            valueType == typeof(bool) ||
-            valueType == typeof(byte) ||
-            valueType == typeof(sbyte) ||
-            valueType == typeof(short) ||
-            valueType == typeof(ushort) ||
-            valueType == typeof(int) ||
-            valueType == typeof(uint) ||
-            valueType == typeof(long) ||
-            valueType == typeof(ulong) ||
-            valueType == typeof(float) ||
-            valueType == typeof(double) ||
-            valueType == typeof(decimal) ||
-            valueType.IsEnum;
+        if (valueType == typeof(string) ||
+            valueType.IsEnum ||
+            valueType.IsPrimitive ||
+            valueType == typeof(decimal))
+        {
+            return false;
+        }
+
+        var converter = TypeDescriptor.GetConverter(valueType);
+        return !converter.CanConvertFrom(typeof(string));
     }
 
     public static string FormatForEditor(object? value, Type type)
     {
-        if (value == null)
+        if (value is null)
         {
             return string.Empty;
         }
 
-        return value is IFormattable formattable
-            ? formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty
-            : value.ToString() ?? string.Empty;
+        if (value is string text)
+        {
+            return text;
+        }
+
+        var valueType = Nullable.GetUnderlyingType(type) ?? type;
+        var converter = TypeDescriptor.GetConverter(valueType);
+        if (converter.CanConvertFrom(typeof(string)) &&
+            converter.CanConvertTo(typeof(string)))
+        {
+            try
+            {
+                return converter.ConvertToInvariantString(value) ?? string.Empty;
+            }
+            catch (Exception exception) when (IsConversionException(exception))
+            {
+            }
+        }
+
+        if (value is IFormattable formattable && !ShouldUseJson(valueType))
+        {
+            return formattable.ToString(null, CultureInfo.InvariantCulture)
+                ?? string.Empty;
+        }
+
+        try
+        {
+            var serializationType = valueType == typeof(object) ||
+                valueType.IsAbstract ||
+                valueType.IsInterface
+                    ? value.GetType()
+                    : valueType;
+
+            return JsonSerializer.Serialize(
+                value,
+                serializationType,
+                s_jsonOptions);
+        }
+        catch (Exception exception) when (IsConversionException(exception))
+        {
+            return DebugString.Format(value);
+        }
     }
 
     public static bool TryParse(
@@ -41,19 +97,24 @@ internal static class StateValueConverter
         out object? value,
         out string error)
     {
+        ArgumentNullException.ThrowIfNull(type);
+
         text ??= string.Empty;
-        var valueType = Nullable.GetUnderlyingType(type);
-        if (valueType != null && string.IsNullOrWhiteSpace(text))
+        var nullableType = Nullable.GetUnderlyingType(type);
+        var valueType = nullableType ?? type;
+
+        if (valueType == typeof(string))
         {
-            value = null;
+            value = text;
             error = string.Empty;
             return true;
         }
 
-        valueType ??= type;
-        if (valueType == typeof(string))
+        if ((nullableType is not null || !type.IsValueType) &&
+            (string.IsNullOrWhiteSpace(text) ||
+             string.Equals(text.Trim(), "null", StringComparison.OrdinalIgnoreCase)))
         {
-            value = text;
+            value = null;
             error = string.Empty;
             return true;
         }
@@ -70,79 +131,200 @@ internal static class StateValueConverter
             return false;
         }
 
-        var style = NumberStyles.Integer;
-        var culture = CultureInfo.InvariantCulture;
-        var success = false;
-        value = null;
-        if (valueType == typeof(bool))
-        {
-            success = bool.TryParse(text, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(byte))
-        {
-            success = byte.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(sbyte))
-        {
-            success = sbyte.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(short))
-        {
-            success = short.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(ushort))
-        {
-            success = ushort.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(int))
-        {
-            success = int.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(uint))
-        {
-            success = uint.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(long))
-        {
-            success = long.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(ulong))
-        {
-            success = ulong.TryParse(text, style, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(float))
-        {
-            success = float.TryParse(text, NumberStyles.Float, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(double))
-        {
-            success = double.TryParse(text, NumberStyles.Float, culture, out var parsed);
-            value = parsed;
-        }
-        else if (valueType == typeof(decimal))
-        {
-            success = decimal.TryParse(text, NumberStyles.Number, culture, out var parsed);
-            value = parsed;
-        }
-
-        if (success)
+        if (TryConvertFromString(text, valueType, out value) ||
+            TryInvokeParse(text, valueType, out value) ||
+            TryDeserializeJson(text, valueType, out value))
         {
             error = string.Empty;
             return true;
         }
 
         value = null;
-        error = $"'{text}' is not a valid {valueType.Name} value.";
+        error = $"'{text}' is not a valid {valueType.Name} value. " +
+            "Enter a value accepted by its string converter or a JSON representation.";
         return false;
+    }
+
+    private static bool TryConvertFromString(
+        string text,
+        Type valueType,
+        out object? value)
+    {
+        var converter = TypeDescriptor.GetConverter(valueType);
+        if (converter.CanConvertFrom(typeof(string)))
+        {
+            try
+            {
+                value = converter.ConvertFromInvariantString(text);
+                return value is not null || !valueType.IsValueType;
+            }
+            catch (Exception exception) when (IsConversionException(exception))
+            {
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryInvokeParse(
+        string text,
+        Type valueType,
+        out object? value)
+    {
+        foreach (var method in valueType.GetMethods(
+                     BindingFlags.Public | BindingFlags.Static))
+        {
+            if (method.Name != "TryParse" || method.ReturnType != typeof(bool))
+            {
+                continue;
+            }
+
+            var parameters = method.GetParameters();
+            object?[]? arguments = parameters switch
+            {
+                [{ ParameterType: var textType }, { IsOut: true } output]
+                    when textType == typeof(string) &&
+                         output.ParameterType == valueType.MakeByRefType() =>
+                    [text, null],
+
+                [{ ParameterType: var textType }, { ParameterType: var providerType }, { IsOut: true } output]
+                    when textType == typeof(string) &&
+                         providerType == typeof(IFormatProvider) &&
+                         output.ParameterType == valueType.MakeByRefType() =>
+                    [text, CultureInfo.InvariantCulture, null],
+
+                _ => null,
+            };
+
+            if (arguments is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (method.Invoke(null, arguments) is true)
+                {
+                    value = arguments[^1];
+                    return true;
+                }
+            }
+            catch (Exception exception) when (IsConversionException(exception))
+            {
+            }
+        }
+
+        foreach (var method in valueType.GetMethods(
+                     BindingFlags.Public | BindingFlags.Static))
+        {
+            if (method.Name != "Parse" || method.ReturnType != valueType)
+            {
+                continue;
+            }
+
+            var parameters = method.GetParameters();
+            object?[]? arguments = parameters switch
+            {
+                [{ ParameterType: var textType }]
+                    when textType == typeof(string) =>
+                    [text],
+
+                [{ ParameterType: var textType }, { ParameterType: var providerType }]
+                    when textType == typeof(string) &&
+                         providerType == typeof(IFormatProvider) =>
+                    [text, CultureInfo.InvariantCulture],
+
+                _ => null,
+            };
+
+            if (arguments is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                value = method.Invoke(null, arguments);
+                return value is not null;
+            }
+            catch (Exception exception) when (IsConversionException(exception))
+            {
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryDeserializeJson(
+        string text,
+        Type valueType,
+        out object? value)
+    {
+        if (valueType == typeof(object))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(text);
+                value = ConvertJsonElement(document.RootElement);
+                return true;
+            }
+            catch (JsonException)
+            {
+                value = text;
+                return true;
+            }
+        }
+
+        try
+        {
+            value = JsonSerializer.Deserialize(
+                text,
+                valueType,
+                s_jsonOptions);
+            return value is not null || !valueType.IsValueType;
+        }
+        catch (Exception exception) when (IsConversionException(exception))
+        {
+            value = null;
+            return false;
+        }
+    }
+
+    private static object? ConvertJsonElement(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.Null or JsonValueKind.Undefined => null,
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number when element.TryGetInt64(out var integer) => integer,
+            JsonValueKind.Number when element.TryGetDecimal(out var number) => number,
+            JsonValueKind.Number => element.GetDouble(),
+            JsonValueKind.Array => element
+                .EnumerateArray()
+                .Select(ConvertJsonElement)
+                .ToList(),
+            JsonValueKind.Object => element
+                .EnumerateObject()
+                .ToDictionary(
+                    static property => property.Name,
+                    static property => ConvertJsonElement(property.Value)),
+            _ => element.GetRawText(),
+        };
+    }
+
+    private static bool IsConversionException(Exception exception)
+    {
+        return exception is ArgumentException
+            or FormatException
+            or InvalidCastException
+            or InvalidOperationException
+            or NotSupportedException
+            or OverflowException
+            or TargetInvocationException
+            or JsonException;
     }
 }

@@ -27,6 +27,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\Akbura.Diagnostics\Akbura.Diagnostics.csproj" />
 		<ProjectReference Include="..\..\Akbura\Akbura.csproj" />
 		<ProjectReference Include="..\..\Akbura.Build.Tasks\Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
 		<ProjectReference Include="..\..\Akbura.Furioso\Akbura.Furioso.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />

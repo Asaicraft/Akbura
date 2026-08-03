@@ -1,0 +1,171 @@
+Border.diagnostic-input-root {
+    @apply p-1
+        bg-slate-900
+        border-1
+        border-slate-700
+        rounded-lg;
+}
+
+StackPanel.diagnostic-input-stack {
+    Spacing: 6d;
+}
+
+Grid.diagnostic-input-layout {
+    ColumnSpacing: 8d;
+}
+
+ComboBox.diagnostic-input-builder {
+    MinWidth: 164d;
+    MinHeight: 40d;
+
+    HorizontalContentAlignment: Stretch;
+    VerticalContentAlignment: Center;
+
+    @apply bg-slate-800
+        border-1
+        border-slate-700
+        rounded-lg;
+
+    @if(IsPointerOver && IsEnabled) {
+        @apply bg-slate-700
+            border-slate-600;
+    }
+
+    @if(IsFocused) {
+        @apply border-blue-500;
+    }
+
+    @if(!IsEnabled) {
+        Opacity: 0.55d;
+    }
+}
+
+Border.diagnostic-input-builder-item {
+    MinHeight: 28d;
+
+    @apply px-2
+        py-1
+        rounded-md;
+}
+
+Grid.diagnostic-input-builder-content {
+    ColumnSpacing: 8d;
+}
+
+Path.diagnostic-input-builder-icon {
+    Width: 16d;
+    Height: 16d;
+
+    Stretch: Stretch.Uniform;
+    VerticalAlignment: VerticalAlignment.Center;
+
+    Fill:
+        Amx.DynamicResource<IBrush>(
+            "--color-slate-300");
+}
+
+TextBlock.diagnostic-input-builder-name {
+    VerticalAlignment: VerticalAlignment.Center;
+
+    @apply text-sm
+        text-slate-200;
+}
+
+Border.diagnostic-input-editor {
+    MinHeight: 40d;
+
+    @apply px-2
+        bg-slate-800
+        border-1
+        border-slate-700
+        rounded-lg;
+}
+
+ContentPresenter.diagnostic-input-content {
+    HorizontalAlignment: HorizontalAlignment.Stretch;
+    VerticalAlignment: VerticalAlignment.Center;
+}
+
+TextBlock.diagnostic-input-empty {
+    HorizontalAlignment: HorizontalAlignment.Center;
+    VerticalAlignment: VerticalAlignment.Center;
+
+    @apply text-sm
+        text-slate-500;
+}
+
+Button.diagnostic-input-apply {
+    Width: 40d;
+    Height: 40d;
+    Padding: new Thickness(10d);
+
+    HorizontalContentAlignment: HorizontalAlignment.Center;
+    VerticalContentAlignment: VerticalAlignment.Center;
+
+    @apply bg-blue-600
+        border-1
+        border-blue-500
+        rounded-lg;
+
+    @if(IsPointerOver && IsEnabled) {
+        @apply bg-blue-500
+            border-blue-400;
+    }
+
+    @if(IsPressed && IsEnabled) {
+        @apply bg-blue-700;
+    }
+}
+
+Button.diagnostic-input-reload {
+    Width: 40d;
+    Height: 40d;
+    Padding: new Thickness(10d);
+
+    HorizontalContentAlignment: HorizontalAlignment.Center;
+    VerticalContentAlignment: VerticalAlignment.Center;
+
+    @apply bg-slate-800
+        border-1
+        border-slate-700
+        rounded-lg;
+
+    @if(IsPointerOver && IsEnabled) {
+        @apply bg-slate-700
+            border-slate-600;
+    }
+
+    @if(IsPressed && IsEnabled) {
+        @apply bg-slate-600;
+    }
+
+    @if(!IsEnabled) {
+        Opacity: 0.35d;
+    }
+}
+
+Path.diagnostic-input-apply-icon {
+    Width: 18d;
+    Height: 18d;
+
+    Stretch: Stretch.Uniform;
+    Fill: Brushes.White;
+}
+
+Path.diagnostic-input-action-icon {
+    Width: 18d;
+    Height: 18d;
+
+    Stretch: Stretch.Uniform;
+
+    Fill:
+        Amx.DynamicResource<IBrush>(
+            "--color-slate-200");
+}
+
+TextBlock.diagnostic-input-error {
+    TextWrapping: TextWrapping.Wrap;
+
+    @apply text-sm
+        text-red-400;
+}

@@ -15,21 +15,58 @@ public static class AkburaDiagnosticsExtensions
 
     public static void AttachAkburaDevTools(this Application application)
     {
-        AttachAkburaDevTools(application, new KeyGesture(Key.F12));
+        AttachAkburaDevTools(application, static _ => { });
     }
 
+    /// <summary>
+    /// Attaches Akbura developer tools and configures them before the window is
+    /// created.
+    /// </summary>
+    /// <param name="application">The Avalonia application.</param>
+    /// <param name="options">
+    /// A callback that configures the toggle gesture, value editors, and
+    /// optional services available to editors.
+    /// </param>
+    public static void AttachAkburaDevTools(
+        this Application application,
+        Action<AkburaDiagnosticsOptions> options)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var diagnosticsOptions = new AkburaDiagnosticsOptions();
+        options(diagnosticsOptions);
+
+        AttachAkburaDevToolsCore(
+            application,
+            diagnosticsOptions.CreateConfiguration());
+    }
+
+    /// <summary>
+    /// Attaches Akbura developer tools with a custom toggle gesture.
+    /// </summary>
     public static void AttachAkburaDevTools(
         this Application application,
         KeyGesture toggleGesture)
     {
-        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(toggleGesture);
 
+        AttachAkburaDevTools(
+            application,
+            options => options.ToggleGesture = toggleGesture);
+    }
+
+    private static void AttachAkburaDevToolsCore(
+        Application application,
+        AkburaDiagnosticsConfiguration configuration)
+    {
         lock (s_gate)
         {
             if (s_attachments.TryGetValue(application, out var existing))
             {
-                if (!DiagnosticsAttachment.HasSameGesture(existing.ToggleGesture, toggleGesture))
+                if (!DiagnosticsAttachment.HasSameGesture(
+                        existing.ToggleGesture,
+                        configuration.ToggleGesture))
                 {
                     throw new InvalidOperationException(
                         "Akbura diagnostics has already been attached with a different key gesture.");
@@ -38,7 +75,9 @@ public static class AkburaDiagnosticsExtensions
                 return;
             }
 
-            var attachment = new DiagnosticsAttachment(application, toggleGesture);
+            var attachment = new DiagnosticsAttachment(
+                application,
+                configuration);
             s_attachments.Add(application, attachment);
             attachment.ScheduleInitialization();
         }
@@ -58,17 +97,21 @@ public static class AkburaDiagnosticsExtensions
             KeyModifiers.Meta;
 
         private readonly Application _application;
+        private readonly AkburaDiagnosticsConfiguration _configuration;
         private IDisposable? _keyDownSubscription;
         private IDisposable? _keyUpSubscription;
         private readonly KeyGestureLatch _gestureLatch;
         private IClassicDesktopStyleApplicationLifetime? _desktopLifetime;
         private DiagnosticsWindow? _window;
 
-        public DiagnosticsAttachment(Application application, KeyGesture toggleGesture)
+        public DiagnosticsAttachment(
+            Application application,
+            AkburaDiagnosticsConfiguration configuration)
         {
             _application = application;
-            ToggleGesture = toggleGesture;
-            _gestureLatch = new KeyGestureLatch(toggleGesture);
+            _configuration = configuration;
+            ToggleGesture = configuration.ToggleGesture;
+            _gestureLatch = new KeyGestureLatch(configuration.ToggleGesture);
         }
 
         public KeyGesture ToggleGesture { get; }
@@ -168,7 +211,9 @@ public static class AkburaDiagnosticsExtensions
                 return;
             }
 
-            var window = new DiagnosticsWindow();
+            var window = new DiagnosticsWindow(
+                _configuration.InputBuilders,
+                _configuration.Services);
             _window = window;
             window.Closed += (_, _) =>
             {

@@ -2,10 +2,10 @@ using Akbura.ComponentTree;
 using Akbura.Engine;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using System.Collections;
 using System.Globalization;
 
 namespace Akbura.Diagnostics;
@@ -15,6 +15,7 @@ internal partial class DiagnosticsRoot : AkburaControl
     private readonly Dictionary<TreeViewItem, AkburaControl> _componentByItem = [];
     private AkburaControl? _selectedComponent;
     private bool _isAttached;
+    private bool _isRenderingDetails;
 
     public DiagnosticsRoot()
         : base(AkburaEngine.Empty)
@@ -27,10 +28,33 @@ internal partial class DiagnosticsRoot : AkburaControl
 
     internal int DetailRenderVersion { get; private set; }
 
+    internal IInputBuilderProvider InputBuilders { get; set; } =
+        new InputBuilderProvider(InputBuilderProvider.CreateDefaultBuilders());
+
+    internal IServiceProvider? InputServices { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if (VisualRoot != null)
+        {
+            AttachDiagnostics();
+        }
+    }
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
 
+        if (IsInitialized)
+        {
+            AttachDiagnostics();
+        }
+    }
+
+    private void AttachDiagnostics()
+    {
         if (_isAttached)
         {
             return;
@@ -57,6 +81,11 @@ internal partial class DiagnosticsRoot : AkburaControl
 
     private void OnComponentRegistryChanged(object? sender, EventArgs e)
     {
+        if (_isRenderingDetails)
+        {
+            return;
+        }
+
         if (Dispatcher.UIThread.CheckAccess())
         {
             RefreshTree();
@@ -210,27 +239,40 @@ internal partial class DiagnosticsRoot : AkburaControl
 
     private void RenderDetails()
     {
-        DetailRenderVersion++;
-        detailsPanel.Children.Clear();
-        var component = _selectedComponent;
-        if (component == null)
+        if (_isRenderingDetails)
         {
-            selectionTitle.Text = "No component selected";
-            selectionType.Text = string.Empty;
-            detailsPanel.Children.Add(new TextBlock
-            {
-                Text = "Attach an Akbura component to the visual tree to inspect it.",
-                TextWrapping = TextWrapping.Wrap,
-                Opacity = 0.7,
-            });
             return;
         }
 
-        selectionTitle.Text = GetComponentDisplayName(component);
-        selectionType.Text = component.GetType().FullName ?? component.GetType().Name;
-        AppendServices(component);
-        AppendStates(component);
-        AppendParameters(component);
+        _isRenderingDetails = true;
+        try
+        {
+            DetailRenderVersion++;
+            detailsPanel.Children.Clear();
+            var component = _selectedComponent;
+            if (component == null)
+            {
+                selectionTitle.Text = "No component selected";
+                selectionType.Text = string.Empty;
+                detailsPanel.Children.Add(new TextBlock
+                {
+                    Text = "Attach an Akbura component to the visual tree to inspect it.",
+                    TextWrapping = TextWrapping.Wrap,
+                    Opacity = 0.7,
+                });
+                return;
+            }
+
+            selectionTitle.Text = GetComponentDisplayName(component);
+            selectionType.Text = component.GetType().FullName ?? component.GetType().Name;
+            AppendServices(component);
+            AppendStates(component);
+            AppendParameters(component);
+        }
+        finally
+        {
+            _isRenderingDetails = false;
+        }
     }
 
     private void AppendServices(AkburaControl component)
@@ -269,7 +311,7 @@ internal partial class DiagnosticsRoot : AkburaControl
         {
             foreach (var state in states)
             {
-                section.Children.Add(CreateStateRow(state));
+                section.Children.Add(CreateStateRow(component, state));
             }
         }
 
@@ -288,11 +330,7 @@ internal partial class DiagnosticsRoot : AkburaControl
         {
             foreach (var parameter in parameters)
             {
-                section.Children.Add(CreateReadOnlyRow(
-                    parameter.Name,
-                    parameter.AvaloniaProperty.PropertyType,
-                    parameter.Binding.ToString(),
-                    DebugString.Format(component.GetValue(parameter.AvaloniaProperty))));
+                section.Children.Add(CreateParameterRow(component, parameter));
             }
         }
 
@@ -301,26 +339,26 @@ internal partial class DiagnosticsRoot : AkburaControl
 
     private static StackPanel CreateSection(string title)
     {
-        var section = new StackPanel
-        {
-            Spacing = 8,
-        };
-        section.Children.Add(new TextBlock
+        var section = new StackPanel();
+        section.Classes.Add("diagnostic-section");
+
+        var heading = new TextBlock
         {
             Text = title,
-            FontSize = 16,
-            FontWeight = FontWeight.SemiBold,
-        });
+        };
+        heading.Classes.Add("diagnostic-section-title");
+        section.Children.Add(heading);
         return section;
     }
 
     private static Control CreateEmptyValue()
     {
-        return new TextBlock
+        var value = new TextBlock
         {
             Text = "None",
-            Opacity = 0.55,
         };
+        value.Classes.Add("diagnostic-empty");
+        return value;
     }
 
     private static Control CreateReadOnlyRow(
@@ -330,22 +368,7 @@ internal partial class DiagnosticsRoot : AkburaControl
         string value)
     {
         var row = CreateValueRow();
-        var identity = new StackPanel
-        {
-            Spacing = 2,
-        };
-        identity.Children.Add(new TextBlock
-        {
-            Text = name,
-            FontWeight = FontWeight.Medium,
-        });
-        identity.Children.Add(new TextBlock
-        {
-            Text = $"{GetTypeDisplayName(type)} | {detail}",
-            FontSize = 12,
-            Opacity = 0.6,
-        });
-        row.Children.Add(identity);
+        row.Children.Add(CreateIdentity(name, type, detail));
 
         var valueText = new TextBlock
         {
@@ -353,122 +376,182 @@ internal partial class DiagnosticsRoot : AkburaControl
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Center,
         };
+        valueText.Classes.Add("diagnostic-value");
         Grid.SetColumn(valueText, 1);
         row.Children.Add(valueText);
         return row;
     }
 
-    private static Control CreateStateRow(State state)
+    private Control CreateStateRow(
+        AkburaControl component,
+        State state)
     {
-        var container = new StackPanel
-        {
-            Spacing = 7,
-        };
-        var row = CreateValueRow();
-        var identity = new StackPanel
-        {
-            Spacing = 2,
-        };
-        identity.Children.Add(new TextBlock
-        {
-            Text = state.Info?.Name ?? "State",
-            FontWeight = FontWeight.Medium,
-        });
-        identity.Children.Add(new TextBlock
-        {
-            Text = $"{GetTypeDisplayName(state.ValueType)} | initial {DebugString.Format(state.BoxedInitialValue)}",
-            FontSize = 12,
-            Opacity = 0.6,
-        });
-        row.Children.Add(identity);
+        return CreateEditableRow(
+            component,
+            state.Info?.Name ?? "State",
+            state.ValueType,
+            $"initial {DebugString.Format(state.BoxedInitialValue)}",
+            DataVariation.State,
+            state.BoxedValue,
+            value => state.BoxedValue = value);
+    }
 
-        if (!StateValueConverter.CanEdit(state.ValueType))
+    private Control CreateParameterRow(
+        AkburaControl component,
+        Parameter parameter)
+    {
+        var property = parameter.AvaloniaProperty;
+        var currentValue = component.GetValue(property);
+        if (property.IsReadOnly &&
+            currentValue is not IList &&
+            currentValue is not IDictionary)
         {
-            var value = new TextBlock
-            {
-                Text = DebugString.Format(state.BoxedValue),
-                TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            Grid.SetColumn(value, 1);
-            row.Children.Add(value);
-            container.Children.Add(row);
-            return container;
+            return CreateReadOnlyRow(
+                parameter.Name,
+                property.PropertyType,
+                $"{parameter.Binding} | readonly",
+                DebugString.Format(currentValue));
         }
 
-        var editor = new Grid
+        return CreateEditableRow(
+            component,
+            parameter.Name,
+            property.PropertyType,
+            parameter.Binding.ToString(),
+            DataVariation.Parameter,
+            currentValue,
+            value => ApplyParameterValue(component, parameter, value));
+    }
+
+    private Control CreateEditableRow(
+        AkburaControl component,
+        string name,
+        Type type,
+        string detail,
+        DataVariation variation,
+        object? value,
+        Action<object> commitValue)
+    {
+        var row = CreateValueRow();
+        row.Children.Add(CreateIdentity(name, type, detail));
+
+        var editor = new DiagnosticInput
         {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            ColumnSpacing = 8,
+            InputBuilders = InputBuilders,
+            Request = new InputRequest
+            {
+                RequestedType = type,
+                ComponentType = component.GetType(),
+                Variation = variation,
+                MemberName = name,
+                ComponentInstance = component,
+                Services = InputServices,
+                ExistingValue = value,
+            },
+            Value = value!,
+            CommitValue = commitValue,
         };
-        var input = new TextBox
-        {
-            Text = StateValueConverter.FormatForEditor(state.BoxedValue, state.ValueType),
-            MinWidth = 180,
-        };
-        var apply = new Button
-        {
-            Content = "Apply",
-            VerticalAlignment = VerticalAlignment.Stretch,
-        };
-        Grid.SetColumn(apply, 1);
-        editor.Children.Add(input);
-        editor.Children.Add(apply);
         Grid.SetColumn(editor, 1);
         row.Children.Add(editor);
-        container.Children.Add(row);
+        return row;
+    }
 
-        var error = new TextBlock
+    private static StackPanel CreateIdentity(
+        string name,
+        Type type,
+        string detail)
+    {
+        var identity = new StackPanel();
+        identity.Classes.Add("diagnostic-identity");
+
+        var nameText = new TextBlock { Text = name };
+        nameText.Classes.Add("diagnostic-name");
+        identity.Children.Add(nameText);
+
+        var detailText = new TextBlock
         {
-            Foreground = Brushes.OrangeRed,
-            FontSize = 12,
-            IsVisible = false,
+            Text = $"{GetTypeDisplayName(type)} | {detail}",
             TextWrapping = TextWrapping.Wrap,
         };
-        container.Children.Add(error);
+        detailText.Classes.Add("diagnostic-detail");
+        identity.Children.Add(detailText);
+        return identity;
+    }
 
-        void ApplyValue()
+    private static void ApplyParameterValue(
+        AkburaControl component,
+        Parameter parameter,
+        object? value)
+    {
+        var property = parameter.AvaloniaProperty;
+        if (!property.IsReadOnly)
         {
-            if (!StateValueConverter.TryParse(input.Text, state.ValueType, out var value, out var message))
-            {
-                error.Text = message;
-                error.IsVisible = true;
-                return;
-            }
-
-            try
-            {
-                state.BoxedValue = value;
-                error.IsVisible = false;
-            }
-            catch (Exception exception)
-            {
-                error.Text = exception.Message;
-                error.IsVisible = true;
-            }
+            component.SetCurrentValue(property, value);
+            return;
         }
 
-        apply.Click += (_, _) => ApplyValue();
-        input.KeyDown += (_, eventArgs) =>
+        var currentValue = component.GetValue(property);
+        if (TryReplaceCollection(currentValue, value))
         {
-            if (eventArgs.Key == Key.Enter)
-            {
-                eventArgs.Handled = true;
-                ApplyValue();
-            }
-        };
+            component.OnParameterChanged();
+            return;
+        }
 
-        return container;
+        throw new InvalidOperationException(
+            $"Parameter '{parameter.Name}' is readonly and its current value " +
+            "is not a mutable collection.");
+    }
+
+    private static bool TryReplaceCollection(
+        object? currentValue,
+        object? replacement)
+    {
+        if (ReferenceEquals(currentValue, replacement))
+        {
+            return true;
+        }
+
+        if (currentValue is IDictionary targetDictionary &&
+            replacement is IDictionary sourceDictionary &&
+            !targetDictionary.IsReadOnly)
+        {
+            var entries = sourceDictionary
+                .Cast<DictionaryEntry>()
+                .ToArray();
+            targetDictionary.Clear();
+            foreach (var entry in entries)
+            {
+                targetDictionary.Add(entry.Key, entry.Value);
+            }
+
+            return true;
+        }
+
+        if (currentValue is IList targetList &&
+            replacement is IEnumerable sourceItems &&
+            !targetList.IsReadOnly)
+        {
+            var items = sourceItems.Cast<object?>().ToArray();
+            targetList.Clear();
+            foreach (var item in items)
+            {
+                targetList.Add(item);
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private static Grid CreateValueRow()
     {
-        return new Grid
+        var row = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("220,*"),
-            ColumnSpacing = 16,
-            MinHeight = 38,
+            ColumnDefinitions = new ColumnDefinitions("200,*"),
         };
+        row.Classes.Add("diagnostic-value-row");
+        return row;
     }
 
     private static string GetTypeDisplayName(Type type)

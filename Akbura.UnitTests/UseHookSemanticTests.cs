@@ -494,6 +494,27 @@ public sealed class UseHookSemanticTests
             diagnostic.Message.Contains("ambiguous", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void LeadingComment_IsNotReportedAsUseHookExpression()
+    {
+        const string code =
+            "using Akbura.Hooks;\n" +
+            "// Explain the effect.\n" +
+            "useEffect(() => Missing(), []);";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var statement = Assert.IsType<CSharpStatementSyntax>(
+            syntaxTree.GetRoot().Members.Last());
+
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(statement),
+            candidate => candidate.Code == ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError);
+
+        var expression = Assert.IsType<string>(diagnostic.Parameters[0]);
+        Assert.StartsWith("useEffect(", expression, StringComparison.Ordinal);
+        Assert.DoesNotContain("Explain the effect", expression, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(
         "using Hooks;\nstate int value = useRender();",

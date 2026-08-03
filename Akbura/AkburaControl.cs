@@ -574,13 +574,17 @@ public abstract class AkburaControl : Control, IComponentTree
 	/// <inheritdoc/>
 	protected override Size MeasureOverride(Size availableSize)
 	{
-		return LayoutHelper.MeasureChild(Child, availableSize, Padding);
+		return Child is { } child
+			? LayoutHelper.MeasureChild(child, availableSize, Padding)
+			: default;
 	}
 
 	/// <inheritdoc/>
 	protected override Size ArrangeOverride(Size finalSize)
 	{
-		return LayoutHelper.ArrangeChild(Child, finalSize, Padding);
+		return Child is { } child
+			? LayoutHelper.ArrangeChild(child, finalSize, Padding)
+			: finalSize;
 	}
 
 	/// <summary>

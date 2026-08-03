@@ -1,3 +1,4 @@
+using Akbura.Diagnostics;
 using Akbura.FeatureGallery.ViewModels;
 using Akbura.FeatureGallery.Views;
 using Avalonia;
@@ -17,6 +18,7 @@ public partial class App : Application
 
 #if DEBUG
         this.AttachDeveloperTools();
+        this.AttachAkburaDevTools(new Avalonia.Input.KeyGesture(Avalonia.Input.Key.F12, modifiers: Avalonia.Input.KeyModifiers.Control));
 #endif
     }
 

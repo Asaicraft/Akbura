@@ -20,6 +20,10 @@ public static class AvaloniaPropertyHooks
             .GetObservable(property)
             .Subscribe(new StateObserver<TValue>(state));
         state.RetainSubscription(subscription);
+
+        var stateSubscription = state.Subscribe(
+            value => control.SetCurrentValue(property, value));
+        state.RetainSubscription(stateSubscription);
         return state;
     }
 

@@ -17,8 +17,9 @@ state string error = "";
 useEffect(
     () =>
     {
+        var inputRequest = GetInputRequest();
         var builders = InputBuilders
-            .Provides(Request)
+            .Provides(inputRequest)
             .ToArray();
 
         availableInputBuilders = builders;
@@ -37,15 +38,15 @@ useEffect(
         var selectedType = selectedInputBuilder?.GetType();
 
         var builder = selectedType is null
-            ? InputBuilders.Provide(Request)
+            ? InputBuilders.Provide(inputRequest)
             : builders.FirstOrDefault(
                 candidate => candidate.GetType() == selectedType)
-                ?? InputBuilders.Provide(Request);
+                ?? InputBuilders.Provide(inputRequest);
 
         selectedInputBuilder = builder;
-        inputControl = builder.Build(Request, inputValue);
+        inputControl = builder.Build(inputRequest, inputValue);
     },
-    [Request]);
+    [Request, InputBuilders]);
 
 // Connect the generated editor to this component's InputValueProperty.
 useEffect(
@@ -85,6 +86,14 @@ bool IsDirty()
         appliedValue);
 }
 
+InputRequest GetInputRequest()
+{
+    return Request with
+    {
+        InputBuilders = this.InputBuilders,
+    };
+}
+
 void SelectInputBuilder(InputBuilder? builder)
 {
     if (builder is null ||
@@ -97,7 +106,7 @@ void SelectInputBuilder(InputBuilder? builder)
 
     // Preserve the current draft when changing the input method.
     inputControl = builder.Build(
-        Request,
+        GetInputRequest(),
         inputValue);
 }
 
@@ -129,8 +138,13 @@ void Reload()
     error = "";
 }
 
-string GetBuilderName(InputBuilder builder)
+string GetBuilderName(InputBuilder? builder)
 {
+    if (builder is null)
+    {
+        return "";
+    }
+
     var name = builder.GetType().Name;
     const string suffix = nameof(InputBuilder);
 
@@ -143,7 +157,8 @@ string GetBuilderName(InputBuilder builder)
 
 <Border class="diagnostic-input-root">
 
-    <StackPanel class="diagnostic-input-stack">
+    <Grid class="diagnostic-input-stack"
+          RowDefinitions="Auto,Auto">
 
         <Grid class="diagnostic-input-layout"
               ColumnDefinitions="Auto,*,Auto,Auto">
@@ -162,13 +177,13 @@ string GetBuilderName(InputBuilder builder)
                     x.ItemName="builder">
 
                     <Border class="diagnostic-input-builder-item"
-                            ToolTip.Tip={builder.GetType().Name}>
+                            ToolTip.Tip={builder?.GetType().Name}>
 
                         <Grid class="diagnostic-input-builder-content"
                               ColumnDefinitions="Auto,*">
 
                             <Path class="diagnostic-input-builder-icon"
-                                  Data="M3,17.25 V21 H6.75 L17.81,9.94 L14.06,6.19 Z M20.71,7.04 C21.1,6.65 21.1,6 20.71,5.63 L18.37,3.29 C18,2.9 17.35,2.9 16.96,3.29 L15.12,5.12 L18.87,8.87 Z"/>
+                                  Data={builder?.Icon}/>
 
                             <TextBlock Grid.Column="1"
                                        class="diagnostic-input-builder-name"
@@ -208,7 +223,7 @@ string GetBuilderName(InputBuilder builder)
                     Click={() => Apply()}>
 
                 <Path class="diagnostic-input-apply-icon"
-                      Data="M9,16.17 L4.83,12 L3.41,13.41 L9,19 L21,7 L19.59,5.59 Z"/>
+                      Data={DiagnosticResources.ApplyIcon}/>
 
             </Button>
 
@@ -219,16 +234,17 @@ string GetBuilderName(InputBuilder builder)
                     Click={() => Reload()}>
 
                 <Path class="diagnostic-input-action-icon"
-                      Data="M17.65,6.35 C16.2,4.9 14.21,4 12,4 C7.58,4 4,7.58 4,12 C4,16.42 7.58,20 12,20 C15.73,20 18.84,17.45 19.73,14 L17.65,14 C16.83,16.33 14.61,18 12,18 C8.69,18 6,15.31 6,12 C6,8.69 8.69,6 12,6 C13.66,6 15.14,6.69 16.22,7.78 L13,11 L20,11 L20,4 Z"/>
+                      Data={DiagnosticResources.ReloadIcon}/>
 
             </Button>
 
         </Grid>
 
-        <TextBlock class="diagnostic-input-error"
+        <TextBlock Grid.Row="1"
+                   class="diagnostic-input-error"
                    IsVisible={error.Length != 0}
                    Text={error}/>
 
-    </StackPanel>
+    </Grid>
 
 </Border>

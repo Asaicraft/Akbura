@@ -1,0 +1,83 @@
+param IInputBuilderProvider InputBuilders;
+param InputRequest Request;
+
+state object? inputValue =
+    useAvaloniaProperty(InputBuilder.InputValueProperty);
+
+state IReadOnlyList<CollectionInputItem> items =
+    CollectionInputValue.CreateItems(
+        inputValue,
+        Request);
+
+useEffect(
+    () =>
+    {
+        items = CollectionInputValue.CreateItems(
+            inputValue,
+            Request);
+    },
+    [inputValue, Request]);
+
+void UpdateItem(int index, object? value)
+{
+    inputValue = CollectionInputValue.ReplaceItem(
+        inputValue,
+        Request.EditorType,
+        index,
+        value);
+}
+
+string GetCollectionSummary()
+{
+    return $"[{items.Count}] {Request.EditorType.Name}";
+}
+
+<Expander class="collection-input"
+          IsExpanded="False">
+
+    <Expander.Header>
+
+        <TextBlock class="collection-input-summary"
+                   Text={GetCollectionSummary()}/>
+
+    </Expander.Header>
+
+    <Grid class="collection-input-content"
+          RowDefinitions="Auto,Auto">
+
+        <ItemsControl class="collection-input-items"
+                      ItemsSource={items}>
+
+            <ItemsControl.ItemTemplate
+                x.DataType="CollectionInputItem"
+                x.ItemName="item">
+
+                <Grid class="collection-input-item"
+                      ColumnDefinitions="42,*">
+
+                    <TextBlock class="collection-input-index"
+                               Text={$"[{item.Index}]"}/>
+
+                    <DiagnosticInput Grid.Column="1"
+                                     InputBuilders={InputBuilders}
+                                     Request={item.Request}
+                                     Value={item.Value!}
+                                     CommitValue={value =>
+                                         UpdateItem(
+                                             item.Index,
+                                             value)}/>
+
+                </Grid>
+
+            </ItemsControl.ItemTemplate>
+
+        </ItemsControl>
+
+        <TextBlock Grid.Row="1"
+                   class="collection-input-empty"
+                   IsVisible={items.Count == 0}
+                   Text="Collection is empty"/>
+
+    </Grid>
+
+</Expander>

@@ -1,4 +1,7 @@
 Border.diagnostic-input-root {
+    MinWidth: 0d;
+    HorizontalAlignment: HorizontalAlignment.Stretch;
+
     @apply p-1
         bg-slate-900
         border-1
@@ -6,12 +9,16 @@ Border.diagnostic-input-root {
         rounded-lg;
 }
 
-StackPanel.diagnostic-input-stack {
-    Spacing: 6d;
+Grid.diagnostic-input-stack {
+    MinWidth: 0d;
+    RowSpacing: 6d;
+    HorizontalAlignment: HorizontalAlignment.Stretch;
 }
 
 Grid.diagnostic-input-layout {
+    MinWidth: 0d;
     ColumnSpacing: 8d;
+    HorizontalAlignment: HorizontalAlignment.Stretch;
 }
 
 ComboBox.diagnostic-input-builder {
@@ -72,6 +79,7 @@ TextBlock.diagnostic-input-builder-name {
 }
 
 Border.diagnostic-input-editor {
+    MinWidth: 0d;
     MinHeight: 40d;
 
     @apply px-2
@@ -82,6 +90,7 @@ Border.diagnostic-input-editor {
 }
 
 ContentPresenter.diagnostic-input-content {
+    MinWidth: 0d;
     HorizontalAlignment: HorizontalAlignment.Stretch;
     VerticalAlignment: VerticalAlignment.Center;
 }
@@ -97,7 +106,7 @@ TextBlock.diagnostic-input-empty {
 Button.diagnostic-input-apply {
     Width: 40d;
     Height: 40d;
-    Padding: new Thickness(10d);
+    Padding: new Thickness(0d);
 
     HorizontalContentAlignment: HorizontalAlignment.Center;
     VerticalContentAlignment: VerticalAlignment.Center;
@@ -120,7 +129,7 @@ Button.diagnostic-input-apply {
 Button.diagnostic-input-reload {
     Width: 40d;
     Height: 40d;
-    Padding: new Thickness(10d);
+    Padding: new Thickness(0d);
 
     HorizontalContentAlignment: HorizontalAlignment.Center;
     VerticalContentAlignment: VerticalAlignment.Center;
@@ -145,18 +154,22 @@ Button.diagnostic-input-reload {
 }
 
 Path.diagnostic-input-apply-icon {
-    Width: 18d;
-    Height: 18d;
+    Width: 16d;
+    Height: 16d;
 
     Stretch: Stretch.Uniform;
+    HorizontalAlignment: HorizontalAlignment.Center;
+    VerticalAlignment: VerticalAlignment.Center;
     Fill: Brushes.White;
 }
 
 Path.diagnostic-input-action-icon {
-    Width: 18d;
-    Height: 18d;
+    Width: 16d;
+    Height: 16d;
 
     Stretch: Stretch.Uniform;
+    HorizontalAlignment: HorizontalAlignment.Center;
+    VerticalAlignment: VerticalAlignment.Center;
 
     Fill:
         Amx.DynamicResource<IBrush>(
@@ -164,6 +177,7 @@ Path.diagnostic-input-action-icon {
 }
 
 TextBlock.diagnostic-input-error {
+    MinWidth: 0d;
     TextWrapping: TextWrapping.Wrap;
 
     @apply text-sm

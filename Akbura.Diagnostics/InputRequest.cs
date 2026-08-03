@@ -44,6 +44,8 @@ public sealed record InputRequest
     /// </summary>
     public object? ExistingValue { get; init; }
 
+    internal IInputBuilderProvider? InputBuilders { get; init; }
+
     /// <summary>
     /// Gets the concrete type that should be preserved by an editor.
     /// </summary>

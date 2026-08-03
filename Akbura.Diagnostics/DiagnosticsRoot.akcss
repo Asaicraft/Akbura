@@ -99,12 +99,14 @@ TextBlock.diagnostics-selection-type {
 }
 
 ScrollViewer.diagnostics-details-scroll {
-    HorizontalScrollBarVisibility: ScrollBarVisibility.Auto;
+    HorizontalScrollBarVisibility: ScrollBarVisibility.Disabled;
     VerticalScrollBarVisibility: ScrollBarVisibility.Auto;
+    HorizontalContentAlignment: HorizontalAlignment.Stretch;
 }
 
 StackPanel.diagnostics-details {
-    MinWidth: 620d;
+    MinWidth: 0d;
     Spacing: 20d;
     Margin: new Thickness(24d);
+    HorizontalAlignment: HorizontalAlignment.Stretch;
 }

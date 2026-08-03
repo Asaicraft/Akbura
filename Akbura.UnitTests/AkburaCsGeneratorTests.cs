@@ -24,6 +24,141 @@ namespace Akbura.UnitTests;
 public sealed class AkburaCsGeneratorTests
 {
     [Fact]
+    public void Generator_UsesInstantiableMarkupTypeWhenStaticTypeHasSameName()
+    {
+        const string component =
+            "using Avalonia.Controls;\n" +
+            "using Avalonia.Controls.Shapes;\n" +
+            "\n" +
+            "<Button>\n" +
+            "    <Path />\n" +
+            "</Button>\n";
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedPathContentTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    "global using System.IO;",
+                    parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "IconButton.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var text = generated.SourceText.ToString();
+        Assert.Contains(
+            "private global::Avalonia.Controls.Shapes.Path __element1",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Avalonia.Controls.ContentControl.ContentProperty, __element1",
+            text,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Generator_UsesControlCandidateForAmbiguousAkcssTargetType()
+    {
+        const string akcss =
+            "@using Avalonia.Controls.Shapes;\n" +
+            "@using Avalonia.Media;\n" +
+            "\n" +
+            "Path.icon {\n" +
+            "    Width: 18d;\n" +
+            "    Fill: Brushes.White;\n" +
+            "}\n";
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedPathStyleTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    "global using System.IO;",
+                    parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "Icon.akcss");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(akcss)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var text = generated.SourceText.ToString();
+        Assert.Contains(
+            "global::Avalonia.Controls.Shapes.Path",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Avalonia.Controls.Shapes.Shape.FillProperty",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Avalonia.Media.Brushes.White",
+            text,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void Generator_EmitsCompilableComponentLifecycleAndDescriptors()
     {
         const string component =

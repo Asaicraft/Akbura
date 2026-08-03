@@ -1,6 +1,7 @@
 using Akbura.ComponentTree;
 using Akbura.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -269,6 +270,26 @@ public sealed class DiagnosticsTests
     }
 
     [Fact]
+    public void InputBuilderProvider_PrefersCollectionInputOverUniversalInput()
+    {
+        var configuration = new AkburaDiagnosticsOptions()
+            .CreateConfiguration();
+        var request = new InputRequest
+        {
+            RequestedType = typeof(IList<int>),
+            ExistingValue = new List<int> { 1, 2, 3 },
+            ComponentType = typeof(InspectableComponent),
+            Variation = DataVariation.Parameter,
+        };
+        var builders = configuration.InputBuilders
+            .Provides(request)
+            .ToArray();
+
+        Assert.IsType<CollectionInputBuilder>(builders[0]);
+        Assert.IsType<UniversalInputBuilder>(builders[^1]);
+    }
+
+    [Fact]
     public async Task InputBuilderBinding_SynchronizesValuesInBothDirections()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
@@ -288,6 +309,314 @@ public sealed class DiagnosticsTests
 
                 InputBuilder.SetInputValue(source, "external");
                 Assert.Equal("external", InputBuilder.GetInputValue(input));
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task InputBuilders_LoadTheirIconsFromDiagnosticsResources()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+
+        await session.Dispatch(
+            () =>
+            {
+                var stringIcon = new StringInputBuilder().Icon;
+                var collectionIcon = new CollectionInputBuilder().Icon;
+                var universalIcon = new UniversalInputBuilder().Icon;
+
+                Assert.NotSame(stringIcon, universalIcon);
+                Assert.NotSame(collectionIcon, universalIcon);
+                Assert.True(stringIcon.Bounds.Width > 0d);
+                Assert.True(stringIcon.Bounds.Height > 0d);
+                Assert.True(collectionIcon.Bounds.Width > 0d);
+                Assert.True(collectionIcon.Bounds.Height > 0d);
+                Assert.True(universalIcon.Bounds.Width > 0d);
+                Assert.True(universalIcon.Bounds.Height > 0d);
+                Assert.True(
+                    universalIcon.Bounds.Height /
+                    universalIcon.Bounds.Width >= 0.75d);
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task CollectionInput_UsesNestedDiagnosticInputsForItems()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+
+        await session.Dispatch(
+            () =>
+            {
+                var original =
+                    new System.Collections.ObjectModel.ObservableCollection<int>
+                    {
+                        1,
+                        2,
+                        3,
+                    };
+                var request = new InputRequest
+                {
+                    RequestedType = typeof(IList<int>),
+                    ExistingValue = original,
+                    ComponentType = typeof(InspectableComponent),
+                    Variation = DataVariation.Parameter,
+                };
+                var input = Assert.IsType<CollectionInput>(
+                    new CollectionInputBuilder().Build(
+                        request,
+                        request.ExistingValue));
+                var window = new DiagnosticsWindow
+                {
+                    Content = input,
+                };
+
+                window.Show();
+                window.UpdateLayout();
+
+                var expander = Assert.IsType<Expander>(input.Child);
+                Assert.False(expander.IsExpanded);
+
+                expander.IsExpanded = true;
+                window.UpdateLayout();
+
+                var itemsControl = input.GetVisualDescendants()
+                    .OfType<ItemsControl>()
+                    .Single();
+                var itemModels = Assert.IsAssignableFrom<
+                    IEnumerable<CollectionInputItem>>(
+                        itemsControl.ItemsSource);
+                Assert.Equal(3, itemModels.Count());
+
+                var itemTemplate = Assert.IsAssignableFrom<
+                    Avalonia.Controls.Templates.IDataTemplate>(
+                        itemsControl.ItemTemplate);
+                var itemHost = new StackPanel();
+                foreach (var item in itemModels)
+                {
+                    itemHost.Children.Add(
+                        Assert.IsType<Grid>(
+                            itemTemplate.Build(item)));
+                }
+
+                var itemWindow = new Window
+                {
+                    Content = itemHost,
+                };
+                itemWindow.Show();
+                itemWindow.UpdateLayout();
+
+                var editors = itemHost.GetVisualDescendants()
+                    .OfType<DiagnosticInput>()
+                    .OrderBy(static editor => editor.Request.MemberName)
+                    .ToArray();
+                Assert.Equal(3, editors.Length);
+                Assert.All(
+                    editors,
+                    static editor =>
+                        Assert.Equal(
+                            typeof(int),
+                            editor.Request.RequestedType));
+
+                ApplyEditorValue(editors[1], 8);
+
+                var updated = Assert.IsType<
+                    System.Collections.ObjectModel.ObservableCollection<int>>(
+                        InputBuilder.GetInputValue(input));
+                Assert.NotSame(original, updated);
+                Assert.Equal([1, 8, 3], updated);
+                Assert.Equal([1, 2, 3], original);
+
+                expander.IsExpanded = false;
+                Assert.False(expander.IsExpanded);
+
+                itemWindow.Close();
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DiagnosticsDetails_ConstrainLongErrorsToAvailableWidth()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+
+        await session.Dispatch(
+            () =>
+            {
+                var diagnosticsWindow = new DiagnosticsWindow
+                {
+                    Width = 760d,
+                    Height = 560d,
+                };
+                diagnosticsWindow.Show();
+
+                var diagnosticsRoot = Assert.IsType<DiagnosticsRoot>(
+                    diagnosticsWindow.Content);
+                var detailsScroll = diagnosticsRoot.Child!
+                    .GetVisualDescendants()
+                    .OfType<ScrollViewer>()
+                    .Single(scroll =>
+                        scroll.Content is StackPanel);
+
+                Assert.Equal(
+                    ScrollBarVisibility.Disabled,
+                    detailsScroll.HorizontalScrollBarVisibility);
+                Assert.Equal(
+                    Avalonia.Layout.HorizontalAlignment.Stretch,
+                    detailsScroll.HorizontalContentAlignment);
+
+                var editor = new DiagnosticInput
+                {
+                    InputBuilders = new AkburaDiagnosticsOptions()
+                        .CreateConfiguration()
+                        .InputBuilders,
+                    Request = new InputRequest
+                    {
+                        RequestedType = typeof(string),
+                        ComponentType = typeof(InspectableComponent),
+                        Variation = DataVariation.Parameter,
+                        ExistingValue = "value",
+                    },
+                    Value = "value",
+                    CommitValue = static _ =>
+                        throw new FormatException(new string('x', 2_000)),
+                };
+                var host = new ScrollViewer
+                {
+                    Width = 480d,
+                    HorizontalScrollBarVisibility =
+                        ScrollBarVisibility.Disabled,
+                    Content = editor,
+                };
+                diagnosticsWindow.Content = host;
+                diagnosticsWindow.UpdateLayout();
+                InputBuilder.SetInputValue(editor, "changed");
+                diagnosticsWindow.UpdateLayout();
+                ApplyEditorValue(editor, "changed");
+                diagnosticsWindow.UpdateLayout();
+
+                var error = editor.GetVisualDescendants()
+                    .OfType<TextBlock>()
+                    .Single(text =>
+                        text.Text?.Length == 2_000);
+                Assert.True(error.IsVisible);
+                Assert.True(
+                    error.Bounds.Width <= editor.Bounds.Width,
+                    $"Error width {error.Bounds.Width} exceeded editor width {editor.Bounds.Width}.");
+                Assert.True(
+                    host.Extent.Width <= host.Viewport.Width + 0.5d,
+                    $"Extent {host.Extent.Width} exceeded viewport {host.Viewport.Width}.");
+
+                diagnosticsWindow.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DiagnosticInput_ActionButtonsContainPathIcons()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+
+        await session.Dispatch(
+            () =>
+            {
+                var configuration = new AkburaDiagnosticsOptions()
+                    .CreateConfiguration();
+                var editor = new DiagnosticInput
+                {
+                    InputBuilders = configuration.InputBuilders,
+                    Request = new InputRequest
+                    {
+                        RequestedType = typeof(string),
+                        ComponentType = typeof(InspectableComponent),
+                        Variation = DataVariation.Parameter,
+                        ExistingValue = "value",
+                    },
+                    Value = "value",
+                    CommitValue = static _ => { },
+                };
+                var window = new DiagnosticsWindow
+                {
+                    Content = editor,
+                };
+
+                window.Show();
+
+                var buttons = editor.GetVisualDescendants()
+                    .OfType<Button>()
+                    .ToArray();
+                Assert.Equal(2, buttons.Length);
+                Assert.All(
+                    buttons,
+                    static button =>
+                    {
+                        var icon = Assert.IsType<Avalonia.Controls.Shapes.Path>(
+                            button.Content);
+                        Assert.NotNull(icon.Fill);
+                        Assert.Equal(16d, icon.Width);
+                        Assert.Equal(16d, icon.Height);
+                        Assert.Equal(
+                            Avalonia.Layout.HorizontalAlignment.Center,
+                            icon.HorizontalAlignment);
+                        Assert.Equal(
+                            Avalonia.Layout.VerticalAlignment.Center,
+                            icon.VerticalAlignment);
+                        Assert.Equal(
+                            new Avalonia.Thickness(0d),
+                            button.Padding);
+                    });
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DiagnosticInput_ItemTemplateAcceptsTransientNullItem()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+
+        await session.Dispatch(
+            () =>
+            {
+                var configuration = new AkburaDiagnosticsOptions()
+                    .CreateConfiguration();
+                var editor = new DiagnosticInput
+                {
+                    InputBuilders = configuration.InputBuilders,
+                    Request = new InputRequest
+                    {
+                        RequestedType = typeof(string),
+                        ComponentType = typeof(InspectableComponent),
+                        Variation = DataVariation.Parameter,
+                        ExistingValue = "value",
+                    },
+                    Value = "value",
+                    CommitValue = static _ => { },
+                };
+                var window = new DiagnosticsWindow
+                {
+                    Content = editor,
+                };
+
+                window.Show();
+
+                var selector = editor.GetVisualDescendants()
+                    .OfType<ComboBox>()
+                    .Single();
+                var template = Assert.IsAssignableFrom<
+                    Avalonia.Controls.Templates.IDataTemplate>(
+                        selector.ItemTemplate);
+
+                Assert.NotNull(template.Build(null));
+
+                window.Close();
             },
             CancellationToken.None);
     }
@@ -388,6 +717,9 @@ public sealed class DiagnosticsTests
         var apply = editor.GetVisualDescendants()
             .OfType<Button>()
             .Single(button =>
+                ReferenceEquals(
+                    button.FindAncestorOfType<DiagnosticInput>(),
+                    editor) &&
                 string.Equals(
                     ToolTip.GetTip(button) as string,
                     "Apply changes",

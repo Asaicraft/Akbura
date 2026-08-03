@@ -2,9 +2,9 @@ using Akbura.Engine;
 
 namespace Akbura.Diagnostics;
 
-public partial class DiagnosticInput : AkburaControl
+public partial class CollectionInput : AkburaControl
 {
-    public DiagnosticInput()
+    public CollectionInput()
         : base(AkburaEngine.Empty)
     {
     }

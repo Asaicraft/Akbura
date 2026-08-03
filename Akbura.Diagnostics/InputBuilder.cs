@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Markup.Xaml.MarkupExtensions.CompiledBindings;
+using Avalonia.Media;
 
 namespace Akbura.Diagnostics;
 
@@ -109,6 +110,12 @@ public abstract class InputBuilder : AvaloniaObject
     {
         return BuildCore(request);
     }
+
+    /// <summary>
+    /// Gets the icon displayed for this input method in diagnostics.
+    /// </summary>
+    public virtual StreamGeometry Icon =>
+        DiagnosticResources.InputBuilderIcon;
 
     /// <summary>
     /// Creates and configures a control for editing the requested value.

@@ -74,6 +74,7 @@ internal sealed class InputBuilderProvider : IInputBuilderProvider
             new NumericInputBuilder<float>(isNullable: true),
             new NumericInputBuilder<double>(isNullable: true),
             new NumericInputBuilder<decimal>(isNullable: true),
+            new CollectionInputBuilder(),
             new UniversalInputBuilder(),
         ];
     }

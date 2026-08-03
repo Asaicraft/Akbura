@@ -1,0 +1,58 @@
+Expander.collection-input {
+    MinWidth: 0d;
+    Padding: new Thickness(8d);
+    Background: Brushes.Transparent;
+    HorizontalAlignment: HorizontalAlignment.Stretch;
+    HorizontalContentAlignment: HorizontalAlignment.Stretch;
+}
+
+TextBlock.collection-input-summary {
+    MinHeight: 32d;
+    VerticalAlignment: VerticalAlignment.Center;
+    TextTrimming: TextTrimming.CharacterEllipsis;
+
+    @apply text-xs
+        text-slate-400;
+}
+
+Grid.collection-input-content {
+    MinWidth: 0d;
+    RowSpacing: 4d;
+    Margin: new Thickness(0d);
+    HorizontalAlignment: HorizontalAlignment.Stretch;
+}
+
+ItemsControl.collection-input-items {
+    MinWidth: 0d;
+    HorizontalAlignment: HorizontalAlignment.Stretch;
+}
+
+Border.collection-input-item {
+    MinWidth: 0d;
+    Margin: new Thickness(0d, 0d, 0d, 4d);
+    Padding: new Thickness(6d);
+    HorizontalAlignment: HorizontalAlignment.Stretch;
+
+    @apply bg-slate-950
+        border-1
+        border-slate-800
+        rounded-md;
+}
+
+TextBlock.collection-input-index {
+    HorizontalAlignment: HorizontalAlignment.Left;
+    VerticalAlignment: VerticalAlignment.Center;
+
+    @apply px-1
+        text-xs
+        font-medium
+        text-slate-500;
+}
+
+TextBlock.collection-input-empty {
+    HorizontalAlignment: HorizontalAlignment.Center;
+
+    @apply py-3
+        text-sm
+        text-slate-500;
+}

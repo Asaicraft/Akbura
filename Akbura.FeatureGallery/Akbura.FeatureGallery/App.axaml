@@ -14,7 +14,43 @@
 			<ResourceDictionary.MergedDictionaries>
 				<ResourceInclude Source="avares://Akbura/Styles.axaml" />
 			</ResourceDictionary.MergedDictionaries>
+
+			<StreamGeometry x:Key="Akbura.FeatureGallery.Diagnostics.RouteInputBuilder.Icon">
+				M11,2
+				H13
+				V5
+				H19
+				L22,8
+				L19,11
+				H13
+				V22
+				H11
+				V15
+				H5
+				L2,12
+				L5,9
+				H11
+				Z
+
+				M13,7
+				V9
+				H18.17
+				L19.17,8
+				L18.17,7
+				Z
+
+				M5.83,11
+				L4.83,12
+				L5.83,13
+				H11
+				V11
+				Z
+		</StreamGeometry>
+
 		</ResourceDictionary>
+
+		
+
 	</Application.Resources>
 
 

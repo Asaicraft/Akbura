@@ -1,0 +1,16 @@
+﻿@page "/diagnostics/"
+@attribute [RenderStatic]
+@inject MarkdownPages Markdown
+
+@await Html.PartialAsync("DocsPage", new Shared.DocsPage
+{
+    Brand = "DIAGNOSTICS",
+    Folder = "diagnostics",
+    Slug = "index",
+    DefaultMenu = new MarkdownMenu
+    {
+        Icon = Markdown.DefaultMenuIcon,
+        Text = "Diagnostics",
+        Link = "/diagnostics/",
+    },
+}.Init(this, Markdown))

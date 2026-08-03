@@ -1,9 +1,12 @@
+using Akbura.Diagnostics;
+using Akbura.FeatureGallery.Diagnostics;
 using Akbura.FeatureGallery.ViewModels;
 using Akbura.FeatureGallery.Views;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using System.Linq;
 
@@ -17,6 +20,17 @@ public partial class App : Application
 
 #if DEBUG
         this.AttachDeveloperTools();
+        this.AttachAkburaDevTools(
+            options =>
+            {
+                options.ToggleGesture = new KeyGesture(
+                    Key.F12,
+                    KeyModifiers.Control);
+
+                options.InputBuilders.Insert(
+                    0,
+                    new RouteInputBuilder());
+            });
 #endif
     }
 

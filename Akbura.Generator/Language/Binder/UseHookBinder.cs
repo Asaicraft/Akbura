@@ -722,7 +722,7 @@ internal sealed class UseHookBinder : Binder
         using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
         AkburaSemanticModel.AddCSharpBindingDiagnostics(
             syntax,
-            invocation.ToFullString().Trim(),
+            invocation.WithoutLeadingTrivia().ToFullString().Trim(),
             bindingResult,
             builder);
         return builder.ToImmutable();

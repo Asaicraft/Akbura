@@ -22,18 +22,19 @@
 			<IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
 			<PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
 		</PackageReference>
-		
+
 		<PackageReference Include="CommunityToolkit.Mvvm" />
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\Akbura.Diagnostics\Akbura.Diagnostics.csproj" />
 		<ProjectReference Include="..\..\Akbura\Akbura.csproj" />
 		<ProjectReference Include="..\..\Akbura.Build.Tasks\Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
 		<ProjectReference Include="..\..\Akbura.Furioso\Akbura.Furioso.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Pages\" />
+		<Folder Include="Pages\" />
 	</ItemGroup>
 
 	<Import Project="..\..\Akbura\buildTransitive\Akbura.targets" />

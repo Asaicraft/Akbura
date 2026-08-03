@@ -1,5 +1,6 @@
 ﻿using Akbura.Akcss;
 using Akbura.ComponentTree;
+using Akbura.Diagnostics;
 using Akbura.Engine;
 using Akbura.Hooks;
 using Akbura.Markup;
@@ -20,1064 +21,1134 @@ namespace Akbura;
 
 public abstract class AkburaControl : Control, IComponentTree
 {
-	private readonly AvaloniaList<IComponentTree> _componentChildren = [];
-	private IComponentTree? _componentParent;
-
-	public static readonly DirectProperty<AkburaControl, Control?> ChildProperty =
-		AvaloniaProperty.RegisterDirect<AkburaControl, Control?>(nameof(Child), getter: x => x.Child);
-
-	public static readonly StyledProperty<Thickness> PaddingProperty =
-		Decorator.PaddingProperty.AddOwner<AkburaControl>();
-
-	public static readonly AttachedProperty<ImmutableArray<AkcssStyleActivator>> AkcssStylesProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, ImmutableArray<AkcssStyleActivator>>(
-			"AkcssStyles",
-			coerce: CoerceAkcssStyles);
-
-	/// <summary>
-	/// Initializes static members of the <see cref="Decorator"/> class.
-	/// </summary>
-	static AkburaControl()
-	{
-		AffectsMeasure<AkburaControl>(ChildProperty, PaddingProperty);
-		ChildProperty.Changed.AddClassHandler<AkburaControl>((x, e) => x.ChildChanged(e));
-		InitializeExplicitThickness();
-		AkcssStylesProperty.Changed.AddClassHandler<Control>(OnAkcssStylesChanged);
-	}
-
-	public Control? Child
-	{
-		get; private set => SetAndRaise(ChildProperty, ref field, value);
-	}
-
-	/// <summary>
-	/// Gets or sets the padding placed between the border of the control and its content.
-	/// </summary>
-	public Thickness Padding
-	{
-		get => GetValue(PaddingProperty);
-		set => SetValue(PaddingProperty, value);
-	}
-
-	/// <summary>
-	/// Gets the ordered AKCSS applications attached to a control.
-	/// </summary>
-	public static ImmutableArray<AkcssStyleActivator> GetAkcssStyles(Control control)
-	{
-		ArgumentNullException.ThrowIfNull(control);
-
-		var styles = control.GetValue(AkcssStylesProperty);
-		return styles.IsDefault ? ImmutableArray<AkcssStyleActivator>.Empty : styles;
-	}
-
-	/// <summary>
-	/// Attaches the complete ordered AKCSS cascade to a control.
-	/// </summary>
-	public static void SetAkcssStyles(
-		Control control,
-		ImmutableArray<AkcssStyleActivator> styles)
-	{
-		ArgumentNullException.ThrowIfNull(control);
-
-		if (control.IsSet(AkcssStylesProperty))
-		{
-			throw new InvalidOperationException("AkcssStyles has already been set.");
-		}
-
-		control.SetValue(
-			AkcssStylesProperty,
-			ValidateAkcssStyles(styles));
-	}
-
-	/// <summary>
-	/// Reapplies the complete AKCSS cascade attached to a control.
-	/// </summary>
-	public static void ExecuteAkcssStyles(Control control)
-	{
-		ArgumentNullException.ThrowIfNull(control);
-		AkcssRuntime.Refresh(control);
-	}
-
-	private static ImmutableArray<AkcssStyleActivator> CoerceAkcssStyles(
-		AvaloniaObject sender,
-		ImmutableArray<AkcssStyleActivator> styles)
-		=> ValidateAkcssStyles(styles);
-
-	private static ImmutableArray<AkcssStyleActivator> ValidateAkcssStyles(
-		ImmutableArray<AkcssStyleActivator> styles)
-	{
-		if (styles.IsDefault)
-		{
-			return [];
-		}
-
-		for (var index = 0; index < styles.Length; index++)
-		{
-			if (styles[index] == null)
-			{
-				throw new ArgumentException(
-					$"AKCSS style activator at index {index} is null.",
-					nameof(styles));
-			}
-		}
-
-		return styles;
-	}
-
-	private static void OnAkcssStylesChanged(
-		Control control,
-		AvaloniaPropertyChangedEventArgs args)
-	{
-		var styles = args.NewValue is ImmutableArray<AkcssStyleActivator> value
-			? value
-			: ImmutableArray<AkcssStyleActivator>.Empty;
-		AkcssRuntime.SetStyles(control, styles);
-	}
-
-	private readonly AkburaEngine _engine;
-	private bool _updatesEnabled;
-	private bool _isUpdating;
-	private bool _updatePending;
-	private int _updateSuppressionDepth;
-	private readonly UseHookRuntime _useHooks;
-
-	public AkburaControl() : this(AkburaEngine.Singletone)
-	{
-
-	}
-
-	public AkburaControl(AkburaEngine akburaEngine)
-	{
-		_engine = akburaEngine;
-		_useHooks = new UseHookRuntime(this);
-	}
-
-	IComponentTree? IComponentTree.ComponentParent
-	{
-		get => _componentParent;
-	}
-
-	IAvaloniaReadOnlyList<IComponentTree> IComponentTree.ComponentChildren =>
-		_componentChildren;
-
-	public void InvalidState()
-	{
-		RequestUpdate();
-	}
-
-	protected override void OnInitialized()
-	{
-		base.OnInitialized();
-
-		var services = GetServices();
-		var validatedServices = GetServices();
-		if (services != validatedServices)
-		{
-			throw new AkburaServicesArrayChangedException(this);
-		}
-
-		for (var index = 0; index < services.Length; index++)
-		{
-			services[index].Inject(this, _engine);
-		}
-
-		Child = FirstUpdate();
-
-		var parameters = GetParameters();
-		for (var index = 0; index < parameters.Length; index++)
-		{
-			var parameter = parameters[index];
-			if (!parameter.IsSet(this))
-			{
-				throw new AkburaParameterNotSettedException(this, parameter);
-			}
-		}
-
-		var validatedParameters = GetParameters();
-		if (parameters != validatedParameters)
-		{
-			throw new AkburaParametersArrayChangedException(this);
-		}
-
-		var commands = GetCommands();
-		var validatedCommands = GetCommands();
-		if (commands != validatedCommands)
-		{
-			throw new AkburaCommandsArrayChangedException(this);
-		}
-
-		var states = GetStates();
-		var validatedStates = GetStates();
-		if (states != validatedStates)
-		{
-			throw new AkburaStatesArrayChangedException(this);
-		}
-
-		_updatesEnabled = true;
-		RequestUpdate();
-	}
-
-	protected abstract Control Update();
-
-	protected abstract Control FirstUpdate();
-
-	/// <summary>
-	/// Creates an instance state from a state description.
-	/// </summary>
-	/// <typeparam name="T">The state value type.</typeparam>
-	/// <param name="info">The static state description.</param>
-	/// <returns>A state attached to this component.</returns>
-	protected State<T> CreateState<T>(StateInfo<T> info)
-	{
-		ArgumentNullException.ThrowIfNull(info);
-
-		return info.CreateTypedState(this);
-	}
-
-	/// <summary>
-	/// Suppresses component updates until the returned scope is disposed.
-	/// </summary>
-	/// <returns>An update suppression scope.</returns>
-	protected IDisposable SuppressUpdates()
-	{
-		_updateSuppressionDepth++;
-		return new UpdateSuppressionScope(this);
-	}
-
-	/// <summary>
-	/// Gets the parameters declared by this component.
-	/// </summary>
-	/// <remarks>
-	/// Implementations must cache and return the same immutable array instance on every call.
-	/// </remarks>
-	/// <returns>The component parameter descriptors.</returns>
-	protected abstract ImmutableArray<Parameter> GetParameters();
-
-	/// <summary>
-	/// Gets the Avalonia properties that expose commands declared by this component.
-	/// </summary>
-	/// <remarks>
-	/// Implementations must cache and return the same immutable array instance on every call.
-	/// </remarks>
-	/// <returns>The component command properties.</returns>
-	protected abstract ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands();
-
-	/// <summary>
-	/// Gets the services injected into this component.
-	/// </summary>
-	/// <remarks>
-	/// Implementations must cache and return the same immutable array instance on every call.
-	/// </remarks>
-	/// <returns>The component injected-service descriptors.</returns>
-	protected abstract ImmutableArray<InjectService> GetServices();
-
-	/// <summary>
-	/// Gets the states declared by this component.
-	/// </summary>
-	/// <remarks>
-	/// Implementations must cache and return the same immutable array instance on every call.
-	/// </remarks>
-	/// <returns>The component states.</returns>
-	protected abstract ImmutableArray<State> GetStates();
-
-	[EditorBrowsable(EditorBrowsableState.Never)]
-	[Browsable(false)]
-	protected IServiceProvider CreateMarkupServiceProvider(
-		object targetObject,
-		object targetProperty,
-		object intermediateRootObject,
-		Uri baseUri,
-		IReadOnlyList<object> directParentsStack,
-		IServiceProvider? fallbackServiceProvider = null,
-		IReadOnlyDictionary<string, Type>? knownTypes = null)
-	{
-		IAvaloniaXamlIlEagerParentStackProvider?
-			parentProvider = null;
-
-		if (fallbackServiceProvider?.GetService(
-				typeof(
-					IAvaloniaXamlIlParentStackProvider))
-			is IAvaloniaXamlIlEagerParentStackProvider
-				deferredParentProvider)
-		{
-			parentProvider = deferredParentProvider;
-		}
-
-		if (parentProvider == null &&
-			Application.Current is { } application)
-		{
-			parentProvider =
-				new AkburaApplicationParentStackProvider(
-					application);
-		}
-
-		return new AkburaMarkupServiceProvider(
-			targetObject: targetObject,
-			targetProperty: targetProperty,
-			rootObject: this,
-			intermediateRootObject:
-				intermediateRootObject,
-			baseUri: baseUri,
-			directParentsStack:
-				directParentsStack,
-			parentProvider: parentProvider,
-			fallbackServiceProvider:
-				fallbackServiceProvider,
-			knownTypes: knownTypes);
-	}
-
-	/// <summary>
-	/// Creates deferred template content for generated Akbura code.
-	/// </summary>
-	[EditorBrowsable(EditorBrowsableState.Never)]
-	[Browsable(false)]
-	protected static IDeferredContent CreateDeferredContent<T>(
-		Func<IServiceProvider, object> builder,
-		IServiceProvider parentServiceProvider)
-	{
-		return new AkburaDeferredContent<T>(
-			builder,
-			parentServiceProvider);
-	}
-
-	/// <summary>
-	/// Applies a markup extension result whose concrete runtime type
-	/// is not known by the generated code.
-	/// </summary>
-	[EditorBrowsable(EditorBrowsableState.Never)]
-	[Browsable(false)]
-	protected static void ApplyMarkupExtensionResult(
-		AvaloniaObject target,
-		AvaloniaProperty property,
-		object? value)
-	{
-		ArgumentNullException.ThrowIfNull(target);
-		ArgumentNullException.ThrowIfNull(property);
-
-		if (value is BindingBase binding)
-		{
-			target.Bind(property, binding);
-			return;
-		}
-
-		if (ReferenceEquals(value, AvaloniaProperty.UnsetValue))
-		{
-			// This clears the local value. It does not mean "do nothing".
-			target.SetValue(property, AvaloniaProperty.UnsetValue);
-			return;
-		}
-
-		// This also correctly handles Avalonia's DoNothing marker:
-		// AvaloniaObject.SetValue ignores it.
-		target.SetValue(property, value);
-	}
-
-	internal ImmutableArray<Parameter> GetDiagnosticParameters()
-	{
-		return GetParameters();
-	}
-
-	internal ImmutableArray<InjectService> GetDiagnosticServices()
-	{
-		return GetServices();
-	}
-
-	internal ImmutableArray<State> GetDiagnosticStates()
-	{
-		return GetStates();
-	}
-
-	internal void OnParameterChanged()
-	{
-		RequestUpdate();
-	}
-
-	/// <summary>
-	/// Registers one invocation of a render use hook in the current frame.
-	/// </summary>
-	/// <typeparam name="TState">The persistent runtime state owned by this hook slot.</typeparam>
-	/// <typeparam name="TArguments">The arguments captured for the current frame.</typeparam>
-	/// <param name="key">The reference identity of the logical hook contract.</param>
-	/// <param name="arguments">The arguments for the current frame.</param>
-	/// <param name="createState">Creates the slot state on the first completed frame.</param>
-	/// <param name="apply">Applies the current arguments after each completed frame.</param>
-	/// <param name="detach">Stops resources owned by the slot when the component detaches.</param>
-	/// <remarks>
-	/// Hook calls must remain in the same order and count between completed render frames.
-	/// Methods marked with <see cref="CompilerAnotations.UseHookAttribute"/> can use this
-	/// primitive to implement custom persistent render hooks without compiler changes.
-	/// </remarks>
-	public void UseHook<TState, TArguments>(
-		UseHookKey key,
-		TArguments arguments,
-		Func<TArguments, TState> createState,
-		Action<TState, TArguments> apply,
-		Action<TState>? detach = null)
-		where TState : class
-	{
-		_useHooks.Register(new DelegateUseHookRegistration<TState, TArguments>(
-			key,
-			arguments,
-			createState,
-			apply,
-			detach));
-	}
-
-	internal void BeginStateNotification()
-	{
-		_updatePending = true;
-		_updateSuppressionDepth++;
-	}
-
-	internal void EndStateNotification()
-	{
-		EndUpdateSuppression();
-	}
-
-	private void RequestUpdate()
-	{
-		_updatePending = true;
-		ProcessPendingUpdates();
-	}
-
-	private void ProcessPendingUpdates()
-	{
-		if (!_updatesEnabled ||
-			_isUpdating ||
-			_updateSuppressionDepth != 0)
-		{
-			return;
-		}
-
-		var updateCount = 0;
-		var maxUpdatesPerBatch = _engine.MaxUpdatesPerBatch;
-		while (_updatePending && _updateSuppressionDepth == 0)
-		{
-			if (updateCount >= maxUpdatesPerBatch)
-			{
-				_updatePending = false;
-				throw new AkburaUpdateLimitExceededException(
-					this,
-					maxUpdatesPerBatch);
-			}
-
-			updateCount++;
-			_updatePending = false;
-			_isUpdating = true;
-			_useHooks.BeginFrame();
-			try
-			{
-				Child = Update();
-				_useHooks.CompleteFrame();
-			}
-			catch
-			{
-				_useHooks.AbortFrame();
-				throw;
-			}
-			finally
-			{
-				_isUpdating = false;
-			}
-		}
-	}
-
-	private void EndUpdateSuppression()
-	{
-		if (_updateSuppressionDepth == 0)
-		{
-			throw new InvalidOperationException("There is no active update suppression scope.");
-		}
-
-		_updateSuppressionDepth--;
-		if (_updateSuppressionDepth == 0)
-		{
-			ProcessPendingUpdates();
-		}
-	}
-
-	private sealed class UpdateSuppressionScope : IDisposable
-	{
-		private AkburaControl? _owner;
-
-		public UpdateSuppressionScope(AkburaControl owner)
-		{
-			_owner = owner;
-		}
-
-		public void Dispose()
-		{
-			var owner = _owner;
-			if (owner == null)
-			{
-				return;
-			}
-
-			_owner = null;
-			owner.EndUpdateSuppression();
-		}
-	}
-
-	protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-	{
-		base.OnAttachedToVisualTree(e);
-		SetComponentParent(FindComponentParent());
-		AkburaComponentRegistry.Attach(this);
-		if (_useHooks.NeedsRestart)
-		{
-			RequestUpdate();
-		}
-	}
-
-	protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-	{
-		base.OnDetachedFromVisualTree(e);
-		_useHooks.StopForDetach();
-		SetComponentParent(null);
-		AkburaComponentRegistry.Detach(this);
-	}
-
-	private IComponentTree? FindComponentParent()
-	{
-		for (var parent = this.GetVisualParent(); parent != null; parent = parent.GetVisualParent())
-		{
-			if (parent is IComponentTree componentParent)
-			{
-				return componentParent;
-			}
-		}
-
-		return null;
-	}
-
-	private void SetComponentParent(IComponentTree? componentParent)
-	{
-		if (ReferenceEquals(_componentParent, componentParent))
-		{
-			return;
-		}
-
-		if (_componentParent is AkburaControl oldParent)
-		{
-			oldParent._componentChildren.Remove(this);
-		}
-
-		_componentParent = componentParent;
-
-		if (componentParent is AkburaControl newParent &&
-			!newParent._componentChildren.Contains(this))
-		{
-			newParent._componentChildren.Add(this);
-		}
-	}
-
-	/// <inheritdoc/>
-	protected override Size MeasureOverride(Size availableSize)
-	{
-		return LayoutHelper.MeasureChild(Child, availableSize, Padding);
-	}
-
-	/// <inheritdoc/>
-	protected override Size ArrangeOverride(Size finalSize)
-	{
-		return LayoutHelper.ArrangeChild(Child, finalSize, Padding);
-	}
-
-	/// <summary>
-	/// Called when the <see cref="Child"/> property changes.
-	/// </summary>
-	/// <param name="e">The event args.</param>
-	private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
-	{
-		var oldChild = (Control?)e.OldValue;
-		var newChild = (Control?)e.NewValue;
-
-		if (oldChild != null)
-		{
-			VisualChildren.Remove(oldChild);
-			((ISetInheritanceParent)oldChild).SetParent(null);
-		}
-
-		if (newChild != null)
-		{
-			((ISetInheritanceParent)newChild).SetParent(this);
-
-			ApplyStylesToVisualTree(newChild);
-
-			VisualChildren.Add(newChild);
-		}
-	}
-
-
-	private static void ApplyStylesToVisualTree(Control root)
-	{
-		foreach (var visual in root.GetSelfAndVisualDescendants())
-		{
-			if (visual is StyledElement element)
-			{
-				element.ApplyStyling();
-			}
-		}
-	}
-
-	#region Explicit Thickness
-
-	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_paddingStates = new();
-	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_marginStates = new();
-	private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_borderThicknessStates = new();
-
-	public static readonly AttachedProperty<double?> ExplicitLeftPaddingProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitLeftPadding",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitTopPaddingProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitTopPadding",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitRightPaddingProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitRightPadding",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitBottomPaddingProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitBottomPadding",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitLeftMarginProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitLeftMargin",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitTopMarginProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitTopMargin",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitRightMarginProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitRightMargin",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitBottomMarginProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitBottomMargin",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitLeftBorderThicknessProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitLeftBorderThickness",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitTopBorderThicknessProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitTopBorderThickness",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitRightBorderThicknessProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitRightBorderThickness",
-			defaultValue: null);
-
-	public static readonly AttachedProperty<double?> ExplicitBottomBorderThicknessProperty =
-		AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
-			"ExplicitBottomBorderThickness",
-			defaultValue: null);
-
-	public static double? GetExplicitLeftPadding(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitLeftPaddingProperty);
-
-	public static void SetExplicitLeftPadding(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitLeftPaddingProperty, value);
-
-	public static double? GetExplicitTopPadding(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitTopPaddingProperty);
-
-	public static void SetExplicitTopPadding(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitTopPaddingProperty, value);
-
-	public static double? GetExplicitRightPadding(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitRightPaddingProperty);
-
-	public static void SetExplicitRightPadding(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitRightPaddingProperty, value);
-
-	public static double? GetExplicitBottomPadding(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitBottomPaddingProperty);
-
-	public static void SetExplicitBottomPadding(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitBottomPaddingProperty, value);
-
-	public static double? GetExplicitLeftMargin(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitLeftMarginProperty);
-
-	public static void SetExplicitLeftMargin(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitLeftMarginProperty, value);
-
-	public static double? GetExplicitTopMargin(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitTopMarginProperty);
-
-	public static void SetExplicitTopMargin(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitTopMarginProperty, value);
-
-	public static double? GetExplicitRightMargin(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitRightMarginProperty);
-
-	public static void SetExplicitRightMargin(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitRightMarginProperty, value);
-
-	public static double? GetExplicitBottomMargin(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitBottomMarginProperty);
-
-	public static void SetExplicitBottomMargin(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitBottomMarginProperty, value);
-
-	public static double? GetExplicitLeftBorderThickness(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitLeftBorderThicknessProperty);
-
-	public static void SetExplicitLeftBorderThickness(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitLeftBorderThicknessProperty, value);
-
-	public static double? GetExplicitTopBorderThickness(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitTopBorderThicknessProperty);
-
-	public static void SetExplicitTopBorderThickness(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitTopBorderThicknessProperty, value);
-
-	public static double? GetExplicitRightBorderThickness(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitRightBorderThicknessProperty);
-
-	public static void SetExplicitRightBorderThickness(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitRightBorderThicknessProperty, value);
-
-	public static double? GetExplicitBottomBorderThickness(Control control) =>
-		GetExplicitThicknessSide(control, ExplicitBottomBorderThicknessProperty);
-
-	public static void SetExplicitBottomBorderThickness(Control control, double? value) =>
-		SetExplicitThicknessSide(control, ExplicitBottomBorderThicknessProperty, value);
-
-	private static void InitializeExplicitThickness()
-	{
-		AddExplicitThicknessHandlers(
-			OnExplicitPaddingChanged,
-			ExplicitLeftPaddingProperty,
-			ExplicitTopPaddingProperty,
-			ExplicitRightPaddingProperty,
-			ExplicitBottomPaddingProperty);
-		AddExplicitThicknessHandlers(
-			OnExplicitMarginChanged,
-			ExplicitLeftMarginProperty,
-			ExplicitTopMarginProperty,
-			ExplicitRightMarginProperty,
-			ExplicitBottomMarginProperty);
-		AddExplicitThicknessHandlers(
-			OnExplicitBorderThicknessChanged,
-			ExplicitLeftBorderThicknessProperty,
-			ExplicitTopBorderThicknessProperty,
-			ExplicitRightBorderThicknessProperty,
-			ExplicitBottomBorderThicknessProperty);
-
-		PaddingProperty.Changed.AddClassHandler<AkburaControl>(OnPaddingChanged);
-		Decorator.PaddingProperty.Changed.AddClassHandler<Decorator>(OnPaddingChanged);
-		TemplatedControl.PaddingProperty.Changed.AddClassHandler<TemplatedControl>(OnPaddingChanged);
-		Layoutable.MarginProperty.Changed.AddClassHandler<Control>(OnMarginChanged);
-		Border.BorderThicknessProperty.Changed.AddClassHandler<Border>(OnBorderThicknessChanged);
-		TemplatedControl.BorderThicknessProperty.Changed.AddClassHandler<TemplatedControl>(OnBorderThicknessChanged);
-	}
-
-	private static void AddExplicitThicknessHandlers(
-		Action<Control, AvaloniaPropertyChangedEventArgs> handler,
-		params AttachedProperty<double?>[] properties)
-	{
-		foreach (var property in properties)
-		{
-			property.Changed.AddClassHandler<Control>(handler);
-		}
-	}
-
-	private static double? GetExplicitThicknessSide(
-		Control control,
-		AttachedProperty<double?> property)
-	{
-		ArgumentNullException.ThrowIfNull(control);
-		return control.GetValue(property);
-	}
-
-	private static void SetExplicitThicknessSide(
-		Control control,
-		AttachedProperty<double?> property,
-		double? value)
-	{
-		ArgumentNullException.ThrowIfNull(control);
-		control.SetValue(property, value);
-	}
-
-	private static void OnExplicitPaddingChanged(
-		Control control,
-		AvaloniaPropertyChangedEventArgs args)
-	{
-		var property = GetPaddingProperty(control);
-		if (property != null)
-		{
-			OnExplicitThicknessChanged(
-				control,
-				property,
-				s_paddingStates,
-				ExplicitLeftPaddingProperty,
-				ExplicitTopPaddingProperty,
-				ExplicitRightPaddingProperty,
-				ExplicitBottomPaddingProperty);
-		}
-	}
-
-	private static void OnExplicitMarginChanged(
-		Control control,
-		AvaloniaPropertyChangedEventArgs args)
-	{
-		OnExplicitThicknessChanged(
-			control,
-			Layoutable.MarginProperty,
-			s_marginStates,
-			ExplicitLeftMarginProperty,
-			ExplicitTopMarginProperty,
-			ExplicitRightMarginProperty,
-			ExplicitBottomMarginProperty);
-	}
-
-	private static void OnExplicitBorderThicknessChanged(
-		Control control,
-		AvaloniaPropertyChangedEventArgs args)
-	{
-		var property = GetBorderThicknessProperty(control);
-		if (property != null)
-		{
-			OnExplicitThicknessChanged(
-				control,
-				property,
-				s_borderThicknessStates,
-				ExplicitLeftBorderThicknessProperty,
-				ExplicitTopBorderThicknessProperty,
-				ExplicitRightBorderThicknessProperty,
-				ExplicitBottomBorderThicknessProperty);
-		}
-	}
-
-	private static void OnPaddingChanged(
-		Control control,
-		AvaloniaPropertyChangedEventArgs args)
-	{
-		var property = GetPaddingProperty(control);
-		if (property != null)
-		{
-			OnBaseThicknessChanged(
-				control,
-				property,
-				s_paddingStates,
-				args,
-				ExplicitLeftPaddingProperty,
-				ExplicitTopPaddingProperty,
-				ExplicitRightPaddingProperty,
-				ExplicitBottomPaddingProperty);
-		}
-	}
-
-	private static void OnMarginChanged(
-		Control control,
-		AvaloniaPropertyChangedEventArgs args)
-	{
-		OnBaseThicknessChanged(
-			control,
-			Layoutable.MarginProperty,
-			s_marginStates,
-			args,
-			ExplicitLeftMarginProperty,
-			ExplicitTopMarginProperty,
-			ExplicitRightMarginProperty,
-			ExplicitBottomMarginProperty);
-	}
-
-	private static void OnBorderThicknessChanged(
-		Control control,
-		AvaloniaPropertyChangedEventArgs args)
-	{
-		var property = GetBorderThicknessProperty(control);
-		if (property != null)
-		{
-			OnBaseThicknessChanged(
-				control,
-				property,
-				s_borderThicknessStates,
-				args,
-				ExplicitLeftBorderThicknessProperty,
-				ExplicitTopBorderThicknessProperty,
-				ExplicitRightBorderThicknessProperty,
-				ExplicitBottomBorderThicknessProperty);
-		}
-	}
-
-	private static void OnExplicitThicknessChanged(
-		Control control,
-		StyledProperty<Thickness> property,
-		ConditionalWeakTable<Control, ExplicitThicknessState> states,
-		AttachedProperty<double?> leftProperty,
-		AttachedProperty<double?> topProperty,
-		AttachedProperty<double?> rightProperty,
-		AttachedProperty<double?> bottomProperty)
-	{
-		if (!HasExplicitThickness(
-				control,
-				leftProperty,
-				topProperty,
-				rightProperty,
-				bottomProperty))
-		{
-			RestoreBaseThickness(control, property, states);
-			return;
-		}
-
-		var state = states.GetValue(
-			control,
-			key => new ExplicitThicknessState(key.GetValue(property)));
-		ApplyExplicitThickness(
-			control,
-			property,
-			state,
-			leftProperty,
-			topProperty,
-			rightProperty,
-			bottomProperty);
-	}
-
-	private static void OnBaseThicknessChanged(
-		Control control,
-		StyledProperty<Thickness> property,
-		ConditionalWeakTable<Control, ExplicitThicknessState> states,
-		AvaloniaPropertyChangedEventArgs args,
-		AttachedProperty<double?> leftProperty,
-		AttachedProperty<double?> topProperty,
-		AttachedProperty<double?> rightProperty,
-		AttachedProperty<double?> bottomProperty)
-	{
-		if (!states.TryGetValue(control, out var state) || state.IsApplying)
-		{
-			return;
-		}
-
-		state.BaseValue = (Thickness)args.NewValue!;
-		ApplyExplicitThickness(
-			control,
-			property,
-			state,
-			leftProperty,
-			topProperty,
-			rightProperty,
-			bottomProperty);
-	}
-
-	private static void ApplyExplicitThickness(
-		Control control,
-		StyledProperty<Thickness> property,
-		ExplicitThicknessState state,
-		AttachedProperty<double?> leftProperty,
-		AttachedProperty<double?> topProperty,
-		AttachedProperty<double?> rightProperty,
-		AttachedProperty<double?> bottomProperty)
-	{
-		var baseValue = state.BaseValue;
-		SetThickness(
-			control,
-			property,
-			state,
-			new Thickness(
-				control.GetValue(leftProperty) ?? baseValue.Left,
-				control.GetValue(topProperty) ?? baseValue.Top,
-				control.GetValue(rightProperty) ?? baseValue.Right,
-				control.GetValue(bottomProperty) ?? baseValue.Bottom));
-	}
-
-	private static void RestoreBaseThickness(
-		Control control,
-		StyledProperty<Thickness> property,
-		ConditionalWeakTable<Control, ExplicitThicknessState> states)
-	{
-		if (!states.TryGetValue(control, out var state))
-		{
-			return;
-		}
-
-		SetThickness(control, property, state, state.BaseValue);
-		states.Remove(control);
-	}
-
-	private static void SetThickness(
-		Control control,
-		StyledProperty<Thickness> property,
-		ExplicitThicknessState state,
-		Thickness value)
-	{
-		if (control.GetValue(property) == value)
-		{
-			return;
-		}
-
-		state.IsApplying = true;
-		try
-		{
-			control.SetCurrentValue(property, value);
-		}
-		finally
-		{
-			state.IsApplying = false;
-		}
-	}
-
-	private static bool HasExplicitThickness(
-		Control control,
-		AttachedProperty<double?> leftProperty,
-		AttachedProperty<double?> topProperty,
-		AttachedProperty<double?> rightProperty,
-		AttachedProperty<double?> bottomProperty)
-	{
-		return control.GetValue(leftProperty) != null ||
-			control.GetValue(topProperty) != null ||
-			control.GetValue(rightProperty) != null ||
-			control.GetValue(bottomProperty) != null;
-	}
-
-	private static StyledProperty<Thickness>? GetPaddingProperty(Control control)
-	{
-		return control switch
-		{
-			AkburaControl => PaddingProperty,
-			TemplatedControl => TemplatedControl.PaddingProperty,
-			Decorator => Decorator.PaddingProperty,
-			_ => null,
-		};
-	}
-
-	private static StyledProperty<Thickness>? GetBorderThicknessProperty(Control control)
-	{
-		return control switch
-		{
-			Border => Border.BorderThicknessProperty,
-			TemplatedControl => TemplatedControl.BorderThicknessProperty,
-			_ => null,
-		};
-	}
-
-	private sealed class ExplicitThicknessState
-	{
-		public ExplicitThicknessState(Thickness baseValue)
-		{
-			BaseValue = baseValue;
-		}
-
-		public Thickness BaseValue { get; set; }
-
-		public bool IsApplying { get; set; }
-	}
-
-	#endregion
+    private readonly AvaloniaList<IComponentTree> _componentChildren = [];
+    private IComponentTree? _componentParent;
+
+    public static readonly DirectProperty<AkburaControl, Control?> ChildProperty =
+        AvaloniaProperty.RegisterDirect<AkburaControl, Control?>(nameof(Child), getter: x => x.Child);
+
+    public static readonly StyledProperty<Thickness> PaddingProperty =
+        Decorator.PaddingProperty.AddOwner<AkburaControl>();
+
+    public static readonly AttachedProperty<ImmutableArray<AkcssStyleActivator>> AkcssStylesProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, ImmutableArray<AkcssStyleActivator>>(
+            "AkcssStyles",
+            coerce: CoerceAkcssStyles);
+
+    /// <summary>
+    /// Initializes static members of the <see cref="Decorator"/> class.
+    /// </summary>
+    static AkburaControl()
+    {
+        AffectsMeasure<AkburaControl>(ChildProperty, PaddingProperty);
+        ChildProperty.Changed.AddClassHandler<AkburaControl>((x, e) => x.ChildChanged(e));
+        InitializeExplicitThickness();
+        AkcssStylesProperty.Changed.AddClassHandler<Control>(OnAkcssStylesChanged);
+    }
+
+    public Control? Child
+    {
+        get; private set => SetAndRaise(ChildProperty, ref field, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the padding placed between the border of the control and its content.
+    /// </summary>
+    public Thickness Padding
+    {
+        get => GetValue(PaddingProperty);
+        set => SetValue(PaddingProperty, value);
+    }
+
+    /// <summary>
+    /// Gets the ordered AKCSS applications attached to a control.
+    /// </summary>
+    public static ImmutableArray<AkcssStyleActivator> GetAkcssStyles(Control control)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+
+        var styles = control.GetValue(AkcssStylesProperty);
+        return styles.IsDefault ? ImmutableArray<AkcssStyleActivator>.Empty : styles;
+    }
+
+    /// <summary>
+    /// Attaches the complete ordered AKCSS cascade to a control.
+    /// </summary>
+    public static void SetAkcssStyles(
+        Control control,
+        ImmutableArray<AkcssStyleActivator> styles)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+
+        if (control.IsSet(AkcssStylesProperty))
+        {
+            throw new InvalidOperationException("AkcssStyles has already been set.");
+        }
+
+        control.SetValue(
+            AkcssStylesProperty,
+            ValidateAkcssStyles(styles));
+    }
+
+    /// <summary>
+    /// Reapplies the complete AKCSS cascade attached to a control.
+    /// </summary>
+    public static void ExecuteAkcssStyles(Control control)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+        AkcssRuntime.Refresh(control);
+    }
+
+    private static ImmutableArray<AkcssStyleActivator> CoerceAkcssStyles(
+        AvaloniaObject sender,
+        ImmutableArray<AkcssStyleActivator> styles)
+        => ValidateAkcssStyles(styles);
+
+    private static ImmutableArray<AkcssStyleActivator> ValidateAkcssStyles(
+        ImmutableArray<AkcssStyleActivator> styles)
+    {
+        if (styles.IsDefault)
+        {
+            return [];
+        }
+
+        for (var index = 0; index < styles.Length; index++)
+        {
+            if (styles[index] == null)
+            {
+                throw new ArgumentException(
+                    $"AKCSS style activator at index {index} is null.",
+                    nameof(styles));
+            }
+        }
+
+        return styles;
+    }
+
+    private static void OnAkcssStylesChanged(
+        Control control,
+        AvaloniaPropertyChangedEventArgs args)
+    {
+        var styles = args.NewValue is ImmutableArray<AkcssStyleActivator> value
+            ? value
+            : ImmutableArray<AkcssStyleActivator>.Empty;
+        AkcssRuntime.SetStyles(control, styles);
+    }
+
+    private readonly AkburaEngine _engine;
+    private bool _updatesEnabled;
+    private bool _isUpdating;
+    private bool _updatePending;
+    private int _updateSuppressionDepth;
+    private readonly UseHookRuntime _useHooks;
+
+    public AkburaControl() : this(AkburaEngine.Singletone)
+    {
+
+    }
+
+    public AkburaControl(AkburaEngine akburaEngine)
+    {
+        _engine = akburaEngine;
+        _useHooks = new UseHookRuntime(this);
+    }
+
+    IComponentTree? IComponentTree.ComponentParent
+    {
+        get => _componentParent;
+    }
+
+    IAvaloniaReadOnlyList<IComponentTree> IComponentTree.ComponentChildren =>
+        _componentChildren;
+
+    public void InvalidState()
+    {
+        RequestUpdate();
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        using var activity = Diagnostic.StartComponentInitialization(this);
+
+        using var duration = Diagnostic.BeginComponentInitialization(this);
+
+        try
+        {
+            InitializeAkburaComponent();
+        }
+        catch (Exception exception)
+        {
+            Diagnostic.SetActivityError(activity, exception);
+
+            throw;
+        }
+    }
+
+    private void InitializeAkburaComponent()
+    {
+        var services = GetServices();
+        var validatedServices = GetServices();
+        if (services != validatedServices)
+        {
+            throw new AkburaServicesArrayChangedException(this);
+        }
+
+        for (var index = 0; index < services.Length; index++)
+        {
+            services[index].Inject(this, _engine);
+        }
+
+        Child = FirstUpdate();
+
+        var parameters = GetParameters();
+        for (var index = 0; index < parameters.Length; index++)
+        {
+            var parameter = parameters[index];
+            if (!parameter.IsSet(this))
+            {
+                throw new AkburaParameterNotSettedException(
+                    this,
+                    parameter);
+            }
+        }
+
+        var validatedParameters = GetParameters();
+        if (parameters != validatedParameters)
+        {
+            throw new AkburaParametersArrayChangedException(this);
+        }
+
+        var commands = GetCommands();
+        var validatedCommands = GetCommands();
+        if (commands != validatedCommands)
+        {
+            throw new AkburaCommandsArrayChangedException(this);
+        }
+
+        var states = GetStates();
+        var validatedStates = GetStates();
+        if (states != validatedStates)
+        {
+            throw new AkburaStatesArrayChangedException(this);
+        }
+
+        _updatesEnabled = true;
+        RequestUpdate();
+    }
+
+    protected abstract Control Update();
+
+    protected abstract Control FirstUpdate();
+
+    /// <summary>
+    /// Creates an instance state from a state description.
+    /// </summary>
+    /// <typeparam name="T">The state value type.</typeparam>
+    /// <param name="info">The static state description.</param>
+    /// <returns>A state attached to this component.</returns>
+    protected State<T> CreateState<T>(StateInfo<T> info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+
+        return info.CreateTypedState(this);
+    }
+
+    /// <summary>
+    /// Suppresses component updates until the returned scope is disposed.
+    /// </summary>
+    /// <returns>An update suppression scope.</returns>
+    protected IDisposable SuppressUpdates()
+    {
+        _updateSuppressionDepth++;
+        return new UpdateSuppressionScope(this);
+    }
+
+    /// <summary>
+    /// Gets the parameters declared by this component.
+    /// </summary>
+    /// <remarks>
+    /// Implementations must cache and return the same immutable array instance on every call.
+    /// </remarks>
+    /// <returns>The component parameter descriptors.</returns>
+    protected abstract ImmutableArray<Parameter> GetParameters();
+
+    /// <summary>
+    /// Gets the Avalonia properties that expose commands declared by this component.
+    /// </summary>
+    /// <remarks>
+    /// Implementations must cache and return the same immutable array instance on every call.
+    /// </remarks>
+    /// <returns>The component command properties.</returns>
+    protected abstract ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands();
+
+    /// <summary>
+    /// Gets the services injected into this component.
+    /// </summary>
+    /// <remarks>
+    /// Implementations must cache and return the same immutable array instance on every call.
+    /// </remarks>
+    /// <returns>The component injected-service descriptors.</returns>
+    protected abstract ImmutableArray<InjectService> GetServices();
+
+    /// <summary>
+    /// Gets the states declared by this component.
+    /// </summary>
+    /// <remarks>
+    /// Implementations must cache and return the same immutable array instance on every call.
+    /// </remarks>
+    /// <returns>The component states.</returns>
+    protected abstract ImmutableArray<State> GetStates();
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected IServiceProvider CreateMarkupServiceProvider(
+        object targetObject,
+        object targetProperty,
+        object intermediateRootObject,
+        Uri baseUri,
+        IReadOnlyList<object> directParentsStack,
+        IServiceProvider? fallbackServiceProvider = null,
+        IReadOnlyDictionary<string, Type>? knownTypes = null)
+    {
+        IAvaloniaXamlIlEagerParentStackProvider?
+            parentProvider = null;
+
+        if (fallbackServiceProvider?.GetService(
+                typeof(
+                    IAvaloniaXamlIlParentStackProvider))
+            is IAvaloniaXamlIlEagerParentStackProvider
+                deferredParentProvider)
+        {
+            parentProvider = deferredParentProvider;
+        }
+
+        if (parentProvider == null &&
+            Application.Current is { } application)
+        {
+            parentProvider =
+                new AkburaApplicationParentStackProvider(
+                    application);
+        }
+
+        return new AkburaMarkupServiceProvider(
+            targetObject: targetObject,
+            targetProperty: targetProperty,
+            rootObject: this,
+            intermediateRootObject:
+                intermediateRootObject,
+            baseUri: baseUri,
+            directParentsStack:
+                directParentsStack,
+            parentProvider: parentProvider,
+            fallbackServiceProvider:
+                fallbackServiceProvider,
+            knownTypes: knownTypes);
+    }
+
+    /// <summary>
+    /// Creates deferred template content for generated Akbura code.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected static IDeferredContent CreateDeferredContent<T>(
+        Func<IServiceProvider, object> builder,
+        IServiceProvider parentServiceProvider)
+    {
+        return new AkburaDeferredContent<T>(
+            builder,
+            parentServiceProvider);
+    }
+
+    /// <summary>
+    /// Applies a markup extension result whose concrete runtime type
+    /// is not known by the generated code.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected static void ApplyMarkupExtensionResult(
+        AvaloniaObject target,
+        AvaloniaProperty property,
+        object? value)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(property);
+
+        if (value is BindingBase binding)
+        {
+            target.Bind(property, binding);
+            return;
+        }
+
+        if (ReferenceEquals(value, AvaloniaProperty.UnsetValue))
+        {
+            // This clears the local value. It does not mean "do nothing".
+            target.SetValue(property, AvaloniaProperty.UnsetValue);
+            return;
+        }
+
+        // This also correctly handles Avalonia's DoNothing marker:
+        // AvaloniaObject.SetValue ignores it.
+        target.SetValue(property, value);
+    }
+
+    internal ImmutableArray<Parameter> GetDiagnosticParameters()
+    {
+        return GetParameters();
+    }
+
+    internal ImmutableArray<InjectService> GetDiagnosticServices()
+    {
+        return GetServices();
+    }
+
+    internal ImmutableArray<State> GetDiagnosticStates()
+    {
+        return GetStates();
+    }
+
+    internal void OnParameterChanged()
+    {
+        RequestUpdate();
+    }
+
+    /// <summary>
+    /// Registers one invocation of a render use hook in the current frame.
+    /// </summary>
+    /// <typeparam name="TState">The persistent runtime state owned by this hook slot.</typeparam>
+    /// <typeparam name="TArguments">The arguments captured for the current frame.</typeparam>
+    /// <param name="key">The reference identity of the logical hook contract.</param>
+    /// <param name="arguments">The arguments for the current frame.</param>
+    /// <param name="createState">Creates the slot state on the first completed frame.</param>
+    /// <param name="apply">Applies the current arguments after each completed frame.</param>
+    /// <param name="detach">Stops resources owned by the slot when the component detaches.</param>
+    /// <remarks>
+    /// Hook calls must remain in the same order and count between completed render frames.
+    /// Methods marked with <see cref="CompilerAnotations.UseHookAttribute"/> can use this
+    /// primitive to implement custom persistent render hooks without compiler changes.
+    /// </remarks>
+    public void UseHook<TState, TArguments>(
+        UseHookKey key,
+        TArguments arguments,
+        Func<TArguments, TState> createState,
+        Action<TState, TArguments> apply,
+        Action<TState>? detach = null)
+        where TState : class
+    {
+        _useHooks.Register(new DelegateUseHookRegistration<TState, TArguments>(
+            key,
+            arguments,
+            createState,
+            apply,
+            detach));
+    }
+
+    internal void BeginStateNotification()
+    {
+        _updatePending = true;
+        _updateSuppressionDepth++;
+    }
+
+    internal void EndStateNotification()
+    {
+        EndUpdateSuppression();
+    }
+
+    private void RequestUpdate()
+    {
+        _updatePending = true;
+        ProcessPendingUpdates();
+    }
+
+    private void ProcessPendingUpdates()
+    {
+        if (!_updatesEnabled ||
+            _isUpdating ||
+            _updateSuppressionDepth != 0 ||
+            !_updatePending)
+        {
+            return;
+        }
+
+        using var activity = Diagnostic.StartComponentUpdateBatch(this);
+
+        using var duration = Diagnostic.BeginComponentUpdateBatch(this);
+
+        var updateCount = 0;
+        var maxUpdatesPerBatch = _engine.MaxUpdatesPerBatch;
+
+        try
+        {
+            while (_updatePending &&
+                   _updateSuppressionDepth == 0)
+            {
+                if (updateCount >= maxUpdatesPerBatch)
+                {
+                    _updatePending = false;
+
+                    Diagnostic
+                        .RecordComponentUpdateLimitExceeded(
+                            this);
+
+                    activity?.SetTag(
+                        Diagnostic.Tags.UpdateLimit,
+                        maxUpdatesPerBatch);
+
+                    throw new AkburaUpdateLimitExceededException(
+                        this,
+                        maxUpdatesPerBatch);
+                }
+
+                updateCount++;
+                _updatePending = false;
+                _isUpdating = true;
+
+                var hookFrameStarted = false;
+
+                try
+                {
+                    _useHooks.BeginFrame();
+                    hookFrameStarted = true;
+
+                    Child = Update();
+
+                    _useHooks.CompleteFrame();
+                    hookFrameStarted = false;
+                }
+                catch
+                {
+                    if (hookFrameStarted)
+                    {
+                        _useHooks.AbortFrame();
+                    }
+
+                    throw;
+                }
+                finally
+                {
+                    _isUpdating = false;
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            Diagnostic.SetActivityError(activity, exception);
+
+            throw;
+        }
+        finally
+        {
+            Diagnostic.RecordComponentUpdateBatchSize(
+                this,
+                updateCount);
+
+            activity?.SetTag(
+                Diagnostic.Tags.UpdateCount,
+                updateCount);
+        }
+    }
+
+    private void EndUpdateSuppression()
+    {
+        if (_updateSuppressionDepth == 0)
+        {
+            throw new InvalidOperationException("There is no active update suppression scope.");
+        }
+
+        _updateSuppressionDepth--;
+        if (_updateSuppressionDepth == 0)
+        {
+            ProcessPendingUpdates();
+        }
+    }
+
+    private sealed class UpdateSuppressionScope : IDisposable
+    {
+        private AkburaControl? _owner;
+
+        public UpdateSuppressionScope(AkburaControl owner)
+        {
+            _owner = owner;
+        }
+
+        public void Dispose()
+        {
+            var owner = _owner;
+            if (owner == null)
+            {
+                return;
+            }
+
+            _owner = null;
+            owner.EndUpdateSuppression();
+        }
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        SetComponentParent(FindComponentParent());
+        AkburaComponentRegistry.Attach(this);
+        if (_useHooks.NeedsRestart)
+        {
+            RequestUpdate();
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _useHooks.StopForDetach();
+        SetComponentParent(null);
+        AkburaComponentRegistry.Detach(this);
+    }
+
+    private IComponentTree? FindComponentParent()
+    {
+        for (var parent = this.GetVisualParent(); parent != null; parent = parent.GetVisualParent())
+        {
+            if (parent is IComponentTree componentParent)
+            {
+                return componentParent;
+            }
+        }
+
+        return null;
+    }
+
+    private void SetComponentParent(IComponentTree? componentParent)
+    {
+        if (ReferenceEquals(_componentParent, componentParent))
+        {
+            return;
+        }
+
+        if (_componentParent is AkburaControl oldParent)
+        {
+            oldParent._componentChildren.Remove(this);
+        }
+
+        _componentParent = componentParent;
+
+        if (componentParent is AkburaControl newParent &&
+            !newParent._componentChildren.Contains(this))
+        {
+            newParent._componentChildren.Add(this);
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        return Child is { } child
+            ? LayoutHelper.MeasureChild(child, availableSize, Padding)
+            : default;
+    }
+
+    /// <inheritdoc/>
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        return Child is { } child
+            ? LayoutHelper.ArrangeChild(child, finalSize, Padding)
+            : finalSize;
+    }
+
+    /// <summary>
+    /// Called when the <see cref="Child"/> property changes.
+    /// </summary>
+    /// <param name="e">The event args.</param>
+    private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        var oldChild = (Control?)e.OldValue;
+        var newChild = (Control?)e.NewValue;
+
+        if (oldChild != null)
+        {
+            VisualChildren.Remove(oldChild);
+            ((ISetInheritanceParent)oldChild).SetParent(null);
+        }
+
+        if (newChild != null)
+        {
+            ((ISetInheritanceParent)newChild).SetParent(this);
+
+            ApplyStylesToVisualTree(newChild);
+
+            VisualChildren.Add(newChild);
+        }
+    }
+
+
+    private static void ApplyStylesToVisualTree(Control root)
+    {
+        foreach (var visual in root.GetSelfAndVisualDescendants())
+        {
+            if (visual is StyledElement element)
+            {
+                element.ApplyStyling();
+            }
+        }
+    }
+
+    #region Explicit Thickness
+
+    private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_paddingStates = new();
+    private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_marginStates = new();
+    private static readonly ConditionalWeakTable<Control, ExplicitThicknessState> s_borderThicknessStates = new();
+
+    public static readonly AttachedProperty<double?> ExplicitLeftPaddingProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitLeftPadding",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitTopPaddingProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitTopPadding",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitRightPaddingProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitRightPadding",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitBottomPaddingProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitBottomPadding",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitLeftMarginProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitLeftMargin",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitTopMarginProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitTopMargin",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitRightMarginProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitRightMargin",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitBottomMarginProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitBottomMargin",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitLeftBorderThicknessProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitLeftBorderThickness",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitTopBorderThicknessProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitTopBorderThickness",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitRightBorderThicknessProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitRightBorderThickness",
+            defaultValue: null);
+
+    public static readonly AttachedProperty<double?> ExplicitBottomBorderThicknessProperty =
+        AvaloniaProperty.RegisterAttached<AkburaControl, Control, double?>(
+            "ExplicitBottomBorderThickness",
+            defaultValue: null);
+
+    public static double? GetExplicitLeftPadding(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitLeftPaddingProperty);
+
+    public static void SetExplicitLeftPadding(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitLeftPaddingProperty, value);
+
+    public static double? GetExplicitTopPadding(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitTopPaddingProperty);
+
+    public static void SetExplicitTopPadding(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitTopPaddingProperty, value);
+
+    public static double? GetExplicitRightPadding(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitRightPaddingProperty);
+
+    public static void SetExplicitRightPadding(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitRightPaddingProperty, value);
+
+    public static double? GetExplicitBottomPadding(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitBottomPaddingProperty);
+
+    public static void SetExplicitBottomPadding(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitBottomPaddingProperty, value);
+
+    public static double? GetExplicitLeftMargin(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitLeftMarginProperty);
+
+    public static void SetExplicitLeftMargin(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitLeftMarginProperty, value);
+
+    public static double? GetExplicitTopMargin(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitTopMarginProperty);
+
+    public static void SetExplicitTopMargin(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitTopMarginProperty, value);
+
+    public static double? GetExplicitRightMargin(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitRightMarginProperty);
+
+    public static void SetExplicitRightMargin(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitRightMarginProperty, value);
+
+    public static double? GetExplicitBottomMargin(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitBottomMarginProperty);
+
+    public static void SetExplicitBottomMargin(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitBottomMarginProperty, value);
+
+    public static double? GetExplicitLeftBorderThickness(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitLeftBorderThicknessProperty);
+
+    public static void SetExplicitLeftBorderThickness(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitLeftBorderThicknessProperty, value);
+
+    public static double? GetExplicitTopBorderThickness(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitTopBorderThicknessProperty);
+
+    public static void SetExplicitTopBorderThickness(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitTopBorderThicknessProperty, value);
+
+    public static double? GetExplicitRightBorderThickness(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitRightBorderThicknessProperty);
+
+    public static void SetExplicitRightBorderThickness(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitRightBorderThicknessProperty, value);
+
+    public static double? GetExplicitBottomBorderThickness(Control control) =>
+        GetExplicitThicknessSide(control, ExplicitBottomBorderThicknessProperty);
+
+    public static void SetExplicitBottomBorderThickness(Control control, double? value) =>
+        SetExplicitThicknessSide(control, ExplicitBottomBorderThicknessProperty, value);
+
+    private static void InitializeExplicitThickness()
+    {
+        AddExplicitThicknessHandlers(
+            OnExplicitPaddingChanged,
+            ExplicitLeftPaddingProperty,
+            ExplicitTopPaddingProperty,
+            ExplicitRightPaddingProperty,
+            ExplicitBottomPaddingProperty);
+        AddExplicitThicknessHandlers(
+            OnExplicitMarginChanged,
+            ExplicitLeftMarginProperty,
+            ExplicitTopMarginProperty,
+            ExplicitRightMarginProperty,
+            ExplicitBottomMarginProperty);
+        AddExplicitThicknessHandlers(
+            OnExplicitBorderThicknessChanged,
+            ExplicitLeftBorderThicknessProperty,
+            ExplicitTopBorderThicknessProperty,
+            ExplicitRightBorderThicknessProperty,
+            ExplicitBottomBorderThicknessProperty);
+
+        PaddingProperty.Changed.AddClassHandler<AkburaControl>(OnPaddingChanged);
+        Decorator.PaddingProperty.Changed.AddClassHandler<Decorator>(OnPaddingChanged);
+        TemplatedControl.PaddingProperty.Changed.AddClassHandler<TemplatedControl>(OnPaddingChanged);
+        Layoutable.MarginProperty.Changed.AddClassHandler<Control>(OnMarginChanged);
+        Border.BorderThicknessProperty.Changed.AddClassHandler<Border>(OnBorderThicknessChanged);
+        TemplatedControl.BorderThicknessProperty.Changed.AddClassHandler<TemplatedControl>(OnBorderThicknessChanged);
+    }
+
+    private static void AddExplicitThicknessHandlers(
+        Action<Control, AvaloniaPropertyChangedEventArgs> handler,
+        params AttachedProperty<double?>[] properties)
+    {
+        foreach (var property in properties)
+        {
+            property.Changed.AddClassHandler<Control>(handler);
+        }
+    }
+
+    private static double? GetExplicitThicknessSide(
+        Control control,
+        AttachedProperty<double?> property)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+        return control.GetValue(property);
+    }
+
+    private static void SetExplicitThicknessSide(
+        Control control,
+        AttachedProperty<double?> property,
+        double? value)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+        control.SetValue(property, value);
+    }
+
+    private static void OnExplicitPaddingChanged(
+        Control control,
+        AvaloniaPropertyChangedEventArgs args)
+    {
+        var property = GetPaddingProperty(control);
+        if (property != null)
+        {
+            OnExplicitThicknessChanged(
+                control,
+                property,
+                s_paddingStates,
+                ExplicitLeftPaddingProperty,
+                ExplicitTopPaddingProperty,
+                ExplicitRightPaddingProperty,
+                ExplicitBottomPaddingProperty);
+        }
+    }
+
+    private static void OnExplicitMarginChanged(
+        Control control,
+        AvaloniaPropertyChangedEventArgs args)
+    {
+        OnExplicitThicknessChanged(
+            control,
+            Layoutable.MarginProperty,
+            s_marginStates,
+            ExplicitLeftMarginProperty,
+            ExplicitTopMarginProperty,
+            ExplicitRightMarginProperty,
+            ExplicitBottomMarginProperty);
+    }
+
+    private static void OnExplicitBorderThicknessChanged(
+        Control control,
+        AvaloniaPropertyChangedEventArgs args)
+    {
+        var property = GetBorderThicknessProperty(control);
+        if (property != null)
+        {
+            OnExplicitThicknessChanged(
+                control,
+                property,
+                s_borderThicknessStates,
+                ExplicitLeftBorderThicknessProperty,
+                ExplicitTopBorderThicknessProperty,
+                ExplicitRightBorderThicknessProperty,
+                ExplicitBottomBorderThicknessProperty);
+        }
+    }
+
+    private static void OnPaddingChanged(
+        Control control,
+        AvaloniaPropertyChangedEventArgs args)
+    {
+        var property = GetPaddingProperty(control);
+        if (property != null)
+        {
+            OnBaseThicknessChanged(
+                control,
+                property,
+                s_paddingStates,
+                args,
+                ExplicitLeftPaddingProperty,
+                ExplicitTopPaddingProperty,
+                ExplicitRightPaddingProperty,
+                ExplicitBottomPaddingProperty);
+        }
+    }
+
+    private static void OnMarginChanged(
+        Control control,
+        AvaloniaPropertyChangedEventArgs args)
+    {
+        OnBaseThicknessChanged(
+            control,
+            Layoutable.MarginProperty,
+            s_marginStates,
+            args,
+            ExplicitLeftMarginProperty,
+            ExplicitTopMarginProperty,
+            ExplicitRightMarginProperty,
+            ExplicitBottomMarginProperty);
+    }
+
+    private static void OnBorderThicknessChanged(
+        Control control,
+        AvaloniaPropertyChangedEventArgs args)
+    {
+        var property = GetBorderThicknessProperty(control);
+        if (property != null)
+        {
+            OnBaseThicknessChanged(
+                control,
+                property,
+                s_borderThicknessStates,
+                args,
+                ExplicitLeftBorderThicknessProperty,
+                ExplicitTopBorderThicknessProperty,
+                ExplicitRightBorderThicknessProperty,
+                ExplicitBottomBorderThicknessProperty);
+        }
+    }
+
+    private static void OnExplicitThicknessChanged(
+        Control control,
+        StyledProperty<Thickness> property,
+        ConditionalWeakTable<Control, ExplicitThicknessState> states,
+        AttachedProperty<double?> leftProperty,
+        AttachedProperty<double?> topProperty,
+        AttachedProperty<double?> rightProperty,
+        AttachedProperty<double?> bottomProperty)
+    {
+        if (!HasExplicitThickness(
+                control,
+                leftProperty,
+                topProperty,
+                rightProperty,
+                bottomProperty))
+        {
+            RestoreBaseThickness(control, property, states);
+            return;
+        }
+
+        var state = states.GetValue(
+            control,
+            key => new ExplicitThicknessState(key.GetValue(property)));
+        ApplyExplicitThickness(
+            control,
+            property,
+            state,
+            leftProperty,
+            topProperty,
+            rightProperty,
+            bottomProperty);
+    }
+
+    private static void OnBaseThicknessChanged(
+        Control control,
+        StyledProperty<Thickness> property,
+        ConditionalWeakTable<Control, ExplicitThicknessState> states,
+        AvaloniaPropertyChangedEventArgs args,
+        AttachedProperty<double?> leftProperty,
+        AttachedProperty<double?> topProperty,
+        AttachedProperty<double?> rightProperty,
+        AttachedProperty<double?> bottomProperty)
+    {
+        if (!states.TryGetValue(control, out var state) || state.IsApplying)
+        {
+            return;
+        }
+
+        state.BaseValue = (Thickness)args.NewValue!;
+        ApplyExplicitThickness(
+            control,
+            property,
+            state,
+            leftProperty,
+            topProperty,
+            rightProperty,
+            bottomProperty);
+    }
+
+    private static void ApplyExplicitThickness(
+        Control control,
+        StyledProperty<Thickness> property,
+        ExplicitThicknessState state,
+        AttachedProperty<double?> leftProperty,
+        AttachedProperty<double?> topProperty,
+        AttachedProperty<double?> rightProperty,
+        AttachedProperty<double?> bottomProperty)
+    {
+        var baseValue = state.BaseValue;
+        SetThickness(
+            control,
+            property,
+            state,
+            new Thickness(
+                control.GetValue(leftProperty) ?? baseValue.Left,
+                control.GetValue(topProperty) ?? baseValue.Top,
+                control.GetValue(rightProperty) ?? baseValue.Right,
+                control.GetValue(bottomProperty) ?? baseValue.Bottom));
+    }
+
+    private static void RestoreBaseThickness(
+        Control control,
+        StyledProperty<Thickness> property,
+        ConditionalWeakTable<Control, ExplicitThicknessState> states)
+    {
+        if (!states.TryGetValue(control, out var state))
+        {
+            return;
+        }
+
+        SetThickness(control, property, state, state.BaseValue);
+        states.Remove(control);
+    }
+
+    private static void SetThickness(
+        Control control,
+        StyledProperty<Thickness> property,
+        ExplicitThicknessState state,
+        Thickness value)
+    {
+        if (control.GetValue(property) == value)
+        {
+            return;
+        }
+
+        state.IsApplying = true;
+        try
+        {
+            control.SetCurrentValue(property, value);
+        }
+        finally
+        {
+            state.IsApplying = false;
+        }
+    }
+
+    private static bool HasExplicitThickness(
+        Control control,
+        AttachedProperty<double?> leftProperty,
+        AttachedProperty<double?> topProperty,
+        AttachedProperty<double?> rightProperty,
+        AttachedProperty<double?> bottomProperty)
+    {
+        return control.GetValue(leftProperty) != null ||
+            control.GetValue(topProperty) != null ||
+            control.GetValue(rightProperty) != null ||
+            control.GetValue(bottomProperty) != null;
+    }
+
+    private static StyledProperty<Thickness>? GetPaddingProperty(Control control)
+    {
+        return control switch
+        {
+            AkburaControl => PaddingProperty,
+            TemplatedControl => TemplatedControl.PaddingProperty,
+            Decorator => Decorator.PaddingProperty,
+            _ => null,
+        };
+    }
+
+    private static StyledProperty<Thickness>? GetBorderThicknessProperty(Control control)
+    {
+        return control switch
+        {
+            Border => Border.BorderThicknessProperty,
+            TemplatedControl => TemplatedControl.BorderThicknessProperty,
+            _ => null,
+        };
+    }
+
+    private sealed class ExplicitThicknessState
+    {
+        public ExplicitThicknessState(Thickness baseValue)
+        {
+            BaseValue = baseValue;
+        }
+
+        public Thickness BaseValue { get; set; }
+
+        public bool IsApplying { get; set; }
+    }
+
+    #endregion
 }

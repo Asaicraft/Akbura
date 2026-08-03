@@ -15,6 +15,18 @@
 		<PackageReference Include="Avalonia.Desktop" />
 	</ItemGroup>
 
+	<ItemGroup Condition="
+		  '$(Configuration)' == 'Debug'
+		  Or
+		  '$(Configuration)' == 'DebugStats'
+		  Or
+		  '$(Configuration)' == 'ReleaseStats'">
+
+		<RuntimeHostConfigurationOption
+		  Include="Akbura.Diagnostics.Diagnostic.IsEnabled"
+		  Value="true" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<ProjectReference Include="..\Akbura.FeatureGallery\Akbura.FeatureGallery.csproj" />
 	</ItemGroup>

@@ -1,26 +1,64 @@
-using Avalonia.Controls;
-using Avalonia.Layout;
+<Grid class="diagnostics-root"
+      ColumnDefinitions="320,*">
 
-state int a = 1;
+    <Border class="diagnostics-sidebar">
 
-<Grid ColumnDefinitions="300,*">
-    <Border Grid.Column="0" BorderBrush="#364152" BorderThickness="0,0,1,0" Padding="16">
-        <Grid RowDefinitions="Auto,*">
-            <StackPanel Spacing="4">
-                <TextBlock Text="Components" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="Attached Akbura component tree" Opacity="0.65" />
-            </StackPanel>
-            <TreeView x.Name="componentTree" Grid.Row="1" Margin="0,16,0,0" />
+        <Grid RowDefinitions="Auto,Auto,*">
+
+            <Grid class="diagnostics-brand"
+                  ColumnDefinitions="Auto,*">
+
+                <Border class="diagnostics-brand-mark">
+                    <TextBlock class="diagnostics-brand-letter"
+                               Text="A"/>
+                </Border>
+
+                <StackPanel Grid.Column="1"
+                            class="diagnostics-brand-copy">
+                    <TextBlock class="diagnostics-brand-title"
+                               Text="Akbura Diagnostics"/>
+                    <TextBlock class="diagnostics-brand-subtitle"
+                               Text="Live component inspector"/>
+                </StackPanel>
+
+            </Grid>
+
+            <Border Grid.Row="1"
+                    class="diagnostics-tree-caption">
+                <TextBlock class="diagnostics-tree-caption-text"
+                           Text="ATTACHED COMPONENTS"/>
+            </Border>
+
+            <TreeView x.Name="componentTree"
+                      Grid.Row="2"
+                      class="diagnostics-tree"/>
+
         </Grid>
+
     </Border>
 
-    <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="20,16">
-        <StackPanel Spacing="4">
-            <TextBlock x.Name="selectionTitle" Text="No component selected" FontSize="20" FontWeight="SemiBold" />
-            <TextBlock x.Name="selectionType" Opacity="0.65" />
-        </StackPanel>
-        <ScrollViewer Grid.Row="1" Margin="0,18,0,0">
-            <StackPanel x.Name="detailsPanel" Spacing="18" />
+    <Grid Grid.Column="1"
+          class="diagnostics-workspace"
+          RowDefinitions="Auto,*">
+
+        <Border class="diagnostics-selection-header">
+
+            <StackPanel class="diagnostics-selection-copy">
+                <TextBlock x.Name="selectionTitle"
+                           class="diagnostics-selection-title"
+                           Text="No component selected"/>
+                <TextBlock x.Name="selectionType"
+                           class="diagnostics-selection-type"/>
+            </StackPanel>
+
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      class="diagnostics-details-scroll">
+            <StackPanel x.Name="detailsPanel"
+                        class="diagnostics-details"/>
         </ScrollViewer>
+
     </Grid>
+
 </Grid>

@@ -2085,8 +2085,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         var binding = BindCSharpType(csharpType, GetAkcssCSharpUsingDirectives(targetTypeSyntax));
-        if (binding.TypeSymbol is INamedTypeSymbol boundType &&
-            IsAvaloniaControlTargetType(boundType))
+        if (TryGetAkcssTargetType(binding, out var boundType))
         {
             targetType = new CSharpSymbolDefinition(boundType);
             return true;
@@ -2102,6 +2101,42 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return false;
+    }
+
+    private bool TryGetAkcssTargetType(
+        CSharpBindingResult binding,
+        out INamedTypeSymbol targetType)
+    {
+        if (binding.TypeSymbol is INamedTypeSymbol boundType &&
+            IsAvaloniaControlTargetType(boundType))
+        {
+            targetType = boundType;
+            return true;
+        }
+
+        INamedTypeSymbol? viableCandidate = null;
+        foreach (var candidate in binding.CandidateSymbols)
+        {
+            if (candidate is not INamedTypeSymbol namedType ||
+                !IsAvaloniaControlTargetType(namedType))
+            {
+                continue;
+            }
+
+            if (viableCandidate != null &&
+                !SymbolEqualityComparer.Default.Equals(
+                    viableCandidate,
+                    namedType))
+            {
+                targetType = null!;
+                return false;
+            }
+
+            viableCandidate = namedType;
+        }
+
+        targetType = viableCandidate!;
+        return viableCandidate != null;
     }
 
     private bool IsAvaloniaControlTargetType(INamedTypeSymbol type)
@@ -2630,8 +2665,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         var binding = BindCSharpType(csharpType);
-        if (binding.TypeSymbol is INamedTypeSymbol namedType &&
-            namedType.TypeKind != TypeKind.Error)
+        if (TryGetMarkupComponentType(binding, out var namedType))
         {
             var contentModel = CreateMarkupContentModel(namedType, markupElement);
             var symbol = new MarkupComponentSymbol(
@@ -6034,6 +6068,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         {
             if (candidate is not INamedTypeSymbol namedType ||
                 namedType.TypeKind == TypeKind.Error ||
+                namedType.IsStatic ||
                 !seenSymbols.Add(namedType))
             {
                 continue;
@@ -6045,6 +6080,48 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return builder.ToImmutable();
+    }
+
+    private static bool TryGetMarkupComponentType(
+        CSharpBindingResult binding,
+        out INamedTypeSymbol componentType)
+    {
+        if (binding.TypeSymbol is INamedTypeSymbol
+            {
+                TypeKind: not TypeKind.Error,
+                IsStatic: false,
+            } boundType)
+        {
+            componentType = boundType;
+            return true;
+        }
+
+        INamedTypeSymbol? viableCandidate = null;
+        foreach (var candidate in binding.CandidateSymbols)
+        {
+            if (candidate is not INamedTypeSymbol
+                {
+                    TypeKind: not TypeKind.Error,
+                    IsStatic: false,
+                } namedType)
+            {
+                continue;
+            }
+
+            if (viableCandidate != null &&
+                !SymbolEqualityComparer.Default.Equals(
+                    viableCandidate,
+                    namedType))
+            {
+                componentType = null!;
+                return false;
+            }
+
+            viableCandidate = namedType;
+        }
+
+        componentType = viableCandidate!;
+        return viableCandidate != null;
     }
 
     [Conditional("DEBUG")]

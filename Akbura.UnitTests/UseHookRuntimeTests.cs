@@ -255,6 +255,15 @@ public sealed class UseHookRuntimeTests
 
         component.ObservedValue = 7;
         Assert.Equal(2, component.UpdateCount);
+
+        component.ObservedState.Value = 9;
+
+        Assert.Equal(9, component.ObservedValue);
+        Assert.Equal(9, component.ObservedState.Value);
+        Assert.Equal(3, component.UpdateCount);
+
+        component.ObservedState.Value = 9;
+        Assert.Equal(3, component.UpdateCount);
     }
 
     [Fact]

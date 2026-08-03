@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using Avalonia.Controls;
 
 namespace Akbura.ComponentTree;
 
@@ -6,8 +8,15 @@ internal static class AkburaComponentRegistry
 {
     private static readonly object s_gate = new();
     private static readonly List<WeakReference<AkburaControl>> s_components = [];
+    private static readonly ConditionalWeakTable<TopLevel, object> s_excludedTopLevels = new();
 
     internal static event EventHandler? Changed;
+
+    internal static void ExcludeTopLevel(TopLevel topLevel)
+    {
+        ArgumentNullException.ThrowIfNull(topLevel);
+        s_excludedTopLevels.GetValue(topLevel, static _ => new object());
+    }
 
     internal static ImmutableArray<AkburaControl> GetAttachedComponents()
     {
@@ -31,9 +40,33 @@ internal static class AkburaComponentRegistry
         }
     }
 
+    internal static int GetAttachedComponentCount()
+    {
+        lock (s_gate)
+        {
+            for (var index = s_components.Count - 1;
+                 index >= 0;
+                 index--)
+            {
+                if (!s_components[index].TryGetTarget(out _))
+                {
+                    s_components.RemoveAt(index);
+                }
+            }
+
+            return s_components.Count;
+        }
+    }
+
     internal static void Attach(AkburaControl component)
     {
         ArgumentNullException.ThrowIfNull(component);
+
+        if (TopLevel.GetTopLevel(component) is { } topLevel &&
+            s_excludedTopLevels.TryGetValue(topLevel, out _))
+        {
+            return;
+        }
 
         lock (s_gate)
         {

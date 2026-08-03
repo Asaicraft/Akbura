@@ -1,0 +1,268 @@
+param IInputBuilderProvider InputBuilders;
+param InputRequest Request;
+param object? Value;
+param bool IsCompact = false;
+param Action<object> CommitValue;
+
+state IReadOnlyList<InputBuilder> availableInputBuilders = [];
+state InputBuilder? selectedInputBuilder = null;
+state Control? inputControl = null;
+
+state object? appliedValue = Value;
+
+state object? inputValue =
+    useAvaloniaProperty(InputBuilder.InputValueProperty);
+
+state string error = "";
+
+useEffect(
+    () =>
+    {
+        var inputRequest = GetInputRequest();
+        var builders = InputBuilders
+            .Provides(inputRequest)
+            .ToArray();
+
+        availableInputBuilders = builders;
+
+        appliedValue = Value;
+        inputValue = Value;
+
+        if (builders.Length == 0)
+        {
+            selectedInputBuilder = null;
+            inputControl = null;
+
+            return;
+        }
+
+        var selectedType = selectedInputBuilder?.GetType();
+
+        var builder = selectedType is null
+            ? InputBuilders.Provide(inputRequest)
+            : builders.FirstOrDefault(
+                candidate => candidate.GetType() == selectedType)
+                ?? InputBuilders.Provide(inputRequest);
+
+        selectedInputBuilder = builder;
+        inputControl = builder.Build(inputRequest, inputValue);
+    },
+    [Request, InputBuilders]);
+
+// Connect the generated editor to this component's InputValueProperty.
+useEffect(
+    () =>
+    {
+        if (inputControl is null)
+        {
+            return null;
+        }
+
+        return InputBuilder.BindInputValue(
+            inputControl,
+            this);
+    },
+    [inputControl]);
+
+// Synchronize changes coming from outside the component.
+useEffect(
+    () =>
+    {
+        var hadPendingChanges =
+            !object.Equals(inputValue, appliedValue);
+
+        appliedValue = Value;
+
+        if (!hadPendingChanges)
+        {
+            inputValue = Value;
+        }
+    },
+    [Value]);
+
+bool IsDirty()
+{
+    return !object.Equals(
+        inputValue,
+        appliedValue);
+}
+
+InputRequest GetInputRequest()
+{
+    return Request with
+    {
+        InputBuilders = this.InputBuilders,
+    };
+}
+
+void SelectInputBuilder(InputBuilder? builder)
+{
+    if (builder is null ||
+        ReferenceEquals(builder, selectedInputBuilder))
+    {
+        return;
+    }
+
+    selectedInputBuilder = builder;
+
+    // Preserve the current draft when changing the input method.
+    inputControl = builder.Build(
+        GetInputRequest(),
+        inputValue);
+}
+
+void Apply()
+{
+    if (!IsDirty())
+    {
+        return;
+    }
+
+    var commitError = DiagnosticValueCommit.TryCommit(
+        CommitValue,
+        inputValue);
+    if (commitError.Length != 0)
+    {
+        error = commitError;
+        return;
+    }
+
+    appliedValue = inputValue;
+    Value = inputValue;
+    error = "";
+}
+
+void Reload()
+{
+    appliedValue = Value;
+    inputValue = Value;
+    error = "";
+}
+
+string GetBuilderName(InputBuilder? builder)
+{
+    if (builder is null)
+    {
+        return "";
+    }
+
+    var name = builder.GetType().Name;
+    const string suffix = nameof(InputBuilder);
+
+    return name.EndsWith(
+        suffix,
+        StringComparison.Ordinal)
+            ? name[..^suffix.Length]
+            : name;
+}
+
+string GetResourceIcon(InputBuilder? builder)
+{
+    var type = builder?.GetType();
+    var typeName = type?.FullName ?? "Akbura.Diagnostics.UniversalInputBuilder";
+
+    return $"{typeName}.Icon";
+}
+
+<Border class="diagnostic-input-root">
+
+    <Grid class="diagnostic-input-stack"
+          RowDefinitions="Auto,Auto">
+
+        <Grid class="diagnostic-input-layout"
+              RowDefinitions={IsCompact ? new("Auto,Auto") : new("Auto")}
+              ColumnDefinitions={IsCompact
+                  ? new("*,Auto,Auto")
+                  : new("Auto,*,Auto,Auto")}>
+
+            <ComboBox x.Name="builderSelector"
+                      Grid.Row="0"
+                      Grid.Column="0"
+                      Grid.ColumnSpan={IsCompact ? 3 : 1}
+                      class="diagnostic-input-builder"
+                      ItemsSource={availableInputBuilders}
+                      SelectedItem={selectedInputBuilder}
+                      IsEnabled={availableInputBuilders.Count > 0}
+                      SelectionChanged={() =>
+                          SelectInputBuilder(
+                              builderSelector.SelectedItem as InputBuilder)}>
+
+                <ComboBox.ItemTemplate
+                    x.DataType="InputBuilder"
+                    x.ItemName="builder">
+
+                    <Border class="diagnostic-input-builder-item"
+                            ToolTip.Tip={builder?.GetType().Name}>
+
+                        <Grid class="diagnostic-input-builder-content"
+                              ColumnDefinitions="Auto,*">
+
+                            <Path class="diagnostic-input-builder-icon"
+                                  Data=${StaticResource {GetResourceIcon(builder)}}/>
+
+                            <TextBlock Grid.Column="1"
+                                       class="diagnostic-input-builder-name"
+                                       Text={GetBuilderName(builder)}/>
+
+                        </Grid>
+
+                    </Border>
+
+                </ComboBox.ItemTemplate>
+
+            </ComboBox>
+
+            <Border Grid.Row={IsCompact ? 1 : 0}
+                    Grid.Column={IsCompact ? 0 : 1}
+                    class="diagnostic-input-editor"
+                    {IsDirty()}:border-blue-500>
+
+                <Grid>
+
+                    <ContentPresenter
+                        class="diagnostic-input-content"
+                        Content={inputControl}/>
+
+                    <TextBlock
+                        class="diagnostic-input-empty"
+                        IsVisible={inputControl is null}
+                        Text="No compatible input builder"/>
+
+                </Grid>
+
+            </Border>
+
+            <Button Grid.Row={IsCompact ? 1 : 0}
+                    Grid.Column={IsCompact ? 1 : 2}
+                    class="diagnostic-input-apply"
+                    IsVisible={IsDirty()}
+                    ToolTip.Tip="Apply changes"
+                    Click={() => Apply()}>
+
+                <Path class="diagnostic-input-apply-icon"
+                      Data=${StaticResource Akbura.Diagnostics.InputBuilder.ApplyIcon}/>
+
+            </Button>
+
+            <Button Grid.Row={IsCompact ? 1 : 0}
+                    Grid.Column={IsCompact ? 2 : 3}
+                    class="diagnostic-input-reload"
+                    IsEnabled={IsDirty()}
+                    ToolTip.Tip="Reload current value"
+                    Click={() => Reload()}>
+
+                <Path class="diagnostic-input-action-icon"
+                      Data=${StaticResource Akbura.Diagnostics.InputBuilder.ReloadIcon}/>
+
+            </Button>
+
+        </Grid>
+
+        <TextBlock Grid.Row="1"
+                   class="diagnostic-input-error"
+                   IsVisible={error.Length != 0}
+                   Text={error}/>
+
+    </Grid>
+
+</Border>

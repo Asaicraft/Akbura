@@ -11,9 +11,6 @@ public sealed class CollectionInputBuilder : InputBuilder
 {
     public override Type OutputType => typeof(IEnumerable);
 
-    public override StreamGeometry Icon =>
-        DiagnosticResources.CollectionInputBuilderIcon;
-
     public override bool CanProvide(InputRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);

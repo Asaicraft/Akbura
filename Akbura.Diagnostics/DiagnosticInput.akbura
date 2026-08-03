@@ -156,6 +156,14 @@ string GetBuilderName(InputBuilder? builder)
             : name;
 }
 
+string GetResourceIcon(InputBuilder? builder)
+{
+    var type = builder?.GetType();
+    var typeName = type?.FullName ?? "Akbura.Diagnostics.UniversalInputBuilder";
+
+    return $"{typeName}.Icon";
+}
+
 <Border class="diagnostic-input-root">
 
     <Grid class="diagnostic-input-stack"
@@ -190,7 +198,7 @@ string GetBuilderName(InputBuilder? builder)
                               ColumnDefinitions="Auto,*">
 
                             <Path class="diagnostic-input-builder-icon"
-                                  Data={builder?.Icon}/>
+                                  Data=${StaticResource {GetResourceIcon(builder)}}/>
 
                             <TextBlock Grid.Column="1"
                                        class="diagnostic-input-builder-name"
@@ -232,7 +240,7 @@ string GetBuilderName(InputBuilder? builder)
                     Click={() => Apply()}>
 
                 <Path class="diagnostic-input-apply-icon"
-                      Data={DiagnosticResources.ApplyIcon}/>
+                      Data=${StaticResource Akbura.Diagnostics.InputBuilder.ApplyIcon}/>
 
             </Button>
 
@@ -244,7 +252,7 @@ string GetBuilderName(InputBuilder? builder)
                     Click={() => Reload()}>
 
                 <Path class="diagnostic-input-action-icon"
-                      Data={DiagnosticResources.ReloadIcon}/>
+                      Data=${StaticResource Akbura.Diagnostics.InputBuilder.ReloadIcon}/>
 
             </Button>
 

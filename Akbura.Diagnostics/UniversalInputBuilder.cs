@@ -13,9 +13,6 @@ namespace Akbura.Diagnostics;
 /// </summary>
 public sealed class UniversalInputBuilder : InputBuilder
 {
-    public override StreamGeometry Icon =>
-        DiagnosticResources.UniversalInputBuilderIcon;
-
     public override Type OutputType => typeof(object);
 
     public override bool CanProvide(InputRequest request)

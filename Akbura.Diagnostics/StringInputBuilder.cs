@@ -10,8 +10,6 @@ namespace Akbura.Diagnostics;
 /// </summary>
 public sealed class StringInputBuilder : InputBuilder
 {
-    public override StreamGeometry Icon =>
-        DiagnosticResources.StringInputBuilderIcon;
 
     public override Type OutputType => typeof(string);
 

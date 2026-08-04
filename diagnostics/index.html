@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>Built-in Styles</title>
+    <title>Diagnostics</title>
 
     <script>
             if (location.search === "?dark") {
@@ -60,10 +60,10 @@
                                 <a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
                                     Akbura
                                 </a>
-                                <a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+                                <a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
                                     Akcss
                                 </a>
-                                <a href="diagnostics" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                                <a href="diagnostics" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
                                     Diagnostics
                                 </a>
                                 <a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
@@ -121,10 +121,10 @@
                         <a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
                             Akbura
                         </a>
-                        <a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+                        <a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
                             Akcss
                         </a>
-                        <a href="diagnostics" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        <a href="diagnostics" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
                             Diagnostics
                         </a>
                         <a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
@@ -154,8 +154,6 @@
             
 
 
-
-
 <style>
 .active {
 	color: #0ea5e9 !important;
@@ -174,45 +172,14 @@
 			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
 				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
 					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
-								<a href="https://asaicraft.github.io/Akbura/akcss/" class="block flex items-center whitespace-nowrap">
+								<a href="https://asaicraft.github.io/Akbura/diagnostics/" class="block flex items-center whitespace-nowrap">
 <svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
-AKCSS									</span>
+Diagnostics									</span>
 								</a>
 						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/getting-started" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Getting Started
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/markup-extensions" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Markup Extensions
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Custom Class Styles
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/inline-akcss" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Inline AKCSS
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/utilities" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Utilities
-									</a>
-								</li>
-						</ul>
-								<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="block flex items-center whitespace-nowrap">
-									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
-Built-in Styles									</span>
-								</a>
-						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/spacing" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Margin and Padding
+									<a href="https://asaicraft.github.io/Akbura/diagnostics/custom-input" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Custom input builders
 									</a>
 								</li>
 						</ul>
@@ -224,36 +191,118 @@ Built-in Styles									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							Built-in Styles
+							Diagnostics
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>Akbura includes a collection of typed AKCSS utilities for common Avalonia layout and appearance tasks.</p>
-<p>Import them in an <code>.akbura</code> component:</p>
-<pre><code class="language-akbura">using Akbura.Styles.akcss;
+					<p>Run the application in Debug configuration and press the shortcut configured for Akbura diagnostics. This opens the Akbura component inspector independently of Avalonia Developer Tools.</p>
+<div class="warning custom-block">
+            <p class="custom-block-title">WARNING</p><p>The <code>Akbura.Diagnostics</code> NuGet package has not been published yet. The package reference below is the intended setup once the package becomes available.</p>
+</div>
+<h2 id="add-the-package">Add the package<a class="header-anchor" href="javascript:;" onclick="location.hash='#add-the-package'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Add the diagnostics package to the application project:</p>
+<pre><code class="language-xml">&lt;PackageReference Include=&quot;Akbura.Diagnostics&quot;&gt;
+    &lt;IncludeAssets Condition=&quot;'$(Configuration)' != 'Debug'&quot;&gt;None&lt;/IncludeAssets&gt;
+    &lt;PrivateAssets Condition=&quot;'$(Configuration)' != 'Debug'&quot;&gt;All&lt;/PrivateAssets&gt;
+&lt;/PackageReference&gt;
 </code></pre>
-<p>Utilities are then available as concise markup attributes:</p>
-<pre><code class="language-akbura">&lt;Button w-40 px-4 py-2 bg-blue-500 text-white rounded-md&gt;
-    Continue
-&lt;/Button&gt;
+<p>The conditional metadata keeps the diagnostics dependency limited to Debug builds.</p>
+<p>While working directly from the Akbura repository, use a project reference instead:</p>
+<pre><code class="language-xml">&lt;ProjectReference Include=&quot;..\..\Akbura.Diagnostics\Akbura.Diagnostics.csproj&quot; /&gt;
 </code></pre>
-<p>Built-in styles are type-aware. A utility is available only when its target type is compatible with the control on which it is used. For example, padding utilities target controls that expose a <code>Padding</code> property, while margin utilities work with every Avalonia <code>Control</code>.</p>
-<p>Most built-in values come from dynamic Avalonia resources such as <code>--spacing</code>, <code>--color-blue-500</code>, <code>--radius-md</code>, and <code>--shadow-lg</code>. Applications can replace these resources to customize the theme without redefining each utility.</p>
-<h2 id="categories">Categories<a class="header-anchor" href="javascript:;" onclick="location.hash='#categories'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Remove the project reference after switching to the published package.</p>
+<h2 id="attach-diagnostics">Attach diagnostics<a class="header-anchor" href="javascript:;" onclick="location.hash='#attach-diagnostics'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Attach the diagnostics window from <code>Application.Initialize()</code> after the application resources have been loaded:</p>
+<pre><code class="language-csharp">using Akbura.Diagnostics;
+using Avalonia;
+using Avalonia.Input;
+using Avalonia.Markup.Xaml;
+
+public partial class App : Application
+{
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+
+#if DEBUG
+        this.AttachAkburaDevTools();
+#endif
+    }
+}
+</code></pre>
+<p>The default toggle gesture is <code>F12</code>.</p>
+<p>Use the options overload to choose another gesture. The Feature Gallery uses <code>Ctrl+F12</code>:</p>
+<pre><code class="language-csharp">#if DEBUG
+this.AttachAkburaDevTools(options =&gt;
+{
+    options.ToggleGesture = new KeyGesture(
+        Key.F12,
+        KeyModifiers.Control);
+});
+#endif
+</code></pre>
+<p>Keep the call inside <code>#if DEBUG</code> so diagnostics is not attached in Release builds.</p>
+<h2 id="use-akbura-and-avalonia-developer-tools-together">Use Akbura and Avalonia developer tools together<a class="header-anchor" href="javascript:;" onclick="location.hash='#use-akbura-and-avalonia-developer-tools-together'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura diagnostics is not a replacement for Avalonia Developer Tools. The two tools inspect the application from different perspectives and are intended to complement each other.</p>
+<p>Avalonia Developer Tools works with Avalonia's visual and logical trees. It is useful for inspecting controls, styles, bindings, layout, properties, and routed events.</p>
+<p>Akbura diagnostics works with the Akbura component tree. It shows the component hierarchy and exposes component-specific data such as states, parameters, and injected services.</p>
+<p>An Akbura component also participates in Avalonia's visual and logical trees, so the same component may be visible in both tools:</p>
 <ul>
-<li><a href="/akcss/spacing">Margin and padding</a></li>
+<li>use Avalonia Developer Tools to inspect how the component is represented and rendered by Avalonia;</li>
+<li>use Akbura diagnostics to inspect the component itself and its Akbura state.</li>
 </ul>
-<p>More built-in style categories will be documented here as they are added.</p>
+<p>Both tools can be attached to the same application:</p>
+<pre><code class="language-csharp">public override void Initialize()
+{
+    AvaloniaXamlLoader.Load(this);
+
+#if DEBUG
+    this.AttachDeveloperTools();
+
+    this.AttachAkburaDevTools(options =&gt;
+    {
+        options.ToggleGesture = new KeyGesture(
+            Key.F12,
+            KeyModifiers.Control);
+    });
+#endif
+}
+</code></pre>
+<p>In this example, Avalonia Developer Tools keeps its own shortcut, while Akbura diagnostics opens with <code>Ctrl+F12</code>.</p>
+<h2 id="use-the-diagnostics-window">Use the diagnostics window<a class="header-anchor" href="javascript:;" onclick="location.hash='#use-the-diagnostics-window'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Run the application in Debug configuration and press the configured shortcut.</p>
+<p>The diagnostics window lets you:</p>
+<ul>
+<li>browse the live Akbura component tree;</li>
+<li>inspect states, parameters, and injected services;</li>
+<li>edit values with the available input builders;</li>
+<li>apply a draft value or reload the current value from the component;</li>
+<li>switch to another compatible input builder from the editor selector.</li>
+</ul>
+<p>Built-in input builders cover strings, numeric values, collections, and a universal fallback. The universal input accepts values supported by a .NET <code>TypeConverter</code>, a public <code>Parse</code> or <code>TryParse</code> method, or a JSON representation.</p>
+<div class="info custom-block">
+            <p class="custom-block-title">INFO</p><p>Akbura diagnostics currently supports the classic desktop application lifetime.</p>
+</div>
+<h2 id="configure-application-services">Configure application services<a class="header-anchor" href="javascript:;" onclick="location.hash='#configure-application-services'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A custom input builder can receive application services through <code>InputRequest.Services</code>:</p>
+<pre><code class="language-csharp">this.AttachAkburaDevTools(options =&gt;
+{
+    options.Services = serviceProvider;
+});
+</code></pre>
+<p>Use this only when an editor needs application-specific data, such as a catalog of valid values.</p>
+<h2 id="next-step">Next step<a class="header-anchor" href="javascript:;" onclick="location.hash='#next-step'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Continue with <a href="diagnostics/custom-input">Custom input builders</a> to add a specialized editor and give it priority over the built-in inputs.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/built-in-styles.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/diagnostics/index.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -270,8 +319,33 @@ Built-in Styles									</span>
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#categories'" data-id="categories" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Categories
+										<span v-hash="'#add-the-package'" data-id="add-the-package" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Add the package
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#attach-diagnostics'" data-id="attach-diagnostics" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Attach diagnostics
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#use-akbura-and-avalonia-developer-tools-together'" data-id="use-akbura-and-avalonia-developer-tools-together" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Use Akbura and Avalonia developer tools together
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#use-the-diagnostics-window'" data-id="use-the-diagnostics-window" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Use the diagnostics window
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#configure-application-services'" data-id="configure-application-services" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Configure application services
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#next-step'" data-id="next-step" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Next step
 										</span>
 									</li>
 							</ul>
@@ -320,6 +394,7 @@ mount('#sidebar', Sidebar)
 <script>hljs.highlightAll()</script>
 <script src="lib/js/lite-yt-embed.js"></script>
 <script src="mjs/docs.mjs" type="module"></script>
+
 
         </main>
     </div>

@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>Inline AKCSS</title>
+    <title>Custom input builders</title>
 
     <script>
             if (location.search === "?dark") {
@@ -60,10 +60,10 @@
                                 <a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
                                     Akbura
                                 </a>
-                                <a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+                                <a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
                                     Akcss
                                 </a>
-                                <a href="diagnostics" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                                <a href="diagnostics" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
                                     Diagnostics
                                 </a>
                                 <a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
@@ -121,10 +121,10 @@
                         <a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
                             Akbura
                         </a>
-                        <a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+                        <a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
                             Akcss
                         </a>
-                        <a href="diagnostics" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                        <a href="diagnostics" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
                             Diagnostics
                         </a>
                         <a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
@@ -174,45 +174,14 @@
 			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
 				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
 					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
-								<a href="https://asaicraft.github.io/Akbura/akcss/" class="block flex items-center whitespace-nowrap">
+								<a href="https://asaicraft.github.io/Akbura/diagnostics/" class="block flex items-center whitespace-nowrap">
 <svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
-AKCSS									</span>
+Diagnostics									</span>
 								</a>
 						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/getting-started" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Getting Started
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/markup-extensions" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Markup Extensions
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Custom Class Styles
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/inline-akcss" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
-										Inline AKCSS
-									</a>
-								</li>
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/utilities" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Utilities
-									</a>
-								</li>
-						</ul>
-								<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="block flex items-center whitespace-nowrap">
-									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
-Built-in Styles									</span>
-								</a>
-						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
-								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akcss/spacing" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
-										Margin and Padding
+									<a href="https://asaicraft.github.io/Akbura/diagnostics/custom-input" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Custom input builders
 									</a>
 								</li>
 						</ul>
@@ -224,168 +193,231 @@ Built-in Styles									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							Inline AKCSS
+							Custom input builders
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<h2 id="inline-akcss">Inline AKCSS<a class="header-anchor" href="javascript:;" onclick="location.hash='#inline-akcss'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Inline AKCSS lets a component declare its own styles directly inside the <code>.akbura</code> file.</p>
-<p>Use a top-level <code>@akcss</code> block:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
-
-namespace Demo.Pages;
-
-@akcss {
-    .primary {
-        Background: Blue;
-        Foreground: White;
-        Padding: (16, 8);
-    }
-}
-
-&lt;Button class=&quot;primary&quot;&gt;
-    Save
-&lt;/Button&gt;
+					<p>A custom input builder replaces free-form value entry with an editor designed for a specific component value. This example adds a <code>Route</code> input for the Feature Gallery's <code>Url</code> state and presents the known routes in a drop-down list.</p>
+<h2 id="how-input-builders-are-selected">How input builders are selected<a class="header-anchor" href="javascript:;" onclick="location.hash='#how-input-builders-are-selected'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Diagnostics evaluates <code>AkburaDiagnosticsOptions.InputBuilders</code> in order. Every builder whose <code>CanProvide()</code> method returns <code>true</code> appears in the selector, and the first compatible builder is selected initially.</p>
+<p>Insert an application-specific builder at index <code>0</code> when it should be preferred over the built-in editors. The universal editor remains available as the final fallback.</p>
+<h2 id="create-routeinputbuilder">Create <code>RouteInputBuilder</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#create-routeinputbuilder'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Create this file:</p>
+<pre><code class="language-text">Akbura.FeatureGallery/Akbura.FeatureGallery/Diagnostics/RouteInputBuilder.cs
 </code></pre>
-<p>The <code>primary</code> style belongs to this component and can be used without importing a separate <code>.akcss</code> file.</p>
-<div class="info custom-block">
-            <p class="custom-block-title">INFO</p><p>Inline AKCSS does not mean assigning styles directly through markup attributes. It defines regular AKCSS classes locally inside the component.</p>
-</div>
-<h2 id="reactive-inline-styles">Reactive inline styles<a class="header-anchor" href="javascript:;" onclick="location.hash='#reactive-inline-styles'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Inline styles have the same reactive behavior as styles declared in external <code>.akcss</code> files:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
+<p>Add the following implementation:</p>
+<pre><code class="language-csharp">using Akbura.Diagnostics;
+using FeatureGalleryComponent = Akbura.FeatureGallery.Components.App;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Data;
+using Avalonia.Markup.Xaml.MarkupExtensions.CompiledBindings;
 
-namespace Demo.Pages;
+namespace Akbura.FeatureGallery.Diagnostics;
 
-@akcss {
-    Button.primary {
-        Background: Blue;
-        Padding: 10;
+public sealed class RouteInputBuilder : InputBuilder
+{
+    public override Type OutputType =&gt; typeof(string);
 
-        @if(IsPointerOver) {
-            Background: DarkBlue;
-            Padding: 15;
+    public override bool CanProvide(InputRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return request.EditorType == typeof(string) &amp;&amp;
+               request.ComponentInstance is Router &amp;&amp;
+               string.Equals(
+                   request.MemberName,
+                   nameof(Router.Url),
+                   StringComparison.Ordinal);
+    }
+
+    protected override Control BuildCore(InputRequest request)
+    {
+        return BuildCore(
+            request,
+            request.ExistingValue);
+    }
+
+    protected override Control BuildCore(
+        InputRequest request,
+        object? existingValue)
+    {
+        var router = (Router)request.ComponentInstance!;
+        var routes = GetRoutes(
+            router,
+            existingValue as string);
+
+        var comboBox = new ComboBox
+        {
+            ItemsSource = routes,
+            MinWidth = 180d,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+
+        var binding = new CompiledBinding(InputValueBindingPath)
+        {
+            Source = comboBox,
+            Mode = BindingMode.TwoWay,
+            UpdateSourceTrigger =
+                UpdateSourceTrigger.PropertyChanged,
+        };
+
+        comboBox.Bind(
+            SelectingItemsControl.SelectedItemProperty,
+            binding);
+
+        return comboBox;
+    }
+
+    private static IReadOnlyList&lt;string&gt; GetRoutes(
+        Router router,
+        string? currentRoute)
+    {
+        var routes = new List&lt;string&gt;();
+        var knownRoutes = new HashSet&lt;string&gt;(
+            StringComparer.OrdinalIgnoreCase);
+
+        var pages = router.Pages;
+
+        if (pages is not null)
+        {
+            foreach (var page in pages)
+            {
+                var route = page.Url;
+
+                if (string.IsNullOrWhiteSpace(route) ||
+                    !knownRoutes.Add(route))
+                {
+                    continue;
+                }
+
+                routes.Add(route);
+            }
         }
-    }
-}
 
-&lt;Button class=&quot;primary&quot;&gt;
-    Hover over me
-&lt;/Button&gt;
-</code></pre>
-<p>The style observes <code>IsPointerOver</code>. When its value changes, AKCSS evaluates the style again.</p>
-<p>Properties inside <code>@if</code> use <code>BindingPriority.StyleTrigger</code>, so they take priority over regular declarations using <code>BindingPriority.Style</code>.</p>
-<p>When the condition becomes false, the trigger values are removed and the regular values are restored.</p>
-<h2 id="akcss-using-directives">AKCSS using directives<a class="header-anchor" href="javascript:;" onclick="location.hash='#akcss-using-directives'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>C# namespaces used by an inline AKCSS block are imported with <code>@using</code>:</p>
-<pre><code class="language-akbura">@akcss {
-    @using Avalonia.Media;
-
-    Button.primary {
-        Background: Brushes.DodgerBlue;
-        Foreground: Brushes.White;
-    }
-}
-</code></pre>
-<p>Notice the difference:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
-
-@akcss {
-    @using Avalonia.Media;
-}
-</code></pre>
-<ul>
-<li><code>using</code> imports a namespace into the Akbura component.</li>
-<li><code>@using</code> imports a namespace into the AKCSS module.</li>
-</ul>
-<h2 id="importing-external-styles">Importing external styles<a class="header-anchor" href="javascript:;" onclick="location.hash='#importing-external-styles'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>An inline block can import styles from another <code>.akcss</code> module:</p>
-<pre><code class="language-akbura">@akcss {
-    @using Demo.Styles.Shared.akcss;
-
-    Button.primary {
-        @apply surface;
-        Padding: 12;
-    }
-}
-</code></pre>
-<p>Here, <code>surface</code> is resolved from <code>Demo.Styles.Shared.akcss</code>, while <code>primary</code> remains local to the component.</p>
-<h2 id="inline-utilities">Inline utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#inline-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Component-local utilities can be declared inside <code>@utilities</code>:</p>
-<pre><code class="language-akbura">@akcss {
-    @utilities {
-        .fade {
-            Opacity: 0.75;
+        if (!string.IsNullOrWhiteSpace(currentRoute) &amp;&amp;
+            knownRoutes.Add(currentRoute))
+        {
+            routes.Add(currentRoute);
         }
 
-        .square-(double size) {
-            Width: size;
-            Height: size;
-        }
-    }
-}
-
-&lt;Button fade square-48&gt;
-    Square button
-&lt;/Button&gt;
-</code></pre>
-<p>Inline utilities are available immediately in the markup of the same component.</p>
-<p>When a local utility and an imported utility have the same name, AKCSS searches the local inline module first.</p>
-<h2 id="selectors">Selectors<a class="header-anchor" href="javascript:;" onclick="location.hash='#selectors'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Inline AKCSS supports the same selectors as external styles:</p>
-<pre><code class="language-akbura">@akcss {
-    .card {
-        Padding: 10;
-    }
-
-    Button.primary {
-        Background: Blue;
-    }
-
-    (Demo.Controls.SpecialButton) {
-        Padding: 12;
-    }
-
-    (global::Demo.Controls.SpecialButton).accent {
-        Background: Orange;
+        return routes;
     }
 }
 </code></pre>
-<h2 id="combining-inline-and-external-akcss">Combining inline and external AKCSS<a class="header-anchor" href="javascript:;" onclick="location.hash='#combining-inline-and-external-akcss'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Inline AKCSS is best suited for styles used by only one component. External <code>.akcss</code> files are better for shared styles and utilities.</p>
-<p>Both approaches can be used together:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
-using Demo.Styles.Shared.akcss;
-
-namespace Demo.Pages;
-
-@akcss {
-    .localCard {
-        Padding: 16;
-    }
-}
-
-&lt;StackPanel&gt;
-    &lt;Border class=&quot;localCard&quot;&gt;
-        Local component style
-    &lt;/Border&gt;
-
-    &lt;Button class=&quot;sharedButton&quot;&gt;
-        Shared external style
-    &lt;/Button&gt;
-&lt;/StackPanel&gt;
+<p><code>OutputType</code> declares the value produced by the editor. <code>CanProvide()</code> limits the editor to the Feature Gallery <code>App</code> component's <code>Url</code> member. <code>BuildCore()</code> binds the selected route to <code>InputBuilder.InputValueProperty</code>, which is the value contract used by the diagnostics UI.</p>
+<p>The result is a route-specific editor instead of a plain text field:</p>
+<p><img src="img/diagnostics/custom-route-input.png" alt="The Route input builder editing the Url state." />
+<img src="img/diagnostics/custom-route-input-selector.png" alt="The input selector showing routes." /></p>
+<h2 id="add-the-input-icon">Add the input icon<a class="header-anchor" href="javascript:;" onclick="location.hash='#add-the-input-icon'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Diagnostics looks up an icon using the builder's fully qualified type name followed by <code>.Icon</code>. For this class, the resource key must be:</p>
+<pre><code class="language-text">Akbura.FeatureGallery.Diagnostics.RouteInputBuilder.Icon
 </code></pre>
-<p>Use inline AKCSS for component-specific styling and external <code>.akcss</code> modules for reusable application-wide styles.</p>
+<p>Add the geometry inside <code>Application.Resources</code> in:</p>
+<pre><code class="language-text">Akbura.FeatureGallery/Akbura.FeatureGallery/App.axaml
+</code></pre>
+<p>Place it in the existing <code>ResourceDictionary</code>, after <code>ResourceDictionary.MergedDictionaries</code> and before the closing <code>&lt;/ResourceDictionary&gt;</code>:</p>
+<pre><code class="language-xml">&lt;StreamGeometry x:Key=&quot;Akbura.FeatureGallery.Diagnostics.RouteInputBuilder.Icon&quot;&gt;
+    M11,2
+    H13
+    V5
+    H19
+    L22,8
+    L19,11
+    H13
+    V22
+    H11
+    V15
+    H5
+    L2,12
+    L5,9
+    H11
+    Z
+
+    M13,7
+    V9
+    H18.17
+    L19.17,8
+    L18.17,7
+    Z
+
+    M5.83,11
+    L4.83,12
+    L5.83,13
+    H11
+    V11
+    Z
+&lt;/StreamGeometry&gt;
+</code></pre>
+<p>The relevant part of <code>App.axaml</code> should look like this:</p>
+<pre><code class="language-xml">&lt;Application.Resources&gt;
+    &lt;ResourceDictionary&gt;
+        &lt;ResourceDictionary.MergedDictionaries&gt;
+            &lt;ResourceInclude Source=&quot;avares://Akbura/Styles.axaml&quot; /&gt;
+        &lt;/ResourceDictionary.MergedDictionaries&gt;
+
+        &lt;StreamGeometry x:Key=&quot;Akbura.FeatureGallery.Diagnostics.RouteInputBuilder.Icon&quot;&gt;
+            &lt;!-- geometry from the previous snippet --&gt;
+        &lt;/StreamGeometry&gt;
+    &lt;/ResourceDictionary&gt;
+&lt;/Application.Resources&gt;
+</code></pre>
+<h2 id="register-the-builder">Register the builder<a class="header-anchor" href="javascript:;" onclick="location.hash='#register-the-builder'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Update <code>App.axaml.cs</code> to import the builder namespace and Avalonia input types:</p>
+<pre><code class="language-csharp">using Akbura.Diagnostics;
+using Akbura.FeatureGallery.Diagnostics;
+using Avalonia.Input;
+</code></pre>
+<p>Register the builder while attaching diagnostics:</p>
+<pre><code class="language-csharp">#if DEBUG
+this.AttachDeveloperTools();
+this.AttachAkburaDevTools(options =&gt;
+{
+    options.ToggleGesture = new KeyGesture(
+        Key.F12,
+        KeyModifiers.Control);
+
+    options.InputBuilders.Insert(
+        0,
+        new RouteInputBuilder());
+});
+#endif
+</code></pre>
+<p>Index <code>0</code> gives <code>RouteInputBuilder</code> priority. The selector still lists every other compatible builder, including <code>Universal</code>:</p>
+<p><img src="img/diagnostics/custom-route-selector.png" alt="The input selector showing Route and Universal builders." /></p>
+<p>The second <code>Url</code> value in the screenshot belongs to another component. Because <code>CanProvide()</code> restricts the custom builder to the Feature Gallery <code>App</code> component, that value continues to use the universal editor.</p>
+<h2 id="input-builder-contract">Input builder contract<a class="header-anchor" href="javascript:;" onclick="location.hash='#input-builder-contract'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A custom builder must follow four rules:</p>
+<ol>
+<li>Return the edited value type from <code>OutputType</code>.</li>
+<li>Return <code>true</code> from <code>CanProvide()</code> only for values the editor can safely handle.</li>
+<li>Return an Avalonia <code>Control</code> from <code>BuildCore()</code>.</li>
+<li>Keep the control's editable property synchronized with <code>InputBuilder.InputValueProperty</code> using a two-way binding.</li>
+</ol>
+<p>Diagnostics owns Apply, Reload, validation display, and writing the committed value back to the component.</p>
+<h2 id="using-application-services">Using application services<a class="header-anchor" href="javascript:;" onclick="location.hash='#using-application-services'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Set <code>options.Services</code> when a builder needs data from the application:</p>
+<pre><code class="language-csharp">this.AttachAkburaDevTools(options =&gt;
+{
+    options.Services = serviceProvider;
+    options.InputBuilders.Insert(0, new RouteInputBuilder());
+});
+</code></pre>
+<p>The builder can read those services from <code>request.Services</code> in <code>CanProvide()</code> or <code>BuildCore()</code>.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="header-anchor" href="javascript:;" onclick="location.hash='#troubleshooting'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>When the builder does not appear, verify that it was inserted before diagnostics was attached and that <code>CanProvide()</code> matches the actual <code>ComponentType</code>, <code>MemberName</code>, and <code>EditorType</code>.</p>
+<p>When the icon is missing, verify that the resource key exactly matches the builder's namespace and class name, including the <code>.Icon</code> suffix.</p>
+<p>When the editor changes visually but Apply receives the old value, verify the two-way binding to <code>InputBuilder.InputValueProperty</code>.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/akcss/inline-akcss.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/AkburaDocs/_pages/diagnostics/custom-input.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -393,23 +425,16 @@ namespace Demo.Pages;
 					<div class="not-prose my-20">
 								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
 									<div class="-mt-px flex w-0 flex-1">
-											<a href="https://asaicraft.github.io/Akbura/akcss/custom-classes" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+											<a href="https://asaicraft.github.io/Akbura/diagnostics/" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
 												<!-- Heroicon name: mini/arrow-long-left -->
 												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
 												</svg>
-												Custom Class Styles
+												Diagnostics
 											</a>
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
-											<a href="https://asaicraft.github.io/Akbura/akcss/utilities" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
-												Utilities
-												<!-- Heroicon name: mini/arrow-long-right -->
-												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
-												</svg>
-											</a>
 									</div>
 								</nav>
 					</div>
@@ -423,38 +448,38 @@ namespace Demo.Pages;
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#inline-akcss'" data-id="inline-akcss" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Inline AKCSS
+										<span v-hash="'#how-input-builders-are-selected'" data-id="how-input-builders-are-selected" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											How input builders are selected
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#reactive-inline-styles'" data-id="reactive-inline-styles" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Reactive inline styles
+										<span v-hash="'#create-routeinputbuilder'" data-id="create-routeinputbuilder" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Create 
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#akcss-using-directives'" data-id="akcss-using-directives" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											AKCSS using directives
+										<span v-hash="'#add-the-input-icon'" data-id="add-the-input-icon" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Add the input icon
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#importing-external-styles'" data-id="importing-external-styles" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Importing external styles
+										<span v-hash="'#register-the-builder'" data-id="register-the-builder" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Register the builder
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#inline-utilities'" data-id="inline-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Inline utilities
+										<span v-hash="'#input-builder-contract'" data-id="input-builder-contract" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Input builder contract
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#selectors'" data-id="selectors" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Selectors
+										<span v-hash="'#using-application-services'" data-id="using-application-services" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Using application services
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#combining-inline-and-external-akcss'" data-id="combining-inline-and-external-akcss" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Combining inline and external AKCSS
+										<span v-hash="'#troubleshooting'" data-id="troubleshooting" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Troubleshooting
 										</span>
 									</li>
 							</ul>
@@ -503,6 +528,7 @@ mount('#sidebar', Sidebar)
 <script>hljs.highlightAll()</script>
 <script src="lib/js/lite-yt-embed.js"></script>
 <script src="mjs/docs.mjs" type="module"></script>
+
 
         </main>
     </div>

@@ -47,6 +47,11 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/Workspaces/">
+    <Project Path="Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj" Id="e0c6426f-ece8-4de0-a40c-c22d196bbc1a">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+      <Deploy />
+    </Project>
     <Project Path="Workspaces/Akbura.VisualStudio/Akbura.VisualStudio.csproj" Id="18328b7e-6083-4ea1-b033-ca3f27686a2c">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />

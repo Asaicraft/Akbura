@@ -27,7 +27,7 @@
 		<PackageVersion Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" />
 		<PackageVersion Include="Microsoft.VisualStudio.Text.Logic" Version="17.14.249" />
 		<PackageVersion Include="Microsoft.VisualStudio.Text.UI.Wpf" Version="17.14.249" />
-		<PackageVersion Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" />
+		<PackageVersion Include="Microsoft.VSSDK.BuildTools" Version="18.5.40034" />
 		<PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.15" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />

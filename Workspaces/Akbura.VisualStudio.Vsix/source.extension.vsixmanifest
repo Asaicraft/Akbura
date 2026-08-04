@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<PackageManifest
+    Version="2.0.0"
+    xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
+    xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+
+	<Metadata>
+		<Identity
+			Id="Akbura.VisualStudio.Vsix.09fb6c7e-e90e-4536-ac90-4c71949913da"
+			Version="0.1.0"
+			Language="en-US"
+			Publisher="Asaicraft" />
+
+		<DisplayName>Akbura Language Support</DisplayName>
+
+		<Description xml:space="preserve">
+      Syntax highlighting and editor services for Akbura.
+    </Description>
+	</Metadata>
+
+	<Installation>
+		<InstallationTarget
+			Id="Microsoft.VisualStudio.Community"
+			Version="[17.14,)">
+			<ProductArchitecture>amd64</ProductArchitecture>
+		</InstallationTarget>
+
+		<InstallationTarget
+			Id="Microsoft.VisualStudio.Pro"
+			Version="[17.14,)">
+			<ProductArchitecture>amd64</ProductArchitecture>
+		</InstallationTarget>
+
+		<InstallationTarget
+			Id="Microsoft.VisualStudio.Enterprise"
+			Version="[17.14,)">
+			<ProductArchitecture>amd64</ProductArchitecture>
+		</InstallationTarget>
+	</Installation>
+
+	<Prerequisites>
+		<Prerequisite
+			Id="Microsoft.VisualStudio.Component.CoreEditor"
+			DisplayName="Visual Studio core editor"
+			Version="[17.14,)" />
+	</Prerequisites>
+
+	<Assets>
+		<Asset
+			Type="Microsoft.VisualStudio.MefComponent"
+			Path="|Akbura.VisualStudio;BuiltProjectOutputGroup|"
+			d:Source="Project"
+			d:ProjectName="Akbura.VisualStudio" />
+	</Assets>
+
+</PackageManifest>

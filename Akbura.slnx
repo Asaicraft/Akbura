@@ -46,6 +46,20 @@
     <File Path="Directory.Packages.props" />
     <File Path="README.md" />
   </Folder>
+  <Folder Name="/Workspaces/">
+    <Project Path="Workspaces/Akbura.VisualStudio/Akbura.VisualStudio.csproj" Id="18328b7e-6083-4ea1-b033-ca3f27686a2c">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Workspaces/Akbura.Workspaces.MSBuild/Akbura.Workspaces.MSBuild.csproj" Id="1e620b9a-a42e-4ad1-8448-9ccdf85fc284">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Workspaces/Akbura.Workspaces/Akbura.Workspaces.csproj" Id="ec1f02fc-0d05-4701-bbc2-63fcc4823ff9">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+  </Folder>
   <Project Path="Akbura.AotTest/Akbura.AotTest.csproj" />
   <Project Path="Akbura.Benchmarks/Akbura.Benchmarks.csproj" />
   <Project Path="Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />

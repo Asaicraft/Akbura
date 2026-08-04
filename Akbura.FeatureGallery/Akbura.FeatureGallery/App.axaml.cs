@@ -1,5 +1,7 @@
+#if DEBUG
 using Akbura.Diagnostics;
 using Akbura.FeatureGallery.Diagnostics;
+#endif
 using Akbura.FeatureGallery.ViewModels;
 using Akbura.FeatureGallery.Views;
 using Avalonia;

@@ -19,5 +19,13 @@ public enum AkburaClassificationKind
     Operator,
     Punctuation,
     MarkupText,
+
+    Utility,
+    UtilityModifier,
+
+    /// <summary>
+    /// Fallback classification when the embedded C# syntax
+    /// cannot be decomposed into more precise spans.
+    /// </summary>
     EmbeddedCSharp,
 }

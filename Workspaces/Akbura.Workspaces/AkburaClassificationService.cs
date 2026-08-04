@@ -4,9 +4,10 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces;
 
-internal sealed class AkburaClassificationService :
-    IAkburaClassificationService
+internal sealed class AkburaClassificationService : IAkburaClassificationService
 {
+    private readonly EmbeddedCSharpClassificationService _embeddedCSharp = new();
+
     public ImmutableArray<AkburaClassifiedSpan> GetClassifications(
         AkburaDocumentSnapshot document,
         TextSpan requestedSpan,
@@ -44,7 +45,8 @@ internal sealed class AkburaClassificationService :
             AddToken(
                 token,
                 span,
-                builder);
+                builder,
+                cancellationToken);
 
             AddTrivia(
                 token.TrailingTrivia,
@@ -71,11 +73,22 @@ internal sealed class AkburaClassificationService :
         return ImmutableArray.Create(items);
     }
 
-    private static void AddToken(
+    private void AddToken(
         SyntaxToken token,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        CancellationToken cancellationToken)
     {
+        if (token.Kind == SyntaxKind.CSharpRawToken &&
+            _embeddedCSharp.TryAddClassifications(
+                token,
+                requestedSpan,
+                builder,
+                cancellationToken))
+        {
+            return;
+        }
+
         var classification =
             AkburaSyntaxClassificationFacts.GetClassification(token);
 
@@ -91,7 +104,7 @@ internal sealed class AkburaClassificationService :
             classification.Value));
     }
 
-    private static void AddTrivia(
+    private void AddTrivia(
         SyntaxTriviaList triviaList,
         TextSpan requestedSpan,
         ImmutableArray<AkburaClassifiedSpan>.Builder builder,
@@ -124,7 +137,8 @@ internal sealed class AkburaClassificationService :
                 AddToken(
                     skippedToken,
                     requestedSpan,
-                    builder);
+                    builder,
+                    cancellationToken);
             }
         }
     }

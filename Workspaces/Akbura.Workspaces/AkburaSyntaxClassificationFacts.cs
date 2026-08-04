@@ -4,12 +4,24 @@ namespace Akbura.Workspaces;
 
 internal static class AkburaSyntaxClassificationFacts
 {
-    public static AkburaClassificationKind? GetClassification(
-        SyntaxToken token)
+    public static AkburaClassificationKind? GetClassification(SyntaxToken token)
     {
         if (token.Width == 0 || token.IsMissing)
         {
             return null;
+        }
+
+        if (token.Kind == SyntaxKind.CSharpRawToken)
+        {
+            return AkburaClassificationKind.EmbeddedCSharp;
+        }
+
+        var utilityClassification =
+            GetUtilityClassification(token);
+
+        if (utilityClassification is not null)
+        {
+            return utilityClassification;
         }
 
         return token.Kind switch
@@ -23,9 +35,6 @@ internal static class AkburaSyntaxClassificationFacts
 
             SyntaxKind.AkTextLiteral =>
                 AkburaClassificationKind.MarkupText,
-
-            SyntaxKind.CSharpRawToken =>
-                AkburaClassificationKind.EmbeddedCSharp,
 
             SyntaxKind.IdentifierToken =>
                 GetIdentifierClassification(token),
@@ -46,8 +55,7 @@ internal static class AkburaSyntaxClassificationFacts
         };
     }
 
-    public static AkburaClassificationKind? GetClassification(
-        SyntaxTrivia trivia)
+    public static AkburaClassificationKind? GetClassification(SyntaxTrivia trivia)
     {
         return trivia.Kind switch
         {
@@ -59,74 +67,110 @@ internal static class AkburaSyntaxClassificationFacts
         };
     }
 
+    private static AkburaClassificationKind? GetUtilityClassification(SyntaxToken token)
+    {
+        for (var node = token.Parent;
+             node is not null;
+             node = node.Parent)
+        {
+            if (node is TailwindPrefixSegmentSyntax)
+            {
+                return AkburaClassificationKind.UtilityModifier;
+            }
+
+            if (node is TailwindAttributeSyntax)
+            {
+                return AkburaClassificationKind.Utility;
+            }
+        }
+
+        return null;
+    }
+
     private static AkburaClassificationKind
         GetIdentifierClassification(SyntaxToken token)
     {
-        var parentKind = token.Parent?.Kind ?? SyntaxKind.None;
-
-        if (IsComponentName(parentKind))
+        for (var node = token.Parent;
+             node is not null;
+             node = node.Parent)
         {
-            return AkburaClassificationKind.Component;
-        }
+            switch (node)
+            {
+                // <Button>
+                // <Router.NotFound>
+                //
+                case MarkupComponentNameSyntax componentName:
+                    return componentName.Parent is
+                        MarkupAttachedPropertyAttributeSyntax
+                            ? AkburaClassificationKind.Type
+                            : AkburaClassificationKind.Component;
 
-        if (IsAttribute(parentKind))
-        {
-            return AkburaClassificationKind.Attribute;
-        }
+                // Header="..."
+                case MarkupPlainAttributeSyntax attribute
+                    when Contains(attribute.Name, token):
 
-        if (parentKind == SyntaxKind.CSharpTypeSyntax)
-        {
-            return AkburaClassificationKind.Type;
-        }
+                    return AkburaClassificationKind.Attribute;
 
-        if (parentKind is
-            SyntaxKind.NamespaceDeclarationSyntax or
-            SyntaxKind.UsingDirectiveSyntax or
-            SyntaxKind.UsingAliasSyntax)
-        {
-            return AkburaClassificationKind.Namespace;
+                // Grid.Row="..."
+                case MarkupAttachedPropertyAttributeSyntax attribute
+                    when Contains(attribute.Name, token):
+
+                    return AkburaClassificationKind.Attribute;
+
+                // bind:Text="..."
+                // out:Value="..."
+                //
+                // bind/out 
+                // а Text/Value
+                case MarkupPrefixedAttributeSyntax attribute
+                    when Contains(attribute.Name, token):
+
+                    return AkburaClassificationKind.Attribute;
+
+                case CSharpTypeSyntax:
+                    return AkburaClassificationKind.Type;
+
+                case NamespaceDeclarationSyntax:
+                case UsingDirectiveSyntax:
+                case UsingAliasSyntax:
+                    return AkburaClassificationKind.Namespace;
+            }
         }
 
         return AkburaClassificationKind.Identifier;
     }
 
-    private static bool IsComponentName(SyntaxKind kind)
+    private static bool Contains(
+        AkburaSyntax syntax,
+        SyntaxToken token)
     {
-        return kind is
-            SyntaxKind.MarkupComponentNameSyntax or
-            SyntaxKind.MarkupSimpleComponentNameSyntax or
-            SyntaxKind.MarkupQualifiedNameSyntax or
-            SyntaxKind.MarkupAliasQualifierSyntax or
-            SyntaxKind.MarkupQualifiedComponentNameSyntax or
-            SyntaxKind.MarkupNameSegmentSyntax or
-            SyntaxKind.MarkupIdentifierNameSegmentSyntax or
-            SyntaxKind.MarkupGenericNameSegmentSyntax;
-    }
-
-    private static bool IsAttribute(SyntaxKind kind)
-    {
-        return kind is
-            SyntaxKind.MarkupAttributeSyntax or
-            SyntaxKind.MarkupPlainAttributeSyntax or
-            SyntaxKind.MarkupAttachedPropertyAttributeSyntax or
-            SyntaxKind.MarkupPrefixedAttributeSyntax or
-            SyntaxKind.TailwindAttributeSyntax or
-            SyntaxKind.TailwindFlagAttributeSyntax or
-            SyntaxKind.TailwindFullAttributeSyntax;
+        return syntax.FullSpan.Contains(token.Span);
     }
 
     private static bool IsDirectiveToken(SyntaxToken token)
     {
-        if (token.Kind is SyntaxKind.AtToken or SyntaxKind.HashToken)
+        if (token.Kind is
+            SyntaxKind.AtToken or
+            SyntaxKind.HashToken)
         {
             return true;
         }
 
-        return token.Parent?.Kind is
-            SyntaxKind.InlineAkcssBlockSyntax or
-            SyntaxKind.AkcssApplyDirectiveSyntax or
-            SyntaxKind.AkcssInterceptDirectiveSyntax or
-            SyntaxKind.AkcssIfDirectiveSyntax;
+        for (var node = token.Parent;
+             node is not null;
+             node = node.Parent)
+        {
+            if (node.Kind is
+                SyntaxKind.InlineAkcssBlockSyntax or
+                SyntaxKind.AkcssApplyDirectiveSyntax or
+                SyntaxKind.AkcssInterceptDirectiveSyntax or
+                SyntaxKind.AkcssIfDirectiveSyntax)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsKeyword(SyntaxKind kind)

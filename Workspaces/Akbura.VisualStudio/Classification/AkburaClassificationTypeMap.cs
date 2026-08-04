@@ -94,6 +94,16 @@ internal sealed class AkburaClassificationTypeMap
                 GetRequired(
                     registry,
                     PredefinedClassificationTypeNames.FormalLanguage),
+
+            [AkburaClassificationKind.Utility] =
+                GetRequired(
+                    registry,
+                    PredefinedClassificationTypeNames.MarkupAttributeValue),
+
+                        [AkburaClassificationKind.UtilityModifier] =
+                GetRequired(
+                    registry,
+                    PredefinedClassificationTypeNames.PreprocessorKeyword),
         };
     }
 

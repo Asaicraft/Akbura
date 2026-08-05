@@ -11,6 +11,7 @@
 		<PackageReference Include="Microsoft.VisualStudio.SDK" />
 		<PackageReference Include="Microsoft.VisualStudio.Text.Logic" />
 		<PackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
+		<PackageReference Include="Microsoft.CodeAnalysis.EditorFeatures.Text" />
 	</ItemGroup>
 
 	<ItemGroup>

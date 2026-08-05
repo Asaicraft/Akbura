@@ -11,7 +11,7 @@ namespace Akbura.VisualStudio.Classification;
 
 internal sealed class AkburaClassificationTypeMap
 {
-    private readonly Dictionary<AkburaClassificationKind, IClassificationType> _types;
+    private readonly IClassificationType[] _types;
 
     public AkburaClassificationTypeMap(
         IClassificationTypeRegistryService registry)
@@ -21,101 +21,124 @@ internal sealed class AkburaClassificationTypeMap
             throw new ArgumentNullException(nameof(registry));
         }
 
-        _types = new Dictionary<
-            AkburaClassificationKind,
-            IClassificationType>
-        {
-            [AkburaClassificationKind.Keyword] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Keyword),
+        var last = (int)AkburaClassificationKind.LastKind;
 
-            [AkburaClassificationKind.Namespace] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Identifier),
+        _types = new IClassificationType[last + 1];
 
-            [AkburaClassificationKind.Type] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Type),
+        _types[(int)AkburaClassificationKind.Keyword] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Keyword);
 
-            [AkburaClassificationKind.Component] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.MarkupNode),
+        _types[(int)AkburaClassificationKind.Namespace] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Identifier);
 
-            [AkburaClassificationKind.Attribute] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.MarkupAttribute),
+        _types[(int)AkburaClassificationKind.Type] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Type);
 
-            [AkburaClassificationKind.Identifier] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Identifier),
+        _types[(int)AkburaClassificationKind.Component] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.MarkupNode);
 
-            [AkburaClassificationKind.Directive] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.PreprocessorKeyword),
+        _types[(int)AkburaClassificationKind.Attribute] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.MarkupAttribute);
 
-            [AkburaClassificationKind.String] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.String),
+        _types[(int)AkburaClassificationKind.Identifier] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Identifier);
 
-            [AkburaClassificationKind.Number] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Number),
+        _types[(int)AkburaClassificationKind.Directive] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.PreprocessorKeyword);
 
-            [AkburaClassificationKind.Comment] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Comment),
+        _types[(int)AkburaClassificationKind.String] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.String);
 
-            [AkburaClassificationKind.Operator] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Operator),
+        _types[(int)AkburaClassificationKind.Number] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Number);
 
-            [AkburaClassificationKind.Punctuation] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Punctuation),
+        _types[(int)AkburaClassificationKind.Comment] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Comment);
 
-            [AkburaClassificationKind.MarkupText] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.Text),
+        _types[(int)AkburaClassificationKind.Operator] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Operator);
 
-            [AkburaClassificationKind.EmbeddedCSharp] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.FormalLanguage),
+        _types[(int)AkburaClassificationKind.Punctuation] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Punctuation);
 
-            [AkburaClassificationKind.Utility] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.MarkupAttributeValue),
+        _types[(int)AkburaClassificationKind.MarkupText] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Text);
 
-                        [AkburaClassificationKind.UtilityModifier] =
-                GetRequired(
-                    registry,
-                    PredefinedClassificationTypeNames.PreprocessorKeyword),
-        };
+        _types[(int)AkburaClassificationKind.Utility] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.MarkupAttributeValue);
+
+        _types[(int)AkburaClassificationKind.UtilityModifier] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.PreprocessorKeyword);
+
+        _types[(int)AkburaClassificationKind.MarkupExtensionType] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Type);
+
+        _types[(int)AkburaClassificationKind.MarkupExtensionProperty] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.MarkupAttribute);
+
+        _types[(int)AkburaClassificationKind.MarkupExtensionValue] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.MarkupAttributeValue);
+
+        _types[(int)AkburaClassificationKind.MarkupExtensionPunctuation] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.Punctuation);
+
+        _types[(int)AkburaClassificationKind.EmbeddedCSharp] =
+            GetRequired(
+                registry,
+                PredefinedClassificationTypeNames.FormalLanguage);
     }
 
-    public IClassificationType Get(
-        AkburaClassificationKind kind)
+    public IClassificationType Get(AkburaClassificationKind kind)
     {
-        return _types[kind];
+        var index = (int)kind;
+
+        if ((uint)index >= (uint)_types.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
+        }
+
+        return _types[index];
     }
 
-    private static IClassificationType GetRequired(
-        IClassificationTypeRegistryService registry,
-        string name)
+    private static IClassificationType GetRequired(IClassificationTypeRegistryService registry, string name)
     {
         return registry.GetClassificationType(name) ??
             throw new InvalidOperationException(

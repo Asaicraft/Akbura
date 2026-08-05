@@ -24,6 +24,7 @@
 		<PackageVersion Include="Microsoft.Build.Locator" Version="1.11.2" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.11.0" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.11.0" />
+		<PackageVersion Include="Microsoft.CodeAnalysis.EditorFeatures.Text" Version="4.11.0" />
 		<PackageVersion Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" />
 		<PackageVersion Include="Microsoft.VisualStudio.Text.Logic" Version="17.14.249" />
 		<PackageVersion Include="Microsoft.VisualStudio.Text.UI.Wpf" Version="17.14.249" />

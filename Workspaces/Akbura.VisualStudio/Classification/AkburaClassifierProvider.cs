@@ -52,9 +52,6 @@ internal sealed class AkburaClassifierProvider :
         return textBuffer.Properties.GetOrCreateSingletonProperty(
             () => new AkburaClassifier(
                 bufferContext,
-                _workspaceHost.Workspace
-                    .LanguageServices
-                    .Classification,
                 _typeMap));
     }
 }

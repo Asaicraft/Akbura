@@ -6,26 +6,29 @@ namespace Akbura.Workspaces;
 /// </summary>
 public enum AkburaClassificationKind
 {
-    Keyword,
-    Namespace,
-    Type,
-    Component,
-    Attribute,
-    Identifier,
-    Directive,
-    String,
-    Number,
-    Comment,
-    Operator,
-    Punctuation,
-    MarkupText,
+    Keyword = 0,
+    Namespace = 1,
+    Type = 2,
+    Component = 3,
+    Attribute = 4,
+    Identifier = 5,
+    Directive = 6,
+    String = 7,
+    Number = 8,
+    Comment = 9,
+    Operator = 10,
+    Punctuation = 11,
+    MarkupText = 12,
 
-    Utility,
-    UtilityModifier,
+    Utility = 13,
+    UtilityModifier = 14,
 
-    /// <summary>
-    /// Fallback classification when the embedded C# syntax
-    /// cannot be decomposed into more precise spans.
-    /// </summary>
-    EmbeddedCSharp,
+    MarkupExtensionType = 15,
+    MarkupExtensionProperty = 16,
+    MarkupExtensionValue = 17,
+    MarkupExtensionPunctuation = 18,
+
+    EmbeddedCSharp = 19,
+
+    LastKind = EmbeddedCSharp,
 }

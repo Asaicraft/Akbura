@@ -4,7 +4,8 @@ namespace Akbura.Workspaces;
 
 internal static class AkburaSyntaxClassificationFacts
 {
-    public static AkburaClassificationKind? GetClassification(SyntaxToken token)
+    public static AkburaClassificationKind? GetClassification(
+    SyntaxToken token)
     {
         if (token.Width == 0 || token.IsMissing)
         {
@@ -14,6 +15,13 @@ internal static class AkburaSyntaxClassificationFacts
         if (token.Kind == SyntaxKind.CSharpRawToken)
         {
             return AkburaClassificationKind.EmbeddedCSharp;
+        }
+
+        var markupExtensionClassification = GetMarkupExtensionClassification(token);
+
+        if (markupExtensionClassification is not null)
+        {
+            return markupExtensionClassification;
         }
 
         var utilityClassification =
@@ -53,6 +61,71 @@ internal static class AkburaSyntaxClassificationFacts
 
             _ => null,
         };
+    }
+
+    private static AkburaClassificationKind? GetMarkupExtensionClassification(SyntaxToken token)
+    {
+        if (!IsInsideMarkupExtension(token))
+        {
+            return null;
+        }
+
+        if (token.Kind is
+            SyntaxKind.DollarToken or
+            SyntaxKind.OpenBraceToken or
+            SyntaxKind.CloseBraceToken or
+            SyntaxKind.CommaToken or
+            SyntaxKind.DotToken or
+            SyntaxKind.DoubleColonToken or
+            SyntaxKind.EqualsToken)
+        {
+            return AkburaClassificationKind
+                .MarkupExtensionPunctuation;
+        }
+
+        for (var node = token.Parent;
+             node is not null;
+             node = node.Parent)
+        {
+            switch (node)
+            {
+                case MarkupExtensionTypeSyntax:
+                    return AkburaClassificationKind
+                        .MarkupExtensionType;
+
+                case MarkupExtensionPropertyArgumentSyntax property
+                    when Contains(property.Name, token):
+
+                    return AkburaClassificationKind
+                        .MarkupExtensionProperty;
+
+                case MarkupExtensionLiteralValueSyntax:
+                    return AkburaClassificationKind
+                        .MarkupExtensionValue;
+
+                case MarkupExtensionSyntax:
+                    return token.Kind == SyntaxKind.IdentifierToken
+                        ? AkburaClassificationKind.MarkupExtensionValue
+                        : null;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsInsideMarkupExtension(SyntaxToken token)
+    {
+        for (var node = token.Parent;
+             node is not null;
+             node = node.Parent)
+        {
+            if (node is MarkupExtensionSyntax)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static AkburaClassificationKind? GetClassification(SyntaxTrivia trivia)

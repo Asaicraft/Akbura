@@ -8,8 +8,7 @@ namespace Akbura.VisualStudio.Classification;
 
 [Export(typeof(IClassifierProvider))]
 [ContentType(AkburaContentTypeNames.Akbura)]
-internal sealed class AkburaClassifierProvider :
-    IClassifierProvider
+internal sealed class AkburaClassifierProvider : IClassifierProvider
 {
     private readonly ITextDocumentFactoryService
         _textDocumentFactory;

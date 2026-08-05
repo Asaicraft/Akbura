@@ -140,6 +140,11 @@ public sealed class AkburaWorkspace : IDisposable
                     changes,
                     cancellationToken);
 
+                if (ReferenceEquals(result, oldDocument))
+                {
+                    return oldDocument;
+                }
+
                 var newProject =
                     project.ReplaceDocument(result);
 

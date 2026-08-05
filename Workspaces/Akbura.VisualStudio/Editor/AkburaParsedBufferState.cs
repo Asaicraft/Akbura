@@ -23,14 +23,11 @@ internal sealed class AkburaParsedBufferState
     {
         RequestVersion = requestVersion;
 
-        Snapshot = snapshot ??
-            throw new ArgumentNullException(nameof(snapshot));
+        Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
 
-        Text = text ??
-            throw new ArgumentNullException(nameof(text));
+        Text = text ?? throw new ArgumentNullException(nameof(text));
 
-        Document = document ??
-            throw new ArgumentNullException(nameof(document));
+        Document = document ?? throw new ArgumentNullException(nameof(document));
 
         Classifications = classifications;
     }
@@ -43,7 +40,5 @@ internal sealed class AkburaParsedBufferState
 
     public AkburaDocumentSnapshot Document { get; }
 
-    public ImmutableArray<AkburaClassifiedSpan>
-        Classifications
-    { get; }
+    public ImmutableArray<AkburaClassifiedSpan> Classifications { get; }
 }

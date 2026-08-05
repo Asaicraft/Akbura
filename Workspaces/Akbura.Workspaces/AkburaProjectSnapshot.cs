@@ -2,6 +2,7 @@ using Akbura.Language;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Akbura.Workspaces;
 
@@ -126,8 +127,7 @@ public sealed class AkburaProjectSnapshot
             Documents.Add(document.Id, document));
     }
 
-    internal AkburaProjectSnapshot ReplaceDocument(
-        AkburaDocumentSnapshot document)
+    internal AkburaProjectSnapshot ReplaceDocument(AkburaDocumentSnapshot document)
     {
         if (document == null)
         {
@@ -138,9 +138,10 @@ public sealed class AkburaProjectSnapshot
                 document.Id,
                 out var oldDocument))
         {
-            throw new KeyNotFoundException(
-                $"Document '{document.Id}' was not found.");
+            throw new KeyNotFoundException($"Document '{document.Id}' was not found.");
         }
+
+        Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation started");
 
         var compilation = ReferenceEquals(
             oldDocument.SyntaxTree,
@@ -150,16 +151,26 @@ public sealed class AkburaProjectSnapshot
                     oldDocument.SyntaxTree,
                     document.SyntaxTree);
 
+        Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation completed");
+
+        Debug.WriteLine("[Akbura] Project.ReplaceDocument: dictionary started");
+
+        var documents =
+            Documents.SetItem(
+                document.Id,
+                document);
+
+        Debug.WriteLine("[Akbura] Project.ReplaceDocument: dictionary completed");
+
         return new AkburaProjectSnapshot(
             Id,
             VersionStamp.Create(),
             Context,
             compilation,
-            Documents.SetItem(document.Id, document));
+            documents);
     }
 
-    internal AkburaProjectSnapshot RemoveDocument(
-        AkburaDocumentId documentId)
+    internal AkburaProjectSnapshot RemoveDocument(AkburaDocumentId documentId)
     {
         if (!Documents.TryGetValue(
                 documentId,
@@ -216,10 +227,10 @@ public sealed class AkburaProjectSnapshot
             compilation = new AkburaCompilation(
                 context.CSharpCompilation,
                 trees,
-                ImmutableArray<AkcssSyntaxTree>.Empty,
+                [],
                 context.RootNamespace,
                 context.ProjectDirectory,
-                previousCompilation: Compilation);
+                reuseFrom: Compilation);
         }
 
         return new AkburaProjectSnapshot(

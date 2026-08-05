@@ -9,11 +9,9 @@ namespace Akbura.VisualStudio.Classification;
 
 internal sealed class AkburaClassifier : IClassifier
 {
-    private readonly AkburaTextBufferContext
-        _bufferContext;
+    private readonly AkburaTextBufferContext _bufferContext;
 
-    private readonly AkburaClassificationTypeMap
-        _typeMap;
+    private readonly AkburaClassificationTypeMap _typeMap;
 
     public AkburaClassifier(
         AkburaTextBufferContext bufferContext,

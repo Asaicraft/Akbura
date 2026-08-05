@@ -135,10 +135,15 @@ internal sealed partial class DeclarationTable
 
     public static DeclarationTable Create(AkburaCompilation compilation)
     {
+        if (compilation == null)
+        {
+            throw new ArgumentNullException(nameof(compilation));
+        }
+
         return Create(
             compilation.SyntaxTrees,
             compilation.AkcssSyntaxTrees,
-            compilation.PreviousCompilation?.DeclarationTable);
+            previous: null);
     }
 
     public static DeclarationTable Create(

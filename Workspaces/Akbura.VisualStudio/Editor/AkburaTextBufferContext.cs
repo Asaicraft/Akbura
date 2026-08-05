@@ -22,22 +22,17 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private readonly ITextBuffer _textBuffer;
     private readonly AkburaWorkspace _workspace;
 
-    private readonly IAkburaClassificationService
-        _classificationService;
+    private readonly IAkburaClassificationService _classificationService;
 
-    private readonly JoinableTaskFactory
-        _joinableTaskFactory;
+    private readonly JoinableTaskFactory _joinableTaskFactory;
 
     private readonly Uri _uri;
 
-    private readonly CancellationTokenSource
-        _disposeCancellation = new();
+    private readonly CancellationTokenSource _disposeCancellation = new();
 
-    private readonly ITextDocumentFactoryService?
-        _subscribedDocumentFactory;
+    private readonly ITextDocumentFactoryService? _subscribedDocumentFactory;
 
-    private readonly ITextDocument?
-        _textDocument;
+    private readonly ITextDocument? _textDocument;
 
     /// <summary>
     /// Stores the newest request that has not yet been consumed.
@@ -50,14 +45,12 @@ internal sealed class AkburaTextBufferContext : IDisposable
     /// <summary>
     /// Stores the cancellation source of the currently executing parse.
     /// </summary>
-    private CancellationTokenSource?
-        _activeParseCancellation;
+    private CancellationTokenSource? _activeParseCancellation;
 
     /// <summary>
     /// Stores the latest completely calculated immutable state.
     /// </summary>
-    private AkburaParsedBufferState?
-        _publishedState;
+    private AkburaParsedBufferState? _publishedState;
 
     /// <summary>
     /// Monotonically increasing editor request version.
@@ -74,6 +67,11 @@ internal sealed class AkburaTextBufferContext : IDisposable
     /// Zero means active and one means disposed.
     /// </summary>
     private int _disposeState;
+
+#if DEBUG
+    private long _enqueueCount;
+    private long _processingCount;
+#endif
 
     public AkburaTextBufferContext(
         ITextBuffer textBuffer,
@@ -235,6 +233,14 @@ internal sealed class AkburaTextBufferContext : IDisposable
         Interlocked.Exchange(
             ref _pendingRequest,
             request);
+#if DEBUG
+        var enqueueCount =Interlocked.Increment(ref _enqueueCount);
+
+        Debug.WriteLine(
+            $"[Akbura] Enqueue #{enqueueCount}, " +
+            $"request={requestVersion}, " +
+            $"snapshot={snapshot.Version.VersionNumber}");
+#endif
 
         CancelActiveParse();
         EnsureWorker();
@@ -274,38 +280,24 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         try
         {
-            while (Volatile.Read(
-                       ref _disposeState) == 0)
+            while (Volatile.Read(ref _disposeState) == 0)
             {
-                var request =
-                    Interlocked.Exchange(
-                        ref _pendingRequest,
-                        null);
+                var request = Interlocked.Exchange(ref _pendingRequest, null);
 
                 if (request == null)
                 {
-                    if (TryTransitionWorkerToIdle())
-                    {
-                        return;
-                    }
-
-                    continue;
+                    return;
                 }
 
-                request = await DebounceAsync(
-                        request,
-                        disposalToken)
+                request = await DebounceAsync(request, disposalToken)
                     .ConfigureAwait(false);
 
-                if (!IsCurrentRequest(
-                        request.RequestVersion))
+                if (!IsCurrentRequest(request.RequestVersion))
                 {
                     continue;
                 }
 
-                await ParseAndPublishAsync(
-                        request,
-                        disposalToken)
+                await ParseAndPublishAsync(request, disposalToken)
                     .ConfigureAwait(false);
             }
         }
@@ -322,23 +314,29 @@ internal sealed class AkburaTextBufferContext : IDisposable
              * A worker failure must not terminate Visual Studio editing.
              */
             Debug.WriteLine(
-                $"Akbura update worker failed: {exception}");
+                $"Akbura update worker failed: " +
+                $"{exception}");
         }
         finally
         {
             /*
-             * An unexpected worker exit must release ownership.
+             * Release ownership exactly once when this worker exits.
              */
-            if (Interlocked.Exchange(
-                    ref _workerState,
-                    0) != 0 &&
-                Volatile.Read(ref _disposeState) == 0 &&
+            Volatile.Write(ref _workerState, 0);
+
+            /*
+             * A request may have arrived while the worker was exiting.
+             * EnsureWorker uses compare-exchange and therefore cannot create
+             * another owner when a producer has already started one.
+             */
+            if (Volatile.Read(ref _disposeState) == 0 &&
                 Volatile.Read(ref _pendingRequest) != null)
             {
                 EnsureWorker();
             }
         }
     }
+
 
     private async Task<UpdateRequest> DebounceAsync(
         UpdateRequest request,
@@ -393,9 +391,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         CancellationToken disposalToken)
     {
         using var parseCancellation =
-            CancellationTokenSource
-                .CreateLinkedTokenSource(
-                    disposalToken);
+            CancellationTokenSource.CreateLinkedTokenSource(
+                disposalToken);
 
         var previousCancellation =
             Interlocked.Exchange(
@@ -426,23 +423,24 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 parseCancellation.Token;
 
             /*
-             * Task.Run guarantees that parsing and classification cannot
-             * execute on the Visual Studio main thread.
+             * Cancellation is converted into a null result inside the worker.
+             * This prevents an expected cancellation exception from crossing
+             * the Task.Run boundary as a user-unhandled exception.
              */
             var state = await Task.Run(
-                    () => CreateParsedState(
+                    () => TryCreateParsedState(
                         request,
-                        cancellationToken),
-                    cancellationToken)
+                        cancellationToken))
                 .ConfigureAwait(false);
 
-            cancellationToken
-                .ThrowIfCancellationRequested();
+            if (state == null)
+            {
+                return;
+            }
 
             /*
-             * A newer request normally cancels this operation. The version
-             * check also protects against a parser that completed during
-             * the cancellation race.
+             * A newer request may have arrived after parsing completed.
+             * Only the newest request is allowed to publish editor state.
              */
             if (!IsCurrentRequest(
                     request.RequestVersion))
@@ -452,16 +450,21 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
             PublishState(state);
 
+            /*
+             * Publishing to the editor should only be cancelled when the
+             * complete buffer context is disposed. A newer parse request is
+             * handled by the immutable publication checks in RaiseChangedAsync.
+             */
             await RaiseChangedAsync(
                     state,
-                    cancellationToken)
+                    disposalToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
-            when (parseCancellation.IsCancellationRequested)
+            when (disposalToken.IsCancellationRequested)
         {
             /*
-             * A newer editor snapshot superseded this parse.
+             * Normal context shutdown.
              */
         }
         catch (Exception exception)
@@ -482,44 +485,61 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private AkburaParsedBufferState CreateParsedState(
-        UpdateRequest request,
-        CancellationToken cancellationToken)
+    private AkburaParsedBufferState? TryCreateParsedState(
+    UpdateRequest request,
+    CancellationToken cancellationToken)
     {
-        cancellationToken
-            .ThrowIfCancellationRequested();
+        try
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
 
-        var document =
-            _workspace.OpenOrChangeDocument(
-                _uri,
+            var document =
+                _workspace.OpenOrChangeDocument(
+                    _uri,
+                    request.Text,
+                    changes: null,
+                    cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
+
+            /*
+             * Calculate classifications once for the complete document.
+             * Scrolling must not traverse the syntax tree synchronously.
+             */
+            var classifications =
+                _classificationService.GetClassifications(
+                    document,
+                    new TextSpan(
+                        start: 0,
+                        length: request.Text.Length),
+                    cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
+
+            return new AkburaParsedBufferState(
+                request.RequestVersion,
+                request.Snapshot,
                 request.Text,
-                changes: null,
-                cancellationToken);
-
-        cancellationToken
-            .ThrowIfCancellationRequested();
-
-        /*
-         * Calculate classifications once for the complete document.
-         * Scrolling must not traverse the syntax tree synchronously.
-         */
-        var classifications =
-            _classificationService.GetClassifications(
                 document,
-                new TextSpan(
-                    start: 0,
-                    length: request.Text.Length),
-                cancellationToken);
-
-        cancellationToken
-            .ThrowIfCancellationRequested();
-
-        return new AkburaParsedBufferState(
-            request.RequestVersion,
-            request.Snapshot,
-            request.Text,
-            document,
-            classifications);
+                classifications);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            /*
+             * A newer editor snapshot superseded this operation.
+             */
+            return null;
+        }
     }
 
     private void PublishState(
@@ -597,47 +617,16 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     currentSnapshot.Length)));
     }
 
-    private bool TryTransitionWorkerToIdle()
-    {
-        /*
-         * Release worker ownership before checking for a request that may
-         * have arrived concurrently.
-         */
-        Volatile.Write(
-            ref _workerState,
-            0);
-
-        if (Volatile.Read(ref _disposeState) != 0 ||
-            Volatile.Read(ref _pendingRequest) == null)
-        {
-            return true;
-        }
-
-        /*
-         * Reacquire ownership if no producer has already started a new
-         * worker. Otherwise the new worker owns the pending request.
-         */
-        return Interlocked.CompareExchange(
-                   ref _workerState,
-                   1,
-                   0) != 0;
-    }
-
     private bool IsCurrentRequest(
         long requestVersion)
     {
-        return requestVersion ==
-                   Volatile.Read(
-                       ref _requestedVersion) &&
-               Volatile.Read(
-                   ref _disposeState) == 0;
+        return requestVersion == Volatile.Read(ref _requestedVersion) 
+            && Volatile.Read(ref _disposeState) == 0;
     }
 
     private void CancelActiveParse()
     {
-        var cancellation =
-            Volatile.Read(
-                ref _activeParseCancellation);
+        var cancellation = Volatile.Read( ref _activeParseCancellation);
 
         if (cancellation != null)
         {

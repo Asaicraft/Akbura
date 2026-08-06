@@ -4,12 +4,18 @@ namespace Akbura.Workspaces;
 
 internal static class AkburaSyntaxClassificationFacts
 {
-    public static AkburaClassificationKind? GetClassification(
-    SyntaxToken token)
+    public static AkburaClassificationKind? GetClassification(SyntaxToken token)
     {
         if (token.Width == 0 || token.IsMissing)
         {
             return null;
+        }
+
+        var akcssClassification = GetAkcssClassification(token);
+
+        if (akcssClassification is not null)
+        {
+            return akcssClassification;
         }
 
         if (token.Kind == SyntaxKind.CSharpRawToken)
@@ -61,6 +67,164 @@ internal static class AkburaSyntaxClassificationFacts
 
             _ => null,
         };
+    }
+
+    private static AkburaClassificationKind? GetAkcssClassification(SyntaxToken token)
+    {
+        for (var node = token.Parent;
+             node != null;
+             node = node.Parent)
+        {
+            switch (node)
+            {
+                case InlineAkcssBlockSyntax block
+                    when HasSameSpan(
+                             block.AtToken,
+                             token) ||
+                         HasSameSpan(
+                             block.AkcssKeyword,
+                             token):
+
+                    return AkburaClassificationKind
+                        .Directive;
+
+                case AkcssUsingDirectiveSyntax directive
+                    when HasSameSpan(
+                             directive.AtToken,
+                             token) ||
+                         HasSameSpan(
+                             directive.UsingKeyword,
+                             token):
+
+                    return AkburaClassificationKind
+                        .Directive;
+
+                case AkcssUsingDirectiveSyntax directive
+                    when Contains(
+                        directive.Name,
+                        token):
+
+                    return AkburaClassificationKind
+                        .Namespace;
+
+                case AkcssUtilitiesSectionSyntax section
+                    when HasSameSpan(
+                             section.AtToken,
+                             token) ||
+                         HasSameSpan(
+                             section.UtilitiesToken,
+                             token):
+
+                    return AkburaClassificationKind
+                        .Directive;
+
+                case AkcssApplyDirectiveSyntax apply
+                    when HasSameSpan(
+                             apply.AtToken,
+                             token) ||
+                         HasSameSpan(
+                             apply.ApplyKeyword,
+                             token):
+
+                    return AkburaClassificationKind
+                        .Directive;
+
+                case AkcssApplyDirectiveSyntax
+                    when token.Kind is
+                        SyntaxKind.IdentifierToken or
+                        SyntaxKind.NumericLiteralToken:
+
+                    return AkburaClassificationKind
+                        .Utility;
+
+                case AkcssInterceptDirectiveSyntax intercept
+                    when HasSameSpan(
+                             intercept.AtToken,
+                             token) ||
+                         HasSameSpan(
+                             intercept.InterceptKeyword,
+                             token):
+
+                    return AkburaClassificationKind
+                        .Directive;
+
+                case AkcssIfDirectiveSyntax conditional
+                    when HasSameSpan(
+                             conditional.AtToken,
+                             token) ||
+                         HasSameSpan(
+                             conditional.IfKeyword,
+                             token):
+
+                    return AkburaClassificationKind
+                        .Directive;
+
+                case AkcssStyleSelectorSyntax selector
+                    when selector.Name is { } name &&
+                         Contains(
+                             name,
+                             token):
+
+                    return AkburaClassificationKind
+                        .Utility;
+
+                case AkcssUtilitySelectorSyntax selector
+                    when Contains(
+                        selector.Name,
+                        token):
+
+                    return AkburaClassificationKind
+                        .Utility;
+
+                case AkcssUtilityParameterSyntax parameter
+                    when Contains(
+                        parameter.ParamName,
+                        token):
+
+                    return AkburaClassificationKind
+                        .ParameterName;
+
+                case AkcssAssignmentSyntax assignment
+                    when Contains(
+                        assignment.PropertyName,
+                        token):
+
+                    return token.Kind ==
+                               SyntaxKind.IdentifierToken &&
+                           token.Span.End ==
+                               assignment
+                                   .PropertyName
+                                   .Span.End
+                        ? AkburaClassificationKind
+                            .PropertyName
+                        : AkburaClassificationKind
+                            .Identifier;
+
+                case AkcssAdditionalPseudoStateSyntax state
+                    when HasSameSpan(
+                             state.AtToken,
+                             token) ||
+                         Contains(
+                             state.State,
+                             token):
+
+                    return AkburaClassificationKind
+                        .UtilityModifier;
+
+                case AkcssPseudoSelectorSyntax selector
+                    when HasSameSpan(
+                             selector.AtToken,
+                             token) ||
+                         Contains(
+                             selector.FirstState,
+                             token):
+
+                    return AkburaClassificationKind
+                        .UtilityModifier;
+            }
+        }
+
+        return null;
     }
 
     private static AkburaClassificationKind? GetMarkupExtensionClassification(SyntaxToken token)
@@ -222,28 +386,9 @@ internal static class AkburaSyntaxClassificationFacts
 
     private static bool IsDirectiveToken(SyntaxToken token)
     {
-        if (token.Kind is
+        return token.Kind is
             SyntaxKind.AtToken or
-            SyntaxKind.HashToken)
-        {
-            return true;
-        }
-
-        for (var node = token.Parent;
-             node is not null;
-             node = node.Parent)
-        {
-            if (node.Kind is
-                SyntaxKind.InlineAkcssBlockSyntax or
-                SyntaxKind.AkcssApplyDirectiveSyntax or
-                SyntaxKind.AkcssInterceptDirectiveSyntax or
-                SyntaxKind.AkcssIfDirectiveSyntax)
-            {
-                return true;
-            }
-        }
-
-        return false;
+            SyntaxKind.HashToken;
     }
 
     private static bool IsKeyword(SyntaxKind kind)
@@ -323,5 +468,10 @@ internal static class AkburaSyntaxClassificationFacts
             SyntaxKind.SingleQuoteToken or
             SyntaxKind.DoubleQuoteToken or
             SyntaxKind.DollarToken;
+    }
+
+    private static bool HasSameSpan(SyntaxToken left, SyntaxToken right)
+    {
+        return left.Span == right.Span;
     }
 }

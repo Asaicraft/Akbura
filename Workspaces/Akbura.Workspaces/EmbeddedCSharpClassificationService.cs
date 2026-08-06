@@ -148,6 +148,36 @@ internal sealed class EmbeddedCSharpClassificationService
             cancellationToken);
     }
 
+    public void AddClassifications(
+        CSharpExpressionSyntax expressionSyntax,
+        TextSpan requestedSpan,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        CancellationToken cancellationToken)
+    {
+        var expression =
+            expressionSyntax
+                .GetRawCSharpExpression();
+
+        if (expression == null)
+        {
+            return;
+        }
+
+        var sourceSpan =
+            expressionSyntax.Tokens.FullSpan;
+
+        var positionOffset =
+            sourceSpan.Start -
+            expression.FullSpan.Start;
+
+        AddTokens(
+            expression.DescendantTokens(),
+            positionOffset,
+            requestedSpan,
+            builder,
+            cancellationToken);
+    }
+
     private static SyntaxNode? ParseRawNode(AkburaSyntaxToken token,string text)
     {
         for (var parent = token.Parent;
@@ -163,6 +193,10 @@ internal sealed class EmbeddedCSharpClassificationService
                 case CSharpTypeSyntax:
                     return CSharpSyntaxFactory
                         .ParseTypeName(text);
+
+                case CSharpExpressionSyntax:
+                    return CSharpSyntaxFactory
+                        .ParseExpression(text);
             }
         }
 

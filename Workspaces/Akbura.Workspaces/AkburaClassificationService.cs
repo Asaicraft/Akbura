@@ -34,7 +34,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
         var semanticBuilder = ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
 
-        var root = document.SyntaxTree.GetRoot();
+        var root = document.SyntaxTree.GetRootSyntax();
 
         AddEmbeddedCSharpNodes(
             root,
@@ -127,9 +127,15 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
              node != null;
              node = node.Parent)
         {
-            if (node is CSharpStatementSyntax or CSharpTypeSyntax)
+            switch (node)
             {
-                return true;
+                case CSharpStatementSyntax:
+                case CSharpExpressionSyntax:
+                    return true;
+
+                case CSharpTypeSyntax type:
+                    return IsEmbeddedCSharpType(
+                        type);
             }
         }
 
@@ -162,9 +168,18 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
                         cancellationToken);
                     break;
 
-                case CSharpTypeSyntax type:
+                case CSharpTypeSyntax type
+                     when IsEmbeddedCSharpType(type):
                     _embeddedCSharp.AddClassifications(
                         type,
+                        requestedSpan,
+                        builder,
+                        cancellationToken);
+                    break;
+
+                case CSharpExpressionSyntax expression:
+                    _embeddedCSharp.AddClassifications(
+                        expression,
                         requestedSpan,
                         builder,
                         cancellationToken);
@@ -256,5 +271,12 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             Math.Min(span.End, textLength));
 
         return TextSpan.FromBounds(start, end);
+    }
+
+    private static bool IsEmbeddedCSharpType(CSharpTypeSyntax type)
+    {
+        return type.Parent is not
+            AkcssAssignmentSyntax and not
+            AkcssUsingDirectiveSyntax;
     }
 }

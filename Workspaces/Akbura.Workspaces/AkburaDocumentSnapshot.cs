@@ -6,7 +6,7 @@ using System.Diagnostics;
 namespace Akbura.Workspaces;
 
 /// <summary>
-/// Immutable snapshot of one .akbura editor document.
+/// Immutable snapshot of one Akbura language document.
 /// </summary>
 public sealed class AkburaDocumentSnapshot
 {
@@ -17,7 +17,7 @@ public sealed class AkburaDocumentSnapshot
         string filePath,
         VersionStamp version,
         SourceText text,
-        ComponentSyntaxTree syntaxTree,
+        AkburaSyntaxTree syntaxTree,
         bool isOpen)
     {
         Id = id;
@@ -45,7 +45,7 @@ public sealed class AkburaDocumentSnapshot
 
     public bool IsOpen { get; }
 
-    internal ComponentSyntaxTree SyntaxTree { get; }
+    internal AkburaSyntaxTree SyntaxTree { get; }
 
     internal static AkburaDocumentSnapshot Create(
         AkburaProjectId projectId,
@@ -54,10 +54,12 @@ public sealed class AkburaDocumentSnapshot
         CancellationToken cancellationToken)
     {
         var filePath = DocumentUri.GetFilePath(uri);
-        var syntaxTree = ComponentSyntaxTree.ParseText(
-            text,
-            filePath,
-            cancellationToken);
+
+        var syntaxTree =
+            CreateSyntaxTree(
+                text,
+                filePath,
+                cancellationToken);
 
         return new AkburaDocumentSnapshot(
             AkburaDocumentId.CreateNew(),
@@ -98,10 +100,12 @@ public sealed class AkburaDocumentSnapshot
 
         Debug.WriteLine("[Akbura] Document.WithText: WithChangedText started");
 
-        var syntaxTree = SyntaxTree.WithChangedText(
-            newText,
-            changes,
-            cancellationToken);
+        var syntaxTree =
+            WithChangedText(
+                SyntaxTree,
+                newText,
+                changes,
+                cancellationToken);
 
         Debug.WriteLine("[Akbura] Document.WithText: WithChangedText completed");
 
@@ -132,5 +136,53 @@ public sealed class AkburaDocumentSnapshot
             Text,
             SyntaxTree,
             isOpen);
+    }
+
+    private static AkburaSyntaxTree CreateSyntaxTree(
+        SourceText text,
+        string filePath,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(
+                Path.GetExtension(filePath),
+                ".akcss",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return AkcssSyntaxTree.ParseText(
+                text,
+                filePath,
+                cancellationToken);
+        }
+
+        return ComponentSyntaxTree.ParseText(
+            text,
+            filePath,
+            cancellationToken);
+    }
+
+    private static AkburaSyntaxTree WithChangedText(
+        AkburaSyntaxTree syntaxTree,
+        SourceText newText,
+        IEnumerable<TextChangeRange>? changes,
+        CancellationToken cancellationToken)
+    {
+        return syntaxTree switch
+        {
+            ComponentSyntaxTree componentTree =>
+                componentTree.WithChangedText(
+                    newText,
+                    changes,
+                    cancellationToken),
+
+            AkcssSyntaxTree akcssTree =>
+                akcssTree.WithChangedText(
+                    newText,
+                    changes,
+                    cancellationToken),
+
+            _ => throw new InvalidOperationException(
+                $"Unsupported syntax tree type " +
+                $"'{syntaxTree.GetType().FullName}'."),
+        };
     }
 }

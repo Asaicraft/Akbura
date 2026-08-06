@@ -356,11 +356,21 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 
     private static bool IsAkburaDocument(string? filePath)
     {
-        return !string.IsNullOrWhiteSpace(filePath) &&
-                string.Equals(
-                    Path.GetExtension(filePath),
-                    ".akbura",
-                    StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(filePath);
+
+        return string.Equals(
+                   extension,
+                   ".akbura",
+                   StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(
+                   extension,
+                   ".akcss",
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsGlobalUsingsDocument(string? filePath)

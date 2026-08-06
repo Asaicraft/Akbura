@@ -34,12 +34,9 @@ public sealed class AkburaProjectSnapshot
 
     public ProjectContext Context { get; }
 
-    public CSharpCompilation CSharpCompilation =>
-        Context.CSharpCompilation;
+    public CSharpCompilation CSharpCompilation => Context.CSharpCompilation;
 
-    public ImmutableDictionary<
-        AkburaDocumentId,
-        AkburaDocumentSnapshot> Documents { get; }
+    public ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> Documents { get; }
 
     internal AkburaCompilation Compilation { get; }
 
@@ -116,8 +113,10 @@ public sealed class AkburaProjectSnapshot
                 $"Document '{document.Id}' already exists.");
         }
 
-        var compilation = Compilation.AddSyntaxTrees(
-            new AkburaSyntaxTree[] { document.SyntaxTree });
+        var compilation =
+            AddSyntaxTree(
+                Compilation,
+                document.SyntaxTree);
 
         return new AkburaProjectSnapshot(
             Id,
@@ -143,13 +142,15 @@ public sealed class AkburaProjectSnapshot
 
         Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation started");
 
-        var compilation = ReferenceEquals(
-            oldDocument.SyntaxTree,
-            document.SyntaxTree)
-                ? Compilation
-                : Compilation.ReplaceSyntaxTree(
-                    oldDocument.SyntaxTree,
-                    document.SyntaxTree);
+        var compilation =
+            ReferenceEquals(
+                oldDocument.SyntaxTree,
+                document.SyntaxTree)
+                    ? Compilation
+                    : ReplaceSyntaxTree(
+                        Compilation,
+                        oldDocument.SyntaxTree,
+                        document.SyntaxTree);
 
         Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation completed");
 
@@ -179,8 +180,10 @@ public sealed class AkburaProjectSnapshot
             return this;
         }
 
-        var compilation = Compilation.RemoveSyntaxTrees(
-            new AkburaSyntaxTree[] { document.SyntaxTree });
+        var compilation =
+            RemoveSyntaxTree(
+                Compilation,
+                document.SyntaxTree);
 
         return new AkburaProjectSnapshot(
             Id,
@@ -219,18 +222,33 @@ public sealed class AkburaProjectSnapshot
         }
         else
         {
-            var trees = Documents.Values
-                .Select(static document =>
-                    (AkburaSyntaxTree)document.SyntaxTree)
-                .ToImmutableArray();
+            var componentTrees =
+                Documents.Values
+                    .Select(
+                        static document =>
+                            document.SyntaxTree)
+                    .Where(
+                        static syntaxTree =>
+                            syntaxTree is not
+                                AkcssSyntaxTree)
+                    .ToImmutableArray();
 
-            compilation = new AkburaCompilation(
-                context.CSharpCompilation,
-                trees,
-                [],
-                context.RootNamespace,
-                context.ProjectDirectory,
-                reuseFrom: Compilation);
+            var akcssTrees =
+                Documents.Values
+                    .Select(
+                        static document =>
+                            document.SyntaxTree)
+                    .OfType<AkcssSyntaxTree>()
+                    .ToImmutableArray();
+
+            compilation =
+                new AkburaCompilation(
+                    context.CSharpCompilation,
+                    componentTrees,
+                    akcssTrees,
+                    context.RootNamespace,
+                    context.ProjectDirectory,
+                    reuseFrom: Compilation);
         }
 
         return new AkburaProjectSnapshot(
@@ -239,5 +257,75 @@ public sealed class AkburaProjectSnapshot
             context,
             compilation,
             Documents);
+    }
+
+    private static AkburaCompilation AddSyntaxTree(
+    AkburaCompilation compilation,
+    AkburaSyntaxTree syntaxTree)
+    {
+        return syntaxTree switch
+        {
+            AkcssSyntaxTree akcssTree =>
+                compilation.AddAkcssSyntaxTrees(
+                    [
+                    akcssTree,
+                    ]),
+
+            _ =>
+                compilation.AddSyntaxTrees(
+                    [
+                    syntaxTree,
+                    ]),
+        };
+    }
+
+    private static AkburaCompilation ReplaceSyntaxTree(
+        AkburaCompilation compilation,
+        AkburaSyntaxTree oldTree,
+        AkburaSyntaxTree newTree)
+    {
+        if (oldTree is AkcssSyntaxTree oldAkcssTree)
+        {
+            if (newTree is not
+                AkcssSyntaxTree newAkcssTree)
+            {
+                throw new InvalidOperationException(
+                    "The document syntax tree kind cannot change.");
+            }
+
+            return compilation.ReplaceAkcssSyntaxTree(
+                oldAkcssTree,
+                newAkcssTree);
+        }
+
+        if (newTree is AkcssSyntaxTree)
+        {
+            throw new InvalidOperationException(
+                "The document syntax tree kind cannot change.");
+        }
+
+        return compilation.ReplaceSyntaxTree(
+            oldTree,
+            newTree);
+    }
+
+    private static AkburaCompilation RemoveSyntaxTree(
+        AkburaCompilation compilation,
+        AkburaSyntaxTree syntaxTree)
+    {
+        return syntaxTree switch
+        {
+            AkcssSyntaxTree akcssTree =>
+                compilation.RemoveAkcssSyntaxTrees(
+                    [
+                    akcssTree,
+                    ]),
+
+            _ =>
+                compilation.RemoveSyntaxTrees(
+                    [
+                    syntaxTree,
+                    ]),
+        };
     }
 }

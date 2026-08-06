@@ -38,8 +38,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         cancellationToken
             .ThrowIfCancellationRequested();
 
-        var root =
-            document.SyntaxTree.GetRoot();
+        var root = document.SyntaxTree.GetRootSyntax();
 
         var token =
             root.FindTokenInternal(
@@ -500,7 +499,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         CancellationToken cancellationToken,
         out AkburaDefinition definition)
     {
-        symbol = GetNavigationSymbol(symbol);
+        symbol =
+            GetNavigationSymbol(
+                symbol);
 
         var containingType =
             symbol as INamedTypeSymbol ??
@@ -512,7 +513,24 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return false;
         }
 
-        var originalType = containingType.OriginalDefinition;
+        var targetName =
+            containingType.Name;
+
+        var targetNamespace =
+            containingType.ContainingNamespace
+                is { IsGlobalNamespace: false }
+                    ? containingType
+                        .ContainingNamespace
+                        .ToDisplayString()
+                    : string.Empty;
+
+        AkburaDocumentSnapshot?
+            singleNameMatch = null;
+
+        AkburaDocumentSnapshot?
+            targetDocument = null;
+
+        var nameMatchCount = 0;
 
         foreach (var document in
                  context.Project.Documents.Values)
@@ -520,44 +538,95 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             cancellationToken
                 .ThrowIfCancellationRequested();
 
-            var semanticModel =
-                context.Project.Compilation
-                    .GetSemanticModel(
-                        document.SyntaxTree);
-
-            var documentRoot =
-                document.SyntaxTree.GetRoot();
-
-            if (semanticModel.GetDeclaredSymbol(documentRoot) is not
-                IAkburaComponentSymbol component)
+            /*
+             * Generated C# component types can only map back to component
+             * documents. Standalone AKCSS trees must not participate here.
+             */
+            if (document.SyntaxTree is not
+                ComponentSyntaxTree componentTree)
             {
                 continue;
             }
 
-            var componentType =
-                component.CSharpDefinition.NamedType;
-
-            if (componentType == null ||
-                !SymbolEqualityComparer.Default.Equals(
-                    componentType.OriginalDefinition,
-                    originalType))
+            if (!string.Equals(
+                    componentTree.ComponentName,
+                    targetName,
+                    StringComparison.Ordinal))
             {
                 continue;
             }
 
-            definition =
-                CreateAkburaDefinition(
-                    sourceSpan,
-                    document,
-                    new TextSpan(
-                        start: 0,
-                        length: 0));
+            nameMatchCount++;
 
-            return true;
+            singleNameMatch ??=
+                document;
+
+            var componentNamespace =
+                GetComponentNamespace(
+                    componentTree,
+                    context.Project.Context
+                        .RootNamespace);
+
+            if (!string.Equals(
+                    componentNamespace,
+                    targetNamespace,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            targetDocument =
+                document;
+
+            break;
         }
 
-        definition = null!;
-        return false;
+        targetDocument ??=
+            nameMatchCount == 1
+                ? singleNameMatch
+                : null;
+
+        if (targetDocument == null)
+        {
+            definition = null!;
+            return false;
+        }
+
+        definition =
+            CreateAkburaDefinition(
+                sourceSpan,
+                targetDocument,
+                new TextSpan(
+                    start: 0,
+                    length: 0));
+
+        return true;
+    }
+
+    private static string GetComponentNamespace(
+        ComponentSyntaxTree syntaxTree,
+        string rootNamespace)
+    {
+        var root =
+            syntaxTree.GetRoot();
+
+        foreach (var member in root.Members)
+        {
+            if (member is not
+                NamespaceDeclarationSyntax
+                    namespaceDeclaration)
+            {
+                continue;
+            }
+
+            return namespaceDeclaration
+                .Name
+                .ToFullString()
+                .Trim();
+        }
+
+        return rootNamespace ??
+            string.Empty;
     }
 
     private static RoslynSymbol GetNavigationSymbol(RoslynSymbol symbol)

@@ -18,6 +18,10 @@ internal static class AkburaContentTypeDefinitions
     [Export]
     [FileExtension(".akbura")]
     [ContentType(AkburaContentTypeNames.Akbura)]
-    internal static FileExtensionToContentTypeDefinition
-        AkburaFileExtension = null!;
+    internal static FileExtensionToContentTypeDefinition AkburaFileExtension = null!;
+
+    [Export]
+    [FileExtension(".akcss")]
+    [ContentType(AkburaContentTypeNames.Akbura)]
+    internal static FileExtensionToContentTypeDefinition AkcssFileExtension = null!;
 }

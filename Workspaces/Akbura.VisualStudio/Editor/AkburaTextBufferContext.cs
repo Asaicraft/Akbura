@@ -551,7 +551,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 request.RequestVersion,
                 request.Snapshot,
                 request.Text,
-                document,
+                context,
                 classifications);
         }
         catch (OperationCanceledException)

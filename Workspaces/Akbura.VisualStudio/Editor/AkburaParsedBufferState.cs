@@ -18,16 +18,22 @@ internal sealed class AkburaParsedBufferState
         long requestVersion,
         ITextSnapshot snapshot,
         SourceText text,
-        AkburaDocumentSnapshot document,
+        AkburaDocumentContext context,
         ImmutableArray<AkburaClassifiedSpan> classifications)
     {
         RequestVersion = requestVersion;
 
-        Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
+        Snapshot = snapshot ??
+            throw new ArgumentNullException(
+                nameof(snapshot));
 
-        Text = text ?? throw new ArgumentNullException(nameof(text));
+        Text = text ??
+            throw new ArgumentNullException(
+                nameof(text));
 
-        Document = document ?? throw new ArgumentNullException(nameof(document));
+        Context = context ??
+            throw new ArgumentNullException(
+                nameof(context));
 
         Classifications = classifications;
     }
@@ -38,7 +44,11 @@ internal sealed class AkburaParsedBufferState
 
     public SourceText Text { get; }
 
-    public AkburaDocumentSnapshot Document { get; }
+    public AkburaDocumentContext Context { get; }
+
+    public AkburaProjectSnapshot Project => Context.Project;
+
+    public AkburaDocumentSnapshot Document => Context.Document;
 
     public ImmutableArray<AkburaClassifiedSpan> Classifications { get; }
 }

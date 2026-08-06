@@ -6,29 +6,33 @@ namespace Akbura.Workspaces;
 
 internal sealed class AkburaClassificationService : IAkburaClassificationService
 {
+
     private readonly EmbeddedCSharpClassificationService _embeddedCSharp = new();
 
+    private readonly EmbeddedCSharpSemanticClassificationService _semanticCSharp = new();
+
     public ImmutableArray<AkburaClassifiedSpan> GetClassifications(
-        AkburaDocumentSnapshot document,
+        AkburaDocumentContext context,
         TextSpan requestedSpan,
         CancellationToken cancellationToken = default)
     {
-        if (document == null)
+        if (context == null)
         {
-            throw new ArgumentNullException(nameof(document));
+            throw new ArgumentNullException(nameof(context));
         }
 
-        var span = ClampSpan(
-            requestedSpan,
-            document.Text.Length);
+        var document = context.Document;
+
+        var span = ClampSpan(requestedSpan, document.Text.Length);
 
         if (span.Length == 0)
         {
-            return ImmutableArray<AkburaClassifiedSpan>.Empty;
+            return [];
         }
 
-        var builder =
-            ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
+        var syntacticBuilder = ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
+
+        var semanticBuilder = ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
 
         var root = document.SyntaxTree.GetRoot();
 
@@ -39,30 +43,63 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             AddTrivia(
                 token.LeadingTrivia,
                 span,
-                builder,
+                syntacticBuilder,
                 cancellationToken);
 
             AddToken(
                 token,
                 span,
-                builder,
+                syntacticBuilder,
                 cancellationToken);
 
             AddTrivia(
                 token.TrailingTrivia,
                 span,
-                builder,
+                syntacticBuilder,
                 cancellationToken);
         }
 
-        var items = builder.ToArray();
+        var semanticModel =
+            context.Project.Compilation
+                .GetSemanticModel(
+                    document.SyntaxTree);
 
-        Array.Sort(
-            items,
+        _semanticCSharp.AddClassifications(
+            semanticModel,
+            root,
+            span,
+            semanticBuilder,
+            cancellationToken);
+
+        var semanticSpans = semanticBuilder.ToImmutable();
+
+        var semanticSpanSet =
+            new HashSet<TextSpan>(
+                semanticSpans.Select(
+                    static item => item.Span));
+
+        var items =
+            new List<AkburaClassifiedSpan>(
+                syntacticBuilder.Count +
+                semanticSpans.Length);
+
+        items.AddRange(semanticSpans);
+
+        foreach (var syntactic in syntacticBuilder)
+        {
+            if (!semanticSpanSet.Contains(
+                    syntactic.Span))
+            {
+                items.Add(syntactic);
+            }
+        }
+
+        items.Sort(
             static (left, right) =>
             {
-                var start = left.Span.Start.CompareTo(
-                    right.Span.Start);
+                var start =
+                    left.Span.Start.CompareTo(
+                        right.Span.Start);
 
                 return start != 0
                     ? start
@@ -70,7 +107,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
                         right.Span.Length);
             });
 
-        return ImmutableArray.Create(items);
+        return [.. items];
     }
 
     private void AddToken(

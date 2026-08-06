@@ -109,79 +109,136 @@ public sealed class AkburaWorkspace : IDisposable
         IReadOnlyList<TextChangeRange>? changes = null,
         CancellationToken cancellationToken = default)
     {
+        return OpenOrChangeDocumentContext(
+            uri,
+            text,
+            changes,
+            cancellationToken).Document;
+    }
+
+    public AkburaDocumentContext OpenOrChangeDocumentContext(
+        Uri uri,
+        SourceText text,
+        IReadOnlyList<TextChangeRange>? changes = null,
+        CancellationToken cancellationToken = default)
+    {
+        return OpenOrChangeDocumentContext(
+            DefaultProjectId,
+            uri,
+            text,
+            changes,
+            cancellationToken);
+    }
+
+    public AkburaDocumentContext OpenOrChangeDocumentContext(
+        AkburaProjectId projectId,
+        Uri uri,
+        SourceText text,
+        IReadOnlyList<TextChangeRange>? changes = null,
+        CancellationToken cancellationToken = default)
+    {
         if (uri == null)
         {
             throw new ArgumentNullException(nameof(uri));
         }
+
         if (text == null)
         {
             throw new ArgumentNullException(nameof(text));
         }
+
         ThrowIfDisposed();
 
-        AkburaWorkspaceChangedEventArgs eventArgs;
-        AkburaDocumentSnapshot result;
+        AkburaWorkspaceChangedEventArgs? eventArgs = null;
+        AkburaDocumentContext result;
 
         lock (_gate)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var oldSolution = _currentSolution;
+            var oldSolution =
+                _currentSolution;
 
             if (oldSolution.TryGetDocument(
                     uri,
                     out var oldDocument))
             {
-                var project = oldSolution.GetRequiredProject(
-                    oldDocument.ProjectId);
-
-                result = oldDocument.WithText(
-                    text,
-                    changes,
-                    cancellationToken);
-
-                if (ReferenceEquals(result, oldDocument))
+                if (oldDocument.ProjectId != projectId)
                 {
-                    return oldDocument;
+                    throw new InvalidOperationException(
+                        $"Document '{uri}' belongs to project " +
+                        $"'{oldDocument.ProjectId}', but project " +
+                        $"'{projectId}' was requested.");
+                }
+
+                var oldProject =
+                    oldSolution.GetRequiredProject(
+                        projectId);
+
+                var newDocument =
+                    oldDocument.WithText(
+                        text,
+                        changes,
+                        cancellationToken);
+
+                if (ReferenceEquals(
+                        newDocument,
+                        oldDocument))
+                {
+                    return new AkburaDocumentContext(
+                        oldProject,
+                        oldDocument);
                 }
 
                 var newProject =
-                    project.ReplaceDocument(result);
+                    oldProject.ReplaceDocument(
+                        newDocument);
 
                 var newSolution =
-                    oldSolution.WithProject(newProject);
+                    oldSolution.WithProject(
+                        newProject);
 
-                _currentSolution = newSolution;
+                _currentSolution =
+                    newSolution;
 
                 eventArgs =
                     new AkburaWorkspaceChangedEventArgs(
-                        ReferenceEquals(result, oldDocument)
-                            ? AkburaWorkspaceChangeKind.DocumentOpened
-                            : AkburaWorkspaceChangeKind.DocumentChanged,
+                        oldDocument.IsOpen
+                            ? AkburaWorkspaceChangeKind.DocumentChanged
+                            : AkburaWorkspaceChangeKind.DocumentOpened,
                         oldSolution,
                         newSolution,
                         newProject.Id,
-                        result.Id);
+                        newDocument.Id);
+
+                result =
+                    new AkburaDocumentContext(
+                        newProject,
+                        newDocument);
             }
             else
             {
-                var project =
+                var oldProject =
                     oldSolution.GetRequiredProject(
-                        DefaultProjectId);
+                        projectId);
 
-                result = AkburaDocumentSnapshot.Create(
-                    project.Id,
-                    uri,
-                    text,
-                    cancellationToken);
+                var newDocument =
+                    AkburaDocumentSnapshot.Create(
+                        oldProject.Id,
+                        uri,
+                        text,
+                        cancellationToken);
 
                 var newProject =
-                    project.AddDocument(result);
+                    oldProject.AddDocument(
+                        newDocument);
 
                 var newSolution =
-                    oldSolution.WithProject(newProject);
+                    oldSolution.WithProject(
+                        newProject);
 
-                _currentSolution = newSolution;
+                _currentSolution =
+                    newSolution;
 
                 eventArgs =
                     new AkburaWorkspaceChangedEventArgs(
@@ -189,11 +246,19 @@ public sealed class AkburaWorkspace : IDisposable
                         oldSolution,
                         newSolution,
                         newProject.Id,
-                        result.Id);
+                        newDocument.Id);
+
+                result =
+                    new AkburaDocumentContext(
+                        newProject,
+                        newDocument);
             }
         }
 
-        Changed?.Invoke(this, eventArgs);
+        Changed?.Invoke(
+            this,
+            eventArgs);
+
         return result;
     }
 

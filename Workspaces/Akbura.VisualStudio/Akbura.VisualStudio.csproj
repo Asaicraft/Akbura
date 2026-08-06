@@ -12,6 +12,7 @@
 		<PackageReference Include="Microsoft.VisualStudio.Text.Logic" />
 		<PackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
 		<PackageReference Include="Microsoft.CodeAnalysis.EditorFeatures.Text" />
+		<PackageReference Include="Microsoft.VisualStudio.LanguageServices" PrivateAssets="all" ExcludeAssets="runtime" />
 	</ItemGroup>
 
 	<ItemGroup>

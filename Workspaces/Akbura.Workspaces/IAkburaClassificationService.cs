@@ -6,7 +6,7 @@ namespace Akbura.Workspaces;
 public interface IAkburaClassificationService
 {
     ImmutableArray<AkburaClassifiedSpan> GetClassifications(
-        AkburaDocumentSnapshot document,
+        AkburaDocumentContext context,
         TextSpan requestedSpan,
         CancellationToken cancellationToken = default);
 }

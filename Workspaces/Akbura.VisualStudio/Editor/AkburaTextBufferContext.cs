@@ -20,7 +20,12 @@ internal sealed class AkburaTextBufferContext : IDisposable
         TimeSpan.FromMilliseconds(100);
 
     private readonly ITextBuffer _textBuffer;
+
+    private readonly AkburaVisualStudioWorkspace _visualStudioWorkspace;
+
     private readonly AkburaWorkspace _workspace;
+
+    private AkburaProjectId? _projectId;
 
     private readonly IAkburaClassificationService _classificationService;
 
@@ -76,25 +81,22 @@ internal sealed class AkburaTextBufferContext : IDisposable
     public AkburaTextBufferContext(
         ITextBuffer textBuffer,
         ITextDocumentFactoryService textDocumentFactory,
-        AkburaWorkspace workspace)
+        AkburaVisualStudioWorkspace visualStudioWorkspace)
     {
-        _textBuffer = textBuffer ??
-            throw new ArgumentNullException(nameof(textBuffer));
+        _textBuffer = textBuffer ?? throw new ArgumentNullException(nameof(textBuffer));
 
-        _workspace = workspace ??
-            throw new ArgumentNullException(nameof(workspace));
+        _visualStudioWorkspace = visualStudioWorkspace ?? throw new ArgumentNullException(nameof(visualStudioWorkspace));
+
+        _workspace = visualStudioWorkspace.Workspace;
 
         if (textDocumentFactory == null)
         {
-            throw new ArgumentNullException(
-                nameof(textDocumentFactory));
+            throw new ArgumentNullException(nameof(textDocumentFactory));
         }
 
-        _classificationService =
-            workspace.LanguageServices.Classification;
+        _classificationService = _workspace.LanguageServices.Classification;
 
-        _joinableTaskFactory =
-            ThreadHelper.JoinableTaskFactory;
+        _joinableTaskFactory = ThreadHelper.JoinableTaskFactory;
 
         if (textDocumentFactory.TryGetTextDocument(
                 textBuffer,
@@ -128,8 +130,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
             _textBuffer.CurrentSnapshot);
     }
 
-    public event EventHandler<AkburaBufferChangedEventArgs>?
-        Changed;
+    public event EventHandler<AkburaBufferChangedEventArgs>? Changed;
 
     /// <summary>
     /// Returns the latest published state that is not newer than the
@@ -234,7 +235,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
             ref _pendingRequest,
             request);
 #if DEBUG
-        var enqueueCount =Interlocked.Increment(ref _enqueueCount);
+        var enqueueCount = Interlocked.Increment(ref _enqueueCount);
 
         Debug.WriteLine(
             $"[Akbura] Enqueue #{enqueueCount}, " +
@@ -244,6 +245,37 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         CancelActiveParse();
         EnsureWorker();
+    }
+
+    private async Task<AkburaProjectId?> GetProjectIdAsync(CancellationToken cancellationToken)
+    {
+        if (_projectId is { } projectId)
+        {
+            return projectId;
+        }
+
+        var filePath =
+            _textDocument?.FilePath;
+
+        if (string.IsNullOrWhiteSpace(
+                filePath))
+        {
+            return null;
+        }
+
+        var synchronizedProjectId =
+            await _visualStudioWorkspace
+                .SynchronizeProjectAsync(
+                    filePath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (synchronizedProjectId is { } result)
+        {
+            _projectId = result;
+        }
+
+        return synchronizedProjectId;
     }
 
     private void EnsureWorker()
@@ -358,14 +390,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            request =
-                GetNewestPendingRequest(request);
+            request = GetNewestPendingRequest(request);
 
-            /*
-             * Restart the delay when another edit arrived while waiting.
-             * This prevents starting a parse for every character during
-             * continuous typing.
-             */
             if (versionBeforeDelay ==
                 Volatile.Read(
                     ref _requestedVersion))
@@ -375,8 +401,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private UpdateRequest GetNewestPendingRequest(
-        UpdateRequest current)
+    private UpdateRequest GetNewestPendingRequest(UpdateRequest current)
     {
         var newer =
             Interlocked.Exchange(
@@ -399,10 +424,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 ref _activeParseCancellation,
                 parseCancellation);
 
-        /*
-         * One worker owns parsing, so this should normally be null.
-         * Cancel defensively if a previous source is still visible.
-         */
         if (previousCancellation != null &&
             !ReferenceEquals(
                 previousCancellation,
@@ -422,14 +443,18 @@ internal sealed class AkburaTextBufferContext : IDisposable
             var cancellationToken =
                 parseCancellation.Token;
 
-            /*
-             * Cancellation is converted into a null result inside the worker.
-             * This prevents an expected cancellation exception from crossing
-             * the Task.Run boundary as a user-unhandled exception.
-             */
+            var projectId = await GetProjectIdAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             var state = await Task.Run(
                     () => TryCreateParsedState(
                         request,
+                        projectId,
                         cancellationToken))
                 .ConfigureAwait(false);
 
@@ -438,10 +463,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return;
             }
 
-            /*
-             * A newer request may have arrived after parsing completed.
-             * Only the newest request is allowed to publish editor state.
-             */
             if (!IsCurrentRequest(
                     request.RequestVersion))
             {
@@ -450,11 +471,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
             PublishState(state);
 
-            /*
-             * Publishing to the editor should only be cancelled when the
-             * complete buffer context is disposed. A newer parse request is
-             * handled by the immutable publication checks in RaiseChangedAsync.
-             */
             await RaiseChangedAsync(
                     state,
                     disposalToken)
@@ -463,15 +479,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
         catch (OperationCanceledException)
             when (disposalToken.IsCancellationRequested)
         {
-            /*
-             * Normal context shutdown.
-             */
         }
         catch (Exception exception)
         {
-            /*
-             * Parser and classification failures must not break editing.
-             */
             Debug.WriteLine(
                 $"Akbura background processing failed: " +
                 $"{exception}");
@@ -486,8 +496,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
     }
 
     private AkburaParsedBufferState? TryCreateParsedState(
-    UpdateRequest request,
-    CancellationToken cancellationToken)
+        UpdateRequest request,
+        AkburaProjectId? projectId,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -496,25 +507,36 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return null;
             }
 
-            var document =
-                _workspace.OpenOrChangeDocument(
+            var context = projectId is { } resolvedProjectId
+                ? _workspace.OpenOrChangeDocumentContext(
+                    resolvedProjectId,
+                    _uri,
+                    request.Text,
+                    changes: null,
+                    cancellationToken)
+                : _workspace.OpenOrChangeDocumentContext(
                     _uri,
                     request.Text,
                     changes: null,
                     cancellationToken);
+
+            Debug.WriteLine(
+                $"[Akbura] Document project: " +
+                $"assembly={context.Project.CSharpCompilation.AssemblyName}, " +
+                $"trees={context.Project.CSharpCompilation.SyntaxTrees.Count()}, " +
+                $"references={context.Project.CSharpCompilation.References.Count()}");
+
+            var document =
+                context.Document;
 
             if (cancellationToken.IsCancellationRequested)
             {
                 return null;
             }
 
-            /*
-             * Calculate classifications once for the complete document.
-             * Scrolling must not traverse the syntax tree synchronously.
-             */
             var classifications =
                 _classificationService.GetClassifications(
-                    document,
+                    context,
                     new TextSpan(
                         start: 0,
                         length: request.Text.Length),
@@ -535,9 +557,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
-            /*
-             * A newer editor snapshot superseded this operation.
-             */
             return null;
         }
     }
@@ -620,13 +639,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private bool IsCurrentRequest(
         long requestVersion)
     {
-        return requestVersion == Volatile.Read(ref _requestedVersion) 
+        return requestVersion == Volatile.Read(ref _requestedVersion)
             && Volatile.Read(ref _disposeState) == 0;
     }
 
     private void CancelActiveParse()
     {
-        var cancellation = Volatile.Read( ref _activeParseCancellation);
+        var cancellation = Volatile.Read(ref _activeParseCancellation);
 
         if (cancellation != null)
         {
@@ -675,11 +694,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         _textBuffer.ChangedLowPriority -=
             OnTextBufferChangedLowPriority;
 
-        if (_subscribedDocumentFactory != null)
-        {
-            _subscribedDocumentFactory.TextDocumentDisposed -=
+        _subscribedDocumentFactory?.TextDocumentDisposed -=
                 OnTextDocumentDisposed;
-        }
 
         Interlocked.Exchange(
             ref _pendingRequest,

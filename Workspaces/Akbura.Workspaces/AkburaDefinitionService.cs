@@ -220,23 +220,47 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return akburaDefinition;
         }
 
-        if (csharpSymbol != null &&
-            TryCreateCSharpDefinition(
-                sourceSpan,
-                csharpSymbol,
-                out var csharpDefinition))
+        if (csharpSymbol != null)
         {
-            return csharpDefinition;
+            if (TryCreateCSharpDefinition(
+                    sourceSpan,
+                    csharpSymbol,
+                    out var csharpDefinition))
+            {
+                return csharpDefinition;
+            }
+
+            if (TryCreateAkburaComponentDefinition(
+                    context,
+                    sourceSpan,
+                    csharpSymbol,
+                    cancellationToken,
+                    out var componentDefinition))
+            {
+                return componentDefinition;
+            }
         }
 
         if (akburaSymbol?.CSharpDefinition.Symbol is
-            { } underlyingSymbol &&
-            TryCreateCSharpDefinition(
-                sourceSpan,
-                underlyingSymbol,
-                out var underlyingDefinition))
+            { } underlyingSymbol)
         {
-            return underlyingDefinition;
+            if (TryCreateCSharpDefinition(
+                    sourceSpan,
+                    underlyingSymbol,
+                    out var underlyingDefinition))
+            {
+                return underlyingDefinition;
+            }
+
+            if (TryCreateAkburaComponentDefinition(
+                    context,
+                    sourceSpan,
+                    underlyingSymbol,
+                    cancellationToken,
+                    out var componentDefinition))
+            {
+                return componentDefinition;
+            }
         }
 
         return null;
@@ -408,8 +432,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         RoslynSymbol symbol,
         out AkburaDefinition definition)
     {
-        symbol = GetNavigationSymbol(
-            symbol);
+        symbol = GetNavigationSymbol(symbol);
 
         foreach (var location in symbol.Locations)
         {
@@ -418,31 +441,117 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 continue;
             }
 
+            var mappedLineSpan =
+                location.GetMappedLineSpan();
+
+            if (TryCreatePhysicalDefinition(
+                    sourceSpan,
+                    mappedLineSpan,
+                    out definition))
+            {
+                return true;
+            }
+
             var lineSpan =
                 location.GetLineSpan();
 
-            var filePath =
-                lineSpan.Path;
-
-            if (string.IsNullOrWhiteSpace(
-                    filePath))
+            if (TryCreatePhysicalDefinition(
+                    sourceSpan,
+                    lineSpan,
+                    out definition))
             {
-                filePath =
-                    location.SourceTree
-                        ?.FilePath;
+                return true;
+            }
+        }
+
+        definition = null!;
+        return false;
+    }
+
+    private static bool TryCreatePhysicalDefinition(
+        TextSpan sourceSpan,
+        FileLinePositionSpan lineSpan,
+        out AkburaDefinition definition)
+    {
+        var filePath =
+            lineSpan.Path;
+
+        if (string.IsNullOrWhiteSpace(
+                filePath) ||
+            !File.Exists(filePath))
+        {
+            definition = null!;
+            return false;
+        }
+
+        definition =
+            new AkburaDefinition(
+                sourceSpan,
+                filePath,
+                lineSpan.Span);
+
+        return true;
+    }
+
+    private static bool TryCreateAkburaComponentDefinition(
+        AkburaDocumentContext context,
+        TextSpan sourceSpan,
+        RoslynSymbol symbol,
+        CancellationToken cancellationToken,
+        out AkburaDefinition definition)
+    {
+        symbol = GetNavigationSymbol(symbol);
+
+        var containingType =
+            symbol as INamedTypeSymbol ??
+            symbol.ContainingType;
+
+        if (containingType == null)
+        {
+            definition = null!;
+            return false;
+        }
+
+        var originalType = containingType.OriginalDefinition;
+
+        foreach (var document in
+                 context.Project.Documents.Values)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            var semanticModel =
+                context.Project.Compilation
+                    .GetSemanticModel(
+                        document.SyntaxTree);
+
+            var documentRoot =
+                document.SyntaxTree.GetRoot();
+
+            if (semanticModel.GetDeclaredSymbol(documentRoot) is not
+                IAkburaComponentSymbol component)
+            {
+                continue;
             }
 
-            if (string.IsNullOrWhiteSpace(
-                    filePath))
+            var componentType =
+                component.CSharpDefinition.NamedType;
+
+            if (componentType == null ||
+                !SymbolEqualityComparer.Default.Equals(
+                    componentType.OriginalDefinition,
+                    originalType))
             {
                 continue;
             }
 
             definition =
-                new AkburaDefinition(
+                CreateAkburaDefinition(
                     sourceSpan,
-                    filePath,
-                    lineSpan.Span);
+                    document,
+                    new TextSpan(
+                        start: 0,
+                        length: 0));
 
             return true;
         }
@@ -451,9 +560,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         return false;
     }
 
-    private static RoslynSymbol
-        GetNavigationSymbol(
-            RoslynSymbol symbol)
+    private static RoslynSymbol GetNavigationSymbol(RoslynSymbol symbol)
     {
         if (symbol is IAliasSymbol alias)
         {

@@ -36,9 +36,20 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
         var root = document.SyntaxTree.GetRoot();
 
+        AddEmbeddedCSharpNodes(
+            root,
+            span,
+            syntacticBuilder,
+            cancellationToken);
+
         foreach (var token in root.DescendantTokens(span))
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (IsClassifiedAsEmbeddedCSharpNode(token))
+            {
+                continue;
+            }
 
             AddTrivia(
                 token.LeadingTrivia,
@@ -108,6 +119,58 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             });
 
         return [.. items];
+    }
+
+    private static bool IsClassifiedAsEmbeddedCSharpNode(SyntaxToken token)
+    {
+        for (var node = token.Parent;
+             node != null;
+             node = node.Parent)
+        {
+            if (node is CSharpStatementSyntax or CSharpTypeSyntax)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void AddEmbeddedCSharpNodes(
+        AkburaSyntax root,
+        TextSpan requestedSpan,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        CancellationToken cancellationToken)
+    {
+        foreach (var node in root.DescendantNodes())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!node.FullSpan.OverlapsWith(
+                    requestedSpan))
+            {
+                continue;
+            }
+
+            switch (node)
+            {
+                case CSharpStatementSyntax statement:
+                    _embeddedCSharp.AddClassifications(
+                        statement,
+                        requestedSpan,
+                        builder,
+                        cancellationToken);
+                    break;
+
+                case CSharpTypeSyntax type:
+                    _embeddedCSharp.AddClassifications(
+                        type,
+                        requestedSpan,
+                        builder,
+                        cancellationToken);
+                    break;
+            }
+        }
     }
 
     private void AddToken(

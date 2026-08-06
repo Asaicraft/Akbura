@@ -1,16 +1,25 @@
-﻿using Akbura.Language.Syntax.Green;
+﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using AkburaSyntaxToken =
     Akbura.Language.Syntax.SyntaxToken;
+using CSharp =
+    Microsoft.CodeAnalysis.CSharp.Syntax;
+using CSharpSyntaxFactory =
+    Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CSharpSyntaxKind =
     Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using CSharpSyntaxToken =
     Microsoft.CodeAnalysis.SyntaxToken;
 using CSharpSyntaxTrivia =
     Microsoft.CodeAnalysis.SyntaxTrivia;
+using CSharpSyntaxFacts =
+    Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
+using CodeAnalysis =
+    Microsoft.CodeAnalysis;
 
 namespace Akbura.Workspaces;
 
@@ -23,47 +32,175 @@ internal sealed class EmbeddedCSharpClassificationService
         CancellationToken cancellationToken)
     {
         if (token.Node is not
-                GreenSyntaxToken.CSharpRawToken rawToken ||
-            rawToken.RawNode is not { } rawNode)
+            GreenSyntaxToken.CSharpRawToken rawToken)
         {
             return false;
         }
 
-        if (rawNode.FullSpan.Length != token.Span.Length)
+        if (rawToken.RawNode is { } rawNode &&
+            rawNode.FullSpan.Length ==
+            token.Span.Length)
         {
-            return false;
+            AddTokens(
+                rawNode.DescendantTokens(),
+                token.Span.Start -
+                rawNode.FullSpan.Start,
+                requestedSpan,
+                builder,
+                cancellationToken);
+
+            return true;
+        }
+
+        var parsedNode = ParseRawNode(token, rawToken.Text);
+
+        if (parsedNode != null)
+        {
+            AddTokens(
+                parsedNode.DescendantTokens(),
+                token.Span.Start -
+                parsedNode.FullSpan.Start,
+                requestedSpan,
+                builder,
+                cancellationToken);
+
+            return true;
+        }
+
+        AddTokens(
+            CSharpSyntaxFactory.ParseTokens(
+                rawToken.Text),
+            token.Span.Start,
+            requestedSpan,
+            builder,
+            cancellationToken);
+
+        return true;
+    }
+
+    public void AddClassifications(
+        CSharpStatementSyntax statementSyntax,
+        TextSpan requestedSpan,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        CancellationToken cancellationToken)
+    {
+        var statement =
+            statementSyntax.GetRawCSharpStatement();
+
+        if (statement == null)
+        {
+            return;
+        }
+
+        var sourceSpan =
+            statementSyntax.Tokens.FullSpan;
+
+        var positionOffset =
+            sourceSpan.Start -
+            statement.FullSpan.Start;
+        
+        var parsedSourceEnd =
+            statement.FullSpan.Start +
+            sourceSpan.Length;
+
+        var tokens =
+            statement
+                .DescendantTokens()
+                .TakeWhile(
+                    token =>
+                        token.SpanStart <
+                        parsedSourceEnd);
+
+        AddTokens(
+            tokens,
+            positionOffset,
+            requestedSpan,
+            builder,
+            cancellationToken);
+    }
+
+    public void AddClassifications(
+        CSharpTypeSyntax typeSyntax,
+        TextSpan requestedSpan,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        CancellationToken cancellationToken)
+    {
+        CSharp.TypeSyntax type;
+
+        try
+        {
+            type = typeSyntax.ToCSharp();
+        }
+        catch (InvalidOperationException)
+        {
+            return;
         }
 
         var positionOffset =
-            token.Span.Start -
-            rawNode.FullSpan.Start;
+            typeSyntax.Tokens.FullSpan.Start -
+            type.FullSpan.Start;
 
-        foreach (var csharpToken in rawNode.DescendantTokens())
+        AddTokens(
+            type.DescendantTokens(),
+            positionOffset,
+            requestedSpan,
+            builder,
+            cancellationToken);
+    }
+
+    private static SyntaxNode? ParseRawNode(AkburaSyntaxToken token,string text)
+    {
+        for (var parent = token.Parent;
+             parent != null;
+             parent = parent.Parent)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            switch (parent)
+            {
+                case CSharpStatementSyntax:
+                    return CSharpSyntaxFactory
+                        .ParseStatement(text);
+
+                case CSharpTypeSyntax:
+                    return CSharpSyntaxFactory
+                        .ParseTypeName(text);
+            }
+        }
+
+        return null;
+    }
+
+    private static void AddTokens(
+        IEnumerable<CSharpSyntaxToken> tokens,
+        int positionOffset,
+        TextSpan requestedSpan,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        CancellationToken cancellationToken)
+    {
+        foreach (var token in tokens)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
             AddTrivia(
-                csharpToken.LeadingTrivia,
+                token.LeadingTrivia,
                 positionOffset,
                 requestedSpan,
                 builder,
                 cancellationToken);
 
             AddToken(
-                csharpToken,
+                token,
                 positionOffset,
                 requestedSpan,
                 builder);
 
             AddTrivia(
-                csharpToken.TrailingTrivia,
+                token.TrailingTrivia,
                 positionOffset,
                 requestedSpan,
                 builder,
                 cancellationToken);
         }
-
-        return true;
     }
 
     private static void AddToken(
@@ -88,7 +225,7 @@ internal sealed class EmbeddedCSharpClassificationService
     }
 
     private static void AddTrivia(
-        SyntaxTriviaList triviaList,
+        CodeAnalysis.SyntaxTriviaList triviaList,
         int positionOffset,
         TextSpan requestedSpan,
         ImmutableArray<AkburaClassifiedSpan>.Builder builder,
@@ -140,13 +277,14 @@ internal sealed class EmbeddedCSharpClassificationService
             classification));
     }
 
-    private static AkburaClassificationKind?
-        GetClassification(CSharpSyntaxToken token)
+    private static AkburaClassificationKind? GetClassification(
+        CSharpSyntaxToken token)
     {
-        var kind = token.Kind();
+        var kind =
+            token.Kind();
 
-        if (SyntaxFacts.IsKeywordKind(kind) ||
-            SyntaxFacts.IsContextualKeyword(kind))
+        if (CSharpSyntaxFacts.IsKeywordKind(kind) ||
+            IsVarKeyword(token))
         {
             return AkburaClassificationKind.Keyword;
         }
@@ -182,8 +320,7 @@ internal sealed class EmbeddedCSharpClassificationService
         };
     }
 
-    private static AkburaClassificationKind?
-        GetClassification(CSharpSyntaxTrivia trivia)
+    private static AkburaClassificationKind? GetClassification(CSharpSyntaxTrivia trivia)
     {
         return trivia.Kind() switch
         {
@@ -196,6 +333,39 @@ internal sealed class EmbeddedCSharpClassificationService
                 AkburaClassificationKind.Comment,
 
             _ => null,
+        };
+    }
+
+    private static bool IsVarKeyword(CSharpSyntaxToken token)
+    {
+        if (CSharpSyntaxFacts.GetContextualKeywordKind(
+                token.ValueText) !=
+            CSharpSyntaxKind.VarKeyword)
+        {
+            return false;
+        }
+
+        if (token.Parent is not
+            CSharp.IdentifierNameSyntax identifier)
+        {
+            return false;
+        }
+
+        return identifier.Parent switch
+        {
+            CSharp.VariableDeclarationSyntax declaration =>
+                declaration.Type.Span ==
+                identifier.Span,
+
+            CSharp.ForEachStatementSyntax statement =>
+                statement.Type.Span ==
+                identifier.Span,
+
+            CSharp.DeclarationExpressionSyntax declaration =>
+                declaration.Type.Span ==
+                identifier.Span,
+
+            _ => false,
         };
     }
 

@@ -10,8 +10,7 @@ namespace Akbura.VisualStudio;
 
 [Export(typeof(AkburaVisualStudioWorkspace))]
 [PartCreationPolicy(CreationPolicy.Shared)]
-internal sealed class AkburaVisualStudioWorkspace :
-    IDisposable
+internal sealed class AkburaVisualStudioWorkspace : IDisposable
 {
     private readonly VisualStudioWorkspace _visualStudioWorkspace;
 

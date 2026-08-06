@@ -20,10 +20,10 @@ namespace Akbura.Workspaces;
 internal sealed class EmbeddedCSharpSemanticClassificationService
 {
     private static void AddDeclaredTypeClassifications(
-    AkburaSemanticModel semanticModel,
-    CSharpTypeSyntax typeSyntax,
-    TextSpan requestedSpan,
-    ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        AkburaSemanticModel semanticModel,
+        CSharpTypeSyntax typeSyntax,
+        TextSpan requestedSpan,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
     {
         var typeSymbol =
             GetDeclaredTypeSymbol(
@@ -68,7 +68,13 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
     {
         switch (syntax)
         {
-            case CSharp.PredefinedTypeSyntax:
+            case CSharp.PredefinedTypeSyntax predefinedType:
+                AddMappedClassification(
+                    predefinedType.Keyword.Span,
+                    sourceOffset,
+                    requestedSpan,
+                    AkburaClassificationKind.Keyword,
+                    builder);
                 return;
 
             case CSharp.IdentifierNameSyntax identifier:
@@ -166,6 +172,35 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                     builder);
                 return;
         }
+    }
+
+    private static void AddMappedClassification(
+        TextSpan csharpSpan,
+        int sourceOffset,
+        TextSpan requestedSpan,
+        AkburaClassificationKind classification,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+    {
+        if (csharpSpan.Length == 0)
+        {
+            return;
+        }
+
+        var sourceSpan =
+            new TextSpan(
+                sourceOffset +
+                csharpSpan.Start,
+                csharpSpan.Length);
+
+        if (!sourceSpan.OverlapsWith(requestedSpan))
+        {
+            return;
+        }
+
+        builder.Add(
+            new AkburaClassifiedSpan(
+                sourceSpan,
+                classification));
     }
 
     private static void AddSimpleTypeNameClassifications(

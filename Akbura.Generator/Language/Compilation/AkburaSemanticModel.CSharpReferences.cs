@@ -14,6 +14,7 @@ using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language;
@@ -84,7 +85,7 @@ internal partial class AkburaSemanticModel
             statementSyntax.Tokens.FullSpan.Start -
             statement.FullSpan.Start;
 
-        return CollectCSharpSymbolReferences(
+        var references =CollectCSharpSymbolReferences(
             semanticModel,
             [
                 new CSharpReferenceTarget(
@@ -94,6 +95,78 @@ internal partial class AkburaSemanticModel
             ],
             akburaSymbolsByName,
             akburaSymbolsByCommandTypeName);
+
+        return AddUseHookReference(
+            statementSyntax,
+            statement,
+            sourcePositionOffset,
+            references);
+    }
+
+    private ImmutableArray<CSharpSymbolReference> AddUseHookReference(
+        CSharpStatementSyntax statementSyntax,
+        CSharp.StatementSyntax statement,
+        int sourcePositionOffset,
+        ImmutableArray<CSharpSymbolReference> references)
+    {
+        if (GetSymbolInfo(statementSyntax).Symbol is not
+                IUseHookSymbol hook ||
+            statement is not
+            CSharp.ExpressionStatementSyntax
+            {
+                Expression:
+                    CSharp.InvocationExpressionSyntax invocation
+            } ||
+            !TryGetInvocationName(
+                invocation.Expression,
+                out var name))
+        {
+            return references;
+        }
+
+        var sourceSpan =
+            new TextSpan(
+                sourcePositionOffset +
+                name.Identifier.Span.Start,
+                name.Identifier.Span.Length);
+
+        foreach (var reference in references)
+        {
+            if (reference.SourceSpan ==
+                sourceSpan)
+            {
+                return references;
+            }
+        }
+
+        return references.Add(
+            new CSharpSymbolReference(
+                name,
+                sourceSpan,
+                new CSharpSymbolDefinition(
+                    hook.Method),
+                hook,
+                name.Identifier.ValueText));
+    }
+
+    private static bool TryGetInvocationName(
+        CSharp.ExpressionSyntax expression,
+        out CSharp.SimpleNameSyntax name)
+    {
+        switch (expression)
+        {
+            case CSharp.SimpleNameSyntax simpleName:
+                name = simpleName;
+                return true;
+
+            case CSharp.MemberAccessExpressionSyntax memberAccess:
+                name = memberAccess.Name;
+                return true;
+
+            default:
+                name = null!;
+                return false;
+        }
     }
 
     public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(MarkupAttributeSyntax markupAttribute)
@@ -391,64 +464,37 @@ internal partial class AkburaSemanticModel
         SemanticModel semanticModel,
         IEnumerable<CSharpReferenceTarget> targets,
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
-        Dictionary<string, AkburaSymbol>
-            akburaSymbolsByCommandTypeName)
+        Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
     {
-        using var references = ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
+        using var references =
+            ImmutableArrayBuilder<
+                CSharpSymbolReference>.Rent();
 
-        var seenReferences = new HashSet<string>(StringComparer.Ordinal);
+        var seenReferences =
+            new HashSet<string>(
+                StringComparer.Ordinal);
 
         foreach (var target in targets)
         {
-            foreach (var identifier in
+            foreach (var name in
                      target.ProbeNode
                          .DescendantNodesAndSelf()
                          .OfType<
-                             CSharp.IdentifierNameSyntax>())
+                             CSharp.SimpleNameSyntax>())
             {
-                AddCSharpSymbolReference(
-                    references,
-                    seenReferences,
-                    identifier,
-                    target.MapToSource(
-                        identifier.Span),
-                    semanticModel
-                        .GetSymbolInfo(identifier)
-                        .Symbol,
-                    akburaSymbolsByName,
-                    akburaSymbolsByCommandTypeName);
-            }
-
-            foreach (var memberAccess in
-                     target.ProbeNode
-                         .DescendantNodesAndSelf()
-                         .OfType<CSharp.MemberAccessExpressionSyntax>())
-            {
-                if (memberAccess.Name is not CSharp.IdentifierNameSyntax name)
+                if (IsVarTypeName(name))
                 {
                     continue;
                 }
 
-                var symbol = GetBestSymbolInfo(
-                    semanticModel,
-                    memberAccess);
-
-                if (symbol == null &&
-                    memberAccess.Parent is
-                        CSharp.InvocationExpressionSyntax invocation &&
-                    invocation.Expression == memberAccess)
-                {
-                    symbol =
-                        GetBestSymbolInfo(
-                            semanticModel,
-                            invocation);
-                }
+                var symbol = GetReferenceSymbol(semanticModel, name);
 
                 AddCSharpSymbolReference(
                     references,
                     seenReferences,
                     name,
-                    target.MapToSource(name.Span),
+                    target.MapToSource(
+                        name.Identifier.Span),
                     symbol,
                     akburaSymbolsByName,
                     akburaSymbolsByCommandTypeName);
@@ -456,6 +502,86 @@ internal partial class AkburaSemanticModel
         }
 
         return references.ToImmutable();
+    }
+
+    private static RoslynSymbol? GetReferenceSymbol(
+        SemanticModel semanticModel,
+        CSharp.SimpleNameSyntax name)
+    {
+        if (name.Parent is
+                CSharp.MemberAccessExpressionSyntax
+                memberAccess &&
+            ReferenceEquals(
+                memberAccess.Name,
+                name))
+        {
+            var symbol =
+                GetBestSymbolInfo(
+                    semanticModel,
+                    memberAccess);
+
+            if (symbol == null &&
+                memberAccess.Parent is
+                    CSharp.InvocationExpressionSyntax invocation &&
+                ReferenceEquals(
+                    invocation.Expression,
+                    memberAccess))
+            {
+                symbol =
+                    GetBestSymbolInfo(
+                        semanticModel,
+                        invocation);
+            }
+
+            return symbol;
+        }
+
+        if (name.Parent is
+                CSharp.InvocationExpressionSyntax invocationExpression &&
+            ReferenceEquals(
+                invocationExpression.Expression,
+                name))
+        {
+            return GetBestSymbolInfo(
+                       semanticModel,
+                       invocationExpression) ??
+                GetBestSymbolInfo(
+                    semanticModel,
+                    name);
+        }
+
+        return GetBestSymbolInfo(
+            semanticModel,
+            name);
+    }
+
+    private static bool IsVarTypeName(CSharp.SimpleNameSyntax name)
+    {
+        if (name is not
+                CSharp.IdentifierNameSyntax identifier ||
+                CSharpSyntaxFacts.GetContextualKeywordKind(identifier.Identifier.ValueText) !=
+            Microsoft.CodeAnalysis.CSharp
+                .SyntaxKind.VarKeyword)
+        {
+            return false;
+        }
+
+        return identifier.Parent switch
+        {
+            CSharp.VariableDeclarationSyntax declaration =>
+                declaration.Type.Span ==
+                identifier.Span,
+
+            CSharp.ForEachStatementSyntax statement =>
+                statement.Type.Span ==
+                identifier.Span,
+
+            CSharp.DeclarationExpressionSyntax declaration =>
+                declaration.Type.Span ==
+                identifier.Span,
+
+            _ => false,
+        };
     }
 
     private CSharp.MethodDeclarationSyntax CreateMarkupInlineReferenceProbeMethod(

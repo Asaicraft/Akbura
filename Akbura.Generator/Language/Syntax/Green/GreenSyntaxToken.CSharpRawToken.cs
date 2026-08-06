@@ -5,6 +5,7 @@ using System.Text;
 using CsharpRawNode = Microsoft.CodeAnalysis.SyntaxNode;
 
 namespace Akbura.Language.Syntax.Green;
+
 partial class GreenSyntaxToken
 {
     public sealed class CSharpRawToken : GreenSyntaxToken
@@ -71,12 +72,16 @@ partial class GreenSyntaxToken
 
         public override GreenNode WithAnnotations(ImmutableArray<AkburaSyntaxAnnotation>? annotations)
         {
-            return new CSharpRawToken(_rawText, _leading, _trailing, GetDiagnostics(), annotations);
+            return _rawNode != null
+                ? new CSharpRawToken(_rawNode, _leading, _trailing, GetDiagnostics(), annotations)
+                : new CSharpRawToken(_rawText, _leading, _trailing, GetDiagnostics(), annotations);
         }
 
         public override GreenNode WithDiagnostics(ImmutableArray<AkburaDiagnostic>? diagnostics)
         {
-            return new CSharpRawToken(_rawText, _leading, _trailing, diagnostics, GetAnnotations());
+            return _rawNode != null
+                ? new CSharpRawToken(_rawNode, _leading, _trailing, diagnostics, GetAnnotations())
+                : new CSharpRawToken(_rawText, _leading, _trailing, diagnostics, GetAnnotations());
         }
 
         public override GreenNode? GetLeadingTrivia()
@@ -91,7 +96,7 @@ partial class GreenSyntaxToken
 
         public override GreenSyntaxToken TokenWithLeadingTrivia(GreenNode? trivia)
         {
-            if(_rawNode != null)
+            if (_rawNode != null)
             {
                 return new CSharpRawToken(_rawNode, trivia, _trailing, GetDiagnostics(), GetAnnotations());
             }

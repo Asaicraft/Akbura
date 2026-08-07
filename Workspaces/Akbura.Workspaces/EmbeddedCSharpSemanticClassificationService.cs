@@ -30,8 +30,26 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                 semanticModel,
                 typeSyntax);
 
-        if (typeSymbol == null ||
-            typeSymbol.TypeKind == TypeKind.Error)
+        if (typeSymbol == null)
+        {
+            return;
+        }
+
+        AddTypeClassifications(
+            typeSyntax,
+            typeSymbol,
+            requestedSpan,
+            builder);
+    }
+
+    internal static void AddTypeClassifications(
+        CSharpTypeSyntax typeSyntax,
+        RoslynITypeSymbol typeSymbol,
+        TextSpan requestedSpan,
+        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+    {
+        if (typeSymbol.TypeKind ==
+            TypeKind.Error)
         {
             return;
         }
@@ -40,7 +58,8 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
 
         try
         {
-            csharpType = typeSyntax.ToCSharp();
+            csharpType =
+                typeSyntax.ToCSharp();
         }
         catch (InvalidOperationException)
         {
@@ -48,8 +67,8 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         }
 
         var sourceOffset =
-            typeSyntax.Span.Start -
-            csharpType.Span.Start;
+            typeSyntax.Tokens.FullSpan.Start -
+            csharpType.FullSpan.Start;
 
         AddTypeClassifications(
             csharpType,
@@ -59,7 +78,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
             builder);
     }
 
-    private static void AddTypeClassifications(
+    internal static void AddTypeClassifications(
         CSharp.TypeSyntax syntax,
         RoslynITypeSymbol typeSymbol,
         int sourceOffset,
@@ -574,9 +593,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         };
     }
 
-    private static AkburaClassificationKind?
-        GetRoslynClassification(
-            RoslynSymbol? symbol)
+    internal static AkburaClassificationKind? GetRoslynClassification(RoslynSymbol? symbol)
     {
         if (symbol is IAliasSymbol alias)
         {

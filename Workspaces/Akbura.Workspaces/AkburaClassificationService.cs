@@ -11,6 +11,8 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
     private readonly EmbeddedCSharpSemanticClassificationService _semanticCSharp = new();
 
+    private readonly AkcssSemanticClassificationService _semanticAkcss = new();
+
     public ImmutableArray<AkburaClassifiedSpan> GetClassifications(
         AkburaDocumentContext context,
         TextSpan requestedSpan,
@@ -82,7 +84,34 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             semanticBuilder,
             cancellationToken);
 
+        _semanticAkcss.AddClassifications(
+            semanticModel,
+            root,
+            span,
+            semanticBuilder,
+            cancellationToken);
+
         var semanticSpans = semanticBuilder.ToImmutable();
+
+        foreach (var item in semanticSpans)
+        {
+            var text =
+                document.Text.ToString(item.Span);
+
+            System.Diagnostics.Debug.WriteLine(
+                $"SEMANTIC: {item.Kind}, " +
+                $"{item.Span}, \"{text}\"");
+        }
+
+        foreach (var item in syntacticBuilder)
+        {
+            var text =
+                document.Text.ToString(item.Span);
+
+            System.Diagnostics.Debug.WriteLine(
+                $"SYNTACTIC: {item.Kind}, " +
+                $"{item.Span}, \"{text}\"");
+        }
 
         var semanticSpanSet =
             new HashSet<TextSpan>(

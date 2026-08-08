@@ -918,7 +918,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return symbol;
         }
 
-        var root = SyntaxTree.GetRoot();
+        var root = SyntaxTree.GetRootSyntax();
         if (!ReferenceEquals(syntax.Root, root) &&
             root.FullSpan.Contains(syntax.FullSpan))
         {
@@ -2107,8 +2107,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         CSharpBindingResult binding,
         out INamedTypeSymbol targetType)
     {
-        if (binding.TypeSymbol is INamedTypeSymbol boundType &&
-            IsAvaloniaControlTargetType(boundType))
+        if (binding.TypeSymbol is INamedTypeSymbol
+            {
+                TypeKind: not TypeKind.Error,
+            } boundType)
         {
             targetType = boundType;
             return true;

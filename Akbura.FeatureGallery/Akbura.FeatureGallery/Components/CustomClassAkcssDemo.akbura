@@ -1,0 +1,135 @@
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Markup;
+using Akbura.FeatureGallery.Pages.AkcssPage.akcss;
+using Akbura.Styles.akcss;
+
+state bool isActive = true;
+state int dynamicAge = 42;
+
+<StackPanel gap-4>
+
+    <StackPanel Orientation="Horizontal"
+                gap-2>
+        <Button Content={isActive
+                    ? "Disable condition"
+                    : "Enable condition"}
+                Click={() => isActive = !isActive}/>
+
+        <Button Content="- age"
+                Click={() => dynamicAge--}/>
+
+        <Button Content="+ age"
+                Click={() => dynamicAge++}/>
+    </StackPanel>
+
+    <Grid ColumnDefinitions="*,*"
+          RowDefinitions="Auto,Auto"
+          gap-3>
+
+        <Border p-4
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg>
+
+            <StackPanel gap-2>
+                <TextBlock Text="A. Regular AKCSS class"
+                           font-semibold/>
+
+                <TextBlock
+                    Text={"<AkcssData class=\"demo\" />"}
+                    text-sm
+                    text-slate-400/>
+
+                <Button HorizontalAlignment="Left">
+                    <AkcssData class="demo"/>
+                </Button>
+            </StackPanel>
+
+        </Border>
+
+        <Border col-1
+                p-4
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg>
+
+            <StackPanel gap-2>
+                <TextBlock Text="B. Utilities"
+                           font-semibold/>
+
+                <TextBlock
+                    Text={"<AkcssData name-Utility age-25 scale-2 />"}
+                    text-sm
+                    text-slate-400/>
+
+                <Button HorizontalAlignment="Left">
+                    <AkcssData name-Utility
+                               age-25
+                               scale-2/>
+                </Button>
+            </StackPanel>
+
+        </Border>
+
+        <Border row-1
+                p-4
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg>
+
+            <StackPanel gap-2>
+                <TextBlock Text="C. Conditional utility"
+                           font-semibold/>
+
+                <TextBlock
+                    Text={isActive
+                        ? "Condition active -> Age = 30"
+                        : "Condition inactive -> Age = 18"}
+                    text-sm
+                    text-slate-400/>
+
+                <Button HorizontalAlignment="Left">
+                    <AkcssData name-Conditional
+                               age-18
+                               scale-1
+                               {isActive}:age-30/>
+                </Button>
+            </StackPanel>
+
+        </Border>
+
+        <Border row-1
+                col-1
+                p-4
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg>
+
+            <StackPanel gap-2>
+                <TextBlock Text="D. Condition + MarkupExtension"
+                           font-semibold/>
+
+                <TextBlock
+                    Text={isActive
+                        ? "Condition active -> Age = " + dynamicAge
+                        : "Condition inactive -> Age = 18"}
+                    text-sm
+                    text-slate-400/>
+
+                <Button HorizontalAlignment="Left">
+                    <AkcssData name-MarkupExtension
+                               age-18
+                               scale-1
+                               {isActive}:age-${GalleryAge {dynamicAge}}/>
+                </Button>
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+</StackPanel>

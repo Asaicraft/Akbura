@@ -143,9 +143,9 @@ internal sealed class BindingSession
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        return _semanticModel.GetBoundNode(
+        return _semanticModel.GetBoundNode( 
             syntax,
-            () => IsCurrentSemanticModelSyntax(syntax)
+            () => ShouldUseMemberSemanticModel(syntax)
                 ? _semanticModel.GetMemberSemanticModel(syntax).BindOperationSyntax(syntax)
                 : GetOperationBinder(syntax).BindOperationSyntax(syntax));
     }
@@ -159,7 +159,7 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => IsCurrentSemanticModelSyntax(syntax)
+            () => ShouldUseMemberSemanticModel(syntax)
                 ? _semanticModel.GetMemberSemanticModel(syntax).BindSemanticSyntax(syntax)
                 : GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
     }
@@ -364,6 +364,13 @@ internal sealed class BindingSession
         }
 
         return binder;
+    }
+
+    private bool ShouldUseMemberSemanticModel(AkburaSyntax syntax)
+    {
+        return _semanticModel.SyntaxTree.Kind ==
+                   SyntaxTreeKind.Component &&
+               IsCurrentSemanticModelSyntax(syntax);
     }
 
     private static ImmutableArray<CSharpBlockSyntax> GetContainingCSharpBlocks(AkburaSyntax syntax)

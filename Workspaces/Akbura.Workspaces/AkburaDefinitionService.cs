@@ -1,13 +1,15 @@
 ﻿using Akbura.Language;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
-
 using AkburaSymbol =
     Akbura.Language.Symbols.ISymbol;
-
+using CSharp =
+    Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynSymbol =
     Microsoft.CodeAnalysis.ISymbol;
 
@@ -74,6 +76,60 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                         position,
                         cancellationToken);
 
+                case AkcssAssignmentSyntax assignment:
+                    {
+                        var definition =
+                            GetAkcssPropertyDefinition(
+                                context,
+                                semanticModel,
+                                assignment,
+                                position,
+                                cancellationToken);
+
+                        if (definition != null)
+                        {
+                            return definition;
+                        }
+
+                        break;
+                    }
+
+                case AkcssApplyDirectiveSyntax apply:
+                    {
+                        var definition =
+                            GetAkcssApplyDefinition(
+                                context,
+                                semanticModel,
+                                apply,
+                                position,
+                                cancellationToken);
+
+                        if (definition != null)
+                        {
+                            return definition;
+                        }
+
+                        break;
+                    }
+
+                case CSharpTypeSyntax type:
+                    {
+                        var definition =
+                            GetAkcssTypeDefinition(
+                                context,
+                                semanticModel,
+                                type,
+                                position,
+                                cancellationToken);
+
+                        if (definition != null)
+                        {
+                            return definition;
+                        }
+
+                        break;
+                    }
+
                 case MarkupElementSyntax element:
                     {
                         var definition =
@@ -95,6 +151,180 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         }
 
         return null;
+    }
+
+    private static AkburaDefinition?
+    GetAkcssPropertyDefinition(
+        AkburaDocumentContext context,
+        AkburaSemanticModel semanticModel,
+        AkcssAssignmentSyntax assignment,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        var sourceSpan = GetRightmostNameSpan(assignment.PropertyName);
+
+        if (!sourceSpan.Contains(position))
+        {
+            return null;
+        }
+
+        if (semanticModel.GetOperation(
+                assignment) is not
+            IAkcssPropertySetterOperation
+                {
+                    Property: { } property,
+                })
+        {
+            return null;
+        }
+
+        AkburaSymbol navigationSymbol;
+
+        if (property.Parameter is
+            { } parameter)
+        {
+            navigationSymbol =
+                parameter;
+        }
+        else if (property.Command is
+        { } command)
+        {
+            navigationSymbol =
+                command;
+        }
+        else
+        {
+            navigationSymbol =
+                property;
+        }
+
+        return CreateDefinition(
+            context,
+            sourceSpan,
+            navigationSymbol,
+            property.CSharpDefinition.Symbol,
+            cancellationToken);
+    }
+
+    private static AkburaDefinition?
+    GetAkcssApplyDefinition(
+        AkburaDocumentContext context,
+        AkburaSemanticModel semanticModel,
+        AkcssApplyDirectiveSyntax apply,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        if (semanticModel.GetOperation(
+                apply) is not
+            IAkcssApplyOperation operation)
+        {
+            return null;
+        }
+
+        if (!TryGetAkcssApplyItem(
+                context.Document.Text,
+                apply,
+                position,
+                out var item,
+                out var sourceSpan))
+        {
+            return null;
+        }
+
+        using var diagnostics =
+            ImmutableArrayBuilder<
+                AkburaSemanticDiagnostic>.Rent();
+
+        var symbol =
+            semanticModel.ResolveAkcssApplyItem(
+                apply,
+                item,
+                operation.ContainingAkcssSymbol,
+                diagnostics);
+
+        if (symbol == null)
+        {
+            return null;
+        }
+
+        return CreateDefinition(
+            context,
+            sourceSpan,
+            symbol,
+            symbol.CSharpDefinition.Symbol,
+            cancellationToken);
+    }
+
+    private static bool TryGetAkcssApplyItem(
+        SourceText text,
+        AkcssApplyDirectiveSyntax apply,
+        int position,
+        out string item,
+        out TextSpan sourceSpan)
+    {
+        var itemsSpan =
+            apply.Items.FullSpan;
+
+        var current =
+            Math.Max(
+                0,
+                itemsSpan.Start);
+
+        var end =
+            Math.Min(
+                text.Length,
+                itemsSpan.End);
+
+        while (current < end)
+        {
+            while (current < end &&
+                   char.IsWhiteSpace(
+                       text[current]))
+            {
+                current++;
+            }
+
+            if (current >= end)
+            {
+                break;
+            }
+
+            var start =
+                current;
+
+            while (current < end &&
+                   !char.IsWhiteSpace(
+                       text[current]))
+            {
+                current++;
+            }
+
+            var span =
+                TextSpan.FromBounds(
+                    start,
+                    current);
+
+            if (!span.Contains(position))
+            {
+                continue;
+            }
+
+            item =
+                text.ToString(span);
+
+            sourceSpan =
+                span;
+
+            return true;
+        }
+
+        item =
+            string.Empty;
+
+        sourceSpan =
+            default;
+
+        return false;
     }
 
     private static AkburaDefinition? GetCSharpDefinition(
@@ -347,6 +577,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             IAkburaComponentSymbol component =>
                 component.DeclarationSyntax,
 
+            IAkcssSymbol akcss =>
+                akcss.DeclarationSyntax,
+
             CSharpLocalSymbol local =>
                 local.DeclarationSyntax,
 
@@ -370,6 +603,18 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             CommandDeclarationSyntax command =>
                 command.Name.Span,
 
+            AkcssUtilityDeclarationSyntax utility =>
+                utility
+                    .Selector
+                    .Name
+                    .Identifier
+                    .Span,
+
+            AkcssStyleRuleSyntax style
+                when style.Selector.Name is
+                { } name =>
+                name.Identifier.Span,
+
             AkburaDocumentSyntax =>
                 new TextSpan(
                     start: 0,
@@ -377,6 +622,91 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
             _ => declaration.Span,
         };
+    }
+
+    private static AkburaDefinition? GetAkcssTypeDefinition(
+        AkburaDocumentContext context,
+        AkburaSemanticModel semanticModel,
+        CSharpTypeSyntax typeSyntax,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        if (typeSyntax.Parent is not
+                AkcssStyleSelectorSyntax &&
+            typeSyntax.Parent is not
+                AkcssUtilitySelectorSyntax)
+        {
+            return null;
+        }
+
+        var sourceSpan =
+            GetRightmostNameSpan(
+                typeSyntax);
+
+        if (!sourceSpan.Contains(position))
+        {
+            return null;
+        }
+
+        if (!semanticModel
+                .TryResolveAkcssTargetType(
+                    typeSyntax,
+                    out var definition) ||
+            definition.Symbol is not
+            { } typeSymbol)
+        {
+            return null;
+        }
+
+        return CreateDefinition(
+            context,
+            sourceSpan,
+            akburaSymbol: null,
+            typeSymbol,
+            cancellationToken);
+    }
+
+    private static TextSpan GetRightmostNameSpan(CSharpTypeSyntax typeSyntax)
+    {
+        CSharp.TypeSyntax syntax;
+
+        try
+        {
+            syntax =
+                typeSyntax.ToCSharp();
+        }
+        catch (InvalidOperationException)
+        {
+            return typeSyntax.Span;
+        }
+
+        var sourceOffset =
+            typeSyntax.Tokens.FullSpan.Start -
+            syntax.FullSpan.Start;
+
+        var csharpSpan =
+            syntax switch
+            {
+                CSharp.IdentifierNameSyntax identifier =>
+                    identifier.Identifier.Span,
+
+                CSharp.GenericNameSyntax generic =>
+                    generic.Identifier.Span,
+
+                CSharp.QualifiedNameSyntax qualified =>
+                    qualified.Right.Identifier.Span,
+
+                CSharp.AliasQualifiedNameSyntax alias =>
+                    alias.Name.Identifier.Span,
+
+                _ =>
+                    syntax.Span,
+            };
+
+        return new TextSpan(
+            sourceOffset +
+            csharpSpan.Start,
+            csharpSpan.Length);
     }
 
     private static bool TryFindDocument(

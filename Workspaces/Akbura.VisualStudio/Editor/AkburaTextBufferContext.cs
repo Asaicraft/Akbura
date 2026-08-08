@@ -301,7 +301,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
          * ProcessPendingUpdatesAsync catches all non-cancellation
          * exceptions, so the joinable task cannot leak an exception.
          */
-        _joinableTaskFactory.RunAsync(
+        _= _joinableTaskFactory.RunAsync(
             ProcessPendingUpdatesAsync);
     }
 

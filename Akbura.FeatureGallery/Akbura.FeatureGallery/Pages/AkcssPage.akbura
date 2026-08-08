@@ -1,5 +1,7 @@
 using Akbura.FeatureGallery.Pages.Page.akcss;
 using Akbura.Markup;
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Markup;
 
 <StackPanel page
             ${md}:page-desktop>

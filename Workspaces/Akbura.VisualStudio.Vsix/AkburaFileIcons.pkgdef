@@ -1,0 +1,9 @@
+[$RootKey$\ShellFileAssociations\.akbura]
+"DefaultIconMoniker"="A4BE0232-1E36-4B93-93D8-6614639B6B32:1"
+
+[$RootKey$\ShellFileAssociations\.akcss]
+"DefaultIconMoniker"="A4BE0232-1E36-4B93-93D8-6614639B6B32:2"
+
+[$RootKey$\ImageLibrary]
+"TraceLevel"="Verbose"
+"TraceFilename"="ImageLibrary.log"

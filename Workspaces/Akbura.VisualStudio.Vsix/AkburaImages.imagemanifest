@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ImageManifest
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns="http://schemas.microsoft.com/VisualStudio/ImageManifestSchema/2014">
+
+	<Symbols>
+		<String
+			Name="Resources"
+			Value="/Akbura.VisualStudio.Vsix;Component/Resources/Icons" />
+
+		<Guid
+			Name="AkburaImagesGuid"
+			Value="{A4BE0232-1E36-4B93-93D8-6614639B6B32}" />
+
+		<ID Name="AkburaFile" Value="1" />
+		<ID Name="AkcssFile" Value="2" />
+	</Symbols>
+
+	<Images>
+		<Image
+            Guid="$(AkburaImagesGuid)"
+            ID="$(AkburaFile)"
+            AllowColorInversion="false">
+
+			<Source Uri="$(Resources)/akbura_64.png">
+				<Size Value="64" />
+			</Source>
+		</Image>
+
+		<Image
+            Guid="$(AkburaImagesGuid)"
+            ID="$(AkcssFile)"
+            AllowColorInversion="false">
+
+			<Source Uri="$(Resources)/akcss_64.png">
+				<Size Value="64" />
+			</Source>
+		</Image>
+	</Images>
+
+	<ImageLists />
+</ImageManifest>

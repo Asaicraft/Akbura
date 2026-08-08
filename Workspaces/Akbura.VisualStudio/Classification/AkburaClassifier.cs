@@ -42,7 +42,7 @@ internal sealed class AkburaClassifier : IClassifier
 
         try
         {
-            if (!_bufferContext.TryGetPublishedState(
+            if (!_bufferContext.TryGetPublishedClassificationState(
                     requestedSpan.Snapshot,
                     out var state))
             {

@@ -339,7 +339,9 @@ internal sealed partial class AkburaCompilation
             return referencedModel;
         }
 
-        if (!_referenceManager.ContainsComponentSyntaxTree(syntaxTree))
+        if (!_referenceManager.ContainsComponentSyntaxTree(syntaxTree) &&
+            (syntaxTree is not AkcssSyntaxTree referencedAkcssTree ||
+             !_referenceManager.ContainsAkcssSyntaxTree(referencedAkcssTree)))
         {
             throw new ArgumentException("Syntax tree is not part of this compilation.", nameof(syntaxTree));
         }
@@ -355,11 +357,34 @@ internal sealed partial class AkburaCompilation
             _referenceManager.ContainsComponentSyntaxTree(syntaxTree);
     }
 
+    internal bool ContainsAkcssSyntaxTree(AkcssSyntaxTree syntaxTree)
+    {
+        return AkcssSyntaxTrees.Contains(syntaxTree) ||
+            _referenceManager.ContainsAkcssSyntaxTree(syntaxTree);
+    }
+
     internal bool TryGetSemanticModel(
         AkburaSyntaxTree syntaxTree,
         out AkburaSemanticModel semanticModel)
     {
-        if (!ContainsComponentSyntaxTree(syntaxTree))
+        if (SyntaxTrees.Contains(syntaxTree) ||
+            syntaxTree is AkcssSyntaxTree localAkcssTree &&
+            AkcssSyntaxTrees.Contains(localAkcssTree))
+        {
+            semanticModel = GetSemanticModel(syntaxTree);
+            return true;
+        }
+
+        if (_referenceManager.TryGetSemanticModel(
+                syntaxTree,
+                out semanticModel))
+        {
+            return true;
+        }
+
+        if (!_referenceManager.ContainsComponentSyntaxTree(syntaxTree) &&
+            (syntaxTree is not AkcssSyntaxTree referencedAkcssTree ||
+             !_referenceManager.ContainsAkcssSyntaxTree(referencedAkcssTree)))
         {
             semanticModel = null!;
             return false;

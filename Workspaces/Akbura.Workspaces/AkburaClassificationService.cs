@@ -13,6 +13,30 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
     private readonly AkcssSemanticClassificationService _semanticAkcss = new();
 
+    public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
+        SourceText text,
+        string filePath,
+        TextSpan requestedSpan,
+        CancellationToken cancellationToken = default)
+    {
+        if (text == null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        var syntaxTree =
+            AkburaDocumentSnapshot.CreateSyntaxTree(
+                text,
+                filePath ?? string.Empty,
+                cancellationToken);
+
+        return GetSyntacticClassifications(
+            syntaxTree.GetRootSyntax(),
+            text.Length,
+            requestedSpan,
+            cancellationToken);
+    }
+
     public ImmutableArray<AkburaClassifiedSpan> GetClassifications(
         AkburaDocumentContext context,
         TextSpan requestedSpan,
@@ -32,45 +56,17 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             return [];
         }
 
-        var syntacticBuilder = ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
-
-        var semanticBuilder = ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
-
         var root = document.SyntaxTree.GetRootSyntax();
 
-        AddEmbeddedCSharpNodes(
-            root,
-            span,
-            syntacticBuilder,
-            cancellationToken);
-
-        foreach (var token in root.DescendantTokens(span))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (IsClassifiedAsEmbeddedCSharpNode(token))
-            {
-                continue;
-            }
-
-            AddTrivia(
-                token.LeadingTrivia,
+        var syntacticSpans =
+            GetSyntacticClassifications(
+                root,
+                document.Text.Length,
                 span,
-                syntacticBuilder,
                 cancellationToken);
 
-            AddToken(
-                token,
-                span,
-                syntacticBuilder,
-                cancellationToken);
-
-            AddTrivia(
-                token.TrailingTrivia,
-                span,
-                syntacticBuilder,
-                cancellationToken);
-        }
+        var semanticBuilder =
+            ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
 
         var semanticModel =
             context.Project.Compilation
@@ -91,27 +87,76 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             semanticBuilder,
             cancellationToken);
 
-        var semanticSpans = semanticBuilder.ToImmutable();
+        return MergeClassifications(
+            syntacticSpans,
+            semanticBuilder.ToImmutable());
+    }
 
-        foreach (var item in semanticSpans)
+    private ImmutableArray<AkburaClassifiedSpan>
+        GetSyntacticClassifications(
+            AkburaSyntax root,
+            int textLength,
+            TextSpan requestedSpan,
+            CancellationToken cancellationToken)
+    {
+        var span = ClampSpan(
+            requestedSpan,
+            textLength);
+
+        if (span.Length == 0)
         {
-            var text =
-                document.Text.ToString(item.Span);
-
-            System.Diagnostics.Debug.WriteLine(
-                $"SEMANTIC: {item.Kind}, " +
-                $"{item.Span}, \"{text}\"");
+            return [];
         }
 
-        foreach (var item in syntacticBuilder)
-        {
-            var text =
-                document.Text.ToString(item.Span);
+        var builder =
+            ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
 
-            System.Diagnostics.Debug.WriteLine(
-                $"SYNTACTIC: {item.Kind}, " +
-                $"{item.Span}, \"{text}\"");
+        AddEmbeddedCSharpNodes(
+            root,
+            span,
+            builder,
+            cancellationToken);
+
+        foreach (var token in root.DescendantTokens(span))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (IsClassifiedAsEmbeddedCSharpNode(token))
+            {
+                continue;
+            }
+
+            AddTrivia(
+                token.LeadingTrivia,
+                span,
+                builder,
+                cancellationToken);
+
+            AddToken(
+                token,
+                span,
+                builder,
+                cancellationToken);
+
+            AddTrivia(
+                token.TrailingTrivia,
+                span,
+                builder,
+                cancellationToken);
         }
+
+        var items = builder.ToArray();
+
+        Array.Sort(items, CompareClassifications);
+
+        return ImmutableArray.Create(items);
+    }
+
+    private static ImmutableArray<AkburaClassifiedSpan>
+        MergeClassifications(
+            ImmutableArray<AkburaClassifiedSpan> syntacticSpans,
+            ImmutableArray<AkburaClassifiedSpan> semanticSpans)
+    {
 
         var semanticSpanSet =
             new HashSet<TextSpan>(
@@ -120,12 +165,12 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
         var items =
             new List<AkburaClassifiedSpan>(
-                syntacticBuilder.Count +
+                syntacticSpans.Length +
                 semanticSpans.Length);
 
         items.AddRange(semanticSpans);
 
-        foreach (var syntactic in syntacticBuilder)
+        foreach (var syntactic in syntacticSpans)
         {
             if (!semanticSpanSet.Contains(
                     syntactic.Span))
@@ -134,20 +179,23 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             }
         }
 
-        items.Sort(
-            static (left, right) =>
-            {
-                var start =
-                    left.Span.Start.CompareTo(
-                        right.Span.Start);
-
-                return start != 0
-                    ? start
-                    : left.Span.Length.CompareTo(
-                        right.Span.Length);
-            });
+        items.Sort(CompareClassifications);
 
         return [.. items];
+    }
+
+    private static int CompareClassifications(
+        AkburaClassifiedSpan left,
+        AkburaClassifiedSpan right)
+    {
+        var start =
+            left.Span.Start.CompareTo(
+                right.Span.Start);
+
+        return start != 0
+            ? start
+            : left.Span.Length.CompareTo(
+                right.Span.Length);
     }
 
     private static bool IsClassifiedAsEmbeddedCSharpNode(SyntaxToken token)

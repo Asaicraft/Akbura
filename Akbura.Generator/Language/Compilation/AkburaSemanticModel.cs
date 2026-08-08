@@ -379,10 +379,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         var syntax = singleDeclaration.Syntax;
         if (declaration is SingleSyntaxDeclaration syntaxDeclaration &&
-            syntaxDeclaration.SyntaxTree != null &&
-            !ReferenceEquals(syntax.Root, SyntaxTree.GetRoot()))
+            (syntaxDeclaration.SyntaxTree ?? syntaxDeclaration.AkcssSyntaxTree) is { } declarationTree &&
+            !ReferenceEquals(syntax.Root, SyntaxTree.GetRootSyntax()) &&
+            Compilation.TryGetSemanticModel(declarationTree, out var containingModel))
         {
-            var containingModel = Compilation.GetSemanticModel(syntaxDeclaration.SyntaxTree);
             var symbol = containingModel.GetDeclaredSymbol(syntax);
             return symbol == null
                 ? AkburaSymbolInfo.None(AkburaCandidateReason.NotFound)
@@ -5597,6 +5597,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     internal ImmutableArray<CSharp.UsingDirectiveSyntax> GetCSharpUsingDirectives()
     {
+        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        {
+            return GetAkcssCSharpUsingDirectives(
+                SyntaxTree.GetRootSyntax());
+        }
+
         using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
         var directives = new HashSet<string>(StringComparer.Ordinal);
         AddCSharpUsingDirectives(

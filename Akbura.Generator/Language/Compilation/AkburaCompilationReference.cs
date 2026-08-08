@@ -104,6 +104,11 @@ internal sealed class AkburaCompilationReference
         return Compilation.ContainsComponentSyntaxTree(syntaxTree);
     }
 
+    internal bool ContainsAkcssSyntaxTree(AkcssSyntaxTree syntaxTree)
+    {
+        return Compilation.ContainsAkcssSyntaxTree(syntaxTree);
+    }
+
     internal bool TryGetSemanticModel(
         AkburaSyntaxTree syntaxTree,
         out AkburaSemanticModel semanticModel)

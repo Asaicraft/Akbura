@@ -10,9 +10,9 @@ namespace Akbura.VisualStudio.Editor;
 /// <summary>
 /// Synchronizes one Visual Studio text buffer with one Akbura document.
 ///
-/// Editor callbacks only publish immutable update requests.
-/// Parsing and classification are performed by one background worker.
-/// Completed state is published atomically and read without locks.
+/// Editor callbacks only publish immutable update requests. One background
+/// worker publishes a fast syntactic state first and a semantic state later.
+/// Each completed stage is published atomically and read without locks.
 /// </summary>
 internal sealed class AkburaTextBufferContext : IDisposable
 {
@@ -53,9 +53,17 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private CancellationTokenSource? _activeParseCancellation;
 
     /// <summary>
-    /// Stores the latest completely calculated immutable state.
+    /// Stores the newest classification state. It can contain either the
+    /// fast syntactic pass or the completed semantic pass.
     /// </summary>
-    private AkburaParsedBufferState? _publishedState;
+    private AkburaClassifiedBufferState? _publishedClassificationState;
+
+    /// <summary>
+    /// Stores the latest state backed by a project semantic model. Editor
+    /// features such as navigation keep using this state while a newer
+    /// syntactic classification is being displayed.
+    /// </summary>
+    private AkburaParsedBufferState? _publishedSemanticState;
 
     /// <summary>
     /// Monotonically increasing editor request version.
@@ -133,6 +141,32 @@ internal sealed class AkburaTextBufferContext : IDisposable
     public event EventHandler<AkburaBufferChangedEventArgs>? Changed;
 
     /// <summary>
+    /// Returns the newest syntactic or semantic classification state that is
+    /// not newer than the requested editor snapshot.
+    /// </summary>
+    internal bool TryGetPublishedClassificationState(
+        ITextSnapshot requestedSnapshot,
+        out AkburaClassifiedBufferState state)
+    {
+        ValidateRequestedSnapshot(requestedSnapshot);
+
+        var current =
+            Volatile.Read(
+                ref _publishedClassificationState);
+
+        if (current == null ||
+            current.Snapshot.Version.VersionNumber >
+                requestedSnapshot.Version.VersionNumber)
+        {
+            state = null!;
+            return false;
+        }
+
+        state = current;
+        return true;
+    }
+
+    /// <summary>
     /// Returns the latest published state that is not newer than the
     /// requested editor snapshot.
     ///
@@ -144,6 +178,27 @@ internal sealed class AkburaTextBufferContext : IDisposable
     internal bool TryGetPublishedState(
         ITextSnapshot requestedSnapshot,
         out AkburaParsedBufferState state)
+    {
+        ValidateRequestedSnapshot(requestedSnapshot);
+
+        var current =
+            Volatile.Read(
+                ref _publishedSemanticState);
+
+        if (current == null ||
+            current.Snapshot.Version.VersionNumber >
+                requestedSnapshot.Version.VersionNumber)
+        {
+            state = null!;
+            return false;
+        }
+
+        state = current;
+        return true;
+    }
+
+    private void ValidateRequestedSnapshot(
+        ITextSnapshot requestedSnapshot)
     {
         if (requestedSnapshot == null)
         {
@@ -159,20 +214,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 "The snapshot belongs to another text buffer.",
                 nameof(requestedSnapshot));
         }
-
-        var current =
-            Volatile.Read(ref _publishedState);
-
-        if (current == null ||
-            current.Snapshot.Version.VersionNumber >
-                requestedSnapshot.Version.VersionNumber)
-        {
-            state = null!;
-            return false;
-        }
-
-        state = current;
-        return true;
     }
 
     /// <summary>
@@ -266,7 +307,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
         var synchronizedProjectId =
             await _visualStudioWorkspace
                 .SynchronizeProjectAsync(
-                    filePath,
+                    filePath!,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -321,14 +362,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     return;
                 }
 
-                request = await DebounceAsync(request, disposalToken)
-                    .ConfigureAwait(false);
-
-                if (!IsCurrentRequest(request.RequestVersion))
-                {
-                    continue;
-                }
-
                 await ParseAndPublishAsync(request, disposalToken)
                     .ConfigureAwait(false);
             }
@@ -370,47 +403,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
     }
 
 
-    private async Task<UpdateRequest> DebounceAsync(
-        UpdateRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (UpdateDelay <= TimeSpan.Zero)
-        {
-            return GetNewestPendingRequest(request);
-        }
-
-        while (true)
-        {
-            var versionBeforeDelay =
-                Volatile.Read(
-                    ref _requestedVersion);
-
-            await Task.Delay(
-                    UpdateDelay,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            request = GetNewestPendingRequest(request);
-
-            if (versionBeforeDelay ==
-                Volatile.Read(
-                    ref _requestedVersion))
-            {
-                return request;
-            }
-        }
-    }
-
-    private UpdateRequest GetNewestPendingRequest(UpdateRequest current)
-    {
-        var newer =
-            Interlocked.Exchange(
-                ref _pendingRequest,
-                null);
-
-        return newer ?? current;
-    }
-
     private async Task ParseAndPublishAsync(
         UpdateRequest request,
         CancellationToken disposalToken)
@@ -443,6 +435,44 @@ internal sealed class AkburaTextBufferContext : IDisposable
             var cancellationToken =
                 parseCancellation.Token;
 
+            var syntacticState = await Task.Run(
+                    () => TryCreateSyntacticState(
+                        request,
+                        cancellationToken),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!IsCurrentRequest(
+                    request.RequestVersion))
+            {
+                return;
+            }
+
+            if (syntacticState != null)
+            {
+                PublishClassificationState(
+                    syntacticState);
+
+                await RaiseChangedAsync(
+                        syntacticState,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (UpdateDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(
+                        UpdateDelay,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (!IsCurrentRequest(
+                    request.RequestVersion))
+            {
+                return;
+            }
+
             var projectId = await GetProjectIdAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -469,15 +499,16 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return;
             }
 
-            PublishState(state);
+            PublishSemanticState(state);
+            PublishClassificationState(state);
 
             await RaiseChangedAsync(
                     state,
-                    disposalToken)
+                    cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
-            when (disposalToken.IsCancellationRequested)
+            when (parseCancellation.IsCancellationRequested)
         {
         }
         catch (Exception exception)
@@ -493,6 +524,67 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 null,
                 parseCancellation);
         }
+    }
+
+    private AkburaClassifiedBufferState?
+        TryCreateSyntacticState(
+            UpdateRequest request,
+            CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            var classifications =
+                _classificationService
+                    .GetSyntacticClassifications(
+                        request.Text,
+                        GetClassificationFilePath(),
+                        new TextSpan(
+                            start: 0,
+                            length: request.Text.Length),
+                        cancellationToken);
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            return new AkburaClassifiedBufferState(
+                request.RequestVersion,
+                request.Snapshot,
+                request.Text,
+                classifications,
+                includesSemanticClassifications: false);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(
+                $"Akbura syntactic classification failed: " +
+                $"{exception}");
+
+            return null;
+        }
+    }
+
+    private string GetClassificationFilePath()
+    {
+        var filePath =
+            _textDocument?.FilePath;
+
+        if (!string.IsNullOrWhiteSpace(
+                filePath))
+        {
+            return filePath!;
+        }
+
+        return _uri.IsFile
+            ? _uri.LocalPath
+            : _uri.AbsolutePath;
     }
 
     private AkburaParsedBufferState? TryCreateParsedState(
@@ -526,9 +618,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 $"trees={context.Project.CSharpCompilation.SyntaxTrees.Count()}, " +
                 $"references={context.Project.CSharpCompilation.References.Count()}");
 
-            var document =
-                context.Document;
-
             if (cancellationToken.IsCancellationRequested)
             {
                 return null;
@@ -561,14 +650,14 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private void PublishState(
+    private void PublishSemanticState(
         AkburaParsedBufferState state)
     {
         while (true)
         {
             var previous =
                 Volatile.Read(
-                    ref _publishedState);
+                    ref _publishedSemanticState);
 
             /*
              * Never replace a newer publication with an older one.
@@ -582,7 +671,45 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
             if (ReferenceEquals(
                     Interlocked.CompareExchange(
-                        ref _publishedState,
+                        ref _publishedSemanticState,
+                        state,
+                        previous),
+                    previous))
+            {
+                return;
+            }
+        }
+    }
+
+    private void PublishClassificationState(
+        AkburaClassifiedBufferState state)
+    {
+        while (true)
+        {
+            var previous =
+                Volatile.Read(
+                    ref _publishedClassificationState);
+
+            if (previous != null)
+            {
+                if (previous.RequestVersion >
+                    state.RequestVersion)
+                {
+                    return;
+                }
+
+                if (previous.RequestVersion ==
+                        state.RequestVersion &&
+                    (previous.IncludesSemanticClassifications ||
+                     !state.IncludesSemanticClassifications))
+                {
+                    return;
+                }
+            }
+
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(
+                        ref _publishedClassificationState,
                         state,
                         previous),
                     previous))
@@ -593,13 +720,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
     }
 
     private async Task RaiseChangedAsync(
-        AkburaParsedBufferState state,
+        AkburaClassifiedBufferState state,
         CancellationToken cancellationToken)
     {
         if (!ReferenceEquals(
                 state,
                 Volatile.Read(
-                    ref _publishedState)))
+                    ref _publishedClassificationState)))
         {
             return;
         }
@@ -612,10 +739,12 @@ internal sealed class AkburaTextBufferContext : IDisposable
             .ThrowIfCancellationRequested();
 
         if (Volatile.Read(ref _disposeState) != 0 ||
+            !IsCurrentRequest(
+                state.RequestVersion) ||
             !ReferenceEquals(
                 state,
                 Volatile.Read(
-                    ref _publishedState)))
+                    ref _publishedClassificationState)))
         {
             return;
         }

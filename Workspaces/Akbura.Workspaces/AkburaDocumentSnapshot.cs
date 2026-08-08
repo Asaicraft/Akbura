@@ -138,7 +138,7 @@ public sealed class AkburaDocumentSnapshot
             isOpen);
     }
 
-    private static AkburaSyntaxTree CreateSyntaxTree(
+    internal static AkburaSyntaxTree CreateSyntaxTree(
         SourceText text,
         string filePath,
         CancellationToken cancellationToken)

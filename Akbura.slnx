@@ -56,6 +56,10 @@
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
+    <Project Path="Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj" Id="8284f1e6-0ff7-489c-8fbb-cbe81cd250fc">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
     <Project Path="Workspaces/Akbura.Workspaces.MSBuild/Akbura.Workspaces.MSBuild.csproj" Id="1e620b9a-a42e-4ad1-8448-9ccdf85fc284">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />

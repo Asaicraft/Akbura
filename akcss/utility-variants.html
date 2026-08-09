@@ -351,6 +351,44 @@ provide <code>Order</code>, <code>ConflictGroup</code>, and <code>UnprefixedPrec
 property-level conflict resolution.</p>
 <p>Without the attribute, the extension still works as a prefix with <code>Order = 0</code>,
 no conflict group, and source-order precedence.</p>
+<h2 id="utility-binding-priority">Utility binding priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#utility-binding-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Variant ordering and Avalonia binding priority are separate decisions.</p>
+<ol>
+<li>AKCSS selects one winning operation for each target property using operation
+priority, <code>Order</code>, <code>ConflictGroup</code>, <code>UnprefixedPrecedence</code>, and source order.</li>
+<li>If the winning prefix extension has <code>UtilityBindingPriorityAttribute</code>, that
+operation is applied at the requested Avalonia <code>BindingPriority</code>.</li>
+</ol>
+<p>Changing Avalonia priority cannot make a losing AKCSS candidate win.</p>
+<p>Both attributes can be placed on one extension when both decisions are needed:</p>
+<pre><code class="language-csharp">using Akbura.Markup;
+using Avalonia.Data;
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = &quot;Modes&quot;,
+    UnprefixedPrecedence =
+        UnprefixedUtilityPrecedence.Above)]
+[UtilityBindingPriority(
+    PriorityMember = nameof(Priority))]
+public sealed class priorityExtension
+{
+    public BindingPriority Priority { get; set; }
+
+    public bool ProvideValue(IServiceProvider services) =&gt; true;
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Border ${priority Priority=Template}:p-4 /&gt;
+&lt;Border ${priority Priority=Style}:p-6 /&gt;
+</code></pre>
+<p>The two attributes remain independent: <code>UtilityVariantAttribute</code> supplies
+conflict metadata, while <code>UtilityBindingPriorityAttribute</code> supplies either a
+constant priority or the name of a readable instance field/property of exact
+type <code>BindingPriority</code>.</p>
+<p>Only <code>Animation</code>, <code>StyleTrigger</code>, <code>Template</code>, and <code>Style</code> are supported because
+their contributions can be disposed without clearing unrelated values.
+<code>LocalValue</code>, <code>Inherited</code>, <code>Unset</code>, CLR properties, and direct properties are
+not supported by this feature.</p>
 <h3 id="order">Order<a class="header-anchor" href="javascript:;" onclick="location.hash='#order'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
 <pre><code class="language-csharp">public double Order { get; }
 </code></pre>
@@ -955,6 +993,11 @@ non-empty conflict group and one conflicting property operation.</p>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#utilityvariantattribute'" data-id="utilityvariantattribute" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											UtilityVariantAttribute
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#utility-binding-priority'" data-id="utility-binding-priority" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Utility binding priority
 										</span>
 											<ul class="ml-4">
 													<li data-id="order" class="text-gray-500 hover:text-gray-900">

@@ -414,6 +414,49 @@ available value removes that candidate from conflict resolution, allowing the
 next matching utility to apply.</p>
 <p>The braces are required. <code>md:p-3</code> is retained only for parser recovery and
 produces a diagnostic that suggests <code>${md}:p-3</code>.</p>
+<h2 id="utility-binding-priority">Utility binding priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#utility-binding-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>UtilityBindingPriorityAttribute</code> controls the Avalonia binding layer used by
+the property operations of an already selected utility candidate:</p>
+<pre><code class="language-csharp">using Akbura.Markup;
+using Avalonia.Data;
+
+[UtilityBindingPriority(
+    Priority = BindingPriority.Animation)]
+public sealed class importantExtension
+{
+    public bool ProvideValue(IServiceProvider services) =&gt; true;
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Border Margin=&quot;10&quot;
+        ${important}:m-12 /&gt;
+</code></pre>
+<p>AKCSS still resolves the winning <code>Margin</code> operation by its normal
+property-level cascade. Only then is the winner written at
+<code>BindingPriority.Animation</code>. When the prefix becomes inactive, the generated
+code disposes that contribution and Avalonia reveals the original
+<code>Margin=&quot;10&quot;</code> local value again.</p>
+<p>The priority may also come from a readable instance field or property:</p>
+<pre><code class="language-csharp">[UtilityBindingPriority(
+    PriorityMember = nameof(Priority))]
+public sealed class priorityExtension
+{
+    public BindingPriority Priority { get; set; }
+
+    public bool ProvideValue(IServiceProvider services) =&gt; true;
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;Border ${priority Priority=Template}:p-4 /&gt;
+&lt;Border ${priority Priority=Style}:p-6 /&gt;
+</code></pre>
+<p>Each prefix invocation creates its own extension instance. Akbura calls
+<code>ProvideValue</code> and reads <code>PriorityMember</code> from that same instance.</p>
+<p>Only reversible priorities are supported: <code>Animation</code>, <code>StyleTrigger</code>,
+<code>Template</code>, and <code>Style</code>. A priority-aware utility may write only Avalonia
+<code>StyledProperty</code> or <code>AttachedProperty</code> values. CLR properties,
+<code>DirectProperty</code>, <code>LocalValue</code>, <code>Inherited</code>, and <code>Unset</code> are rejected.</p>
+<p><code>UtilityBindingPriorityAttribute</code> never changes which AKCSS candidate wins.
+<code>UtilityVariantAttribute</code> continues to control only <code>Order</code>, <code>ConflictGroup</code>,
+and <code>UnprefixedPrecedence</code>.</p>
 <h2 id="variant-priority">Variant priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#variant-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Utilities conflict by their resolved utility name. For example, <code>p-1</code>,
 <code>p-2</code>, and <code>${md}:p-3</code> all use the conflict key <code>p</code>. Only one candidate wins
@@ -792,6 +835,11 @@ gap-4 → Spacing = 4 × 4 = 16
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#markup-extension-prefixes'" data-id="markup-extension-prefixes" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Markup extension prefixes
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#utility-binding-priority'" data-id="utility-binding-priority" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Utility binding priority
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

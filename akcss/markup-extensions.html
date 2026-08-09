@@ -361,6 +361,68 @@ property. Without the attribute, prefixed candidates use normal source order.</p
 <p>See <a href="akcss/utility-variants">Utility Variants</a> for the complete property-level
 conflict-resolution algorithm, <code>ConflictGroup</code>, <code>Order</code>, built-in breakpoint
 implementation, and <code>UnprefixedUtilityPrecedence</code> modes.</p>
+<h2 id="utility-binding-priority">Utility binding priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#utility-binding-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A prefix extension can select the Avalonia binding layer used after AKCSS has
+selected a winning property operation:</p>
+<pre><code class="language-csharp">using Akbura.Markup;
+using Avalonia.Data;
+
+[UtilityBindingPriority(
+    Priority = BindingPriority.Animation)]
+public sealed class importantExtension
+{
+    public BindingBase ProvideValue(IServiceProvider services)
+    {
+        return new Binding(&quot;IsChecked&quot;)
+        {
+            ElementName = &quot;ImportantToggle&quot;
+        };
+    }
+}
+</code></pre>
+<pre><code class="language-akbura">&lt;ToggleSwitch x.Name=&quot;ImportantToggle&quot; /&gt;
+
+&lt;Border Margin=&quot;10&quot;
+        ${important}:m-12 /&gt;
+</code></pre>
+<p>The binding controls whether <code>m-12</code> participates. While it is active, the
+winning <code>Margin</code> operation is installed at <code>BindingPriority.Animation</code>.
+When it becomes inactive, Akbura disposes only that contribution and Avalonia
+reveals the previous <code>Margin=&quot;10&quot;</code> value.</p>
+<p>Use exactly one priority source:</p>
+<pre><code class="language-csharp">[UtilityBindingPriority(
+    Priority = BindingPriority.Template)]
+public sealed class fixedPriorityExtension
+{
+}
+</code></pre>
+<pre><code class="language-csharp">[UtilityBindingPriority(
+    PriorityMember = nameof(Priority))]
+public sealed class priorityExtension
+{
+    public BindingPriority Priority { get; set; }
+}
+</code></pre>
+<p><code>PriorityMember</code> may name an accessible instance field or readable instance
+property whose type is exactly <code>BindingPriority</code>. Akbura creates one extension
+instance for each prefix invocation, applies its constructor and named
+properties, calls <code>ProvideValue</code>, and reads the priority from that same
+instance. A refresh first disposes the old property contributions and then
+creates the next instance.</p>
+<p>The supported priorities are:</p>
+<ul>
+<li><code>BindingPriority.Animation</code></li>
+<li><code>BindingPriority.StyleTrigger</code></li>
+<li><code>BindingPriority.Template</code></li>
+<li><code>BindingPriority.Style</code></li>
+</ul>
+<p><code>LocalValue</code>, <code>Inherited</code>, <code>Unset</code>, and unknown enum values are rejected.
+Priority-aware utilities may write only <code>StyledProperty</code> and
+<code>AttachedProperty</code> values. Dynamic resources are bound at the requested
+priority; ordinary values are installed as disposable Avalonia contributions.</p>
+<p>This attribute does not participate in conflict resolution. It can be combined
+with <code>UtilityVariantAttribute</code>, but <code>Order</code>, <code>ConflictGroup</code>, and
+<code>UnprefixedPrecedence</code> still select the AKCSS winner independently.</p>
 <h2 id="lifecycle">Lifecycle<a class="header-anchor" href="javascript:;" onclick="location.hash='#lifecycle'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Akbura owns every subscription and binding created for utility markup
 extensions.</p>
@@ -490,6 +552,11 @@ use <code>${...}</code> and do not call it.</p>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#utility-variants'" data-id="utility-variants" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Utility variants
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#utility-binding-priority'" data-id="utility-binding-priority" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Utility binding priority
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

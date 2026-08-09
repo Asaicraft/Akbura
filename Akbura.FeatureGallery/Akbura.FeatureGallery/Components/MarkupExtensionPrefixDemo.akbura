@@ -1,0 +1,52 @@
+state bool dynamicResourceEnabled = true;
+
+ResourceHost.Resources["MyKey"] = dynamicResourceEnabled;
+
+<StackPanel x.Name="ResourceHost"
+            gap-4>
+
+    <ToggleSwitch
+        Content="Enable the DynamicResource prefix"
+        IsChecked={dynamicResourceEnabled}
+        Click={() => dynamicResourceEnabled = !dynamicResourceEnabled}/>
+
+    <ToggleSwitch x.Name="MyToggle"
+                  Content="Enable the Binding prefix"
+                  IsChecked="True"/>
+
+    <Border ${DynamicResource MyKey}:p-5
+            bg-slate-800
+            border-1
+            border-slate-700
+            rounded-lg>
+
+        <TextBlock
+            Text="DynamicResource resolves a boolean resource and activates p-5."
+            whitespace-normal/>
+
+    </Border>
+
+    <Border ${StaticResource MyBoolValue}:p-7
+            bg-slate-800
+            border-1
+            border-slate-700
+            rounded-lg>
+
+        <TextBlock
+            Text="StaticResource resolves a boolean resource and activates p-7."
+            whitespace-normal/>
+
+    </Border>
+
+    <Border ${Binding #MyToggle.IsChecked}:p-10
+            bg-blue-600
+            rounded-lg>
+
+        <TextBlock
+            Text="Binding observes MyToggle.IsChecked and activates p-10."
+            text-white
+            whitespace-normal/>
+
+    </Border>
+
+</StackPanel>

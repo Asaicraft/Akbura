@@ -25,9 +25,16 @@ public sealed class AkcssUtilityApplication
     public AkcssUtility Utility { get; }
 
     internal void Execute(
-        Control target,
+        object target,
         IReadOnlyList<object?> arguments)
     {
-        _execute(target, arguments);
+        if (target is not Control control)
+        {
+            throw new ArgumentException(
+                "A legacy AKCSS utility application requires a Control target.",
+                nameof(target));
+        }
+
+        _execute(control, arguments);
     }
 }

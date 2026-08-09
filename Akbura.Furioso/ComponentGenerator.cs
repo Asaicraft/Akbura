@@ -934,9 +934,17 @@ internal static class ComponentGenerator
                 return;
             }
 
+            var hasPriorityMember = argumentIndex == -1 &&
+                operation.BindingPriority.Source ==
+                    TailwindUtilityBindingPrioritySource.Member &&
+                operation.BindingPriority.Member.Symbol != null;
+
             AppendIndented(source, indentation)
                 .Append("private ")
-                .Append(GetTypeNameWithNullableAnnotation(resultType))
+                .Append(hasPriorityMember
+                    ? "global::Akbura.Akcss.AkcssUtilityPrefixInvocation<" +
+                      GetTypeNameWithNullableAnnotation(resultType) + ">"
+                    : GetTypeNameWithNullableAnnotation(resultType))
                 .Append(' ')
                 .Append(GetAkcssMarkupExtensionFactoryName(
                     element,
@@ -946,14 +954,49 @@ internal static class ComponentGenerator
                     "(global::Avalonia.Controls.Control __target)");
             AppendIndentedLine(source, indentation, "{");
 
-            var expression = GetMarkupExtensionExpression(
-                extension,
+            var targetProperty = GetAkcssMarkupExtensionPropertyName(
                 element,
-                GetAkcssMarkupExtensionPropertyName(
+                operation,
+                argumentIndex);
+            string expression;
+            string statement;
+            if (hasPriorityMember)
+            {
+                var creation = GetMarkupExtensionCreationExpression(
+                    extension,
                     element,
-                    operation,
-                    argumentIndex));
-            var statement = "return " + expression + ";";
+                    targetProperty);
+                var creationStatement = "var __extension = " + creation + ";";
+                AppendLineDirective(
+                    source,
+                    indentation + 1,
+                    syntax,
+                    creationStatement,
+                    creationStatement.IndexOf(
+                        creation,
+                        StringComparison.Ordinal));
+
+                expression = GetMarkupExtensionProvideValueExpression(
+                    extension,
+                    element,
+                    targetProperty,
+                    "__extension");
+                var memberName = EscapeIdentifier(
+                    operation.BindingPriority.Member.Symbol!.Name);
+                statement =
+                    "return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<" +
+                    GetTypeNameWithNullableAnnotation(resultType) + ">(" +
+                    expression + ", __extension." + memberName + ");";
+            }
+            else
+            {
+                expression = GetMarkupExtensionExpression(
+                    extension,
+                    element,
+                    targetProperty);
+                statement = "return " + expression + ";";
+            }
+
             AppendLineDirective(
                 source,
                 indentation + 1,
@@ -1357,6 +1400,24 @@ internal static class ComponentGenerator
                    contentPresenterType != null &&
                    _semanticModel.Compilation.CSharpCompilation
                        .ClassifyConversion(type, contentPresenterType)
+                       .IsImplicit;
+        }
+
+        private bool IsControlElement(ElementPlan element)
+        {
+            var componentType = element.Symbol.ComponentType ??
+                element.Symbol.AkburaComponent?.ComponentType;
+            var controlType =
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetTypeByMetadataName(
+                        "Avalonia.Controls.Control");
+
+            return componentType != null &&
+                   controlType != null &&
+                   _semanticModel.Compilation.CSharpCompilation
+                       .ClassifyConversion(
+                           componentType,
+                           controlType)
                        .IsImplicit;
         }
 
@@ -2237,7 +2298,8 @@ internal static class ComponentGenerator
                             GetAkcssMarkupExtensionFactoryName(
                                 element,
                                 operation,
-                                argumentIndex: -1)));
+                                argumentIndex: -1),
+                            operation.BindingPriority));
             }
 
             if (operation.Variant.IsPrefixed)
@@ -2260,6 +2322,14 @@ internal static class ComponentGenerator
                     .Append(operation.Variant
                         .UnprefixedPrecedence
                         .ToString());
+            }
+
+            if (operation.BindingPriority.Source ==
+                TailwindUtilityBindingPrioritySource.Constant)
+            {
+                result.Append(", bindingPriority: ")
+                    .Append(GetBindingPriorityExpression(
+                        operation.BindingPriority.ConstantValue));
             }
 
             return result.Append(')').ToString();
@@ -2290,7 +2360,8 @@ internal static class ComponentGenerator
                     result.Add(
                         GetAkcssUtilityArgumentValueSourceExpression(
                             argument,
-                            expectedType));
+                            expectedType,
+                            IsControlElement(element)));
                     continue;
                 }
 
@@ -2312,15 +2383,58 @@ internal static class ComponentGenerator
             return result;
         }
 
+        private string GetBindingPriorityExpression(int value)
+        {
+            var priorityType = _semanticModel.Compilation.CSharpCompilation
+                .GetTypeByMetadataName("Avalonia.Data.BindingPriority");
+            if (priorityType != null)
+            {
+                foreach (var member in priorityType.GetMembers().OfType<IFieldSymbol>())
+                {
+                    if (!member.HasConstantValue || member.ConstantValue == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (Convert.ToInt32(
+                                member.ConstantValue,
+                                CultureInfo.InvariantCulture) == value)
+                        {
+                            return "global::Avalonia.Data.BindingPriority." +
+                                EscapeIdentifier(member.Name);
+                        }
+                    }
+                    catch (FormatException)
+                    {
+                    }
+                    catch (InvalidCastException)
+                    {
+                    }
+                    catch (OverflowException)
+                    {
+                    }
+                }
+            }
+
+            return "(global::Avalonia.Data.BindingPriority)" +
+                value.ToString(CultureInfo.InvariantCulture);
+        }
+
         private static string GetAkcssUtilityArgumentValueSourceExpression(
             TailwindUtilityArgument argument,
-            ITypeSymbol expectedType)
+            ITypeSymbol expectedType,
+            bool isControlTarget)
         {
             var isConstant =
                 argument.ValueOperation.ConstantValue.HasValue;
             var result = new StringBuilder(
                     "global::Akbura.Akcss." +
-                    "AkcssUtilityValueSource.Create<")
+                    "AkcssUtilityValueSource." +
+                    (isControlTarget
+                        ? "Create<"
+                        : "CreateForObject<"))
                 .Append(GetTypeName(expectedType))
                 .Append(">(");
             if (isConstant)
@@ -2343,18 +2457,30 @@ internal static class ComponentGenerator
             ITypeSymbol expectedType,
             ElementPlan element,
             string targetProperty,
-            string factoryName)
+            string factoryName,
+            TailwindUtilityBindingPriority bindingPriority = default)
         {
             var expectedTypeName =
                 GetTypeName(expectedType);
 
-            var valueExpression =
-                RequiresLocalMarkupExtensionContext(element)
-                    ? GetMarkupExtensionExpression(
+            var hasPriorityMember = bindingPriority.Source ==
+                TailwindUtilityBindingPrioritySource.Member &&
+                bindingPriority.Member.Symbol != null;
+            var valueExpression = RequiresLocalMarkupExtensionContext(element)
+                ? GetMarkupExtensionExpression(
+                    extension,
+                    element,
+                    targetProperty)
+                : factoryName + "(__target)";
+            var factoryExpression = hasPriorityMember
+                ? RequiresLocalMarkupExtensionContext(element)
+                    ? GetPriorityAwareMarkupExtensionFactoryLambda(
                         extension,
                         element,
-                        targetProperty)
-                    : factoryName + "(__target)";
+                        targetProperty,
+                        bindingPriority.Member.Symbol!)
+                    : factoryName
+                : "__target => " + valueExpression;
 
 
             var recreate =
@@ -2368,12 +2494,35 @@ internal static class ComponentGenerator
             {
                 return new StringBuilder(
                         "global::Akbura.Akcss." +
-                        "AkcssUtilityValueSource.CreateBinding<")
+                        "AkcssUtilityValueSource." +
+                        (hasPriorityMember
+                            ? "CreateBindingWithPriority<"
+                            : "CreateBinding<"))
                     .Append(expectedTypeName)
-                    .Append(">(__target => ")
-                    .Append(valueExpression)
+                    .Append(">(")
+                    .Append(factoryExpression)
                     .Append(", ")
                     .Append(targetProperty)
+                    .Append(", static __value => (")
+                    .Append(expectedTypeName)
+                    .Append(")__value!, recreateOnRefresh: ")
+                    .Append(recreate)
+                    .Append(')')
+                    .ToString();
+            }
+
+            if (extension.ResultType.Symbol is ITypeSymbol objectResult &&
+                objectResult.SpecialType == SpecialType.System_Object)
+            {
+                return new StringBuilder(
+                        "global::Akbura.Akcss." +
+                        "AkcssUtilityValueSource." +
+                        (hasPriorityMember
+                            ? "CreateObjectWithPriority<"
+                            : "CreateObject<"))
+                    .Append(expectedTypeName)
+                    .Append(">(")
+                    .Append(factoryExpression)
                     .Append(", static __value => (")
                     .Append(expectedTypeName)
                     .Append(")__value!, recreateOnRefresh: ")
@@ -2396,10 +2545,12 @@ internal static class ComponentGenerator
                     return new StringBuilder(
                             "global::Akbura.Akcss." +
                             "AkcssUtilityValueSource." +
-                            "CreateObservableObject<")
+                            (hasPriorityMember
+                                ? "CreateObservableObjectWithPriority<"
+                                : "CreateObservableObject<"))
                         .Append(expectedTypeName)
-                        .Append(">(__target => ")
-                        .Append(valueExpression)
+                        .Append(">(")
+                        .Append(factoryExpression)
                         .Append(", static __value => (")
                         .Append(expectedTypeName)
                         .Append(")__value!, recreateOnRefresh: ")
@@ -2410,12 +2561,15 @@ internal static class ComponentGenerator
 
                 return new StringBuilder(
                         "global::Akbura.Akcss." +
-                        "AkcssUtilityValueSource.CreateObservable<")
+                        "AkcssUtilityValueSource." +
+                        (hasPriorityMember
+                            ? "CreateObservableWithPriority<"
+                            : "CreateObservable<"))
                     .Append(observableElementTypeName)
                     .Append(", ")
                     .Append(expectedTypeName)
-                    .Append(">(__target => ")
-                    .Append(valueExpression)
+                    .Append(">(")
+                    .Append(factoryExpression)
                     .Append(", static __value => (")
                     .Append(expectedTypeName)
                     .Append(")__value, recreateOnRefresh: ")
@@ -2426,10 +2580,13 @@ internal static class ComponentGenerator
 
             return new StringBuilder(
                     "global::Akbura.Akcss." +
-                    "AkcssUtilityValueSource.Create<")
+                    "AkcssUtilityValueSource." +
+                    (hasPriorityMember
+                        ? "CreateWithPriority<"
+                        : "Create<"))
                 .Append(expectedTypeName)
-                .Append(">(__target => ")
-                .Append(valueExpression)
+                .Append(">(")
+                .Append(factoryExpression)
                 .Append(", recreateOnRefresh: ")
                 .Append(recreate)
                 .Append(')')
@@ -2670,6 +2827,15 @@ internal static class ComponentGenerator
             }
 
             if (IsDataTypeDirective(operation.Syntax))
+            {
+                return;
+            }
+
+            if (string.Equals(
+                    AkburaSemanticModel.GetMarkupPropertyName(
+                        operation.Syntax),
+                    "class",
+                    StringComparison.Ordinal))
             {
                 return;
             }
@@ -3134,6 +3300,23 @@ internal static class ComponentGenerator
                     targetPropertyExpression);
             }
 
+            var creation = GetMarkupExtensionCreationExpression(
+                extension,
+                element,
+                targetPropertyExpression);
+            return GetMarkupExtensionProvideValueExpression(
+                extension,
+                element,
+                targetPropertyExpression,
+                "(" + creation + ")");
+        }
+
+        private string GetMarkupExtensionCreationExpression(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            string targetPropertyExpression)
+        {
+
             var type = GetTypeName(extension.ExtensionType.Symbol);
 
             var arguments = string.Join(
@@ -3177,12 +3360,21 @@ internal static class ComponentGenerator
                 creation.Append(" }");
             }
 
+            return creation.ToString();
+        }
+
+        private string GetMarkupExtensionProvideValueExpression(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            string targetPropertyExpression,
+            string instanceExpression)
+        {
+            var result = new StringBuilder(instanceExpression);
+
             if (extension.ProvideValueMethod.Symbol
                 is RoslynMethodSymbol provideValue)
             {
-                creation.Insert(0, '(').Append(')');
-
-                creation
+                result
                     .Append('.')
                     .Append(EscapeIdentifier(provideValue.Name))
                     .Append('(');
@@ -3199,7 +3391,7 @@ internal static class ComponentGenerator
                             ? element.DeferredOwner.Roots[0].FieldName
                             : "this";
 
-                    creation
+                    result
                         .Append("CreateMarkupServiceProvider(")
                         .Append("targetObject: ")
                         .Append(element.FieldName)
@@ -3213,17 +3405,42 @@ internal static class ComponentGenerator
 
                     if (element.IsDeferred)
                     {
-                        creation.Append(
+                        result.Append(
                             ", fallbackServiceProvider: __services");
                     }
 
-                    creation.Append(')');
+                    result.Append(')');
                 }
 
-                creation.Append(')');
+                result.Append(')');
             }
 
-            return creation.ToString();
+            return result.ToString();
+        }
+
+        private string GetPriorityAwareMarkupExtensionFactoryLambda(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            string targetPropertyExpression,
+            Microsoft.CodeAnalysis.ISymbol priorityMember)
+        {
+            var resultType = GetTypeNameWithNullableAnnotation(
+                extension.ResultType.Symbol as ITypeSymbol ??
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetSpecialType(SpecialType.System_Object));
+            var creation = GetMarkupExtensionCreationExpression(
+                extension,
+                element,
+                targetPropertyExpression);
+            var value = GetMarkupExtensionProvideValueExpression(
+                extension,
+                element,
+                targetPropertyExpression,
+                "__extension");
+            return "__target => { var __extension = " + creation +
+                "; return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<" +
+                resultType + ">(" + value + ", __extension." +
+                EscapeIdentifier(priorityMember.Name) + "); }";
         }
 
         private string GetBindingExpression(
@@ -3288,20 +3505,42 @@ internal static class ComponentGenerator
             }
 
             var type = GetTypeName(binding.BindingType.Symbol);
+            var bindingPath = binding.Path;
+            string? bindingSource = null;
+
+            if (!extension.Properties.Any(static property =>
+                    property.Name is "Source" or "ElementName") &&
+                TryGetElementNameBindingSource(
+                    binding,
+                    out var elementNameSource,
+                    out var remainingPath))
+            {
+                bindingSource = elementNameSource;
+                bindingPath = remainingPath;
+            }
 
             var result = new StringBuilder("new ")
                 .Append(type)
                 .Append('(')
-                .Append(ToStringLiteral(binding.Path))
+                .Append(ToStringLiteral(bindingPath))
                 .Append(')');
 
-            if (!extension.Properties.IsEmpty)
+            if (bindingSource != null ||
+                !extension.Properties.IsEmpty)
             {
                 result.Append(" { ");
 
+                var hasInitializer = false;
+                if (bindingSource != null)
+                {
+                    result.Append("Source = ")
+                        .Append(bindingSource);
+                    hasInitializer = true;
+                }
+
                 for (var index = 0; index < extension.Properties.Length; index++)
                 {
-                    if (index > 0)
+                    if (hasInitializer)
                     {
                         result.Append(", ");
                     }
@@ -3315,12 +3554,62 @@ internal static class ComponentGenerator
                             property,
                             element,
                             targetPropertyExpression));
+
+                    hasInitializer = true;
                 }
 
                 result.Append(" }");
             }
 
             return result.ToString();
+        }
+
+        private bool TryGetElementNameBindingSource(
+            MarkupBindingValue binding,
+            out string sourceExpression,
+            out string remainingPath)
+        {
+            sourceExpression = string.Empty;
+            remainingPath = binding.Path;
+
+            if (binding.Kind != MarkupBindingKind.Reflection ||
+                binding.PathElements.IsEmpty)
+            {
+                return false;
+            }
+
+            var root = binding.PathElements[0];
+            if (root.Kind != MarkupBindingPathElementKind.ElementName ||
+                root.Text.Length <= 1)
+            {
+                return false;
+            }
+
+            var elementNameRoot = root.Text;
+            var elementName = elementNameRoot[1..];
+            var sourceElement = _elements.FirstOrDefault(element =>
+                element.NameOperation?.NameSymbol is { } name &&
+                string.Equals(
+                    name.IdentifierText,
+                    elementName,
+                    StringComparison.Ordinal));
+
+            if (sourceElement == null ||
+                !binding.Path.StartsWith(
+                    elementNameRoot,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            remainingPath = binding.Path[elementNameRoot.Length..];
+            if (remainingPath.StartsWith(".", StringComparison.Ordinal))
+            {
+                remainingPath = remainingPath[1..];
+            }
+
+            sourceExpression = sourceElement.FieldName;
+            return true;
         }
 
         private static bool TryGetSingleFieldBindingPath(

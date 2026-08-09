@@ -52,6 +52,15 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_TailwindMarkupExtensionResultMismatch = nameof(AKBURA_SEMANTIC_TailwindMarkupExtensionResultMismatch);
     public const string AKBURA_SEMANTIC_TailwindVariantResultMismatch = nameof(AKBURA_SEMANTIC_TailwindVariantResultMismatch);
     public const string AKBURA_SEMANTIC_TailwindLegacyPrefix = nameof(AKBURA_SEMANTIC_TailwindLegacyPrefix);
+    public const string AKBURA_SEMANTIC_UtilityBindingPrioritySourceMissing = nameof(AKBURA_SEMANTIC_UtilityBindingPrioritySourceMissing);
+    public const string AKBURA_SEMANTIC_UtilityBindingPrioritySourceConflict = nameof(AKBURA_SEMANTIC_UtilityBindingPrioritySourceConflict);
+    public const string AKBURA_SEMANTIC_UtilityBindingPriorityMemberNotFound = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityMemberNotFound);
+    public const string AKBURA_SEMANTIC_UtilityBindingPriorityMemberStatic = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityMemberStatic);
+    public const string AKBURA_SEMANTIC_UtilityBindingPriorityMemberInaccessible = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityMemberInaccessible);
+    public const string AKBURA_SEMANTIC_UtilityBindingPriorityMemberUnreadable = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityMemberUnreadable);
+    public const string AKBURA_SEMANTIC_UtilityBindingPriorityMemberTypeMismatch = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityMemberTypeMismatch);
+    public const string AKBURA_SEMANTIC_UtilityBindingPriorityNotSupported = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityNotSupported);
+    public const string AKBURA_SEMANTIC_UtilityBindingPriorityTargetNotSupported = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityTargetNotSupported);
     public const string AKBURA_SEMANTIC_AkcssImportNotFound = nameof(AKBURA_SEMANTIC_AkcssImportNotFound);
     public const string AKBURA_SEMANTIC_AkcssApplyItemNotFound = nameof(AKBURA_SEMANTIC_AkcssApplyItemNotFound);
     public const string AKBURA_SEMANTIC_AkcssApplyItemAmbiguous = nameof(AKBURA_SEMANTIC_AkcssApplyItemAmbiguous);

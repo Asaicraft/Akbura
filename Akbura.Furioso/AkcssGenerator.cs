@@ -2155,6 +2155,12 @@ internal static class AkcssGenerator
             rootUtility,
             plan,
             sourceMap);
+        source.AppendLine();
+        AppendUtilityOperationApply(
+            source,
+            rootUtility,
+            plan,
+            sourceMap);
         AppendUtilityOperationReset(
             source,
             plan);
@@ -2342,6 +2348,59 @@ internal static class AkcssGenerator
                 6,
                 $"((global::Avalonia.AvaloniaObject)__target).ClearValue({propertyReference});");
             AppendIndentedLine(source, 5, "}");
+        }
+
+        source.AppendLine("                }");
+    }
+
+    private static void AppendUtilityOperationApply(
+        StringBuilder source,
+        ITailwindUtilitySymbol rootUtility,
+        UtilityOperationPlan plan,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        source.AppendLine("                public override global::System.IDisposable Apply(");
+        source.AppendLine("                    object __target,");
+        source.AppendLine("                    global::System.Collections.Generic.IReadOnlyList<object?> __arguments,");
+        source.AppendLine("                    global::Avalonia.Data.BindingPriority __bindingPriority)");
+        source.AppendLine("                {");
+        source.AppendLine("                    global::System.ArgumentNullException.ThrowIfNull(__target);");
+        source.AppendLine("                    global::System.ArgumentNullException.ThrowIfNull(__arguments);");
+        AppendUtilityArgumentLocals(
+            source,
+            rootUtility,
+            indentation: 5);
+
+        var indentation = 5;
+        var openBlocks = 0;
+        foreach (var frame in plan.Frames)
+        {
+            if (frame is not UtilityApplyOperationFrame applyFrame)
+            {
+                continue;
+            }
+
+            AppendIndentedLine(source, indentation, "{");
+            indentation++;
+            openBlocks++;
+            AppendApplyArgumentLocals(
+                source,
+                applyFrame,
+                indentation);
+        }
+
+        AppendPriorityPropertySetter(
+            source,
+            plan.Setter,
+            "__target",
+            "__bindingPriority",
+            indentation,
+            sourceMap);
+
+        for (var index = 0; index < openBlocks; index++)
+        {
+            indentation--;
+            AppendIndentedLine(source, indentation, "}");
         }
 
         source.AppendLine("                }");
@@ -2999,6 +3058,107 @@ internal static class AkcssGenerator
             sourceMap);
     }
 
+    private static void AppendPriorityPropertySetter(
+        StringBuilder source,
+        IAkcssPropertySetterOperation operation,
+        string targetName,
+        string priorityName,
+        int indentation,
+        AkcssGenerationSourceMap sourceMap)
+    {
+        if (operation.Property is not { } property || !property.CanWrite)
+        {
+            AppendIndentedLine(
+                source,
+                indentation,
+                "throw new global::System.InvalidOperationException(\"The AKCSS property operation cannot be applied at a binding priority.\");");
+            return;
+        }
+
+        var value = GetValueExpression(operation, targetName, observeDynamicResource: true);
+        GeneratedStatement? statement = null;
+        if (value.DynamicResource is { } dynamicResource)
+        {
+            statement = CreateDynamicResourceContribution(
+                property,
+                targetName,
+                priorityName,
+                value.Expression,
+                dynamicResource);
+        }
+
+        if (statement == null)
+        {
+            value = GetValueExpression(operation, targetName, observeDynamicResource: false);
+            statement = CreateAvaloniaPropertyContribution(
+                property,
+                targetName,
+                priorityName,
+                value.Expression);
+        }
+
+        if (statement == null)
+        {
+            AppendIndentedLine(
+                source,
+                indentation,
+                "throw new global::System.InvalidOperationException(\"UtilityBindingPriorityAttribute requires a StyledProperty or AttachedProperty operation.\");");
+            return;
+        }
+
+        var conditions = new List<string>(2);
+        var receiverType = GetPropertyReceiverType(property);
+        if (receiverType is { SpecialType: not SpecialType.System_Object })
+        {
+            conditions.Add($"{targetName} is {GetTypeName(receiverType)}");
+        }
+
+        if (value.RequiresResourceHost)
+        {
+            conditions.Add($"{targetName} is global::Avalonia.Controls.IResourceHost");
+        }
+
+        if (conditions.Count > 0)
+        {
+            AppendIndentedLine(
+                source,
+                indentation,
+                $"if (!({string.Join(" && ", conditions)}))");
+            AppendIndentedLine(source, indentation, "{");
+            AppendIndentedLine(
+                source,
+                indentation + 1,
+                "throw new global::System.InvalidOperationException(\"The AKCSS target is not compatible with the priority-aware property operation.\");");
+            AppendIndentedLine(source, indentation, "}");
+        }
+
+        LinePositionSpan lineSpan = default;
+        var path = string.Empty;
+        var hasLineDirective = operation.Syntax?.Expression != null &&
+            sourceMap.TryGetLineDirective(
+                operation.Syntax.Expression,
+                out lineSpan,
+                out path);
+        if (hasLineDirective)
+        {
+            var start = lineSpan.Start;
+            var end = lineSpan.End;
+            var characterOffset = indentation * 4 + statement.Value.ValueOffset;
+            AppendIndentedLine(
+                source,
+                indentation,
+                $"#line ({start.Line + 1},{start.Character + 1})-" +
+                $"({end.Line + 1},{end.Character + 1}) {characterOffset} " +
+                ToLineDirectivePath(path));
+        }
+
+        AppendIndentedLine(source, indentation, statement.Value.Text);
+        if (hasLineDirective)
+        {
+            AppendIndentedLine(source, indentation, "#line default");
+        }
+    }
+
     private static void AppendTargetCompatibleStatement(
         StringBuilder source,
         int indentation,
@@ -3091,6 +3251,39 @@ internal static class AkcssGenerator
         return new GeneratedStatement(prefix + value + "))));", prefix.Length);
     }
 
+    private static GeneratedStatement? CreateDynamicResourceContribution(
+        AkburaPropertySymbol property,
+        string targetName,
+        string priorityName,
+        string value,
+        DynamicResourceBinding dynamicResource)
+    {
+        var propertyReference = GetStaticMemberReference(property.AvaloniaPropertyDefinition.Symbol) ??
+                                GetStaticMemberReference(property.AttachedPropertyDefinition.Symbol);
+        if (propertyReference == null && property.WriteKind == PropertyAccessKind.AvaloniaProperty)
+        {
+            propertyReference = GetStaticMemberReference(property.WriteDefinition.Symbol);
+        }
+
+        if (propertyReference == null)
+        {
+            return null;
+        }
+
+        var resourceValue = dynamicResource.ValueParameterName;
+        var prefix =
+            $"return ((global::Avalonia.AvaloniaObject){targetName}).Bind(" +
+            $"{propertyReference}, " +
+            $"global::Avalonia.Controls.ResourceNodeExtensions.GetResourceObservable(" +
+            $"(global::Avalonia.Controls.IResourceHost){targetName}, " +
+            $"{dynamicResource.KeyExpression}, converter: " +
+            $"{resourceValue} => global::System.Object.ReferenceEquals({resourceValue}, global::Avalonia.AvaloniaProperty.UnsetValue) " +
+            $"? global::Avalonia.AvaloniaProperty.UnsetValue : (object?)(";
+        return new GeneratedStatement(
+            prefix + value + $")), {priorityName});",
+            prefix.Length);
+    }
+
     private static GeneratedStatement? CreateClrPropertyAssignment(
         AkburaPropertySymbol property,
         string targetName,
@@ -3123,6 +3316,33 @@ internal static class AkcssGenerator
             $"((global::Avalonia.AvaloniaObject){targetName}).SetValue(" +
             $"{propertyReference}, ";
         return new GeneratedStatement(prefix + value + ");", prefix.Length);
+    }
+
+    private static GeneratedStatement? CreateAvaloniaPropertyContribution(
+        AkburaPropertySymbol property,
+        string targetName,
+        string priorityName,
+        string value)
+    {
+        var propertyReference = GetStaticMemberReference(property.AvaloniaPropertyDefinition.Symbol) ??
+                                GetStaticMemberReference(property.AttachedPropertyDefinition.Symbol);
+        if (propertyReference == null && property.WriteKind == PropertyAccessKind.AvaloniaProperty)
+        {
+            propertyReference = GetStaticMemberReference(property.WriteDefinition.Symbol);
+        }
+
+        if (propertyReference == null)
+        {
+            return null;
+        }
+
+        var prefix =
+            $"return ((global::Avalonia.AvaloniaObject){targetName}).SetValue(" +
+            $"{propertyReference}, ";
+        return new GeneratedStatement(
+            prefix + value + $", {priorityName}) ?? " +
+            "throw new global::System.InvalidOperationException(\"Avalonia did not return a reversible AKCSS utility contribution.\");",
+            prefix.Length);
     }
 
     private static GeneratedStatement? CreateAttachedPropertyAssignment(

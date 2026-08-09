@@ -3081,6 +3081,124 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public async Task Generator_AppliesAkcssClassesAndUtilitiesToOrdinaryObjects()
+    {
+        const string component =
+            "using Avalonia.Controls;\n" +
+            "using Demo;\n" +
+            "\n" +
+            "param int Value = 25;\n" +
+            "\n" +
+            "@akcss {\n" +
+            "    @using Demo;\n" +
+            "\n" +
+            "    StyleData.initial { Value: 10; }\n" +
+            "\n" +
+            "    @utilities {\n" +
+            "        StyleData.value-(int value) { Value: value; }\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "<Button>\n" +
+            "    <StyleData class=\"initial\" value-{Value} />\n" +
+            "</Button>\n";
+        const string csharp =
+            "namespace Demo\n" +
+            "{\n" +
+            "    public sealed class StyleData\n" +
+            "    {\n" +
+            "        public int Value { get; set; }\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "public partial class ObjectStyledView\n" +
+            "{\n" +
+            "    public ObjectStyledView() : base(global::Akbura.Engine.AkburaEngine.Empty) { }\n" +
+            "}\n";
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
+            LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedObjectAkcssTests",
+            syntaxTrees: [CSharpSyntaxTree.ParseText(csharp, parseOptions)],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "ObjectStyledView.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedComponent = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results)
+                .GeneratedSources,
+            static source => source.HintName.StartsWith(
+                "Akbura.Component.",
+                StringComparison.Ordinal));
+        var componentText = generatedComponent.SourceText.ToString();
+        Assert.Contains(
+            "AkcssUtilityValueSource.CreateForObject<int>",
+            componentText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType = assembly.GetType("ObjectStyledView");
+                var dataType = assembly.GetType("Demo.StyleData");
+                Assert.NotNull(componentType);
+                Assert.NotNull(dataType);
+
+                var component = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(componentType));
+                var window = new Window { Content = component };
+                window.Show();
+
+                var button = Assert.IsType<Button>(component.Child);
+                var data = button.Content;
+                Assert.NotNull(data);
+                Assert.IsType(dataType, data);
+                var valueProperty = dataType.GetProperty("Value")!;
+                Assert.Equal(25, valueProperty.GetValue(data));
+
+                componentType.GetProperty("Value")!.SetValue(component, 31);
+                Assert.Equal(31, valueProperty.GetValue(data));
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Generator_ResolvesUtilityConflictsPerPropertyOperation()
     {
         const string component =
@@ -3440,6 +3558,244 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public async Task Generator_UtilityBindingPriority_UsesOneExtensionInstanceAndRestoresLocalValue()
+    {
+        const string component =
+            """
+            using Avalonia;
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @using Avalonia;
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Border.m-(double value) {
+                        Margin: new Thickness(
+                            value * Amx.DynamicResource<double>("--priority-factor"));
+                    }
+
+                    Border.p-(double value) {
+                        Padding: new Thickness(value);
+                    }
+                }
+            }
+
+            <Border
+                Margin="10"
+                ${important}:m-24
+                ${priority Priority=Template}:p-7 />
+            """;
+        const string csharp =
+            """
+            using Akbura.Markup;
+            using Avalonia.Data;
+            using System;
+
+            namespace Demo.Extensions
+            {
+                [UtilityBindingPriority(Priority = BindingPriority.Animation)]
+                public sealed class importantExtension
+                {
+                    public bool ProvideValue(IServiceProvider services) => true;
+                }
+
+                [UtilityBindingPriority(PriorityMember = nameof(Priority))]
+                public sealed class priorityExtension
+                {
+                    private readonly int _instanceId = ++CreationCount;
+                    private BindingPriority _priority;
+
+                    public static int CreationCount { get; private set; }
+
+                    public static int ProvideValueInstanceId { get; private set; }
+
+                    public static int PriorityInstanceId { get; private set; }
+
+                    public BindingPriority Priority
+                    {
+                        get
+                        {
+                            PriorityInstanceId = _instanceId;
+                            return _priority;
+                        }
+
+                        set => _priority = value;
+                    }
+
+                    public bool ProvideValue(IServiceProvider services)
+                    {
+                        ProvideValueInstanceId = _instanceId;
+                        return true;
+                    }
+                }
+            }
+
+            public partial class PriorityUtilityView
+            {
+                public PriorityUtilityView()
+                    : base(global::Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedUtilityBindingPriorityTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "PriorityUtilityView.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        var generated = Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Component.",
+                    StringComparison.Ordinal));
+        var generatedText = generated.SourceText.ToString();
+        var generatedAkcss = Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Akcss.",
+                    StringComparison.Ordinal));
+        var generatedAkcssText = generatedAkcss.SourceText.ToString();
+
+        Assert.Contains(
+            "bindingPriority: global::Avalonia.Data.BindingPriority.Animation",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AkcssUtilityValueSource.CreateWithPriority<bool>",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "AkcssUtilityPrefixInvocation<bool>",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "var __extension = new global::Demo.Extensions.priorityExtension",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            1,
+            generatedText.Split(
+                "new global::Demo.Extensions.priorityExtension",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains(
+            "__extension.Priority",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "__target).Bind(",
+            generatedAkcssText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"--priority-factor\"",
+            generatedAkcssText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            ", __bindingPriority);",
+            generatedAkcssText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType = assembly.GetType("PriorityUtilityView");
+                var extensionType = assembly.GetType(
+                    "Demo.Extensions.priorityExtension");
+                Assert.NotNull(componentType);
+                Assert.NotNull(extensionType);
+
+                var component = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(componentType));
+                component.Resources["--priority-factor"] = 1d;
+                var window = new Window
+                {
+                    Content = component,
+                };
+                window.Show();
+
+                var border = Assert.IsType<Border>(component.Child);
+                Assert.Equal(new Thickness(24), border.Margin);
+                Assert.Equal(new Thickness(7), border.Padding);
+                var creationCount = Assert.IsType<int>(
+                    extensionType.GetProperty("CreationCount")!.GetValue(null));
+                Assert.True(creationCount > 0);
+                Assert.Equal(
+                    extensionType.GetProperty("ProvideValueInstanceId")!.GetValue(null),
+                    extensionType.GetProperty("PriorityInstanceId")!.GetValue(null));
+
+                border.Resources["--priority-factor"] = 2d;
+                Assert.Equal(new Thickness(48), border.Margin);
+
+                window.Content = null;
+                Assert.Equal(new Thickness(10), border.Margin);
+                Assert.Equal(default, border.Padding);
+
+                window.Content = component;
+                Assert.Equal(new Thickness(48), border.Margin);
+                Assert.Equal(new Thickness(7), border.Padding);
+                Assert.Equal(
+                    creationCount + 1,
+                    extensionType.GetProperty("CreationCount")!.GetValue(null));
+                Assert.Equal(
+                    extensionType.GetProperty("ProvideValueInstanceId")!.GetValue(null),
+                    extensionType.GetProperty("PriorityInstanceId")!.GetValue(null));
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Generator_AkcssUtilityMarkupExtensions_SupportReactiveValuesBindingsAndLifecycle()
     {
         const string component =
@@ -3466,15 +3822,28 @@ public sealed class AkburaCsGeneratorTests
                     Control.variant-(double value) {
                         MaxWidth: value;
                     }
+
+                    Control.named-(double value) {
+                        MinHeight: value;
+                    }
+
+                    Control.resource-(double value) {
+                        MaxHeight: value;
+                    }
                 }
             }
 
-            <Border
-                typed-${TypedSignal}
-                object-${ObjectSignal}
-                bound-${BoundValue}
-                variant-1
-                ${ReactiveVariant}:variant-2 />
+            <StackPanel>
+                <CheckBox x.Name="MyToggle" IsChecked="True" />
+                <Border
+                    typed-${TypedSignal}
+                    object-${ObjectSignal}
+                    bound-${BoundValue}
+                    variant-1
+                    ${ReactiveVariant}:variant-2
+                    ${Binding #MyToggle.IsChecked}:named-64
+                    ${DynamicResource AkburaTestDynamicVariant}:resource-48 />
+            </StackPanel>
             """;
         const string csharp =
             """
@@ -3658,6 +4027,10 @@ public sealed class AkburaCsGeneratorTests
             "variant:",
             generatedText,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "new global::Avalonia.Data.Binding(\"IsChecked\") { Source = MyToggle }",
+            generatedText,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
             static diagnostic =>
@@ -3687,6 +4060,9 @@ public sealed class AkburaCsGeneratorTests
                 Assert.NotNull(modelType);
                 Assert.NotNull(sourcesType);
 
+                Application.Current!.Resources[
+                    "AkburaTestDynamicVariant"] = true;
+
                 var component =
                     Assert.IsAssignableFrom<AkburaControl>(
                         Activator.CreateInstance(componentType));
@@ -3701,8 +4077,18 @@ public sealed class AkburaCsGeneratorTests
                 };
                 window.Show();
 
+                var panel =
+                    Assert.IsType<StackPanel>(component.Child);
+                var toggle =
+                    Assert.IsType<CheckBox>(panel.Children[0]);
                 var border =
-                    Assert.IsType<Border>(component.Child);
+                    Assert.IsType<Border>(panel.Children[1]);
+                var directResourceProbe = new Border();
+                panel.Children.Add(directResourceProbe);
+                using var directResourceBinding = directResourceProbe.Bind(
+                    Border.TagProperty,
+                    new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension(
+                        "AkburaTestDynamicVariant"));
                 var typed = sourcesType
                     .GetProperty("Typed")!
                     .GetValue(null)!;
@@ -3717,6 +4103,8 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Equal(25d, border.Height);
                 Assert.Equal(73d, border.MinWidth);
                 Assert.Equal(1d, border.MaxWidth);
+                Assert.Equal(64d, border.MinHeight);
+                Assert.Equal(48d, border.MaxHeight);
                 Assert.Equal(
                     1,
                     typed.GetType()
@@ -3748,6 +4136,23 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Equal(44d, border.Height);
                 Assert.Equal(91d, border.MinWidth);
                 Assert.Equal(2d, border.MaxWidth);
+
+                toggle.IsChecked = false;
+                Assert.Equal(0d, border.MinHeight);
+
+                toggle.IsChecked = true;
+                Assert.Equal(64d, border.MinHeight);
+
+                panel.Resources[
+                    "AkburaTestDynamicVariant"] = false;
+                Assert.Equal(false, directResourceProbe.Tag);
+                Assert.Equal(
+                    double.PositiveInfinity,
+                    border.MaxHeight);
+
+                panel.Resources[
+                    "AkburaTestDynamicVariant"] = true;
+                Assert.Equal(48d, border.MaxHeight);
 
                 window.Content = null;
                 Assert.Equal(

@@ -11,29 +11,29 @@ namespace Akbura.Akcss;
 
 internal static class AkcssRuntime
 {
-    private static readonly ConditionalWeakTable<Control, TargetRuntime> s_targets = new();
+    private static readonly ConditionalWeakTable<object, TargetRuntime> s_targets = new();
 
     public static void SetStyles(
-        Control target,
+        object target,
         ImmutableArray<AkcssStyleActivator> styles)
     {
         ArgumentNullException.ThrowIfNull(target);
 
-        s_targets.GetValue(target, static control => new TargetRuntime(control))
+        s_targets.GetValue(target, static value => new TargetRuntime(value))
             .SetStyles(styles.IsDefault ? [] : styles);
     }
 
-    public static void Refresh(Control target)
+    public static void Refresh(object target)
     {
         ArgumentNullException.ThrowIfNull(target);
 
-        s_targets.GetValue(target, static control => new TargetRuntime(control))
+        s_targets.GetValue(target, static value => new TargetRuntime(value))
             .Refresh();
     }
 
     private sealed class TargetRuntime : IObserver<object?>
     {
-        private readonly Control _target;
+        private readonly object _target;
         private readonly List<IDisposable> _subscriptions = [];
         private readonly HashSet<string> _pendingConflictKeys =
             new(StringComparer.Ordinal);
@@ -43,11 +43,14 @@ internal static class AkcssRuntime
         private bool _isDetached;
         private bool _applyPending;
 
-        public TargetRuntime(Control target)
+        public TargetRuntime(object target)
         {
             _target = target;
-            target.AttachedToVisualTree += OnAttachedToVisualTree;
-            target.DetachedFromVisualTree += OnDetachedFromVisualTree;
+            if (target is Control control)
+            {
+                control.AttachedToVisualTree += OnAttachedToVisualTree;
+                control.DetachedFromVisualTree += OnDetachedFromVisualTree;
+            }
         }
 
         public void SetStyles(ImmutableArray<AkcssStyleActivator> styles)

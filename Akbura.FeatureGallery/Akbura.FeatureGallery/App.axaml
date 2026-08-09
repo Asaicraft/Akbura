@@ -45,7 +45,10 @@
 				H11
 				V11
 				Z
-		</StreamGeometry>
+			</StreamGeometry>
+
+			<x:Boolean x:Key="MyKey">True</x:Boolean>
+			<x:Boolean x:Key="MyBoolValue">True</x:Boolean>
 
 		</ResourceDictionary>
 

@@ -91,12 +91,41 @@ public abstract class AkburaControl : Control, IComponentTree
     }
 
     /// <summary>
+    /// Attaches the complete ordered AKCSS cascade to an ordinary object.
+    /// </summary>
+    public static void SetAkcssStyles(
+        object target,
+        ImmutableArray<AkcssStyleActivator> styles)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        if (target is Control control)
+        {
+            SetAkcssStyles(control, styles);
+            return;
+        }
+
+        AkcssRuntime.SetStyles(
+            target,
+            ValidateAkcssStyles(styles));
+    }
+
+    /// <summary>
     /// Reapplies the complete AKCSS cascade attached to a control.
     /// </summary>
     public static void ExecuteAkcssStyles(Control control)
     {
         ArgumentNullException.ThrowIfNull(control);
         AkcssRuntime.Refresh(control);
+    }
+
+    /// <summary>
+    /// Reapplies the complete AKCSS cascade attached to an ordinary object.
+    /// </summary>
+    public static void ExecuteAkcssStyles(object target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        AkcssRuntime.Refresh(target);
     }
 
     private static ImmutableArray<AkcssStyleActivator> CoerceAkcssStyles(

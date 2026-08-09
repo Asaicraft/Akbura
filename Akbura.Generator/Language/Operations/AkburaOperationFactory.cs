@@ -341,6 +341,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             boundNode.ConditionOperation,
             boundNode.ConditionMarkupExtension,
             boundNode.Variant,
+            boundNode.BindingPriority,
             boundNode.HasErrors,
             CreateCSharpOperationTree(
                 boundNode.Syntax,

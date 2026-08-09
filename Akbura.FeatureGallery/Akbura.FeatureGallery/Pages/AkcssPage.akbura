@@ -13,7 +13,7 @@ using Akbura.FeatureGallery.Markup;
                    ${md}:page-title-desktop/>
 
         <TextBlock
-            Text="Typed, reactive styles and reusable utilities for Akbura components and Avalonia controls."
+            Text="Typed, reactive styles and reusable utilities for controls, components and ordinary C# objects."
             page-description
             ${md}:page-description-desktop/>
 
@@ -179,6 +179,63 @@ using Akbura.FeatureGallery.Markup;
 
             <FeatureView.View>
                 <AkcssDemo/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock Text="Ordinary C# objects"
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
+
+            <TextBlock
+                Text="An AKCSS selector can target any CLR class. The target does not need to derive from Control or AvaloniaObject."
+                page-section-description/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/CustomClassAkcssDemo.akbura">
+
+            <FeatureView.Code>
+                {"""
+                // Models/AkcssData.cs
+                public sealed class AkcssData
+                {
+                    public string Name { get; set; } = "Default";
+                    public int Age { get; set; }
+                    public double Scale { get; set; } = 1;
+                }
+
+                // Pages/AkcssPage.akcss
+                @using Akbura.FeatureGallery.Models;
+
+                AkcssData.demo {
+                    Name: "From class";
+                    Age: 18;
+                    Scale: 1.0;
+                }
+
+                @utilities {
+                    AkcssData.age-(int value) {
+                        Age: value;
+                    }
+                }
+
+                // Components/CustomClassAkcssDemo.akbura
+                <Button>
+                    <AkcssData class="demo"
+                               age-25/>
+                </Button>
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <CustomClassAkcssDemo/>
             </FeatureView.View>
 
         </FeatureView>

@@ -3731,6 +3731,101 @@ internal partial class AkburaSemanticModel
             [syntax.Name.Identifier.ValueText]);
     }
 
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPrioritySourceMissingDiagnostic(
+        AkburaSyntax syntax,
+        INamedTypeSymbol extensionType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPrioritySourceMissing,
+            [extensionType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPrioritySourceConflictDiagnostic(
+        AkburaSyntax syntax,
+        INamedTypeSymbol extensionType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPrioritySourceConflict,
+            [extensionType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberNotFoundDiagnostic(
+        AkburaSyntax syntax,
+        string memberName,
+        INamedTypeSymbol extensionType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberNotFound,
+            [memberName, extensionType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberStaticDiagnostic(
+        AkburaSyntax syntax,
+        Microsoft.CodeAnalysis.ISymbol member)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberStatic,
+            [member.Name]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberInaccessibleDiagnostic(
+        AkburaSyntax syntax,
+        Microsoft.CodeAnalysis.ISymbol member)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberInaccessible,
+            [member.Name]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberUnreadableDiagnostic(
+        AkburaSyntax syntax,
+        Microsoft.CodeAnalysis.ISymbol member)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberUnreadable,
+            [member.Name]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberTypeMismatchDiagnostic(
+        AkburaSyntax syntax,
+        Microsoft.CodeAnalysis.ISymbol member,
+        ITypeSymbol memberType)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberTypeMismatch,
+            [
+                member.Name,
+                memberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            ]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityNotSupportedDiagnostic(
+        AkburaSyntax syntax,
+        string priority)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityNotSupported,
+            [priority]);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityTargetNotSupportedDiagnostic(
+        AkburaSyntax syntax,
+        Akbura.Language.Symbols.IPropertySymbol? property)
+    {
+        return new AkburaSemanticDiagnostic(
+            syntax,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityTargetNotSupported,
+            [property?.Name ?? "<unknown>"]);
+    }
+
     private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(
         MarkupAttributeSyntax syntax,
         Diagnostic diagnostic)

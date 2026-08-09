@@ -1,6 +1,7 @@
 using Akbura.CompilerAnotations;
 using Akbura.Markup;
 using Avalonia.Controls;
+using Avalonia.Data;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
@@ -21,8 +22,10 @@ public sealed class AkcssUtilityCandidateActivator
     private readonly ImmutableArray<AkcssUtilityValueSource> _arguments;
     private readonly Func<bool>? _condition;
     private readonly AkcssUtilityValueSource? _variant;
+    private readonly BindingPriority? _bindingPriority;
     private readonly List<IDisposable> _subscriptions = [];
     private readonly object?[] _values;
+    private readonly IDisposable?[] _operationContributions;
     private Action<AkcssUtilityCandidateActivator>? _changed;
 
     public AkcssUtilityCandidateActivator(
@@ -35,7 +38,8 @@ public sealed class AkcssUtilityCandidateActivator
         double order = 0d,
         string? conflictGroup = null,
         UnprefixedUtilityPrecedence unprefixedPrecedence =
-            UnprefixedUtilityPrecedence.SourceOrder)
+            UnprefixedUtilityPrecedence.SourceOrder,
+        BindingPriority? bindingPriority = null)
         : base(GetFirstUtility(applications))
     {
         if (string.IsNullOrWhiteSpace(conflictKey))
@@ -51,6 +55,9 @@ public sealed class AkcssUtilityCandidateActivator
         _arguments = arguments.IsDefault ? [] : arguments;
         _condition = condition;
         _variant = variant;
+        _bindingPriority = bindingPriority.HasValue
+            ? AkcssBindingPriority.Validate(bindingPriority.Value)
+            : null;
         Order = order;
         ConflictGroup = string.IsNullOrWhiteSpace(conflictGroup)
             ? null
@@ -61,6 +68,7 @@ public sealed class AkcssUtilityCandidateActivator
             conflictKey,
             applications,
             _arguments.Length);
+        _operationContributions = new IDisposable?[_operations.Length];
         _conflictKeys = GetConflictKeys(_operations);
     }
 
@@ -90,6 +98,10 @@ public sealed class AkcssUtilityCandidateActivator
     internal ImmutableArray<string> ConflictKeys => _conflictKeys;
 
     internal int OperationCount => _operations.Length;
+
+    internal bool UsesBindingPriority =>
+        _bindingPriority.HasValue ||
+        _variant?.HasBindingPriorityMetadata == true;
 
     internal bool IsReady
     {
@@ -128,7 +140,6 @@ public sealed class AkcssUtilityCandidateActivator
 
     public override void Execute(object target)
     {
-        var control = GetControl(target);
         if (!IsReady || !IsActive)
         {
             return;
@@ -137,21 +148,24 @@ public sealed class AkcssUtilityCandidateActivator
         CopyArgumentValues();
         for (var index = 0; index < _operations.Length; index++)
         {
-            if (_operations[index].IsActive(control, _values))
+            if (_operations[index].IsActive(target, _values))
             {
-                _operations[index].Execute(control, _values);
+                ExecuteOperationCore(index, target);
+            }
+            else if (UsesBindingPriority)
+            {
+                DisposeContribution(index);
             }
         }
     }
 
     public override void Reset(object target)
     {
-        var control = GetControl(target);
         for (var index = _operations.Length - 1;
              index >= 0;
              index--)
         {
-            _operations[index].Reset(control);
+            ResetOperationCore(index, target);
         }
     }
 
@@ -177,7 +191,7 @@ public sealed class AkcssUtilityCandidateActivator
 
     internal bool IsOperationActive(
         int index,
-        Control target)
+        object target)
     {
         if (!IsReady || !IsActive)
         {
@@ -190,21 +204,21 @@ public sealed class AkcssUtilityCandidateActivator
 
     internal void ExecuteOperation(
         int index,
-        Control target)
+        object target)
     {
         CopyArgumentValues();
-        _operations[index].Execute(target, _values);
+        ExecuteOperationCore(index, target);
     }
 
     internal void ResetOperation(
         int index,
-        Control target)
+        object target)
     {
-        _operations[index].Reset(target);
+        ResetOperationCore(index, target);
     }
 
     internal void Attach(
-        Control target,
+        object target,
         Action<AkcssUtilityCandidateActivator> changed)
     {
         _changed = changed ??
@@ -237,8 +251,14 @@ public sealed class AkcssUtilityCandidateActivator
         _variant?.Attach(target, OnChanged);
     }
 
-    internal void Refresh(Control target)
+    internal void Refresh(object target)
     {
+        if (_variant?.HasBindingPriorityMetadata == true &&
+            _variant.RecreateOnRefresh)
+        {
+            DisposeContributions();
+        }
+
         foreach (var argument in _arguments)
         {
             argument.Refresh(target);
@@ -247,8 +267,10 @@ public sealed class AkcssUtilityCandidateActivator
         _variant?.Refresh(target);
     }
 
-    internal void Detach(Control target)
+    internal void Detach(object target)
     {
+        DisposeContributions();
+
         foreach (var subscription in _subscriptions)
         {
             subscription.Dispose();
@@ -263,6 +285,64 @@ public sealed class AkcssUtilityCandidateActivator
 
         _variant?.Detach(target);
         _changed = null;
+    }
+
+    private void ExecuteOperationCore(int index, object target)
+    {
+        if (!UsesBindingPriority)
+        {
+            _operations[index].Execute(target, _values);
+            return;
+        }
+
+        DisposeContribution(index);
+        _operationContributions[index] = _operations[index].Apply(
+            target,
+            _values,
+            GetBindingPriority());
+    }
+
+    private void ResetOperationCore(int index, object target)
+    {
+        if (UsesBindingPriority)
+        {
+            DisposeContribution(index);
+            return;
+        }
+
+        _operations[index].Reset(target);
+    }
+
+    private BindingPriority GetBindingPriority()
+    {
+        if (_variant?.HasBindingPriorityMetadata == true)
+        {
+            return AkcssBindingPriority.Validate(_variant.BindingPriority);
+        }
+
+        if (_bindingPriority.HasValue)
+        {
+            return _bindingPriority.Value;
+        }
+
+        throw new InvalidOperationException(
+            "The AKCSS candidate does not define a binding priority.");
+    }
+
+    private void DisposeContributions()
+    {
+        for (var index = _operationContributions.Length - 1;
+             index >= 0;
+             index--)
+        {
+            DisposeContribution(index);
+        }
+    }
+
+    private void DisposeContribution(int index)
+    {
+        _operationContributions[index]?.Dispose();
+        _operationContributions[index] = null;
     }
 
     private void CopyArgumentValues()
@@ -361,14 +441,6 @@ public sealed class AkcssUtilityCandidateActivator
         return applications[0].Utility;
     }
 
-    private static Control GetControl(object target)
-    {
-        return target as Control ??
-            throw new ArgumentException(
-                $"An AKCSS utility target must derive from '{typeof(Control)}'.",
-                nameof(target));
-    }
-
     private readonly struct CandidateOperation
     {
         private readonly AkcssUtilityOperation? _operation;
@@ -410,14 +482,14 @@ public sealed class AkcssUtilityCandidateActivator
         public int Order { get; }
 
         public bool IsActive(
-            Control target,
+            object target,
             IReadOnlyList<object?> arguments)
         {
             return _operation?.IsActive(target, arguments) ?? true;
         }
 
         public void Execute(
-            Control target,
+            object target,
             IReadOnlyList<object?> arguments)
         {
             if (_operation != null)
@@ -429,7 +501,21 @@ public sealed class AkcssUtilityCandidateActivator
             _legacyApplication!.Execute(target, arguments);
         }
 
-        public void Reset(Control target)
+        public IDisposable Apply(
+            object target,
+            IReadOnlyList<object?> arguments,
+            BindingPriority priority)
+        {
+            if (_operation == null)
+            {
+                throw new NotSupportedException(
+                    "Legacy AKCSS utility applications cannot use UtilityBindingPriorityAttribute.");
+            }
+
+            return _operation.Apply(target, arguments, priority);
+        }
+
+        public void Reset(object target)
         {
             if (_operation != null)
             {

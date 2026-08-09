@@ -3,6 +3,7 @@ using Akbura.CompilerAnotations;
 using Akbura.Markup;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using System.Collections.Immutable;
 using System.Reflection;
 
@@ -532,6 +533,134 @@ public sealed class AkcssRuntimeTests
                 () => signal.Error(error)));
     }
 
+    [Fact]
+    public void UtilityBindingPriority_DisposesOnlyItsContributionAndRestoresLocalValue()
+    {
+        var control = new Border { Width = 10d };
+        var signal = new TestSignal<bool>();
+        var factoryCalls = 0;
+        var variant = AkcssUtilityValueSource
+            .CreateObservableWithPriority<bool, bool>(
+                _ =>
+                {
+                    factoryCalls++;
+                    return new AkcssUtilityPrefixInvocation<IObservable<bool>?>(
+                        signal,
+                        BindingPriority.Animation);
+                },
+                static value => value,
+                recreateOnRefresh: true);
+        var utility = new WidthPriorityUtility(42d);
+        var candidate = new AkcssUtilityCandidateActivator(
+            "property:Width",
+            sourceOrder: 0,
+            applications:
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    static (_, _) => throw new InvalidOperationException(
+                        "The legacy utility path must not be used.")),
+            ],
+            variant: variant);
+
+        AkburaControl.SetAkcssStyles(control, [candidate]);
+        Assert.Equal(10d, control.Width);
+
+        signal.Emit(true);
+        Assert.Equal(42d, control.Width);
+
+        signal.Emit(false);
+        Assert.Equal(10d, control.Width);
+        Assert.Equal(0, utility.Operation.ResetCount);
+
+        signal.Emit(true);
+        Assert.Equal(42d, control.Width);
+        AkburaControl.ExecuteAkcssStyles(control);
+        Assert.Equal(10d, control.Width);
+        Assert.Equal(2, factoryCalls);
+
+        signal.Emit(true);
+        Assert.Equal(42d, control.Width);
+        control.ClearValue(AkburaControl.AkcssStylesProperty);
+        Assert.Equal(10d, control.Width);
+        Assert.Equal(0, utility.Operation.ResetCount);
+    }
+
+    [Fact]
+    public void UtilityBindingPriority_DoesNotChangeAkcssConflictWinner()
+    {
+        var control = new Border();
+        var first = new RecordingPriorityUtility();
+        var second = new RecordingPriorityUtility();
+        var firstCandidate = CreatePriorityCandidate(
+            first,
+            sourceOrder: 0,
+            BindingPriority.Animation);
+        var secondCandidate = CreatePriorityCandidate(
+            second,
+            sourceOrder: 1,
+            BindingPriority.Style);
+
+        AkburaControl.SetAkcssStyles(
+            control,
+            [firstCandidate, secondCandidate]);
+
+        Assert.Equal(0, first.Operation.ApplyCount);
+        Assert.Equal(1, second.Operation.ApplyCount);
+        Assert.Equal(BindingPriority.Style, second.Operation.LastPriority);
+    }
+
+    [Theory]
+    [InlineData(BindingPriority.Animation)]
+    [InlineData(BindingPriority.StyleTrigger)]
+    [InlineData(BindingPriority.Template)]
+    [InlineData(BindingPriority.Style)]
+    public void UtilityBindingPriority_AcceptsEveryReversiblePriority(
+        BindingPriority priority)
+    {
+        var control = new Border();
+        var utility = new RecordingPriorityUtility();
+        var candidate = CreatePriorityCandidate(
+            utility,
+            sourceOrder: 0,
+            priority);
+
+        AkburaControl.SetAkcssStyles(control, [candidate]);
+
+        Assert.Equal(1, utility.Operation.ApplyCount);
+        Assert.Equal(priority, utility.Operation.LastPriority);
+    }
+
+    [Theory]
+    [InlineData(BindingPriority.LocalValue)]
+    [InlineData(BindingPriority.Inherited)]
+    [InlineData(BindingPriority.Unset)]
+    [InlineData((BindingPriority)123)]
+    public void UtilityBindingPriorityMember_RejectsNonReversibleRuntimeValueBeforeWrite(
+        BindingPriority priority)
+    {
+        var control = new Border();
+        var variant = AkcssUtilityValueSource.CreateWithPriority<bool>(
+            _ => new AkcssUtilityPrefixInvocation<bool>(
+                true,
+                priority));
+        var utility = new RecordingPriorityUtility();
+        var candidate = new AkcssUtilityCandidateActivator(
+            "property:Width",
+            sourceOrder: 0,
+            applications:
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    static (_, _) => throw new InvalidOperationException()),
+            ],
+            variant: variant);
+
+        Assert.Throws<InvalidOperationException>(
+            () => AkburaControl.SetAkcssStyles(control, [candidate]));
+        Assert.Equal(0, utility.Operation.ApplyCount);
+    }
+
     [Theory]
     [InlineData(typeof(smExtension), 640d)]
     [InlineData(typeof(mdExtension), 768d)]
@@ -629,6 +758,23 @@ public sealed class AkcssRuntimeTests
             .CreateObservable<bool, bool>(
                 _ => signal,
                 static value => value);
+    }
+
+    private static AkcssUtilityCandidateActivator CreatePriorityCandidate(
+        RecordingPriorityUtility utility,
+        int sourceOrder,
+        BindingPriority bindingPriority)
+    {
+        return new AkcssUtilityCandidateActivator(
+            "property:Width",
+            sourceOrder,
+            [
+                new AkcssUtilityApplication(
+                    utility,
+                    static (_, _) => throw new InvalidOperationException(
+                        "The legacy utility path must not be used.")),
+            ],
+            bindingPriority: bindingPriority);
     }
 
     private sealed class LoggingClass : AkcssClass
@@ -819,6 +965,138 @@ public sealed class AkcssRuntimeTests
         public override void Update(object target, int value)
         {
             _values.Add(value);
+        }
+    }
+
+    private sealed class WidthPriorityUtility : ZeroAkcssUtility
+    {
+        private readonly ImmutableArray<AkcssUtilityOperation> _operations;
+
+        public WidthPriorityUtility(double value)
+        {
+            Operation = new WidthPriorityOperation(this, value);
+            _operations = [Operation];
+        }
+
+        public WidthPriorityOperation Operation { get; }
+
+        public override ImmutableArray<AkcssUtilityOperation> Operations =>
+            _operations;
+
+        public override void Update(object target)
+        {
+        }
+    }
+
+    private sealed class WidthPriorityOperation : AkcssUtilityOperation
+    {
+        private readonly double _value;
+
+        public WidthPriorityOperation(
+            AkcssUtility utility,
+            double value)
+            : base(
+                utility,
+                "property:Width",
+                AkcssOperationPriority.Style,
+                order: 0)
+        {
+            _value = value;
+        }
+
+        public int ResetCount { get; private set; }
+
+        public override bool IsActive(
+            object target,
+            IReadOnlyList<object?> arguments) => true;
+
+        public override void Update(
+            object target,
+            IReadOnlyList<object?> arguments)
+        {
+            throw new InvalidOperationException(
+                "Priority-aware candidates must call Apply.");
+        }
+
+        public override IDisposable Apply(
+            object target,
+            IReadOnlyList<object?> arguments,
+            BindingPriority priority)
+        {
+            return ((Border)target).SetValue(
+                Border.WidthProperty,
+                _value,
+                priority)!;
+        }
+
+        public override void Reset(object target)
+        {
+            ResetCount++;
+            ((Border)target).ClearValue(Border.WidthProperty);
+        }
+    }
+
+    private sealed class RecordingPriorityUtility : ZeroAkcssUtility
+    {
+        private readonly ImmutableArray<AkcssUtilityOperation> _operations;
+
+        public RecordingPriorityUtility()
+        {
+            Operation = new RecordingPriorityOperation(this);
+            _operations = [Operation];
+        }
+
+        public RecordingPriorityOperation Operation { get; }
+
+        public override ImmutableArray<AkcssUtilityOperation> Operations =>
+            _operations;
+
+        public override void Update(object target)
+        {
+        }
+    }
+
+    private sealed class RecordingPriorityOperation : AkcssUtilityOperation
+    {
+        public RecordingPriorityOperation(AkcssUtility utility)
+            : base(
+                utility,
+                "property:Width",
+                AkcssOperationPriority.Style,
+                order: 0)
+        {
+        }
+
+        public int ApplyCount { get; private set; }
+
+        public BindingPriority? LastPriority { get; private set; }
+
+        public override bool IsActive(
+            object target,
+            IReadOnlyList<object?> arguments) => true;
+
+        public override void Update(
+            object target,
+            IReadOnlyList<object?> arguments)
+        {
+            throw new InvalidOperationException();
+        }
+
+        public override IDisposable Apply(
+            object target,
+            IReadOnlyList<object?> arguments,
+            BindingPriority priority)
+        {
+            ApplyCount++;
+            LastPriority = priority;
+            return new TestDisposable();
+        }
+    }
+
+    private sealed class TestDisposable : IDisposable
+    {
+        public void Dispose()
+        {
         }
     }
 

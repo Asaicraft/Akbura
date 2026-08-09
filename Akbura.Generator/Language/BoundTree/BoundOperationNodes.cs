@@ -460,6 +460,7 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         CSharpOperationDefinition conditionOperation,
         MarkupExtensionValue? conditionMarkupExtension = null,
         TailwindUtilityVariant variant = default,
+        TailwindUtilityBindingPriority bindingPriority = default,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
         bool hasErrors = false)
         : base(
@@ -485,6 +486,7 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         ConditionOperation = conditionOperation;
         ConditionMarkupExtension = conditionMarkupExtension;
         Variant = variant;
+        BindingPriority = bindingPriority;
     }
 
     public new TailwindAttributeSyntax Syntax => (TailwindAttributeSyntax)base.Syntax;
@@ -509,6 +511,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
 
     public TailwindUtilityVariant Variant { get; }
 
+    public TailwindUtilityBindingPriority BindingPriority { get; }
+
     public BoundTailwindUtilityAttribute Update(
         IMarkupComponentSymbol? containingComponent,
         string utilityName,
@@ -520,7 +524,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         CSharpSymbolDefinition conditionType,
         CSharpOperationDefinition conditionOperation,
         MarkupExtensionValue? conditionMarkupExtension,
-        TailwindUtilityVariant variant)
+        TailwindUtilityVariant variant,
+        TailwindUtilityBindingPriority bindingPriority)
     {
         if (ReferenceEquals(containingComponent, ContainingComponent) &&
             utilityName == UtilityName &&
@@ -532,7 +537,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
             conditionType.Equals(ConditionType) &&
             conditionOperation.Equals(ConditionOperation) &&
             ReferenceEquals(conditionMarkupExtension, ConditionMarkupExtension) &&
-            variant.Equals(Variant))
+            variant.Equals(Variant) &&
+            bindingPriority.Equals(BindingPriority))
         {
             return this;
         }
@@ -551,6 +557,7 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
             conditionOperation,
             conditionMarkupExtension,
             variant,
+            bindingPriority,
             Diagnostics,
             HasErrors);
     }

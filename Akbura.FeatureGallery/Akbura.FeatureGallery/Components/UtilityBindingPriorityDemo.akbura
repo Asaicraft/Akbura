@@ -1,0 +1,64 @@
+using Akbura.FeatureGallery.Markup;
+
+<StackPanel gap-4>
+
+    <ToggleSwitch x.Name="ImportantToggle"
+                  Content="Apply Animation-priority margin"/>
+
+    <Border Margin="10"
+            ${important Source={ImportantToggle}}:m-12
+            p-4
+            bg-slate-800
+            border-1
+            border-slate-700
+            rounded-lg>
+
+        <TextBlock
+            Text="When the toggle is on, m-12 overrides Margin=10. Turning it off restores the original local value."
+            whitespace-normal/>
+
+    </Border>
+
+    <Grid ColumnDefinitions="*,*"
+          gap-4>
+
+        <Border ${priority Priority=Template}:p-4
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg>
+
+            <StackPanel gap-2>
+                <TextBlock Text="Template"
+                           font-semibold/>
+                <TextBlock
+                    Text="This invocation applies its winning utility operation at BindingPriority.Template."
+                    text-sm
+                    text-slate-300
+                    whitespace-normal/>
+            </StackPanel>
+
+        </Border>
+
+        <Border Grid.Column="1"
+                ${priority Priority=Style}:p-6
+                bg-slate-800
+                border-1
+                border-slate-700
+                rounded-lg>
+
+            <StackPanel gap-2>
+                <TextBlock Text="Style"
+                           font-semibold/>
+                <TextBlock
+                    Text="A separate extension instance supplies BindingPriority.Style for this candidate."
+                    text-sm
+                    text-slate-300
+                    whitespace-normal/>
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+</StackPanel>

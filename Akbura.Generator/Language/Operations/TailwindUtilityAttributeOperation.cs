@@ -23,6 +23,7 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         CSharpOperationDefinition conditionOperation,
         MarkupExtensionValue? conditionMarkupExtension,
         TailwindUtilityVariant variant,
+        TailwindUtilityBindingPriority bindingPriority,
         bool hasErrors,
         ICSharpOperation? conditionOperationTree = null)
     {
@@ -42,6 +43,7 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         ConditionOperation = conditionOperation;
         ConditionMarkupExtension = conditionMarkupExtension;
         Variant = variant;
+        BindingPriority = bindingPriority;
         HasErrors = hasErrors;
         ConditionOperationTree = conditionOperationTree;
         AdoptCSharpOperationTree(ConditionOperationTree);
@@ -96,6 +98,8 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
     public MarkupExtensionValue? ConditionMarkupExtension { get; }
 
     public TailwindUtilityVariant Variant { get; }
+
+    public TailwindUtilityBindingPriority BindingPriority { get; }
 
     private static ImmutableArray<IOperation> CreateChildren(
         ICSharpOperation? conditionOperationTree,

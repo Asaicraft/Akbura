@@ -87,6 +87,100 @@ using Akbura.Markup;
 
         <StackPanel page-section-header>
 
+            <TextBlock Text="Utility binding priority"
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
+
+            <TextBlock
+                Text="Select the AKCSS winner first, then place its property contribution on a reversible Avalonia binding layer."
+                page-section-description/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/UtilityBindingPriorityDemo.akbura">
+
+            <FeatureView.Code>
+                {"""
+                using Akbura.FeatureGallery.Markup;
+
+                <StackPanel gap-4>
+                    <ToggleSwitch x.Name="ImportantToggle"
+                                  Content="Apply Animation-priority margin"/>
+
+                    <Border Margin="10"
+                            ${important Source={ImportantToggle}}:m-12
+                            p-4>
+                        Turning the toggle off restores Margin=10.
+                    </Border>
+
+                    <Grid ColumnDefinitions="*,*" gap-4>
+                        <Border ${priority Priority=Template}:p-4>
+                            Template priority
+                        </Border>
+
+                        <Border Grid.Column="1"
+                                ${priority Priority=Style}:p-6>
+                            Style priority
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                // Markup/UtilityBindingPriorityDemoExtensions.cs
+
+                [UtilityBindingPriority(
+                    Priority = BindingPriority.Animation)]
+                public sealed class importantExtension
+                {
+                    public ToggleSwitch? Source { get; set; }
+
+                    public BindingBase ProvideValue(
+                        IServiceProvider serviceProvider)
+                    {
+                        return new Binding(
+                            nameof(ToggleSwitch.IsChecked))
+                        {
+                            Source = Source
+                        };
+                    }
+                }
+
+                [UtilityVariant(
+                    10d,
+                    ConflictGroup = "PriorityDemo",
+                    UnprefixedPrecedence =
+                        UnprefixedUtilityPrecedence.Above)]
+                [UtilityBindingPriority(
+                    PriorityMember = nameof(Priority))]
+                public sealed class priorityExtension
+                {
+                    public BindingPriority Priority { get; set; }
+
+                    public bool ProvideValue(
+                        IServiceProvider serviceProvider) => true;
+                }
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <UtilityBindingPriorityDemo/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+        <Border page-note>
+
+            <TextBlock
+                Text="UtilityVariantAttribute still controls only conflict selection. UtilityBindingPriorityAttribute is read after the winning property operation has been selected."
+                page-note-text/>
+
+        </Border>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
             <TextBlock Text="Interaction states"
                        page-section-title
                        ${md}:page-section-title-desktop/>

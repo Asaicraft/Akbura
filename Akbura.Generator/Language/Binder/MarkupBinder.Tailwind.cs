@@ -39,6 +39,7 @@ internal sealed partial class MarkupBinder
             MarkupExtension: (MarkupExtensionValue?)null,
             Variant: default(TailwindUtilityVariant));
         var utilities = ImmutableArray<ITailwindUtilitySymbol>.Empty;
+        var bindingPriority = default(TailwindUtilityBindingPriority);
         {
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
             arguments = CreateTailwindUtilityArguments(
@@ -56,6 +57,12 @@ internal sealed partial class MarkupBinder
                 diagnosticsBuilder,
                 out utilityName,
                 out validatedArguments);
+            bindingPriority = CreateTailwindUtilityBindingPriority(
+                attribute,
+                condition.MarkupExtension,
+                containingComponent,
+                utilities,
+                diagnosticsBuilder);
             AddTailwindExpressionDiagnostics(attribute, validatedArguments, diagnosticsBuilder);
             diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
         }
@@ -76,6 +83,7 @@ internal sealed partial class MarkupBinder
             condition.Operation,
             condition.MarkupExtension,
             condition.Variant,
+            bindingPriority,
             diagnostics,
             hasErrors: utilities.Length == 0 || diagnostics.Length > 0 || componentName.Length == 0);
     }
@@ -908,6 +916,476 @@ internal sealed partial class MarkupBinder
             order,
             conflictGroup,
             precedence);
+    }
+
+    private TailwindUtilityBindingPriority CreateTailwindUtilityBindingPriority(
+        TailwindAttributeSyntax syntax,
+        MarkupExtensionValue? extension,
+        IMarkupComponentSymbol? containingComponent,
+        ImmutableArray<ITailwindUtilitySymbol> utilities,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (extension?.ExtensionType.Symbol is not INamedTypeSymbol extensionType)
+        {
+            return default;
+        }
+
+        var attribute = FindInheritedAttribute(
+            extensionType,
+            "Akbura.Markup.UtilityBindingPriorityAttribute");
+        if (attribute == null)
+        {
+            return default;
+        }
+
+        var hasConstant = false;
+        var hasMember = false;
+        var constantValue = 0;
+        string? memberName = null;
+        foreach (var namedArgument in attribute.NamedArguments)
+        {
+            if (namedArgument.Key == "Priority")
+            {
+                hasConstant = true;
+                if (namedArgument.Value.Value is object value)
+                {
+                    try
+                    {
+                        constantValue = Convert.ToInt32(
+                            value,
+                            System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    catch (FormatException)
+                    {
+                    }
+                    catch (InvalidCastException)
+                    {
+                    }
+                    catch (OverflowException)
+                    {
+                    }
+                }
+            }
+            else if (namedArgument.Key == "PriorityMember")
+            {
+                hasMember = true;
+                memberName = namedArgument.Value.Value as string;
+            }
+        }
+
+        if (!hasConstant && !hasMember)
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateUtilityBindingPrioritySourceMissingDiagnostic(
+                    syntax,
+                    extensionType));
+            return default;
+        }
+
+        if (hasConstant && hasMember)
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateUtilityBindingPrioritySourceConflictDiagnostic(
+                    syntax,
+                    extensionType));
+            return default;
+        }
+
+        TailwindUtilityBindingPriority result;
+        if (hasConstant)
+        {
+            if (!IsSupportedUtilityBindingPriority(constantValue))
+            {
+                diagnosticsBuilder.Add(
+                    AkburaSemanticModel.CreateUtilityBindingPriorityNotSupportedDiagnostic(
+                        syntax,
+                        GetBindingPriorityDisplayName(constantValue)));
+                return default;
+            }
+
+            result = new TailwindUtilityBindingPriority(constantValue);
+        }
+        else
+        {
+            var member = ResolveUtilityBindingPriorityMember(
+                syntax,
+                extensionType,
+                memberName,
+                containingComponent,
+                diagnosticsBuilder);
+            if (member == null)
+            {
+                return default;
+            }
+
+            result = new TailwindUtilityBindingPriority(
+                new CSharpSymbolDefinition(member));
+        }
+
+        ValidateUtilityBindingPriorityOperations(
+            syntax,
+            utilities,
+            diagnosticsBuilder);
+        return result;
+    }
+
+    private Microsoft.CodeAnalysis.ISymbol? ResolveUtilityBindingPriorityMember(
+        TailwindAttributeSyntax syntax,
+        INamedTypeSymbol extensionType,
+        string? memberName,
+        IMarkupComponentSymbol? containingComponent,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (string.IsNullOrWhiteSpace(memberName))
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateUtilityBindingPriorityMemberNotFoundDiagnostic(
+                    syntax,
+                    memberName ?? "<null>",
+                    extensionType));
+            return null;
+        }
+
+        Microsoft.CodeAnalysis.ISymbol? member = null;
+        for (var current = extensionType; current != null; current = current.BaseType)
+        {
+            var declaredMembers = current.GetMembers(memberName!);
+            if (declaredMembers.Length == 0)
+            {
+                continue;
+            }
+
+            member = declaredMembers.FirstOrDefault(static candidate =>
+                candidate is IFieldSymbol or Microsoft.CodeAnalysis.IPropertySymbol);
+            break;
+        }
+
+        if (member == null)
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateUtilityBindingPriorityMemberNotFoundDiagnostic(
+                    syntax,
+                    memberName!,
+                    extensionType));
+            return null;
+        }
+
+        if (member.IsStatic)
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateUtilityBindingPriorityMemberStaticDiagnostic(
+                    syntax,
+                    member));
+            return null;
+        }
+
+        var readableMember = member;
+        ITypeSymbol memberType;
+        if (member is IFieldSymbol field)
+        {
+            memberType = field.Type;
+        }
+        else
+        {
+            var property = (Microsoft.CodeAnalysis.IPropertySymbol)member;
+            if (property.GetMethod == null || property.Parameters.Length != 0)
+            {
+                diagnosticsBuilder.Add(
+                    AkburaSemanticModel.CreateUtilityBindingPriorityMemberUnreadableDiagnostic(
+                        syntax,
+                        member));
+                return null;
+            }
+
+            readableMember = property.GetMethod;
+            memberType = property.Type;
+        }
+
+        if (!IsUtilityBindingPriorityMemberAccessible(
+                readableMember,
+                containingComponent))
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateUtilityBindingPriorityMemberInaccessibleDiagnostic(
+                    syntax,
+                    member));
+            return null;
+        }
+
+        var priorityType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.Data.BindingPriority");
+        if (priorityType == null ||
+            !SymbolEqualityComparer.Default.Equals(memberType, priorityType))
+        {
+            diagnosticsBuilder.Add(
+                AkburaSemanticModel.CreateUtilityBindingPriorityMemberTypeMismatchDiagnostic(
+                    syntax,
+                    member,
+                    memberType));
+            return null;
+        }
+
+        return member;
+    }
+
+    private bool IsUtilityBindingPriorityMemberAccessible(
+        Microsoft.CodeAnalysis.ISymbol member,
+        IMarkupComponentSymbol? containingComponent)
+    {
+        if (member.DeclaredAccessibility == Accessibility.Public)
+        {
+            return true;
+        }
+
+        if (member.DeclaredAccessibility is not (
+                Accessibility.Internal or Accessibility.ProtectedOrInternal))
+        {
+            return false;
+        }
+
+        var containingAssembly = containingComponent?.ComponentType?.ContainingAssembly ??
+            Compilation.CSharpCompilation.Assembly;
+        return SymbolEqualityComparer.Default.Equals(
+            member.ContainingAssembly,
+            containingAssembly);
+    }
+
+    private void ValidateUtilityBindingPriorityOperations(
+        TailwindAttributeSyntax syntax,
+        ImmutableArray<ITailwindUtilitySymbol> utilities,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        var visitedSymbols = new HashSet<IAkcssSymbol>();
+        foreach (var utility in utilities)
+        {
+            ValidateUtilityBindingPriorityOperations(
+                syntax,
+                utility,
+                visitedSymbols,
+                diagnosticsBuilder);
+        }
+    }
+
+    private void ValidateUtilityBindingPriorityOperations(
+        TailwindAttributeSyntax syntax,
+        IAkcssSymbol symbol,
+        HashSet<IAkcssSymbol> visitedSymbols,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        if (!visitedSymbols.Add(symbol))
+        {
+            return;
+        }
+
+        foreach (var operation in symbol.Operations)
+        {
+            switch (operation)
+            {
+                case IAkcssPropertySetterOperation propertySetter:
+                    if (!SupportsUtilityBindingPriority(propertySetter.Property))
+                    {
+                        diagnosticsBuilder.Add(
+                            AkburaSemanticModel.CreateUtilityBindingPriorityTargetNotSupportedDiagnostic(
+                                (AkburaSyntax?)propertySetter.Syntax ?? syntax,
+                                propertySetter.Property));
+                    }
+                    break;
+
+                case IAkcssIfOperation ifOperation:
+                    ValidateUtilityBindingPriorityOperations(
+                        syntax,
+                        ifOperation.Operations,
+                        visitedSymbols,
+                        diagnosticsBuilder);
+                    break;
+
+                case IAkcssApplyOperation applyOperation:
+                    foreach (var appliedSymbol in applyOperation.AppliedSymbols)
+                    {
+                        ValidateUtilityBindingPriorityOperations(
+                            syntax,
+                            appliedSymbol,
+                            visitedSymbols,
+                            diagnosticsBuilder);
+                    }
+                    break;
+            }
+        }
+    }
+
+    private void ValidateUtilityBindingPriorityOperations(
+        TailwindAttributeSyntax syntax,
+        ImmutableArray<IAkcssOperation> operations,
+        HashSet<IAkcssSymbol> visitedSymbols,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    {
+        foreach (var operation in operations)
+        {
+            switch (operation)
+            {
+                case IAkcssPropertySetterOperation propertySetter:
+                    if (!SupportsUtilityBindingPriority(propertySetter.Property))
+                    {
+                        diagnosticsBuilder.Add(
+                            AkburaSemanticModel.CreateUtilityBindingPriorityTargetNotSupportedDiagnostic(
+                                (AkburaSyntax?)propertySetter.Syntax ?? syntax,
+                                propertySetter.Property));
+                    }
+                    break;
+
+                case IAkcssIfOperation nestedIf:
+                    ValidateUtilityBindingPriorityOperations(
+                        syntax,
+                        nestedIf.Operations,
+                        visitedSymbols,
+                        diagnosticsBuilder);
+                    break;
+
+                case IAkcssApplyOperation applyOperation:
+                    foreach (var appliedSymbol in applyOperation.AppliedSymbols)
+                    {
+                        ValidateUtilityBindingPriorityOperations(
+                            syntax,
+                            appliedSymbol,
+                            visitedSymbols,
+                            diagnosticsBuilder);
+                    }
+                    break;
+            }
+        }
+    }
+
+    private bool SupportsUtilityBindingPriority(Akbura.Language.Symbols.IPropertySymbol? property)
+    {
+        if (property == null)
+        {
+            return false;
+        }
+
+        var definition = !property.AvaloniaPropertyDefinition.IsDefault
+            ? property.AvaloniaPropertyDefinition
+            : property.AttachedPropertyDefinition;
+        if (definition.Symbol is not IFieldSymbol field)
+        {
+            return false;
+        }
+
+        var styledPropertyType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.StyledProperty`1");
+        var attachedPropertyType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.AttachedProperty`1");
+        for (var current = field.Type as INamedTypeSymbol;
+             current != null;
+             current = current.BaseType)
+        {
+            if ((styledPropertyType != null &&
+                 SymbolEqualityComparer.Default.Equals(
+                     current.OriginalDefinition,
+                     styledPropertyType)) ||
+                (attachedPropertyType != null &&
+                 SymbolEqualityComparer.Default.Equals(
+                     current.OriginalDefinition,
+                     attachedPropertyType)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static AttributeData? FindInheritedAttribute(
+        INamedTypeSymbol type,
+        string metadataName)
+    {
+        for (var current = type; current != null; current = current.BaseType)
+        {
+            var attribute = current.GetAttributes().FirstOrDefault(candidate =>
+                candidate.AttributeClass?.ToDisplayString() == metadataName);
+            if (attribute != null)
+            {
+                return attribute;
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsSupportedUtilityBindingPriority(int value)
+    {
+        return HasBindingPriorityValue("Animation", value) ||
+            HasBindingPriorityValue("StyleTrigger", value) ||
+            HasBindingPriorityValue("Template", value) ||
+            HasBindingPriorityValue("Style", value);
+    }
+
+    private bool HasBindingPriorityValue(string memberName, int value)
+    {
+        var priorityType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.Data.BindingPriority");
+        var member = priorityType?.GetMembers(memberName)
+            .OfType<IFieldSymbol>()
+            .FirstOrDefault(static field => field.HasConstantValue);
+        if (member?.ConstantValue == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return Convert.ToInt32(
+                member.ConstantValue,
+                System.Globalization.CultureInfo.InvariantCulture) == value;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+        catch (InvalidCastException)
+        {
+            return false;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private string GetBindingPriorityDisplayName(int value)
+    {
+        var priorityType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.Data.BindingPriority");
+        if (priorityType != null)
+        {
+            foreach (var member in priorityType.GetMembers().OfType<IFieldSymbol>())
+            {
+                if (!member.HasConstantValue || member.ConstantValue == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (Convert.ToInt32(
+                            member.ConstantValue,
+                            System.Globalization.CultureInfo.InvariantCulture) == value)
+                    {
+                        return "BindingPriority." + member.Name;
+                    }
+                }
+                catch (FormatException)
+                {
+                }
+                catch (InvalidCastException)
+                {
+                }
+                catch (OverflowException)
+                {
+                }
+            }
+        }
+
+        return value.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private bool TryCreateEnumTailwindUtilityArgument(

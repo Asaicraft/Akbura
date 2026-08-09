@@ -1,4 +1,5 @@
 using Akbura.CompilerAnotations;
+using Avalonia.Data;
 using System.ComponentModel;
 
 namespace Akbura.Akcss;
@@ -48,4 +49,16 @@ public abstract class AkcssUtilityOperation : AkcssStyle
     public abstract void Update(
         object target,
         IReadOnlyList<object?> arguments);
+
+    /// <summary>
+    /// Applies this operation at a reversible Avalonia binding layer.
+    /// </summary>
+    public virtual IDisposable Apply(
+        object target,
+        IReadOnlyList<object?> arguments,
+        BindingPriority priority)
+    {
+        throw new NotSupportedException(
+            $"AKCSS utility operation '{GetType()}' does not support binding priorities.");
+    }
 }

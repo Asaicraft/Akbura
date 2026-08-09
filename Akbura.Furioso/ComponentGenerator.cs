@@ -934,9 +934,17 @@ internal static class ComponentGenerator
                 return;
             }
 
+            var hasPriorityMember = argumentIndex == -1 &&
+                operation.BindingPriority.Source ==
+                    TailwindUtilityBindingPrioritySource.Member &&
+                operation.BindingPriority.Member.Symbol != null;
+
             AppendIndented(source, indentation)
                 .Append("private ")
-                .Append(GetTypeNameWithNullableAnnotation(resultType))
+                .Append(hasPriorityMember
+                    ? "global::Akbura.Akcss.AkcssUtilityPrefixInvocation<" +
+                      GetTypeNameWithNullableAnnotation(resultType) + ">"
+                    : GetTypeNameWithNullableAnnotation(resultType))
                 .Append(' ')
                 .Append(GetAkcssMarkupExtensionFactoryName(
                     element,
@@ -946,14 +954,49 @@ internal static class ComponentGenerator
                     "(global::Avalonia.Controls.Control __target)");
             AppendIndentedLine(source, indentation, "{");
 
-            var expression = GetMarkupExtensionExpression(
-                extension,
+            var targetProperty = GetAkcssMarkupExtensionPropertyName(
                 element,
-                GetAkcssMarkupExtensionPropertyName(
+                operation,
+                argumentIndex);
+            string expression;
+            string statement;
+            if (hasPriorityMember)
+            {
+                var creation = GetMarkupExtensionCreationExpression(
+                    extension,
                     element,
-                    operation,
-                    argumentIndex));
-            var statement = "return " + expression + ";";
+                    targetProperty);
+                var creationStatement = "var __extension = " + creation + ";";
+                AppendLineDirective(
+                    source,
+                    indentation + 1,
+                    syntax,
+                    creationStatement,
+                    creationStatement.IndexOf(
+                        creation,
+                        StringComparison.Ordinal));
+
+                expression = GetMarkupExtensionProvideValueExpression(
+                    extension,
+                    element,
+                    targetProperty,
+                    "__extension");
+                var memberName = EscapeIdentifier(
+                    operation.BindingPriority.Member.Symbol!.Name);
+                statement =
+                    "return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<" +
+                    GetTypeNameWithNullableAnnotation(resultType) + ">(" +
+                    expression + ", __extension." + memberName + ");";
+            }
+            else
+            {
+                expression = GetMarkupExtensionExpression(
+                    extension,
+                    element,
+                    targetProperty);
+                statement = "return " + expression + ";";
+            }
+
             AppendLineDirective(
                 source,
                 indentation + 1,
@@ -2255,7 +2298,8 @@ internal static class ComponentGenerator
                             GetAkcssMarkupExtensionFactoryName(
                                 element,
                                 operation,
-                                argumentIndex: -1)));
+                                argumentIndex: -1),
+                            operation.BindingPriority));
             }
 
             if (operation.Variant.IsPrefixed)
@@ -2278,6 +2322,14 @@ internal static class ComponentGenerator
                     .Append(operation.Variant
                         .UnprefixedPrecedence
                         .ToString());
+            }
+
+            if (operation.BindingPriority.Source ==
+                TailwindUtilityBindingPrioritySource.Constant)
+            {
+                result.Append(", bindingPriority: ")
+                    .Append(GetBindingPriorityExpression(
+                        operation.BindingPriority.ConstantValue));
             }
 
             return result.Append(')').ToString();
@@ -2331,6 +2383,45 @@ internal static class ComponentGenerator
             return result;
         }
 
+        private string GetBindingPriorityExpression(int value)
+        {
+            var priorityType = _semanticModel.Compilation.CSharpCompilation
+                .GetTypeByMetadataName("Avalonia.Data.BindingPriority");
+            if (priorityType != null)
+            {
+                foreach (var member in priorityType.GetMembers().OfType<IFieldSymbol>())
+                {
+                    if (!member.HasConstantValue || member.ConstantValue == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (Convert.ToInt32(
+                                member.ConstantValue,
+                                CultureInfo.InvariantCulture) == value)
+                        {
+                            return "global::Avalonia.Data.BindingPriority." +
+                                EscapeIdentifier(member.Name);
+                        }
+                    }
+                    catch (FormatException)
+                    {
+                    }
+                    catch (InvalidCastException)
+                    {
+                    }
+                    catch (OverflowException)
+                    {
+                    }
+                }
+            }
+
+            return "(global::Avalonia.Data.BindingPriority)" +
+                value.ToString(CultureInfo.InvariantCulture);
+        }
+
         private static string GetAkcssUtilityArgumentValueSourceExpression(
             TailwindUtilityArgument argument,
             ITypeSymbol expectedType,
@@ -2366,18 +2457,30 @@ internal static class ComponentGenerator
             ITypeSymbol expectedType,
             ElementPlan element,
             string targetProperty,
-            string factoryName)
+            string factoryName,
+            TailwindUtilityBindingPriority bindingPriority = default)
         {
             var expectedTypeName =
                 GetTypeName(expectedType);
 
-            var valueExpression =
-                RequiresLocalMarkupExtensionContext(element)
-                    ? GetMarkupExtensionExpression(
+            var hasPriorityMember = bindingPriority.Source ==
+                TailwindUtilityBindingPrioritySource.Member &&
+                bindingPriority.Member.Symbol != null;
+            var valueExpression = RequiresLocalMarkupExtensionContext(element)
+                ? GetMarkupExtensionExpression(
+                    extension,
+                    element,
+                    targetProperty)
+                : factoryName + "(__target)";
+            var factoryExpression = hasPriorityMember
+                ? RequiresLocalMarkupExtensionContext(element)
+                    ? GetPriorityAwareMarkupExtensionFactoryLambda(
                         extension,
                         element,
-                        targetProperty)
-                    : factoryName + "(__target)";
+                        targetProperty,
+                        bindingPriority.Member.Symbol!)
+                    : factoryName
+                : "__target => " + valueExpression;
 
 
             var recreate =
@@ -2391,10 +2494,13 @@ internal static class ComponentGenerator
             {
                 return new StringBuilder(
                         "global::Akbura.Akcss." +
-                        "AkcssUtilityValueSource.CreateBinding<")
+                        "AkcssUtilityValueSource." +
+                        (hasPriorityMember
+                            ? "CreateBindingWithPriority<"
+                            : "CreateBinding<"))
                     .Append(expectedTypeName)
-                    .Append(">(__target => ")
-                    .Append(valueExpression)
+                    .Append(">(")
+                    .Append(factoryExpression)
                     .Append(", ")
                     .Append(targetProperty)
                     .Append(", static __value => (")
@@ -2410,10 +2516,13 @@ internal static class ComponentGenerator
             {
                 return new StringBuilder(
                         "global::Akbura.Akcss." +
-                        "AkcssUtilityValueSource.CreateObject<")
+                        "AkcssUtilityValueSource." +
+                        (hasPriorityMember
+                            ? "CreateObjectWithPriority<"
+                            : "CreateObject<"))
                     .Append(expectedTypeName)
-                    .Append(">(__target => ")
-                    .Append(valueExpression)
+                    .Append(">(")
+                    .Append(factoryExpression)
                     .Append(", static __value => (")
                     .Append(expectedTypeName)
                     .Append(")__value!, recreateOnRefresh: ")
@@ -2436,10 +2545,12 @@ internal static class ComponentGenerator
                     return new StringBuilder(
                             "global::Akbura.Akcss." +
                             "AkcssUtilityValueSource." +
-                            "CreateObservableObject<")
+                            (hasPriorityMember
+                                ? "CreateObservableObjectWithPriority<"
+                                : "CreateObservableObject<"))
                         .Append(expectedTypeName)
-                        .Append(">(__target => ")
-                        .Append(valueExpression)
+                        .Append(">(")
+                        .Append(factoryExpression)
                         .Append(", static __value => (")
                         .Append(expectedTypeName)
                         .Append(")__value!, recreateOnRefresh: ")
@@ -2450,12 +2561,15 @@ internal static class ComponentGenerator
 
                 return new StringBuilder(
                         "global::Akbura.Akcss." +
-                        "AkcssUtilityValueSource.CreateObservable<")
+                        "AkcssUtilityValueSource." +
+                        (hasPriorityMember
+                            ? "CreateObservableWithPriority<"
+                            : "CreateObservable<"))
                     .Append(observableElementTypeName)
                     .Append(", ")
                     .Append(expectedTypeName)
-                    .Append(">(__target => ")
-                    .Append(valueExpression)
+                    .Append(">(")
+                    .Append(factoryExpression)
                     .Append(", static __value => (")
                     .Append(expectedTypeName)
                     .Append(")__value, recreateOnRefresh: ")
@@ -2466,10 +2580,13 @@ internal static class ComponentGenerator
 
             return new StringBuilder(
                     "global::Akbura.Akcss." +
-                    "AkcssUtilityValueSource.Create<")
+                    "AkcssUtilityValueSource." +
+                    (hasPriorityMember
+                        ? "CreateWithPriority<"
+                        : "Create<"))
                 .Append(expectedTypeName)
-                .Append(">(__target => ")
-                .Append(valueExpression)
+                .Append(">(")
+                .Append(factoryExpression)
                 .Append(", recreateOnRefresh: ")
                 .Append(recreate)
                 .Append(')')
@@ -3183,6 +3300,23 @@ internal static class ComponentGenerator
                     targetPropertyExpression);
             }
 
+            var creation = GetMarkupExtensionCreationExpression(
+                extension,
+                element,
+                targetPropertyExpression);
+            return GetMarkupExtensionProvideValueExpression(
+                extension,
+                element,
+                targetPropertyExpression,
+                "(" + creation + ")");
+        }
+
+        private string GetMarkupExtensionCreationExpression(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            string targetPropertyExpression)
+        {
+
             var type = GetTypeName(extension.ExtensionType.Symbol);
 
             var arguments = string.Join(
@@ -3226,12 +3360,21 @@ internal static class ComponentGenerator
                 creation.Append(" }");
             }
 
+            return creation.ToString();
+        }
+
+        private string GetMarkupExtensionProvideValueExpression(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            string targetPropertyExpression,
+            string instanceExpression)
+        {
+            var result = new StringBuilder(instanceExpression);
+
             if (extension.ProvideValueMethod.Symbol
                 is RoslynMethodSymbol provideValue)
             {
-                creation.Insert(0, '(').Append(')');
-
-                creation
+                result
                     .Append('.')
                     .Append(EscapeIdentifier(provideValue.Name))
                     .Append('(');
@@ -3248,7 +3391,7 @@ internal static class ComponentGenerator
                             ? element.DeferredOwner.Roots[0].FieldName
                             : "this";
 
-                    creation
+                    result
                         .Append("CreateMarkupServiceProvider(")
                         .Append("targetObject: ")
                         .Append(element.FieldName)
@@ -3262,17 +3405,42 @@ internal static class ComponentGenerator
 
                     if (element.IsDeferred)
                     {
-                        creation.Append(
+                        result.Append(
                             ", fallbackServiceProvider: __services");
                     }
 
-                    creation.Append(')');
+                    result.Append(')');
                 }
 
-                creation.Append(')');
+                result.Append(')');
             }
 
-            return creation.ToString();
+            return result.ToString();
+        }
+
+        private string GetPriorityAwareMarkupExtensionFactoryLambda(
+            MarkupExtensionValue extension,
+            ElementPlan element,
+            string targetPropertyExpression,
+            Microsoft.CodeAnalysis.ISymbol priorityMember)
+        {
+            var resultType = GetTypeNameWithNullableAnnotation(
+                extension.ResultType.Symbol as ITypeSymbol ??
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetSpecialType(SpecialType.System_Object));
+            var creation = GetMarkupExtensionCreationExpression(
+                extension,
+                element,
+                targetPropertyExpression);
+            var value = GetMarkupExtensionProvideValueExpression(
+                extension,
+                element,
+                targetPropertyExpression,
+                "__extension");
+            return "__target => { var __extension = " + creation +
+                "; return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<" +
+                resultType + ">(" + value + ", __extension." +
+                EscapeIdentifier(priorityMember.Name) + "); }";
         }
 
         private string GetBindingExpression(

@@ -5400,6 +5400,395 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_UtilityBindingPriority_BindsConstantAndMemberSources()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @utilities {
+                    Border.p-(double value) { Padding: new(value); }
+                }
+            }
+
+            <Border
+                ${important}:p-5
+                ${priority Priority=Template}:p-7
+                ${fieldPriority}:p-9 />
+            """;
+        const string csharpCode =
+            """
+            using Akbura.Markup;
+            using Avalonia.Data;
+
+            namespace Demo.Extensions;
+
+            [UtilityBindingPriority(Priority = BindingPriority.Animation)]
+            public sealed class importantExtension
+            {
+                public bool ProvideValue(System.IServiceProvider services) => true;
+            }
+
+            [UtilityBindingPriority(PriorityMember = nameof(Priority))]
+            public sealed class priorityExtension
+            {
+                public BindingPriority Priority { get; set; }
+
+                public bool ProvideValue(System.IServiceProvider services) => true;
+            }
+
+            [UtilityBindingPriority(PriorityMember = nameof(Priority))]
+            public sealed class fieldPriorityExtension
+            {
+                public BindingPriority Priority = BindingPriority.Style;
+
+                public bool ProvideValue(System.IServiceProvider services) => true;
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attributes = GetOnlyMarkupElement(syntaxTree)
+            .StartTag!
+            .Attributes
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(3, attributes.Length);
+        var constant = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attributes[0]));
+        var member = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attributes[1]));
+        var fieldMember = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attributes[2]));
+
+        Assert.Equal(
+            TailwindUtilityBindingPrioritySource.Constant,
+            constant.BindingPriority.Source);
+        Assert.Equal(-1, constant.BindingPriority.ConstantValue);
+        Assert.Equal(
+            TailwindUtilityBindingPrioritySource.Member,
+            member.BindingPriority.Source);
+        Assert.Equal("Priority", member.BindingPriority.Member.Symbol?.Name);
+        Assert.IsAssignableFrom<IFieldSymbol>(
+            fieldMember.BindingPriority.Member.Symbol);
+        Assert.False(
+            constant.HasErrors,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(attributes[0])
+                .Select(static diagnostic => diagnostic.Message)));
+        Assert.False(
+            member.HasErrors,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(attributes[1])
+                .Select(static diagnostic => diagnostic.Message)));
+        Assert.False(
+            fieldMember.HasErrors,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(attributes[2])
+                .Select(static diagnostic => diagnostic.Message)));
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(attributes[0]));
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(attributes[1]));
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(attributes[2]));
+    }
+
+    [Fact]
+    public void SemanticModel_UtilityBindingPriority_ExplicitDefaultIsUnsupported()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @utilities {
+                    Control.p-(double value) { Padding: new(value); }
+                }
+            }
+
+            <Border ${defaultPriority}:p-5 />
+            """;
+        const string csharpCode =
+            """
+            using Akbura.Markup;
+            using Avalonia.Data;
+
+            namespace Demo.Extensions;
+
+            [UtilityBindingPriority(Priority = default)]
+            public sealed class defaultPriorityExtension
+            {
+                public bool ProvideValue(System.IServiceProvider services) => true;
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.Single(GetOnlyMarkupElement(syntaxTree)
+            .StartTag!
+            .Attributes
+            .OfType<TailwindFullAttributeSyntax>());
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(attribute),
+            static item => item.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityNotSupported);
+
+        Assert.True(operation.HasErrors);
+        Assert.Equal(default, operation.BindingPriority.Source);
+        Assert.Contains("LocalValue", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SemanticModel_UtilityBindingPriority_RejectsOtherNonReversibleConstants()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @utilities {
+                    Border.p-(double value) { Padding: new(value); }
+                }
+            }
+
+            <StackPanel>
+                <Border ${inheritedPriority}:p-1 />
+                <Border ${unsetPriority}:p-2 />
+                <Border ${unknownPriority}:p-3 />
+            </StackPanel>
+            """;
+        const string csharpCode =
+            """
+            using Akbura.Markup;
+            using Avalonia.Data;
+
+            namespace Demo.Extensions;
+
+            public abstract class PriorityExtensionBase
+            {
+                public bool ProvideValue(System.IServiceProvider services) => true;
+            }
+
+            [UtilityBindingPriority(Priority = BindingPriority.Inherited)]
+            public sealed class inheritedPriorityExtension : PriorityExtensionBase { }
+
+            [UtilityBindingPriority(Priority = BindingPriority.Unset)]
+            public sealed class unsetPriorityExtension : PriorityExtensionBase { }
+
+            [UtilityBindingPriority(Priority = (BindingPriority)123)]
+            public sealed class unknownPriorityExtension : PriorityExtensionBase { }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attributes = syntaxTree.GetRootSyntax()
+            .DescendantNodes()
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(3, attributes.Length);
+        var expectedNames = new[]
+        {
+            "BindingPriority.Inherited",
+            "BindingPriority.Unset",
+            "123",
+        };
+        for (var index = 0; index < attributes.Length; index++)
+        {
+            var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                semanticModel.GetOperation(attributes[index]));
+            var diagnostic = Assert.Single(
+                semanticModel.GetSemanticDiagnostics(attributes[index]),
+                static item => item.Code ==
+                    ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityNotSupported);
+
+            Assert.True(operation.HasErrors);
+            Assert.Contains(
+                expectedNames[index],
+                diagnostic.Message,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void SemanticModel_UtilityBindingPriority_ReportsInvalidAttributeSourcesAndMembers()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @utilities {
+                    Control.p-(double value) { Padding: new(value); }
+                }
+            }
+
+            <StackPanel>
+                <Border ${missingSource}:p-1 />
+                <Border ${bothSources}:p-2 />
+                <Border ${missingMember}:p-3 />
+                <Border ${staticMember}:p-4 />
+                <Border ${privateMember}:p-5 />
+                <Border ${wrongMember}:p-6 />
+                <Border ${unreadableMember}:p-7 />
+            </StackPanel>
+            """;
+        const string csharpCode =
+            """
+            using Akbura.Markup;
+            using Avalonia.Data;
+
+            namespace Demo.Extensions;
+
+            public abstract class ExtensionBase
+            {
+                public bool ProvideValue(System.IServiceProvider services) => true;
+            }
+
+            [UtilityBindingPriority]
+            public sealed class missingSourceExtension : ExtensionBase { }
+
+            [UtilityBindingPriority(Priority = BindingPriority.Style, PriorityMember = "Priority")]
+            public sealed class bothSourcesExtension : ExtensionBase
+            {
+                public BindingPriority Priority => BindingPriority.Style;
+            }
+
+            [UtilityBindingPriority(PriorityMember = "Absent")]
+            public sealed class missingMemberExtension : ExtensionBase { }
+
+            [UtilityBindingPriority(PriorityMember = nameof(Priority))]
+            public sealed class staticMemberExtension : ExtensionBase
+            {
+                public static BindingPriority Priority => BindingPriority.Style;
+            }
+
+            [UtilityBindingPriority(PriorityMember = "Priority")]
+            public sealed class privateMemberExtension : ExtensionBase
+            {
+                private BindingPriority Priority => BindingPriority.Style;
+            }
+
+            [UtilityBindingPriority(PriorityMember = nameof(Priority))]
+            public sealed class wrongMemberExtension : ExtensionBase
+            {
+                public int Priority => 3;
+            }
+
+            [UtilityBindingPriority(PriorityMember = nameof(Priority))]
+            public sealed class unreadableMemberExtension : ExtensionBase
+            {
+                public BindingPriority Priority { set { } }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attributes = syntaxTree.GetRootSyntax()
+            .DescendantNodes()
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+        var expectedCodes = new[]
+        {
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPrioritySourceMissing,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPrioritySourceConflict,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberNotFound,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberStatic,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberInaccessible,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberTypeMismatch,
+            ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityMemberUnreadable,
+        };
+
+        Assert.Equal(expectedCodes.Length, attributes.Length);
+        for (var index = 0; index < attributes.Length; index++)
+        {
+            var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                semanticModel.GetOperation(attributes[index]));
+            Assert.True(operation.HasErrors);
+            Assert.Contains(
+                semanticModel.GetSemanticDiagnostics(attributes[index]),
+                diagnostic => diagnostic.Code == expectedCodes[index]);
+        }
+    }
+
+    [Fact]
+    public void SemanticModel_UtilityBindingPriority_RejectsClrPropertiesThroughIfAndApply()
+    {
+        const string code =
+            """
+            using Demo;
+            using Demo.Extensions;
+
+            @akcss {
+                @utilities {
+                    Target.inner { Value: 10; }
+
+                    Target.outer {
+                        @if(true) {
+                            Value: 20;
+                            @apply inner;
+                        }
+                    }
+                }
+            }
+
+            <Target ${important}:outer />
+            """;
+        const string csharpCode =
+            """
+            using Akbura.Markup;
+            using Avalonia.Data;
+
+            namespace Demo
+            {
+                public sealed class Target
+                {
+                    public int Value { get; set; }
+                }
+            }
+
+            namespace Demo.Extensions
+            {
+                [UtilityBindingPriority(Priority = BindingPriority.Animation)]
+                public sealed class importantExtension
+                {
+                    public bool ProvideValue(System.IServiceProvider services) => true;
+                }
+            }
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(csharpCode));
+        var attribute = Assert.Single(syntaxTree.GetRootSyntax()
+            .DescendantNodes()
+            .OfType<TailwindFullAttributeSyntax>());
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(
+            TailwindUtilityBindingPrioritySource.Constant,
+            operation.BindingPriority.Source);
+        Assert.True(operation.HasErrors);
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(attribute),
+            static diagnostic => diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_UtilityBindingPriorityTargetNotSupported);
+    }
+
+    [Fact]
     public void SemanticModel_TailwindUtilityMarkupExtensionPrefixes_AcceptStandardAvaloniaExtensionsWithoutVariantMetadata()
     {
         const string code =

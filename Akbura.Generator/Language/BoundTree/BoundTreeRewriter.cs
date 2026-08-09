@@ -1,4 +1,5 @@
 using Akbura.Language.Binder;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
@@ -309,6 +310,9 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         var arguments = VisitTailwindUtilityArgumentList(node.Arguments);
         var conditionType = VisitCSharpSymbolDefinition(node.ConditionType);
         var conditionOperation = VisitCSharpOperationDefinition(node.ConditionOperation);
+        var bindingPriority = node.BindingPriority.Source == TailwindUtilityBindingPrioritySource.Member
+            ? new TailwindUtilityBindingPriority(VisitCSharpSymbolDefinition(node.BindingPriority.Member))
+            : node.BindingPriority;
 
         return node.Update(
             containingComponent,
@@ -321,7 +325,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             conditionType,
             conditionOperation,
             node.ConditionMarkupExtension,
-            node.Variant);
+            node.Variant,
+            bindingPriority);
     }
 
     public override BoundNode? VisitAkcssPropertySetter(BoundAkcssPropertySetter node)

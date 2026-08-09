@@ -257,6 +257,64 @@ next matching utility to apply.
 The braces are required. `md:p-3` is retained only for parser recovery and
 produces a diagnostic that suggests `${md}:p-3`.
 
+## Utility binding priority
+
+`UtilityBindingPriorityAttribute` controls the Avalonia binding layer used by
+the property operations of an already selected utility candidate:
+
+```csharp
+using Akbura.Markup;
+using Avalonia.Data;
+
+[UtilityBindingPriority(
+    Priority = BindingPriority.Animation)]
+public sealed class importantExtension
+{
+    public bool ProvideValue(IServiceProvider services) => true;
+}
+```
+
+```akbura
+<Border Margin="10"
+        ${important}:m-12 />
+```
+
+AKCSS still resolves the winning `Margin` operation by its normal
+property-level cascade. Only then is the winner written at
+`BindingPriority.Animation`. When the prefix becomes inactive, the generated
+code disposes that contribution and Avalonia reveals the original
+`Margin="10"` local value again.
+
+The priority may also come from a readable instance field or property:
+
+```csharp
+[UtilityBindingPriority(
+    PriorityMember = nameof(Priority))]
+public sealed class priorityExtension
+{
+    public BindingPriority Priority { get; set; }
+
+    public bool ProvideValue(IServiceProvider services) => true;
+}
+```
+
+```akbura
+<Border ${priority Priority=Template}:p-4 />
+<Border ${priority Priority=Style}:p-6 />
+```
+
+Each prefix invocation creates its own extension instance. Akbura calls
+`ProvideValue` and reads `PriorityMember` from that same instance.
+
+Only reversible priorities are supported: `Animation`, `StyleTrigger`,
+`Template`, and `Style`. A priority-aware utility may write only Avalonia
+`StyledProperty` or `AttachedProperty` values. CLR properties,
+`DirectProperty`, `LocalValue`, `Inherited`, and `Unset` are rejected.
+
+`UtilityBindingPriorityAttribute` never changes which AKCSS candidate wins.
+`UtilityVariantAttribute` continues to control only `Order`, `ConflictGroup`,
+and `UnprefixedPrecedence`.
+
 ## Variant priority
 
 Utilities conflict by their resolved utility name. For example, `p-1`,

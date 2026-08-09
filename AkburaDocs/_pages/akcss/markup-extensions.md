@@ -156,6 +156,83 @@ See [Utility Variants](akcss/utility-variants) for the complete property-level
 conflict-resolution algorithm, `ConflictGroup`, `Order`, built-in breakpoint
 implementation, and `UnprefixedUtilityPrecedence` modes.
 
+## Utility binding priority
+
+A prefix extension can select the Avalonia binding layer used after AKCSS has
+selected a winning property operation:
+
+```csharp
+using Akbura.Markup;
+using Avalonia.Data;
+
+[UtilityBindingPriority(
+    Priority = BindingPriority.Animation)]
+public sealed class importantExtension
+{
+    public BindingBase ProvideValue(IServiceProvider services)
+    {
+        return new Binding("IsChecked")
+        {
+            ElementName = "ImportantToggle"
+        };
+    }
+}
+```
+
+```akbura
+<ToggleSwitch x.Name="ImportantToggle" />
+
+<Border Margin="10"
+        ${important}:m-12 />
+```
+
+The binding controls whether `m-12` participates. While it is active, the
+winning `Margin` operation is installed at `BindingPriority.Animation`.
+When it becomes inactive, Akbura disposes only that contribution and Avalonia
+reveals the previous `Margin="10"` value.
+
+Use exactly one priority source:
+
+```csharp
+[UtilityBindingPriority(
+    Priority = BindingPriority.Template)]
+public sealed class fixedPriorityExtension
+{
+}
+```
+
+```csharp
+[UtilityBindingPriority(
+    PriorityMember = nameof(Priority))]
+public sealed class priorityExtension
+{
+    public BindingPriority Priority { get; set; }
+}
+```
+
+`PriorityMember` may name an accessible instance field or readable instance
+property whose type is exactly `BindingPriority`. Akbura creates one extension
+instance for each prefix invocation, applies its constructor and named
+properties, calls `ProvideValue`, and reads the priority from that same
+instance. A refresh first disposes the old property contributions and then
+creates the next instance.
+
+The supported priorities are:
+
+- `BindingPriority.Animation`
+- `BindingPriority.StyleTrigger`
+- `BindingPriority.Template`
+- `BindingPriority.Style`
+
+`LocalValue`, `Inherited`, `Unset`, and unknown enum values are rejected.
+Priority-aware utilities may write only `StyledProperty` and
+`AttachedProperty` values. Dynamic resources are bound at the requested
+priority; ordinary values are installed as disposable Avalonia contributions.
+
+This attribute does not participate in conflict resolution. It can be combined
+with `UtilityVariantAttribute`, but `Order`, `ConflictGroup`, and
+`UnprefixedPrecedence` still select the AKCSS winner independently.
+
 ## Lifecycle
 
 Akbura owns every subscription and binding created for utility markup

@@ -181,6 +181,53 @@ property-level conflict resolution.
 Without the attribute, the extension still works as a prefix with `Order = 0`,
 no conflict group, and source-order precedence.
 
+## Utility binding priority
+
+Variant ordering and Avalonia binding priority are separate decisions.
+
+1. AKCSS selects one winning operation for each target property using operation
+   priority, `Order`, `ConflictGroup`, `UnprefixedPrecedence`, and source order.
+2. If the winning prefix extension has `UtilityBindingPriorityAttribute`, that
+   operation is applied at the requested Avalonia `BindingPriority`.
+
+Changing Avalonia priority cannot make a losing AKCSS candidate win.
+
+Both attributes can be placed on one extension when both decisions are needed:
+
+```csharp
+using Akbura.Markup;
+using Avalonia.Data;
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = "Modes",
+    UnprefixedPrecedence =
+        UnprefixedUtilityPrecedence.Above)]
+[UtilityBindingPriority(
+    PriorityMember = nameof(Priority))]
+public sealed class priorityExtension
+{
+    public BindingPriority Priority { get; set; }
+
+    public bool ProvideValue(IServiceProvider services) => true;
+}
+```
+
+```akbura
+<Border ${priority Priority=Template}:p-4 />
+<Border ${priority Priority=Style}:p-6 />
+```
+
+The two attributes remain independent: `UtilityVariantAttribute` supplies
+conflict metadata, while `UtilityBindingPriorityAttribute` supplies either a
+constant priority or the name of a readable instance field/property of exact
+type `BindingPriority`.
+
+Only `Animation`, `StyleTrigger`, `Template`, and `Style` are supported because
+their contributions can be disposed without clearing unrelated values.
+`LocalValue`, `Inherited`, `Unset`, CLR properties, and direct properties are
+not supported by this feature.
+
 ### Order
 
 ```csharp

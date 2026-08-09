@@ -28,10 +28,14 @@ internal sealed class AkburaNavigableSymbolSourceProvider :
     private readonly IServiceProvider
         _serviceProvider;
 
+    private readonly AkburaParserService
+        _parserService;
+
     [ImportingConstructor]
     public AkburaNavigableSymbolSourceProvider(
         ITextDocumentFactoryService textDocumentFactory,
         AkburaVisualStudioWorkspace workspaceHost,
+        AkburaParserService parserService,
         [Import(typeof(SVsServiceProvider))]
         IServiceProvider serviceProvider)
     {
@@ -44,6 +48,10 @@ internal sealed class AkburaNavigableSymbolSourceProvider :
             workspaceHost ??
             throw new ArgumentNullException(
                 nameof(workspaceHost));
+
+        _parserService = parserService ??
+            throw new ArgumentNullException(
+                nameof(parserService));
 
         _serviceProvider =
             serviceProvider ??
@@ -101,7 +109,8 @@ internal sealed class AkburaNavigableSymbolSourceProvider :
                         new AkburaTextBufferContext(
                             buffer,
                             _textDocumentFactory,
-                            _workspaceHost));
+                            _workspaceHost,
+                            _parserService));
 
         return new AkburaNavigableSymbolSource(
             bufferContext,

@@ -25,6 +25,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     private readonly AkburaWorkspace _workspace;
 
+    private readonly AkburaParserService _parserService;
+
     private AkburaProjectId? _projectId;
 
     private readonly IAkburaClassificationService _classificationService;
@@ -89,13 +91,18 @@ internal sealed class AkburaTextBufferContext : IDisposable
     public AkburaTextBufferContext(
         ITextBuffer textBuffer,
         ITextDocumentFactoryService textDocumentFactory,
-        AkburaVisualStudioWorkspace visualStudioWorkspace)
+        AkburaVisualStudioWorkspace visualStudioWorkspace,
+        AkburaParserService parserService)
     {
         _textBuffer = textBuffer ?? throw new ArgumentNullException(nameof(textBuffer));
 
         _visualStudioWorkspace = visualStudioWorkspace ?? throw new ArgumentNullException(nameof(visualStudioWorkspace));
 
         _workspace = visualStudioWorkspace.Workspace;
+
+        _parserService = parserService ??
+            throw new ArgumentNullException(
+                nameof(parserService));
 
         if (textDocumentFactory == null)
         {
@@ -435,12 +442,18 @@ internal sealed class AkburaTextBufferContext : IDisposable
             var cancellationToken =
                 parseCancellation.Token;
 
-            var syntacticState = await Task.Run(
-                    () => TryCreateSyntacticState(
-                        request,
-                        cancellationToken),
-                    cancellationToken)
+            var syntacticDocument = await _parserService
+                .GetSyntacticDocumentAsync(
+                    request.Snapshot)
                 .ConfigureAwait(false);
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            var syntacticState = TryCreateSyntacticState(
+                request,
+                syntacticDocument,
+                cancellationToken);
 
             if (!IsCurrentRequest(
                     request.RequestVersion))
@@ -529,6 +542,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private AkburaClassifiedBufferState?
         TryCreateSyntacticState(
             UpdateRequest request,
+            AkburaSyntacticDocument document,
             CancellationToken cancellationToken)
     {
         try
@@ -539,8 +553,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
             var classifications =
                 _classificationService
                     .GetSyntacticClassifications(
-                        request.Text,
-                        GetClassificationFilePath(),
+                        document,
                         new TextSpan(
                             start: 0,
                             length: request.Text.Length),
@@ -569,22 +582,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
             return null;
         }
-    }
-
-    private string GetClassificationFilePath()
-    {
-        var filePath =
-            _textDocument?.FilePath;
-
-        if (!string.IsNullOrWhiteSpace(
-                filePath))
-        {
-            return filePath!;
-        }
-
-        return _uri.IsFile
-            ? _uri.LocalPath
-            : _uri.AbsolutePath;
     }
 
     private AkburaParsedBufferState? TryCreateParsedState(

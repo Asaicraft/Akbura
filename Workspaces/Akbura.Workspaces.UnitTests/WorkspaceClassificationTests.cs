@@ -22,12 +22,14 @@ public sealed class WorkspaceClassificationTests
 
         using var workspace = new AkburaWorkspace();
         var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Counter.akbura");
 
         var classifications =
             workspace.LanguageServices.Classification
                 .GetSyntacticClassifications(
-                    text,
-                    "Counter.akbura",
+                    document,
                     new TextSpan(0, text.Length));
 
         AssertClassification(

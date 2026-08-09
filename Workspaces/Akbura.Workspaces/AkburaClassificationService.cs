@@ -39,6 +39,24 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             cancellationToken);
     }
 
+    public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
+        AkburaSyntacticDocument document,
+        TextSpan requestedSpan,
+        CancellationToken cancellationToken = default)
+    {
+        if (document == null)
+        {
+            throw new ArgumentNullException(
+                nameof(document));
+        }
+
+        return GetSyntacticClassifications(
+            document.SyntaxTree.GetRootSyntax(),
+            document.Text.Length,
+            requestedSpan,
+            cancellationToken);
+    }
+
     public ImmutableArray<AkburaClassifiedSpan> GetClassifications(
         AkburaDocumentContext context,
         TextSpan requestedSpan,

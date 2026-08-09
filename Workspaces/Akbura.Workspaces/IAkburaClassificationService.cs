@@ -17,6 +17,14 @@ public interface IAkburaClassificationService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Classifies an already parsed syntax-only document.
+    /// </summary>
+    ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
+        AkburaSyntacticDocument document,
+        TextSpan requestedSpan,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Classifies a document using both syntax and the project's semantic
     /// model. Semantic classifications replace syntactic classifications
     /// that cover the same source span.

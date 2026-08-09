@@ -9,6 +9,8 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using AkburaSymbol =
     Akbura.Language.Symbols.ISymbol;
+using AkburaPropertySymbol =
+    Akbura.Language.Symbols.IPropertySymbol;
 using CSharp =
     Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynSymbol =
@@ -138,6 +140,24 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                                 context,
                                 semanticModel,
                                 utilityAttribute,
+                                position,
+                                cancellationToken);
+
+                        if (definition != null)
+                        {
+                            return definition;
+                        }
+
+                        break;
+                    }
+
+                case MarkupAttributeSyntax attribute:
+                    {
+                        var definition =
+                            GetMarkupAttributeDefinition(
+                                context,
+                                semanticModel,
+                                attribute,
                                 position,
                                 cancellationToken);
 
@@ -586,32 +606,28 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return null;
         }
 
-        AkburaSymbol navigationSymbol;
-
-        if (property.Parameter is
-            { } parameter)
-        {
-            navigationSymbol =
-                parameter;
-        }
-        else if (property.Command is
-        { } command)
-        {
-            navigationSymbol =
-                command;
-        }
-        else
-        {
-            navigationSymbol =
-                property;
-        }
-
         return CreateDefinition(
             context,
             sourceSpan,
-            navigationSymbol,
+            GetPropertyNavigationSymbol(property),
             property.CSharpDefinition.Symbol,
             cancellationToken);
+    }
+
+    private static AkburaSymbol GetPropertyNavigationSymbol(
+        AkburaPropertySymbol property)
+    {
+        if (property.Parameter is { } parameter)
+        {
+            return parameter;
+        }
+
+        if (property.Command is { } command)
+        {
+            return command;
+        }
+
+        return property;
     }
 
     private static AkburaDefinition?
@@ -797,6 +813,58 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             cancellationToken);
     }
 
+    private static AkburaDefinition? GetMarkupAttributeDefinition(
+        AkburaDocumentContext context,
+        AkburaSemanticModel semanticModel,
+        MarkupAttributeSyntax attribute,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        var sourceSpan = GetMarkupAttributeNameSpan(attribute);
+        if (sourceSpan == null ||
+            !sourceSpan.Value.Contains(position))
+        {
+            return null;
+        }
+
+        var symbol = semanticModel
+            .GetSymbolInfo(attribute)
+            .Symbol;
+        if (symbol == null)
+        {
+            return null;
+        }
+
+        var navigationSymbol = symbol is AkburaPropertySymbol property
+            ? GetPropertyNavigationSymbol(property)
+            : symbol;
+
+        return CreateDefinition(
+            context,
+            sourceSpan.Value,
+            navigationSymbol,
+            symbol.CSharpDefinition.Symbol,
+            cancellationToken);
+    }
+
+    private static TextSpan? GetMarkupAttributeNameSpan(
+        MarkupAttributeSyntax attribute)
+    {
+        return attribute switch
+        {
+            MarkupPlainAttributeSyntax plain =>
+                plain.Name.Span,
+
+            MarkupAttachedPropertyAttributeSyntax attached =>
+                attached.Name.Span,
+
+            MarkupPrefixedAttributeSyntax prefixed =>
+                prefixed.Name.Span,
+
+            _ => null,
+        };
+    }
+
     private static AkburaDefinition? GetMarkupComponentDefinition(
             AkburaDocumentContext context,
             AkburaSemanticModel semanticModel,
@@ -824,10 +892,14 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return null;
         }
 
+        var navigationSymbol = symbol is AkburaPropertySymbol property
+            ? GetPropertyNavigationSymbol(property)
+            : symbol;
+
         return CreateDefinition(
             context,
             sourceSpan.Value,
-            symbol,
+            navigationSymbol,
             symbol.CSharpDefinition.Symbol,
             cancellationToken);
     }

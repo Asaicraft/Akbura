@@ -131,6 +131,143 @@ public sealed class WorkspaceDefinitionTests
     }
 
     [Fact]
+    public void Definition_AkburaComponentPropertyUsesParameterDeclaration()
+    {
+        const string componentSource = """
+            using Avalonia.Controls;
+
+            param string Title;
+
+            <StackPanel/>
+            """;
+        const string attributeUsageSource = """
+            <Card Title="Hello"/>
+            """;
+        const string propertyElementUsageSource = """
+            <Card>
+                <Card.Title>
+                    Hello
+                </Card.Title>
+            </Card>
+            """;
+        const string componentTypes = """
+            public partial class Card : Akbura.AkburaControl
+            {
+            }
+
+            public partial class AttributeUsage : Akbura.AkburaControl
+            {
+            }
+
+            public partial class PropertyElementUsage : Akbura.AkburaControl
+            {
+            }
+            """;
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var libraryReference = CreateLibraryReference(
+                directory,
+                "@utilities { }");
+            var compilation = CreateApplicationCompilation(
+                libraryReference,
+                componentTypes);
+            var projectContext = new ProjectContext(
+                ProjectId.CreateNewId(),
+                projectFilePath: string.Empty,
+                projectDirectory: directory,
+                rootNamespace: string.Empty,
+                compilation,
+                ImmutableArray<ProjectReference>.Empty);
+            using var workspace = new AkburaWorkspace(
+                projectContext);
+            var componentPath = Path.Combine(
+                directory,
+                "Card.akbura");
+            var attributeUsagePath = Path.Combine(
+                directory,
+                "AttributeUsage.akbura");
+            var propertyElementUsagePath = Path.Combine(
+                directory,
+                "PropertyElementUsage.akbura");
+
+            File.WriteAllText(
+                componentPath,
+                componentSource);
+            File.WriteAllText(
+                attributeUsagePath,
+                attributeUsageSource);
+            File.WriteAllText(
+                propertyElementUsagePath,
+                propertyElementUsageSource);
+
+            workspace.OpenOrChangeDocumentContext(
+                new Uri(componentPath),
+                SourceText.From(componentSource));
+            var attributeUsageContext =
+                workspace.OpenOrChangeDocumentContext(
+                    new Uri(attributeUsagePath),
+                    SourceText.From(attributeUsageSource));
+            var propertyElementUsageContext =
+                workspace.OpenOrChangeDocumentContext(
+                    new Uri(propertyElementUsagePath),
+                    SourceText.From(propertyElementUsageSource));
+
+            var attributeDefinition =
+                workspace.LanguageServices.Definition
+                    .GetDefinition(
+                        attributeUsageContext,
+                        attributeUsageSource.IndexOf(
+                            "Title",
+                            StringComparison.Ordinal));
+            var propertyElementDefinition =
+                workspace.LanguageServices.Definition
+                    .GetDefinition(
+                        propertyElementUsageContext,
+                        propertyElementUsageSource.IndexOf(
+                            "Title",
+                            StringComparison.Ordinal));
+
+            Assert.NotNull(attributeDefinition);
+            Assert.NotNull(propertyElementDefinition);
+            Assert.Equal(
+                Path.GetFullPath(componentPath),
+                attributeDefinition!.TargetFilePath);
+            Assert.Equal(
+                Path.GetFullPath(componentPath),
+                propertyElementDefinition!.TargetFilePath);
+            Assert.Equal(
+                "Title",
+                GetTargetText(attributeDefinition));
+            Assert.Equal(
+                "Title",
+                GetTargetText(propertyElementDefinition));
+            Assert.Equal(
+                "Title",
+                attributeUsageSource.Substring(
+                    attributeDefinition.SourceSpan.Start,
+                    attributeDefinition.SourceSpan.Length));
+            Assert.Equal(
+                "Card.Title",
+                propertyElementUsageSource.Substring(
+                    propertyElementDefinition.SourceSpan.Start,
+                    propertyElementDefinition.SourceSpan.Length));
+        }
+        finally
+        {
+            Directory.Delete(
+                directory,
+                recursive: true);
+        }
+    }
+
+    [Fact]
     public void Definition_EmbeddedAkcssUtilityCreatesNavigableSource()
     {
         WithWorkspace(

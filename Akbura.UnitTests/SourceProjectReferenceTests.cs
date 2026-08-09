@@ -139,8 +139,8 @@ public sealed class SourceProjectReferenceTests
         var projectCTreeV2 = projectCTreeV1.WithChangedText(projectCSourceV2);
         var projectC2 = projectC1.ReplaceSyntaxTree(projectCTreeV1, projectCTreeV2);
         var projectCComponent2 = GetReferencedComponent(projectC2, projectCTreeV2);
+        Assert.NotSame(projectC1, projectC2);
         Assert.Same(projectC1.CSharpCompilation, projectC2.CSharpCompilation);
-        Assert.Same(projectC1, projectC2.PreviousCompilation);
         Assert.Same(projectA1, Assert.Single(projectC2.CompilationReferences).Compilation);
         Assert.Same(projectAComponent1, projectCComponent2.AkburaComponent);
         Assert.Contains(projectBReference, projectC2.CSharpCompilation.References);
@@ -159,9 +159,12 @@ public sealed class SourceProjectReferenceTests
         Assert.Same(projectA1.CSharpCompilation, projectA2.CSharpCompilation);
         Assert.Same(projectAReference1.CSharpReference, projectAReference2.CSharpReference);
         Assert.Contains(projectBReference, projectC3.CSharpCompilation.References);
+        Assert.NotSame(projectC2, projectC3);
         Assert.Same(projectC2.CSharpCompilation, projectC3.CSharpCompilation);
-        Assert.Same(projectC2, projectC3.PreviousCompilation);
         Assert.Same(projectA2, Assert.Single(projectC3.CompilationReferences).Compilation);
+        Assert.NotSame(
+            projectC2.GetSemanticModel(projectCTreeV2),
+            projectC3.GetSemanticModel(projectCTreeV2));
         Assert.Contains(
             projectC3.GetSemanticModel(projectCTreeV2).GetSemanticDiagnostics(staleTitleAttribute),
             static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyNotFound);

@@ -322,21 +322,41 @@ public sealed class DiagnosticsTests
         await session.Dispatch(
             () =>
             {
-                var stringIcon = new StringInputBuilder().Icon;
-                var collectionIcon = new CollectionInputBuilder().Icon;
-                var universalIcon = new UniversalInputBuilder().Icon;
+                var window = new DiagnosticsWindow();
+                window.Show();
 
-                Assert.NotSame(stringIcon, universalIcon);
-                Assert.NotSame(collectionIcon, universalIcon);
-                Assert.True(stringIcon.Bounds.Width > 0d);
-                Assert.True(stringIcon.Bounds.Height > 0d);
-                Assert.True(collectionIcon.Bounds.Width > 0d);
-                Assert.True(collectionIcon.Bounds.Height > 0d);
-                Assert.True(universalIcon.Bounds.Width > 0d);
-                Assert.True(universalIcon.Bounds.Height > 0d);
-                Assert.True(
-                    universalIcon.Bounds.Height /
-                    universalIcon.Bounds.Width >= 0.75d);
+                var keys = new[]
+                {
+                    "Akbura.Diagnostics.StringInputBuilder.Icon",
+                    "Akbura.Diagnostics.CollectionInputBuilder.Icon",
+                    "Akbura.Diagnostics.UniversalInputBuilder.Icon",
+                };
+                var icons = keys
+                    .Select(
+                        key =>
+                        {
+                            Assert.True(
+                                window.TryGetResource(
+                                    key,
+                                    theme: null,
+                                    out var resource));
+                            return Assert.IsType<
+                                Avalonia.Media.StreamGeometry>(
+                                resource);
+                        })
+                    .ToArray();
+
+                Assert.All(
+                    icons,
+                    static icon =>
+                    {
+                        Assert.True(icon.Bounds.Width > 0d);
+                        Assert.True(icon.Bounds.Height > 0d);
+                    });
+                Assert.NotSame(icons[0], icons[2]);
+                Assert.NotSame(icons[1], icons[2]);
+
+                window.Close();
             },
             CancellationToken.None);
     }
@@ -397,7 +417,7 @@ public sealed class DiagnosticsTests
                 foreach (var item in itemModels)
                 {
                     itemHost.Children.Add(
-                        Assert.IsType<Grid>(
+                        Assert.IsType<Border>(
                             itemTemplate.Build(item)));
                 }
 

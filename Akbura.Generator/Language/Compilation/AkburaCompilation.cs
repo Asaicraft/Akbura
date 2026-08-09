@@ -197,7 +197,13 @@ internal sealed partial class AkburaCompilation
 
     public AkburaCompilation WithSyntaxTrees(IEnumerable<AkburaSyntaxTree> syntaxTrees)
     {
-        return WithSyntaxTrees([.. syntaxTrees]);
+        return WithSyntaxTrees(syntaxTrees.ToImmutableArray());
+    }
+
+    public AkburaCompilation WithSyntaxTrees(ImmutableArray<AkburaSyntaxTree> syntaxTrees)
+    {
+        return WithSyntaxAndDeclarations(
+            _syntaxAndDeclarations.WithSyntaxTrees(syntaxTrees));
     }
 
     private AkburaCompilation WithSyntaxAndDeclarations(SyntaxAndDeclarationManager syntaxAndDeclarations)

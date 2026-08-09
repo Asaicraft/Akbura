@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net472</TargetFramework>
+		<LangVersion>14</LangVersion>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.VisualStudio.SDK" />
+		<PackageReference Include="Microsoft.VisualStudio.Text.Logic" />
+		<PackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
+		<PackageReference Include="Microsoft.CodeAnalysis.EditorFeatures.Text" />
+		<PackageReference Include="Microsoft.VisualStudio.LanguageServices" PrivateAssets="all" ExcludeAssets="runtime" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Akbura.Workspaces\Akbura.Workspaces.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -776,12 +776,18 @@ internal sealed partial class Parser
 
         try
         {
-            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or
-                   SyntaxKind.GreaterThanToken or
-                   SyntaxKind.SlashGreaterToken) &&
-                   IsIncrementalMarkupAttributeStart())
+            while (PeekIncrementalTokenKind()
+                   is not (
+                       SyntaxKind.EndOfFileToken or
+                       SyntaxKind.GreaterThanToken or
+                       SyntaxKind.SlashGreaterToken))
             {
-                attributes.Add(ParseIncrementalMarkupAttributeSyntax());
+                var attribute =
+                    IsIncrementalMarkupAttributeStart()
+                        ? ParseIncrementalMarkupAttributeSyntax()
+                        : ParseSkippedMarkupAttributeSyntax();
+
+                attributes.Add(attribute);
             }
 
             var close = PeekIncrementalTokenKind() == SyntaxKind.SlashGreaterToken
@@ -1370,10 +1376,14 @@ internal sealed partial class Parser
         var bracketDepth = 0;
         var braceDepth = 0;
 
+        var iterationsUntilCancellationCheck = CancellationCheckInterval;
+
         try
         {
             while (PeekIncrementalTokenKind() != SyntaxKind.EndOfFileToken)
             {
+                CheckCancellation(ref iterationsUntilCancellationCheck);
+
                 var kind = PeekIncrementalTokenKind();
 
                 if (kind == SyntaxKind.CloseBraceToken && braceDepth == 0)
@@ -2055,8 +2065,12 @@ internal sealed partial class Parser
         var topLevelDotCount = 0;
         var lastTopLevelDotOffset = -1;
 
+        var iterationsUntilCancellationCheck = CancellationCheckInterval;
+
         while (true)
         {
+            CheckCancellation(ref iterationsUntilCancellationCheck);
+
             var kind = PeekIncrementalTokenKind(offset);
             if (kind is SyntaxKind.EndOfFileToken or
                 SyntaxKind.GreaterThanToken or
@@ -2094,10 +2108,17 @@ internal sealed partial class Parser
     private bool IsIncrementalTailwindAttributeStart()
     {
         var kind = PeekIncrementalTokenKind();
-        return kind is SyntaxKind.DollarToken or
+
+        return kind switch
+        {
+            SyntaxKind.DollarToken =>
+                PeekIncrementalTokenKind(1) == SyntaxKind.OpenBraceToken,
+
             SyntaxKind.OpenBraceToken or
-            SyntaxKind.MinusToken ||
-            IsIncrementalTailwindNameToken(kind);
+            SyntaxKind.MinusToken => true,
+
+            _ => IsIncrementalTailwindNameToken(kind),
+        };
     }
 
     private static bool IsIncrementalMarkupAttributeValueStart(SyntaxKind kind)

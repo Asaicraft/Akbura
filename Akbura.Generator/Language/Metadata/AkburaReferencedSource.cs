@@ -84,6 +84,19 @@ internal sealed class AkburaReferencedSource
         return false;
     }
 
+    internal bool ContainsAkcssSyntaxTree(AkcssSyntaxTree syntaxTree)
+    {
+        return Source.Kind == AkburaModuleSourceKind.Akcss &&
+            TryGetMaterializedSyntaxTree(out var materializedTree) &&
+            ReferenceEquals(materializedTree, syntaxTree);
+    }
+
+    internal bool ContainsSyntax(AkburaSyntax syntax)
+    {
+        return TryGetMaterializedSyntaxTree(out var syntaxTree) &&
+            ReferenceEquals(syntaxTree.GetRootSyntax(), syntax.Root);
+    }
+
     public bool TryGetComponentDeclaration(
         AkburaSyntaxTree syntaxTree,
         out AkburaModuleDeclaration declaration)

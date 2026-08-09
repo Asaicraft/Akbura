@@ -105,6 +105,36 @@ internal sealed class AkburaReferencedModule
         return builder.ToImmutable();
     }
 
+    internal bool ContainsAkcssSyntaxTree(AkcssSyntaxTree syntaxTree)
+    {
+        foreach (var source in _lazyEmbeddedData.Value.Sources)
+        {
+            if (source.ContainsAkcssSyntaxTree(syntaxTree))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal bool TryGetSource(
+        AkburaSyntax syntax,
+        out AkburaReferencedSource source)
+    {
+        foreach (var candidate in _lazyEmbeddedData.Value.Sources)
+        {
+            if (candidate.ContainsSyntax(syntax))
+            {
+                source = candidate;
+                return true;
+            }
+        }
+
+        source = null!;
+        return false;
+    }
+
     public bool TryGetComponentDeclaration(
         AkburaSyntaxTree syntaxTree,
         out AkburaModuleDeclaration declaration)

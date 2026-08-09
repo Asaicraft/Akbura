@@ -1,6 +1,6 @@
 namespace Akbura.Language.Symbols;
 
-internal enum SymbolKind
+public enum SymbolKind
 {
     None = 0,
     Namespace,

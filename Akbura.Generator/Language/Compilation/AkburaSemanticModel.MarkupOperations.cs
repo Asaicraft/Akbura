@@ -3839,8 +3839,9 @@ internal partial class AkburaSemanticModel
     internal AkburaSemanticDiagnostic CreateAkcssImportNotFoundDiagnostic(string importName)
     {
         return new AkburaSemanticDiagnostic(
-            SyntaxTree.GetRoot(),
-            ErrorCodes.AKBURA_SEMANTIC_AkcssImportNotFound,
+            SyntaxTree.GetRootSyntax(),
+            ErrorCodes
+                .AKBURA_SEMANTIC_AkcssImportNotFound,
             [importName]);
     }
 

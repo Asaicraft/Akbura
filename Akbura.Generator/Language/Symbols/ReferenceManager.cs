@@ -177,6 +177,27 @@ internal sealed partial class AkburaCompilation
             return false;
         }
 
+        public bool ContainsAkcssSyntaxTree(AkcssSyntaxTree syntaxTree)
+        {
+            foreach (var reference in _compilationReferences)
+            {
+                if (reference.ContainsAkcssSyntaxTree(syntaxTree))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var module in Modules)
+            {
+                if (module.ContainsAkcssSyntaxTree(syntaxTree))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public bool TryGetSemanticModel(
             AkburaSyntaxTree syntaxTree,
             out AkburaSemanticModel semanticModel)

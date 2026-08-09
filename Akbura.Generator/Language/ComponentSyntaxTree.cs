@@ -2,6 +2,7 @@ using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -65,20 +66,56 @@ internal sealed class ComponentSyntaxTree : AkburaSyntaxTree
     }
 
     public ComponentSyntaxTree WithChangedText(
-        SourceText newText,
-        IEnumerable<TextChangeRange>? changes = null,
-        CancellationToken cancellationToken = default)
+    SourceText newText,
+    IEnumerable<TextChangeRange>? changes = null,
+    CancellationToken cancellationToken = default)
     {
-        var changeRanges = changes?.ToArray() ?? newText.GetChangeRanges(Text).ToArray();
-        if (changeRanges.Length == 0 && newText.ToString() == Text.ToString())
+        Debug.WriteLine("[Akbura] SyntaxTree: GetChangeRanges started");
+
+        var changeRanges = changes?.ToArray() ??
+            [.. newText.GetChangeRanges(Text)];
+
+        Debug.WriteLine(
+            $"[Akbura] SyntaxTree: GetChangeRanges completed, " +
+            $"count={changeRanges.Length}");
+
+        if (changeRanges.Length == 0)
         {
-            return this;
+            Debug.WriteLine("[Akbura] SyntaxTree: text comparison started");
+
+            var contentEquals =
+                newText.ContentEquals(Text);
+
+            Debug.WriteLine(
+                $"[Akbura] SyntaxTree: text comparison completed, " +
+                $"equal={contentEquals}");
+
+            if (contentEquals)
+            {
+                return this;
+            }
         }
 
-        var lexer = new Lexer(newText);
-        using var parser = new Parser(lexer, cancellationToken, GetRoot(), changeRanges);
+        Debug.WriteLine("[Akbura] SyntaxTree: parser construction started");
 
-        return new ComponentSyntaxTree(newText, FilePath, parser.ParseCompilationUnit());
+        var lexer = new Lexer(newText);
+
+        using var parser = new Parser(
+            lexer,
+            cancellationToken,
+            GetRoot(),
+            changeRanges);
+
+        Debug.WriteLine("[Akbura] SyntaxTree: ParseCompilationUnit started");
+
+        var root = parser.ParseCompilationUnit();
+
+        Debug.WriteLine("[Akbura] SyntaxTree: ParseCompilationUnit completed");
+
+        return new ComponentSyntaxTree(
+            newText,
+            FilePath,
+            root);
     }
 
     public ComponentSyntaxTree WithChangedText(

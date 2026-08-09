@@ -9,7 +9,7 @@ internal sealed class GreenSkippedTokensTrivia : GreenSyntaxTrivia
 {
     public readonly GreenNode? Tokens;
 
-    public GreenSkippedTokensTrivia(GreenNode? tokens, ImmutableArray<AkburaDiagnostic>? diagnostics = null, ImmutableArray<AkburaSyntaxAnnotation>? annotations = null) : base(SyntaxKind.SkippedTokensTrivia, null!, diagnostics, annotations)
+    public GreenSkippedTokensTrivia(GreenNode? tokens, ImmutableArray<AkburaDiagnostic>? diagnostics = null, ImmutableArray<AkburaSyntaxAnnotation>? annotations = null) : base(SyntaxKind.SkippedTokensTrivia, string.Empty, diagnostics, annotations)
     {
         Tokens = tokens;
         FullWidth = tokens?.FullWidth ?? 0;

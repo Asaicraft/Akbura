@@ -1805,28 +1805,33 @@ public class SemanticPipelineTests
     }
 
     [Fact]
-    public void SemanticModel_AkcssStyleTargetType_MustBeAvaloniaControl()
+    public void SemanticModel_AkcssStyleTargetType_CanBeAnyClrClass()
     {
         const string code =
             "@akcss {\n" +
             "    PlainObject.hello {\n" +
-            "        Background: \"Red\";\n" +
+            "        Value: \"Red\";\n" +
             "    }\n" +
             "}";
 
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(
             syntaxTree,
-            CreateCSharpCompilation("public sealed class PlainObject { }"));
+            CreateCSharpCompilation(
+                "public sealed class PlainObject { public string Value { get; set; } = string.Empty; }"));
         var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
         var rule = Assert.IsType<AkcssStyleRuleSyntax>(Assert.Single(inlineAkcss.Members));
 
         var symbolInfo = semanticModel.GetSymbolInfo(rule);
 
-        Assert.Null(symbolInfo.Symbol);
-        Assert.Equal(AkburaCandidateReason.NotFound, symbolInfo.CandidateReason);
-        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(rule));
-        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssSelectorTargetNotFound, diagnostic.Code);
+        var symbol = Assert.IsType<AkcssStyleSymbol>(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.None, symbolInfo.CandidateReason);
+        Assert.True(symbol.HasTargetType);
+        Assert.Equal("PlainObject", symbol.TargetType.Name);
+        var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
+            Assert.Single(symbol.Operations));
+        Assert.Equal("Value", operation.Property?.Name);
+        Assert.True(semanticModel.GetSemanticDiagnostics(rule).IsEmpty);
     }
 
     [Fact]

@@ -1,0 +1,56 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net472</TargetFramework>
+		<LangVersion>14</LangVersion>
+		<Nullable>enable</Nullable>
+
+		<VSSDKBuildToolsAutoSetup>true</VSSDKBuildToolsAutoSetup>
+		<VsixDeployOnDebug>true</VsixDeployOnDebug>
+
+		<UseCodebase>true</UseCodebase>
+		<GeneratePkgDefFile>true</GeneratePkgDefFile>
+		<IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\Icons\akbura_64.png" />
+		<Resource Include="Resources\Icons\akcss_64.png" />
+
+		<Content Include="AkburaImages.imagemanifest">
+			<IncludeInVSIX>true</IncludeInVSIX>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+
+		<Content Include="AkburaFileIcons.pkgdef">
+			<IncludeInVSIX>true</IncludeInVSIX>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+	
+	<ItemGroup>
+		<ProjectCapability Include="CreateVsixContainer" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.VisualStudio.SDK" ExcludeAssets="runtime" />
+
+		<PackageReference Include="Microsoft.VSSDK.BuildTools">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>
+				runtime;
+				build;
+				native;
+				contentfiles;
+				analyzers;
+				buildtransitive
+			</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Akbura.VisualStudio\Akbura.VisualStudio.csproj" />
+	</ItemGroup>
+
+
+</Project>

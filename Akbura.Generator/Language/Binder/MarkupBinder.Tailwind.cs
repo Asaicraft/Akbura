@@ -979,6 +979,12 @@ internal sealed partial class MarkupBinder
     private ITailwindUtilitySymbol CreateTailwindUtilitySymbol(
         AkcssUtilityDeclarationSyntax utilityDeclaration)
     {
+        if (SemanticModel.GetDeclarationSymbolInfo(utilityDeclaration).Symbol is
+            ITailwindUtilitySymbol declaredSymbol)
+        {
+            return declaredSymbol;
+        }
+
         if (!SemanticModel.TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var targetType))
         {
             targetType = default;
@@ -1127,6 +1133,12 @@ internal sealed partial class MarkupBinder
     private IAkcssSymbol CreateAkcssStyleSymbol(
         AkcssStyleRuleSyntax styleRule)
     {
+        if (SemanticModel.GetDeclarationSymbolInfo(styleRule).Symbol is
+            IAkcssSymbol declaredSymbol)
+        {
+            return declaredSymbol;
+        }
+
         if (!SemanticModel.TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var targetType))
         {
             targetType = default;

@@ -1,0 +1,21 @@
+@using Akbura.FeatureGallery.Models;
+
+AkcssData.demo {
+    Name: "From class";
+    Age: 18;
+    Scale: 1.0;
+}
+
+@utilities {
+    AkcssData.name-(string value) {
+        Name: value;
+    }
+
+    AkcssData.age-(int value) {
+        Age: value;
+    }
+
+    AkcssData.scale-(double value) {
+        Scale: value;
+    }
+}

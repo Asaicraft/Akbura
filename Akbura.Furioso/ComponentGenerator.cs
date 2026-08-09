@@ -1360,6 +1360,24 @@ internal static class ComponentGenerator
                        .IsImplicit;
         }
 
+        private bool IsControlElement(ElementPlan element)
+        {
+            var componentType = element.Symbol.ComponentType ??
+                element.Symbol.AkburaComponent?.ComponentType;
+            var controlType =
+                _semanticModel.Compilation.CSharpCompilation
+                    .GetTypeByMetadataName(
+                        "Avalonia.Controls.Control");
+
+            return componentType != null &&
+                   controlType != null &&
+                   _semanticModel.Compilation.CSharpCompilation
+                       .ClassifyConversion(
+                           componentType,
+                           controlType)
+                       .IsImplicit;
+        }
+
         private bool HasSemanticErrors(AkburaSyntax syntax)
         {
             return _semanticModel.GetSemanticDiagnostics(syntax)
@@ -2290,7 +2308,8 @@ internal static class ComponentGenerator
                     result.Add(
                         GetAkcssUtilityArgumentValueSourceExpression(
                             argument,
-                            expectedType));
+                            expectedType,
+                            IsControlElement(element)));
                     continue;
                 }
 
@@ -2314,13 +2333,17 @@ internal static class ComponentGenerator
 
         private static string GetAkcssUtilityArgumentValueSourceExpression(
             TailwindUtilityArgument argument,
-            ITypeSymbol expectedType)
+            ITypeSymbol expectedType,
+            bool isControlTarget)
         {
             var isConstant =
                 argument.ValueOperation.ConstantValue.HasValue;
             var result = new StringBuilder(
                     "global::Akbura.Akcss." +
-                    "AkcssUtilityValueSource.Create<")
+                    "AkcssUtilityValueSource." +
+                    (isControlTarget
+                        ? "Create<"
+                        : "CreateForObject<"))
                 .Append(GetTypeName(expectedType))
                 .Append(">(");
             if (isConstant)
@@ -2374,6 +2397,23 @@ internal static class ComponentGenerator
                     .Append(valueExpression)
                     .Append(", ")
                     .Append(targetProperty)
+                    .Append(", static __value => (")
+                    .Append(expectedTypeName)
+                    .Append(")__value!, recreateOnRefresh: ")
+                    .Append(recreate)
+                    .Append(')')
+                    .ToString();
+            }
+
+            if (extension.ResultType.Symbol is ITypeSymbol objectResult &&
+                objectResult.SpecialType == SpecialType.System_Object)
+            {
+                return new StringBuilder(
+                        "global::Akbura.Akcss." +
+                        "AkcssUtilityValueSource.CreateObject<")
+                    .Append(expectedTypeName)
+                    .Append(">(__target => ")
+                    .Append(valueExpression)
                     .Append(", static __value => (")
                     .Append(expectedTypeName)
                     .Append(")__value!, recreateOnRefresh: ")
@@ -2670,6 +2710,15 @@ internal static class ComponentGenerator
             }
 
             if (IsDataTypeDirective(operation.Syntax))
+            {
+                return;
+            }
+
+            if (string.Equals(
+                    AkburaSemanticModel.GetMarkupPropertyName(
+                        operation.Syntax),
+                    "class",
+                    StringComparison.Ordinal))
             {
                 return;
             }
@@ -3288,20 +3337,42 @@ internal static class ComponentGenerator
             }
 
             var type = GetTypeName(binding.BindingType.Symbol);
+            var bindingPath = binding.Path;
+            string? bindingSource = null;
+
+            if (!extension.Properties.Any(static property =>
+                    property.Name is "Source" or "ElementName") &&
+                TryGetElementNameBindingSource(
+                    binding,
+                    out var elementNameSource,
+                    out var remainingPath))
+            {
+                bindingSource = elementNameSource;
+                bindingPath = remainingPath;
+            }
 
             var result = new StringBuilder("new ")
                 .Append(type)
                 .Append('(')
-                .Append(ToStringLiteral(binding.Path))
+                .Append(ToStringLiteral(bindingPath))
                 .Append(')');
 
-            if (!extension.Properties.IsEmpty)
+            if (bindingSource != null ||
+                !extension.Properties.IsEmpty)
             {
                 result.Append(" { ");
 
+                var hasInitializer = false;
+                if (bindingSource != null)
+                {
+                    result.Append("Source = ")
+                        .Append(bindingSource);
+                    hasInitializer = true;
+                }
+
                 for (var index = 0; index < extension.Properties.Length; index++)
                 {
-                    if (index > 0)
+                    if (hasInitializer)
                     {
                         result.Append(", ");
                     }
@@ -3315,12 +3386,62 @@ internal static class ComponentGenerator
                             property,
                             element,
                             targetPropertyExpression));
+
+                    hasInitializer = true;
                 }
 
                 result.Append(" }");
             }
 
             return result.ToString();
+        }
+
+        private bool TryGetElementNameBindingSource(
+            MarkupBindingValue binding,
+            out string sourceExpression,
+            out string remainingPath)
+        {
+            sourceExpression = string.Empty;
+            remainingPath = binding.Path;
+
+            if (binding.Kind != MarkupBindingKind.Reflection ||
+                binding.PathElements.IsEmpty)
+            {
+                return false;
+            }
+
+            var root = binding.PathElements[0];
+            if (root.Kind != MarkupBindingPathElementKind.ElementName ||
+                root.Text.Length <= 1)
+            {
+                return false;
+            }
+
+            var elementNameRoot = root.Text;
+            var elementName = elementNameRoot[1..];
+            var sourceElement = _elements.FirstOrDefault(element =>
+                element.NameOperation?.NameSymbol is { } name &&
+                string.Equals(
+                    name.IdentifierText,
+                    elementName,
+                    StringComparison.Ordinal));
+
+            if (sourceElement == null ||
+                !binding.Path.StartsWith(
+                    elementNameRoot,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            remainingPath = binding.Path[elementNameRoot.Length..];
+            if (remainingPath.StartsWith(".", StringComparison.Ordinal))
+            {
+                remainingPath = remainingPath[1..];
+            }
+
+            sourceExpression = sourceElement.FieldName;
+            return true;
         }
 
         private static bool TryGetSingleFieldBindingPath(

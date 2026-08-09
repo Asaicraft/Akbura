@@ -110,7 +110,7 @@ state int dynamicAge = 42;
                 rounded-lg>
 
             <StackPanel gap-2>
-                <TextBlock Text="D. Condition + MarkupExtension"
+                <TextBlock Text="D. Condition + dynamic argument"
                            font-semibold/>
 
                 <TextBlock
@@ -124,7 +124,7 @@ state int dynamicAge = 42;
                     <AkcssData name-MarkupExtension
                                age-18
                                scale-1
-                               {isActive}:age-${GalleryAge {dynamicAge}}/>
+                               {isActive}:age-{dynamicAge}/>
                 </Button>
             </StackPanel>
 

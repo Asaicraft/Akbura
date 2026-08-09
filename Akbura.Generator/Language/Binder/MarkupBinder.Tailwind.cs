@@ -766,7 +766,20 @@ internal sealed partial class MarkupBinder
             return false;
         }
 
-        if (resultType.SpecialType == SpecialType.System_Boolean)
+        if (resultType.SpecialType is
+            SpecialType.System_Boolean or
+            SpecialType.System_Object)
+        {
+            return true;
+        }
+
+        var bindingBaseType =
+            Compilation.CSharpCompilation.GetTypeByMetadataName(
+                "Avalonia.Data.BindingBase");
+        if (bindingBaseType != null &&
+            AkburaSemanticModel.IsAssignableTo(
+                resultType,
+                bindingBaseType))
         {
             return true;
         }

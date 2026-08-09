@@ -8,6 +8,17 @@ summary: Define reactive AKCSS utility prefixes and control how active candidate
 A utility variant is a markup extension that controls whether a prefixed AKCSS
 utility is currently active.
 
+It does not need a dedicated base class or attribute. Standard markup
+extensions can be prefixes too:
+
+```akbura
+<ToggleSwitch x.Name="MyToggle" />
+
+<Border ${DynamicResource MyKey}:p-5
+        ${StaticResource MyBoolValue}:p-7
+        ${Binding #MyToggle.IsChecked}:p-10 />
+```
+
 ```akbura
 using Akbura.Markup;
 
@@ -31,9 +42,11 @@ When an observable has not produced a value yet, or when its latest value is
 `false`, the candidate is excluded. Another utility can then provide the
 property value.
 
-## Declaring a variant
+## Declaring ordering metadata
 
-Mark the markup extension class with `UtilityVariantAttribute`:
+`UtilityVariantAttribute` is optional. Apply it when a family of markup
+extensions needs explicit ordering or special precedence over unprefixed
+utilities:
 
 ```csharp
 using Akbura.Markup;
@@ -160,7 +173,13 @@ This comparison is controlled by `UnprefixedPrecedence`.
 public sealed class UtilityVariantAttribute : Attribute
 ```
 
-The attribute can be applied once to a markup extension class.
+The attribute can be applied once to a markup extension class. It does not
+control whether the extension is allowed before `:`. Its only purpose is to
+provide `Order`, `ConflictGroup`, and `UnprefixedPrecedence` during
+property-level conflict resolution.
+
+Without the attribute, the extension still works as a prefix with `Order = 0`,
+no conflict group, and source-order precedence.
 
 ### Order
 

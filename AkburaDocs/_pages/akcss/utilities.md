@@ -223,6 +223,20 @@ The condition must be a valid boolean expression:
 A markup extension can act as a reactive utility condition:
 
 ```akbura
+<ToggleSwitch x.Name="MyToggle" />
+
+<Border ${DynamicResource MyKey}:p-5
+        ${StaticResource MyBoolValue}:p-7
+        ${Binding #MyToggle.IsChecked}:p-10 />
+```
+
+These are ordinary Avalonia markup extensions. No `UtilityVariantAttribute` is
+required. The attribute only changes conflict ordering for extensions that opt
+into it.
+
+Akbura also includes ordered breakpoint extensions:
+
+```akbura
 using Akbura.Markup;
 using Akbura.Styles.akcss;
 
@@ -234,7 +248,9 @@ using Akbura.Styles.akcss;
         ${xxl}:p-6 />
 ```
 
-The extension must return `bool` or `IObservable<bool>`. A false or not-yet-
+The resolved condition must produce a boolean value. A custom extension can
+return `bool` or `IObservable<bool>` directly; resource and binding extensions
+can provide the value through Avalonia binding machinery. A false or not-yet-
 available value removes that candidate from conflict resolution, allowing the
 next matching utility to apply.
 
@@ -265,7 +281,7 @@ The three unprefixed precedence modes are:
 | `SourceOrder` | The candidate written later wins. |
 | `Above` | The active prefixed utility always wins. |
 
-Custom variants declare these values on their extension type:
+Custom variants may declare these values on their extension type:
 
 ```csharp
 using Akbura.Markup;
@@ -285,7 +301,8 @@ public sealed class WideExtension
 
 `UtilityVariantAttribute` decides priority only after utilities are known to
 conflict. Sharing a `ConflictGroup` never creates a conflict between unrelated
-utilities.
+properties. An extension without the attribute remains a valid prefix and uses
+source-order precedence.
 
 ## Built-in breakpoints
 

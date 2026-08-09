@@ -3383,6 +3383,25 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             clrEvent == null &&
             avaloniaRoutedEvent == null)
         {
+            if (string.Equals(
+                    propertyName,
+                    "class",
+                    StringComparison.Ordinal))
+            {
+                SetSemanticDiagnosticsIfAbsent(
+                    markupAttribute,
+                    ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+
+                return AkburaSymbolInfo.Success(
+                    new PropertySymbol(
+                        "Classes",
+                        new CSharpSymbolDefinition(
+                            Compilation.CSharpCompilation.GetSpecialType(
+                                SpecialType.System_String)),
+                        containingSymbol: componentSymbol,
+                        isImplicitlyDeclared: true));
+            }
+
             SetSemanticDiagnostics(
                 markupAttribute,
                 ImmutableArray.Create(componentType != null &&

@@ -5400,6 +5400,64 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_TailwindUtilityMarkupExtensionPrefixes_AcceptStandardAvaloniaExtensionsWithoutVariantMetadata()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Data;
+            using Avalonia.Markup.Xaml.MarkupExtensions;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.p-(double value) { Padding: new(value); }
+                }
+            }
+
+            <StackPanel>
+                <ToggleSwitch x.Name="MyToggle" />
+                <Border
+                    ${DynamicResource MyKey}:p-5
+                    ${StaticResource MyBoolValue}:p-7
+                    ${Binding #MyToggle.IsChecked}:p-10 />
+            </StackPanel>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var border = syntaxTree.GetRootSyntax()
+            .DescendantNodes()
+            .OfType<MarkupElementSyntax>()
+            .Single(static element =>
+                element.StartTag?.Name.ToFullString().Trim() == "Border");
+        var attributes = border.StartTag!
+            .Attributes
+            .OfType<TailwindFullAttributeSyntax>()
+            .ToArray();
+
+        Assert.Equal(3, attributes.Length);
+        foreach (var attribute in attributes)
+        {
+            var operation =
+                Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                    semanticModel.GetOperation(attribute));
+
+            Assert.NotNull(operation.ConditionMarkupExtension);
+            Assert.True(operation.Variant.IsPrefixed);
+            Assert.Equal(0d, operation.Variant.Order);
+            Assert.Null(operation.Variant.ConflictGroup);
+            Assert.Equal(
+                TailwindUtilityUnprefixedPrecedence.SourceOrder,
+                operation.Variant.UnprefixedPrecedence);
+            Assert.False(operation.HasErrors);
+            Assert.Empty(
+                semanticModel.GetSemanticDiagnostics(attribute));
+        }
+    }
+
+    [Fact]
     public void SemanticModel_TailwindUtilityMarkupExtensions_ReportInvalidResultsAndLegacyPrefix()
     {
         const string code =

@@ -4,7 +4,9 @@ summary: Apply typed AKCSS declarations to controls and ordinary C# objects.
 order: 2
 ---
 
-AKCSS declarations can target ordinary C# classes as well as Avalonia controls. This is useful when markup creates or configures data objects alongside the visual tree.
+AKCSS declarations can target ordinary C# classes as well as Avalonia controls. The target does not need to derive from `Control`, `AvaloniaObject`, or another Avalonia base type. AKCSS resolves the CLR type and binds declarations to its writable properties.
+
+This is useful when markup creates or configures data objects alongside the visual tree.
 
 ## Define a custom class
 

@@ -256,7 +256,7 @@
     <value>Utility markup extension result '{0}' cannot provide '{1}'. Expected the value type, IObservable&lt;T&gt;, IObservable&lt;object&gt;, or BindingBase.</value>
   </data>
   <data name="AKBURA_SEMANTIC_TailwindVariantResultMismatch" xml:space="preserve">
-    <value>Utility prefix markup extension result '{0}' is not supported. Expected bool or IObservable&lt;bool&gt;.</value>
+    <value>Utility prefix markup extension result '{0}' is not supported. Expected bool, IObservable&lt;bool&gt;, BindingBase, or an object value convertible to bool.</value>
   </data>
   <data name="AKBURA_SEMANTIC_TailwindLegacyPrefix" xml:space="preserve">
     <value>Utility prefix '{0}:' is not supported. Use '${{{0}}}:' instead.</value>

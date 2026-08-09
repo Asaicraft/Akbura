@@ -3081,6 +3081,124 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public async Task Generator_AppliesAkcssClassesAndUtilitiesToOrdinaryObjects()
+    {
+        const string component =
+            "using Avalonia.Controls;\n" +
+            "using Demo;\n" +
+            "\n" +
+            "param int Value = 25;\n" +
+            "\n" +
+            "@akcss {\n" +
+            "    @using Demo;\n" +
+            "\n" +
+            "    StyleData.initial { Value: 10; }\n" +
+            "\n" +
+            "    @utilities {\n" +
+            "        StyleData.value-(int value) { Value: value; }\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "<Button>\n" +
+            "    <StyleData class=\"initial\" value-{Value} />\n" +
+            "</Button>\n";
+        const string csharp =
+            "namespace Demo\n" +
+            "{\n" +
+            "    public sealed class StyleData\n" +
+            "    {\n" +
+            "        public int Value { get; set; }\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "public partial class ObjectStyledView\n" +
+            "{\n" +
+            "    public ObjectStyledView() : base(global::Akbura.Engine.AkburaEngine.Empty) { }\n" +
+            "}\n";
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
+            LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedObjectAkcssTests",
+            syntaxTrees: [CSharpSyntaxTree.ParseText(csharp, parseOptions)],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "ObjectStyledView.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedComponent = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results)
+                .GeneratedSources,
+            static source => source.HintName.StartsWith(
+                "Akbura.Component.",
+                StringComparison.Ordinal));
+        var componentText = generatedComponent.SourceText.ToString();
+        Assert.Contains(
+            "AkcssUtilityValueSource.CreateForObject<int>",
+            componentText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var componentType = assembly.GetType("ObjectStyledView");
+                var dataType = assembly.GetType("Demo.StyleData");
+                Assert.NotNull(componentType);
+                Assert.NotNull(dataType);
+
+                var component = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(componentType));
+                var window = new Window { Content = component };
+                window.Show();
+
+                var button = Assert.IsType<Button>(component.Child);
+                var data = button.Content;
+                Assert.NotNull(data);
+                Assert.IsType(dataType, data);
+                var valueProperty = dataType.GetProperty("Value")!;
+                Assert.Equal(25, valueProperty.GetValue(data));
+
+                componentType.GetProperty("Value")!.SetValue(component, 31);
+                Assert.Equal(31, valueProperty.GetValue(data));
+
+                window.Close();
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Generator_ResolvesUtilityConflictsPerPropertyOperation()
     {
         const string component =
@@ -3466,15 +3584,28 @@ public sealed class AkburaCsGeneratorTests
                     Control.variant-(double value) {
                         MaxWidth: value;
                     }
+
+                    Control.named-(double value) {
+                        MinHeight: value;
+                    }
+
+                    Control.resource-(double value) {
+                        MaxHeight: value;
+                    }
                 }
             }
 
-            <Border
-                typed-${TypedSignal}
-                object-${ObjectSignal}
-                bound-${BoundValue}
-                variant-1
-                ${ReactiveVariant}:variant-2 />
+            <StackPanel>
+                <CheckBox x.Name="MyToggle" IsChecked="True" />
+                <Border
+                    typed-${TypedSignal}
+                    object-${ObjectSignal}
+                    bound-${BoundValue}
+                    variant-1
+                    ${ReactiveVariant}:variant-2
+                    ${Binding #MyToggle.IsChecked}:named-64
+                    ${DynamicResource AkburaTestDynamicVariant}:resource-48 />
+            </StackPanel>
             """;
         const string csharp =
             """
@@ -3658,6 +3789,10 @@ public sealed class AkburaCsGeneratorTests
             "variant:",
             generatedText,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "new global::Avalonia.Data.Binding(\"IsChecked\") { Source = MyToggle }",
+            generatedText,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
             static diagnostic =>
@@ -3687,6 +3822,9 @@ public sealed class AkburaCsGeneratorTests
                 Assert.NotNull(modelType);
                 Assert.NotNull(sourcesType);
 
+                Application.Current!.Resources[
+                    "AkburaTestDynamicVariant"] = true;
+
                 var component =
                     Assert.IsAssignableFrom<AkburaControl>(
                         Activator.CreateInstance(componentType));
@@ -3701,8 +3839,18 @@ public sealed class AkburaCsGeneratorTests
                 };
                 window.Show();
 
+                var panel =
+                    Assert.IsType<StackPanel>(component.Child);
+                var toggle =
+                    Assert.IsType<CheckBox>(panel.Children[0]);
                 var border =
-                    Assert.IsType<Border>(component.Child);
+                    Assert.IsType<Border>(panel.Children[1]);
+                var directResourceProbe = new Border();
+                panel.Children.Add(directResourceProbe);
+                using var directResourceBinding = directResourceProbe.Bind(
+                    Border.TagProperty,
+                    new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension(
+                        "AkburaTestDynamicVariant"));
                 var typed = sourcesType
                     .GetProperty("Typed")!
                     .GetValue(null)!;
@@ -3717,6 +3865,8 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Equal(25d, border.Height);
                 Assert.Equal(73d, border.MinWidth);
                 Assert.Equal(1d, border.MaxWidth);
+                Assert.Equal(64d, border.MinHeight);
+                Assert.Equal(48d, border.MaxHeight);
                 Assert.Equal(
                     1,
                     typed.GetType()
@@ -3748,6 +3898,23 @@ public sealed class AkburaCsGeneratorTests
                 Assert.Equal(44d, border.Height);
                 Assert.Equal(91d, border.MinWidth);
                 Assert.Equal(2d, border.MaxWidth);
+
+                toggle.IsChecked = false;
+                Assert.Equal(0d, border.MinHeight);
+
+                toggle.IsChecked = true;
+                Assert.Equal(64d, border.MinHeight);
+
+                panel.Resources[
+                    "AkburaTestDynamicVariant"] = false;
+                Assert.Equal(false, directResourceProbe.Tag);
+                Assert.Equal(
+                    double.PositiveInfinity,
+                    border.MaxHeight);
+
+                panel.Resources[
+                    "AkburaTestDynamicVariant"] = true;
+                Assert.Equal(48d, border.MaxHeight);
 
                 window.Content = null;
                 Assert.Equal(

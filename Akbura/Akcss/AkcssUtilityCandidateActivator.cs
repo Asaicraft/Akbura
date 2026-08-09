@@ -128,7 +128,6 @@ public sealed class AkcssUtilityCandidateActivator
 
     public override void Execute(object target)
     {
-        var control = GetControl(target);
         if (!IsReady || !IsActive)
         {
             return;
@@ -137,21 +136,20 @@ public sealed class AkcssUtilityCandidateActivator
         CopyArgumentValues();
         for (var index = 0; index < _operations.Length; index++)
         {
-            if (_operations[index].IsActive(control, _values))
+            if (_operations[index].IsActive(target, _values))
             {
-                _operations[index].Execute(control, _values);
+                _operations[index].Execute(target, _values);
             }
         }
     }
 
     public override void Reset(object target)
     {
-        var control = GetControl(target);
         for (var index = _operations.Length - 1;
              index >= 0;
              index--)
         {
-            _operations[index].Reset(control);
+            _operations[index].Reset(target);
         }
     }
 
@@ -177,7 +175,7 @@ public sealed class AkcssUtilityCandidateActivator
 
     internal bool IsOperationActive(
         int index,
-        Control target)
+        object target)
     {
         if (!IsReady || !IsActive)
         {
@@ -190,7 +188,7 @@ public sealed class AkcssUtilityCandidateActivator
 
     internal void ExecuteOperation(
         int index,
-        Control target)
+        object target)
     {
         CopyArgumentValues();
         _operations[index].Execute(target, _values);
@@ -198,13 +196,13 @@ public sealed class AkcssUtilityCandidateActivator
 
     internal void ResetOperation(
         int index,
-        Control target)
+        object target)
     {
         _operations[index].Reset(target);
     }
 
     internal void Attach(
-        Control target,
+        object target,
         Action<AkcssUtilityCandidateActivator> changed)
     {
         _changed = changed ??
@@ -237,7 +235,7 @@ public sealed class AkcssUtilityCandidateActivator
         _variant?.Attach(target, OnChanged);
     }
 
-    internal void Refresh(Control target)
+    internal void Refresh(object target)
     {
         foreach (var argument in _arguments)
         {
@@ -247,7 +245,7 @@ public sealed class AkcssUtilityCandidateActivator
         _variant?.Refresh(target);
     }
 
-    internal void Detach(Control target)
+    internal void Detach(object target)
     {
         foreach (var subscription in _subscriptions)
         {
@@ -361,14 +359,6 @@ public sealed class AkcssUtilityCandidateActivator
         return applications[0].Utility;
     }
 
-    private static Control GetControl(object target)
-    {
-        return target as Control ??
-            throw new ArgumentException(
-                $"An AKCSS utility target must derive from '{typeof(Control)}'.",
-                nameof(target));
-    }
-
     private readonly struct CandidateOperation
     {
         private readonly AkcssUtilityOperation? _operation;
@@ -410,14 +400,14 @@ public sealed class AkcssUtilityCandidateActivator
         public int Order { get; }
 
         public bool IsActive(
-            Control target,
+            object target,
             IReadOnlyList<object?> arguments)
         {
             return _operation?.IsActive(target, arguments) ?? true;
         }
 
         public void Execute(
-            Control target,
+            object target,
             IReadOnlyList<object?> arguments)
         {
             if (_operation != null)
@@ -429,7 +419,7 @@ public sealed class AkcssUtilityCandidateActivator
             _legacyApplication!.Execute(target, arguments);
         }
 
-        public void Reset(Control target)
+        public void Reset(object target)
         {
             if (_operation != null)
             {

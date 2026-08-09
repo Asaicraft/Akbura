@@ -26,13 +26,13 @@ public abstract class AkcssUtilityValueSource
 
     internal bool RecreateOnRefresh { get; }
 
-    internal void Attach(Control target, Action changed)
+    internal void Attach(object target, Action changed)
     {
         _changed = changed ?? throw new ArgumentNullException(nameof(changed));
         AttachCore(target);
     }
 
-    internal void Refresh(Control target)
+    internal void Refresh(object target)
     {
         if (RecreateOnRefresh)
         {
@@ -43,7 +43,7 @@ public abstract class AkcssUtilityValueSource
         }
     }
 
-    internal void Detach(Control target)
+    internal void Detach(object target)
     {
         DetachCore(target);
         HasValue = false;
@@ -75,9 +75,9 @@ public abstract class AkcssUtilityValueSource
         ExceptionDispatchInfo.Capture(error).Throw();
     }
 
-    private protected abstract void AttachCore(Control target);
+    private protected abstract void AttachCore(object target);
 
-    private protected abstract void DetachCore(Control target);
+    private protected abstract void DetachCore(object target);
 
     /// <summary>
     /// Creates a source whose markup extension returns the utility value directly.
@@ -88,6 +88,34 @@ public abstract class AkcssUtilityValueSource
     {
         return new DirectValueSource<TValue>(
             factory,
+            recreateOnRefresh);
+    }
+
+    /// <summary>
+    /// Creates a direct value source for an AKCSS target that is not required
+    /// to derive from <see cref="Control"/>.
+    /// </summary>
+    public static AkcssUtilityValueSource CreateForObject<TValue>(
+        Func<object, TValue> factory,
+        bool recreateOnRefresh = false)
+    {
+        return new ObjectTargetDirectValueSource<TValue>(
+            factory,
+            recreateOnRefresh);
+    }
+
+    /// <summary>
+    /// Creates a source whose late-bound markup extension result is converted
+    /// to the utility value type.
+    /// </summary>
+    public static AkcssUtilityValueSource CreateObject<TValue>(
+        Func<Control, object?> factory,
+        Func<object?, TValue> converter,
+        bool recreateOnRefresh = false)
+    {
+        return new ObjectValueSource<TValue>(
+            factory,
+            converter,
             recreateOnRefresh);
     }
 
@@ -149,12 +177,36 @@ public abstract class AkcssUtilityValueSource
                 throw new ArgumentNullException(nameof(factory));
         }
 
-        private protected override void AttachCore(Control target)
+        private protected override void AttachCore(object target)
+        {
+            SetValue(_factory(GetControl(target)));
+        }
+
+        private protected override void DetachCore(object target)
+        {
+        }
+    }
+
+    private sealed class ObjectTargetDirectValueSource<TValue>
+        : AkcssUtilityValueSource
+    {
+        private readonly Func<object, TValue> _factory;
+
+        public ObjectTargetDirectValueSource(
+            Func<object, TValue> factory,
+            bool recreateOnRefresh)
+            : base(recreateOnRefresh)
+        {
+            _factory = factory ??
+                throw new ArgumentNullException(nameof(factory));
+        }
+
+        private protected override void AttachCore(object target)
         {
             SetValue(_factory(target));
         }
 
-        private protected override void DetachCore(Control target)
+        private protected override void DetachCore(object target)
         {
         }
     }
@@ -179,12 +231,12 @@ public abstract class AkcssUtilityValueSource
                 throw new ArgumentNullException(nameof(converter));
         }
 
-        private protected override void AttachCore(Control target)
+        private protected override void AttachCore(object target)
         {
-            _subscription = _factory(target)?.Subscribe(this);
+            _subscription = _factory(GetControl(target))?.Subscribe(this);
         }
 
-        private protected override void DetachCore(Control target)
+        private protected override void DetachCore(object target)
         {
             _subscription?.Dispose();
             _subscription = null;
@@ -201,6 +253,34 @@ public abstract class AkcssUtilityValueSource
         }
 
         void IObserver<TSource>.OnCompleted()
+        {
+        }
+    }
+
+    private sealed class ObjectValueSource<TValue>
+        : AkcssUtilityValueSource
+    {
+        private readonly Func<Control, object?> _factory;
+        private readonly Func<object?, TValue> _converter;
+
+        public ObjectValueSource(
+            Func<Control, object?> factory,
+            Func<object?, TValue> converter,
+            bool recreateOnRefresh)
+            : base(recreateOnRefresh)
+        {
+            _factory = factory ??
+                throw new ArgumentNullException(nameof(factory));
+            _converter = converter ??
+                throw new ArgumentNullException(nameof(converter));
+        }
+
+        private protected override void AttachCore(object target)
+        {
+            SetValue(_converter(_factory(GetControl(target))));
+        }
+
+        private protected override void DetachCore(object target)
         {
         }
     }
@@ -230,23 +310,25 @@ public abstract class AkcssUtilityValueSource
                 throw new ArgumentNullException(nameof(converter));
         }
 
-        private protected override void AttachCore(Control target)
+        private protected override void AttachCore(object target)
         {
-            _binding = target.Bind(
+            var control = GetControl(target);
+            _binding = control.Bind(
                 _property,
-                _factory(target));
-            _subscription = target
+                _factory(control));
+            _subscription = control
                 .GetObservable(_property)
                 .Subscribe(this);
         }
 
-        private protected override void DetachCore(Control target)
+        private protected override void DetachCore(object target)
         {
+            var control = GetControl(target);
             _subscription?.Dispose();
             _subscription = null;
             _binding?.Dispose();
             _binding = null;
-            target.ClearValue(_property);
+            control.ClearValue(_property);
         }
 
         void IObserver<object?>.OnNext(object? value)
@@ -276,5 +358,13 @@ public abstract class AkcssUtilityValueSource
         void IObserver<object?>.OnCompleted()
         {
         }
+    }
+
+    private static Control GetControl(object target)
+    {
+        return target as Control ??
+            throw new ArgumentException(
+                $"This AKCSS value source requires a '{typeof(Control)}' target.",
+                nameof(target));
     }
 }

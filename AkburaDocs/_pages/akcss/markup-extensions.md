@@ -115,9 +115,27 @@ using Akbura.Markup;
         ${md}:p-3 />
 ```
 
-A variant extension must return either `bool` or `IObservable<bool>`.
-The observable form reevaluates only the affected element and utility conflict
-key.
+A prefix is not a special kind of markup extension. Existing markup extensions
+can be used directly when their resolved value supplies a boolean condition:
+
+```akbura
+<ToggleSwitch x.Name="MyToggle" />
+
+<Border ${DynamicResource MyKey}:p-5
+        ${StaticResource MyBoolValue}:p-7
+        ${Binding #MyToggle.IsChecked}:p-10 />
+```
+
+This means resource lookup and Avalonia bindings can control utilities without
+a custom extension class. A direct extension may return `bool` or
+`IObservable<bool>`. Extensions such as `DynamicResource` and `Binding` can
+also provide the condition through an Avalonia binding. The observable and
+binding forms reevaluate only the affected element and conflicting property.
+
+`UtilityVariantAttribute` is optional. It does not make an extension usable as
+a prefix. It only supplies `Order`, `ConflictGroup`, and
+`UnprefixedPrecedence` for resolving active candidates that write the same
+property. Without the attribute, prefixed candidates use normal source order.
 
 The older form:
 
@@ -131,7 +149,7 @@ is parsed only for error recovery and produces a diagnostic. Use:
 <Border ${md}:p-3 />
 ```
 
-Variant ordering and unprefixed fallback behavior are configured with
+Custom ordering and unprefixed fallback behavior can be configured with
 `UtilityVariantAttribute`.
 
 See [Utility Variants](akcss/utility-variants) for the complete property-level

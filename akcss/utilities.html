@@ -387,6 +387,16 @@ state bool isBusy = false;
 </code></pre>
 <h2 id="markup-extension-prefixes">Markup extension prefixes<a class="header-anchor" href="javascript:;" onclick="location.hash='#markup-extension-prefixes'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>A markup extension can act as a reactive utility condition:</p>
+<pre><code class="language-akbura">&lt;ToggleSwitch x.Name=&quot;MyToggle&quot; /&gt;
+
+&lt;Border ${DynamicResource MyKey}:p-5
+        ${StaticResource MyBoolValue}:p-7
+        ${Binding #MyToggle.IsChecked}:p-10 /&gt;
+</code></pre>
+<p>These are ordinary Avalonia markup extensions. No <code>UtilityVariantAttribute</code> is
+required. The attribute only changes conflict ordering for extensions that opt
+into it.</p>
+<p>Akbura also includes ordered breakpoint extensions:</p>
 <pre><code class="language-akbura">using Akbura.Markup;
 using Akbura.Styles.akcss;
 
@@ -397,7 +407,9 @@ using Akbura.Styles.akcss;
         ${xl}:p-5
         ${xxl}:p-6 /&gt;
 </code></pre>
-<p>The extension must return <code>bool</code> or <code>IObservable&lt;bool&gt;</code>. A false or not-yet-
+<p>The resolved condition must produce a boolean value. A custom extension can
+return <code>bool</code> or <code>IObservable&lt;bool&gt;</code> directly; resource and binding extensions
+can provide the value through Avalonia binding machinery. A false or not-yet-
 available value removes that candidate from conflict resolution, allowing the
 next matching utility to apply.</p>
 <p>The braces are required. <code>md:p-3</code> is retained only for parser recovery and
@@ -439,7 +451,7 @@ according to <code>UnprefixedPrecedence</code>.</li>
 </tr>
 </tbody>
 </table>
-<p>Custom variants declare these values on their extension type:</p>
+<p>Custom variants may declare these values on their extension type:</p>
 <pre><code class="language-csharp">using Akbura.Markup;
 
 [UtilityVariant(
@@ -456,7 +468,8 @@ public sealed class WideExtension
 </code></pre>
 <p><code>UtilityVariantAttribute</code> decides priority only after utilities are known to
 conflict. Sharing a <code>ConflictGroup</code> never creates a conflict between unrelated
-utilities.</p>
+properties. An extension without the attribute remains a valid prefix and uses
+source-order precedence.</p>
 <h2 id="built-in-breakpoints">Built-in breakpoints<a class="header-anchor" href="javascript:;" onclick="location.hash='#built-in-breakpoints'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>The built-in variants are available through an explicit import:</p>
 <pre><code class="language-akbura">using Akbura.Markup;

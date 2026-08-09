@@ -234,6 +234,14 @@ Built-in Styles									</span>
 					<h2 id="utility-variants">Utility variants<a class="header-anchor" href="javascript:;" onclick="location.hash='#utility-variants'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>A utility variant is a markup extension that controls whether a prefixed AKCSS
 utility is currently active.</p>
+<p>It does not need a dedicated base class or attribute. Standard markup
+extensions can be prefixes too:</p>
+<pre><code class="language-akbura">&lt;ToggleSwitch x.Name=&quot;MyToggle&quot; /&gt;
+
+&lt;Border ${DynamicResource MyKey}:p-5
+        ${StaticResource MyBoolValue}:p-7
+        ${Binding #MyToggle.IsChecked}:p-10 /&gt;
+</code></pre>
 <pre><code class="language-akbura">using Akbura.Markup;
 
 &lt;Border p-1
@@ -252,8 +260,10 @@ utility is currently active.</p>
 <p>When an observable has not produced a value yet, or when its latest value is
 <code>false</code>, the candidate is excluded. Another utility can then provide the
 property value.</p>
-<h2 id="declaring-a-variant">Declaring a variant<a class="header-anchor" href="javascript:;" onclick="location.hash='#declaring-a-variant'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Mark the markup extension class with <code>UtilityVariantAttribute</code>:</p>
+<h2 id="declaring-ordering-metadata">Declaring ordering metadata<a class="header-anchor" href="javascript:;" onclick="location.hash='#declaring-ordering-metadata'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>UtilityVariantAttribute</code> is optional. Apply it when a family of markup
+extensions needs explicit ordering or special precedence over unprefixed
+utilities:</p>
 <pre><code class="language-csharp">using Akbura.Markup;
 
 [UtilityVariant(
@@ -335,7 +345,12 @@ with the last unprefixed candidate writing the same property.</p>
     AllowMultiple = false)]
 public sealed class UtilityVariantAttribute : Attribute
 </code></pre>
-<p>The attribute can be applied once to a markup extension class.</p>
+<p>The attribute can be applied once to a markup extension class. It does not
+control whether the extension is allowed before <code>:</code>. Its only purpose is to
+provide <code>Order</code>, <code>ConflictGroup</code>, and <code>UnprefixedPrecedence</code> during
+property-level conflict resolution.</p>
+<p>Without the attribute, the extension still works as a prefix with <code>Order = 0</code>,
+no conflict group, and source-order precedence.</p>
 <h3 id="order">Order<a class="header-anchor" href="javascript:;" onclick="location.hash='#order'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
 <pre><code class="language-csharp">public double Order { get; }
 </code></pre>
@@ -891,8 +906,8 @@ non-empty conflict group and one conflicting property operation.</p>
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#declaring-a-variant'" data-id="declaring-a-variant" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Declaring a variant
+										<span v-hash="'#declaring-ordering-metadata'" data-id="declaring-ordering-metadata" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Declaring ordering metadata
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

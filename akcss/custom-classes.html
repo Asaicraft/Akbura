@@ -231,7 +231,8 @@ Built-in Styles									</span>
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>AKCSS declarations can target ordinary C# classes as well as Avalonia controls. This is useful when markup creates or configures data objects alongside the visual tree.</p>
+					<p>AKCSS declarations can target ordinary C# classes as well as Avalonia controls. The target does not need to derive from <code>Control</code>, <code>AvaloniaObject</code>, or another Avalonia base type. AKCSS resolves the CLR type and binds declarations to its writable properties.</p>
+<p>This is useful when markup creates or configures data objects alongside the visual tree.</p>
 <h2 id="define-a-custom-class">Define a custom class<a class="header-anchor" href="javascript:;" onclick="location.hash='#define-a-custom-class'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p><code>MyClass.cs</code>:</p>
 <pre><code class="language-csharp">namespace Data;

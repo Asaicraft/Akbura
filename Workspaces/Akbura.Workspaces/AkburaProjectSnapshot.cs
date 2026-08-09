@@ -259,6 +259,22 @@ public sealed class AkburaProjectSnapshot
             Documents);
     }
 
+    internal AkburaProjectSnapshot WithCompilationReferences(
+        ImmutableArray<AkburaCompilationReference> references)
+    {
+        var compilation =
+            Compilation.WithCompilationReferences(references);
+
+        return ReferenceEquals(compilation, Compilation)
+            ? this
+            : new AkburaProjectSnapshot(
+                Id,
+                VersionStamp.Create(),
+                Context,
+                compilation,
+                Documents);
+    }
+
     private static AkburaCompilation AddSyntaxTree(
     AkburaCompilation compilation,
     AkburaSyntaxTree syntaxTree)

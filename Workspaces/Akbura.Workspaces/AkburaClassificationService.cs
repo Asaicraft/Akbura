@@ -28,6 +28,8 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             AkburaDocumentSnapshot.CreateSyntaxTree(
                 text,
                 filePath ?? string.Empty,
+                rootNamespace: string.Empty,
+                projectDirectory: string.Empty,
                 cancellationToken);
 
         return GetSyntacticClassifications(

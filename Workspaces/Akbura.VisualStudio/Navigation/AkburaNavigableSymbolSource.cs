@@ -17,11 +17,15 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
     private readonly IServiceProvider
         _serviceProvider;
 
+    private readonly AkburaVisualStudioWorkspace
+        _workspaceHost;
+
     private int _disposeState;
 
     public AkburaNavigableSymbolSource(
         AkburaTextBufferContext bufferContext,
         IAkburaDefinitionService definitionService,
+        AkburaVisualStudioWorkspace workspaceHost,
         IServiceProvider serviceProvider)
     {
         _bufferContext =
@@ -34,6 +38,11 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             throw new ArgumentNullException(
                 nameof(definitionService));
 
+        _workspaceHost =
+            workspaceHost ??
+            throw new ArgumentNullException(
+                nameof(workspaceHost));
+
         _serviceProvider =
             serviceProvider ??
             throw new ArgumentNullException(
@@ -45,9 +54,18 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             SnapshotSpan triggerSpan,
             CancellationToken cancellationToken)
     {
+        AkburaNavigationTrace.Write(
+            $"Query received: " +
+            $"trigger={triggerSpan.Start.Position}, " +
+            $"length={triggerSpan.Length}, " +
+            $"snapshot={triggerSpan.Snapshot.Version.VersionNumber}, " +
+            $"character={GetCharacter(triggerSpan)}.");
+
         if (Volatile.Read(
                 ref _disposeState) != 0)
         {
+            AkburaNavigationTrace.Write(
+                "Query ignored: source is disposed.");
             return null;
         }
 
@@ -58,6 +76,9 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                         triggerSpan.Snapshot,
                         out var state))
             {
+                AkburaNavigationTrace.Write(
+                    "Query failed: no semantic buffer state " +
+                    "has been published yet.");
                 return null;
             }
 
@@ -69,11 +90,26 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             if (parsedTriggerSpan.Start.Position >=
                 state.Snapshot.Length)
             {
+                AkburaNavigationTrace.Write(
+                    $"Query failed: translated position " +
+                    $"{parsedTriggerSpan.Start.Position} is outside " +
+                    $"semantic snapshot length " +
+                    $"{state.Snapshot.Length}.");
                 return null;
             }
 
             var parsedPosition =
                 parsedTriggerSpan.Start.Position;
+
+            AkburaNavigationTrace.Write(
+                $"Semantic state found: " +
+                $"file='{state.Context.Document.FilePath}', " +
+                $"assembly='{state.Context.Project.CSharpCompilation.AssemblyName}', " +
+                $"rootNamespace='{state.Context.Project.Context.RootNamespace}', " +
+                $"projectReferences={state.Context.Project.Context.ProjectReferences.Length}, " +
+                $"semanticSnapshot={state.Snapshot.Version.VersionNumber}, " +
+                $"position={parsedPosition}, " +
+                $"context={GetTextContext(state.Snapshot, parsedPosition)}.");
 
             var definition =
                 await Task.Run(
@@ -89,6 +125,10 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                 Volatile.Read(
                     ref _disposeState) != 0)
             {
+                AkburaNavigationTrace.Write(
+                    definition == null
+                        ? "Query failed: definition service returned null."
+                        : "Query cancelled after definition lookup.");
                 return null;
             }
 
@@ -96,8 +136,20 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                     definition,
                     state.Snapshot))
             {
+                AkburaNavigationTrace.Write(
+                    $"Query failed: definition source span " +
+                    $"{definition.SourceSpan} is invalid for " +
+                    $"snapshot length {state.Snapshot.Length}.");
                 return null;
             }
+
+            AkburaNavigationTrace.Write(
+                $"Definition found: " +
+                $"sourceSpan={definition.SourceSpan}, " +
+                $"target='{definition.TargetFilePath}', " +
+                $"targetLines={definition.TargetLineSpan}, " +
+                $"targetAssembly='{definition.TargetAssemblyName ?? "<none>"}', " +
+                $"targetSource='{definition.TargetSourcePath ?? "<none>"}'.");
 
             var parsedSymbolSpan =
                 new SnapshotSpan(
@@ -113,18 +165,28 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
 
             if (currentSymbolSpan.Length == 0)
             {
+                AkburaNavigationTrace.Write(
+                    "Query failed: translated symbol span is empty.");
                 return null;
             }
+
+            AkburaNavigationTrace.Write(
+                $"Navigable symbol returned: " +
+                $"span={currentSymbolSpan.Start.Position}.." +
+                $"{currentSymbolSpan.End.Position}.");
 
             return new AkburaNavigableSymbol(
                 currentSymbolSpan,
                 definition,
+                _workspaceHost,
                 _serviceProvider);
         }
         catch (OperationCanceledException)
             when (cancellationToken
                 .IsCancellationRequested)
         {
+            AkburaNavigationTrace.Write(
+                "Query cancelled by Visual Studio.");
             throw;
         }
         catch (ArgumentException exception)
@@ -137,6 +199,10 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                 $"[Akbura] Definition span translation failed: " +
                 $"{exception}");
 
+            AkburaNavigationTrace.Write(
+                "Query failed while translating editor spans.",
+                exception);
+
             return null;
         }
         catch (Exception exception)
@@ -147,6 +213,10 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             Debug.WriteLine(
                 $"[Akbura] Definition lookup failed: " +
                 $"{exception}");
+
+            AkburaNavigationTrace.Write(
+                "Query failed with an exception.",
+                exception);
 
             return null;
         }
@@ -234,11 +304,53 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                    left.TextBuffer,
                    right.TextBuffer) &&
                left.Version.VersionNumber ==
-                   right.Version.VersionNumber;
+               right.Version.VersionNumber;
+    }
+
+    private static string GetCharacter(
+        SnapshotSpan triggerSpan)
+    {
+        if (triggerSpan.Length == 0)
+        {
+            return "<empty>";
+        }
+
+        var character =
+            triggerSpan.Snapshot[
+                triggerSpan.Start.Position];
+        return character switch
+        {
+            '\r' => "\\r",
+            '\n' => "\\n",
+            '\t' => "\\t",
+            _ => $"'{character}'",
+        };
+    }
+
+    private static string GetTextContext(
+        ITextSnapshot snapshot,
+        int position)
+    {
+        var start = Math.Max(
+            0,
+            position - 20);
+        var end = Math.Min(
+            snapshot.Length,
+            position + 21);
+        return "'" +
+            snapshot.GetText(
+                    start,
+                    end - start)
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n") +
+            "'";
     }
 
     public void Dispose()
     {
+        AkburaNavigationTrace.Write(
+            "Navigable symbol source disposed.");
+
         Interlocked.Exchange(
             ref _disposeState,
             1);

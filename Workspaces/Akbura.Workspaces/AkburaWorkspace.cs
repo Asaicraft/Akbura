@@ -1,4 +1,6 @@
+using Akbura.Language;
 using Microsoft.CodeAnalysis.Text;
+using System.Collections.Immutable;
 
 namespace Akbura.Workspaces;
 
@@ -88,7 +90,11 @@ public sealed class AkburaWorkspace : IDisposable
             }
 
             var newSolution =
-                oldSolution.WithProject(result);
+                RebuildProjectReferences(
+                    oldSolution.WithProject(result));
+
+            result = newSolution.GetRequiredProject(
+                projectId);
 
             _currentSolution = newSolution;
 
@@ -195,8 +201,13 @@ public sealed class AkburaWorkspace : IDisposable
                         newDocument);
 
                 var newSolution =
-                    oldSolution.WithProject(
-                        newProject);
+                    RebuildProjectReferences(
+                        oldSolution.WithProject(
+                            newProject));
+
+                newProject =
+                    newSolution.GetRequiredProject(
+                        projectId);
 
                 _currentSolution =
                     newSolution;
@@ -227,6 +238,8 @@ public sealed class AkburaWorkspace : IDisposable
                         oldProject.Id,
                         uri,
                         text,
+                        oldProject.Context.RootNamespace,
+                        oldProject.Context.ProjectDirectory,
                         cancellationToken);
 
                 var newProject =
@@ -234,8 +247,13 @@ public sealed class AkburaWorkspace : IDisposable
                         newDocument);
 
                 var newSolution =
-                    oldSolution.WithProject(
-                        newProject);
+                    RebuildProjectReferences(
+                        oldSolution.WithProject(
+                            newProject));
+
+                newProject =
+                    newSolution.GetRequiredProject(
+                        projectId);
 
                 _currentSolution =
                     newSolution;
@@ -304,13 +322,19 @@ public sealed class AkburaWorkspace : IDisposable
                     projectId,
                     uri,
                     text,
+                    project.Context.RootNamespace,
+                    project.Context.ProjectDirectory,
                     cancellationToken);
 
                 project = project.AddDocument(result);
             }
 
             var newSolution =
-                oldSolution.WithProject(project);
+                RebuildProjectReferences(
+                    oldSolution.WithProject(project));
+
+            project = newSolution.GetRequiredProject(
+                projectId);
 
             _currentSolution = newSolution;
 
@@ -361,7 +385,11 @@ public sealed class AkburaWorkspace : IDisposable
                 project.ReplaceDocument(result);
 
             var newSolution =
-                oldSolution.WithProject(newProject);
+                RebuildProjectReferences(
+                    oldSolution.WithProject(newProject));
+
+            newProject = newSolution.GetRequiredProject(
+                project.Id);
 
             _currentSolution = newSolution;
 
@@ -406,7 +434,11 @@ public sealed class AkburaWorkspace : IDisposable
                 project.ReplaceDocument(closedDocument);
 
             var newSolution =
-                oldSolution.WithProject(newProject);
+                RebuildProjectReferences(
+                    oldSolution.WithProject(newProject));
+
+            newProject = newSolution.GetRequiredProject(
+                project.Id);
 
             _currentSolution = newSolution;
 
@@ -446,7 +478,8 @@ public sealed class AkburaWorkspace : IDisposable
                 project.RemoveDocument(documentId);
 
             var newSolution =
-                oldSolution.WithProject(newProject);
+                RebuildProjectReferences(
+                    oldSolution.WithProject(newProject));
 
             _currentSolution = newSolution;
 
@@ -499,6 +532,99 @@ public sealed class AkburaWorkspace : IDisposable
         {
             _isDisposed = true;
         }
+    }
+
+    private static AkburaSolutionSnapshot
+        RebuildProjectReferences(
+            AkburaSolutionSnapshot solution)
+    {
+        var rebuiltProjects =
+            new Dictionary<
+                AkburaProjectId,
+                AkburaProjectSnapshot>();
+        var visiting =
+            new HashSet<AkburaProjectId>();
+
+        AkburaProjectSnapshot Rebuild(
+            AkburaProjectId projectId)
+        {
+            if (rebuiltProjects.TryGetValue(
+                    projectId,
+                    out var rebuiltProject))
+            {
+                return rebuiltProject;
+            }
+
+            var project =
+                solution.GetRequiredProject(projectId);
+
+            /*
+             * Roslyn rejects cyclic project references. Keep this guard so
+             * a temporarily inconsistent host snapshot cannot recurse
+             * forever while the solution is being reloaded.
+             */
+            if (!visiting.Add(projectId))
+            {
+                return project;
+            }
+
+            var references =
+                ImmutableArray.CreateBuilder<
+                    AkburaCompilationReference>();
+            var previousReferences =
+                project.Compilation
+                    .CompilationReferences;
+
+            foreach (var projectReference in
+                     project.Context.ProjectReferences)
+            {
+                var referencedProjectId =
+                    AkburaProjectId.FromRoslyn(
+                        projectReference.ProjectId);
+
+                if (!solution.TryGetProject(
+                        referencedProjectId,
+                        out _))
+                {
+                    continue;
+                }
+
+                var referencedCompilation =
+                    Rebuild(referencedProjectId)
+                        .Compilation;
+                var referenceIndex = references.Count;
+                references.Add(
+                    referenceIndex < previousReferences.Length
+                        ? previousReferences[referenceIndex]
+                            .WithCompilation(
+                                referencedCompilation)
+                        : referencedCompilation.ToReference());
+            }
+
+            visiting.Remove(projectId);
+
+            rebuiltProject =
+                project.WithCompilationReferences(
+                    references.ToImmutable());
+            rebuiltProjects.Add(
+                projectId,
+                rebuiltProject);
+            return rebuiltProject;
+        }
+
+        foreach (var projectId in
+                 solution.Projects.Keys)
+        {
+            _ = Rebuild(projectId);
+        }
+
+        foreach (var project in
+                 rebuiltProjects.Values)
+        {
+            solution = solution.WithProject(project);
+        }
+
+        return solution;
     }
 
     private void ThrowIfDisposed()

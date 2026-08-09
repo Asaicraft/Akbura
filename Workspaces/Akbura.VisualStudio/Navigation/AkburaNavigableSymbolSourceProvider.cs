@@ -12,6 +12,7 @@ namespace Akbura.VisualStudio.Navigation;
 [Export(typeof(INavigableSymbolSourceProvider))]
 [Name(nameof(AkburaNavigableSymbolSourceProvider))]
 [ContentType(AkburaContentTypeNames.Akbura)]
+[Order(Before = "NavigableSymbolService")]
 internal sealed class AkburaNavigableSymbolSourceProvider :
     INavigableSymbolSourceProvider
 {
@@ -72,6 +73,23 @@ internal sealed class AkburaNavigableSymbolSourceProvider :
                 nameof(buffer));
         }
 
+        var filePath = "<unknown>";
+        if (_textDocumentFactory.TryGetTextDocument(
+                buffer,
+                out var textDocument))
+        {
+            filePath = textDocument.FilePath ??
+                "<untitled>";
+        }
+
+        AkburaNavigationTrace.Write(
+            $"Provider created: " +
+            $"file='{filePath}', " +
+            $"contentType='{buffer.ContentType.TypeName}', " +
+            $"snapshot={buffer.CurrentSnapshot.Version.VersionNumber}, " +
+            $"length={buffer.CurrentSnapshot.Length}, " +
+            $"log='{AkburaNavigationTrace.LogFilePath}'.");
+
         /*
          * The classifier and navigation provider share the same
          * parsed buffer context through the text buffer property bag.
@@ -88,6 +106,7 @@ internal sealed class AkburaNavigableSymbolSourceProvider :
         return new AkburaNavigableSymbolSource(
             bufferContext,
             _definitionService,
+            _workspaceHost,
             _serviceProvider);
     }
 }

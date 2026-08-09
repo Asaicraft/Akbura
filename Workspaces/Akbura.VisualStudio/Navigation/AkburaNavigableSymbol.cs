@@ -5,6 +5,7 @@ using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.TextManager.Interop;
 using System.Diagnostics;
+using System.Text;
 
 using VsTextSpan =
     Microsoft.VisualStudio.TextManager.Interop.TextSpan;
@@ -28,9 +29,13 @@ internal sealed class AkburaNavigableSymbol :
     private readonly IServiceProvider
         _serviceProvider;
 
+    private readonly AkburaVisualStudioWorkspace
+        _workspaceHost;
+
     public AkburaNavigableSymbol(
         SnapshotSpan symbolSpan,
         AkburaDefinition definition,
+        AkburaVisualStudioWorkspace workspaceHost,
         IServiceProvider serviceProvider)
     {
         SymbolSpan = symbolSpan;
@@ -39,6 +44,11 @@ internal sealed class AkburaNavigableSymbol :
             definition ??
             throw new ArgumentNullException(
                 nameof(definition));
+
+        _workspaceHost =
+            workspaceHost ??
+            throw new ArgumentNullException(
+                nameof(workspaceHost));
 
         _serviceProvider =
             serviceProvider ??
@@ -55,11 +65,17 @@ internal sealed class AkburaNavigableSymbol :
     public void Navigate(
         INavigableRelationship relationship)
     {
+        AkburaNavigationTrace.Write(
+            $"Navigate requested: " +
+            $"relationship='{relationship.GetType().FullName}'.");
+
         if (!ReferenceEquals(
                 relationship,
                 PredefinedNavigableRelationships
                     .Definition))
         {
+            AkburaNavigationTrace.Write(
+                "Navigate ignored: unsupported relationship.");
             return;
         }
 
@@ -82,6 +98,10 @@ internal sealed class AkburaNavigableSymbol :
             Debug.WriteLine(
                 $"[Akbura] Navigation failed: " +
                 $"{exception}");
+
+            AkburaNavigationTrace.Write(
+                "Navigate failed with an exception.",
+                exception);
         }
     }
 
@@ -89,14 +109,36 @@ internal sealed class AkburaNavigableSymbol :
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
-        var filePath =
-            _definition.TargetFilePath;
+        var hasPhysicalProjectSource =
+            _workspaceHost.TryResolveProjectSource(
+                _definition,
+                out var projectSourcePath);
+
+        var filePath = hasPhysicalProjectSource
+            ? projectSourcePath
+            : _definition.TargetFilePath;
+
+        AkburaNavigationTrace.Write(
+            $"Navigation target selected: " +
+            $"path='{filePath}', " +
+            $"physicalProjectSource={hasPhysicalProjectSource}, " +
+            $"materialize={!hasPhysicalProjectSource && _definition.TargetText != null}.");
+
+        MaterializeTargetSource(
+            filePath,
+            hasPhysicalProjectSource
+                ? null
+                : _definition.TargetText);
 
         if (!File.Exists(filePath))
         {
             Debug.WriteLine(
                 $"[Akbura] Definition file was not found: " +
                 $"'{filePath}'.");
+
+            AkburaNavigationTrace.Write(
+                $"Navigate failed: target file '{filePath}' " +
+                $"does not exist.");
 
             return;
         }
@@ -145,5 +187,44 @@ internal sealed class AkburaNavigableSymbol :
         ErrorHandler.ThrowOnFailure(
             textView.EnsureSpanVisible(
                 visibleSpan));
+
+        AkburaNavigationTrace.Write(
+            $"Navigate completed: " +
+            $"path='{filePath}', " +
+            $"selection={start.Line}:{start.Character}.." +
+            $"{end.Line}:{end.Character}.");
+    }
+
+    private static void MaterializeTargetSource(
+        string filePath,
+        Microsoft.CodeAnalysis.Text.SourceText? text)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        var content = text.ToString();
+        if (File.Exists(filePath) &&
+            string.Equals(
+                File.ReadAllText(filePath),
+                content,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var directory =
+            Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(
+            filePath,
+            content,
+            new UTF8Encoding(
+                encoderShouldEmitUTF8Identifier: true));
     }
 }

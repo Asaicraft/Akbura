@@ -51,6 +51,8 @@ public sealed class AkburaDocumentSnapshot
         AkburaProjectId projectId,
         Uri uri,
         SourceText text,
+        string rootNamespace,
+        string projectDirectory,
         CancellationToken cancellationToken)
     {
         var filePath = DocumentUri.GetFilePath(uri);
@@ -59,6 +61,8 @@ public sealed class AkburaDocumentSnapshot
             CreateSyntaxTree(
                 text,
                 filePath,
+                rootNamespace,
+                projectDirectory,
                 cancellationToken);
 
         return new AkburaDocumentSnapshot(
@@ -141,6 +145,8 @@ public sealed class AkburaDocumentSnapshot
     internal static AkburaSyntaxTree CreateSyntaxTree(
         SourceText text,
         string filePath,
+        string rootNamespace,
+        string projectDirectory,
         CancellationToken cancellationToken)
     {
         if (string.Equals(
@@ -148,9 +154,19 @@ public sealed class AkburaDocumentSnapshot
                 ".akcss",
                 StringComparison.OrdinalIgnoreCase))
         {
+            var sourcePath =
+                GetProjectRelativeSourcePath(
+                    filePath,
+                    projectDirectory);
+            var logicalName =
+                AkcssGeneratedModuleNames.GetMetadataName(
+                    rootNamespace,
+                    sourcePath);
+
             return AkcssSyntaxTree.ParseText(
                 text,
                 filePath,
+                logicalName,
                 cancellationToken);
         }
 
@@ -158,6 +174,38 @@ public sealed class AkburaDocumentSnapshot
             text,
             filePath,
             cancellationToken);
+    }
+
+    private static string GetProjectRelativeSourcePath(
+        string filePath,
+        string projectDirectory)
+    {
+        if (!string.IsNullOrWhiteSpace(projectDirectory) &&
+            !string.IsNullOrWhiteSpace(filePath))
+        {
+            var projectPath = Path
+                .GetFullPath(projectDirectory)
+                .TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+            var fullSourcePath = Path.GetFullPath(filePath);
+            var projectPrefix =
+                projectPath + Path.DirectorySeparatorChar;
+
+            if (fullSourcePath.StartsWith(
+                    projectPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return AkcssGeneratedModuleNames
+                    .NormalizeSourcePath(
+                        fullSourcePath[
+                            projectPrefix.Length..]);
+            }
+        }
+
+        return AkcssGeneratedModuleNames
+            .NormalizeSourcePath(
+                Path.GetFileName(filePath));
     }
 
     private static AkburaSyntaxTree WithChangedText(

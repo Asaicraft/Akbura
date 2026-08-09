@@ -91,6 +91,12 @@ internal sealed class AkburaReferencedSource
             ReferenceEquals(materializedTree, syntaxTree);
     }
 
+    internal bool ContainsSyntax(AkburaSyntax syntax)
+    {
+        return TryGetMaterializedSyntaxTree(out var syntaxTree) &&
+            ReferenceEquals(syntaxTree.GetRootSyntax(), syntax.Root);
+    }
+
     public bool TryGetComponentDeclaration(
         AkburaSyntaxTree syntaxTree,
         out AkburaModuleDeclaration declaration)

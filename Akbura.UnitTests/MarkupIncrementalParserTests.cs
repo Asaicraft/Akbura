@@ -542,6 +542,99 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void RemovingPlainAttributeValue_ProducesIncompleteAttribute()
+    {
+        const string oldCode = "<Button Hello=\"World\" Role=\"Action\"/>";
+        const string removed = "\"World\"";
+        var changeStart = oldCode.IndexOf(removed, StringComparison.Ordinal);
+        var newCode = oldCode.Remove(changeStart, removed.Length);
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: removed.Length,
+            newLength: 0);
+
+        Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            oldMarkup.Element.StartTag!.Attributes[0]);
+        var incomplete = Assert.IsType<GreenIncompleteAttributeSyntax>(
+            newMarkup.Element.StartTag!.Attributes[0]);
+        Assert.Equal("Hello", incomplete.Name.Identifier.ValueText);
+        Assert.True(incomplete.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void RemovingPrefixedUtility_ProducesIncompletePrefixedAttribute()
+    {
+        const string oldCode = "<Button {condition}:p-5/>";
+        const string removed = "p-5";
+        var changeStart = oldCode.IndexOf(removed, StringComparison.Ordinal);
+        var newCode = oldCode.Remove(changeStart, removed.Length);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: removed.Length,
+            newLength: 0);
+
+        Assert.True(
+            newMarkup.Element.StartTag!.Attributes.Count > 0,
+            $"No attribute was parsed from '{newMarkup.ToFullString()}'; " +
+            $"close token: '{newMarkup.Element.StartTag.CloseToken.ToFullString()}'.");
+        var incomplete = Assert.IsType<GreenIncompletePrefixedAttributeSyntax>(
+            newMarkup.Element.StartTag.Attributes[0]);
+        Assert.IsType<GreenExpressionConditionalPrefixSyntax>(incomplete.Prefix);
+        Assert.True(incomplete.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void InsertingUnmatchedEndTag_ProducesIncompleteTag()
+    {
+        const string oldCode = "<StackPanel><Button/></StackPanel>";
+        const string inserted = "</Button>";
+        var changeStart = oldCode.IndexOf("<Button", StringComparison.Ordinal);
+        var newCode = oldCode.Insert(changeStart, inserted);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: 0,
+            newLength: inserted.Length);
+
+        Assert.Equal(2, newMarkup.Element.Body.Count);
+        Assert.IsType<GreenIncompleteTagSyntax>(newMarkup.Element.Body[0]);
+        Assert.IsType<GreenMarkupElementContentSyntax>(newMarkup.Element.Body[1]);
+        Assert.Equal("StackPanel", newMarkup.Element.EndTag!.Name.ToFullString());
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void RemovingStartTagCloseToken_PreservesNestedElement()
+    {
+        const string oldCode = "<StackPanel gap-3><Button/></StackPanel>";
+        var changeStart = oldCode.IndexOf('>');
+        var newCode = oldCode.Remove(changeStart, 1);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: 1,
+            newLength: 0);
+
+        Assert.True(newMarkup.Element.StartTag!.CloseToken.IsMissing);
+        Assert.Equal(1, newMarkup.Element.Body.Count);
+        Assert.IsType<GreenMarkupElementContentSyntax>(newMarkup.Element.Body[0]);
+        Assert.Equal("StackPanel", newMarkup.Element.EndTag!.Name.ToFullString());
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void OldMarkupWithDiagnostics_IsNotReusedAsWholeRoot()
     {
         const string code = "<Button>@if(isOpen){<FirstControl/>}</Button>";

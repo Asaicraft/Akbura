@@ -622,6 +622,31 @@ node MarkupExtensionConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
 	Colon     : ColonToken;
 }
 
+/// <summary>
+/// A closing tag which cannot complete an element because its opening tag is
+/// absent, for example an unmatched &lt;/Button&gt; inside another element.
+/// </summary>
+node IncompleteTagSyntax : MarkupContentSyntax {
+	EndTag : MarkupEndTagSyntax;
+}
+
+/// <summary>
+/// A conditional utility prefix without the utility that should follow it,
+/// for example {condition}: at the end of a start tag.
+/// </summary>
+node IncompletePrefixedAttributeSyntax : MarkupAttributeSyntax {
+	Prefix : TailwindPrefixSegmentSyntax;
+}
+
+/// <summary>
+/// A plain attribute whose equals token is present but whose value is absent,
+/// for example Content= at the end of a start tag.
+/// </summary>
+node IncompleteAttributeSyntax : MarkupAttributeSyntax {
+	Name        : SimpleName;
+	EqualsToken : EqualsToken;
+}
+
 // ─────────────────────────────────────────────────────────────
 // AKCSS ROOT
 // ─────────────────────────────────────────────────────────────

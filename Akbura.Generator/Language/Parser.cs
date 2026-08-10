@@ -899,18 +899,8 @@ internal sealed partial class Parser : IDisposable
                 // Strip the leading trivia of the token, and add it to the target's final trivia list.
                 builder.Add(token.GetLeadingTrivia());
 
-                if (token.Width > 0)
+                if (diagnostic == null)
                 {
-                    // Then add the token (stripped of its own trivia) to the target's final trivia list.
-
-                    builder.Add(GreenSyntaxFactory.SkippedTokensTrivia(
-                        token.TokenWithLeadingTrivia(null).TokenWithTrailingTrivia(null)));
-                }
-                else
-                {
-                    // Do not bother adding zero-width tokens to target's final trivia list.  Lots of code (like
-                    // GetStructure) does not like it at all. But do keep around any diagnostics that might have
-                    // been on this zero width token, and move it to the target.
                     var existing = (SyntaxDiagnosticInfo)token.GetDiagnostics().FirstOrDefault()!;
                     if (existing != null)
                     {
@@ -918,6 +908,15 @@ internal sealed partial class Parser : IDisposable
                         finalDiagnosticOffset = currentOffset + token.GetLeadingTriviaWidth() + existing.Position;
                     }
                 }
+
+                if (token.Width > 0)
+                {
+                    // Then add the token (stripped of its own trivia) to the target's final trivia list.
+
+                    builder.Add(GreenSyntaxFactory.SkippedTokensTrivia(
+                        token.TokenWithLeadingTrivia(null).TokenWithTrailingTrivia(null)));
+                }
+                // Do not add zero-width tokens to trivia. Their diagnostics were preserved above.
 
                 // Finally strip the trailing trivia of the token, and add it to the target's final list.
                 builder.Add(token.GetTrailingTrivia());

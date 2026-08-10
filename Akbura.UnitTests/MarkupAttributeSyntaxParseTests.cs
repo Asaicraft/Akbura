@@ -167,6 +167,20 @@ public class MarkupAttributeSyntaxParseTests
     }
 
     [Fact]
+    public void ExpressionPrefix_MissingUtility_ProducesIncompletePrefixedAttribute()
+    {
+        const string code = "{condition}:";
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenIncompletePrefixedAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+
+        Assert.IsType<GreenExpressionConditionalPrefixSyntax>(syntax.Prefix);
+        Assert.True(syntax.ContainsDiagnostics);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
     public void AttachedPropertyAttribute_ParseSuccessfully()
     {
         const string code = "Grid.Column={1}";
@@ -347,18 +361,17 @@ public class MarkupAttributeSyntaxParseTests
     }
 
     [Fact]
-    public void TailwindAttribute_MissingNameAfterPrefix_ProducesMissingToken()
+    public void TailwindAttribute_MissingNameAfterPrefix_ProducesIncompleteAttribute()
     {
         const string code = "md:";
 
         var parser = MakeParser(code);
 
-        var syntax = Assert.IsType<GreenTailwindFullAttributeSyntax>(
+        var syntax = Assert.IsType<GreenIncompletePrefixedAttributeSyntax>(
             parser.ParseMarkupAttributeSyntax());
 
         Assert.IsType<GreenSimpleConditionalPrefixSyntax>(syntax.Prefix);
-        Assert.True(syntax.Name.Identifier.IsMissing);
-        Assert.Null(syntax.Minus);
+        Assert.True(syntax.ContainsDiagnostics);
         Assert.Equal(code, syntax.ToFullString());
     }
 
@@ -410,18 +423,18 @@ public class MarkupAttributeSyntaxParseTests
     }
 
     [Fact]
-    public void PlainAttribute_MissingValue_DoesNotCrash()
+    public void PlainAttribute_MissingValue_ProducesIncompleteAttribute()
     {
         const string code = "Title=";
 
         var parser = MakeParser(code);
 
-        var syntax = Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+        var syntax = Assert.IsType<GreenIncompleteAttributeSyntax>(
             parser.ParseMarkupAttributeSyntax());
 
         Assert.Equal("Title", syntax.Name.ToFullString());
         Assert.False(syntax.EqualsToken.IsMissing);
-        Assert.Null(syntax.Value);
+        Assert.True(syntax.ContainsDiagnostics);
         Assert.Equal(code, syntax.ToFullString());
     }
 

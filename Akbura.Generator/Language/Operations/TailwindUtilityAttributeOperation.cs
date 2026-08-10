@@ -33,7 +33,7 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
             ? throw new ArgumentException("Tailwind utility name cannot be empty.", nameof(utilityName))
             : utilityName;
         Utilities = utilities.IsDefault
-            ? ImmutableArray<ITailwindUtilitySymbol>.Empty
+            ? []
             : utilities;
         Utility = utility ?? (Utilities.Length == 0 ? null : Utilities[0]);
         Arguments = arguments.IsDefault ? ImmutableArray<TailwindUtilityArgument>.Empty : arguments;

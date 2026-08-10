@@ -15,14 +15,11 @@ namespace Akbura.VisualStudio.Completion;
 internal sealed class AkburaCompletionSourceProvider :
     IAsyncCompletionSourceProvider
 {
-    private readonly ITextDocumentFactoryService
-        _textDocumentFactory;
+    private readonly ITextDocumentFactoryService _textDocumentFactory;
 
-    private readonly AkburaVisualStudioWorkspace
-        _workspaceHost;
+    private readonly AkburaVisualStudioWorkspace _workspaceHost;
 
-    private readonly AkburaParserService
-        _parserService;
+    private readonly AkburaParserService _parserService;
 
     [ImportingConstructor]
     public AkburaCompletionSourceProvider(
@@ -44,8 +41,7 @@ internal sealed class AkburaCompletionSourceProvider :
             "[Akbura.Completion] Source provider created.");
     }
 
-    public IAsyncCompletionSource GetOrCreate(
-        ITextView textView)
+    public IAsyncCompletionSource GetOrCreate(ITextView textView)
     {
         if (textView == null)
         {

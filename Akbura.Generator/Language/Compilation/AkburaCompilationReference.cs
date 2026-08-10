@@ -3,6 +3,7 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace Akbura.Language;
@@ -85,6 +86,24 @@ internal sealed class AkburaCompilationReference
 
         symbol = null!;
         return false;
+    }
+
+    internal IEnumerable<IAkburaComponentSymbol> GetComponentSymbols()
+    {
+        foreach (var syntaxTree in Compilation.SyntaxTrees)
+        {
+            var semanticModel = Compilation.GetSemanticModel(syntaxTree);
+            if (semanticModel.GetDeclaredSymbol(
+                    syntaxTree.GetRoot()) is IAkburaComponentSymbol symbol)
+            {
+                yield return symbol;
+            }
+        }
+
+        foreach (var symbol in Compilation.GetReferencedComponentSymbols())
+        {
+            yield return symbol;
+        }
     }
 
     internal ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(

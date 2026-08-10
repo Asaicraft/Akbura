@@ -8,7 +8,7 @@ namespace Akbura.Workspaces;
 /// <summary>
 /// Represents one immutable, syntax-only Akbura document.
 /// </summary>
-public sealed class AkburaSyntacticDocument
+public sealed partial class AkburaSyntacticDocument
 {
     private readonly ImmutableArray<BlockBoundaries>
         _indentationBlocks;

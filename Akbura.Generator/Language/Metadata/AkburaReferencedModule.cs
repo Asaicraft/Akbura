@@ -4,6 +4,7 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Threading;
@@ -88,6 +89,23 @@ internal sealed class AkburaReferencedModule
 
         symbol = null!;
         return false;
+    }
+
+    internal IEnumerable<IAkburaComponentSymbol> GetComponentSymbols()
+    {
+        foreach (var source in _lazyEmbeddedData.Value.Sources)
+        {
+            foreach (var declaration in source.Source.Declarations)
+            {
+                if (declaration.Kind == DeclarationKind.Component &&
+                    declaration.MetadataName is { Length: > 0 } metadataName &&
+                    source.TryGetComponentSymbol(metadataName, out var symbol))
+                {
+                    yield return symbol;
+                    break;
+                }
+            }
+        }
     }
 
     public ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(

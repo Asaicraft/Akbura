@@ -174,6 +174,46 @@ public sealed class WorkspaceClassificationTests
     }
 
     [Fact]
+    public void SemanticWorkspace_ComponentAfterGlobalUsingsCanBeEditedRepeatedly()
+    {
+        using var workspace = CreateSemanticWorkspace();
+        var globalUsingsPath = Path.GetFullPath("GlobalUsings.akbura");
+        var componentPath = Path.GetFullPath("Counter.akbura");
+
+        workspace.OpenOrChangeDocumentContext(
+            new Uri(globalUsingsPath),
+            SourceText.From("global using Avalonia.Controls;"));
+
+        var initialText = SourceText.From(
+            "state string text = \"\";\n\n<Button/>");
+        var initialContext = workspace.OpenOrChangeDocumentContext(
+            new Uri(componentPath),
+            initialText);
+        _ = workspace.LanguageServices.Classification.GetClassifications(
+            initialContext,
+            new TextSpan(0, initialText.Length));
+
+        var firstEdit = SourceText.From(
+            "state string text = \"б\";\n\n<Button/>");
+        var firstContext = workspace.OpenOrChangeDocumentContext(
+            new Uri(componentPath),
+            firstEdit);
+
+        var secondEdit = SourceText.From(
+            "state string text = \"ба\";\n\n<Button/>");
+        var secondContext = workspace.OpenOrChangeDocumentContext(
+            new Uri(componentPath),
+            secondEdit);
+
+        Assert.True(firstContext.Document.Text.ContentEquals(firstEdit));
+        Assert.True(secondContext.Document.Text.ContentEquals(secondEdit));
+        Assert.NotEmpty(
+            workspace.LanguageServices.Classification.GetClassifications(
+                secondContext,
+                new TextSpan(0, secondEdit.Length)));
+    }
+
+    [Fact]
     public void SemanticClassification_ImportedAkcssUtilityUsesOwningSemanticModel()
     {
         const string stylesSource = """

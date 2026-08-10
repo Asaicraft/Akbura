@@ -92,8 +92,7 @@ public sealed class AkburaProjectSnapshot
         return false;
     }
 
-    internal AkburaProjectSnapshot AddDocument(
-        AkburaDocumentSnapshot document)
+    internal AkburaProjectSnapshot AddDocument(AkburaDocumentSnapshot document)
     {
         if (document == null)
         {

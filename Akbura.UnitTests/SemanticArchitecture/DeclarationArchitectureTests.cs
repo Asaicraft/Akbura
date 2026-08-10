@@ -262,6 +262,99 @@ public sealed class DeclarationArchitectureTests : SemanticArchitectureTestBase
         Assert.Equal(1, newCompilation.SyntaxAndDeclarations.GetLazyState().SyntaxOrdinalMap[newSecond]);
     }
 
+    [Fact]
+    public void SyntaxAndDeclarationManager_ReplaceSyntaxTreeUsesDeclarationOrdinalAfterGlobalUsings()
+    {
+        var globalUsings = AkburaSyntaxTree.ParseText(
+            "global using System;",
+            "GlobalUsings.akbura");
+        var first = AkburaSyntaxTree.ParseText(
+            "state int first = 0;",
+            "First.akbura");
+        var oldSecond = AkburaSyntaxTree.ParseText(
+            "state int second = 0;",
+            "Second.akbura");
+        var newSecond = AkburaSyntaxTree.ParseText(
+            "state int second = 1;",
+            "Second.akbura");
+        var oldCompilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [globalUsings, first, oldSecond]);
+        var oldTable = oldCompilation.DeclarationTable;
+
+        var newCompilation = oldCompilation.ReplaceSyntaxTree(
+            oldSecond,
+            newSecond);
+        var newTable = newCompilation.DeclarationTable;
+
+        Assert.Equal(2, newTable.Components.Length);
+        Assert.Same(oldTable.Components[0], newTable.Components[0]);
+        Assert.NotSame(oldTable.Components[1], newTable.Components[1]);
+        Assert.Same(newSecond, newCompilation.SyntaxTrees[2]);
+    }
+
+    [Fact]
+    public void SyntaxAndDeclarationManager_ReplaceGlobalUsingsKeepsComponentDeclarations()
+    {
+        var oldGlobalUsings = AkburaSyntaxTree.ParseText(
+            "global using System;",
+            "GlobalUsings.akbura");
+        var newGlobalUsings = AkburaSyntaxTree.ParseText(
+            "global using System.Collections.Generic;",
+            "GlobalUsings.akbura");
+        var component = AkburaSyntaxTree.ParseText(
+            "state int count = 0;",
+            "Counter.akbura");
+        var oldCompilation = new AkburaCompilation(
+            CreateCSharpCompilation(),
+            [oldGlobalUsings, component]);
+        var oldDeclaration = Assert.Single(
+            oldCompilation.DeclarationTable.Components);
+
+        var newCompilation = oldCompilation.ReplaceSyntaxTree(
+            oldGlobalUsings,
+            newGlobalUsings);
+
+        Assert.Same(
+            oldDeclaration,
+            Assert.Single(newCompilation.DeclarationTable.Components));
+        Assert.Same(newGlobalUsings, newCompilation.SyntaxTrees[0]);
+    }
+
+    [Fact]
+    public void SyntaxAndDeclarationManager_ReplaceAkcssSyntaxTreeUsesDeclarationOrdinalAfterGlobalUsings()
+    {
+        var component = AkburaSyntaxTree.ParseText(
+            "state int count = 0;",
+            "Counter.akbura");
+        var globalUsings = AkcssSyntaxTree.ParseText(
+            "@using Avalonia.Controls;",
+            "GlobalUsings.akcss");
+        var first = AkcssSyntaxTree.ParseText(
+            ".first { Width: 1; }",
+            "First.akcss");
+        var oldSecond = AkcssSyntaxTree.ParseText(
+            ".second { Width: 2; }",
+            "Second.akcss");
+        var newSecond = AkcssSyntaxTree.ParseText(
+            ".second { Width: 3; }",
+            "Second.akcss");
+        var oldCompilation = CreateCompilation(
+            component,
+            [globalUsings, first, oldSecond]);
+        var oldTable = oldCompilation.DeclarationTable;
+
+        var newCompilation = oldCompilation.ReplaceAkcssSyntaxTree(
+            oldSecond,
+            newSecond);
+        var newTable = newCompilation.DeclarationTable;
+
+        Assert.Equal(2, newTable.AkcssModules.Length);
+        Assert.Same(oldTable.AkcssModules[0], newTable.AkcssModules[0]);
+        Assert.NotSame(oldTable.AkcssModules[1], newTable.AkcssModules[1]);
+        Assert.Same(newSecond, newCompilation.AkcssSyntaxTrees[2]);
+    }
+
 
     [Fact]
     public void SyntaxAndDeclarationManager_ReplaceSyntaxTreeCarriesLastComputedMemberNameBoxes()

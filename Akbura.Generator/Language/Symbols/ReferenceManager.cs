@@ -233,6 +233,25 @@ internal sealed partial class AkburaCompilation
             }
         }
 
+        public IEnumerable<IAkburaComponentSymbol> GetComponentSymbols()
+        {
+            foreach (var reference in _compilationReferences)
+            {
+                foreach (var symbol in reference.GetComponentSymbols())
+                {
+                    yield return symbol;
+                }
+            }
+
+            foreach (var module in Modules)
+            {
+                foreach (var symbol in module.GetComponentSymbols())
+                {
+                    yield return symbol;
+                }
+            }
+        }
+
         public ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
         {
             using var builder = ImmutableArrayBuilder<AkcssSyntaxTree>.Rent();

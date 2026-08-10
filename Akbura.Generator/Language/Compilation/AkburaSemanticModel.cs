@@ -3024,41 +3024,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private IEnumerable<string> GetAkburaComponentCandidateMetadataNames(
         MarkupComponentNameSyntax componentName)
     {
-        var nameText = componentName.ToFullString().Trim();
-        if (string.IsNullOrWhiteSpace(nameText))
+        foreach (var metadataName in
+                 GetAkburaComponentCandidateMetadataNames(
+                     componentName.ToFullString()))
         {
-            yield break;
+            yield return metadataName;
         }
-
-        if (nameText.StartsWith("global::", StringComparison.Ordinal))
-        {
-            yield return nameText["global::".Length..];
-            yield break;
-        }
-
-        if (nameText.IndexOf("::", StringComparison.Ordinal) >= 0)
-        {
-            yield break;
-        }
-
-        if (nameText.IndexOf(".", StringComparison.Ordinal) >= 0)
-        {
-            yield return nameText;
-            yield break;
-        }
-
-        foreach (var @namespace in GetAkburaUsingNamespaces())
-        {
-            yield return @namespace + "." + nameText;
-        }
-
-        var currentNamespace = GetAkburaNamespaceText(SyntaxTree.GetRoot(), SyntaxTree);
-        if (currentNamespace.Length > 0)
-        {
-            yield return currentNamespace + "." + nameText;
-        }
-
-        yield return nameText;
     }
 
     private ImmutableArray<string> GetAkburaUsingNamespaces()

@@ -39,8 +39,7 @@ internal sealed class AkburaOutliningTagger :
     {
         if (spans == null || spans.Count == 0)
         {
-            return Array.Empty<
-                ITagSpan<IOutliningRegionTag>>();
+            return [];
         }
 
         var snapshot = spans[0].Snapshot;
@@ -54,8 +53,7 @@ internal sealed class AkburaOutliningTagger :
             ScheduleRefresh(
                 snapshot,
                 task);
-            return Array.Empty<
-                ITagSpan<IOutliningRegionTag>>();
+            return [];
         }
 
         var result =

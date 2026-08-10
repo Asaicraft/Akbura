@@ -68,6 +68,15 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private AkburaParsedBufferState? _publishedSemanticState;
 
     /// <summary>
+    /// Stores the latest document context independently of semantic
+    /// classification. Completion can consume this state as soon as the
+    /// workspace has accepted the document.
+    /// </summary>
+    private PublishedDocumentContext? _publishedDocumentContext;
+
+    private event Action? DocumentContextPublished;
+
+    /// <summary>
     /// Monotonically increasing editor request version.
     /// </summary>
     private long _requestedVersion;
@@ -204,6 +213,78 @@ internal sealed class AkburaTextBufferContext : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Returns a published document context, waiting only until the workspace
+    /// has accepted a document. Semantic classification may still be running.
+    /// </summary>
+    internal async Task<AkburaDocumentContext?>
+        GetPublishedDocumentContextAsync(
+        ITextSnapshot requestedSnapshot,
+        CancellationToken cancellationToken)
+    {
+        ValidateRequestedSnapshot(requestedSnapshot);
+
+        var current = Volatile.Read(
+            ref _publishedDocumentContext);
+        if (current != null &&
+            current.Snapshot.Version.VersionNumber <=
+                requestedSnapshot.Version.VersionNumber)
+        {
+            return current.Context;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            return null;
+        }
+
+        var completion =
+            new TaskCompletionSource<AkburaDocumentContext?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void OnPublished()
+        {
+            var published = Volatile.Read(
+                ref _publishedDocumentContext);
+            if (published != null)
+            {
+                completion.TrySetResult(published.Context);
+            }
+            else if (Volatile.Read(ref _disposeState) != 0)
+            {
+                completion.TrySetResult(null);
+            }
+        }
+
+        DocumentContextPublished += OnPublished;
+        try
+        {
+            /*
+             * A semantic publication can race with subscribing to Changed.
+             * Check once more before awaiting the next notification.
+             */
+            var published = Volatile.Read(
+                ref _publishedDocumentContext);
+            if (published != null)
+            {
+                return published.Context;
+            }
+
+            using (cancellationToken.Register(
+                       () => completion.TrySetCanceled()))
+            using (_disposeCancellation.Token.Register(
+                       () => completion.TrySetResult(null)))
+            {
+                return await completion.Task.ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            DocumentContextPublished -= OnPublished;
+        }
+    }
+
     private void ValidateRequestedSnapshot(
         ITextSnapshot requestedSnapshot)
     {
@@ -243,6 +324,25 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         document = state.Document;
         parsedSnapshot = state.Snapshot;
+        return true;
+    }
+
+    internal bool TryGetLatestDocumentContext(
+        out AkburaDocumentContext context,
+        out ITextSnapshot snapshot)
+    {
+        var published = Volatile.Read(ref _publishedDocumentContext);
+
+        if (published == null)
+        {
+            context = null!;
+            snapshot = null!;
+            return false;
+        }
+
+        context = published.Context;
+        snapshot = published.Snapshot;
+
         return true;
     }
 
@@ -620,6 +720,12 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return null;
             }
 
+            PublishDocumentContext(
+                new PublishedDocumentContext(
+                    request.RequestVersion,
+                    request.Snapshot,
+                    context));
+
             var classifications =
                 _classificationService.GetClassifications(
                     context,
@@ -673,6 +779,36 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         previous),
                     previous))
             {
+                return;
+            }
+        }
+    }
+
+    private void PublishDocumentContext(
+        PublishedDocumentContext state)
+    {
+        while (true)
+        {
+            var previous = Volatile.Read(
+                ref _publishedDocumentContext);
+            if (previous != null &&
+                previous.RequestVersion >= state.RequestVersion)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(
+                        ref _publishedDocumentContext,
+                        state,
+                        previous),
+                    previous))
+            {
+                Debug.WriteLine(
+                    $"[Akbura.Completion] Document context published: " +
+                    $"request={state.RequestVersion}, " +
+                    $"snapshot={state.Snapshot.Version.VersionNumber}.");
+                DocumentContextPublished?.Invoke();
                 return;
             }
         }
@@ -841,6 +977,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
          * Release classifier subscriptions held by this context.
          */
         Changed = null;
+        DocumentContextPublished = null;
     }
 
     private sealed class UpdateRequest
@@ -866,5 +1003,24 @@ internal sealed class AkburaTextBufferContext : IDisposable
         public ITextSnapshot Snapshot { get; }
 
         public SourceText Text { get; }
+    }
+
+    private sealed class PublishedDocumentContext
+    {
+        public PublishedDocumentContext(
+            long requestVersion,
+            ITextSnapshot snapshot,
+            AkburaDocumentContext context)
+        {
+            RequestVersion = requestVersion;
+            Snapshot = snapshot;
+            Context = context;
+        }
+
+        public long RequestVersion { get; }
+
+        public ITextSnapshot Snapshot { get; }
+
+        public AkburaDocumentContext Context { get; }
     }
 }

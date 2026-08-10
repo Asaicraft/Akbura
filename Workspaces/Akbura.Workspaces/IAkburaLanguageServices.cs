@@ -5,4 +5,6 @@ public interface IAkburaLanguageServices
     IAkburaClassificationService Classification { get; }
 
     IAkburaDefinitionService Definition { get; }
+
+    IAkburaCompletionService Completion { get; }
 }

@@ -95,4 +95,122 @@ public sealed class WorkspaceSyntacticDocumentTests
         Assert.Empty(document.OutliningRegions);
         Assert.Equal(0, document.GetDesiredIndentationLevel(1));
     }
+
+    [Theory]
+    [InlineData("<", AkburaCompletionContextKind.ComponentName, "")]
+    [InlineData("<Sta", AkburaCompletionContextKind.ComponentName, "Sta")]
+    [InlineData("<Card ", AkburaCompletionContextKind.AttributeName, "")]
+    [InlineData("<Card Tit", AkburaCompletionContextKind.AttributeName, "Tit")]
+    [InlineData("</", AkburaCompletionContextKind.ClosingComponentName, "")]
+    public void SyntacticDocument_DetectsCompletionContext(
+        string source,
+        AkburaCompletionContextKind expectedKind,
+        string expectedPrefix)
+    {
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(source.Length);
+
+        Assert.Equal(expectedKind, context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(context.ApplicableSpan));
+    }
+
+    [Fact]
+    public void SyntacticDocument_AttributeCompletionContainsExistingAttributes()
+    {
+        const string source = "<Card Title=\"Hello\" Compact ";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(source.Length);
+
+        Assert.Equal(
+            AkburaCompletionContextKind.AttributeName,
+            context.Kind);
+        Assert.Contains("Title", context.ExistingAttributeNames);
+        Assert.Contains("Compact", context.ExistingAttributeNames);
+    }
+
+    [Theory]
+    [InlineData("<Card>", "</Card>")]
+    [InlineData("<Unknown>", "</Unknown>")]
+    [InlineData("<Card.Title>", "</Card.Title>")]
+    [InlineData("<Card/>", null)]
+    [InlineData("</Card>", null)]
+    [InlineData("<Card></Card>", null)]
+    [InlineData("<Card Text=\"a>b\">", null)]
+    [InlineData("<Card>\n<Border>", "</Border>")]
+    public void SyntacticDocument_DeterminesAutoClosingTag(
+        string source,
+        string? expected)
+    {
+        var position = source.IndexOf(">", StringComparison.Ordinal) + 1;
+        if (source.EndsWith(">", StringComparison.Ordinal) &&
+            expected == "</Border>")
+        {
+            position = source.Length;
+        }
+
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.Equal(
+            expected,
+            document.GetAutoClosingTagText(position));
+    }
+
+    [Fact]
+    public void SyntacticDocument_ClosesAfterQuotedGreaterThanAttribute()
+    {
+        const string source = "<Card Text=\"a>b\">";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.Equal(
+            "</Card>",
+            document.GetAutoClosingTagText(source.Length));
+    }
+
+    [Fact]
+    public void SyntacticDocument_DoesNotUseSiblingEndTagForAutoClose()
+    {
+        const string source = """
+            <StackPanel>
+                <Page><Page></Page>
+            </StackPanel>
+            """;
+        var position = source.IndexOf(
+                "<Page>",
+                StringComparison.Ordinal) +
+            "<Page>".Length;
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.Equal(
+            "</Page>",
+            document.GetAutoClosingTagText(position));
+    }
+
+    [Fact]
+    public void SyntacticDocument_AkcssDoesNotOfferMarkupEditing()
+    {
+        const string source = ".card { Value: value < Other; }";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
+
+        Assert.True(
+            document.GetCompletionContext(source.Length).IsDefault);
+        Assert.Null(
+            document.GetAutoClosingTagText(source.Length));
+    }
 }

@@ -408,6 +408,14 @@ internal sealed partial class AkburaCompilation
         }
     }
 
+    internal IEnumerable<IAkburaComponentSymbol> GetReferencedComponentSymbols()
+    {
+        foreach (var symbol in _referenceManager.GetComponentSymbols())
+        {
+            yield return symbol;
+        }
+    }
+
     internal ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
     {
         var localMatches = GetLocalAkcssSyntaxTreesByLogicalName(logicalName);

@@ -1165,6 +1165,9 @@ public sealed class WorkspaceCompletionTests
                 Assert.Contains("title", localNames);
                 Assert.Contains("length", localNames);
                 Assert.Contains("panel", localNames);
+                Assert.True(projection.IsStateName("title"));
+                Assert.False(projection.IsStateName("length"));
+                Assert.False(projection.IsStateName("panel"));
                 Assert.Equal(
                     1,
                     localNames.Count(static name =>
@@ -1222,6 +1225,7 @@ public sealed class WorkspaceCompletionTests
                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>(),
                     static variable =>
                         variable.Identifier.ValueText == "count");
+                Assert.True(projection.IsStateName("count"));
 
                 var parseOptions = semanticContext.Project
                     .CSharpCompilation.SyntaxTrees

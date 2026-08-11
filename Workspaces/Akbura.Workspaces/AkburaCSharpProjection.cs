@@ -4,6 +4,7 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using System.Collections.Immutable;
 
 namespace Akbura.Workspaces;
 
@@ -13,12 +14,16 @@ internal sealed class AkburaCSharpProjection
         CompilationUnitSyntax root,
         TextSpan hostSpan,
         TextSpan projectedSpan,
-        int projectedPosition)
+        int projectedPosition,
+        ImmutableArray<string> stateNames)
     {
         Root = root ?? throw new ArgumentNullException(nameof(root));
         HostSpan = hostSpan;
         ProjectedSpan = projectedSpan;
         ProjectedPosition = projectedPosition;
+        StateNames = stateNames.IsDefault
+            ? ImmutableArray<string>.Empty
+            : stateNames;
 
         if (hostSpan.Length != projectedSpan.Length)
         {
@@ -35,6 +40,14 @@ internal sealed class AkburaCSharpProjection
     public TextSpan ProjectedSpan { get; }
 
     public int ProjectedPosition { get; }
+
+    public ImmutableArray<string> StateNames { get; }
+
+    public bool IsStateName(string name)
+    {
+        return !string.IsNullOrEmpty(name) &&
+            StateNames.Contains(name, StringComparer.Ordinal);
+    }
 
     public bool TryMapToHost(
         TextSpan projectedSpan,
@@ -154,7 +167,8 @@ internal static class AkburaCSharpProjectionFactory
             probe.Root,
             completionContext.HostSpan,
             probe.ProjectedSpan,
-            probe.ProjectedPosition);
+            probe.ProjectedPosition,
+            probe.StateNames);
         return true;
     }
 

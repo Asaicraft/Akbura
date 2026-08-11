@@ -99,11 +99,21 @@ internal sealed class CSharpProbeBuilder
             .OfType<CSharp.ExpressionSyntax>()
             .Single();
         var projectedSpan = projectedExpression.FullSpan;
+        var stateNames = root
+            .GetAnnotatedNodes(
+                CSharpProbeBinder.StateCompletionAnnotationKind)
+            .OfType<CSharp.VariableDeclaratorSyntax>()
+            .Select(static declarator =>
+                declarator.Identifier.ValueText)
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
 
         return new CSharpProbeProjection(
             root,
             projectedSpan,
-            projectedSpan.Start + relativePosition);
+            projectedSpan.Start + relativePosition,
+            stateNames);
     }
 
     private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
@@ -282,11 +292,15 @@ internal readonly struct CSharpProbeProjection
     public CSharpProbeProjection(
         CSharp.CompilationUnitSyntax root,
         TextSpan projectedSpan,
-        int projectedPosition)
+        int projectedPosition,
+        ImmutableArray<string> stateNames)
     {
         Root = root ?? throw new ArgumentNullException(nameof(root));
         ProjectedSpan = projectedSpan;
         ProjectedPosition = projectedPosition;
+        StateNames = stateNames.IsDefault
+            ? ImmutableArray<string>.Empty
+            : stateNames;
     }
 
     public CSharp.CompilationUnitSyntax Root { get; }
@@ -294,4 +308,6 @@ internal readonly struct CSharpProbeProjection
     public TextSpan ProjectedSpan { get; }
 
     public int ProjectedPosition { get; }
+
+    public ImmutableArray<string> StateNames { get; }
 }

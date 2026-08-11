@@ -18,6 +18,9 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class CSharpProbeBinder
 {
+    internal const string StateCompletionAnnotationKind =
+        "AkburaCSharpCompletionState";
+
     internal CSharpProbeScope CreateProbeScope(
         AkburaSyntax scope,
         SyntaxNode csharpNode,
@@ -347,7 +350,11 @@ internal sealed partial class CSharpProbeBinder
             case AkburaSymbolKind.State:
             {
                 var state = (IStateSymbol)symbol;
-                AddProbeLocal(localStatements, state.Name, state.Type);
+                AddProbeLocal(
+                    localStatements,
+                    state.Name,
+                    state.Type,
+                    StateCompletionAnnotationKind);
                 break;
             }
 
@@ -412,7 +419,8 @@ internal sealed partial class CSharpProbeBinder
     private static void AddProbeLocal(
         ImmutableArrayBuilder<CSharp.StatementSyntax> localStatements,
         string name,
-        CSharpSymbolDefinition type)
+        CSharpSymbolDefinition type,
+        string? annotationKind = null)
     {
         if (string.IsNullOrWhiteSpace(name) ||
             type.Symbol is not ITypeSymbol typeSymbol)
@@ -422,12 +430,21 @@ internal sealed partial class CSharpProbeBinder
 
         var typeSyntax = CSharpSyntaxFactory.ParseTypeName(
             typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        var declarator = CSharpSyntaxFactory.VariableDeclarator(
+                CSharpSyntaxFactory.Identifier(name))
+            .WithInitializer(CSharpSyntaxFactory.EqualsValueClause(
+                CSharpSyntaxFactory.LiteralExpression(
+                    CSharpSyntaxKind.DefaultLiteralExpression)));
+        if (!string.IsNullOrEmpty(annotationKind))
+        {
+            declarator = declarator.WithAdditionalAnnotations(
+                new SyntaxAnnotation(annotationKind));
+        }
+
         localStatements.Add(CSharpSyntaxFactory.LocalDeclarationStatement(
             CSharpSyntaxFactory.VariableDeclaration(typeSyntax)
                 .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
-                    CSharpSyntaxFactory.VariableDeclarator(CSharpSyntaxFactory.Identifier(name))
-                        .WithInitializer(CSharpSyntaxFactory.EqualsValueClause(
-                            CSharpSyntaxFactory.LiteralExpression(CSharpSyntaxKind.DefaultLiteralExpression)))))));
+                    declarator))));
     }
 
     private static void AddCommandProbeMembers(

@@ -4,6 +4,7 @@
 		<TargetFramework>net472</TargetFramework>
 		<LangVersion>14</LangVersion>
 		<Nullable>enable</Nullable>
+		<UseWPF>true</UseWPF>
 
 		<VSSDKBuildToolsAutoSetup>true</VSSDKBuildToolsAutoSetup>
 		<VsixDeployOnDebug>true</VsixDeployOnDebug>
@@ -16,6 +17,9 @@
 	<ItemGroup>
 		<Resource Include="Resources\Icons\akbura_64.png" />
 		<Resource Include="Resources\Icons\akcss_64.png" />
+		<Resource Include="Resources\Icons\state_16.png" />
+		<Resource Include="Resources\Icons\state_32.png" />
+		<Resource Include="Resources\Icons\state_64.png" />
 
 		<Content Include="AkburaImages.imagemanifest">
 			<IncludeInVSIX>true</IncludeInVSIX>

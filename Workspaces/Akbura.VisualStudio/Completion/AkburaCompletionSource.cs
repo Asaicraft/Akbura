@@ -38,6 +38,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImageElement PropertyIcon =
         CreateImageElement(KnownMonikers.Property, "Property");
 
+    private static readonly ImageElement StateIcon =
+        CreateImageElement(AkburaCompletionImageMonikers.State, "State");
+
     private static readonly ImageElement EventIcon =
         CreateImageElement(KnownMonikers.Event, "Event");
 
@@ -190,11 +193,11 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     }
 
     public async Task<CompletionContext> GetCompletionContextAsync(
-     IAsyncCompletionSession session,
-     CompletionTrigger trigger,
-     SnapshotPoint triggerLocation,
-     SnapshotSpan applicableToSpan,
-     CancellationToken cancellationToken)
+        IAsyncCompletionSession session,
+        CompletionTrigger trigger,
+        SnapshotPoint triggerLocation,
+        SnapshotSpan applicableToSpan,
+        CancellationToken cancellationToken)
     {
         var totalTimer = Stopwatch.StartNew();
         var snapshot =
@@ -439,7 +442,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             var item = new CompletionItem(
                 displayText: completion.DisplayText,
                 source: this,
-                icon: GetRoslynIcon(completion.Tags),
+                icon: GetRoslynIcon(
+                    result.State.Projection,
+                    completion),
                 filters: ImmutableArray<CompletionFilter>.Empty,
                 suffix: completion.DisplayTextSuffix,
                 insertText: completion.DisplayText,
@@ -638,8 +643,15 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     }
 
     private static ImageElement GetRoslynIcon(
-        ImmutableArray<string> tags)
+        AkburaCSharpProjection projection,
+        Microsoft.CodeAnalysis.Completion.CompletionItem item)
     {
+        if (projection.IsStateName(item.DisplayText))
+        {
+            return StateIcon;
+        }
+
+        var tags = item.Tags;
         if (tags.Contains("Method"))
         {
             return CreateImageElement(

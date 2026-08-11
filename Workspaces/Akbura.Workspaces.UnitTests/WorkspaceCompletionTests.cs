@@ -455,6 +455,346 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void Completion_AttributeIncludesImportedAkcssUtilities()
+    {
+        const string stylesSource = """
+            @utilities {
+                StackPanel.gap-(double value) {
+                }
+
+                StackPanel.flow-horizontal {
+                }
+
+                TextBlock.text-2xl {
+                }
+            }
+            """;
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+            using Styles.akcss;
+
+            <StackPanel gap-
+            """;
+
+        WithWorkspace(
+            source,
+            stylesSource,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                var utility = Assert.Single(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "gap-(double value)");
+                Assert.Equal(
+                    AkburaCompletionKind.TailwindUtility,
+                    utility.Kind);
+                Assert.Equal("gap-", utility.InsertText);
+                Assert.Equal("gap-", utility.FilterText);
+                Assert.Equal("StackPanel", utility.Suffix);
+                Assert.Equal(
+                    "gap-",
+                    syntacticDocument.Text.ToString(
+                        result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
+    public void Completion_InsertsParameterlessUtilityName()
+    {
+        const string stylesSource = """
+            @utilities {
+                StackPanel.flow-horizontal {
+                }
+            }
+            """;
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+            using Styles.akcss;
+
+            <StackPanel flow
+            """;
+
+        WithWorkspace(
+            source,
+            stylesSource,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                var utility = Assert.Single(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "flow-horizontal");
+                Assert.Equal(
+                    AkburaCompletionKind.TailwindUtility,
+                    utility.Kind);
+                Assert.Equal("flow-horizontal", utility.InsertText);
+            });
+    }
+
+    [Fact]
+    public void Completion_UtilityPreservesTypedArgument()
+    {
+        const string stylesSource = """
+            @utilities {
+                StackPanel.gap-(double value) {
+                }
+            }
+            """;
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+            using Styles.akcss;
+
+            <StackPanel gap-3
+            """;
+
+        WithWorkspace(
+            source,
+            stylesSource,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                var utility = Assert.Single(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "gap-(double value)");
+                Assert.Equal("gap-3", utility.InsertText);
+            });
+    }
+
+    [Fact]
+    public void Completion_UtilityFiltersIncompatibleTargetType()
+    {
+        const string stylesSource = """
+            @utilities {
+                TextBlock.text-2xl {
+                }
+            }
+            """;
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+            using Styles.akcss;
+
+            <StackPanel text
+            """;
+
+        WithWorkspace(
+            source,
+            stylesSource,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item =>
+                        item.Kind == AkburaCompletionKind.TailwindUtility);
+            });
+    }
+
+    [Fact]
+    public void Completion_UsesAkcssUtilityFromProjectReference()
+    {
+        const string stylesSource = """
+            @utilities {
+                StackPanel.gap-(double value) {
+                }
+            }
+            """;
+        const string source = """
+            namespace Application;
+
+            using Avalonia.Controls;
+            using Library.Styles.akcss;
+
+            <StackPanel gap-
+            """;
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceCompletionTests),
+            Guid.NewGuid().ToString("N"));
+        var libraryDirectory = Path.Combine(directory, "Library");
+        var applicationDirectory = Path.Combine(
+            directory,
+            "Application");
+        Directory.CreateDirectory(libraryDirectory);
+        Directory.CreateDirectory(applicationDirectory);
+
+        try
+        {
+            var libraryProjectId = ProjectId.CreateNewId("Library");
+            var applicationProjectId = ProjectId.CreateNewId(
+                "Application");
+            var libraryCompilation = CreateCompilation()
+                .WithAssemblyName("Library");
+            var applicationCompilation = CSharpCompilation.Create(
+                "Application",
+                [CSharpSyntaxTree.ParseText(
+                    "namespace Application { " +
+                    "public partial class App : " +
+                    "Akbura.AkburaControl { } }")],
+                CreatePlatformReferences().Append(
+                    libraryCompilation.ToMetadataReference()),
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+            var libraryContext = new ProjectContext(
+                libraryProjectId,
+                Path.Combine(libraryDirectory, "Library.csproj"),
+                libraryDirectory,
+                "Library",
+                libraryCompilation,
+                ImmutableArray<ProjectReference>.Empty);
+            var applicationContext = new ProjectContext(
+                applicationProjectId,
+                Path.Combine(
+                    applicationDirectory,
+                    "Application.csproj"),
+                applicationDirectory,
+                "Application",
+                applicationCompilation,
+                [new ProjectReference(libraryProjectId)]);
+
+            using var workspace = new AkburaWorkspace();
+            var libraryProject = workspace.AddOrUpdateProject(
+                libraryContext);
+            workspace.OpenOrChangeDocumentContext(
+                libraryProject.Id,
+                new Uri(Path.Combine(
+                    libraryDirectory,
+                    "Styles.akcss")),
+                SourceText.From(stylesSource));
+            var applicationProject = workspace.AddOrUpdateProject(
+                applicationContext);
+
+            var result = GetCompletionResult(
+                workspace,
+                applicationProject.Id,
+                Path.Combine(applicationDirectory, "App.akbura"),
+                source);
+
+            Assert.Contains(
+                result.Items,
+                static item =>
+                    item.DisplayText == "gap-(double value)" &&
+                    item.Kind ==
+                        AkburaCompletionKind.TailwindUtility);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Completion_UtilityUsesGlobalAkcssUsing()
+    {
+        const string stylesSource = """
+            @utilities {
+                StackPanel.gap-(double value) {
+                }
+            }
+            """;
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <StackPanel gap-
+            """;
+
+        WithWorkspace(
+            source,
+            stylesSource,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "gap-(double value)" &&
+                        item.Kind ==
+                            AkburaCompletionKind.TailwindUtility);
+            },
+            globalUsingsSource:
+                "global using Styles.akcss;");
+    }
+
+    [Fact]
+    public void Completion_UtilityWorksAfterMarkupExtensionPrefix()
+    {
+        const string stylesSource = """
+            @utilities {
+                StackPanel.gap-(double value) {
+                }
+            }
+            """;
+        const string source = """
+            namespace Gallery;
+
+            using Akbura.Markup;
+            using Avalonia.Controls;
+            using Styles.akcss;
+
+            <StackPanel ${md}:ga
+            """;
+
+        WithWorkspace(
+            source,
+            stylesSource,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                var utility = Assert.Single(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "gap-(double value)");
+                Assert.Equal("gap-", utility.InsertText);
+                Assert.Equal(
+                    "ga",
+                    syntacticDocument.Text.ToString(
+                        result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
     public void CompletionItem_ComputesDetailedDescriptionOnDemand()
     {
         var calls = 0;
@@ -686,6 +1026,21 @@ public sealed class WorkspaceCompletionTests
             AkburaDocumentContext,
             AkburaSyntacticDocument> assertion)
     {
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            assertion);
+    }
+
+    private static void WithWorkspace(
+        string source,
+        string? stylesSource,
+        Action<
+            AkburaWorkspace,
+            AkburaDocumentContext,
+            AkburaSyntacticDocument> assertion,
+        string? globalUsingsSource = null)
+    {
         var directory = Path.Combine(
             Path.GetTempPath(),
             nameof(WorkspaceCompletionTests),
@@ -705,6 +1060,22 @@ public sealed class WorkspaceCompletionTests
             workspace.OpenOrChangeDocumentContext(
                 new Uri(Path.Combine(directory, "Card.akbura")),
                 SourceText.From(CardSource));
+            if (stylesSource != null)
+            {
+                workspace.OpenOrChangeDocumentContext(
+                    new Uri(Path.Combine(directory, "Styles.akcss")),
+                    SourceText.From(stylesSource));
+            }
+
+            if (globalUsingsSource != null)
+            {
+                workspace.OpenOrChangeDocumentContext(
+                    new Uri(Path.Combine(
+                        directory,
+                        "GlobalUsings.akbura")),
+                    SourceText.From(globalUsingsSource));
+            }
+
             var appPath = Path.Combine(directory, "App.akbura");
             var text = SourceText.From(source);
             var semanticContext =

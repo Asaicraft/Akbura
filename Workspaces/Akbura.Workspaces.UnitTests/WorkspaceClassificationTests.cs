@@ -12,6 +12,166 @@ namespace Akbura.Workspaces.UnitTests;
 public sealed class WorkspaceClassificationTests
 {
     [Fact]
+    public void SyntacticDiagnostics_ReportSkippedTextWithoutSemanticContext()
+    {
+        const string source =
+            "<HelloWorld !=1233fd3--- ><Button/></HelloWorld>";
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Counter.akbura");
+        var invalidText = "!=1233fd3---";
+        var invalidSpan = new TextSpan(
+            source.IndexOf(
+                invalidText,
+                StringComparison.Ordinal),
+            invalidText.Length);
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetSyntacticDiagnostics(
+                document,
+                new TextSpan(0, text.Length));
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Severity ==
+                    AkburaDiagnosticSeverity.Error &&
+                diagnostic.Span.OverlapsWith(invalidSpan));
+    }
+
+    [Fact]
+    public void SyntacticDiagnostics_PreserveMissingTokenPosition()
+    {
+        const string source =
+            "<StackPanel gap-3\n<Button/></StackPanel>";
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Counter.akbura");
+        var missingClosePosition = source.IndexOf('\n');
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetSyntacticDiagnostics(
+                document,
+                new TextSpan(0, text.Length));
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Span ==
+                    new TextSpan(missingClosePosition, 0));
+    }
+
+    [Fact]
+    public void SyntacticDiagnostics_InvalidAttributeReportsExpectedAttribute()
+    {
+        const string source = "<StackPanel gap-3 312132/>";
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Counter.akbura");
+        var invalidSpan = new TextSpan(
+            source.IndexOf("312132", StringComparison.Ordinal),
+            "312132".Length);
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetSyntacticDiagnostics(
+                document,
+                new TextSpan(0, text.Length));
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Code == ErrorCodes.ERR_SyntaxError &&
+                diagnostic.Span.OverlapsWith(invalidSpan) &&
+                diagnostic.Message ==
+                    "Syntax error; 'attribute' expected.");
+        Assert.DoesNotContain(
+            diagnostics,
+            static diagnostic =>
+                diagnostic.Message.Contains(
+                    "System.Object[]",
+                    StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SyntacticDiagnostics_DoNotRequireProjectSemanticReferences()
+    {
+        const string source = """
+            state int count = 0;
+
+            <StackPanel gap-3>
+                <TextBlock Text={count}/>
+            </StackPanel>
+            """;
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Counter.akbura");
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetSyntacticDiagnostics(
+                document,
+                new TextSpan(0, text.Length));
+
+        Assert.DoesNotContain(
+            diagnostics,
+            static diagnostic =>
+                diagnostic.Code.StartsWith(
+                    "AKBURA_SEMANTIC_",
+                    StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            diagnostics,
+            static diagnostic =>
+                diagnostic.Message.Contains(
+                    "not defined or imported",
+                    StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SemanticDiagnostics_ReportUnknownComponentName()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            <UnknownControl/>
+            """;
+
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var filePath = Path.GetFullPath("Counter.akbura");
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(filePath),
+            text);
+        var componentStart = source.IndexOf(
+            "UnknownControl",
+            StringComparison.Ordinal);
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetDiagnostics(
+                context,
+                new TextSpan(0, text.Length));
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Code ==
+                    "AKBURA_SEMANTIC_MarkupComponentNotFound" &&
+                diagnostic.Span == new TextSpan(
+                    componentStart,
+                    "UnknownControl".Length));
+    }
+
+    [Fact]
     public void SyntacticClassification_DoesNotRequireSemanticContext()
     {
         const string source = """
@@ -290,6 +450,74 @@ public sealed class WorkspaceClassificationTests
             .GetDeclaredSymbol(utilityDeclaration);
 
         Assert.Same(declaredUtility, operation.Utility);
+    }
+
+    [Fact]
+    public void SemanticDiagnostics_DiamondReferencesDoNotDuplicateAkcssUtility()
+    {
+        const string stylesSource = """
+            @utilities {
+                .gap-(double value) {
+                }
+            }
+            """;
+        const string componentSource = """
+            using Avalonia.Controls;
+            using Library.Styles.akcss;
+
+            <Button gap-3/>
+            """;
+
+        var libraryCSharpCompilation =
+            CreateCSharpCompilation().WithAssemblyName("Library");
+        var bridgeCSharpCompilation =
+            CreateCSharpCompilation().WithAssemblyName("Bridge");
+        var applicationCSharpCompilation =
+            CreateCSharpCompilation().WithAssemblyName("Application");
+        var stylesTree = AkcssSyntaxTree.ParseText(
+            stylesSource,
+            "Styles.akcss",
+            "Library.Styles.akcss");
+        var componentTree = ComponentSyntaxTree.ParseText(
+            componentSource,
+            "Counter.akbura");
+        var libraryCompilation = new AkburaCompilation(
+            libraryCSharpCompilation,
+            ImmutableArray<AkburaSyntaxTree>.Empty,
+            [stylesTree]);
+        var bridgeCompilation = new AkburaCompilation(
+            bridgeCSharpCompilation,
+            ImmutableArray<AkburaSyntaxTree>.Empty,
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            compilationReferences: [libraryCompilation.ToReference()]);
+        var applicationCompilation = new AkburaCompilation(
+            applicationCSharpCompilation,
+            [componentTree],
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            compilationReferences:
+            [
+                libraryCompilation.ToReference(),
+                bridgeCompilation.ToReference(),
+            ]);
+        var semanticModel = applicationCompilation.GetSemanticModel(
+            componentTree);
+        var utilityAttribute = Assert.Single(
+            componentTree.GetRoot()
+                .DescendantNodes()
+                .OfType<TailwindFullAttributeSyntax>());
+
+        var operation =
+            Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                semanticModel.GetOperation(utilityAttribute));
+        var diagnostics = semanticModel.GetSemanticDiagnostics(
+            componentTree.GetRoot());
+
+        Assert.NotNull(operation.Utility);
+        Assert.DoesNotContain(
+            diagnostics,
+            static diagnostic =>
+                diagnostic.Code ==
+                    ErrorCodes.AKBURA_SEMANTIC_TailwindUtilityAmbiguous);
     }
 
     [Fact]

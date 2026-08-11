@@ -13,4 +13,5 @@ public enum AkburaCompletionKind
     Event,
     Command,
     MarkupExtension,
+    TailwindUtility,
 }

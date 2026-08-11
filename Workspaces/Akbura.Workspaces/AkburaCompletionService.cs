@@ -67,10 +67,9 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     cancellationToken),
 
             AkburaCompletionContextKind.AttributeName =>
-                GetMemberItems(
+                GetAttributeItems(
                     semanticModel,
                     syntaxContext,
-                    propertyElements: false,
                     cancellationToken),
 
             AkburaCompletionContextKind.PropertyElementName =>
@@ -216,6 +215,137 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                 StringComparer.Ordinal)
             .Take(MaximumCompletionItems)
             .ToImmutableArray();
+    }
+
+    private static ImmutableArray<AkburaCompletionItem>
+        GetAttributeItems(
+            AkburaSemanticModel semanticModel,
+            AkburaSyntacticCompletionContext context,
+            CancellationToken cancellationToken)
+    {
+        var members = GetMemberItems(
+            semanticModel,
+            context,
+            propertyElements: false,
+            cancellationToken);
+        var utilities = GetTailwindUtilityItems(
+            semanticModel,
+            context,
+            cancellationToken);
+
+        return members
+            .Concat(utilities)
+            .OrderBy(static item => item.SortText,
+                StringComparer.Ordinal)
+            .Take(MaximumCompletionItems)
+            .ToImmutableArray();
+    }
+
+    private static ImmutableArray<AkburaCompletionItem>
+        GetTailwindUtilityItems(
+            AkburaSemanticModel semanticModel,
+            AkburaSyntacticCompletionContext context,
+            CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(context.ComponentName))
+        {
+            return ImmutableArray<AkburaCompletionItem>.Empty;
+        }
+
+        var items = ImmutableArray.CreateBuilder<AkburaCompletionItem>();
+        foreach (var candidate in
+                 semanticModel.LookupTailwindUtilities(
+                     context.ComponentName!,
+                     cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var insertion = candidate.Name +
+                (candidate.Parameters.Length == 0 ? string.Empty : "-");
+            if (!MatchesTailwindUtilityPrefix(
+                    insertion,
+                    context.Prefix))
+            {
+                continue;
+            }
+
+            var display = GetTailwindUtilityDisplay(candidate);
+            var insertText = context.Prefix.Length > insertion.Length &&
+                context.Prefix.StartsWith(
+                    insertion,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? context.Prefix
+                    : insertion;
+            const int priority = 60;
+            items.Add(
+                new AkburaCompletionItem(
+                    display,
+                    insertText,
+                    AkburaCompletionKind.TailwindUtility,
+                    description: string.Empty,
+                    descriptionFactory: () =>
+                        GetTailwindUtilityDescription(candidate),
+                    filterText: insertion,
+                    sortText:
+                        $"{priority:D2}_{candidate.Name}_" +
+                        $"{candidate.Parameters.Length:D2}_{display}",
+                    suffix: string.IsNullOrWhiteSpace(
+                            candidate.TargetTypeDisplay)
+                        ? "all targets"
+                        : candidate.TargetTypeDisplay,
+                    priority: priority));
+        }
+
+        return items
+            .OrderBy(static item => item.SortText,
+                StringComparer.Ordinal)
+            .Take(MaximumCompletionItems)
+            .ToImmutableArray();
+    }
+
+    private static string GetTailwindUtilityDisplay(
+        TailwindUtilityLookupCandidate candidate)
+    {
+        var builder = new System.Text.StringBuilder(
+            candidate.Name);
+        foreach (var parameter in candidate.Parameters)
+        {
+            builder.Append("-(");
+            if (!string.IsNullOrWhiteSpace(parameter.TypeDisplay))
+            {
+                builder.Append(parameter.TypeDisplay);
+                builder.Append(' ');
+            }
+
+            builder.Append(parameter.Name);
+            if (parameter.IsOptional)
+            {
+                builder.Append(" = default");
+            }
+
+            builder.Append(')');
+        }
+
+        return builder.ToString();
+    }
+
+    private static string GetTailwindUtilityDescription(
+        TailwindUtilityLookupCandidate candidate)
+    {
+        var display = GetTailwindUtilityDisplay(candidate);
+        return string.IsNullOrWhiteSpace(candidate.TargetTypeDisplay)
+            ? $"AKCSS utility {display}"
+            : $"AKCSS utility {display}{Environment.NewLine}" +
+                $"Target: {candidate.TargetTypeDisplay}";
+    }
+
+    private static bool MatchesTailwindUtilityPrefix(
+        string insertion,
+        string prefix)
+    {
+        return MatchesPrefix(insertion, prefix) ||
+            prefix.StartsWith(
+                insertion,
+                StringComparison.OrdinalIgnoreCase);
     }
 
     private static ImmutableArray<AkburaCompletionItem>

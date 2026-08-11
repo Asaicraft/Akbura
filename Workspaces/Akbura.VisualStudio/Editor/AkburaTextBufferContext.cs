@@ -33,7 +33,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     private Task<AkburaProjectId?>? _projectInitializationTask;
 
+    private int _projectContextVersion;
+
+    private int _projectInitializationVersion = -1;
+
     private readonly IAkburaClassificationService _classificationService;
+
+    private readonly IAkburaDiagnosticService _diagnosticService;
 
     private readonly JoinableTaskFactory _joinableTaskFactory;
 
@@ -124,6 +130,11 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         _classificationService = _workspace.LanguageServices.Classification;
 
+        _diagnosticService = _workspace.LanguageServices.Diagnostics;
+
+        _visualStudioWorkspace.ProjectContextChanged +=
+            OnProjectContextChanged;
+
         _joinableTaskFactory = ThreadHelper.JoinableTaskFactory;
 
         if (textDocumentFactory.TryGetTextDocument(
@@ -162,6 +173,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
     }
 
     public event EventHandler<AkburaBufferChangedEventArgs>? Changed;
+
+    internal event EventHandler? Disposed;
+
+    internal string FilePath => _textDocument?.FilePath ??
+        (_uri.IsFile
+            ? Path.GetFullPath(_uri.LocalPath)
+            : _uri.AbsoluteUri);
 
     /// <summary>
     /// Returns the newest syntactic or semantic classification state that is
@@ -404,32 +422,64 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     private async Task<AkburaProjectId?> GetProjectIdAsync(CancellationToken cancellationToken)
     {
-        if (_projectId is { } projectId)
+        while (true)
         {
-            return projectId;
+            if (_projectId is { } projectId)
+            {
+                return projectId;
+            }
+
+            var initializationTask =
+                GetOrCreateProjectInitializationTaskAsync(
+                    out var initializationVersion);
+            var synchronizedProjectId = await AwaitWithoutCancelingSourceAsync(
+                    initializationTask,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (synchronizedProjectId is { } result)
+            {
+                _projectId = result;
+                return result;
+            }
+
+            if (initializationVersion == Volatile.Read(
+                    ref _projectContextVersion))
+            {
+                return null;
+            }
         }
-
-        var initializationTask =
-            GetOrCreateProjectInitializationTaskAsync();
-        var synchronizedProjectId = await AwaitWithoutCancelingSourceAsync(
-                initializationTask,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (synchronizedProjectId is { } result)
-        {
-            _projectId = result;
-        }
-
-        return synchronizedProjectId;
     }
 
     private Task<AkburaProjectId?>
-        GetOrCreateProjectInitializationTaskAsync()
+        GetOrCreateProjectInitializationTaskAsync(
+            out int initializationVersion)
     {
         lock (_projectInitializationGate)
         {
-            return _projectInitializationTask ??=
+            if (_projectId is { } projectId)
+            {
+                initializationVersion = Volatile.Read(
+                    ref _projectContextVersion);
+                return Task.FromResult<AkburaProjectId?>(
+                    projectId);
+            }
+
+            var projectContextVersion = Volatile.Read(
+                ref _projectContextVersion);
+            var current = _projectInitializationTask;
+            if (current != null &&
+                (!current.IsCompleted ||
+                 _projectInitializationVersion == projectContextVersion))
+            {
+                initializationVersion =
+                    _projectInitializationVersion;
+                return current;
+            }
+
+            _projectInitializationVersion = projectContextVersion;
+            initializationVersion = projectContextVersion;
+            return _projectInitializationTask =
                 InitializeProjectAsync(
                     _disposeCancellation.Token);
         }
@@ -444,22 +494,32 @@ internal sealed class AkburaTextBufferContext : IDisposable
             return null;
         }
 
-        return await _visualStudioWorkspace
+        var projectId = await _visualStudioWorkspace
             .SynchronizeProjectAsync(
                 filePath!,
                 cancellationToken)
             .ConfigureAwait(false);
+
+        if (projectId is { } result)
+        {
+            _projectId = result;
+        }
+
+        return projectId;
     }
 
     private async Task WarmUpProjectAsync()
     {
         try
         {
-            var projectId = await GetOrCreateProjectInitializationTaskAsync()
+            var projectId = await GetProjectIdAsync(
+                    _disposeCancellation.Token)
                 .ConfigureAwait(false);
             if (projectId is { } result)
             {
                 _projectId = result;
+                EnqueueSnapshot(
+                    _textBuffer.CurrentSnapshot);
             }
         }
         catch (OperationCanceledException)
@@ -734,6 +794,15 @@ internal sealed class AkburaTextBufferContext : IDisposable
                             length: request.Text.Length),
                         cancellationToken);
 
+            var diagnostics =
+                _diagnosticService
+                    .GetSyntacticDiagnostics(
+                        document,
+                        new TextSpan(
+                            start: 0,
+                            length: request.Text.Length),
+                        cancellationToken);
+
             cancellationToken
                 .ThrowIfCancellationRequested();
 
@@ -742,6 +811,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 request.Snapshot,
                 request.Text,
                 classifications,
+                diagnostics,
                 includesSemanticClassifications: false);
         }
         catch (OperationCanceledException)
@@ -771,18 +841,20 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return null;
             }
 
-            var context = projectId is { } resolvedProjectId
-                ? _workspace.OpenOrChangeDocumentContext(
-                    resolvedProjectId,
-                    _uri,
-                    request.Text,
-                    changes: null,
-                    cancellationToken)
-                : _workspace.OpenOrChangeDocumentContext(
-                    _uri,
-                    request.Text,
-                    changes: null,
-                    cancellationToken);
+            if (projectId is not { } resolvedProjectId)
+            {
+                Debug.WriteLine(
+                    "[Akbura] Semantic state deferred: " +
+                    "the owning Roslyn project is not available yet.");
+                return null;
+            }
+
+            var context = _workspace.OpenOrChangeDocumentContext(
+                resolvedProjectId,
+                _uri,
+                request.Text,
+                changes: null,
+                cancellationToken);
 
             Debug.WriteLine(
                 $"[Akbura] Document project: " +
@@ -809,6 +881,14 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         length: request.Text.Length),
                     cancellationToken);
 
+            var diagnostics =
+                _diagnosticService.GetDiagnostics(
+                    context,
+                    new TextSpan(
+                        start: 0,
+                        length: request.Text.Length),
+                    cancellationToken);
+
             if (cancellationToken.IsCancellationRequested)
             {
                 return null;
@@ -819,7 +899,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 request.Snapshot,
                 request.Text,
                 context,
-                classifications);
+                classifications,
+                diagnostics);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -1019,6 +1100,23 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
+    private void OnProjectContextChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (Volatile.Read(ref _disposeState) != 0 ||
+            _projectId != null)
+        {
+            return;
+        }
+
+        Interlocked.Increment(
+            ref _projectContextVersion);
+
+        EnqueueSnapshot(
+            _textBuffer.CurrentSnapshot);
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(
@@ -1030,6 +1128,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         _textBuffer.ChangedLowPriority -=
             OnTextBufferChangedLowPriority;
+
+        _visualStudioWorkspace.ProjectContextChanged -=
+            OnProjectContextChanged;
 
         _subscribedDocumentFactory?.TextDocumentDisposed -=
                 OnTextDocumentDisposed;
@@ -1048,10 +1149,22 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         CancelActiveParse();
 
+        try
+        {
+            Disposed?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(
+                $"Akbura buffer disposal notification failed: " +
+                $"{exception}");
+        }
+
         /*
          * Release classifier subscriptions held by this context.
          */
         Changed = null;
+        Disposed = null;
         DocumentContextPublished = null;
     }
 

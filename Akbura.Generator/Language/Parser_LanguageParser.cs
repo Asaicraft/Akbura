@@ -103,7 +103,9 @@ partial class Parser
 
         try
         {
-            tokens.Add(EatTokenWithPrejudice(ErrorCodes.ERR_SyntaxError));
+            tokens.Add(EatTokenWithPrejudice(
+                ErrorCodes.ERR_SyntaxError,
+                "declaration or markup"));
 
             return GreenSyntaxFactory
                 .CSharpStatementSyntax(
@@ -1319,7 +1321,10 @@ partial class Parser
 
                     var incompleteTag = GreenSyntaxFactory.IncompleteTagSyntax(
                         candidateEndTag);
-                    body.Add(AddError(incompleteTag, ErrorCodes.ERR_SyntaxError));
+                    body.Add(AddError(
+                        incompleteTag,
+                        ErrorCodes.ERR_SyntaxError,
+                        "start tag"));
                 }
 
                 openTags.Pop();
@@ -1519,7 +1524,10 @@ partial class Parser
 
             if (hasUnsupportedControlFlowDirective)
             {
-                text = AddErrorToFirstToken(text, ErrorCodes.ERR_SyntaxError);
+                text = AddErrorToFirstToken(
+                    text,
+                    ErrorCodes.ERR_SyntaxError,
+                    "supported markup content");
             }
 
             return text;
@@ -1620,7 +1628,10 @@ partial class Parser
             var lastToken = incremental
                 ? ReadIncrementalToken()
                 : EatToken();
-            skippedTokens.Add(AddError(lastToken, ErrorCodes.ERR_SyntaxError));
+            skippedTokens.Add(AddError(
+                lastToken,
+                ErrorCodes.ERR_SyntaxError,
+                "attribute"));
 
             while (!IsMarkupStartTagBoundary(
                        incremental
@@ -1770,7 +1781,8 @@ partial class Parser
                 incomplete,
                 incomplete.Width,
                 length: 0,
-                ErrorCodes.ERR_SyntaxError);
+                ErrorCodes.ERR_SyntaxError,
+                "attribute value");
         }
 
         return GreenSyntaxFactory.MarkupPlainAttributeSyntax(name, equals, value);

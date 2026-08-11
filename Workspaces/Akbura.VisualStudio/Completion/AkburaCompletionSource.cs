@@ -26,6 +26,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImmutableArray<char>
         MarkupExtensionCommitCharacters = [' ', '\t', '\n'];
 
+    private static readonly ImmutableArray<char>
+        TailwindUtilityCommitCharacters = [' ', '\t', '\n'];
+
     private static readonly ImageElement ComponentIcon =
         CreateImageElement(KnownMonikers.Class, "Component");
 
@@ -47,6 +50,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImageElement MarkupExtensionIcon =
         CreateImageElement(KnownMonikers.Extension, "Markup extension");
 
+    private static readonly ImageElement TailwindUtilityIcon =
+        CreateImageElement(KnownMonikers.Property, "AKCSS utility");
+
     private static readonly CompletionFilter ComponentFilter =
         new("Components", "C", ComponentIcon);
 
@@ -64,6 +70,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
     private static readonly CompletionFilter MarkupExtensionFilter =
         new("Markup extensions", "X", MarkupExtensionIcon);
+
+    private static readonly CompletionFilter TailwindUtilityFilter =
+        new("AKCSS utilities", "U", TailwindUtilityIcon);
 
     private static readonly ImmutableArray<CompletionFilter>
         ComponentFilters = [ComponentFilter];
@@ -83,6 +92,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImmutableArray<CompletionFilter>
         MarkupExtensionFilters = [MarkupExtensionFilter];
 
+    private static readonly ImmutableArray<CompletionFilter>
+        TailwindUtilityFilters = [TailwindUtilityFilter];
+
     private static readonly ImmutableArray<CompletionFilterWithState>
         CompletionFilters =
         [
@@ -92,6 +104,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             new(EventFilter, isAvailable: true),
             new(CommandFilter, isAvailable: true),
             new(MarkupExtensionFilter, isAvailable: true),
+            new(TailwindUtilityFilter, isAvailable: true),
         ];
 
     private readonly ITextBuffer _buffer;
@@ -391,6 +404,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.MarkupExtension =>
                 MarkupExtensionCommitCharacters,
 
+            AkburaCompletionKind.TailwindUtility =>
+                TailwindUtilityCommitCharacters,
+
             _ => MemberCommitCharacters,
         };
     }
@@ -407,6 +423,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.Command => CommandIcon,
             AkburaCompletionKind.MarkupExtension =>
                 MarkupExtensionIcon,
+            AkburaCompletionKind.TailwindUtility =>
+                TailwindUtilityIcon,
             _ => PropertyIcon,
         };
     }
@@ -432,6 +450,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.Command => CommandFilters,
             AkburaCompletionKind.MarkupExtension =>
                 MarkupExtensionFilters,
+            AkburaCompletionKind.TailwindUtility =>
+                TailwindUtilityFilters,
             _ => PropertyFilters,
         };
     }

@@ -117,7 +117,7 @@ public sealed partial class AkburaSyntacticDocument
                 ImmutableArray<string>.Empty);
         }
 
-        var attributeSpan = GetApplicableNameSpan(
+        var attributeSpan = GetApplicableAttributeNameSpan(
             position,
             Math.Max(
                 startTag.Name.Span.End,
@@ -206,6 +206,26 @@ public sealed partial class AkburaSyntacticDocument
         }
 
         return TextSpan.FromBounds(start, position);
+    }
+
+    private TextSpan GetApplicableAttributeNameSpan(
+        int position,
+        int minimumStart)
+    {
+        var span = GetApplicableNameSpan(
+            position,
+            minimumStart);
+        if (span.Length > 0 &&
+            Text[span.Start] == ':' &&
+            span.Start > minimumStart &&
+            Text[span.Start - 1] == '}')
+        {
+            return TextSpan.FromBounds(
+                span.Start + 1,
+                span.End);
+        }
+
+        return span;
     }
 
     private bool TryGetMarkupExtensionTypeContext(

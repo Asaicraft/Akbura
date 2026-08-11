@@ -794,7 +794,10 @@ internal sealed partial class Parser
 
                     var incompleteTag = GreenSyntaxFactory.IncompleteTagSyntax(
                         candidateEndTag);
-                    body.Add(AddError(incompleteTag, ErrorCodes.ERR_SyntaxError));
+                    body.Add(AddError(
+                        incompleteTag,
+                        ErrorCodes.ERR_SyntaxError,
+                        "start tag"));
                 }
 
                 openTags.Pop();
@@ -1116,7 +1119,8 @@ internal sealed partial class Parser
                 incomplete,
                 incomplete.Width,
                 length: 0,
-                ErrorCodes.ERR_SyntaxError);
+                ErrorCodes.ERR_SyntaxError,
+                "attribute value");
         }
 
         return GreenSyntaxFactory.MarkupPlainAttributeSyntax(name, equals, value);

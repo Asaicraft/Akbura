@@ -5,6 +5,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using MarkupElementSyntax = Akbura.Language.Syntax.MarkupElementSyntax;
+using MarkupRootSyntax = Akbura.Language.Syntax.MarkupRootSyntax;
 
 namespace Akbura.Language;
 
@@ -14,6 +16,11 @@ internal partial class AkburaSemanticModel
     private CompletionComponentCatalog? _completionComponentCatalog;
     private readonly object _completionMarkupExtensionsGate = new();
     private CompletionMarkupExtensionCatalog? _completionMarkupExtensionCatalog;
+    private readonly object _completionTailwindUtilitiesGate = new();
+    private readonly Dictionary<
+        string,
+        ImmutableArray<TailwindUtilityLookupCandidate>>
+        _completionTailwindUtilities = new(StringComparer.Ordinal);
 
     internal ImmutableArray<MarkupComponentLookupCandidate>
         LookupMarkupComponents(CancellationToken cancellationToken = default)
@@ -70,6 +77,85 @@ internal partial class AkburaSemanticModel
         }
 
         return catalog.Candidates;
+    }
+
+    internal ImmutableArray<TailwindUtilityLookupCandidate>
+        LookupTailwindUtilities(
+            string componentName,
+            CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(componentName))
+        {
+            return ImmutableArray<TailwindUtilityLookupCandidate>.Empty;
+        }
+
+        lock (_completionTailwindUtilitiesGate)
+        {
+            if (_completionTailwindUtilities.TryGetValue(
+                    componentName,
+                    out var cached))
+            {
+                return cached;
+            }
+        }
+
+        var candidates = ComputeTailwindUtilities(
+            componentName,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_completionTailwindUtilitiesGate)
+        {
+            if (_completionTailwindUtilities.TryGetValue(
+                    componentName,
+                    out var cached))
+            {
+                return cached;
+            }
+
+            _completionTailwindUtilities.Add(
+                componentName,
+                candidates);
+            return candidates;
+        }
+    }
+
+    private ImmutableArray<TailwindUtilityLookupCandidate>
+        ComputeTailwindUtilities(
+            string componentName,
+            CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryResolveMarkupComponentForCompletion(
+                componentName,
+                out var component))
+        {
+            return ImmutableArray<TailwindUtilityLookupCandidate>.Empty;
+        }
+
+        var markupSyntax = SyntaxTree.GetRootSyntax()
+            .DescendantNodesAndSelf()
+            .FirstOrDefault(static syntax =>
+                syntax is MarkupElementSyntax or MarkupRootSyntax);
+        if (markupSyntax == null)
+        {
+            return ImmutableArray<TailwindUtilityLookupCandidate>.Empty;
+        }
+
+        for (var binder = BindingSession.GetBinder(markupSyntax);
+             binder != null;
+             binder = binder.Next)
+        {
+            if (binder is MarkupBinder markupBinder)
+            {
+                return markupBinder
+                    .LookupTailwindUtilitiesForCompletion(
+                        component,
+                        cancellationToken);
+            }
+        }
+
+        return ImmutableArray<TailwindUtilityLookupCandidate>.Empty;
     }
 
     private ImmutableArray<MarkupExtensionLookupCandidate>

@@ -35,10 +35,15 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             throw new ArgumentNullException(
                 nameof(visualStudioWorkspace));
 
+        _visualStudioWorkspace.WorkspaceChanged +=
+            OnVisualStudioWorkspaceChanged;
+
         Workspace = new AkburaWorkspace();
     }
 
     public AkburaWorkspace Workspace { get; }
+
+    internal event EventHandler? ProjectContextChanged;
 
     /// <summary>
     /// Finds the C# project that owns the specified Akbura document
@@ -790,6 +795,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             return;
         }
 
+        _visualStudioWorkspace.WorkspaceChanged -=
+            OnVisualStudioWorkspaceChanged;
+
         _disposeCancellation.Cancel();
 
         lock (_synchronizationGate)
@@ -799,6 +807,17 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         }
 
         Workspace.Dispose();
+        ProjectContextChanged = null;
+    }
+
+    private void OnVisualStudioWorkspaceChanged(
+        object? sender,
+        WorkspaceChangeEventArgs e)
+    {
+        if (Volatile.Read(ref _disposeState) == 0)
+        {
+            ProjectContextChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private SemaphoreSlim GetProjectSynchronizationLock(

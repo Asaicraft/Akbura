@@ -136,6 +136,35 @@ public sealed class AkcssIncrementalParserTests
     }
 
     [Fact]
+    public void UtilityParameterNameRemoval_IsRecoverable()
+    {
+        const string oldCode =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        .w-(MyType value) { Width: 10; }\n" +
+            "    }\n" +
+            "}";
+        const string removedText = " value";
+        var changeStart = oldCode.IndexOf(
+            removedText,
+            StringComparison.Ordinal);
+        var newCode = oldCode.Remove(
+            changeStart,
+            removedText.Length);
+        var oldSyntax = Parse(oldCode);
+
+        var syntax = ParseIncremental(
+            newCode,
+            oldSyntax,
+            [new TextChangeRange(
+                new TextSpan(changeStart, removedText.Length),
+                newLength: 0)]);
+
+        Assert.Equal(newCode, syntax.ToFullString());
+        Assert.True(syntax.ContainsDiagnostics);
+    }
+
+    [Fact]
     public void IfDirectiveAssignmentEdit_ReusesOuterBodySiblings()
     {
         const string oldCode =

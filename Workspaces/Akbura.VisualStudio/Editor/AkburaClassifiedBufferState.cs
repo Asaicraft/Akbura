@@ -17,6 +17,7 @@ internal class AkburaClassifiedBufferState
         ITextSnapshot snapshot,
         SourceText text,
         ImmutableArray<AkburaClassifiedSpan> classifications,
+        ImmutableArray<AkburaDiagnosticSpan> diagnostics,
         bool includesSemanticClassifications)
     {
         RequestVersion = requestVersion;
@@ -30,6 +31,7 @@ internal class AkburaClassifiedBufferState
                 nameof(text));
 
         Classifications = classifications;
+        Diagnostics = diagnostics;
         IncludesSemanticClassifications =
             includesSemanticClassifications;
     }
@@ -41,6 +43,8 @@ internal class AkburaClassifiedBufferState
     public SourceText Text { get; }
 
     public ImmutableArray<AkburaClassifiedSpan> Classifications { get; }
+
+    public ImmutableArray<AkburaDiagnosticSpan> Diagnostics { get; }
 
     public bool IncludesSemanticClassifications { get; }
 }

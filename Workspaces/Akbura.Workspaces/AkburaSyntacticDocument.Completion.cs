@@ -24,6 +24,14 @@ public sealed partial class AkburaSyntacticDocument
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = SyntaxTree.GetRootSyntax();
+        if (TryGetMarkupExtensionTypeContext(
+                root,
+                position,
+                out var markupExtensionContext))
+        {
+            return markupExtensionContext;
+        }
+
         if (TryGetIncompleteClosingTagContext(
                 root,
                 position,
@@ -61,9 +69,9 @@ public sealed partial class AkburaSyntacticDocument
             token.Parent);
         if (startTag == null ||
             position < startTag.LessToken.Span.End ||
-            !IsBeforeTagClose(
+            !IsBeforeStartTagClose(
                 position,
-                startTag.CloseToken))
+                startTag))
         {
             return default;
         }
@@ -198,6 +206,96 @@ public sealed partial class AkburaSyntacticDocument
         }
 
         return TextSpan.FromBounds(start, position);
+    }
+
+    private bool TryGetMarkupExtensionTypeContext(
+        AkburaSyntax root,
+        int position,
+        out AkburaSyntacticCompletionContext context)
+    {
+        var nameStart = position;
+        while (nameStart > 0 &&
+               IsCompletionNameCharacter(Text[nameStart - 1]))
+        {
+            nameStart--;
+        }
+
+        var openBracePosition = nameStart - 1;
+        while (openBracePosition >= 0 &&
+               char.IsWhiteSpace(Text[openBracePosition]))
+        {
+            openBracePosition--;
+        }
+
+        if (openBracePosition < 1 ||
+            Text[openBracePosition] != '{' ||
+            Text[openBracePosition - 1] != '$')
+        {
+            context = default;
+            return false;
+        }
+
+        var token = root.FindTokenInternal(
+            Math.Min(position - 1, Text.Length - 1));
+        var extension = FindAncestor<MarkupExtensionSyntax>(
+            token.Parent);
+        if ((extension == null ||
+             extension.OpenBrace.Span.Start != openBracePosition) &&
+            !IsInsideMarkupStartTag(openBracePosition - 1))
+        {
+            context = default;
+            return false;
+        }
+
+        var applicableSpan = TextSpan.FromBounds(
+            nameStart,
+            position);
+        context = new AkburaSyntacticCompletionContext(
+            AkburaCompletionContextKind.MarkupExtensionType,
+            applicableSpan,
+            Text.ToString(applicableSpan),
+            componentName: null,
+            parentComponentName: null,
+            ImmutableArray<string>.Empty);
+        return true;
+    }
+
+    private bool IsInsideMarkupStartTag(int position)
+    {
+        var start = position;
+        while (start >= 0 &&
+               Text[start] is not ('<' or '>'))
+        {
+            start--;
+        }
+
+        if (start < 0 || Text[start] != '<' ||
+            (start + 1 < Text.Length &&
+             Text[start + 1] is '/' or '!' or '?'))
+        {
+            return false;
+        }
+
+        var quote = '\0';
+        for (var index = start + 1; index < position; index++)
+        {
+            var character = Text[index];
+            if (quote == '\0')
+            {
+                if (character is '\'' or '"')
+                {
+                    quote = character;
+                }
+            }
+            else if (character == quote &&
+                     (index == start + 1 ||
+                      Text[index - 1] != '\\'))
+            {
+                quote = '\0';
+            }
+        }
+
+        return quote == '\0';
     }
 
     private bool TryGetIncompleteClosingTagContext(
@@ -352,7 +450,17 @@ public sealed partial class AkburaSyntacticDocument
         SyntaxToken closeToken)
     {
         return closeToken.IsMissing ||
-            position <= closeToken.Span.Start;
+            position < closeToken.Span.End;
+    }
+
+    private static bool IsBeforeStartTagClose(
+        int position,
+        MarkupStartTagSyntax startTag)
+    {
+        // The start-tag span is the authoritative boundary after a list of
+        // attributes, including incomplete attributes recovered as utilities.
+        return startTag.CloseToken.IsMissing ||
+            position < startTag.Span.End;
     }
 
     private static bool IsInsideAttributeValue(
@@ -365,28 +473,32 @@ public sealed partial class AkburaSyntacticDocument
              !ReferenceEquals(current, startTag);
              current = current.Parent)
         {
-            if (current is MarkupAttributeValueSyntax)
+            if (current is MarkupAttributeValueSyntax value &&
+                position <= value.Span.End)
             {
                 return true;
             }
 
             if (current is MarkupPlainAttributeSyntax plain &&
                 !plain.EqualsToken.IsMissing &&
-                position >= plain.EqualsToken.Span.End)
+                position >= plain.EqualsToken.Span.End &&
+                position <= plain.Span.End)
             {
                 return true;
             }
 
             if (current is MarkupAttachedPropertyAttributeSyntax attached &&
                 !attached.EqualsToken.IsMissing &&
-                position >= attached.EqualsToken.Span.End)
+                position >= attached.EqualsToken.Span.End &&
+                position <= attached.Span.End)
             {
                 return true;
             }
 
             if (current is MarkupPrefixedAttributeSyntax prefixed &&
                 !prefixed.EqualsToken.IsMissing &&
-                position >= prefixed.EqualsToken.Span.End)
+                position >= prefixed.EqualsToken.Span.End &&
+                position <= prefixed.Span.End)
             {
                 return true;
             }

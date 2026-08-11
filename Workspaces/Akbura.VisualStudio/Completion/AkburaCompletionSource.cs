@@ -23,6 +23,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImmutableArray<char>
         MemberCommitCharacters = ['=', ' ', '\t', '\n'];
 
+    private static readonly ImmutableArray<char>
+        MarkupExtensionCommitCharacters = [' ', '\t', '\n'];
+
     private static readonly ImageElement ComponentIcon =
         CreateImageElement(KnownMonikers.Class, "Component");
 
@@ -41,6 +44,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImageElement ClosingTagIcon =
         CreateImageElement(KnownMonikers.GoToNext, "Closing tag");
 
+    private static readonly ImageElement MarkupExtensionIcon =
+        CreateImageElement(KnownMonikers.Extension, "Markup extension");
+
     private static readonly CompletionFilter ComponentFilter =
         new("Components", "C", ComponentIcon);
 
@@ -55,6 +61,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
     private static readonly CompletionFilter CommandFilter =
         new("Commands", "M", CommandIcon);
+
+    private static readonly CompletionFilter MarkupExtensionFilter =
+        new("Markup extensions", "X", MarkupExtensionIcon);
 
     private static readonly ImmutableArray<CompletionFilter>
         ComponentFilters = [ComponentFilter];
@@ -71,6 +80,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImmutableArray<CompletionFilter>
         CommandFilters = [CommandFilter];
 
+    private static readonly ImmutableArray<CompletionFilter>
+        MarkupExtensionFilters = [MarkupExtensionFilter];
+
     private static readonly ImmutableArray<CompletionFilterWithState>
         CompletionFilters =
         [
@@ -79,6 +91,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             new(PropertyFilter, isAvailable: true),
             new(EventFilter, isAvailable: true),
             new(CommandFilter, isAvailable: true),
+            new(MarkupExtensionFilter, isAvailable: true),
         ];
 
     private readonly ITextBuffer _buffer;
@@ -345,6 +358,15 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             return true;
         }
 
+        if (trigger.Character == '{' &&
+            AkburaMarkupEditingFacts
+                .IsMarkupExtensionTypeCompletionPosition(
+                    triggerLocation.Snapshot,
+                    triggerLocation.Position))
+        {
+            return true;
+        }
+
         return AkburaMarkupEditingFacts
                    .IsCompletionNameCharacter(
                        trigger.Character) &&
@@ -366,6 +388,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.ClosingTag =>
                 ClosingTagCommitCharacters,
 
+            AkburaCompletionKind.MarkupExtension =>
+                MarkupExtensionCommitCharacters,
+
             _ => MemberCommitCharacters,
         };
     }
@@ -380,6 +405,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.Parameter => ParameterIcon,
             AkburaCompletionKind.Event => EventIcon,
             AkburaCompletionKind.Command => CommandIcon,
+            AkburaCompletionKind.MarkupExtension =>
+                MarkupExtensionIcon,
             _ => PropertyIcon,
         };
     }
@@ -403,6 +430,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.Parameter => ParameterFilters,
             AkburaCompletionKind.Event => EventFilters,
             AkburaCompletionKind.Command => CommandFilters,
+            AkburaCompletionKind.MarkupExtension =>
+                MarkupExtensionFilters,
             _ => PropertyFilters,
         };
     }

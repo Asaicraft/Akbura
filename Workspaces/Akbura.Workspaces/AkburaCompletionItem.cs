@@ -39,7 +39,8 @@ public sealed class AkburaCompletionItem
         string? sortText = null,
         string? suffix = null,
         int priority = 50,
-        int caretOffsetFromEnd = 0)
+        int caretOffsetFromEnd = 0,
+        bool triggerCompletionAfterInsert = false)
     {
         if (string.IsNullOrWhiteSpace(displayText))
         {
@@ -62,6 +63,7 @@ public sealed class AkburaCompletionItem
         SortText = sortText ?? $"{priority:D2}_{displayText}";
         Suffix = suffix ?? string.Empty;
         CaretOffsetFromEnd = caretOffsetFromEnd;
+        TriggerCompletionAfterInsert = triggerCompletionAfterInsert;
     }
 
     public string DisplayText { get; }
@@ -77,6 +79,8 @@ public sealed class AkburaCompletionItem
     public int Priority { get; }
 
     public int CaretOffsetFromEnd { get; }
+
+    public bool TriggerCompletionAfterInsert { get; }
 
     public AkburaCompletionKind Kind { get; }
 

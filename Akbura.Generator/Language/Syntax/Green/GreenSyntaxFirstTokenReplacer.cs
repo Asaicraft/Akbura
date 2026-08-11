@@ -37,9 +37,7 @@ internal sealed class GreenSyntaxFirstTokenReplacer: GreenSyntaxRewriter
             {
                 if (node is GreenSyntaxToken token)
                 {
-                    Debug.Assert(token == _oldToken);
-                    _foundOldToken = true;
-                    return _newToken; // NB: diagnostic offsets have already been updated (by SyntaxParser.AddSkippedSyntax)
+                    return VisitToken(token);
                 }
 
                 return UpdateDiagnosticOffset(base.Visit(node)!, _diagnosticOffsetDelta);
@@ -47,6 +45,18 @@ internal sealed class GreenSyntaxFirstTokenReplacer: GreenSyntaxRewriter
         }
 
         return node;
+    }
+
+    public override GreenNode? VisitToken(GreenSyntaxToken? token)
+    {
+        if (token != null && !_foundOldToken)
+        {
+            Debug.Assert(token == _oldToken);
+            _foundOldToken = true;
+            return _newToken; // Diagnostic offsets were already updated by Parser.AddSkippedSyntax.
+        }
+
+        return token;
     }
 
     private static TSyntax UpdateDiagnosticOffset<TSyntax>(TSyntax node, int diagnosticOffsetDelta) where TSyntax : GreenNode

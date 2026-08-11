@@ -12,4 +12,5 @@ public enum AkburaCompletionKind
     Property,
     Event,
     Command,
+    MarkupExtension,
 }

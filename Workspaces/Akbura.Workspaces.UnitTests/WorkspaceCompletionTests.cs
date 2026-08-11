@@ -100,6 +100,72 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void Completion_AvaloniaPropertyUsesComponentType()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <StackPanel Wid></StackPanel>
+            """;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.IndexOf(
+                            "Wid",
+                            StringComparison.Ordinal) + 3);
+
+                var item = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "Width");
+                Assert.Equal(
+                    AkburaCompletionKind.Property,
+                    item.Kind);
+                Assert.Equal("Width=\"\"", item.InsertText);
+                Assert.Equal(1, item.CaretOffsetFromEnd);
+                Assert.Equal(
+                    "Wid",
+                    syntacticDocument.Text.ToString(
+                        result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
+    public void Completion_ComponentRequestsMemberCompletionAfterInsert()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Sta
+            """;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                var item = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "StackPanel");
+                Assert.True(item.TriggerCompletionAfterInsert);
+            });
+    }
+
+    [Fact]
     public void Completion_AttributeExcludesExistingMember()
     {
         const string source = """
@@ -198,6 +264,143 @@ public sealed class WorkspaceCompletionTests
 
         Assert.Empty(result.Items);
         Assert.True(result.IsIncomplete);
+    }
+
+    [Fact]
+    public void Completion_MarkupExtensionUsesDuckTypedVisibleTypes()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Akbura.Markup;
+            using Gallery.Extensions;
+
+            <Card Content=${
+            """;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Binding" &&
+                        item.Kind ==
+                            AkburaCompletionKind.MarkupExtension);
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "StaticResource");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "DynamicResource");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "md" &&
+                        item.Suffix == "utility variant");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "sm");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "lg");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "xl");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "xxl");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Custom" &&
+                        item.InsertText == "Custom");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "PlainMarkup");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "InheritedProbe");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "InvalidProbe");
+
+                var generic = Assert.Single(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "GenericProbe");
+                Assert.Equal("GenericProbe<>", generic.InsertText);
+                Assert.Equal(1, generic.CaretOffsetFromEnd);
+                Assert.True(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_MarkupExtensionRequiresOrdinaryUsing()
+    {
+        const string source = """
+            namespace Gallery;
+
+            <Card Content=${Cus
+            """;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                Assert.Empty(result.Items);
+                Assert.Equal(
+                    "Cus",
+                    syntacticDocument.Text.ToString(
+                        result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
+    public void Completion_MarkupExtensionSupportsNamespaceAlias()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using extensions = Gallery.Extensions;
+
+            <Card Content=${extensions::Cus
+            """;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText ==
+                            "extensions::Custom");
+            });
     }
 
     [Fact]
@@ -562,9 +765,123 @@ public sealed class WorkspaceCompletionTests
                 }
             }
 
+            namespace Avalonia.Data
+            {
+                public class Binding
+                {
+                }
+
+                public class ReflectionBinding
+                {
+                }
+
+                public class CompiledBinding
+                {
+                }
+            }
+
+            namespace Avalonia.Markup.Xaml.MarkupExtensions
+            {
+                public sealed class StaticResourceExtension
+                {
+                    public StaticResourceExtension(object key)
+                    {
+                    }
+
+                    public object ProvideValue(
+                        System.IServiceProvider services) => new();
+                }
+
+                public sealed class DynamicResourceExtension
+                {
+                    public DynamicResourceExtension(object key)
+                    {
+                    }
+
+                    public object ProvideValue() => new();
+                }
+            }
+
             namespace Akbura
             {
                 public class AkburaControl : Avalonia.Controls.Control
+                {
+                }
+            }
+
+            namespace Akbura.Markup
+            {
+                [System.AttributeUsage(
+                    System.AttributeTargets.Class)]
+                public sealed class UtilityVariantAttribute :
+                    System.Attribute
+                {
+                }
+
+                public abstract class BreakpointExtensionBase
+                {
+                    public bool ProvideValue() => true;
+                }
+
+                [UtilityVariant]
+                public sealed class smExtension :
+                    BreakpointExtensionBase
+                {
+                }
+
+                [UtilityVariant]
+                public sealed class mdExtension :
+                    BreakpointExtensionBase
+                {
+                }
+
+                [UtilityVariant]
+                public sealed class lgExtension :
+                    BreakpointExtensionBase
+                {
+                }
+
+                [UtilityVariant]
+                public sealed class xlExtension :
+                    BreakpointExtensionBase
+                {
+                }
+
+                [UtilityVariant]
+                public sealed class xxlExtension :
+                    BreakpointExtensionBase
+                {
+                }
+            }
+
+            namespace Gallery.Extensions
+            {
+                public sealed class CustomExtension
+                {
+                    public object ProvideValue() => new();
+                }
+
+                public sealed class PlainMarkup
+                {
+                    public object ProvideValue() => new();
+                }
+
+                public class ProbeExtensionBase
+                {
+                    public object ProvideValue() => new();
+                }
+
+                public sealed class InheritedProbeExtension :
+                    ProbeExtensionBase
+                {
+                }
+
+                public sealed class GenericProbeExtension<T>
+                {
+                    public T? ProvideValue() => default;
+                }
+
+                public sealed class InvalidProbeExtension
                 {
                 }
             }

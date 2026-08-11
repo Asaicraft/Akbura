@@ -120,6 +120,89 @@ public sealed class WorkspaceSyntacticDocumentTests
             document.Text.ToString(context.ApplicableSpan));
     }
 
+    [Theory]
+    [InlineData("<Card Con|></Card>")]
+    [InlineData("<Card Con|</Card>")]
+    [InlineData("<Card Title=\"Hello\" Con|></Card>")]
+    [InlineData("<Card\n    Con|></Card>")]
+    public void SyntacticDocument_DetectsAttributeCompletionBeforeFollowingSyntax(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(
+            AkburaCompletionContextKind.AttributeName,
+            context.Kind);
+        Assert.Equal("Con", context.Prefix);
+    }
+
+    [Theory]
+    [InlineData("<Button Content=${|}/>", "")]
+    [InlineData("<Button Content=${Bin|}/>", "Bin")]
+    [InlineData("<Button p-${Static|}/>", "Static")]
+    [InlineData("<Button ${md|}:p-5/>", "md")]
+    [InlineData(
+        "<Button Content=${Outer Value=${Bin|}}/>",
+        "Bin")]
+    public void SyntacticDocument_DetectsMarkupExtensionTypeCompletion(
+        string sourceWithCaret,
+        string expectedPrefix)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(
+            AkburaCompletionContextKind.MarkupExtensionType,
+            context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(context.ApplicableSpan));
+    }
+
+    [Fact]
+    public void SyntacticDocument_DoesNotCompleteMarkupExtensionArgumentsAsTypes()
+    {
+        const string sourceWithCaret =
+            "<Button Content=${Binding |}/>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.NotEqual(
+            AkburaCompletionContextKind.MarkupExtensionType,
+            document.GetCompletionContext(position).Kind);
+    }
+
+    [Fact]
+    public void SyntacticDocument_DoesNotTreatQuotedTextAsMarkupExtension()
+    {
+        const string sourceWithCaret =
+            "<Button Content=\"${Bin|}\"/>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.NotEqual(
+            AkburaCompletionContextKind.MarkupExtensionType,
+            document.GetCompletionContext(position).Kind);
+    }
+
     [Fact]
     public void SyntacticDocument_AttributeCompletionContainsExistingAttributes()
     {

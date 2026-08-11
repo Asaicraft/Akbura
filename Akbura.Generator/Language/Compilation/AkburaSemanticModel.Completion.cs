@@ -12,6 +12,8 @@ internal partial class AkburaSemanticModel
 {
     private readonly object _completionComponentsGate = new();
     private CompletionComponentCatalog? _completionComponentCatalog;
+    private readonly object _completionMarkupExtensionsGate = new();
+    private CompletionMarkupExtensionCatalog? _completionMarkupExtensionCatalog;
 
     internal ImmutableArray<MarkupComponentLookupCandidate>
         LookupMarkupComponents(CancellationToken cancellationToken = default)
@@ -39,6 +41,86 @@ internal partial class AkburaSemanticModel
         }
 
         return catalog.Candidates;
+    }
+
+    internal ImmutableArray<MarkupExtensionLookupCandidate>
+        LookupMarkupExtensions(CancellationToken cancellationToken = default)
+    {
+        var catalog = Volatile.Read(
+            ref _completionMarkupExtensionCatalog);
+        if (catalog != null)
+        {
+            return catalog.Candidates;
+        }
+
+        var candidates = ComputeMarkupExtensions(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_completionMarkupExtensionsGate)
+        {
+            catalog = _completionMarkupExtensionCatalog;
+            if (catalog == null)
+            {
+                catalog = new CompletionMarkupExtensionCatalog(
+                    candidates);
+                Volatile.Write(
+                    ref _completionMarkupExtensionCatalog,
+                    catalog);
+            }
+        }
+
+        return catalog.Candidates;
+    }
+
+    private ImmutableArray<MarkupExtensionLookupCandidate>
+        ComputeMarkupExtensions(CancellationToken cancellationToken)
+    {
+        var timer = Stopwatch.StartNew();
+        var visibleNamespaces = GetVisibleMarkupExtensionNamespaces();
+        var candidates = new Dictionary<
+            string,
+            MarkupExtensionLookupCandidate>(StringComparer.Ordinal);
+        var csharpCompilation = Compilation.CSharpCompilation;
+
+        foreach (var visibleNamespace in visibleNamespaces)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var namespaceSymbol = GetNamespaceSymbol(
+                csharpCompilation.GlobalNamespace,
+                visibleNamespace.Name);
+            if (namespaceSymbol == null)
+            {
+                continue;
+            }
+
+            foreach (var type in namespaceSymbol.GetTypeMembers()
+                         .OrderBy(
+                             static type =>
+                                 HasMarkupExtensionSuffix(type.Name)
+                                     ? 1
+                                     : 0))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                AddMarkupExtensionCandidate(
+                    candidates,
+                    csharpCompilation,
+                    type,
+                    visibleNamespace.Alias);
+            }
+        }
+
+        AddMarkupExtensionTypeAliasCandidates(
+            candidates,
+            csharpCompilation,
+            cancellationToken);
+
+        var result = candidates.Values
+            .OrderBy(
+                static candidate => candidate.DisplayName,
+                StringComparer.Ordinal)
+            .ToImmutableArray();
+        TraceMarkupExtensionCatalogStage(timer.Elapsed);
+        return result;
     }
 
     private ImmutableArray<MarkupComponentLookupCandidate>
@@ -351,6 +433,158 @@ internal partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
+    private ImmutableArray<VisibleMarkupNamespace>
+        GetVisibleMarkupExtensionNamespaces()
+    {
+        using var builder =
+            ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+        {
+            AddVisibleMarkupNamespace(
+                builder,
+                seen,
+                visibleNamespace.Name,
+                visibleNamespace.Alias);
+        }
+
+        foreach (var namespaceName in
+                 GetDefaultMarkupExtensionNamespaces())
+        {
+            AddVisibleMarkupNamespace(
+                builder,
+                seen,
+                namespaceName,
+                alias: null);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private void AddMarkupExtensionTypeAliasCandidates(
+        Dictionary<string, MarkupExtensionLookupCandidate> candidates,
+        CSharpCompilation csharpCompilation,
+        CancellationToken cancellationToken)
+    {
+        foreach (var directive in GetCSharpUsingDirectives())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (directive.Alias == null ||
+                directive.Name == null ||
+                directive.StaticKeyword.RawKind != 0)
+            {
+                continue;
+            }
+
+            var type = csharpCompilation.GetTypeByMetadataName(
+                NormalizeGlobalName(directive.Name.ToString()));
+            if (type == null)
+            {
+                continue;
+            }
+
+            AddMarkupExtensionCandidate(
+                candidates,
+                csharpCompilation,
+                type,
+                namespaceAlias: null,
+                displayNameOverride:
+                    directive.Alias.Name.Identifier.ValueText);
+        }
+    }
+
+    private void AddMarkupExtensionCandidate(
+        Dictionary<string, MarkupExtensionLookupCandidate> candidates,
+        CSharpCompilation csharpCompilation,
+        INamedTypeSymbol type,
+        string? namespaceAlias,
+        string? displayNameOverride = null)
+    {
+        var provideValueMethod =
+            FindMarkupExtensionProvideValueMethod(type);
+        var isAvaloniaBinding = IsAvaloniaBindingCompletionType(type);
+        if ((provideValueMethod == null && !isAvaloniaBinding) ||
+            !IsCompletableMarkupExtension(csharpCompilation, type))
+        {
+            return;
+        }
+
+        var displayName = displayNameOverride ??
+            GetMarkupExtensionCompletionName(type, namespaceAlias);
+        if (displayName.Length == 0 ||
+            candidates.ContainsKey(displayName))
+        {
+            return;
+        }
+
+        candidates.Add(
+            displayName,
+            new MarkupExtensionLookupCandidate(
+                displayName,
+                GetTypeMetadataName(type),
+                type,
+                provideValueMethod,
+                isAvaloniaBinding,
+                IsUtilityVariantMarkupExtension(type)));
+    }
+
+    private bool IsCompletableMarkupExtension(
+        CSharpCompilation compilation,
+        INamedTypeSymbol type)
+    {
+        if (type.IsStatic ||
+            type.IsAbstract ||
+            type.TypeKind is not (TypeKind.Class or TypeKind.Struct) ||
+            !compilation.IsSymbolAccessibleWithin(
+                type,
+                compilation.Assembly))
+        {
+            return false;
+        }
+
+        return type.InstanceConstructors.Any(constructor =>
+            constructor.DeclaredAccessibility == Accessibility.Public &&
+            compilation.IsSymbolAccessibleWithin(
+                constructor,
+                compilation.Assembly));
+    }
+
+    private static bool IsAvaloniaBindingCompletionType(
+        INamedTypeSymbol type)
+    {
+        return string.Equals(
+                type.ContainingNamespace.ToDisplayString(),
+                "Avalonia.Data",
+                StringComparison.Ordinal) &&
+            IsAvaloniaBindingExtensionName(type.Name);
+    }
+
+    private static bool IsUtilityVariantMarkupExtension(
+        INamedTypeSymbol type)
+    {
+        return type.GetAttributes().Any(static attribute =>
+            string.Equals(
+                attribute.AttributeClass?.ToDisplayString(),
+                "Akbura.Markup.UtilityVariantAttribute",
+                StringComparison.Ordinal));
+    }
+
+    private static string GetMarkupExtensionCompletionName(
+        INamedTypeSymbol type,
+        string? namespaceAlias)
+    {
+        var name = type.Name;
+        if (HasMarkupExtensionSuffix(name))
+        {
+            name = name[..^"Extension".Length];
+        }
+
+        return namespaceAlias == null
+            ? name
+            : namespaceAlias + "::" + name;
+    }
+
     private static void AddVisibleMarkupNamespace(
         ImmutableArrayBuilder<VisibleMarkupNamespace> builder,
         HashSet<string> seen,
@@ -564,6 +798,15 @@ internal partial class AkburaSemanticModel
             $"{stage}: {elapsed.TotalMilliseconds:F2} ms");
     }
 
+    [Conditional("DEBUG")]
+    private static void TraceMarkupExtensionCatalogStage(
+        TimeSpan elapsed)
+    {
+        Debug.WriteLine(
+            $"[Akbura.Completion.Performance] Markup extension " +
+            $"catalog: {elapsed.TotalMilliseconds:F2} ms");
+    }
+
     private static string GetTypeMetadataName(INamedTypeSymbol type)
     {
         return NormalizeGlobalName(type.ToDisplayString(
@@ -599,6 +842,20 @@ internal partial class AkburaSemanticModel
         }
 
         public ImmutableArray<MarkupComponentLookupCandidate> Candidates
+        {
+            get;
+        }
+    }
+
+    private sealed class CompletionMarkupExtensionCatalog
+    {
+        public CompletionMarkupExtensionCatalog(
+            ImmutableArray<MarkupExtensionLookupCandidate> candidates)
+        {
+            Candidates = candidates;
+        }
+
+        public ImmutableArray<MarkupExtensionLookupCandidate> Candidates
         {
             get;
         }

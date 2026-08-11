@@ -592,6 +592,64 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void RemovingMarkupExtensionPrefixedUtility_ProducesIncompletePrefixedAttribute()
+    {
+        const string oldCode = "<Button ${md}:p-5/>";
+        const string removed = "p-5";
+        var changeStart = oldCode.IndexOf(removed, StringComparison.Ordinal);
+        var newCode = oldCode.Remove(changeStart, removed.Length);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: removed.Length,
+            newLength: 0);
+
+        var incomplete = Assert.IsType<GreenIncompletePrefixedAttributeSyntax>(
+            newMarkup.Element.StartTag!.Attributes[0]);
+        Assert.IsType<GreenMarkupExtensionConditionalPrefixSyntax>(incomplete.Prefix);
+        Assert.True(incomplete.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Theory]
+    [InlineData("<Button />", "<Button $/>")]
+    [InlineData("<Button $/>", "<Button ${/>")]
+    [InlineData("<Button ${/>", "<Button ${m/>")]
+    [InlineData("<Button ${m/>", "<Button ${md/>")]
+    [InlineData("<Button ${md/>", "<Button ${md}/>")]
+    [InlineData("<Button ${md}/>", "<Button ${md}:/>")]
+    public void TypingMarkupExtensionPrefix_DoesNotCrash(
+        string oldCode,
+        string newCode)
+    {
+        var change = GetSingleChange(oldCode, newCode);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            change.Span.Start,
+            change.Span.Length,
+            change.NewLength);
+
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void SkippedTextBeforeAttributeWithLeadingTrivia_DoesNotCrash()
+    {
+        const string code = "<Button ! Content=\"Hello\"/>";
+
+        var syntax = Parse(code);
+        var markup = Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[0]);
+        var attribute = markup.Element.StartTag!.Attributes[0];
+
+        Assert.True(attribute.ContainsSkippedText);
+        Assert.Equal(code, markup.ToFullString());
+    }
+
+    [Fact]
     public void InsertingUnmatchedEndTag_ProducesIncompleteTag()
     {
         const string oldCode = "<StackPanel><Button/></StackPanel>";
@@ -730,6 +788,31 @@ public sealed class MarkupIncrementalParserTests
 
         Assert.Equal(1, syntax.Members.Count);
         return (oldMarkup, Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[0]));
+    }
+
+    private static TextChangeRange GetSingleChange(string oldText, string newText)
+    {
+        var start = 0;
+        while (start < oldText.Length &&
+               start < newText.Length &&
+               oldText[start] == newText[start])
+        {
+            start++;
+        }
+
+        var oldEnd = oldText.Length;
+        var newEnd = newText.Length;
+        while (oldEnd > start &&
+               newEnd > start &&
+               oldText[oldEnd - 1] == newText[newEnd - 1])
+        {
+            oldEnd--;
+            newEnd--;
+        }
+
+        return new TextChangeRange(
+            new TextSpan(start, oldEnd - start),
+            newEnd - start);
     }
 
     private static GreenAkburaDocumentSyntax Parse(string code)

@@ -80,6 +80,12 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     propertyElements: true,
                     cancellationToken),
 
+            AkburaCompletionContextKind.MarkupExtensionType =>
+                GetMarkupExtensionItems(
+                    semanticModel,
+                    syntaxContext.Prefix,
+                    cancellationToken),
+
             _ => ImmutableArray<AkburaCompletionItem>.Empty,
         };
 
@@ -154,7 +160,55 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     sortText:
                         $"{priority:D2}_{candidate.DisplayName}",
                     suffix: suffix,
-                    priority: priority));
+                    priority: priority,
+                    triggerCompletionAfterInsert: true));
+        }
+
+        return items.Values
+            .OrderBy(static item => item.SortText,
+                StringComparer.Ordinal)
+            .Take(MaximumCompletionItems)
+            .ToImmutableArray();
+    }
+
+    private static ImmutableArray<AkburaCompletionItem>
+        GetMarkupExtensionItems(
+            AkburaSemanticModel semanticModel,
+            string prefix,
+            CancellationToken cancellationToken)
+    {
+        var items = new Dictionary<string, AkburaCompletionItem>(
+            StringComparer.Ordinal);
+
+        foreach (var candidate in
+                 semanticModel.LookupMarkupExtensions(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!MatchesPrefix(candidate.DisplayName, prefix) ||
+                items.ContainsKey(candidate.DisplayName))
+            {
+                continue;
+            }
+
+            var priority = GetMarkupExtensionPriority(candidate);
+            var insertion = GetMarkupExtensionInsertion(candidate);
+            var caretOffset = candidate.ExtensionType.Arity == 0
+                ? 0
+                : candidate.ExtensionType.Arity;
+            items.Add(
+                candidate.DisplayName,
+                new AkburaCompletionItem(
+                    candidate.DisplayName,
+                    insertion,
+                    AkburaCompletionKind.MarkupExtension,
+                    description: string.Empty,
+                    descriptionFactory: () =>
+                        GetMarkupExtensionDescription(candidate),
+                    sortText:
+                        $"{priority:D2}_{candidate.DisplayName}",
+                    suffix: GetMarkupExtensionSuffix(candidate),
+                    priority: priority,
+                    caretOffsetFromEnd: caretOffset));
         }
 
         return items.Values
@@ -447,7 +501,8 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         return kind is
             AkburaCompletionContextKind.ComponentName or
             AkburaCompletionContextKind.AttributeName or
-            AkburaCompletionContextKind.PropertyElementName;
+            AkburaCompletionContextKind.PropertyElementName or
+            AkburaCompletionContextKind.MarkupExtensionType;
     }
 
     private static bool MatchesPrefix(
@@ -497,6 +552,68 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                 .ContainingNamespace
                 .ToDisplayString() ??
             string.Empty;
+    }
+
+    private static int GetMarkupExtensionPriority(
+        MarkupExtensionLookupCandidate candidate)
+    {
+        if (candidate.IsAvaloniaBinding ||
+            candidate.DisplayName is
+                "StaticResource" or
+                "DynamicResource")
+        {
+            return 0;
+        }
+
+        return candidate.IsUtilityVariant ? 5 : 20;
+    }
+
+    private static string GetMarkupExtensionInsertion(
+        MarkupExtensionLookupCandidate candidate)
+    {
+        var arity = candidate.ExtensionType.Arity;
+        return arity == 0
+            ? candidate.DisplayName
+            : candidate.DisplayName + "<" +
+                new string(',', arity - 1) + ">";
+    }
+
+    private static string GetMarkupExtensionSuffix(
+        MarkupExtensionLookupCandidate candidate)
+    {
+        if (candidate.IsAvaloniaBinding)
+        {
+            return "Avalonia binding";
+        }
+
+        if (candidate.IsUtilityVariant)
+        {
+            return "utility variant";
+        }
+
+        return candidate.ProvideValueMethod?.ReturnType
+                .ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat) ??
+            candidate.ExtensionType.ContainingNamespace.ToDisplayString();
+    }
+
+    private static string GetMarkupExtensionDescription(
+        MarkupExtensionLookupCandidate candidate)
+    {
+        var typeName = candidate.ExtensionType.ToDisplayString(
+            SymbolDisplayFormat.FullyQualifiedFormat);
+        if (candidate.IsAvaloniaBinding)
+        {
+            return typeName +
+                " (handled by the Avalonia binding markup binder)";
+        }
+
+        var provideValue = candidate.ProvideValueMethod;
+        return provideValue == null
+            ? typeName
+            : typeName + Environment.NewLine +
+                provideValue.ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat);
     }
 
     private static string GetSimpleName(string componentName)

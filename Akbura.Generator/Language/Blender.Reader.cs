@@ -84,7 +84,7 @@ internal readonly partial struct Blender
 			var expectedNewPosition = oldSpan.Start + _changeDelta;
 
 			if (expectedNewPosition != _newPosition ||
-				IntersectsNextChange(oldSpan) ||
+				IntersectsNextChange(nodeOrToken) ||
 				!CanReuse(nodeOrToken, asToken))
 			{
 				blended = default;
@@ -185,15 +185,26 @@ internal readonly partial struct Blender
 			return cursor;
 		}
 
-		private bool IntersectsNextChange(TextSpan oldSpan)
+		private bool IntersectsNextChange(SyntaxNodeOrToken nodeOrToken)
 		{
 			if (_changes.IsEmpty)
 			{
 				return false;
 			}
 
+			var oldSpan = nodeOrToken.FullSpan;
 			var changeSpan = _changes.Peek().Span;
-			return oldSpan.Start < changeSpan.End && changeSpan.Start < oldSpan.End;
+			if (oldSpan.Start < changeSpan.End && changeSpan.Start < oldSpan.End)
+			{
+				return true;
+			}
+
+			// Embedded C# is lexed as one raw token. An insertion immediately after
+			// that token can extend it even though the zero-width change does not
+			// geometrically intersect the old span.
+			return changeSpan.IsEmpty &&
+				changeSpan.Start == nodeOrToken.Span.End &&
+				nodeOrToken.RequiredUnderlyingNode.GetLastTerminal()?.Kind == SyntaxKind.CSharpRawToken;
 		}
 
 		private static bool CanReuse(SyntaxNodeOrToken nodeOrToken, bool asToken)

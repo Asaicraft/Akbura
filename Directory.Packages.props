@@ -23,6 +23,7 @@
 		<PackageVersion Include="Microsoft.NET.StringTools" Version="17.10.4" />
 		<PackageVersion Include="Microsoft.Build.Locator" Version="1.11.2" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.11.0" />
+		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Features" Version="4.11.0" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.11.0" />
 		<PackageVersion Include="Microsoft.CodeAnalysis.EditorFeatures.Text" Version="4.11.0" />
 		<PackageVersion Include="Microsoft.VisualStudio.LanguageServices" Version="4.11.0" />

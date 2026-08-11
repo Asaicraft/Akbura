@@ -117,12 +117,16 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
     private readonly AkburaParserService _parserService;
 
+    private readonly AkburaRoslynCompletionService
+        _roslynCompletionService;
+
     public AkburaCompletionSource(
         ITextBuffer buffer,
         bool isAkburaDocument,
         AkburaTextBufferContext bufferContext,
         IAkburaCompletionService completionService,
-        AkburaParserService parserService)
+        AkburaParserService parserService,
+        AkburaRoslynCompletionService roslynCompletionService)
     {
         _buffer = buffer ??
             throw new ArgumentNullException(nameof(buffer));
@@ -136,6 +140,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         _parserService = parserService ??
             throw new ArgumentNullException(
                 nameof(parserService));
+        _roslynCompletionService = roslynCompletionService ??
+            throw new ArgumentNullException(
+                nameof(roslynCompletionService));
     }
 
     public CompletionStartData InitializeCompletion(
@@ -211,6 +218,41 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         cancellationToken.ThrowIfCancellationRequested();
 
         stageTimer.Restart();
+        if (syntacticDocument.TryGetCSharpCompletionContext(
+                position,
+                out var csharpContext,
+                cancellationToken))
+        {
+            var semanticContext = GetLatestSemanticContext(
+                snapshot);
+            TracePerformance(
+                "C# semantic context",
+                stageTimer.Elapsed);
+
+            stageTimer.Restart();
+            var csharpResult = await _roslynCompletionService
+                .GetCompletionsAsync(
+                    snapshot,
+                    syntacticDocument,
+                    semanticContext,
+                    csharpContext,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            TracePerformance(
+                "Roslyn completion",
+                stageTimer.Elapsed);
+            TracePerformance(
+                "Total",
+                totalTimer.Elapsed);
+
+            return csharpResult is { } roslynResult
+                ? CreateRoslynCompletionContext(
+                    roslynResult,
+                    cancellationToken)
+                : CreateIncompleteCompletionContext();
+        }
+
+        stageTimer.Restart();
         var syntaxContext =
             syntacticDocument.GetCompletionContext(
                 position);
@@ -227,15 +269,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         }
 
         stageTimer.Restart();
-        AkburaDocumentContext? documentContext = null;
-        if (_bufferContext.TryGetLatestDocumentContext(
-                out var latestContext,
-                out var semanticSnapshot) &&
-            semanticSnapshot.Version.VersionNumber <=
-                snapshot.Version.VersionNumber)
-        {
-            documentContext = latestContext;
-        }
+        var documentContext = GetLatestSemanticContext(
+            snapshot);
         TracePerformance("Semantic context", stageTimer.Elapsed);
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -333,18 +368,185 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             result.IsIncomplete);
     }
 
-    public Task<object> GetDescriptionAsync(
+    public async Task<object> GetDescriptionAsync(
         IAsyncCompletionSession session,
         CompletionItem item,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<object>(
-            item.Properties.TryGetProperty(
-                AkburaCompletionProperties.CoreItem,
-                out AkburaCompletionItem completion)
+        if (item.Properties.TryGetProperty(
+                AkburaCompletionProperties.RoslynItem,
+                out AkburaRoslynCompletionItemData roslynData))
+        {
+            var description = await roslynData.State.Service
+                .GetDescriptionAsync(
+                    roslynData.State.Document,
+                    roslynData.Item,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (description == null)
+            {
+                return item.DisplayText;
+            }
+
+            return string.Concat(
+                description.TaggedParts.Select(static part =>
+                    part.Text));
+        }
+
+        return item.Properties.TryGetProperty(
+            AkburaCompletionProperties.CoreItem,
+            out AkburaCompletionItem completion)
                 ? completion.Description
-                : item.DisplayText);
+                : item.DisplayText;
+    }
+
+    private AkburaDocumentContext? GetLatestSemanticContext(
+        ITextSnapshot snapshot)
+    {
+        if (_bufferContext.TryGetLatestDocumentContext(
+                out var latestContext,
+                out var semanticSnapshot) &&
+            semanticSnapshot.Version.VersionNumber <=
+                snapshot.Version.VersionNumber)
+        {
+            return latestContext;
+        }
+
+        return null;
+    }
+
+    private CompletionContext CreateRoslynCompletionContext(
+        AkburaRoslynCompletionResult result,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = result.State.HostSnapshot;
+        var items = ImmutableArray.CreateBuilder<CompletionItem>(
+            result.List.ItemsList.Count);
+
+        foreach (var completion in result.List.ItemsList)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!result.State.Projection.TryMapToHost(
+                    completion.Span,
+                    out var hostSpan) ||
+                hostSpan.Start < 0 ||
+                hostSpan.End > snapshot.Length)
+            {
+                continue;
+            }
+
+            var item = new CompletionItem(
+                displayText: completion.DisplayText,
+                source: this,
+                icon: GetRoslynIcon(completion.Tags),
+                filters: ImmutableArray<CompletionFilter>.Empty,
+                suffix: completion.DisplayTextSuffix,
+                insertText: completion.DisplayText,
+                sortText: completion.SortText,
+                filterText: completion.FilterText,
+                automationText: completion.DisplayText,
+                attributeIcons: ImmutableArray<ImageElement>.Empty,
+                commitCharacters: GetRoslynCommitCharacters(
+                    result.List,
+                    completion),
+                applicableToSpan: new SnapshotSpan(
+                    snapshot,
+                    new Span(
+                        hostSpan.Start,
+                        hostSpan.Length)),
+                isCommittedAsSnippet: false,
+                isPreselected: false);
+            item.Properties.AddProperty(
+                AkburaCompletionProperties.RoslynItem,
+                new AkburaRoslynCompletionItemData(
+                    result.State,
+                    completion));
+            items.Add(item);
+        }
+
+        Debug.WriteLine(
+            $"[Akbura.Completion] Roslyn returned " +
+            $"{items.Count} mapped items.");
+
+        return new CompletionContext(
+            items.ToImmutable(),
+            ImmutableArray<CompletionFilterWithState>.Empty,
+            isIncomplete: false);
+    }
+
+    private static ImmutableArray<char> GetRoslynCommitCharacters(
+        Microsoft.CodeAnalysis.Completion.CompletionList list,
+        Microsoft.CodeAnalysis.Completion.CompletionItem item)
+    {
+        var rules = item.Rules.CommitCharacterRules;
+        if (rules.IsDefaultOrEmpty)
+        {
+            return AddCompletionGestures(
+                list.Rules.DefaultCommitCharacters);
+        }
+
+        var characters = new HashSet<char>(
+            list.Rules.DefaultCommitCharacters);
+        foreach (var rule in rules)
+        {
+            switch (rule.Kind)
+            {
+                case Microsoft.CodeAnalysis.Completion
+                    .CharacterSetModificationKind.Add:
+                    characters.UnionWith(rule.Characters);
+                    break;
+
+                case Microsoft.CodeAnalysis.Completion
+                    .CharacterSetModificationKind.Remove:
+                    characters.ExceptWith(rule.Characters);
+                    break;
+
+                case Microsoft.CodeAnalysis.Completion
+                    .CharacterSetModificationKind.Replace:
+                    characters.Clear();
+                    characters.UnionWith(rule.Characters);
+                    break;
+            }
+        }
+
+        characters.Add('\t');
+        characters.Add('\n');
+        return characters
+            .OrderBy(static character => character)
+            .ToImmutableArray();
+    }
+
+    private static ImmutableArray<char> AddCompletionGestures(
+        ImmutableArray<char> characters)
+    {
+        if (characters.Contains('\t') &&
+            characters.Contains('\n'))
+        {
+            return characters;
+        }
+
+        var builder = characters.ToBuilder();
+        if (!characters.Contains('\t'))
+        {
+            builder.Add('\t');
+        }
+
+        if (!characters.Contains('\n'))
+        {
+            builder.Add('\n');
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static CompletionContext
+        CreateIncompleteCompletionContext()
+    {
+        return new CompletionContext(
+            ImmutableArray<CompletionItem>.Empty,
+            ImmutableArray<CompletionFilterWithState>.Empty,
+            isIncomplete: true);
     }
 
     private static bool ShouldParticipate(
@@ -376,6 +578,12 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 .IsMarkupExtensionTypeCompletionPosition(
                     triggerLocation.Snapshot,
                     triggerLocation.Position))
+        {
+            return true;
+        }
+
+        if (char.IsLetterOrDigit(trigger.Character) ||
+            trigger.Character == '_')
         {
             return true;
         }
@@ -427,6 +635,54 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 TailwindUtilityIcon,
             _ => PropertyIcon,
         };
+    }
+
+    private static ImageElement GetRoslynIcon(
+        ImmutableArray<string> tags)
+    {
+        if (tags.Contains("Method"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Method,
+                "Method");
+        }
+
+        if (tags.Contains("Class"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Class,
+                "Class");
+        }
+
+        if (tags.Contains("Structure"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Structure,
+                "Structure");
+        }
+
+        if (tags.Contains("Interface"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Interface,
+                "Interface");
+        }
+
+        if (tags.Contains("Field"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Field,
+                "Field");
+        }
+
+        if (tags.Contains("Event"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Event,
+                "Event");
+        }
+
+        return PropertyIcon;
     }
 
     private static ImageElement CreateImageElement(

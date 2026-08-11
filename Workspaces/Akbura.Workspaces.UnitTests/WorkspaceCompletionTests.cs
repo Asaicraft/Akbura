@@ -1096,6 +1096,185 @@ public sealed class WorkspaceCompletionTests
         }
     }
 
+    [Fact]
+    public void CSharpProjection_MapsExpressionAndPreservesVisibleScope()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state string title = "Akbura";
+            var length = title.Length;
+
+            <StackPanel x.Name="panel">
+                <StackPanel Width={panel.|}/>
+            </StackPanel>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var projectedText = projection.Root.ToFullString();
+                Assert.Equal(
+                    syntacticDocument.Text.ToString(
+                        completionContext.HostSpan),
+                    projectedText.Substring(
+                        projection.ProjectedSpan.Start,
+                        projection.ProjectedSpan.Length));
+                Assert.True(projection.TryMapPositionToHost(
+                    projection.ProjectedPosition,
+                    out var mappedPosition));
+                Assert.Equal(position, mappedPosition);
+                Assert.True(projection.TryMapToHost(
+                    projection.ProjectedSpan,
+                    out var mappedSpan));
+                Assert.Equal(
+                    completionContext.HostSpan,
+                    mappedSpan);
+                Assert.False(projection.TryMapToHost(
+                    new TextSpan(
+                        projection.ProjectedSpan.Start - 1,
+                        projection.ProjectedSpan.Length),
+                    out _));
+                Assert.False(projection.TryMapToHost(
+                    new TextSpan(
+                        projection.ProjectedSpan.Start,
+                        projection.ProjectedSpan.Length + 1),
+                    out _));
+
+                var localNames = projection.Root
+                    .DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>()
+                    .Select(static variable =>
+                        variable.Identifier.ValueText)
+                    .ToArray();
+                Assert.Contains("title", localNames);
+                Assert.Contains("length", localNames);
+                Assert.Contains("panel", localNames);
+                Assert.Equal(
+                    1,
+                    localNames.Count(static name =>
+                        name == "length"));
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_UsesCurrentTextWithStaleSemanticDocument()
+    {
+        const string semanticSource = """
+            namespace Gallery;
+            using Avalonia.Controls;
+            state int count = 0;
+            <StackPanel Width={}/>
+            """;
+        const string currentSource = """
+            namespace Gallery;
+            using Avalonia.Controls;
+            state int count = 0;
+            <StackPanel Width={c}/>
+            """;
+
+        WithWorkspace(
+            semanticSource,
+            (_, semanticContext, _) =>
+            {
+                var position = currentSource.IndexOf(
+                    "{c}",
+                    StringComparison.Ordinal) + 2;
+                var syntacticDocument =
+                    AkburaSyntacticDocument.Parse(
+                        SourceText.From(currentSource),
+                        semanticContext.Document.FilePath);
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var projectedText = projection.Root.ToFullString();
+                Assert.Equal(
+                    "c",
+                    projectedText.Substring(
+                        projection.ProjectedSpan.Start,
+                        projection.ProjectedSpan.Length));
+                Assert.Contains(
+                    projection.Root
+                        .DescendantNodes()
+                        .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>(),
+                    static variable =>
+                        variable.Identifier.ValueText == "count");
+
+                var parseOptions = semanticContext.Project
+                    .CSharpCompilation.SyntaxTrees
+                    .Select(static tree => tree.Options)
+                    .OfType<CSharpParseOptions>()
+                    .FirstOrDefault() ?? CSharpParseOptions.Default;
+                var projectionTree = CSharpSyntaxTree.Create(
+                    projection.Root,
+                    parseOptions);
+                var projectionCompilation = semanticContext.Project
+                    .CSharpCompilation.AddSyntaxTrees(projectionTree);
+                var projectionModel = projectionCompilation
+                    .GetSemanticModel(projectionTree);
+                Assert.Contains(
+                    projectionModel.LookupSymbols(
+                        projection.ProjectedPosition,
+                        name: "count"),
+                    static symbol => symbol.Name == "count");
+
+                var completionList = RoslynCompletionTestHost
+                    .GetCompletionsAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completionList);
+                var countCompletion = Assert.Single(
+                    completionList.ItemsList,
+                    static item => item.DisplayText == "count");
+                Assert.True(projection.TryMapToHost(
+                    countCompletion.Span,
+                    out var countHostSpan),
+                    $"Completion span {countCompletion.Span} is outside " +
+                    $"projection span {projection.ProjectedSpan}.");
+                Assert.Equal(
+                    new TextSpan(
+                        currentSource.IndexOf(
+                            "{c}",
+                            StringComparison.Ordinal) + 1,
+                        1),
+                    countHostSpan);
+                Assert.True(projection.TryMapPositionToHost(
+                    projection.ProjectedPosition,
+                    out var mappedPosition));
+                Assert.Equal(position, mappedPosition);
+                Assert.Equal(
+                    semanticSource,
+                    semanticContext.Document.Text.ToString());
+            });
+    }
+
     private static AkburaCompletionResult GetCompletionResult(
         AkburaWorkspace workspace,
         AkburaProjectId projectId,

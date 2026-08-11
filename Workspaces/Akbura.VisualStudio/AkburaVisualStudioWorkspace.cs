@@ -45,6 +45,18 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 
     internal event EventHandler? ProjectContextChanged;
 
+    internal Project? FindRoslynProjectForDocument(
+        string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return null;
+        }
+
+        return FindContainingProject(
+            Path.GetFullPath(filePath));
+    }
+
     /// <summary>
     /// Finds the C# project that owns the specified Akbura document
     /// and synchronizes it with the Akbura workspace.

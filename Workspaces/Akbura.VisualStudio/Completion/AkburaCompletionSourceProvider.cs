@@ -81,6 +81,8 @@ internal sealed class AkburaCompletionSourceProvider :
                     _workspaceHost.Workspace
                         .LanguageServices
                         .Completion,
-                    _parserService));
+                    _parserService,
+                    new AkburaRoslynCompletionService(
+                        _workspaceHost)));
     }
 }

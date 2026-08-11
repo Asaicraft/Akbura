@@ -637,6 +637,44 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void TypingDynamicAttributeExpression_ExtendsCSharpExpression()
+    {
+        var code = "<Button Click={}/>";
+        var syntax = Parse(code);
+        var insertionPosition = code.IndexOf('}');
+
+        foreach (var character in "count++")
+        {
+            var newCode = code.Insert(
+                insertionPosition,
+                character.ToString());
+            var change = new TextChangeRange(
+                new TextSpan(insertionPosition, 0),
+                newLength: 1);
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [change]);
+
+            Assert.Equal(newCode, syntax.ToFullString());
+            code = newCode;
+            insertionPosition++;
+        }
+
+        var markup = Assert.IsType<GreenMarkupRootSyntax>(
+            syntax.Members[0]);
+        Assert.Equal(1, markup.Element.StartTag!.Attributes.Count);
+        var attribute = Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            markup.Element.StartTag.Attributes[0]);
+        var value = Assert.IsType<GreenMarkupDynamicAttributeValueSyntax>(
+            attribute.Value);
+
+        Assert.Equal("{count++}", value.Expression.ToFullString());
+        Assert.False(value.Expression.ContainsDiagnostics);
+    }
+
+    [Fact]
     public void SkippedTextBeforeAttributeWithLeadingTrivia_DoesNotCrash()
     {
         const string code = "<Button ! Content=\"Hello\"/>";

@@ -69,6 +69,82 @@ internal sealed partial class CSharpProbeBinder
             localStatements.ToImmutable());
     }
 
+    internal CSharpProbeScope CreateCompletionProbeScope(
+        AkburaSyntax scope,
+        SyntaxNode csharpNode,
+        ImmutableArray<string> excludedNames = default)
+    {
+        if (scope == null ||
+            csharpNode == null)
+        {
+            return CSharpProbeScope.Empty;
+        }
+
+        using var memberDeclarations =
+            ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        using var localStatements =
+            ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
+        var addedNames = new HashSet<string>(StringComparer.Ordinal);
+        if (!excludedNames.IsDefaultOrEmpty)
+        {
+            foreach (var excludedName in excludedNames)
+            {
+                if (!string.IsNullOrWhiteSpace(excludedName))
+                {
+                    addedNames.Add(excludedName);
+                }
+            }
+        }
+
+        var diagnostics = BindingDiagnosticBag.GetInstance();
+        try
+        {
+            for (var binder = Next;
+                 binder != null;
+                 binder = binder.Next)
+            {
+                var scopeDesignator = binder.ScopeDesignator;
+                if (scopeDesignator == null)
+                {
+                    continue;
+                }
+
+                foreach (var candidate in
+                         binder.GetDeclaredSymbolsForScope(
+                             scopeDesignator))
+                {
+                    if (string.IsNullOrWhiteSpace(candidate.Name) ||
+                        candidate.Kind == AkburaSymbolKind.CSharpSymbol ||
+                        !addedNames.Add(candidate.Name))
+                    {
+                        continue;
+                    }
+
+                    var symbol = Next?.LookupSymbol(
+                        candidate.Name,
+                        BinderLookupOptions.None,
+                        scope,
+                        diagnostics).Symbol;
+                    AddProbeSymbol(
+                        symbol,
+                        memberDeclarations,
+                        localStatements);
+                }
+            }
+        }
+        finally
+        {
+            diagnostics.Free();
+        }
+
+        AddAllComponentMethodProbeMembers(
+            memberDeclarations);
+
+        return new CSharpProbeScope(
+            memberDeclarations.ToImmutable(),
+            localStatements.ToImmutable());
+    }
+
     private void AddComponentMethodProbeMembers(
         string name,
         ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> memberDeclarations)
@@ -81,6 +157,23 @@ internal sealed partial class CSharpProbeBinder
                     method.Identifier.ValueText,
                     name,
                     StringComparison.Ordinal))
+            {
+                memberDeclarations.Add(method);
+            }
+        }
+    }
+
+    private void AddAllComponentMethodProbeMembers(
+        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>
+            memberDeclarations)
+    {
+        foreach (var member in
+                 SemanticModel.SyntaxTree.GetRoot().Members)
+        {
+            if (member is CSharpStatementSyntax statement &&
+                TryCreateComponentMethodProbe(
+                    statement,
+                    out var method))
             {
                 memberDeclarations.Add(method);
             }
@@ -184,7 +277,7 @@ internal sealed partial class CSharpProbeBinder
         }
     }
 
-    private static ImmutableArray<CSharp.MemberDeclarationSyntax> AddProbeMethod(
+    internal static ImmutableArray<CSharp.MemberDeclarationSyntax> AddProbeMethod(
         ImmutableArray<CSharp.MemberDeclarationSyntax> memberDeclarations,
         CSharp.MethodDeclarationSyntax method)
     {
@@ -203,7 +296,7 @@ internal sealed partial class CSharpProbeBinder
         return builder.ToImmutable();
     }
 
-    private static CSharp.BlockSyntax CreateProbeBlock(
+    internal static CSharp.BlockSyntax CreateProbeBlock(
         ImmutableArray<CSharp.StatementSyntax> localStatements,
         CSharp.StatementSyntax statement)
     {
@@ -213,7 +306,7 @@ internal sealed partial class CSharpProbeBinder
             statement);
     }
 
-    private static CSharp.BlockSyntax CreateProbeBlock(
+    internal static CSharp.BlockSyntax CreateProbeBlock(
         ImmutableArray<CSharp.StatementSyntax> localStatements,
         ImmutableArray<CSharp.StatementSyntax> precedingStatements,
         CSharp.StatementSyntax statement)

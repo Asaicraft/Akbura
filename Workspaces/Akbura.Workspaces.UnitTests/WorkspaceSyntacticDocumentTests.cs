@@ -203,6 +203,67 @@ public sealed class WorkspaceSyntacticDocumentTests
             document.GetCompletionContext(position).Kind);
     }
 
+    [Theory]
+    [InlineData(
+        "<Button Content={ViewModel.Us|}/>",
+        "ViewModel.Us")]
+    [InlineData(
+        "<Button Content={ViewModel.|}/>",
+        "ViewModel.")]
+    [InlineData(
+        "<TextBlock Text={$\"Count {count.ToStr|}\"}/>",
+        "$\"Count {count.ToStr}\"")]
+    [InlineData(
+        "<Button IsVisible={|true}/>",
+        "true")]
+    [InlineData(
+        "<Button IsVisible={true|}/>",
+        "true")]
+    public void SyntacticDocument_DetectsCSharpExpressionCompletion(
+        string sourceWithCaret,
+        string expectedExpression)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var result = document.TryGetCSharpCompletionContext(
+            position,
+            out var context);
+
+        Assert.True(result);
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.Expression,
+            context.Kind);
+        Assert.Equal(position, context.HostPosition);
+        Assert.Equal(
+            position - context.HostSpan.Start,
+            context.RelativePosition);
+        Assert.Equal(
+            expectedExpression,
+            document.Text.ToString(context.HostSpan));
+    }
+
+    [Theory]
+    [InlineData("<Button Content=|{ViewModel.User}/>")]
+    [InlineData("<Button Content={ViewModel.User}|/>")]
+    [InlineData("<Button Content=\"ViewModel.Us|er\"/>")]
+    public void SyntacticDocument_DoesNotProjectOutsideCSharpExpressions(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.False(document.TryGetCSharpCompletionContext(
+            position,
+            out _));
+    }
+
     [Fact]
     public void SyntacticDocument_AttributeCompletionContainsExistingAttributes()
     {

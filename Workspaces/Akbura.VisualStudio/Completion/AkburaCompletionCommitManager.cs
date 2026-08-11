@@ -45,7 +45,12 @@ internal sealed class AkburaCompletionCommitManager :
     IAsyncCompletionCommitManager
 {
     private static readonly char[] CommitCharacters =
-        ['>', '=', ' ', '\t', '\n'];
+    [
+        ' ', '\t', '\n',
+        '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+',
+        ',', '-', '.', '/', ':', ';', '<', '=', '>', '?', '@',
+        '[', '\\', ']', '^', '`', '{', '|', '}', '~',
+    ];
 
     private readonly IAsyncCompletionBroker _completionBroker;
 
@@ -67,7 +72,11 @@ internal sealed class AkburaCompletionCommitManager :
         CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        return CommitCharacters.Contains(typedChar);
+        var computedItems = session.GetComputedItems(token);
+        return !computedItems.UsesSoftSelection &&
+            !computedItems.SuggestionItemSelected &&
+            computedItems.SelectedItem?.CommitCharacters.Contains(
+                typedChar) == true;
     }
 
     public CommitResult TryCommit(
@@ -78,6 +87,18 @@ internal sealed class AkburaCompletionCommitManager :
         CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if (item.Properties.TryGetProperty(
+                AkburaCompletionProperties.RoslynItem,
+                out AkburaRoslynCompletionItemData roslynData))
+        {
+            return TryCommitRoslynCompletion(
+                session,
+                buffer,
+                roslynData,
+                typedChar,
+                token);
+        }
+
         if (!item.Properties.TryGetProperty(
                 AkburaCompletionProperties.CoreItem,
                 out AkburaCompletionItem completion))
@@ -143,6 +164,140 @@ internal sealed class AkburaCompletionCommitManager :
             : CommitResult.Handled;
     }
 
+    private static CommitResult TryCommitRoslynCompletion(
+        IAsyncCompletionSession session,
+        ITextBuffer buffer,
+        AkburaRoslynCompletionItemData data,
+        char typedChar,
+        CancellationToken cancellationToken)
+    {
+        if (!ReferenceEquals(
+                data.State.HostSnapshot.TextBuffer,
+                buffer))
+        {
+            return CommitResult.Unhandled;
+        }
+
+        var completionChange = ThreadHelper
+            .JoinableTaskFactory
+            .Run(async () => await data.State.Service
+                .GetChangeAsync(
+                    data.State.Document,
+                    data.Item,
+                    typedChar,
+                    cancellationToken)
+                .ConfigureAwait(false));
+        var changes = completionChange.TextChanges.IsDefaultOrEmpty
+            ? [completionChange.TextChange]
+            : completionChange.TextChanges;
+        var currentSnapshot = buffer.CurrentSnapshot;
+        var mappedChanges = new List<MappedCompletionChange>(
+            changes.Length);
+
+        foreach (var change in changes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!data.State.Projection.TryMapToHost(
+                    change.Span,
+                    out var hostSpan))
+            {
+                return CommitResult.Unhandled;
+            }
+
+            SnapshotSpan currentSpan;
+            try
+            {
+                currentSpan = new SnapshotSpan(
+                        data.State.HostSnapshot,
+                        new Span(
+                            hostSpan.Start,
+                            hostSpan.Length))
+                    .TranslateTo(
+                        currentSnapshot,
+                        SpanTrackingMode.EdgeInclusive);
+            }
+            catch (ArgumentException)
+            {
+                return CommitResult.Unhandled;
+            }
+
+            mappedChanges.Add(new MappedCompletionChange(
+                currentSpan.Span,
+                change.NewText ?? string.Empty));
+        }
+
+        int? caretPosition = null;
+        if (completionChange.NewPosition is { } projectedPosition)
+        {
+            var relativePosition = projectedPosition -
+                data.State.Projection.ProjectedSpan.Start;
+            var projectedLengthAfterChanges =
+                data.State.Projection.ProjectedSpan.Length;
+            foreach (var change in changes)
+            {
+                projectedLengthAfterChanges +=
+                    (change.NewText?.Length ?? 0) -
+                    change.Span.Length;
+            }
+
+            if (relativePosition < 0 ||
+                relativePosition > projectedLengthAfterChanges)
+            {
+                return CommitResult.Unhandled;
+            }
+
+            try
+            {
+                var currentHostStart = new SnapshotPoint(
+                        data.State.HostSnapshot,
+                        data.State.Projection.HostSpan.Start)
+                    .TranslateTo(
+                        currentSnapshot,
+                        PointTrackingMode.Negative)
+                    .Position;
+                caretPosition = currentHostStart +
+                    relativePosition;
+            }
+            catch (ArgumentException)
+            {
+                return CommitResult.Unhandled;
+            }
+        }
+
+        using var edit = buffer.CreateEdit();
+        foreach (var change in mappedChanges
+                     .OrderByDescending(static change =>
+                         change.Span.Start))
+        {
+            if (!edit.Replace(
+                    change.Span,
+                    change.NewText))
+            {
+                return CommitResult.Unhandled;
+            }
+        }
+
+        var appliedSnapshot = edit.Apply();
+        if (caretPosition is { } position &&
+            ReferenceEquals(
+                session.TextView.TextBuffer,
+                buffer) &&
+            position >= 0 &&
+            position <= appliedSnapshot.Length)
+        {
+            session.TextView.Caret.MoveTo(
+                new SnapshotPoint(
+                    appliedSnapshot,
+                    position));
+        }
+
+        return completionChange.IncludesCommitCharacter
+            ? new CommitResult(
+                isHandled: true,
+                CommitBehavior.SuppressFurtherTypeCharCommandHandlers)
+            : CommitResult.Handled;
+    }
+
     private void TriggerNextCompletion(
         IAsyncCompletionSession currentSession,
         ITextSnapshot snapshotBeforeCommit,
@@ -185,5 +340,20 @@ internal sealed class AkburaCompletionCommitManager :
                 CancellationToken.None);
         }).FileAndForget("Akbura/Completion/TriggerMembers");
 #pragma warning restore VSSDK007
+    }
+
+    private readonly struct MappedCompletionChange
+    {
+        public MappedCompletionChange(
+            Span span,
+            string newText)
+        {
+            Span = span;
+            NewText = newText;
+        }
+
+        public Span Span { get; }
+
+        public string NewText { get; }
     }
 }

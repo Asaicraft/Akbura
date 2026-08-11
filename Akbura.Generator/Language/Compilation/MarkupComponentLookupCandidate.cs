@@ -1,4 +1,4 @@
-using Akbura.Language.Symbols;
+using Microsoft.CodeAnalysis;
 
 namespace Akbura.Language;
 
@@ -6,13 +6,21 @@ internal readonly struct MarkupComponentLookupCandidate
 {
     public MarkupComponentLookupCandidate(
         string displayName,
-        IMarkupComponentSymbol symbol)
+        string metadataName,
+        INamedTypeSymbol? componentType,
+        bool isAkburaComponent)
     {
         DisplayName = displayName;
-        Symbol = symbol;
+        MetadataName = metadataName;
+        ComponentType = componentType;
+        IsAkburaComponent = isAkburaComponent;
     }
 
     public string DisplayName { get; }
 
-    public IMarkupComponentSymbol Symbol { get; }
+    public string MetadataName { get; }
+
+    public INamedTypeSymbol? ComponentType { get; }
+
+    public bool IsAkburaComponent { get; }
 }

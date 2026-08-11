@@ -14,6 +14,18 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 {
     private readonly VisualStudioWorkspace _visualStudioWorkspace;
 
+    private readonly object _synchronizationGate = new();
+
+    private readonly Dictionary<ProjectId, ProjectSynchronizationState>
+        _projectSynchronizations = new();
+
+    private readonly Dictionary<ProjectId, SemaphoreSlim>
+        _projectSynchronizationLocks = new();
+
+    private readonly CancellationTokenSource _disposeCancellation = new();
+
+    private int _disposeState;
+
     [ImportingConstructor]
     public AkburaVisualStudioWorkspace(
         VisualStudioWorkspace visualStudioWorkspace)
@@ -41,9 +53,12 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             return null;
         }
 
+        var totalTimer = Stopwatch.StartNew();
         var fullPath = Path.GetFullPath(filePath);
 
+        var stageTimer = Stopwatch.StartNew();
         var project = FindContainingProject(fullPath);
+        TracePerformance("FindContainingProject", stageTimer.Elapsed);
 
         if (project == null)
         {
@@ -54,35 +69,112 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             return null;
         }
 
-        var synchronizedProjects =
-            new HashSet<ProjectId>();
+        var synchronization =
+            GetOrCreateProjectSynchronizationTaskAsync(
+                project,
+                fullPath);
+        var synchronized = await AwaitWithoutCancelingSourceAsync(
+                synchronization,
+                cancellationToken)
+            .ConfigureAwait(false);
 
-        var synchronized =
-            await SynchronizeProjectAndReferencesAsync(
-                    project,
-                    fullPath,
-                    synchronizedProjects,
-                    cancellationToken)
-                .ConfigureAwait(false);
+        TracePerformance("Synchronization total", totalTimer.Elapsed);
 
         return synchronized
             ? new AkburaProjectId(project.Id.Id)
             : null;
     }
 
+    private async Task<bool> GetOrCreateProjectSynchronizationTaskAsync(
+        Project project,
+        string? activeFilePath)
+    {
+        var cancellationToken = _disposeCancellation.Token;
+        var version = await project
+            .GetDependentVersionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectSynchronizationState state;
+        var startsSynchronization = false;
+        lock (_synchronizationGate)
+        {
+            if (_projectSynchronizations.TryGetValue(
+                    project.Id,
+                    out var current) &&
+                (!current.Task.IsCompleted ||
+                 current.Version.Equals(version)))
+            {
+                state = current;
+            }
+            else
+            {
+                state = new ProjectSynchronizationState(version);
+                _projectSynchronizations[project.Id] = state;
+                startsSynchronization = true;
+            }
+        }
+
+        if (startsSynchronization)
+        {
+            _ = CompleteProjectSynchronizationAsync(
+                project,
+                activeFilePath,
+                state);
+        }
+
+        return await state.Task.ConfigureAwait(false);
+    }
+
+    private async Task CompleteProjectSynchronizationAsync(
+        Project project,
+        string? activeFilePath,
+        ProjectSynchronizationState state)
+    {
+        var cancellationToken = _disposeCancellation.Token;
+        try
+        {
+            var synchronizationLock = GetProjectSynchronizationLock(
+                project.Id);
+            await synchronizationLock
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+            try
+            {
+                var result = await SynchronizeProjectAndReferencesAsync(
+                        project,
+                        activeFilePath,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                state.TrySetResult(result);
+            }
+            finally
+            {
+                synchronizationLock.Release();
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            RemoveFailedSynchronization(project.Id, state);
+            state.TrySetCanceled();
+        }
+        catch (Exception exception)
+        {
+            RemoveFailedSynchronization(project.Id, state);
+            state.TrySetException(exception);
+        }
+    }
+
     private async Task<bool>
         SynchronizeProjectAndReferencesAsync(
             Project project,
             string? activeFilePath,
-            HashSet<ProjectId> synchronizedProjects,
             CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!synchronizedProjects.Add(project.Id))
-        {
-            return true;
-        }
+        var totalTimer = Stopwatch.StartNew();
+        var stageTimer = Stopwatch.StartNew();
 
         foreach (var projectReference in
                  project.ProjectReferences)
@@ -99,19 +191,20 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 continue;
             }
 
-            await SynchronizeProjectAndReferencesAsync(
+            await GetOrCreateProjectSynchronizationTaskAsync(
                     referencedProject,
-                    activeFilePath: null,
-                    synchronizedProjects,
-                    cancellationToken)
+                    activeFilePath: null)
                 .ConfigureAwait(false);
         }
+        TracePerformance("Referenced projects", stageTimer.Elapsed);
 
+        stageTimer.Restart();
         var compilation =
             await project
                 .GetCompilationAsync(
                     cancellationToken)
                 .ConfigureAwait(false);
+        TracePerformance("GetCompilationAsync", stageTimer.Elapsed);
 
         if (compilation is not
             CSharpCompilation csharpCompilation)
@@ -123,6 +216,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             return false;
         }
 
+        stageTimer.Restart();
         var context =
             CreateProjectContext(
                 project,
@@ -130,7 +224,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 activeFilePath ??
                     project.FilePath ??
                     Environment.CurrentDirectory);
+        TracePerformance("CreateProjectContext", stageTimer.Elapsed);
 
+        stageTimer.Restart();
         var akburaProject =
             Workspace.AddOrUpdateProject(context);
 
@@ -140,6 +236,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 activeFilePath,
                 cancellationToken)
             .ConfigureAwait(false);
+        TracePerformance(
+            "SynchronizeAkburaDocumentsAsync",
+            stageTimer.Elapsed);
 
         Debug.WriteLine(
             $"[Akbura] Roslyn project synchronized: " +
@@ -149,6 +248,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             $"references={csharpCompilation.References.Count()}, " +
             $"projectReferences={project.ProjectReferences.Count()}");
 
+        TracePerformance(
+            "SynchronizeProjectAndReferencesAsync total",
+            totalTimer.Elapsed);
         return true;
     }
 
@@ -383,62 +485,58 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             $"Akbura documents in " +
             $"project '{project.Name}'.");
 
-        var synchronizedCount = 0;
-
-        foreach (var document in documents)
+        var loadTasks = documents
+            .Select(LoadDocumentAsync)
+            .ToArray();
+        var loadedDocuments = await Task.WhenAll(loadTasks)
+            .ConfigureAwait(false);
+        var inputs = ImmutableArray.CreateBuilder<AkburaDocumentInput>(
+            loadedDocuments.Length);
+        foreach (var input in loadedDocuments)
         {
-            cancellationToken
-                .ThrowIfCancellationRequested();
-
-            var filePath =
-                document.FilePath;
-
-            if (string.IsNullOrWhiteSpace(
-                    filePath))
+            if (input.HasValue)
             {
-                continue;
+                inputs.Add(input.Value);
             }
-
-            var fullPath =
-                Path.GetFullPath(filePath);
-
-            if (activeFilePath != null &&
-                PathsEqual(
-                    fullPath,
-                    activeFilePath))
-            {
-                continue;
-            }
-
-            var text =
-                await document
-                    .GetTextAsync(
-                        cancellationToken)
-                    .ConfigureAwait(false);
-
-            if (text == null)
-            {
-                continue;
-            }
-
-            Workspace.OpenOrChangeDocumentContext(
-                projectId,
-                new Uri(fullPath),
-                text,
-                changes: null,
-                cancellationToken);
-
-            synchronizedCount++;
-
-            Debug.WriteLine(
-                $"[Akbura] Project document synchronized: " +
-                $"'{Path.GetFileName(fullPath)}'.");
         }
 
+        Workspace.SynchronizeProjectDocuments(
+            projectId,
+            inputs.ToImmutable(),
+            cancellationToken);
+
         Debug.WriteLine(
-            $"[Akbura] Synchronized {synchronizedCount} " +
+            $"[Akbura] Synchronized {inputs.Count} " +
             $"Akbura documents for " +
             $"project '{project.Name}'.");
+
+        async Task<AkburaDocumentInput?> LoadDocumentAsync(
+            TextDocument document)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var filePath = document.FilePath;
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return null;
+            }
+
+            var fullPath = Path.GetFullPath(filePath);
+            if (activeFilePath != null &&
+                PathsEqual(fullPath, activeFilePath))
+            {
+                return null;
+            }
+
+            var text = await document
+                .GetTextAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return text == null
+                ? null
+                : new AkburaDocumentInput(
+                    new Uri(fullPath),
+                    text);
+        }
     }
 
     private static ImmutableArray<TextDocument>
@@ -687,6 +785,116 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+        {
+            return;
+        }
+
+        _disposeCancellation.Cancel();
+
+        lock (_synchronizationGate)
+        {
+            _projectSynchronizationLocks.Clear();
+            _projectSynchronizations.Clear();
+        }
+
         Workspace.Dispose();
+    }
+
+    private SemaphoreSlim GetProjectSynchronizationLock(
+        ProjectId projectId)
+    {
+        lock (_synchronizationGate)
+        {
+            if (!_projectSynchronizationLocks.TryGetValue(
+                    projectId,
+                    out var synchronizationLock))
+            {
+                synchronizationLock = new SemaphoreSlim(1, 1);
+                _projectSynchronizationLocks.Add(
+                    projectId,
+                    synchronizationLock);
+            }
+
+            return synchronizationLock;
+        }
+    }
+
+    private void RemoveFailedSynchronization(
+        ProjectId projectId,
+        ProjectSynchronizationState state)
+    {
+        lock (_synchronizationGate)
+        {
+            if (_projectSynchronizations.TryGetValue(
+                    projectId,
+                    out var current) &&
+                ReferenceEquals(current, state))
+            {
+                _projectSynchronizations.Remove(projectId);
+            }
+        }
+    }
+
+#pragma warning disable VSTHRD003 // The shared source task deliberately outlives the requesting editor snapshot.
+    private static async Task<T> AwaitWithoutCancelingSourceAsync<T>(
+        Task<T> task,
+        CancellationToken cancellationToken)
+    {
+        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
+        {
+            return await task.ConfigureAwait(false);
+        }
+
+        var cancellation = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using (cancellationToken.Register(
+                   () => cancellation.TrySetResult(true)))
+        {
+            if (!ReferenceEquals(
+                    await Task.WhenAny(task, cancellation.Task)
+                        .ConfigureAwait(false),
+                    task))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            return await task.ConfigureAwait(false);
+        }
+    }
+#pragma warning restore VSTHRD003
+
+    [Conditional("DEBUG")]
+    private static void TracePerformance(
+        string stage,
+        TimeSpan elapsed)
+    {
+        Debug.WriteLine(
+            $"[Akbura.Completion.Performance] " +
+            $"{stage}: {elapsed.TotalMilliseconds:F2} ms");
+    }
+
+    private sealed class ProjectSynchronizationState
+    {
+        private readonly TaskCompletionSource<bool> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ProjectSynchronizationState(VersionStamp version)
+        {
+            Version = version;
+        }
+
+        public VersionStamp Version { get; }
+
+        public Task<bool> Task => _completion.Task;
+
+        public void TrySetResult(bool result) =>
+            _completion.TrySetResult(result);
+
+        public void TrySetCanceled() =>
+            _completion.TrySetCanceled();
+
+        public void TrySetException(Exception exception) =>
+            _completion.TrySetException(exception);
     }
 }

@@ -16,6 +16,8 @@ internal sealed class AkburaCompilationReference
     private readonly ConcurrentDictionary<string, IAkburaComponentSymbol> _componentSymbols =
         new(StringComparer.Ordinal);
 
+    private ImmutableArray<string> _componentMetadataNames;
+
     public AkburaCompilationReference(AkburaCompilation compilation)
         : this(
             compilation,
@@ -35,6 +37,9 @@ internal sealed class AkburaCompilationReference
     public AkburaCompilation Compilation { get; }
 
     public MetadataReference CSharpReference { get; }
+
+    internal int CachedComponentSymbolCount =>
+        _componentSymbols.Count;
 
     public AkburaCompilationReference WithCompilation(AkburaCompilation compilation)
     {
@@ -68,8 +73,12 @@ internal sealed class AkburaCompilationReference
         foreach (var syntaxTree in Compilation.SyntaxTrees)
         {
             var semanticModel = Compilation.GetSemanticModel(syntaxTree);
-            if (semanticModel.GetDeclaredSymbol(syntaxTree.GetRoot()) is not IAkburaComponentSymbol candidate ||
-                !string.Equals(candidate.MetadataName, metadataName, StringComparison.Ordinal))
+            if (!string.Equals(
+                    semanticModel.GetAkburaComponentMetadataName(syntaxTree),
+                    metadataName,
+                    StringComparison.Ordinal) ||
+                semanticModel.GetDeclaredSymbol(
+                    syntaxTree.GetRoot()) is not IAkburaComponentSymbol candidate)
             {
                 continue;
             }
@@ -86,6 +95,49 @@ internal sealed class AkburaCompilationReference
 
         symbol = null!;
         return false;
+    }
+
+    internal ImmutableArray<string> GetComponentMetadataNames(
+        CancellationToken cancellationToken = default)
+    {
+        if (!_componentMetadataNames.IsDefault)
+        {
+            return _componentMetadataNames;
+        }
+
+        var names = ImmutableArray.CreateBuilder<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var syntaxTree in Compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var semanticModel = Compilation.GetSemanticModel(syntaxTree);
+            var metadataName = semanticModel
+                .GetAkburaComponentMetadataName(syntaxTree);
+            if (metadataName.Length > 0 && seen.Add(metadataName))
+            {
+                names.Add(metadataName);
+            }
+        }
+
+        foreach (var reference in Compilation.CompilationReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var metadataName in
+                     reference.GetComponentMetadataNames(
+                         cancellationToken))
+            {
+                if (seen.Add(metadataName))
+                {
+                    names.Add(metadataName);
+                }
+            }
+        }
+
+        var result = names.ToImmutable();
+        ImmutableInterlocked.InterlockedInitialize(
+            ref _componentMetadataNames,
+            result);
+        return _componentMetadataNames;
     }
 
     internal IEnumerable<IAkburaComponentSymbol> GetComponentSymbols()

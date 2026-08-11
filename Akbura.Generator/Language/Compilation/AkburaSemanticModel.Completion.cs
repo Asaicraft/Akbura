@@ -4,20 +4,64 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Akbura.Language;
 
 internal partial class AkburaSemanticModel
 {
+    private readonly object _completionComponentsGate = new();
+    private CompletionComponentCatalog? _completionComponentCatalog;
+
     internal ImmutableArray<MarkupComponentLookupCandidate>
         LookupMarkupComponents(CancellationToken cancellationToken = default)
     {
+        var catalog = Volatile.Read(
+            ref _completionComponentCatalog);
+        if (catalog != null)
+        {
+            return catalog.Candidates;
+        }
+
+        var candidates = ComputeMarkupComponents(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_completionComponentsGate)
+        {
+            catalog = _completionComponentCatalog;
+            if (catalog == null)
+            {
+                catalog = new CompletionComponentCatalog(candidates);
+                Volatile.Write(
+                    ref _completionComponentCatalog,
+                    catalog);
+            }
+        }
+
+        return catalog.Candidates;
+    }
+
+    private ImmutableArray<MarkupComponentLookupCandidate>
+        ComputeMarkupComponents(CancellationToken cancellationToken)
+    {
+        var timer = Stopwatch.StartNew();
         var visibleNamespaces = GetVisibleMarkupNamespaces();
-        var akburaComponents = GetAkburaComponentsForLookup(cancellationToken);
+        TraceCompletionCatalogStage(
+            "visible namespaces",
+            timer.Elapsed);
+
+        timer.Restart();
         var candidates = new Dictionary<
             string,
             MarkupComponentLookupCandidate>(StringComparer.Ordinal);
         var csharpCompilation = Compilation.CSharpProbeCompilation;
+        var akburaControlType = csharpCompilation.GetTypeByMetadataName(
+            "Akbura.AkburaControl");
+        TraceCompletionCatalogStage(
+            "probe compilation",
+            timer.Elapsed);
+
+        timer.Restart();
 
         foreach (var visibleNamespace in visibleNamespaces)
         {
@@ -33,44 +77,63 @@ internal partial class AkburaSemanticModel
             foreach (var type in namespaceSymbol.GetTypeMembers())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var isAkburaComponent = IsDerivedFromOrEqual(
+                    type,
+                    akburaControlType);
                 if (!IsCompletableMarkupComponent(
                         csharpCompilation,
-                        type))
+                        type,
+                        isAkburaComponent))
                 {
                     continue;
                 }
 
-                var metadataName = GetTypeMetadataName(type);
-                akburaComponents.TryGetValue(
-                    metadataName,
-                    out var akburaComponent);
                 var displayName = visibleNamespace.Alias == null
                     ? type.Name
                     : visibleNamespace.Alias + "::" + type.Name;
                 AddMarkupComponentCandidate(
                     candidates,
                     displayName,
+                    GetTypeMetadataName(type),
                     type,
-                    akburaComponent);
+                    isAkburaComponent);
             }
         }
 
-        foreach (var pair in akburaComponents)
+        foreach (var syntaxTree in Compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
             AddVisibleAkburaComponentCandidates(
                 candidates,
                 visibleNamespaces,
-                pair.Key,
-                pair.Value,
+                GetAkburaComponentMetadataName(syntaxTree),
                 csharpCompilation);
         }
 
-        return candidates.Values
+        foreach (var reference in Compilation.CompilationReferences)
+        {
+            foreach (var metadataName in
+                     reference.GetComponentMetadataNames(
+                         cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                AddVisibleAkburaComponentCandidates(
+                    candidates,
+                    visibleNamespaces,
+                    metadataName,
+                    csharpCompilation);
+            }
+        }
+
+        var result = candidates.Values
             .OrderBy(
                 static candidate => candidate.DisplayName,
                 StringComparer.Ordinal)
             .ToImmutableArray();
+        TraceCompletionCatalogStage(
+            "namespace members",
+            timer.Elapsed);
+        return result;
     }
 
     internal bool TryResolveMarkupComponentForCompletion(
@@ -131,38 +194,6 @@ internal partial class AkburaSemanticModel
 
         component = null!;
         return false;
-    }
-
-    private Dictionary<string, IAkburaComponentSymbol>
-        GetAkburaComponentsForLookup(
-            CancellationToken cancellationToken)
-    {
-        var result = new Dictionary<string, IAkburaComponentSymbol>(
-            StringComparer.Ordinal);
-        foreach (var syntaxTree in Compilation.SyntaxTrees)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (ReferenceEquals(syntaxTree, SyntaxTree))
-            {
-                continue;
-            }
-
-            var semanticModel = Compilation.GetSemanticModel(syntaxTree);
-            if (semanticModel.GetDeclaredSymbol(
-                    syntaxTree.GetRoot()) is IAkburaComponentSymbol component)
-            {
-                AddAkburaComponent(result, component);
-            }
-        }
-
-        foreach (var component in
-                 Compilation.GetReferencedComponentSymbols())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            AddAkburaComponent(result, component);
-        }
-
-        return result;
     }
 
     private IAkburaComponentSymbol? FindLocalAkburaComponent(
@@ -336,23 +367,38 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private static void AddAkburaComponent(
-        Dictionary<string, IAkburaComponentSymbol> components,
-        IAkburaComponentSymbol component)
+    private static void AddMarkupComponentCandidate(
+        Dictionary<string, MarkupComponentLookupCandidate> candidates,
+        string displayName,
+        string metadataName,
+        INamedTypeSymbol? componentType,
+        bool isAkburaComponent)
     {
-        if (!components.ContainsKey(component.MetadataName))
+        if (candidates.TryGetValue(displayName, out var existing) &&
+            (existing.IsAkburaComponent ||
+             !isAkburaComponent))
         {
-            components.Add(component.MetadataName, component);
+            return;
         }
+
+        candidates[displayName] = new MarkupComponentLookupCandidate(
+            displayName,
+            metadataName,
+            componentType,
+            isAkburaComponent);
     }
 
     private static void AddVisibleAkburaComponentCandidates(
         Dictionary<string, MarkupComponentLookupCandidate> candidates,
         ImmutableArray<VisibleMarkupNamespace> visibleNamespaces,
         string metadataName,
-        IAkburaComponentSymbol component,
         CSharpCompilation csharpCompilation)
     {
+        if (metadataName.Length == 0)
+        {
+            return;
+        }
+
         var separator = metadataName.LastIndexOf('.');
         var namespaceName = separator < 0
             ? string.Empty
@@ -360,8 +406,8 @@ internal partial class AkburaSemanticModel
         var simpleName = separator < 0
             ? metadataName
             : metadataName[(separator + 1)..];
-        var componentType = component.ComponentType ??
-            csharpCompilation.GetTypeByMetadataName(metadataName);
+        var componentType = csharpCompilation.GetTypeByMetadataName(
+            metadataName);
 
         foreach (var visibleNamespace in visibleNamespaces)
         {
@@ -379,30 +425,10 @@ internal partial class AkburaSemanticModel
             AddMarkupComponentCandidate(
                 candidates,
                 displayName,
+                metadataName,
                 componentType,
-                component);
+                isAkburaComponent: true);
         }
-    }
-
-    private static void AddMarkupComponentCandidate(
-        Dictionary<string, MarkupComponentLookupCandidate> candidates,
-        string displayName,
-        INamedTypeSymbol? componentType,
-        IAkburaComponentSymbol? akburaComponent)
-    {
-        if (candidates.TryGetValue(displayName, out var existing) &&
-            (existing.Symbol.AkburaComponent != null ||
-             akburaComponent == null))
-        {
-            return;
-        }
-
-        candidates[displayName] = new MarkupComponentLookupCandidate(
-            displayName,
-            CreateMarkupComponentLookupSymbol(
-                displayName,
-                componentType,
-                akburaComponent));
     }
 
     private static IMarkupComponentSymbol
@@ -449,15 +475,93 @@ internal partial class AkburaSemanticModel
 
     private static bool IsCompletableMarkupComponent(
         Compilation compilation,
-        INamedTypeSymbol type)
+        INamedTypeSymbol type,
+        bool isAkburaComponent)
     {
-        return !type.IsStatic &&
-            !type.IsAbstract &&
-            type.Arity == 0 &&
-            type.TypeKind is TypeKind.Class or TypeKind.Struct &&
-            compilation.IsSymbolAccessibleWithin(
+        if (type.IsStatic ||
+            type.IsAbstract ||
+            type.Arity != 0 ||
+            type.TypeKind is not (TypeKind.Class or TypeKind.Struct) ||
+            !compilation.IsSymbolAccessibleWithin(
                 type,
-                compilation.Assembly);
+                compilation.Assembly))
+        {
+            return false;
+        }
+
+        if (isAkburaComponent)
+        {
+            return true;
+        }
+
+        var namespaceName = type.ContainingNamespace.ToDisplayString();
+        if (namespaceName.Equals(
+                "Avalonia",
+                StringComparison.Ordinal) ||
+            namespaceName.StartsWith(
+                "Avalonia.",
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (type.SpecialType != SpecialType.None ||
+            namespaceName.Equals(
+                "System",
+                StringComparison.Ordinal) ||
+            namespaceName.StartsWith(
+                "System.",
+                StringComparison.Ordinal) ||
+            namespaceName.Equals(
+                "Microsoft",
+                StringComparison.Ordinal) ||
+            namespaceName.StartsWith(
+                "Microsoft.",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return type.TypeKind == TypeKind.Class &&
+            type.InstanceConstructors.Any(constructor =>
+                constructor.Parameters.Length == 0 &&
+                compilation.IsSymbolAccessibleWithin(
+                    constructor,
+                    compilation.Assembly));
+    }
+
+    private static bool IsDerivedFromOrEqual(
+        INamedTypeSymbol type,
+        INamedTypeSymbol? baseType)
+    {
+        if (baseType == null)
+        {
+            return false;
+        }
+
+        for (var current = type;
+             current != null;
+             current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(
+                    current,
+                    baseType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    [Conditional("DEBUG")]
+    private static void TraceCompletionCatalogStage(
+        string stage,
+        TimeSpan elapsed)
+    {
+        Debug.WriteLine(
+            $"[Akbura.Completion.Performance] Component catalog " +
+            $"{stage}: {elapsed.TotalMilliseconds:F2} ms");
     }
 
     private static string GetTypeMetadataName(INamedTypeSymbol type)
@@ -484,5 +588,19 @@ internal partial class AkburaSemanticModel
         public string Name { get; }
 
         public string? Alias { get; }
+    }
+
+    private sealed class CompletionComponentCatalog
+    {
+        public CompletionComponentCatalog(
+            ImmutableArray<MarkupComponentLookupCandidate> candidates)
+        {
+            Candidates = candidates;
+        }
+
+        public ImmutableArray<MarkupComponentLookupCandidate> Candidates
+        {
+            get;
+        }
     }
 }

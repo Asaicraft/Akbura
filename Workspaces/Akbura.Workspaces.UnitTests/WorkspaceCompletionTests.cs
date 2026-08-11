@@ -45,7 +45,7 @@ public sealed class WorkspaceCompletionTests
                     static item =>
                         item.DisplayText == "StackPanel" &&
                         item.Kind == AkburaCompletionKind.Component);
-                Assert.Contains(
+                Assert.DoesNotContain(
                     result.Items,
                     static item => item.DisplayText == "Card");
                 Assert.DoesNotContain(
@@ -81,7 +81,9 @@ public sealed class WorkspaceCompletionTests
                     result.Items,
                     static item =>
                         item.DisplayText == "Title" &&
-                        item.Kind == AkburaCompletionKind.Parameter);
+                        item.Kind == AkburaCompletionKind.Parameter &&
+                        item.InsertText == "Title=\"\"" &&
+                        item.CaretOffsetFromEnd == 1);
                 Assert.Contains(
                     result.Items,
                     static item => item.DisplayText == "Compact");
@@ -176,6 +178,98 @@ public sealed class WorkspaceCompletionTests
         var item = Assert.Single(result.Items);
         Assert.Equal("Card", item.InsertText);
         Assert.Equal(AkburaCompletionKind.ClosingTag, item.Kind);
+        Assert.False(result.IsIncomplete);
+    }
+
+    [Fact]
+    public void Completion_SemanticContextCanArriveAfterPopup()
+    {
+        const string source = "<Sta";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "App.akbura");
+
+        using var workspace = new AkburaWorkspace();
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        Assert.Empty(result.Items);
+        Assert.True(result.IsIncomplete);
+    }
+
+    [Fact]
+    public void Completion_ComponentPrefixIsStrictAndSystemTypesAreHidden()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using System;
+            using Avalonia.Controls;
+
+            <
+            """;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "StackPanel");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Card");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item => item.DisplayText == "Boolean");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item => item.DisplayText == "Exception");
+                var card = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "Card");
+                var stackPanel = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "StackPanel");
+                Assert.Equal(0, card.Priority);
+                Assert.Equal("Akbura component", card.Suffix);
+                Assert.Equal(10, stackPanel.Priority);
+                Assert.Equal("Avalonia.Controls", stackPanel.Suffix);
+                Assert.True(
+                    result.Items.IndexOf(card) <
+                    result.Items.IndexOf(stackPanel));
+                Assert.True(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void CompletionItem_ComputesDetailedDescriptionOnDemand()
+    {
+        var calls = 0;
+        var item = new AkburaCompletionItem(
+            "Card",
+            "Card",
+            AkburaCompletionKind.Component,
+            description: string.Empty,
+            descriptionFactory: () =>
+            {
+                calls++;
+                return "global::Gallery.Card";
+            });
+
+        Assert.Equal(0, calls);
+        Assert.Equal("global::Gallery.Card", item.Description);
+        Assert.Equal("global::Gallery.Card", item.Description);
+        Assert.Equal(1, calls);
     }
 
     [Fact]
@@ -292,6 +386,14 @@ public sealed class WorkspaceCompletionTests
             Assert.Contains(
                 componentResult.Items,
                 static item => item.DisplayText == "Card");
+            var applicationReference = Assert.Single(
+                workspace.CurrentSolution
+                    .GetRequiredProject(applicationProject.Id)
+                    .Compilation
+                    .CompilationReferences);
+            Assert.Equal(
+                0,
+                applicationReference.CachedComponentSymbolCount);
 
             var parameterResult = GetCompletionResult(
                 workspace,
@@ -303,6 +405,14 @@ public sealed class WorkspaceCompletionTests
                 static item =>
                     item.DisplayText == "Title" &&
                     item.Kind == AkburaCompletionKind.Parameter);
+            applicationReference = Assert.Single(
+                workspace.CurrentSolution
+                    .GetRequiredProject(applicationProject.Id)
+                    .Compilation
+                    .CompilationReferences);
+            Assert.Equal(
+                1,
+                applicationReference.CachedComponentSymbolCount);
         }
         finally
         {

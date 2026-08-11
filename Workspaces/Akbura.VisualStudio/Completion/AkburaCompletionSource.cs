@@ -1,5 +1,8 @@
 using Akbura.VisualStudio.Editor;
 using Akbura.Workspaces;
+using Microsoft.VisualStudio.Core.Imaging;
+using Microsoft.VisualStudio.Imaging;
+using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Text;
@@ -11,7 +14,72 @@ namespace Akbura.VisualStudio.Completion;
 
 internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 {
-    private static readonly object CompletionItemKey = new();
+    private static readonly ImmutableArray<char>
+        ComponentCommitCharacters = ['>', ' ', '\t', '\n'];
+
+    private static readonly ImmutableArray<char>
+        ClosingTagCommitCharacters = ['>', '\t', '\n'];
+
+    private static readonly ImmutableArray<char>
+        MemberCommitCharacters = ['=', ' ', '\t', '\n'];
+
+    private static readonly ImageElement ComponentIcon =
+        CreateImageElement(KnownMonikers.Class, "Component");
+
+    private static readonly ImageElement ParameterIcon =
+        CreateImageElement(KnownMonikers.Parameter, "Parameter");
+
+    private static readonly ImageElement PropertyIcon =
+        CreateImageElement(KnownMonikers.Property, "Property");
+
+    private static readonly ImageElement EventIcon =
+        CreateImageElement(KnownMonikers.Event, "Event");
+
+    private static readonly ImageElement CommandIcon =
+        CreateImageElement(KnownMonikers.Method, "Command");
+
+    private static readonly ImageElement ClosingTagIcon =
+        CreateImageElement(KnownMonikers.GoToNext, "Closing tag");
+
+    private static readonly CompletionFilter ComponentFilter =
+        new("Components", "C", ComponentIcon);
+
+    private static readonly CompletionFilter ParameterFilter =
+        new("Parameters", "A", ParameterIcon);
+
+    private static readonly CompletionFilter PropertyFilter =
+        new("Properties", "P", PropertyIcon);
+
+    private static readonly CompletionFilter EventFilter =
+        new("Events", "E", EventIcon);
+
+    private static readonly CompletionFilter CommandFilter =
+        new("Commands", "M", CommandIcon);
+
+    private static readonly ImmutableArray<CompletionFilter>
+        ComponentFilters = [ComponentFilter];
+
+    private static readonly ImmutableArray<CompletionFilter>
+        ParameterFilters = [ParameterFilter];
+
+    private static readonly ImmutableArray<CompletionFilter>
+        PropertyFilters = [PropertyFilter];
+
+    private static readonly ImmutableArray<CompletionFilter>
+        EventFilters = [EventFilter];
+
+    private static readonly ImmutableArray<CompletionFilter>
+        CommandFilters = [CommandFilter];
+
+    private static readonly ImmutableArray<CompletionFilterWithState>
+        CompletionFilters =
+        [
+            new(ComponentFilter, isAvailable: true),
+            new(ParameterFilter, isAvailable: true),
+            new(PropertyFilter, isAvailable: true),
+            new(EventFilter, isAvailable: true),
+            new(CommandFilter, isAvailable: true),
+        ];
 
     private readonly ITextBuffer _buffer;
 
@@ -95,6 +163,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
      SnapshotSpan applicableToSpan,
      CancellationToken cancellationToken)
     {
+        var totalTimer = Stopwatch.StartNew();
         var snapshot =
             triggerLocation.Snapshot;
 
@@ -106,16 +175,20 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             $"position={position}, " +
             $"snapshot={snapshot.Version.VersionNumber}.");
 
+        var stageTimer = Stopwatch.StartNew();
         var syntacticDocument =
             await _parserService
                 .GetSyntacticDocumentAsync(snapshot)
                 .ConfigureAwait(false);
+        TracePerformance("Syntax document", stageTimer.Elapsed);
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        stageTimer.Restart();
         var syntaxContext =
             syntacticDocument.GetCompletionContext(
                 position);
+        TracePerformance("Syntax context", stageTimer.Elapsed);
 
         Debug.WriteLine(
             $"[Akbura.Completion] Syntax context: " +
@@ -127,40 +200,32 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             return CompletionContext.Empty;
         }
 
-        var documentContext =
-            await _bufferContext
-                .GetPublishedDocumentContextAsync(
-                    snapshot,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-        if (documentContext == null)
+        stageTimer.Restart();
+        AkburaDocumentContext? documentContext = null;
+        if (_bufferContext.TryGetLatestDocumentContext(
+                out var latestContext,
+                out var semanticSnapshot) &&
+            semanticSnapshot.Version.VersionNumber <=
+                snapshot.Version.VersionNumber)
         {
-            Debug.WriteLine(
-                "[Akbura.Completion] No document context.");
-
-            return CompletionContext.Empty;
+            documentContext = latestContext;
         }
+        TracePerformance("Semantic context", stageTimer.Elapsed);
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        stageTimer.Restart();
         var result =
             _completionService.GetCompletions(
                 syntacticDocument,
                 documentContext,
                 position,
                 cancellationToken);
+        TracePerformance("Core completion", stageTimer.Elapsed);
 
         Debug.WriteLine(
             $"[Akbura.Completion] Core returned " +
             $"{result.Items.Length} items.");
-
-        foreach (var completion in result.Items.Take(10))
-        {
-            Debug.WriteLine(
-                $"[Akbura.Completion] Item: " +
-                $"{completion.DisplayText}");
-        }
 
         var sourceSpan = result.ApplicableSpan;
 
@@ -181,6 +246,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                     sourceSpan.Start,
                     sourceSpan.Length));
 
+        stageTimer.Restart();
         var items =
             ImmutableArray.CreateBuilder<CompletionItem>(
                 result.Items.Length);
@@ -196,11 +262,11 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                     source:
                         this,
                     icon:
-                        default!,
+                        GetIcon(completion.Kind),
                     filters:
-                        ImmutableArray<CompletionFilter>.Empty,
+                        GetFilters(completion.Kind),
                     suffix:
-                        string.Empty,
+                        completion.Suffix,
                     insertText:
                         completion.InsertText,
                     sortText:
@@ -222,7 +288,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                         false);
 
             item.Properties.AddProperty(
-                CompletionItemKey,
+                AkburaCompletionProperties.CoreItem,
                 completion);
 
             items.Add(item);
@@ -232,8 +298,13 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             $"[Akbura.Completion] Returning " +
             $"{items.Count} VS items.");
 
+        TracePerformance("VS item conversion", stageTimer.Elapsed);
+        TracePerformance("Total", totalTimer.Elapsed);
+
         return new CompletionContext(
-            items.ToImmutable());
+            items.ToImmutable(),
+            CompletionFilters,
+            result.IsIncomplete);
     }
 
     public Task<object> GetDescriptionAsync(
@@ -244,7 +315,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult<object>(
             item.Properties.TryGetProperty(
-                CompletionItemKey,
+                AkburaCompletionProperties.CoreItem,
                 out AkburaCompletionItem completion)
                 ? completion.Description
                 : item.DisplayText);
@@ -290,13 +361,60 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         {
             AkburaCompletionKind.Component or
             AkburaCompletionKind.PropertyElement =>
-                ImmutableArray.Create('>', ' ', '\t', '\n'),
+                ComponentCommitCharacters,
 
             AkburaCompletionKind.ClosingTag =>
-                ImmutableArray.Create('>', '\t', '\n'),
+                ClosingTagCommitCharacters,
 
-            _ => ImmutableArray.Create('=', ' ', '\t', '\n'),
+            _ => MemberCommitCharacters,
         };
+    }
+
+    private static ImageElement GetIcon(
+        AkburaCompletionKind kind)
+    {
+        return kind switch
+        {
+            AkburaCompletionKind.Component => ComponentIcon,
+            AkburaCompletionKind.ClosingTag => ClosingTagIcon,
+            AkburaCompletionKind.Parameter => ParameterIcon,
+            AkburaCompletionKind.Event => EventIcon,
+            AkburaCompletionKind.Command => CommandIcon,
+            _ => PropertyIcon,
+        };
+    }
+
+    private static ImageElement CreateImageElement(
+        ImageMoniker moniker,
+        string automationName)
+    {
+        return new ImageElement(
+            new ImageId(moniker.Guid, moniker.Id),
+            automationName);
+    }
+
+    private static ImmutableArray<CompletionFilter> GetFilters(
+        AkburaCompletionKind kind)
+    {
+        return kind switch
+        {
+            AkburaCompletionKind.Component or
+            AkburaCompletionKind.ClosingTag => ComponentFilters,
+            AkburaCompletionKind.Parameter => ParameterFilters,
+            AkburaCompletionKind.Event => EventFilters,
+            AkburaCompletionKind.Command => CommandFilters,
+            _ => PropertyFilters,
+        };
+    }
+
+    [Conditional("DEBUG")]
+    private static void TracePerformance(
+        string stage,
+        TimeSpan elapsed)
+    {
+        Debug.WriteLine(
+            $"[Akbura.Completion.Performance] " +
+            $"{stage}: {elapsed.TotalMilliseconds:F2} ms");
     }
 
 }

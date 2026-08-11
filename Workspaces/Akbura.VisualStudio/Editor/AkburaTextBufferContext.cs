@@ -29,6 +29,10 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     private AkburaProjectId? _projectId;
 
+    private readonly object _projectInitializationGate = new();
+
+    private Task<AkburaProjectId?>? _projectInitializationTask;
+
     private readonly IAkburaClassificationService _classificationService;
 
     private readonly JoinableTaskFactory _joinableTaskFactory;
@@ -149,6 +153,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         _textBuffer.ChangedLowPriority +=
             OnTextBufferChangedLowPriority;
+
+        _ = _joinableTaskFactory.RunAsync(
+            WarmUpProjectAsync);
 
         EnqueueSnapshot(
             _textBuffer.CurrentSnapshot);
@@ -402,21 +409,12 @@ internal sealed class AkburaTextBufferContext : IDisposable
             return projectId;
         }
 
-        var filePath =
-            _textDocument?.FilePath;
-
-        if (string.IsNullOrWhiteSpace(
-                filePath))
-        {
-            return null;
-        }
-
-        var synchronizedProjectId =
-            await _visualStudioWorkspace
-                .SynchronizeProjectAsync(
-                    filePath!,
-                    cancellationToken)
-                .ConfigureAwait(false);
+        var initializationTask =
+            GetOrCreateProjectInitializationTaskAsync();
+        var synchronizedProjectId = await AwaitWithoutCancelingSourceAsync(
+                initializationTask,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         if (synchronizedProjectId is { } result)
         {
@@ -425,6 +423,83 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         return synchronizedProjectId;
     }
+
+    private Task<AkburaProjectId?>
+        GetOrCreateProjectInitializationTaskAsync()
+    {
+        lock (_projectInitializationGate)
+        {
+            return _projectInitializationTask ??=
+                InitializeProjectAsync(
+                    _disposeCancellation.Token);
+        }
+    }
+
+    private async Task<AkburaProjectId?> InitializeProjectAsync(
+        CancellationToken cancellationToken)
+    {
+        var filePath = _textDocument?.FilePath;
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return null;
+        }
+
+        return await _visualStudioWorkspace
+            .SynchronizeProjectAsync(
+                filePath!,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task WarmUpProjectAsync()
+    {
+        try
+        {
+            var projectId = await GetOrCreateProjectInitializationTaskAsync()
+                .ConfigureAwait(false);
+            if (projectId is { } result)
+            {
+                _projectId = result;
+            }
+        }
+        catch (OperationCanceledException)
+            when (_disposeCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(
+                $"[Akbura] Project warm-up failed: {exception}");
+        }
+    }
+
+#pragma warning disable VSTHRD003 // The initialization task deliberately outlives an editor snapshot.
+    private static async Task<T> AwaitWithoutCancelingSourceAsync<T>(
+        Task<T> task,
+        CancellationToken cancellationToken)
+    {
+        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
+        {
+            return await task.ConfigureAwait(false);
+        }
+
+        var cancellation = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using (cancellationToken.Register(
+                   () => cancellation.TrySetResult(true)))
+        {
+            if (!ReferenceEquals(
+                    await Task.WhenAny(task, cancellation.Task)
+                        .ConfigureAwait(false),
+                    task))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            return await task.ConfigureAwait(false);
+        }
+    }
+#pragma warning restore VSTHRD003
 
     private void EnsureWorker()
     {

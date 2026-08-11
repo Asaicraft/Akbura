@@ -258,6 +258,43 @@ public sealed class AkburaProjectSnapshot
             Documents);
     }
 
+    internal AkburaProjectSnapshot WithDocuments(
+        ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents)
+    {
+        if (documents == null)
+        {
+            throw new ArgumentNullException(nameof(documents));
+        }
+
+        if (ReferenceEquals(documents, Documents))
+        {
+            return this;
+        }
+
+        var componentTrees = documents.Values
+            .Select(static document => document.SyntaxTree)
+            .Where(static syntaxTree => syntaxTree is not AkcssSyntaxTree)
+            .ToImmutableArray();
+        var akcssTrees = documents.Values
+            .Select(static document => document.SyntaxTree)
+            .OfType<AkcssSyntaxTree>()
+            .ToImmutableArray();
+        var compilation = new AkburaCompilation(
+            Context.CSharpCompilation,
+            componentTrees,
+            akcssTrees,
+            Context.RootNamespace,
+            Context.ProjectDirectory,
+            reuseFrom: Compilation);
+
+        return new AkburaProjectSnapshot(
+            Id,
+            VersionStamp.Create(),
+            Context,
+            compilation,
+            documents);
+    }
+
     internal AkburaProjectSnapshot WithCompilationReferences(
         ImmutableArray<AkburaCompilationReference> references)
     {

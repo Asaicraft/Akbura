@@ -350,6 +350,98 @@ public sealed class AkburaWorkspace : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Adds or updates all supplied project documents in one immutable
+    /// project transition. Syntax trees and project references are rebuilt
+    /// once after every document has been parsed.
+    /// </summary>
+    public AkburaProjectSnapshot SynchronizeProjectDocuments(
+        AkburaProjectId projectId,
+        ImmutableArray<AkburaDocumentInput> inputs,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        AkburaWorkspaceChangedEventArgs? eventArgs = null;
+        AkburaProjectSnapshot result;
+
+        lock (_gate)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var oldSolution = _currentSolution;
+            var oldProject = oldSolution.GetRequiredProject(projectId);
+            var documents = oldProject.Documents;
+            var changed = false;
+
+            foreach (var input in inputs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (input.Uri == null || input.Text == null)
+                {
+                    throw new ArgumentException(
+                        "Project synchronization inputs must contain a URI and text.",
+                        nameof(inputs));
+                }
+
+                if (TryGetDocument(
+                        documents,
+                        input.Uri,
+                        out var oldDocument))
+                {
+                    var newDocument = oldDocument.WithText(
+                        input.Text,
+                        changes: null,
+                        cancellationToken);
+                    if (ReferenceEquals(newDocument, oldDocument))
+                    {
+                        continue;
+                    }
+
+                    documents = documents.SetItem(
+                        oldDocument.Id,
+                        newDocument);
+                }
+                else
+                {
+                    var newDocument = AkburaDocumentSnapshot.Create(
+                        projectId,
+                        input.Uri,
+                        input.Text,
+                        oldProject.Context.RootNamespace,
+                        oldProject.Context.ProjectDirectory,
+                        cancellationToken);
+                    documents = documents.Add(
+                        newDocument.Id,
+                        newDocument);
+                }
+
+                changed = true;
+            }
+
+            if (!changed)
+            {
+                return oldProject;
+            }
+
+            var newProject = oldProject.WithDocuments(documents);
+            var newSolution = RebuildProjectReferences(
+                oldSolution.WithProject(newProject));
+            result = newSolution.GetRequiredProject(projectId);
+            _currentSolution = newSolution;
+
+            eventArgs = new AkburaWorkspaceChangedEventArgs(
+                AkburaWorkspaceChangeKind.ProjectChanged,
+                oldSolution,
+                newSolution,
+                projectId);
+        }
+
+        Changed?.Invoke(this, eventArgs);
+        return result;
+    }
+
     public AkburaDocumentSnapshot ChangeDocument(
         AkburaDocumentId documentId,
         SourceText newText,
@@ -625,6 +717,24 @@ public sealed class AkburaWorkspace : IDisposable
         }
 
         return solution;
+    }
+
+    private static bool TryGetDocument(
+        ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents,
+        Uri uri,
+        out AkburaDocumentSnapshot document)
+    {
+        foreach (var candidate in documents.Values)
+        {
+            if (DocumentUri.Equals(candidate.Uri, uri))
+            {
+                document = candidate;
+                return true;
+            }
+        }
+
+        document = null!;
+        return false;
     }
 
     private void ThrowIfDisposed()

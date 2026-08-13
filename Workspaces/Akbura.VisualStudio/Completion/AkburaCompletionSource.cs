@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Akbura.VisualStudio.Editor;
 using Akbura.Workspaces;
 using Microsoft.VisualStudio.Core.Imaging;
@@ -384,7 +385,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         CancellationToken cancellationToken)
     {
         var snapshot = result.State.HostSnapshot;
-        var items = ImmutableArray.CreateBuilder<CompletionItem>(
+        using var items = ImmutableArrayBuilder<CompletionItem>.Rent(
             result.List.ItemsList.Count +
             supplementalResult.Items.Length);
 
@@ -442,10 +443,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             foreach (var completion in supplementalResult.Items)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (items.Any(item => string.Equals(
-                        item.DisplayText,
-                        completion.DisplayText,
-                        StringComparison.Ordinal)))
+                if (ContainsDisplayText(
+                        items.WrittenSpan,
+                        completion.DisplayText))
                 {
                     continue;
                 }
@@ -483,7 +483,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             return CompletionContext.Empty;
         }
 
-        var items = ImmutableArray.CreateBuilder<CompletionItem>(
+        using var items = ImmutableArrayBuilder<CompletionItem>.Rent(
             result.Items.Length);
         foreach (var completion in result.Items)
         {
@@ -529,6 +529,24 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionProperties.CoreItem,
             completion);
         return item;
+    }
+
+    private static bool ContainsDisplayText(
+        ReadOnlySpan<CompletionItem> items,
+        string displayText)
+    {
+        foreach (var item in items)
+        {
+            if (string.Equals(
+                    item.DisplayText,
+                    displayText,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsValidSpan(
@@ -589,7 +607,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             return characters;
         }
 
-        var builder = characters.ToBuilder();
+        using var builder =
+            ImmutableArrayBuilder<char>.Rent(characters.Length + 2);
+        builder.AddRange(characters.AsSpan());
         if (!characters.Contains('\t'))
         {
             builder.Add('\t');

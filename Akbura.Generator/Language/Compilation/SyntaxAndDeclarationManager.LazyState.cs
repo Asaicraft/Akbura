@@ -1,4 +1,5 @@
 using Akbura.Collections;
+using Akbura.Pools;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -211,14 +212,15 @@ internal sealed partial class SyntaxAndDeclarationManager
     private static OneOrMany<WeakReference<BoxedMemberNames>> CreateLastComputedMemberNames(
         RootSingleNamespaceDeclaration root)
     {
-        var builder = ImmutableArray.CreateBuilder<WeakReference<BoxedMemberNames>>();
+        using var builder =
+            ImmutableArrayBuilder<WeakReference<BoxedMemberNames>>.Rent();
         AddLastComputedMemberNames(root.Children, builder);
         return OneOrMany.Create(builder.ToImmutable());
     }
 
     private static void AddLastComputedMemberNames(
         ImmutableArray<SingleNamespaceOrTypeDeclaration> declarations,
-        ImmutableArray<WeakReference<BoxedMemberNames>>.Builder builder)
+        ImmutableArrayBuilder<WeakReference<BoxedMemberNames>> builder)
     {
         foreach (var declaration in declarations)
         {

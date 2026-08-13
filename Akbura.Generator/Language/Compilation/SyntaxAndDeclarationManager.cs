@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -265,7 +266,11 @@ internal sealed partial class SyntaxAndDeclarationManager
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
         ImmutableArray<AkburaSyntaxTree> addedTrees)
     {
-        var components = state.DeclarationTable.Components.ToBuilder();
+        using var components = ImmutableArrayBuilder<Declaration>.Rent(
+            state.DeclarationTable.Components.Length +
+            addedTrees.Length);
+        components.AddRange(
+            state.DeclarationTable.Components.AsSpan());
         foreach (var tree in addedTrees)
         {
             if (GlobalUsings.IsComponentFile(tree))
@@ -376,7 +381,11 @@ internal sealed partial class SyntaxAndDeclarationManager
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
         ImmutableArray<AkcssSyntaxTree> addedTrees)
     {
-        var akcssModules = state.DeclarationTable.AkcssModules.ToBuilder();
+        using var akcssModules = ImmutableArrayBuilder<Declaration>.Rent(
+            state.DeclarationTable.AkcssModules.Length +
+            addedTrees.Length);
+        akcssModules.AddRange(
+            state.DeclarationTable.AkcssModules.AsSpan());
         foreach (var tree in addedTrees)
         {
             if (GlobalUsings.IsAkcssFile(tree))

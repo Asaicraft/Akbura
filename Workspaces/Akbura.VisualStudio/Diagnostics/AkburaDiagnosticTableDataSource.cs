@@ -1,6 +1,7 @@
 using Akbura.Language.Syntax;
 using Akbura.VisualStudio.Editor;
 using Akbura.Workspaces;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Shell.TableControl;
@@ -151,8 +152,8 @@ internal sealed class AkburaDiagnosticTableDataSource :
             return [];
         }
 
-        var builder = ImmutableArray.CreateBuilder<
-            AkburaDiagnosticTableEntry>();
+        using var builder = ImmutableArrayBuilder<
+            AkburaDiagnosticTableEntry>.Rent();
 
         foreach (var diagnostic in state.Diagnostics)
         {

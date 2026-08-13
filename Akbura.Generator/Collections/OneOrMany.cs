@@ -118,7 +118,7 @@ internal readonly struct OneOrMany<T>
             return EqualityComparer<T>.Default.Equals(item, _one) ? Empty : this;
         }
 
-        var builder = ImmutableArray.CreateBuilder<T>(_many.Length);
+        using var builder = ImmutableArrayBuilder<T>.Rent(_many.Length);
         foreach (var value in _many)
         {
             if (!EqualityComparer<T>.Default.Equals(value, item))
@@ -322,7 +322,8 @@ internal readonly struct OneOrMany<T>
         ImmutableArray<T> items,
         Func<T, TResult> selector)
     {
-        var builder = ImmutableArray.CreateBuilder<TResult>(items.Length);
+        using var builder =
+            ImmutableArrayBuilder<TResult>.Rent(items.Length);
         foreach (var item in items)
         {
             builder.Add(selector(item));
@@ -336,7 +337,8 @@ internal readonly struct OneOrMany<T>
         Func<T, TArg, TResult> selector,
         TArg arg)
     {
-        var builder = ImmutableArray.CreateBuilder<TResult>(items.Length);
+        using var builder =
+            ImmutableArrayBuilder<TResult>.Rent(items.Length);
         foreach (var item in items)
         {
             builder.Add(selector(item, arg));
@@ -370,7 +372,8 @@ internal static class OneOrMany
                 return new OneOrMany<T>(many[0]);
             default:
             {
-                var builder = ImmutableArray.CreateBuilder<T>(many.Length);
+                using var builder =
+                    ImmutableArrayBuilder<T>.Rent(many.Length);
                 for (var index = 0; index < many.Length; index++)
                 {
                     builder.Add(many[index]);

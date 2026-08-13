@@ -41,7 +41,7 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
 
     #endregion
 
-    private readonly ImmutableArray<T>.Builder _builder = ImmutableArray.CreateBuilder<T>(size);
+    private readonly List<T> _items = new(size);
 
     private readonly ObjectPool<ArrayBuilder<T>>? _pool;
 
@@ -60,7 +60,7 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
     /// </summary>
     public ImmutableArray<T> ToImmutable()
     {
-        return _builder.ToImmutable();
+        return ImmutableArray.CreateRange(_items);
     }
 
     /// <summary>
@@ -73,10 +73,6 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
         {
             result = [];
         }
-        else if (_builder.Capacity == Count)
-        {
-            result = _builder.MoveToImmutable();
-        }
         else
         {
             result = ToImmutable();
@@ -88,20 +84,20 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
 
     public int Count
     {
-        get => _builder.Count;
-        set => _builder.Count = value;
+        get => _items.Count;
+        set => SetCount(value);
     }
 
     public int Capacity
     {
-        get => _builder.Capacity;
-        set => _builder.Capacity = value;
+        get => _items.Capacity;
+        set => _items.Capacity = value;
     }
 
     public T this[int index]
     {
-        get => _builder[index];
-        set => _builder[index] = value;
+        get => _items[index];
+        set => _items[index] = value;
     }
 
     public bool IsReadOnly => false;
@@ -114,42 +110,78 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
     /// </summary>
     public void SetItem(int index, T value)
     {
-        while (index > _builder.Count)
+        while (index > _items.Count)
         {
-            _builder.Add(default!);
+            _items.Add(default!);
         }
 
-        if (index == _builder.Count)
+        if (index == _items.Count)
         {
-            _builder.Add(value);
+            _items.Add(value);
         }
         else
         {
-            _builder[index] = value;
+            _items[index] = value;
         }
     }
 
-    public void Add(T item) => _builder.Add(item);
+    public void Add(T item) => _items.Add(item);
 
-    public void Insert(int index, T item) => _builder.Insert(index, item);
+    public void Insert(int index, T item) => _items.Insert(index, item);
 
     public void EnsureCapacity(int capacity)
     {
-        if (_builder.Capacity < capacity)
+        if (_items.Capacity < capacity)
         {
-            _builder.Capacity = capacity;
+            _items.Capacity = capacity;
         }
     }
 
-    public void Clear() => _builder.Clear();
+    private void SetCount(int count)
+    {
+        ThrowHelper.ThrowIfNegative(count);
+        if (count < _items.Count)
+        {
+            _items.RemoveRange(count, _items.Count - count);
+            return;
+        }
 
-    public bool Contains(T item) => _builder.Contains(item);
+        EnsureCapacity(count);
+        while (_items.Count < count)
+        {
+            _items.Add(default!);
+        }
+    }
 
-    public int IndexOf(T item) => _builder.IndexOf(item);
+    public void Clear() => _items.Clear();
 
-    public int IndexOf(T item, IEqualityComparer<T> equalityComparer) => _builder.IndexOf(item, 0, _builder.Count, equalityComparer);
+    public bool Contains(T item) => _items.Contains(item);
 
-    public int IndexOf(T item, int startIndex, int count) => _builder.IndexOf(item, startIndex, count);
+    public int IndexOf(T item) => _items.IndexOf(item);
+
+    public int IndexOf(T item, IEqualityComparer<T> equalityComparer)
+        => IndexOf(item, 0, _items.Count, equalityComparer);
+
+    public int IndexOf(T item, int startIndex, int count)
+        => _items.IndexOf(item, startIndex, count);
+
+    private int IndexOf(
+        T item,
+        int startIndex,
+        int count,
+        IEqualityComparer<T> equalityComparer)
+    {
+        var endIndex = startIndex + count;
+        for (var index = startIndex; index < endIndex; index++)
+        {
+            if (equalityComparer.Equals(_items[index], item))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
 
     public int FindIndex(Predicate<T> match) => FindIndex(0, Count, match);
 
@@ -160,7 +192,7 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
         var endIndex = startIndex + count;
         for (var i = startIndex; i < endIndex; i++)
         {
-            if (match(_builder[i]))
+            if (match(_items[i]))
             {
                 return i;
             }
@@ -178,7 +210,7 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
         var endIndex = startIndex + count;
         for (var i = startIndex; i < endIndex; i++)
         {
-            if (match(_builder[i], arg))
+            if (match(_items[i], arg))
             {
                 return i;
             }
@@ -187,26 +219,26 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
         return -1;
     }
 
-    public bool Remove(T element) => _builder.Remove(element);
+    public bool Remove(T element) => _items.Remove(element);
 
-    public void RemoveAt(int index) => _builder.RemoveAt(index);
+    public void RemoveAt(int index) => _items.RemoveAt(index);
 
-    public void RemoveRange(int index, int length) => _builder.RemoveRange(index, length);
+    public void RemoveRange(int index, int length) => _items.RemoveRange(index, length);
 
-    public void RemoveLast() => _builder.RemoveAt(_builder.Count - 1);
+    public void RemoveLast() => _items.RemoveAt(_items.Count - 1);
 
-    public void RemoveAll(Predicate<T> match) => _builder.RemoveAll(match);
+    public void RemoveAll(Predicate<T> match) => _items.RemoveAll(match);
 
     public void RemoveAll<TArg>(Func<T, TArg, bool> match, TArg arg)
     {
         var i = 0;
-        for (var j = 0; j < _builder.Count; j++)
+        for (var j = 0; j < _items.Count; j++)
         {
-            if (!match(_builder[j], arg))
+            if (!match(_items[j], arg))
             {
                 if (i != j)
                 {
-                    _builder[i] = _builder[j];
+                    _items[i] = _items[j];
                 }
 
                 i++;
@@ -216,11 +248,11 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
         Clip(i);
     }
 
-    public void ReverseContents() => _builder.Reverse();
+    public void ReverseContents() => _items.Reverse();
 
-    public void Sort() => _builder.Sort();
+    public void Sort() => _items.Sort();
 
-    public void Sort(IComparer<T> comparer) => _builder.Sort(comparer);
+    public void Sort(IComparer<T> comparer) => _items.Sort(comparer);
 
     public void Sort(Comparison<T> compare)
     {
@@ -232,19 +264,20 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
         Sort(Comparer<T>.Create(compare));
     }
 
-    public void Sort(int startIndex, IComparer<T> comparer) => _builder.Sort(startIndex, _builder.Count - startIndex, comparer);
+    public void Sort(int startIndex, IComparer<T> comparer)
+        => _items.Sort(startIndex, _items.Count - startIndex, comparer);
 
-    public T[] ToArray() => _builder.ToArray();
+    public T[] ToArray() => _items.ToArray();
 
-    public void CopyTo(T[] array, int start) => _builder.CopyTo(array, start);
+    public void CopyTo(T[] array, int start) => _items.CopyTo(array, start);
 
-    public T Last() => _builder[^1];
+    public T Last() => _items[_items.Count - 1];
 
     public T? LastOrDefault() => Count == 0 ? default : Last();
 
-    public T First() => _builder[0];
+    public T First() => _items[0];
 
-    public bool Any() => _builder.Count > 0;
+    public bool Any() => _items.Count > 0;
 
     /// <summary>
     /// Realizes the array.
@@ -292,16 +325,11 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
     /// </summary>
     public ImmutableArray<T> ToImmutableAndFree()
     {
-        // This is mostly the same as 'MoveToImmutable', but avoids delegating to that method since 'Free' contains
-        // fast paths to avoid caling 'Clear' in some cases.
+        // Materialize the immutable result before returning this reusable builder to its pool.
         ImmutableArray<T> result;
         if (Count == 0)
         {
             result = [];
-        }
-        else if (_builder.Capacity == Count)
-        {
-            result = _builder.MoveToImmutable();
         }
         else
         {
@@ -337,7 +365,7 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
             // while the chance that we will need their size is diminishingly small.
             // It makes sense to constrain the size to some "not too small" number. 
             // Overall perf does not seem to be very sensitive to this number, so I picked 128 as a limit.
-            if (_builder.Capacity < PooledArrayLengthLimitExclusive)
+            if (_items.Capacity < PooledArrayLengthLimitExclusive)
             {
                 if (Count != 0)
                 {
@@ -405,12 +433,12 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
 
     IEnumerator<T> IEnumerable<T>.GetEnumerator()
     {
-        return _builder.GetEnumerator();
+        return _items.GetEnumerator();
     }
 
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
     {
-        return _builder.GetEnumerator();
+        return _items.GetEnumerator();
     }
 
     public Dictionary<K, ImmutableArray<T>> ToDictionary<K>(Func<T, K> keySelector, IEqualityComparer<K>? comparer = null)
@@ -458,20 +486,23 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
 
     public void AddRange(ArrayBuilder<T> items)
     {
-        _builder.AddRange(items._builder);
+        _items.AddRange(items._items);
     }
 
     public void AddRange<U>(ArrayBuilder<U> items, Func<U, T> selector)
     {
         foreach (var item in items)
         {
-            _builder.Add(selector(item));
+            _items.Add(selector(item));
         }
     }
 
     public void AddRange<U>(ArrayBuilder<U> items) where U : T
     {
-        _builder.AddRange(items._builder);
+        foreach (var item in items)
+        {
+            _items.Add(item);
+        }
     }
 
     public void AddRange<U>(ArrayBuilder<U> items, int start, int length) where U : T
@@ -486,12 +517,15 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
 
     public void AddRange(ImmutableArray<T> items)
     {
-        _builder.AddRange(items);
+        foreach (var item in items)
+        {
+            _items.Add(item);
+        }
     }
 
     public void AddRange(ImmutableArray<T> items, int length)
     {
-        _builder.AddRange(items, length);
+        AddRange(items, 0, length);
     }
 
     public void AddRange(ImmutableArray<T> items, int start, int length)
@@ -521,17 +555,17 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
 
     public void AddRange(IEnumerable<T> items)
     {
-        _builder.AddRange(items);
+        _items.AddRange(items);
     }
 
     public void AddRange(params T[] items)
     {
-        _builder.AddRange(items);
+        _items.AddRange(items);
     }
 
     public void AddRange(T[] items, int length)
     {
-        _builder.AddRange(items, length);
+        AddRange(items, 0, length);
     }
 
 #if COMPILERCORE
@@ -544,13 +578,16 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
     public void Clip(int limit)
     {
         Debug.Assert(limit <= Count);
-        _builder.Count = limit;
+        if (limit < _items.Count)
+        {
+            _items.RemoveRange(limit, _items.Count - limit);
+        }
     }
 
     public void ZeroInit(int count)
     {
-        _builder.Clear();
-        _builder.Count = count;
+        _items.Clear();
+        SetCount(count);
     }
 
     public void AddMany(T item, int count)

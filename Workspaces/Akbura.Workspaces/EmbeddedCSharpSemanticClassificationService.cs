@@ -1,6 +1,7 @@
 ﻿using Akbura.Language;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
@@ -23,7 +24,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         AkburaSemanticModel semanticModel,
         CSharpTypeSyntax typeSyntax,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var typeSymbol =
             GetDeclaredTypeSymbol(
@@ -46,7 +47,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         CSharpTypeSyntax typeSyntax,
         RoslynITypeSymbol typeSymbol,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (typeSymbol.TypeKind ==
             TypeKind.Error)
@@ -83,7 +84,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         RoslynITypeSymbol typeSymbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         switch (syntax)
         {
@@ -198,7 +199,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         int sourceOffset,
         TextSpan requestedSpan,
         AkburaClassificationKind classification,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (csharpSpan.Length == 0)
         {
@@ -227,7 +228,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         RoslynITypeSymbol typeSymbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         switch (syntax)
         {
@@ -263,7 +264,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         RoslynITypeSymbol typeSymbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (typeSymbol is not INamedTypeSymbol namedType)
         {
@@ -299,7 +300,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         RoslynITypeSymbol typeSymbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (typeSymbol is INamedTypeSymbol
             {
@@ -327,7 +328,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         INamedTypeSymbol tupleSymbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var syntaxElements =
             tupleType.Elements;
@@ -373,7 +374,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         RoslynITypeSymbol typeSymbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var classification =
             GetRoslynClassification(
@@ -448,7 +449,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodes())
@@ -510,7 +511,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
     private static void AddReferences(
         ImmutableArray<CSharpSymbolReference> references,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         foreach (var reference in references)
         {

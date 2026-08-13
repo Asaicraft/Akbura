@@ -3,6 +3,7 @@ using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
@@ -25,7 +26,7 @@ internal sealed class
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var node in
@@ -91,7 +92,7 @@ internal sealed class
         AkburaSemanticModel semanticModel,
         AkcssStyleRuleSyntax style,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (semanticModel.GetDeclaredSymbol(
                 style) is not
@@ -121,7 +122,7 @@ internal sealed class
         AkburaSemanticModel semanticModel,
         AkcssUtilityDeclarationSyntax utility,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (semanticModel.GetDeclaredSymbol(
                 utility) is not
@@ -193,7 +194,7 @@ internal sealed class
         AkburaSemanticModel semanticModel,
         AkcssAssignmentSyntax assignment,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         if (semanticModel.GetOperation(
@@ -225,7 +226,7 @@ internal sealed class
         AkburaSemanticModel semanticModel,
         AkcssIfDirectiveSyntax conditional,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         if (semanticModel.GetOperation(
@@ -247,7 +248,7 @@ internal sealed class
         AkburaSemanticModel semanticModel,
         AkcssInterceptDirectiveSyntax intercept,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (semanticModel.GetOperation(
                 intercept) is not
@@ -270,7 +271,7 @@ internal sealed class
         CSharpTypeSyntax? targetSyntax,
         CSharpSymbolDefinition targetDefinition,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (targetSyntax == null ||
             targetDefinition.Symbol is not
@@ -291,7 +292,7 @@ internal sealed class
         CSharpTypeSyntax propertySyntax,
         AkburaPropertySymbol property,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         CSharp.TypeSyntax syntax;
 
@@ -361,7 +362,7 @@ internal sealed class
         AkburaPropertySymbol property,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var ownerType =
             GetPropertyOwnerType(
@@ -415,7 +416,7 @@ internal sealed class
         CSharpExpressionSyntax expressionSyntax,
         CSharpOperationDefinition definition,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         var rootOperation =
@@ -473,7 +474,7 @@ internal sealed class
         RoslynOperation operation,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         HashSet<TextSpan> seenSpans)
     {
         switch (operation)
@@ -609,7 +610,7 @@ internal sealed class
         RoslynSymbol symbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         HashSet<TextSpan> seenSpans)
     {
         if (!TryGetReferenceName(
@@ -643,7 +644,7 @@ internal sealed class
         RoslynSymbol symbol,
         int sourceOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         HashSet<TextSpan> seenSpans)
     {
         if (!symbol.IsStatic ||
@@ -764,7 +765,7 @@ internal sealed class
         TextSpan sourceSpan,
         TextSpan requestedSpan,
         AkburaClassificationKind classification,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (sourceSpan.Length == 0 ||
             !sourceSpan.OverlapsWith(
@@ -784,7 +785,7 @@ internal sealed class
         int sourceOffset,
         TextSpan requestedSpan,
         AkburaClassificationKind classification,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         HashSet<TextSpan>? seenSpans = null)
     {
         if (csharpSpan.Length == 0)

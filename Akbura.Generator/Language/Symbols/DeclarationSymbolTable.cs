@@ -1,4 +1,5 @@
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -87,7 +88,7 @@ internal sealed class DeclarationSymbolTable
             return ImmutableArray<AkburaSymbol>.Empty;
         }
 
-        var builder = ImmutableArray.CreateBuilder<AkburaSymbol>();
+        using var builder = ImmutableArrayBuilder<AkburaSymbol>.Rent();
         foreach (var child in declaration.Children)
         {
             if (CanCreateDeclaredSymbol(child.Kind) &&

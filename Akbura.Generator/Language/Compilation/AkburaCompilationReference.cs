@@ -1,5 +1,6 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
@@ -105,7 +106,7 @@ internal sealed class AkburaCompilationReference
             return _componentMetadataNames;
         }
 
-        var names = ImmutableArray.CreateBuilder<string>();
+        using var names = ImmutableArrayBuilder<string>.Rent();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var syntaxTree in Compilation.SyntaxTrees)
         {

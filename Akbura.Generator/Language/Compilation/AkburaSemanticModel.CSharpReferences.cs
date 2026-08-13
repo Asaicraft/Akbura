@@ -694,7 +694,8 @@ internal partial class AkburaSemanticModel
                 return [];
             }
 
-            var builder = ImmutableArray.CreateBuilder<CSharpReferenceTarget>(count);
+            using var builder =
+                ImmutableArrayBuilder<CSharpReferenceTarget>.Rent(count);
 
             for (var index = 0; index < count; index++)
             {
@@ -705,7 +706,7 @@ internal partial class AkburaSemanticModel
                         sourcePositionOffset));
             }
 
-            return builder.MoveToImmutable();
+            return builder.ToImmutable();
         }
 
         var probeExpression =

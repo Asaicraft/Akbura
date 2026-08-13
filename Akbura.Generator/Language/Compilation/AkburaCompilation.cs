@@ -499,7 +499,8 @@ internal sealed partial class AkburaCompilation
 
     private ImmutableArray<UsingDirectiveSyntax> CreateGlobalAkburaUsingDirectives()
     {
-        var builder = ImmutableArray.CreateBuilder<UsingDirectiveSyntax>();
+        using var builder =
+            ImmutableArrayBuilder<UsingDirectiveSyntax>.Rent();
         foreach (var syntaxTree in SyntaxTrees)
         {
             var isGlobalUsingsFile =
@@ -520,8 +521,8 @@ internal sealed partial class AkburaCompilation
 
     private ImmutableArray<AkcssUsingDirectiveSyntax> CreateGlobalAkcssUsingDirectives()
     {
-        var builder =
-            ImmutableArray.CreateBuilder<AkcssUsingDirectiveSyntax>();
+        using var builder =
+            ImmutableArrayBuilder<AkcssUsingDirectiveSyntax>.Rent();
         foreach (var syntaxTree in AkcssSyntaxTrees)
         {
             if (!GlobalUsings.IsAkcssFile(syntaxTree))
@@ -543,8 +544,8 @@ internal sealed partial class AkburaCompilation
 
     private ImmutableArray<CSharp.UsingDirectiveSyntax> CreateGlobalCSharpUsingDirectives()
     {
-        var builder =
-            ImmutableArray.CreateBuilder<CSharp.UsingDirectiveSyntax>();
+        using var builder =
+            ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
         foreach (var syntaxTree in CSharpCompilation.SyntaxTrees)
         {
             if (syntaxTree.GetRoot() is not CSharp.CompilationUnitSyntax root)

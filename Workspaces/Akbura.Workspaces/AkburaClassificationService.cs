@@ -1,4 +1,5 @@
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -85,8 +86,8 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
                 span,
                 cancellationToken);
 
-        var semanticBuilder =
-            ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
+        using var semanticBuilder =
+            ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
 
         var semanticModel =
             context.Project.Compilation
@@ -128,8 +129,8 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             return [];
         }
 
-        var builder =
-            ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
+        using var builder =
+            ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
 
         AddEmbeddedCSharpNodes(
             root,
@@ -242,7 +243,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
     private void AddEmbeddedCSharpNodes(
         AkburaSyntax root,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodes())
@@ -288,7 +289,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
     private void AddToken(
         SyntaxToken token,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         if (token.Kind == SyntaxKind.CSharpRawToken &&
@@ -319,7 +320,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
     private void AddTrivia(
         SyntaxTriviaList triviaList,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var trivia in triviaList)

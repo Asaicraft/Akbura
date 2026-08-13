@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -56,25 +57,23 @@ public sealed class MsBuildProjectContextProvider :
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        var builder =
-            ImmutableArray.CreateBuilder<ProjectContext>();
-
-        foreach (var project in solution.Projects)
+        var projects = solution.Projects
+            .Where(static project =>
+                project.Language == LanguageNames.CSharp)
+            .ToArray();
+        var contexts = new ProjectContext[projects.Length];
+        for (var index = 0; index < projects.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            if (project.Language != LanguageNames.CSharp)
-            {
-                continue;
-            }
-
-            builder.Add(
-                await CreateContextAsync(
-                        project,
-                        cancellationToken)
-                    .ConfigureAwait(false));
+            contexts[index] = await CreateContextAsync(
+                    projects[index],
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
 
+        using var builder =
+            ImmutableArrayBuilder<ProjectContext>.Rent(contexts.Length);
+        builder.AddRange(contexts);
         return builder.ToImmutable();
     }
 

@@ -1,6 +1,7 @@
 using Akbura.Language;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -281,7 +282,8 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             return ImmutableArray<AkburaCompletionItem>.Empty;
         }
 
-        var items = ImmutableArray.CreateBuilder<AkburaCompletionItem>();
+        using var items =
+            ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
         foreach (var candidate in
                  semanticModel.LookupTailwindUtilities(
                      context.ComponentName!,
@@ -324,7 +326,7 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     priority: priority));
         }
 
-        return items
+        return items.AsEnumerable()
             .OrderBy(static item => item.SortText,
                 StringComparer.Ordinal)
             .Take(MaximumCompletionItems)

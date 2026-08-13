@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -113,12 +114,10 @@ public sealed partial class AkburaSyntacticDocument
             out ImmutableArray<BlockBoundaries> indentationBlocks,
             CancellationToken cancellationToken)
     {
-        var builder =
-            ImmutableArray.CreateBuilder<
-                AkburaOutliningRegion>();
-        var indentationBuilder =
-            ImmutableArray.CreateBuilder<
-                BlockBoundaries>();
+        using var builder =
+            ImmutableArrayBuilder<AkburaOutliningRegion>.Rent();
+        using var indentationBuilder =
+            ImmutableArrayBuilder<BlockBoundaries>.Rent();
 
         foreach (var node in root.DescendantNodes())
         {
@@ -157,12 +156,12 @@ public sealed partial class AkburaSyntacticDocument
                     boundaries.CollapsedText));
         }
 
-        indentationBlocks = indentationBuilder
+        indentationBlocks = indentationBuilder.AsEnumerable()
             .OrderBy(static boundaries =>
                 boundaries.BodyStart)
             .ToImmutableArray();
 
-        return builder
+        return builder.AsEnumerable()
             .OrderBy(static region => region.Span.Start)
             .ThenByDescending(static region => region.Span.Length)
             .ToImmutableArray();

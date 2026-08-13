@@ -3,6 +3,7 @@ using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Operations;
@@ -1384,14 +1385,15 @@ internal static class AkcssGenerator
             return [];
         }
 
-        var builder = ImmutableArray.CreateBuilder<string>(operation.AppliedSymbols.Length);
+        using var builder = ImmutableArrayBuilder<string>.Rent(
+            operation.AppliedSymbols.Length);
 
         foreach (var symbol in operation.AppliedSymbols)
         {
             builder.Add(symbol.MetadataName);
         }
 
-        return builder.MoveToImmutable();
+        return builder.ToImmutable();
     }
 
     private static void GetOperationSource(
@@ -2762,7 +2764,8 @@ internal static class AkcssGenerator
             return false;
         }
 
-        var builder = ImmutableArray.CreateBuilder<string>(argumentTexts.Length);
+        using var builder =
+            ImmutableArrayBuilder<string>.Rent(argumentTexts.Length);
         for (var index = 0; index < argumentTexts.Length; index++)
         {
             var argumentText = argumentTexts[index];
@@ -2779,7 +2782,7 @@ internal static class AkcssGenerator
             builder.Add(expression);
         }
 
-        arguments = builder.MoveToImmutable();
+        arguments = builder.ToImmutable();
         return true;
     }
 

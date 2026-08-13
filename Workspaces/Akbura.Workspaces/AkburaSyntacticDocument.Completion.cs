@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -641,7 +642,7 @@ public sealed partial class AkburaSyntacticDocument
     private static ImmutableArray<string> GetExistingAttributeNames(
         MarkupStartTagSyntax startTag)
     {
-        var builder = ImmutableArray.CreateBuilder<string>();
+        using var builder = ImmutableArrayBuilder<string>.Rent();
         foreach (var attribute in startTag.Attributes)
         {
             var name = attribute switch

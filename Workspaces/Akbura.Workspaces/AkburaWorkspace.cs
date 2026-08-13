@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -660,9 +661,9 @@ public sealed class AkburaWorkspace : IDisposable
                 return project;
             }
 
-            var references =
-                ImmutableArray.CreateBuilder<
-                    AkburaCompilationReference>();
+            using var references =
+                ImmutableArrayBuilder<
+                    AkburaCompilationReference>.Rent();
             var previousReferences =
                 project.Compilation
                     .CompilationReferences;

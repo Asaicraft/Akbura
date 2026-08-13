@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.Symbols;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -143,10 +144,14 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             return;
         }
 
-        var componentTrees = ImmutableArray.CreateBuilder<AkburaSyntaxTree>();
-        var sourceComponentTrees = ImmutableArray.CreateBuilder<ComponentSyntaxTree>();
-        var akcssTrees = ImmutableArray.CreateBuilder<AkcssSyntaxTree>();
-        var sourceAkcssTrees = ImmutableArray.CreateBuilder<AkcssSyntaxTree>();
+        using var componentTrees =
+            ImmutableArrayBuilder<AkburaSyntaxTree>.Rent();
+        using var sourceComponentTrees =
+            ImmutableArrayBuilder<ComponentSyntaxTree>.Rent();
+        using var akcssTrees =
+            ImmutableArrayBuilder<AkcssSyntaxTree>.Rent();
+        using var sourceAkcssTrees =
+            ImmutableArrayBuilder<AkcssSyntaxTree>.Rent();
 
         foreach (var syntaxTree in syntaxTrees)
         {
@@ -172,7 +177,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         }
 
         var semanticHost = sourceComponentTrees.Count > 0
-            ? sourceComponentTrees[0]
+            ? sourceComponentTrees.WrittenSpan[0]
             : CreateSemanticHost(projectOptions.ProjectDirectory, context.CancellationToken);
 
         if (sourceComponentTrees.Count == 0)

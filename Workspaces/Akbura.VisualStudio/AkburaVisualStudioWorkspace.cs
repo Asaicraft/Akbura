@@ -1,4 +1,5 @@
 ﻿using Akbura.Workspaces;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.VisualStudio.LanguageServices;
@@ -507,7 +508,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             .ToArray();
         var loadedDocuments = await Task.WhenAll(loadTasks)
             .ConfigureAwait(false);
-        var inputs = ImmutableArray.CreateBuilder<AkburaDocumentInput>(
+        using var inputs = ImmutableArrayBuilder<AkburaDocumentInput>.Rent(
             loadedDocuments.Length);
         foreach (var input in loadedDocuments)
         {
@@ -559,32 +560,34 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
     private static ImmutableArray<TextDocument>
         GetAkburaDocuments(Project project)
     {
-        var builder =
-            ImmutableArray.CreateBuilder<TextDocument>();
+        using var builder =
+            ImmutableArrayBuilder<TextDocument>.Rent();
         var paths = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
 
-        AddDocuments(project.Documents);
-        AddDocuments(project.AdditionalDocuments);
+        AddDocuments(project.Documents, paths, builder);
+        AddDocuments(project.AdditionalDocuments, paths, builder);
 
         return builder.ToImmutable();
+    }
 
-        void AddDocuments(
-            IEnumerable<TextDocument> documents)
+    private static void AddDocuments(
+        IEnumerable<TextDocument> documents,
+        HashSet<string> paths,
+        ImmutableArrayBuilder<TextDocument> builder)
+    {
+        foreach (var document in documents)
         {
-            foreach (var document in documents)
+            if (!IsAkburaDocument(document.FilePath))
             {
-                if (!IsAkburaDocument(document.FilePath))
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                var fullPath =
-                    Path.GetFullPath(document.FilePath!);
-                if (paths.Add(fullPath))
-                {
-                    builder.Add(document);
-                }
+            var fullPath =
+                Path.GetFullPath(document.FilePath!);
+            if (paths.Add(fullPath))
+            {
+                builder.Add(document);
             }
         }
     }

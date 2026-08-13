@@ -1,5 +1,6 @@
 ﻿using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -28,7 +29,7 @@ internal sealed class EmbeddedCSharpClassificationService
     public bool TryAddClassifications(
         AkburaSyntaxToken token,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         if (token.Node is not
@@ -81,7 +82,7 @@ internal sealed class EmbeddedCSharpClassificationService
     public void AddClassifications(
         CSharpStatementSyntax statementSyntax,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         var statement = statementSyntax.GetRawCSharpStatement();
@@ -121,7 +122,7 @@ internal sealed class EmbeddedCSharpClassificationService
     public void AddClassifications(
         CSharpTypeSyntax typeSyntax,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         if (!EmbeddedCSharpSyntaxFacts.TryGetType(
@@ -147,7 +148,7 @@ internal sealed class EmbeddedCSharpClassificationService
     public void AddClassifications(
         CSharpExpressionSyntax expressionSyntax,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         if (!EmbeddedCSharpSyntaxFacts.TryGetExpression(
@@ -199,7 +200,7 @@ internal sealed class EmbeddedCSharpClassificationService
         IEnumerable<CSharpSyntaxToken> tokens,
         int positionOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var token in tokens)
@@ -233,7 +234,7 @@ internal sealed class EmbeddedCSharpClassificationService
         CSharpSyntaxToken token,
         int positionOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var classification = GetClassification(token);
 
@@ -254,7 +255,7 @@ internal sealed class EmbeddedCSharpClassificationService
         CodeAnalysis.SyntaxTriviaList triviaList,
         int positionOffset,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var trivia in triviaList)
@@ -282,7 +283,7 @@ internal sealed class EmbeddedCSharpClassificationService
         int positionOffset,
         TextSpan requestedSpan,
         AkburaClassificationKind classification,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder)
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (csharpSpan.Length == 0)
         {

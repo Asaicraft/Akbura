@@ -1,3 +1,4 @@
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Workspaces;
@@ -9,11 +10,13 @@ public readonly struct AkburaCSharpCompletionContext
 {
     internal AkburaCSharpCompletionContext(
         AkburaCSharpCompletionContextKind kind,
+        SyntaxKind ownerKind,
         TextSpan ownerSpan,
         TextSpan hostSpan,
         int hostPosition)
     {
         Kind = kind;
+        OwnerKind = ownerKind;
         OwnerSpan = ownerSpan;
         HostSpan = hostSpan;
         HostPosition = hostPosition;
@@ -39,6 +42,8 @@ public readonly struct AkburaCSharpCompletionContext
     /// </summary>
     public int RelativePosition => HostPosition - HostSpan.Start;
 
+    internal SyntaxKind OwnerKind { get; }
+
     internal TextSpan OwnerSpan { get; }
 }
 
@@ -53,7 +58,27 @@ public enum AkburaCSharpCompletionContextKind
     None = 0,
 
     /// <summary>
-    /// A C# expression enclosed by Akbura braces.
+    /// A C# expression embedded in Akbura syntax.
     /// </summary>
     Expression,
+
+    /// <summary>
+    /// A C# statement embedded in an Akbura executable block.
+    /// </summary>
+    Statement,
+
+    /// <summary>
+    /// A C# type used by an Akbura declaration.
+    /// </summary>
+    Type,
+
+    /// <summary>
+    /// The namespace or type name of a C# using directive.
+    /// </summary>
+    UsingDirectiveName,
+
+    /// <summary>
+    /// A C# parameter list used by an Akbura command declaration.
+    /// </summary>
+    CommandParameterList,
 }

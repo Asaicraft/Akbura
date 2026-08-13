@@ -15,8 +15,7 @@ public sealed partial class AkburaSyntacticDocument
         CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
-        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
-            position == 0 || Text.Length == 0)
+        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
         {
             return default;
         }
@@ -38,6 +37,16 @@ public sealed partial class AkburaSyntacticDocument
                 out var incompleteClosingContext))
         {
             return incompleteClosingContext;
+        }
+
+        if (position == 0 || Text.Length == 0)
+        {
+            return TryGetTopLevelKeywordContext(
+                root,
+                position,
+                out var emptyTopLevelContext)
+                    ? emptyTopLevelContext
+                    : default;
         }
 
         var token = root.FindTokenInternal(
@@ -73,7 +82,12 @@ public sealed partial class AkburaSyntacticDocument
                 position,
                 startTag))
         {
-            return default;
+            return TryGetTopLevelKeywordContext(
+                root,
+                position,
+                out var topLevelContext)
+                    ? topLevelContext
+                    : default;
         }
 
         if (IsInsideAttributeValue(
@@ -356,6 +370,103 @@ public sealed partial class AkburaSyntacticDocument
             componentName: null,
             parentComponentName: GetOpenElementName(root, nameStart - 2),
             ImmutableArray<string>.Empty);
+        return true;
+    }
+
+    private bool TryGetTopLevelKeywordContext(
+        AkburaSyntax root,
+        int position,
+        out AkburaSyntacticCompletionContext context)
+    {
+        context = default;
+        if (root is not AkburaDocumentSyntax document ||
+            IsInsideComment(root, position))
+        {
+            return false;
+        }
+
+        var applicableSpan = GetTopLevelKeywordSpan(position);
+        AkTopLevelMemberSyntax? owner = null;
+        foreach (var member in document.Members)
+        {
+            if (applicableSpan.Length > 0
+                    ? member.Span.OverlapsWith(applicableSpan)
+                    : member.Span.Start < position &&
+                      position < member.Span.End)
+            {
+                owner = member;
+                break;
+            }
+        }
+
+        if (owner != null)
+        {
+            if (owner is not CSharpStatementSyntax
+                {
+                    Body: null
+                } statement ||
+                statement.Span.Start > applicableSpan.Start ||
+                !ContainsOnlyWhitespace(
+                    Text,
+                    statement.Span.Start,
+                    applicableSpan.Start))
+            {
+                return false;
+            }
+        }
+
+        context = new AkburaSyntacticCompletionContext(
+            AkburaCompletionContextKind.TopLevel,
+            applicableSpan,
+            Text.ToString(applicableSpan),
+            componentName: null,
+            parentComponentName: null,
+            ImmutableArray<string>.Empty);
+        return true;
+    }
+
+    private TextSpan GetTopLevelKeywordSpan(int position)
+    {
+        var start = position;
+        while (start > 0 &&
+               (char.IsLetterOrDigit(Text[start - 1]) ||
+                Text[start - 1] == '_'))
+        {
+            start--;
+        }
+
+        return TextSpan.FromBounds(start, position);
+    }
+
+    private static bool IsInsideComment(
+        AkburaSyntax root,
+        int position)
+    {
+        if (position == 0 || root.FullSpan.Length == 0)
+        {
+            return false;
+        }
+
+        var trivia = root.FindTrivia(
+            Math.Min(position - 1, root.FullSpan.End - 1));
+        return trivia.Kind is
+            SyntaxKind.SingleLineCommentTrivia or
+            SyntaxKind.MultiLineCommentTrivia;
+    }
+
+    private static bool ContainsOnlyWhitespace(
+        SourceText text,
+        int start,
+        int end)
+    {
+        for (var position = start; position < end; position++)
+        {
+            if (!char.IsWhiteSpace(text[position]))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 

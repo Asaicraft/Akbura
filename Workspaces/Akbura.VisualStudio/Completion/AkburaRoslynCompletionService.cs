@@ -33,6 +33,7 @@ internal sealed class AkburaRoslynCompletionService
             AkburaSyntacticDocument syntacticDocument,
             AkburaDocumentContext? semanticContext,
             AkburaCSharpCompletionContext completionContext,
+            CompletionTrigger trigger,
             CancellationToken cancellationToken)
     {
         if (snapshot == null)
@@ -91,11 +92,16 @@ internal sealed class AkburaRoslynCompletionService
             return null;
         }
 
+        var roslynTrigger = trigger.Reason ==
+                CompletionTriggerReason.Insertion
+            ? RoslynCompletionTrigger.CreateInsertionTrigger(
+                trigger.Character)
+            : RoslynCompletionTrigger.Invoke;
         var completionList = await completionService
             .GetCompletionsAsync(
                 document,
                 projection.ProjectedPosition,
-                RoslynCompletionTrigger.Invoke,
+                roslynTrigger,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         if (completionList == null)

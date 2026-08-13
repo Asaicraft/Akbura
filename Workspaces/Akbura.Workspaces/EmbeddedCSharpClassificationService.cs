@@ -84,16 +84,15 @@ internal sealed class EmbeddedCSharpClassificationService
         ImmutableArray<AkburaClassifiedSpan>.Builder builder,
         CancellationToken cancellationToken)
     {
-        var statement =
-            statementSyntax.GetRawCSharpStatement();
-
+        var statement = statementSyntax.GetRawCSharpStatement();
         if (statement == null)
         {
             return;
         }
 
-        var sourceSpan =
-            statementSyntax.Tokens.FullSpan;
+        // A statement with a body contains nested Akbura syntax nodes. They
+        // are classified independently, so only map this node's own tokens.
+        var sourceSpan = statementSyntax.Tokens.FullSpan;
 
         var positionOffset =
             sourceSpan.Start -
@@ -125,19 +124,16 @@ internal sealed class EmbeddedCSharpClassificationService
         ImmutableArray<AkburaClassifiedSpan>.Builder builder,
         CancellationToken cancellationToken)
     {
-        CSharp.TypeSyntax type;
-
-        try
-        {
-            type = typeSyntax.ToCSharp();
-        }
-        catch (InvalidOperationException)
+        if (!EmbeddedCSharpSyntaxFacts.TryGetType(
+                typeSyntax,
+                out var type,
+                out var sourceSpan))
         {
             return;
         }
 
         var positionOffset =
-            typeSyntax.Tokens.FullSpan.Start -
+            sourceSpan.Start -
             type.FullSpan.Start;
 
         AddTokens(
@@ -154,17 +150,13 @@ internal sealed class EmbeddedCSharpClassificationService
         ImmutableArray<AkburaClassifiedSpan>.Builder builder,
         CancellationToken cancellationToken)
     {
-        var expression =
-            expressionSyntax
-                .GetRawCSharpExpression();
-
-        if (expression == null)
+        if (!EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                expressionSyntax,
+                out var expression,
+                out var sourceSpan))
         {
             return;
         }
-
-        var sourceSpan =
-            expressionSyntax.Tokens.FullSpan;
 
         var positionOffset =
             sourceSpan.Start -

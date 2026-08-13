@@ -105,9 +105,7 @@ internal static class AkburaCSharpProjectionFactory
             throw new ArgumentNullException(nameof(semanticContext));
         }
 
-        if (completionContext.Kind !=
-                AkburaCSharpCompletionContextKind.Expression ||
-            !TryGetCurrentContext(
+        if (!TryGetCurrentContext(
                 syntacticDocument,
                 semanticContext,
                 out semanticContext))
@@ -118,20 +116,8 @@ internal static class AkburaCSharpProjectionFactory
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var inlineExpression = semanticContext.Document.SyntaxTree
-            .GetRootSyntax()
-            .DescendantNodes()
-            .OfType<InlineExpressionSyntax>()
-            .FirstOrDefault(candidate =>
-                candidate.FullSpan == completionContext.OwnerSpan &&
-                candidate.Expression.Tokens.FullSpan ==
-                    completionContext.HostSpan);
-        if (inlineExpression == null)
-        {
-            projection = null!;
-            return false;
-        }
-
+        var root = semanticContext.Document.SyntaxTree
+            .GetRootSyntax();
         var semanticModel = semanticContext.Project.Compilation
             .GetSemanticModel(
                 semanticContext.Document.SyntaxTree);
@@ -139,9 +125,43 @@ internal static class AkburaCSharpProjectionFactory
         CSharpProbeProjection probe;
         try
         {
-            probe = semanticModel.CreateCSharpCompletionProjection(
-                inlineExpression,
-                completionContext.RelativePosition);
+            probe = completionContext.Kind switch
+            {
+                AkburaCSharpCompletionContextKind.Expression =>
+                    CreateExpressionProjection(
+                        semanticModel,
+                        root,
+                        completionContext),
+
+                AkburaCSharpCompletionContextKind.Statement =>
+                    CreateStatementProjection(
+                        semanticModel,
+                        root,
+                        completionContext),
+
+                AkburaCSharpCompletionContextKind.Type =>
+                    CreateTypeProjection(
+                        semanticModel,
+                        root,
+                        completionContext),
+
+                AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName =>
+                    CreateUsingProjection(
+                        semanticModel,
+                        root,
+                        completionContext),
+
+                AkburaCSharpCompletionContextKind
+                    .CommandParameterList =>
+                    CreateCommandParameterProjection(
+                        semanticModel,
+                        root,
+                        completionContext),
+
+                _ => throw new InvalidOperationException(
+                    "The C# completion context is not supported."),
+            };
         }
         catch (InvalidOperationException)
         {
@@ -149,6 +169,11 @@ internal static class AkburaCSharpProjectionFactory
             return false;
         }
         catch (ArgumentException)
+        {
+            projection = null!;
+            return false;
+        }
+        catch (InvalidCastException)
         {
             projection = null!;
             return false;
@@ -170,6 +195,114 @@ internal static class AkburaCSharpProjectionFactory
             probe.ProjectedPosition,
             probe.StateNames);
         return true;
+    }
+
+    private static CSharpProbeProjection CreateExpressionProjection(
+        AkburaSemanticModel semanticModel,
+        AkburaSyntax root,
+        AkburaCSharpCompletionContext context)
+    {
+        var syntax = FindSyntax<CSharpExpressionSyntax>(root, context);
+        if (syntax == null ||
+            syntax.Tokens.FullSpan != context.HostSpan)
+        {
+            throw new InvalidOperationException(
+                "The C# expression no longer matches the current document.");
+        }
+
+        return semanticModel.CreateCSharpCompletionProjection(
+            syntax,
+            context.RelativePosition);
+    }
+
+    private static CSharpProbeProjection CreateStatementProjection(
+        AkburaSemanticModel semanticModel,
+        AkburaSyntax root,
+        AkburaCSharpCompletionContext context)
+    {
+        var syntax = FindSyntax<CSharpStatementSyntax>(root, context);
+        if (syntax == null ||
+            !EmbeddedCSharpSyntaxFacts.TryGetStatement(
+                syntax,
+                out _,
+                out var hostSpan) ||
+            hostSpan != context.HostSpan)
+        {
+            throw new InvalidOperationException(
+                "The C# statement no longer matches the current document.");
+        }
+
+        return semanticModel.CreateCSharpCompletionProjection(
+            syntax,
+            context.RelativePosition);
+    }
+
+    private static CSharpProbeProjection CreateTypeProjection(
+        AkburaSemanticModel semanticModel,
+        AkburaSyntax root,
+        AkburaCSharpCompletionContext context)
+    {
+        var syntax = FindSyntax<CSharpTypeSyntax>(root, context);
+        if (syntax == null ||
+            syntax.Tokens.FullSpan != context.HostSpan)
+        {
+            throw new InvalidOperationException(
+                "The C# type no longer matches the current document.");
+        }
+
+        return semanticModel.CreateCSharpCompletionProjection(
+            syntax,
+            context.RelativePosition);
+    }
+
+    private static CSharpProbeProjection CreateUsingProjection(
+        AkburaSemanticModel semanticModel,
+        AkburaSyntax root,
+        AkburaCSharpCompletionContext context)
+    {
+        var syntax = FindSyntax<
+            Akbura.Language.Syntax.UsingDirectiveSyntax>(root, context);
+        if (syntax == null ||
+            syntax.Name.Tokens.FullSpan != context.HostSpan)
+        {
+            throw new InvalidOperationException(
+                "The C# using directive no longer matches the current document.");
+        }
+
+        return semanticModel.CreateCSharpCompletionProjection(
+            syntax,
+            context.RelativePosition);
+    }
+
+    private static CSharpProbeProjection
+        CreateCommandParameterProjection(
+            AkburaSemanticModel semanticModel,
+            AkburaSyntax root,
+            AkburaCSharpCompletionContext context)
+    {
+        var syntax = FindSyntax<CSharpParameterListSyntax>(root, context);
+        if (syntax == null ||
+            syntax.Parameters.FullSpan != context.HostSpan)
+        {
+            throw new InvalidOperationException(
+                "The command parameter list no longer matches the current document.");
+        }
+
+        return semanticModel.CreateCSharpCompletionProjection(
+            syntax,
+            context.RelativePosition);
+    }
+
+    private static TSyntax? FindSyntax<TSyntax>(
+        AkburaSyntax root,
+        AkburaCSharpCompletionContext context)
+        where TSyntax : AkburaSyntax
+    {
+        return root.DescendantNodes()
+            .OfType<TSyntax>()
+            .FirstOrDefault(candidate =>
+                candidate.Kind == context.OwnerKind &&
+                candidate.FullSpan == context.OwnerSpan);
     }
 
     private static bool TryGetCurrentContext(

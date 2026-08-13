@@ -26,17 +26,38 @@ public sealed partial class AkburaSyntacticDocument
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = SyntaxTree.GetRootSyntax();
-        InlineExpressionSyntax? best = null;
-        TextSpan bestHostSpan = default;
+        CSharpCompletionCandidate? best = null;
 
         if (position < Text.Length)
         {
-            FindExpressionAtPosition(position);
+            CollectCandidates(
+                root.FindTokenInternal(position).Parent);
         }
 
         if (position > 0)
         {
-            FindExpressionAtPosition(position - 1);
+            CollectCandidates(
+                root.FindTokenInternal(position - 1).Parent);
+        }
+
+        // Missing C# nodes can have a zero-width span and therefore are not
+        // necessarily ancestors of either adjacent token.
+        if (best == null)
+        {
+            foreach (var candidate in root.DescendantNodes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (candidate.FullSpan.Start > position)
+                {
+                    break;
+                }
+
+                if (candidate.FullSpan.Start <= position &&
+                    candidate.FullSpan.End >= position)
+                {
+                    TryAddCandidate(candidate);
+                }
+            }
         }
 
         if (best == null)
@@ -45,40 +66,119 @@ public sealed partial class AkburaSyntacticDocument
             return false;
         }
 
-        context = new AkburaCSharpCompletionContext(
-            AkburaCSharpCompletionContextKind.Expression,
-            best.FullSpan,
-            bestHostSpan,
-            position);
+        context = best.Value.Context;
         return true;
 
-        void FindExpressionAtPosition(int tokenPosition)
+        void CollectCandidates(AkburaSyntax? syntax)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var token = root.FindTokenInternal(tokenPosition);
-            for (var current = token.Parent;
+            for (var current = syntax;
                  current != null;
                  current = current.Parent)
             {
-                if (current is not InlineExpressionSyntax candidate)
-                {
-                    continue;
-                }
-
-                var hostSpan = candidate.Expression.Tokens.FullSpan;
-                if (position < hostSpan.Start ||
-                    position > hostSpan.End)
-                {
-                    continue;
-                }
-
-                if (best == null ||
-                    candidate.FullSpan.Length < best.FullSpan.Length)
-                {
-                    best = candidate;
-                    bestHostSpan = hostSpan;
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                TryAddCandidate(current);
             }
         }
+
+        void TryAddCandidate(AkburaSyntax syntax)
+        {
+            switch (syntax)
+            {
+                case CSharpExpressionSyntax expression:
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind.Expression,
+                        expression,
+                        expression.Tokens.FullSpan,
+                        priority: 0);
+                    break;
+
+                case CSharpTypeSyntax type:
+                    var usingDirective =
+                        type.Parent as UsingDirectiveSyntax;
+                    AddCandidate(
+                        usingDirective == null
+                            ? AkburaCSharpCompletionContextKind.Type
+                            : AkburaCSharpCompletionContextKind
+                                .UsingDirectiveName,
+                        usingDirective is null
+                            ? type
+                            : usingDirective,
+                        type.Tokens.FullSpan,
+                        priority: 1);
+                    break;
+
+                case CSharpParameterListSyntax parameterList
+                    when parameterList.Parent is
+                        CommandDeclarationSyntax:
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind
+                            .CommandParameterList,
+                        parameterList,
+                        parameterList.Parameters.FullSpan,
+                        priority: 2);
+                    break;
+
+                case CSharpStatementSyntax statement:
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind.Statement,
+                        statement,
+                        EmbeddedCSharpSyntaxFacts
+                            .GetStatementHostSpan(statement),
+                        priority: 3);
+                    break;
+            }
+        }
+
+        void AddCandidate(
+            AkburaCSharpCompletionContextKind kind,
+            AkburaSyntax owner,
+            TextSpan hostSpan,
+            int priority)
+        {
+            if (!ContainsPosition(hostSpan, position))
+            {
+                return;
+            }
+
+            var candidate = new CSharpCompletionCandidate(
+                new AkburaCSharpCompletionContext(
+                    kind,
+                    owner.Kind,
+                    owner.FullSpan,
+                    hostSpan,
+                    position),
+                priority);
+            if (best == null ||
+                candidate.Priority < best.Value.Priority ||
+                candidate.Priority == best.Value.Priority &&
+                candidate.Context.HostSpan.Length <
+                    best.Value.Context.HostSpan.Length)
+            {
+                best = candidate;
+            }
+        }
+    }
+
+    private static bool ContainsPosition(
+        TextSpan span,
+        int position)
+    {
+        return position >= span.Start &&
+            position <= span.End;
+    }
+
+    private readonly struct CSharpCompletionCandidate
+    {
+        public CSharpCompletionCandidate(
+            AkburaCSharpCompletionContext context,
+            int priority)
+        {
+            Context = context;
+            Priority = priority;
+        }
+
+        public AkburaCSharpCompletionContext Context { get; }
+
+        public int Priority { get; }
     }
 }

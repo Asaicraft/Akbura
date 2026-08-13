@@ -5622,6 +5622,68 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return builder.ToImmutable();
     }
 
+    internal ImmutableArray<CSharp.UsingDirectiveSyntax>
+        GetCSharpUsingDirectivesBefore(
+            UsingDirectiveSyntax currentDirective)
+    {
+        if (currentDirective == null)
+        {
+            throw new ArgumentNullException(nameof(currentDirective));
+        }
+
+        ValidateSyntaxTreeOwnership(currentDirective);
+        using var builder =
+            ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
+        var directives = new HashSet<string>(StringComparer.Ordinal);
+        AddCSharpUsingDirectives(
+            builder,
+            directives,
+            Compilation.GlobalCSharpUsingDirectives);
+
+        foreach (var usingDirective in
+                 Compilation.GlobalAkburaUsingDirectives)
+        {
+            if (IsSameSyntax(usingDirective, currentDirective) ||
+                IsAkcssUsingDirective(usingDirective))
+            {
+                continue;
+            }
+
+            AddCSharpUsingDirective(
+                builder,
+                directives,
+                usingDirective.ToCSharp());
+        }
+
+        foreach (var member in SyntaxTree.GetRoot().Members)
+        {
+            if (member.Position >= currentDirective.Position)
+            {
+                break;
+            }
+
+            if (member is UsingDirectiveSyntax usingDirective &&
+                usingDirective.GlobalKeyword.RawKind == 0 &&
+                !IsAkcssUsingDirective(usingDirective))
+            {
+                AddCSharpUsingDirective(
+                    builder,
+                    directives,
+                    usingDirective.ToCSharp());
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static bool IsSameSyntax(
+        AkburaSyntax left,
+        AkburaSyntax right)
+    {
+        return left.FullSpan == right.FullSpan &&
+            ReferenceEquals(left.Root.Green, right.Root.Green);
+    }
+
     internal ImmutableArray<UsingDirectiveSyntax> GetAkburaUsingDirectives()
     {
         using var builder = ImmutableArrayBuilder<UsingDirectiveSyntax>.Rent();

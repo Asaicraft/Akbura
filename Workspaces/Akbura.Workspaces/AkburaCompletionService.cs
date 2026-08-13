@@ -44,6 +44,12 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             return CreateClosingTagResult(syntaxContext);
         }
 
+        if (syntaxContext.Kind ==
+                AkburaCompletionContextKind.TopLevel)
+        {
+            return CreateTopLevelResult(syntaxContext);
+        }
+
         if (semanticContext == null ||
             semanticContext.Document.SyntaxTree.Kind ==
                 SyntaxTreeKind.Akcss)
@@ -122,6 +128,29 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     name,
                     AkburaCompletionKind.ClosingTag,
                     $"Close '{name}'.")));
+    }
+
+    private static AkburaCompletionResult CreateTopLevelResult(
+        AkburaSyntacticCompletionContext context)
+    {
+        const string stateKeyword = "state";
+        if (!MatchesPrefix(stateKeyword, context.Prefix))
+        {
+            return new AkburaCompletionResult(
+                context.ApplicableSpan,
+                ImmutableArray<AkburaCompletionItem>.Empty);
+        }
+
+        return new AkburaCompletionResult(
+            context.ApplicableSpan,
+            ImmutableArray.Create(
+                new AkburaCompletionItem(
+                    stateKeyword,
+                    stateKeyword,
+                    AkburaCompletionKind.Keyword,
+                    "Declares component state.",
+                    descriptionFactory: null,
+                    priority: 0)));
     }
 
     private static ImmutableArray<AkburaCompletionItem>

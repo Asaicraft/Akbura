@@ -202,6 +202,73 @@ public sealed class CSharpIncrementalParserTests
     }
 
     [Fact]
+    public void IdentifierInsertedAfterMarkupOpenAngle_ExpressionAccessDoesNotAssert()
+    {
+        const string oldCode =
+            "state int count = 0;\n\n" +
+            "<StackPanel gap-3>\n" +
+            "    <Button Click={count++}/>\n" +
+            "</StackPanel>";
+        var insertionPosition = oldCode.IndexOf(
+            "<StackPanel",
+            StringComparison.Ordinal) + 1;
+        var newCode = oldCode.Insert(insertionPosition, "ф");
+        var oldSyntax = Parse(oldCode);
+        var change = new TextChangeRange(
+            new TextSpan(insertionPosition, length: 0),
+            newLength: 1);
+
+        var incremental = ParseIncremental(
+            newCode,
+            oldSyntax,
+            [change]);
+        var root = (AkburaDocumentSyntax)incremental.CreateRed();
+        var expressions = root
+            .DescendantNodes()
+            .OfType<CSharpExpressionSyntax>()
+            .ToArray();
+
+        Assert.Equal(newCode, incremental.ToFullString());
+        Assert.NotEmpty(expressions);
+        Assert.All(
+            expressions,
+            expression => Assert.NotNull(
+                expression.GetRawCSharpExpression()));
+    }
+
+    [Fact]
+    public void ExpressionWithCachedStatement_FallsBackToParsingTokenText()
+    {
+        var statement = Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+            .ParseStatement("value;");
+        var expression = SyntaxFactory.CSharpExpressionSyntax(
+            [SyntaxFactory.CSharpRawToken(statement)]);
+
+        var result = expression.GetRawCSharpExpression();
+
+        Assert.NotNull(result);
+        Assert.Equal("value;", result.ToFullString());
+    }
+
+    [Fact]
+    public void InlineExpressionWithCachedStatement_FallsBackToParsingTokenText()
+    {
+        var statement = Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+            .ParseStatement("value;");
+        var expression = SyntaxFactory.CSharpExpressionSyntax(
+            [SyntaxFactory.CSharpRawToken(statement)]);
+        var inlineExpression = SyntaxFactory.InlineExpressionSyntax(
+            SyntaxFactory.Token(SyntaxKind.OpenBraceToken),
+            expression,
+            SyntaxFactory.Token(SyntaxKind.CloseBraceToken));
+
+        var result = inlineExpression.GetRawCSharpExpression();
+
+        Assert.NotNull(result);
+        Assert.Equal("value;", result.ToFullString());
+    }
+
+    [Fact]
     public void RawTypeIdentifierEdit_ReparsesCSharpRawWrapper()
     {
         const string oldCode = "inject List<Foo> service;";

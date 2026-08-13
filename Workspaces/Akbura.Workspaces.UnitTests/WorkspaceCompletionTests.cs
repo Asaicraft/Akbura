@@ -19,6 +19,52 @@ public sealed class WorkspaceCompletionTests
         <StackPanel/>
         """;
 
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("st", "st")]
+    public void Completion_TopLevelOffersStateWithoutSemanticContext(
+        string source,
+        string expectedPrefix)
+    {
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal("state", item.DisplayText);
+        Assert.Equal("state", item.InsertText);
+        Assert.Equal(AkburaCompletionKind.Keyword, item.Kind);
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(result.ApplicableSpan));
+        Assert.False(result.IsIncomplete);
+    }
+
+    [Fact]
+    public void Completion_TopLevelFiltersStateByPrefix()
+    {
+        const string source = "par";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        Assert.Empty(result.Items);
+    }
+
     [Fact]
     public void Completion_ComponentNameUsesVisibleTypesAndComponents()
     {
@@ -1277,6 +1323,503 @@ public sealed class WorkspaceCompletionTests
                     semanticSource,
                     semanticContext.Document.Text.ToString());
             });
+    }
+
+    [Fact]
+    public void CSharpProjection_StateAndParamInitializersUseRoslynCompletion()
+    {
+        const string stateSource = """
+            namespace Gallery;
+
+            using System;
+            using Avalonia.Controls;
+
+            state int count = 0;
+            state double maximum = Math.|;
+
+            <StackPanel/>
+            """;
+        WithCSharpProjection(
+            stateSource,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Expression,
+                    context.Kind);
+                Assert.True(projection.IsStateName("count"));
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Max");
+            });
+
+        const string emptyStateSource = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state int count = 0;
+            state int maximum = |;
+
+            <StackPanel/>
+            """;
+        WithCSharpProjection(
+            emptyStateSource,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Expression,
+                    context.Kind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "count");
+            });
+
+        const string paramSource = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            param string Prefix = "Akbura";
+            param string Title = Prefix.ToUpp|;
+
+            <StackPanel/>
+            """;
+        WithCSharpProjection(
+            paramSource,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Expression,
+                    context.Kind);
+                Assert.Contains(
+                    projection.Root.DescendantNodes()
+                        .OfType<Microsoft.CodeAnalysis.CSharp.Syntax
+                            .VariableDeclaratorSyntax>(),
+                    static variable =>
+                        variable.Identifier.ValueText == "Prefix");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "ToUpper");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_StatementPreservesStatesAndPrecedingLocals()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state int count = 0;
+            var first = count;
+            var second = fir|;
+
+            <StackPanel/>
+            """;
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                Assert.True(projection.IsStateName("count"));
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "first");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_IncompleteAndBodyStatementsMapExactly()
+    {
+        const string incompleteSource = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state int count = 0;
+            var value = |;
+
+            <StackPanel/>
+            """;
+        WithCSharpProjection(
+            incompleteSource,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "count");
+            });
+
+        const string bodySource = """
+            namespace Gallery;
+
+            using System;
+            using Avalonia.Controls;
+
+            void Update(int value)
+            {
+                if (value > Math.A|)
+                {
+                    value++;
+                }
+            }
+
+            <StackPanel/>
+            """;
+        WithCSharpProjection(
+            bodySource,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Abs");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_MethodBodyPreservesMethodContext()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state string title = "Akbura";
+
+            T Convert<T>(T value)
+                where T : class
+            {
+                var local = title;
+                return val|;
+            }
+
+            <StackPanel/>
+            """;
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                var probeMethod = projection.Root
+                    .DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax
+                        .MethodDeclarationSyntax>()
+                    .Single(static method =>
+                        method.Identifier.ValueText ==
+                            "__akbura_statement_probe");
+                Assert.Contains(
+                    probeMethod.TypeParameterList!.Parameters,
+                    static parameter =>
+                        parameter.Identifier.ValueText == "T");
+                Assert.Single(probeMethod.ConstraintClauses);
+                Assert.Contains(
+                    probeMethod.ParameterList.Parameters,
+                    static parameter =>
+                        parameter.Identifier.ValueText == "value");
+                Assert.Contains(
+                    probeMethod.Body!.DescendantNodes()
+                        .OfType<Microsoft.CodeAnalysis.CSharp.Syntax
+                            .VariableDeclaratorSyntax>(),
+                    static variable =>
+                        variable.Identifier.ValueText == "local");
+                Assert.True(projection.IsStateName("title"));
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "value");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_MethodBodyPreservesAsyncModifier()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Avalonia.Controls;
+
+            state string title = "Akbura";
+
+            async Task LoadAsync(CancellationToken cancellationToken)
+            {
+                var delay = 10;
+                await Task.Del|;
+            }
+
+            <StackPanel/>
+            """;
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                var probeMethod = projection.Root
+                    .DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax
+                        .MethodDeclarationSyntax>()
+                    .Single(static method =>
+                        method.Identifier.ValueText ==
+                            "__akbura_statement_probe");
+                Assert.Contains(
+                    probeMethod.Modifiers,
+                    static modifier =>
+                        modifier.IsKind(SyntaxKind.AsyncKeyword));
+                Assert.Contains(
+                    probeMethod.ParameterList.Parameters,
+                    static parameter =>
+                        parameter.Identifier.ValueText ==
+                            "cancellationToken");
+                Assert.Contains(
+                    probeMethod.Body!.DescendantNodes()
+                        .OfType<Microsoft.CodeAnalysis.CSharp.Syntax
+                            .VariableDeclaratorSyntax>(),
+                    static variable =>
+                        variable.Identifier.ValueText == "delay");
+                Assert.True(projection.IsStateName("title"));
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Delay");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_DeclarationContextsUseRoslynCompletion()
+    {
+        var cases = new[]
+        {
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    state Car| current = null;
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    command System.Threading.Tasks.ValueTa| Save();
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "ValueTask"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using System.Collections.Gen|;
+                    using Avalonia.Controls;
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName,
+                Item: "Generic"),
+            (
+                Source: """
+                    global using System.Collections.Gen|;
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName,
+                Item: "Generic"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using static System.Ma|;
+                    using Avalonia.Controls;
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName,
+                Item: "Math"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Alias = System.Collections.Gen|;
+                    using Avalonia.Controls;
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName,
+                Item: "Generic"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using unsafe Alias = System.IntP|*;
+                    using Avalonia.Controls;
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName,
+                Item: "IntPtr"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    command void Save(Car| model);
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .CommandParameterList,
+                Item: "Card"),
+        };
+
+        foreach (var testCase in cases)
+        {
+            WithCSharpProjection(
+                testCase.Source,
+                (semanticContext, context, projection, _) =>
+                {
+                    Assert.Equal(testCase.Kind, context.Kind);
+                    AssertCompletionContains(
+                        semanticContext,
+                        projection,
+                        testCase.Item);
+                });
+        }
+    }
+
+    [Fact]
+    public void CSharpProjection_StatementUsesCurrentTextWithStaleSemantics()
+    {
+        const string semanticSource = """
+            namespace Gallery;
+            using Avalonia.Controls;
+            state int count = 0;
+            var text = c;
+            <StackPanel/>
+            """;
+        const string currentSource = """
+            namespace Gallery;
+            using Avalonia.Controls;
+            state int count = 0;
+            var text = co|;
+            <StackPanel/>
+            """;
+        var position = currentSource.IndexOf('|');
+        var currentText = currentSource.Remove(position, 1);
+
+        WithWorkspace(
+            semanticSource,
+            (_, semanticContext, _) =>
+            {
+                var syntacticDocument =
+                    AkburaSyntacticDocument.Parse(
+                        SourceText.From(currentText),
+                        semanticContext.Document.FilePath);
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    completionContext.Kind);
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "count");
+                Assert.True(projection.TryMapPositionToHost(
+                    projection.ProjectedPosition,
+                    out var mappedPosition));
+                Assert.Equal(position, mappedPosition);
+            });
+    }
+
+    private static void WithCSharpProjection(
+        string sourceWithCaret,
+        Action<
+            AkburaDocumentContext,
+            AkburaCSharpCompletionContext,
+            AkburaCSharpProjection,
+            int> assertion)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        Assert.True(position >= 0);
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+                Assert.Equal(
+                    syntacticDocument.Text.ToString(
+                        completionContext.HostSpan),
+                    projection.Root.ToFullString().Substring(
+                        projection.ProjectedSpan.Start,
+                        projection.ProjectedSpan.Length));
+                Assert.True(projection.TryMapPositionToHost(
+                    projection.ProjectedPosition,
+                    out var mappedPosition));
+                Assert.Equal(position, mappedPosition);
+
+                assertion(
+                    semanticContext,
+                    completionContext,
+                    projection,
+                    position);
+            });
+    }
+
+    private static void AssertCompletionContains(
+        AkburaDocumentContext semanticContext,
+        AkburaCSharpProjection projection,
+        string displayText)
+    {
+        var completionList = RoslynCompletionTestHost
+            .GetCompletionsAsync(
+                semanticContext.Project.CSharpCompilation,
+                projection.Root,
+                projection.ProjectedPosition,
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert.NotNull(completionList);
+        Assert.Contains(
+            completionList.ItemsList,
+            item => item.DisplayText == displayText);
     }
 
     private static AkburaCompletionResult GetCompletionResult(

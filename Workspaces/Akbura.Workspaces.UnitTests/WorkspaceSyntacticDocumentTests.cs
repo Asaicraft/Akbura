@@ -121,6 +121,52 @@ public sealed class WorkspaceSyntacticDocumentTests
     }
 
     [Theory]
+    [InlineData("|", "")]
+    [InlineData("sta|", "sta")]
+    [InlineData("\n    st|", "st")]
+    [InlineData("<Button/>\nst|", "st")]
+    public void SyntacticDocument_DetectsTopLevelKeywordCompletion(
+        string sourceWithCaret,
+        string expectedPrefix)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(
+            AkburaCompletionContextKind.TopLevel,
+            context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(context.ApplicableSpan));
+    }
+
+    [Theory]
+    [InlineData("<Button>st|</Button>")]
+    [InlineData("var st| = 0;")]
+    [InlineData("void Update()\n{\n    st|\n}")]
+    [InlineData("// st|")]
+    [InlineData("/* st| */")]
+    public void SyntacticDocument_DoesNotCompleteStateOutsideTopLevelStart(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.NotEqual(
+            AkburaCompletionContextKind.TopLevel,
+            document.GetCompletionContext(position).Kind);
+    }
+
+    [Theory]
     [InlineData("<Card Con|></Card>")]
     [InlineData("<Card Con|</Card>")]
     [InlineData("<Card Title=\"Hello\" Con|></Card>")]
@@ -247,6 +293,121 @@ public sealed class WorkspaceSyntacticDocumentTests
     }
 
     [Theory]
+    [InlineData(
+        "state int maximum = Math.M|;",
+        AkburaCSharpCompletionContextKind.Expression,
+        "Math.M")]
+    [InlineData(
+        "param string Title = string.Em|;",
+        AkburaCSharpCompletionContextKind.Expression,
+        "string.Em")]
+    [InlineData(
+        "state int count = |;",
+        AkburaCSharpCompletionContextKind.Expression,
+        "")]
+    [InlineData(
+        "param string Title = |;",
+        AkburaCSharpCompletionContextKind.Expression,
+        "")]
+    [InlineData(
+        "var text = Title.ToUpp|;",
+        AkburaCSharpCompletionContextKind.Statement,
+        "var text = Title.ToUpp;")]
+    [InlineData(
+        "void Update(int value)\n{\n    var result = value.ToStr|;\n}",
+        AkburaCSharpCompletionContextKind.Statement,
+        "    var result = value.ToStr;\n")]
+    [InlineData(
+        "void Update(int value)\n{\n    if (value > Math.A|)\n    {\n    }\n}",
+        AkburaCSharpCompletionContextKind.Statement,
+        "    if (value > Math.A)\n    {\n    }\n")]
+    [InlineData(
+        "param List<UserMo|> Items;",
+        AkburaCSharpCompletionContextKind.Type,
+        "List<UserMo> ")]
+    [InlineData(
+        "inject ILogger<Count|> logger;",
+        AkburaCSharpCompletionContextKind.Type,
+        "ILogger<Count> ")]
+    [InlineData(
+        "state UserMo| model = new();",
+        AkburaCSharpCompletionContextKind.Type,
+        "UserMo ")]
+    [InlineData(
+        "command ValueTa| Save();",
+        AkburaCSharpCompletionContextKind.Type,
+        "ValueTa ")]
+    [InlineData(
+        "using System.Collections.Gen|;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "System.Collections.Gen")]
+    [InlineData(
+        "using Alias = System.Collections.Gen|;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "System.Collections.Gen")]
+    [InlineData(
+        "using static System.Ma|;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "System.Ma")]
+    [InlineData(
+        "global using System.Collections.Gen|;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "System.Collections.Gen")]
+    [InlineData(
+        "using unsafe Alias = System.IntP|*;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "System.IntP*")]
+    [InlineData(
+        "command void Save(UserMo| model);",
+        AkburaCSharpCompletionContextKind.CommandParameterList,
+        "(UserMo model)")]
+    public void SyntacticDocument_DetectsEmbeddedCSharpCompletionContexts(
+        string sourceWithCaret,
+        AkburaCSharpCompletionContextKind expectedKind,
+        string expectedHost)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var result = document.TryGetCSharpCompletionContext(
+            position,
+            out var context);
+
+        Assert.True(result);
+        Assert.Equal(expectedKind, context.Kind);
+        Assert.Equal(position, context.HostPosition);
+        Assert.Equal(
+            position - context.HostSpan.Start,
+            context.RelativePosition);
+        Assert.Equal(
+            expectedHost,
+            document.Text.ToString(context.HostSpan));
+    }
+
+    [Theory]
+    [InlineData("state co|unt = 0;")]
+    [InlineData("<Button Text=\"DateTime.No|\"/>")]
+    [InlineData("<Button Content=${Binding Path=Us|}/>")]
+    [InlineData("<But|")]
+    [InlineData("using Al| = System.Collections.Generic;")]
+    public void SyntacticDocument_DoesNotProjectNonCSharpPositions(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.False(document.TryGetCSharpCompletionContext(
+            position,
+            out _));
+    }
+
+    [Theory]
     [InlineData("<Button Content=|{ViewModel.User}/>")]
     [InlineData("<Button Content={ViewModel.User}|/>")]
     [InlineData("<Button Content=\"ViewModel.Us|er\"/>")]
@@ -258,6 +419,27 @@ public sealed class WorkspaceSyntacticDocumentTests
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
             "Component.akbura");
+
+        Assert.False(document.TryGetCSharpCompletionContext(
+            position,
+            out _));
+    }
+
+    [Fact]
+    public void SyntacticDocument_AkcssDoesNotProjectEmbeddedCSharp()
+    {
+        const string sourceWithCaret = """
+            @utilities {
+                Control.w-(double value) {
+                    Width: Math.M|;
+                }
+            }
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
 
         Assert.False(document.TryGetCSharpCompletionContext(
             position,

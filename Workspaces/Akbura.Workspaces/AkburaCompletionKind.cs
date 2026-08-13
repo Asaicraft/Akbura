@@ -14,4 +14,5 @@ public enum AkburaCompletionKind
     Command,
     MarkupExtension,
     TailwindUtility,
+    Keyword,
 }

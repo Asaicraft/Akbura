@@ -29,6 +29,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImmutableArray<char>
         TailwindUtilityCommitCharacters = [' ', '\t', '\n'];
 
+    private static readonly ImmutableArray<char>
+        KeywordCommitCharacters = [' ', '\t', '\n'];
+
     private static readonly ImageElement ComponentIcon =
         CreateImageElement(KnownMonikers.Class, "Component");
 
@@ -56,6 +59,11 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImageElement TailwindUtilityIcon =
         CreateImageElement(KnownMonikers.Property, "AKCSS utility");
 
+    private static readonly ImageElement KeywordIcon =
+        CreateImageElement(
+            KnownMonikers.IntellisenseKeyword,
+            "Keyword");
+
     private static readonly CompletionFilter ComponentFilter =
         new("Components", "C", ComponentIcon);
 
@@ -76,6 +84,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
     private static readonly CompletionFilter TailwindUtilityFilter =
         new("AKCSS utilities", "U", TailwindUtilityIcon);
+
+    private static readonly CompletionFilter KeywordFilter =
+        new("Keywords", "K", KeywordIcon);
 
     private static readonly ImmutableArray<CompletionFilter>
         ComponentFilters = [ComponentFilter];
@@ -98,6 +109,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImmutableArray<CompletionFilter>
         TailwindUtilityFilters = [TailwindUtilityFilter];
 
+    private static readonly ImmutableArray<CompletionFilter>
+        KeywordFilters = [KeywordFilter];
+
     private static readonly ImmutableArray<CompletionFilterWithState>
         CompletionFilters =
         [
@@ -108,6 +122,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             new(CommandFilter, isAvailable: true),
             new(MarkupExtensionFilter, isAvailable: true),
             new(TailwindUtilityFilter, isAvailable: true),
+            new(KeywordFilter, isAvailable: true),
         ];
 
     private readonly ITextBuffer _buffer;
@@ -221,6 +236,18 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         cancellationToken.ThrowIfCancellationRequested();
 
         stageTimer.Restart();
+        var syntaxContext =
+            syntacticDocument.GetCompletionContext(
+                position,
+                cancellationToken);
+        TracePerformance("Syntax context", stageTimer.Elapsed);
+
+        Debug.WriteLine(
+            $"[Akbura.Completion] Syntax context: " +
+            $"kind={syntaxContext.Kind}, " +
+            $"prefix='{syntaxContext.Prefix}'.");
+
+        stageTimer.Restart();
         if (syntacticDocument.TryGetCSharpCompletionContext(
                 position,
                 out var csharpContext,
@@ -228,6 +255,14 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         {
             var semanticContext = GetLatestSemanticContext(
                 snapshot);
+            var supplementalResult = syntaxContext.Kind ==
+                    AkburaCompletionContextKind.TopLevel
+                ? _completionService.GetCompletions(
+                    syntacticDocument,
+                    semanticContext: null,
+                    position,
+                    cancellationToken)
+                : default;
             TracePerformance(
                 "C# semantic context",
                 stageTimer.Elapsed);
@@ -239,6 +274,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                     syntacticDocument,
                     semanticContext,
                     csharpContext,
+                    trigger,
                     cancellationToken)
                 .ConfigureAwait(false);
             TracePerformance(
@@ -251,20 +287,16 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             return csharpResult is { } roslynResult
                 ? CreateRoslynCompletionContext(
                     roslynResult,
+                    supplementalResult,
                     cancellationToken)
-                : CreateIncompleteCompletionContext();
+                : supplementalResult.IsEmpty
+                    ? CreateIncompleteCompletionContext()
+                    : CreateCoreCompletionContext(
+                        snapshot,
+                        supplementalResult,
+                        isIncomplete: true,
+                        cancellationToken);
         }
-
-        stageTimer.Restart();
-        var syntaxContext =
-            syntacticDocument.GetCompletionContext(
-                position);
-        TracePerformance("Syntax context", stageTimer.Elapsed);
-
-        Debug.WriteLine(
-            $"[Akbura.Completion] Syntax context: " +
-            $"kind={syntaxContext.Kind}, " +
-            $"prefix='{syntaxContext.Prefix}'.");
 
         if (syntaxContext.IsDefault)
         {
@@ -290,85 +322,12 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         Debug.WriteLine(
             $"[Akbura.Completion] Core returned " +
             $"{result.Items.Length} items.");
-
-        var sourceSpan = result.ApplicableSpan;
-
-        if (sourceSpan.Start < 0 ||
-            sourceSpan.End > snapshot.Length)
-        {
-            Debug.WriteLine(
-                $"[Akbura.Completion] Invalid applicable span: " +
-                $"{sourceSpan}.");
-
-            return CompletionContext.Empty;
-        }
-
-        var snapshotSpan =
-            new SnapshotSpan(
-                snapshot,
-                new Span(
-                    sourceSpan.Start,
-                    sourceSpan.Length));
-
-        stageTimer.Restart();
-        var items =
-            ImmutableArray.CreateBuilder<CompletionItem>(
-                result.Items.Length);
-
-        foreach (var completion in result.Items)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var item =
-                new CompletionItem(
-                    displayText:
-                        completion.DisplayText,
-                    source:
-                        this,
-                    icon:
-                        GetIcon(completion.Kind),
-                    filters:
-                        GetFilters(completion.Kind),
-                    suffix:
-                        completion.Suffix,
-                    insertText:
-                        completion.InsertText,
-                    sortText:
-                        completion.SortText,
-                    filterText:
-                        completion.FilterText,
-                    automationText:
-                        completion.DisplayText,
-                    attributeIcons:
-                        ImmutableArray<ImageElement>.Empty,
-                    commitCharacters:
-                        GetCommitCharacters(
-                            completion.Kind),
-                    applicableToSpan:
-                        snapshotSpan,
-                    isCommittedAsSnippet:
-                        false,
-                    isPreselected:
-                        false);
-
-            item.Properties.AddProperty(
-                AkburaCompletionProperties.CoreItem,
-                completion);
-
-            items.Add(item);
-        }
-
-        Debug.WriteLine(
-            $"[Akbura.Completion] Returning " +
-            $"{items.Count} VS items.");
-
-        TracePerformance("VS item conversion", stageTimer.Elapsed);
         TracePerformance("Total", totalTimer.Elapsed);
-
-        return new CompletionContext(
-            items.ToImmutable(),
-            CompletionFilters,
-            result.IsIncomplete);
+        return CreateCoreCompletionContext(
+            snapshot,
+            result,
+            result.IsIncomplete,
+            cancellationToken);
     }
 
     public async Task<object> GetDescriptionAsync(
@@ -421,16 +380,21 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
     private CompletionContext CreateRoslynCompletionContext(
         AkburaRoslynCompletionResult result,
+        AkburaCompletionResult supplementalResult,
         CancellationToken cancellationToken)
     {
         var snapshot = result.State.HostSnapshot;
         var items = ImmutableArray.CreateBuilder<CompletionItem>(
-            result.List.ItemsList.Count);
+            result.List.ItemsList.Count +
+            supplementalResult.Items.Length);
 
         foreach (var completion in result.List.ItemsList)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!result.State.Projection.TryMapToHost(
+            // Auto-import and expanded items can edit generated C# outside
+            // the single source span that maps back to the Akbura document.
+            if (completion.IsComplexTextEdit ||
+                !result.State.Projection.TryMapToHost(
                     completion.Span,
                     out var hostSpan) ||
                 hostSpan.Start < 0 ||
@@ -470,14 +434,108 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             items.Add(item);
         }
 
+        if (!supplementalResult.IsEmpty &&
+            IsValidSpan(
+                snapshot,
+                supplementalResult.ApplicableSpan))
+        {
+            foreach (var completion in supplementalResult.Items)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (items.Any(item => string.Equals(
+                        item.DisplayText,
+                        completion.DisplayText,
+                        StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
+                items.Add(CreateCoreCompletionItem(
+                    snapshot,
+                    supplementalResult.ApplicableSpan,
+                    completion));
+            }
+        }
+
         Debug.WriteLine(
             $"[Akbura.Completion] Roslyn returned " +
             $"{items.Count} mapped items.");
 
         return new CompletionContext(
             items.ToImmutable(),
-            ImmutableArray<CompletionFilterWithState>.Empty,
+            supplementalResult.IsEmpty
+                ? ImmutableArray<CompletionFilterWithState>.Empty
+                : CompletionFilters,
             isIncomplete: false);
+    }
+
+    private CompletionContext CreateCoreCompletionContext(
+        ITextSnapshot snapshot,
+        AkburaCompletionResult result,
+        bool isIncomplete,
+        CancellationToken cancellationToken)
+    {
+        if (!IsValidSpan(snapshot, result.ApplicableSpan))
+        {
+            Debug.WriteLine(
+                $"[Akbura.Completion] Invalid applicable span: " +
+                $"{result.ApplicableSpan}.");
+            return CompletionContext.Empty;
+        }
+
+        var items = ImmutableArray.CreateBuilder<CompletionItem>(
+            result.Items.Length);
+        foreach (var completion in result.Items)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            items.Add(CreateCoreCompletionItem(
+                snapshot,
+                result.ApplicableSpan,
+                completion));
+        }
+
+        Debug.WriteLine(
+            $"[Akbura.Completion] Returning " +
+            $"{items.Count} VS items.");
+        return new CompletionContext(
+            items.ToImmutable(),
+            CompletionFilters,
+            isIncomplete);
+    }
+
+    private CompletionItem CreateCoreCompletionItem(
+        ITextSnapshot snapshot,
+        Microsoft.CodeAnalysis.Text.TextSpan sourceSpan,
+        AkburaCompletionItem completion)
+    {
+        var item = new CompletionItem(
+            displayText: completion.DisplayText,
+            source: this,
+            icon: GetIcon(completion.Kind),
+            filters: GetFilters(completion.Kind),
+            suffix: completion.Suffix,
+            insertText: completion.InsertText,
+            sortText: completion.SortText,
+            filterText: completion.FilterText,
+            automationText: completion.DisplayText,
+            attributeIcons: ImmutableArray<ImageElement>.Empty,
+            commitCharacters: GetCommitCharacters(completion.Kind),
+            applicableToSpan: new SnapshotSpan(
+                snapshot,
+                new Span(sourceSpan.Start, sourceSpan.Length)),
+            isCommittedAsSnippet: false,
+            isPreselected: false);
+        item.Properties.AddProperty(
+            AkburaCompletionProperties.CoreItem,
+            completion);
+        return item;
+    }
+
+    private static bool IsValidSpan(
+        ITextSnapshot snapshot,
+        Microsoft.CodeAnalysis.Text.TextSpan span)
+    {
+        return span.Start >= 0 && span.End <= snapshot.Length;
     }
 
     private static ImmutableArray<char> GetRoslynCommitCharacters(
@@ -620,6 +678,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityCommitCharacters,
 
+            AkburaCompletionKind.Keyword =>
+                KeywordCommitCharacters,
+
             _ => MemberCommitCharacters,
         };
     }
@@ -638,6 +699,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 MarkupExtensionIcon,
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityIcon,
+            AkburaCompletionKind.Keyword => KeywordIcon,
             _ => PropertyIcon,
         };
     }
@@ -652,11 +714,70 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         }
 
         var tags = item.Tags;
+        if (tags.Contains("ExtensionMethod"))
+        {
+            return CreateImageElement(
+                KnownMonikers.ExtensionMethod,
+                "Extension method");
+        }
+
         if (tags.Contains("Method"))
         {
             return CreateImageElement(
                 KnownMonikers.Method,
                 "Method");
+        }
+
+        if (tags.Contains("Property"))
+        {
+            return PropertyIcon;
+        }
+
+        if (tags.Contains("Local"))
+        {
+            return CreateImageElement(
+                KnownMonikers.LocalVariable,
+                "Local variable");
+        }
+
+        if (tags.Contains("Parameter"))
+        {
+            return ParameterIcon;
+        }
+
+        if (tags.Contains("Namespace"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Namespace,
+                "Namespace");
+        }
+
+        if (tags.Contains("Enum"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Enumeration,
+                "Enum");
+        }
+
+        if (tags.Contains("Delegate"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Delegate,
+                "Delegate");
+        }
+
+        if (tags.Contains("Constant"))
+        {
+            return CreateImageElement(
+                KnownMonikers.Constant,
+                "Constant");
+        }
+
+        if (tags.Contains("Keyword"))
+        {
+            return CreateImageElement(
+                KnownMonikers.IntellisenseKeyword,
+                "Keyword");
         }
 
         if (tags.Contains("Class"))
@@ -720,6 +841,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 MarkupExtensionFilters,
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityFilters,
+            AkburaCompletionKind.Keyword => KeywordFilters,
             _ => PropertyFilters,
         };
     }

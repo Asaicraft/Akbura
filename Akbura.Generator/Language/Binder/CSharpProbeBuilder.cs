@@ -38,16 +38,33 @@ internal sealed class CSharpProbeBuilder
         AkburaSyntax scope,
         CSharp.StatementSyntax statement)
     {
+        return CreateStatementProbe(
+            scope,
+            statement,
+            includeAllVisibleSymbols: false);
+    }
+
+    private CSharp.CompilationUnitSyntax CreateStatementProbe(
+        AkburaSyntax scope,
+        CSharp.StatementSyntax statement,
+        bool includeAllVisibleSymbols)
+    {
         var precedingLocals = GetPrecedingLocalDeclarations(scope);
+        var containingMethod = GetContainingComponentMethodProbe(scope);
+        var excludedNames = GetParameterNames(containingMethod);
         var analyzedBlock = CSharpProbeBinder.CreateProbeBlock(
             ImmutableArray<CSharp.StatementSyntax>.Empty,
             precedingLocals,
             statement);
-        var containingMethod = GetContainingComponentMethodProbe(scope);
-        var probeScope = _binder.CreateProbeScope(
-            scope,
-            analyzedBlock,
-            GetParameterNames(containingMethod));
+        var probeScope = includeAllVisibleSymbols
+            ? _binder.CreateCompletionProbeScope(
+                scope,
+                analyzedBlock,
+                excludedNames)
+            : _binder.CreateProbeScope(
+                scope,
+                analyzedBlock,
+                excludedNames);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 containingMethod?.ReturnType ??
                     CSharpSyntaxFactory.PredefinedType(
@@ -70,13 +87,6 @@ internal sealed class CSharpProbeBuilder
         CSharp.ExpressionSyntax expression,
         int relativePosition)
     {
-        if (relativePosition < 0 ||
-            relativePosition > expression.FullSpan.Length)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(relativePosition));
-        }
-
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
         var annotatedExpression = expression
@@ -86,34 +96,169 @@ internal sealed class CSharpProbeBuilder
             annotatedExpression,
             targetType: null,
             includeAllVisibleSymbols: true);
-        var normalizedRoot = root.NormalizeWhitespace();
-        var normalizedExpression = normalizedRoot
-            .GetAnnotatedNodes(annotation)
-            .OfType<CSharp.ExpressionSyntax>()
-            .Single();
-        root = normalizedRoot.ReplaceNode(
-            normalizedExpression,
-            annotatedExpression);
-        var projectedExpression = root
-            .GetAnnotatedNodes(annotation)
-            .OfType<CSharp.ExpressionSyntax>()
-            .Single();
-        var projectedSpan = projectedExpression.FullSpan;
-        var stateNames = root
-            .GetAnnotatedNodes(
-                CSharpProbeBinder.StateCompletionAnnotationKind)
-            .OfType<CSharp.VariableDeclaratorSyntax>()
-            .Select(static declarator =>
-                declarator.Identifier.ValueText)
-            .Where(static name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
-
-        return new CSharpProbeProjection(
+        return CreateProjection(
             root,
-            projectedSpan,
-            projectedSpan.Start + relativePosition,
-            stateNames);
+            annotatedExpression,
+            annotation,
+            relativePosition);
+    }
+
+    public CSharpProbeProjection CreateStatementProjection(
+        AkburaSyntax scope,
+        CSharp.StatementSyntax statement,
+        int relativePosition)
+    {
+        var annotation = new SyntaxAnnotation(
+            CompletionAnnotationKind);
+        var annotatedStatement = statement
+            .WithAdditionalAnnotations(annotation);
+        var root = CreateStatementProbe(
+            scope,
+            annotatedStatement,
+            includeAllVisibleSymbols: true);
+        return CreateProjection(
+            root,
+            annotatedStatement,
+            annotation,
+            relativePosition);
+    }
+
+    public CSharpProbeProjection CreateTypeProjection(
+        CSharp.TypeSyntax type,
+        int relativePosition)
+    {
+        var annotation = new SyntaxAnnotation(
+            CompletionAnnotationKind);
+        var annotatedType = type
+            .WithAdditionalAnnotations(annotation);
+        var declaration = CSharpSyntaxFactory.VariableDeclaration(
+                annotatedType)
+            .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
+                CSharpSyntaxFactory.VariableDeclarator(
+                    "__akbura_type_probe")));
+        var field = CSharpSyntaxFactory.FieldDeclaration(declaration)
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(
+                    CSharpSyntaxKind.PrivateKeyword)));
+        var root = _binder.CreateComponentProbeCompilationUnit(
+            ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(field),
+            "__AkburaTypeProbe");
+        return CreateProjection(
+            root,
+            annotatedType,
+            annotation,
+            relativePosition);
+    }
+
+    public CSharpProbeProjection CreateReturnTypeProjection(
+        CSharp.TypeSyntax type,
+        int relativePosition)
+    {
+        var annotation = new SyntaxAnnotation(
+            CompletionAnnotationKind);
+        var annotatedType = type
+            .WithAdditionalAnnotations(annotation);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                annotatedType,
+                "__akbura_return_type_probe")
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(
+                    CSharpSyntaxKind.PrivateKeyword)))
+            .WithBody(CSharpSyntaxFactory.Block(
+                CSharpSyntaxFactory.ThrowStatement(
+                    CSharpSyntaxFactory.LiteralExpression(
+                        CSharpSyntaxKind.NullLiteralExpression))));
+        var root = _binder.CreateComponentProbeCompilationUnit(
+            ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(method),
+            "__AkburaReturnTypeProbe");
+        return CreateProjection(
+            root,
+            annotatedType,
+            annotation,
+            relativePosition);
+    }
+
+    public CSharpProbeProjection CreateUsingDirectiveProjection(
+        UsingDirectiveSyntax usingSyntax,
+        int relativePosition)
+    {
+        var annotation = new SyntaxAnnotation(
+            CompletionAnnotationKind);
+        var type = usingSyntax.Name.ToCSharp();
+        var annotatedType = type
+            .WithAdditionalAnnotations(annotation);
+        var unannotatedUsing = usingSyntax.ToCSharp();
+        var currentUsing = CSharpSyntaxFactory.UsingDirective(
+            unannotatedUsing.GlobalKeyword,
+            unannotatedUsing.UsingKeyword,
+            unannotatedUsing.StaticKeyword,
+            unannotatedUsing.UnsafeKeyword,
+            unannotatedUsing.Alias,
+            annotatedType,
+            unannotatedUsing.SemicolonToken);
+        var usingDirectives = _binder.SemanticModel
+            .GetCSharpUsingDirectivesBefore(usingSyntax)
+            .Add(currentUsing);
+        var root = _binder.CreateComponentProbeCompilationUnit(
+            ImmutableArray<CSharp.MemberDeclarationSyntax>.Empty,
+            "__AkburaUsingProbe",
+            usingDirectives);
+        return CreateProjection(
+            root,
+            annotatedType,
+            annotation,
+            relativePosition);
+    }
+
+    public CSharpProbeProjection CreateCommandParameterProjection(
+        CommandDeclarationSyntax command,
+        CSharp.ParameterListSyntax parameters,
+        int relativePosition)
+    {
+        var annotation = new SyntaxAnnotation(
+            CompletionAnnotationKind);
+        var annotatedParameters = parameters
+            .WithAdditionalAnnotations(annotation);
+        CSharp.TypeSyntax returnType;
+        try
+        {
+            returnType = command.ReturnType.ToCSharp();
+        }
+        catch (InvalidOperationException)
+        {
+            returnType = CSharpSyntaxFactory.PredefinedType(
+                CSharpSyntaxFactory.Token(
+                    CSharpSyntaxKind.VoidKeyword));
+        }
+        catch (ArgumentException)
+        {
+            returnType = CSharpSyntaxFactory.PredefinedType(
+                CSharpSyntaxFactory.Token(
+                    CSharpSyntaxKind.VoidKeyword));
+        }
+        catch (InvalidCastException)
+        {
+            returnType = CSharpSyntaxFactory.PredefinedType(
+                CSharpSyntaxFactory.Token(
+                    CSharpSyntaxKind.VoidKeyword));
+        }
+
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                returnType,
+                "__akbura_command_probe")
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(
+                    CSharpSyntaxKind.PrivateKeyword)))
+            .WithParameterList(annotatedParameters)
+            .WithBody(CSharpSyntaxFactory.Block());
+        var root = _binder.CreateComponentProbeCompilationUnit(
+            ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(method),
+            "__AkburaCommandProbe");
+        return CreateProjection(
+            root,
+            annotatedParameters,
+            annotation,
+            relativePosition);
     }
 
     private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
@@ -200,6 +345,50 @@ internal sealed class CSharpProbeBuilder
             .Where(static name =>
                 !string.IsNullOrWhiteSpace(name))
             .ToImmutableArray();
+    }
+
+    private static CSharpProbeProjection CreateProjection<TNode>(
+        CSharp.CompilationUnitSyntax root,
+        TNode sourceNode,
+        SyntaxAnnotation annotation,
+        int relativePosition)
+        where TNode : SyntaxNode
+    {
+        if (relativePosition < 0 ||
+            relativePosition > sourceNode.FullSpan.Length)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(relativePosition));
+        }
+
+        var normalizedRoot = root.NormalizeWhitespace();
+        var normalizedNode = normalizedRoot
+            .GetAnnotatedNodes(annotation)
+            .OfType<TNode>()
+            .Single();
+        root = normalizedRoot.ReplaceNode(
+            normalizedNode,
+            sourceNode);
+        var projectedNode = root
+            .GetAnnotatedNodes(annotation)
+            .OfType<TNode>()
+            .Single();
+        var stateNames = root
+            .GetAnnotatedNodes(
+                CSharpProbeBinder.StateCompletionAnnotationKind)
+            .OfType<CSharp.VariableDeclaratorSyntax>()
+            .Select(static declarator =>
+                declarator.Identifier.ValueText)
+            .Where(static name =>
+                !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+
+        return new CSharpProbeProjection(
+            root,
+            projectedNode.FullSpan,
+            projectedNode.FullSpan.Start + relativePosition,
+            stateNames);
     }
 
     private static CSharp.MethodDeclarationSyntax?

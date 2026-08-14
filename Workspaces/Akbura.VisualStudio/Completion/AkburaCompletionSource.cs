@@ -28,6 +28,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         MarkupExtensionCommitCharacters = [' ', '\t', '\n'];
 
     private static readonly ImmutableArray<char>
+        AkcssModuleCommitCharacters = [';', '\t', '\n'];
+
+    private static readonly ImmutableArray<char>
         TailwindUtilityCommitCharacters = [' ', '\t', '\n'];
 
     private static readonly ImmutableArray<char>
@@ -57,6 +60,11 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly ImageElement MarkupExtensionIcon =
         CreateImageElement(KnownMonikers.Extension, "Markup extension");
 
+    private static readonly ImageElement AkcssModuleIcon =
+        CreateImageElement(
+            AkburaCompletionImageMonikers.AkcssModule,
+            "AKCSS module");
+
     private static readonly ImageElement TailwindUtilityIcon =
         CreateImageElement(KnownMonikers.Property, "AKCSS utility");
 
@@ -83,6 +91,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private static readonly CompletionFilter MarkupExtensionFilter =
         new("Markup extensions", "X", MarkupExtensionIcon);
 
+    private static readonly CompletionFilter AkcssModuleFilter =
+        new("AKCSS modules", "S", AkcssModuleIcon);
+
     private static readonly CompletionFilter TailwindUtilityFilter =
         new("AKCSS utilities", "U", TailwindUtilityIcon);
 
@@ -108,6 +119,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         MarkupExtensionFilters = [MarkupExtensionFilter];
 
     private static readonly ImmutableArray<CompletionFilter>
+        AkcssModuleFilters = [AkcssModuleFilter];
+
+    private static readonly ImmutableArray<CompletionFilter>
         TailwindUtilityFilters = [TailwindUtilityFilter];
 
     private static readonly ImmutableArray<CompletionFilter>
@@ -122,6 +136,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             new(EventFilter, isAvailable: true),
             new(CommandFilter, isAvailable: true),
             new(MarkupExtensionFilter, isAvailable: true),
+            new(AkcssModuleFilter, isAvailable: true),
             new(TailwindUtilityFilter, isAvailable: true),
             new(KeywordFilter, isAvailable: true),
         ];
@@ -259,14 +274,21 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         {
             var semanticContext = GetLatestSemanticContext(
                 snapshot);
-            var supplementalResult = syntaxContext.Kind ==
-                    AkburaCompletionContextKind.TopLevel
+            var supplementalResult = csharpContext.Kind ==
+                    AkburaCSharpCompletionContextKind.UsingDirectiveName
                 ? _completionService.GetCompletions(
                     syntacticDocument,
-                    semanticContext: null,
+                    semanticContext,
                     position,
                     cancellationToken)
-                : default;
+                : syntaxContext.Kind ==
+                    AkburaCompletionContextKind.TopLevel
+                    ? _completionService.GetCompletions(
+                        syntacticDocument,
+                        semanticContext: null,
+                        position,
+                        cancellationToken)
+                    : default;
             AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                 "C# semantic context",
                 stageTimer.Elapsed);
@@ -292,6 +314,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 ? CreateRoslynCompletionContext(
                     roslynResult,
                     supplementalResult,
+                    csharpContext.Kind,
                     cancellationToken)
                 : supplementalResult.IsEmpty
                     ? CreateIncompleteCompletionContext()
@@ -386,6 +409,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private CompletionContext CreateRoslynCompletionContext(
         AkburaRoslynCompletionResult result,
         AkburaCompletionResult supplementalResult,
+        AkburaCSharpCompletionContextKind csharpContextKind,
         CancellationToken cancellationToken)
     {
         var snapshot = result.State.HostSnapshot;
@@ -442,6 +466,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             items.Add(item);
         }
 
+        var roslynItemCount = items.Count;
+
         if (!supplementalResult.IsEmpty &&
             IsValidSpan(
                 snapshot,
@@ -466,15 +492,15 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Completion,
-            $"Roslyn returned " +
-            $"{items.Count} mapped items.");
+            $"Combined completion contains {items.Count} mapped items " +
+            $"(Roslyn {roslynItemCount}, supplemental " +
+            $"{supplementalResult.Items.Length}).");
 
         return new CompletionContext(
             items.ToImmutable(),
-            supplementalResult.IsEmpty
-                ? ImmutableArray<CompletionFilterWithState>.Empty
-                : CompletionFilters,
-            isIncomplete: false);
+            ImmutableArray<CompletionFilterWithState>.Empty,
+            isIncomplete: csharpContextKind ==
+                AkburaCSharpCompletionContextKind.UsingDirectiveName);
     }
 
     private CompletionContext CreateCoreCompletionContext(
@@ -705,6 +731,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.MarkupExtension =>
                 MarkupExtensionCommitCharacters,
 
+            AkburaCompletionKind.AkcssModule =>
+                AkcssModuleCommitCharacters,
+
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityCommitCharacters,
 
@@ -727,6 +756,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.Command => CommandIcon,
             AkburaCompletionKind.MarkupExtension =>
                 MarkupExtensionIcon,
+            AkburaCompletionKind.AkcssModule =>
+                AkcssModuleIcon,
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityIcon,
             AkburaCompletionKind.Keyword => KeywordIcon,
@@ -869,6 +900,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.Command => CommandFilters,
             AkburaCompletionKind.MarkupExtension =>
                 MarkupExtensionFilters,
+            AkburaCompletionKind.AkcssModule =>
+                AkcssModuleFilters,
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityFilters,
             AkburaCompletionKind.Keyword => KeywordFilters,

@@ -116,6 +116,77 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void Completion_UsingOffersFullAkcssModuleName()
+    {
+        const string sourceWithCaret =
+            "using Gallery.Components.Sty|";
+        const string stylesSource = """
+            @utilities {
+            }
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceCompletionTests),
+            Guid.NewGuid().ToString("N"));
+        var componentsDirectory = Path.Combine(
+            directory,
+            "Components");
+        Directory.CreateDirectory(componentsDirectory);
+
+        try
+        {
+            var projectContext = new ProjectContext(
+                ProjectId.CreateNewId(),
+                Path.Combine(directory, "Gallery.csproj"),
+                directory,
+                "Gallery",
+                CreateCompilation(),
+                ImmutableArray<ProjectReference>.Empty);
+            using var workspace = new AkburaWorkspace(projectContext);
+            workspace.OpenOrChangeDocumentContext(
+                new Uri(Path.Combine(
+                    componentsDirectory,
+                    "Styles.akcss")),
+                SourceText.From(stylesSource));
+            var appPath = Path.Combine(directory, "App.akbura");
+            var text = SourceText.From(source);
+            var semanticContext =
+                workspace.OpenOrChangeDocumentContext(
+                    new Uri(appPath),
+                    text);
+            var syntacticDocument = AkburaSyntacticDocument.Parse(
+                text,
+                appPath);
+
+            var result = workspace.LanguageServices.Completion
+                .GetCompletions(
+                    syntacticDocument,
+                    semanticContext,
+                    position);
+
+            var item = Assert.Single(
+                result.Items,
+                static item => item.Kind ==
+                    AkburaCompletionKind.AkcssModule);
+            Assert.Equal(
+                "Gallery.Components.Styles.akcss",
+                item.DisplayText);
+            Assert.Equal(item.DisplayText, item.InsertText);
+            Assert.Equal(
+                "Gallery.Components.Sty",
+                syntacticDocument.Text.ToString(
+                    result.ApplicableSpan));
+            Assert.True(result.IsIncomplete);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Completion_ComponentNameUsesVisibleTypesAndComponents()
     {
         const string source = """
@@ -789,6 +860,19 @@ public sealed class WorkspaceCompletionTests
                 SourceText.From(stylesSource));
             var applicationProject = workspace.AddOrUpdateProject(
                 applicationContext);
+
+            const string importSource = "using Library.Sty";
+            var importResult = GetCompletionResult(
+                workspace,
+                applicationProject.Id,
+                Path.Combine(applicationDirectory, "App.akbura"),
+                importSource);
+            Assert.Contains(
+                importResult.Items,
+                static item =>
+                    item.DisplayText == "Library.Styles.akcss" &&
+                    item.InsertText == "Library.Styles.akcss" &&
+                    item.Kind == AkburaCompletionKind.AkcssModule);
 
             var result = GetCompletionResult(
                 workspace,
@@ -1690,6 +1774,22 @@ public sealed class WorkspaceCompletionTests
                 Kind: AkburaCSharpCompletionContextKind
                     .UsingDirectiveName,
                 Item: "Generic"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using |
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName,
+                Item: "System"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Akbura.|
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName,
+                Item: "Markup"),
             (
                 Source: """
                     global using System.Collections.Gen|;

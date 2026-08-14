@@ -13,6 +13,7 @@ public enum AkburaCompletionKind
     Event,
     Command,
     MarkupExtension,
+    AkcssModule,
     TailwindUtility,
     Keyword,
 }

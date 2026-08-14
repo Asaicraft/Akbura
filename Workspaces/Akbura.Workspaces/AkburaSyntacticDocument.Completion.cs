@@ -389,7 +389,12 @@ public sealed partial class AkburaSyntacticDocument
     {
         context = default;
         if (root is not AkburaDocumentSyntax document ||
-            IsInsideComment(root, position))
+            IsInsideComment(root, position) ||
+            TryGetEmbeddedCSharpContext(
+                position,
+                out var embeddedContext) &&
+            embeddedContext.Kind ==
+                AkburaCSharpCompletionContextKind.UsingDirectiveName)
         {
             return false;
         }

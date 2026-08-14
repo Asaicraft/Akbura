@@ -54,6 +54,49 @@ internal sealed class AkburaReferencedModule
         return builder.ToImmutable();
     }
 
+    internal ImmutableArray<string> GetAkcssModuleNames()
+    {
+        using var builder = ImmutableArrayBuilder<string>.Rent();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var module in _akcssModules)
+        {
+            if (names.Add(module.MetadataName))
+            {
+                builder.Add(module.MetadataName);
+            }
+        }
+
+        if (_akcssModules.Length != 0)
+        {
+            return builder.ToImmutable();
+        }
+
+        foreach (var source in Manifest.Sources)
+        {
+            if (source.Kind != AkburaModuleSourceKind.Akcss)
+            {
+                continue;
+            }
+
+            foreach (var declaration in source.Declarations)
+            {
+                if (declaration.Kind != DeclarationKind.AkcssModule)
+                {
+                    continue;
+                }
+
+                var name = declaration.MetadataName ??
+                    source.SourceCodePath;
+                if (names.Add(name))
+                {
+                    builder.Add(name);
+                }
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
     internal bool IsSyntaxTreeMaterialized(string sourceCodePath)
     {
         if (!_lazyEmbeddedData.IsValueCreated)

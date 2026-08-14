@@ -158,6 +158,9 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("void Update()\n{\n    st|\n}")]
     [InlineData("// st|")]
     [InlineData("/* st| */")]
+    [InlineData("using |")]
+    [InlineData("using Akbura.|")]
+    [InlineData("global using Akbura.|")]
     public void SyntacticDocument_DoesNotCompleteStateOutsideTopLevelStart(
         string sourceWithCaret)
     {
@@ -347,6 +350,14 @@ public sealed class WorkspaceSyntacticDocumentTests
         "using System.Collections.Gen|;",
         AkburaCSharpCompletionContextKind.UsingDirectiveName,
         "System.Collections.Gen")]
+    [InlineData(
+        "using Akbura.|",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "Akbura.")]
+    [InlineData(
+        "using Akbura.|;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "Akbura.")]
     [InlineData(
         "using Alias = System.Collections.Gen|;",
         AkburaCSharpCompletionContextKind.UsingDirectiveName,

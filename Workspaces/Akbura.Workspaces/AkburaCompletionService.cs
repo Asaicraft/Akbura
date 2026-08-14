@@ -3,6 +3,7 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
@@ -29,6 +30,20 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (document.TryGetCSharpCompletionContext(
+                position,
+                out var csharpContext,
+                cancellationToken) &&
+            csharpContext.Kind ==
+                AkburaCSharpCompletionContextKind.UsingDirectiveName)
+        {
+            return CreateAkcssModuleImportResult(
+                document,
+                semanticContext,
+                csharpContext,
+                cancellationToken);
+        }
+
         var syntaxContext = document.GetCompletionContext(
             position,
             cancellationToken);
@@ -152,6 +167,71 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     "Declares component state.",
                     descriptionFactory: null,
                     priority: 0)));
+    }
+
+    private static AkburaCompletionResult CreateAkcssModuleImportResult(
+        AkburaSyntacticDocument document,
+        AkburaDocumentContext? semanticContext,
+        AkburaCSharpCompletionContext context,
+        CancellationToken cancellationToken)
+    {
+        var applicableSpan = TextSpan.FromBounds(
+            context.HostSpan.Start,
+            context.HostPosition);
+        var usingDirective = document.SyntaxTree
+            .GetRootSyntax()
+            .DescendantNodes()
+            .OfType<UsingDirectiveSyntax>()
+            .FirstOrDefault(candidate =>
+                candidate.FullSpan == context.OwnerSpan);
+        if (usingDirective == null ||
+            usingDirective.Alias != null ||
+            usingDirective.StaticKeyword.RawKind != 0 ||
+            usingDirective.UnsafeKeyword.RawKind != 0 ||
+            semanticContext == null)
+        {
+            return new AkburaCompletionResult(
+                applicableSpan,
+                ImmutableArray<AkburaCompletionItem>.Empty,
+                isIncomplete: true);
+        }
+
+        var prefix = document.Text.ToString(applicableSpan);
+        using var items =
+            ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
+        foreach (var name in semanticContext.Project.Compilation
+                     .GetAvailableAkcssModuleNames(cancellationToken)
+                     .OrderBy(
+                         static name => name,
+                         StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!MatchesPrefix(name, prefix))
+            {
+                continue;
+            }
+
+            const int priority = 5;
+            items.Add(new AkburaCompletionItem(
+                name,
+                name,
+                AkburaCompletionKind.AkcssModule,
+                $"Imports AKCSS module '{name}'.",
+                descriptionFactory: null,
+                filterText: name,
+                sortText: $"{priority:D2}_{name}",
+                suffix: "AKCSS module",
+                priority: priority));
+            if (items.Count == MaximumCompletionItems)
+            {
+                break;
+            }
+        }
+
+        return new AkburaCompletionResult(
+            applicableSpan,
+            items.ToImmutable(),
+            isIncomplete: true);
     }
 
     private static ImmutableArray<AkburaCompletionItem>

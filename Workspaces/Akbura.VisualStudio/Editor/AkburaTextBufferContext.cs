@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Threading;
-using System.Diagnostics;
 
 namespace Akbura.VisualStudio.Editor;
 
@@ -102,10 +101,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
     /// </summary>
     private int _disposeState;
 
-#if DEBUG
     private long _enqueueCount;
-    private long _processingCount;
-#endif
 
     public AkburaTextBufferContext(
         ITextBuffer textBuffer,
@@ -407,14 +403,11 @@ internal sealed class AkburaTextBufferContext : IDisposable
         Interlocked.Exchange(
             ref _pendingRequest,
             request);
-#if DEBUG
-        var enqueueCount = Interlocked.Increment(ref _enqueueCount);
-
-        Debug.WriteLine(
-            $"[Akbura] Enqueue #{enqueueCount}, " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Enqueue #{Interlocked.Increment(ref _enqueueCount)}, " +
             $"request={requestVersion}, " +
             $"snapshot={snapshot.Version.VersionNumber}");
-#endif
 
         CancelActiveParse();
         EnsureWorker();
@@ -528,8 +521,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                $"[Akbura] Project warm-up failed: {exception}");
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Project warm-up failed: {exception}");
         }
     }
 
@@ -620,7 +614,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
             /*
              * A worker failure must not terminate Visual Studio editing.
              */
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Akbura update worker failed: " +
                 $"{exception}");
         }
@@ -761,7 +756,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Akbura background processing failed: " +
                 $"{exception}");
         }
@@ -821,7 +817,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Akbura syntactic classification failed: " +
                 $"{exception}");
 
@@ -843,8 +840,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
             if (projectId is not { } resolvedProjectId)
             {
-                Debug.WriteLine(
-                    "[Akbura] Semantic state deferred: " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Workspace,
+                    "Semantic state deferred: " +
                     "the owning Roslyn project is not available yet.");
                 return null;
             }
@@ -856,8 +854,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 changes: null,
                 cancellationToken);
 
-            Debug.WriteLine(
-                $"[Akbura] Document project: " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Document project: " +
                 $"assembly={context.Project.CSharpCompilation.AssemblyName}, " +
                 $"trees={context.Project.CSharpCompilation.SyntaxTrees.Count()}, " +
                 $"references={context.Project.CSharpCompilation.References.Count()}");
@@ -960,8 +959,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         previous),
                     previous))
             {
-                Debug.WriteLine(
-                    $"[Akbura.Completion] Document context published: " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Completion,
+                    $"Document context published: " +
                     $"request={state.RequestVersion}, " +
                     $"snapshot={state.Snapshot.Version.VersionNumber}.");
                 DocumentContextPublished?.Invoke();
@@ -1155,7 +1155,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Akbura buffer disposal notification failed: " +
                 $"{exception}");
         }

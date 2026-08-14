@@ -81,7 +81,12 @@ internal class ObjectPool<T> where T : class
                 // If you are seeing this message it means that object has been allocated from the pool 
                 // and has not been returned back. This is not critical, but turns pool into rather 
                 // inefficient kind of "new".
-                Debug.WriteLine($"TRACEOBJECTPOOLLEAKS_BEGIN\nPool detected potential leaking of {typeof(T)}. \n Location of the leak: \n {GetTrace()} TRACEOBJECTPOOLLEAKS_END");
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.ObjectPool,
+                    $"TRACEOBJECTPOOLLEAKS_BEGIN\n" +
+                    $"Pool detected potential leaking of {typeof(T)}. " +
+                    $"\n Location of the leak: \n {trace} " +
+                    $"TRACEOBJECTPOOLLEAKS_END");
             }
         }
     }
@@ -233,7 +238,12 @@ internal class ObjectPool<T> where T : class
         else
         {
             var trace = CaptureStackTrace();
-            Debug.WriteLine($"TRACEOBJECTPOOLLEAKS_BEGIN\nObject of type {typeof(T)} was freed, but was not from pool. \n Callstack: \n {trace} TRACEOBJECTPOOLLEAKS_END");
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.ObjectPool,
+                $"TRACEOBJECTPOOLLEAKS_BEGIN\n" +
+                $"Object of type {typeof(T)} was freed, " +
+                $"but was not from pool. \n Callstack: \n {trace} " +
+                $"TRACEOBJECTPOOLLEAKS_END");
         }
 
         if (replacement != null)

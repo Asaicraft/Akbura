@@ -1,7 +1,6 @@
 using Akbura.Language;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
-using System.Diagnostics;
 
 namespace Akbura.Workspaces;
 
@@ -86,13 +85,16 @@ public sealed class AkburaDocumentSnapshot
             throw new ArgumentNullException(nameof(newText));
         }
 
-        Debug.WriteLine("[Akbura] Document.WithText: ContentEquals started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Document.WithText: ContentEquals started");
 
         var contentEquals =
         newText.ContentEquals(Text);
 
-        Debug.WriteLine(
-            $"[Akbura] Document.WithText: ContentEquals completed, " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Document.WithText: ContentEquals completed, " +
             $"equal={contentEquals}");
 
         if (contentEquals)
@@ -102,7 +104,9 @@ public sealed class AkburaDocumentSnapshot
                 : WithOpenState(isOpen: true);
         }
 
-        Debug.WriteLine("[Akbura] Document.WithText: WithChangedText started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Document.WithText: WithChangedText started");
 
         var syntaxTree =
             WithChangedText(
@@ -111,7 +115,9 @@ public sealed class AkburaDocumentSnapshot
                 changes,
                 cancellationToken);
 
-        Debug.WriteLine("[Akbura] Document.WithText: WithChangedText completed");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Document.WithText: WithChangedText completed");
 
         return new AkburaDocumentSnapshot(
             Id,

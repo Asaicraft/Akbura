@@ -3,7 +3,6 @@ using Akbura.Workspaces;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Classification;
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace Akbura.VisualStudio.Classification;
 
@@ -139,7 +138,8 @@ internal sealed class AkburaClassifier : IClassifier
              * Snapshot translation can fail only when the editor version
              * chain is no longer compatible. It must not break editing.
              */
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Classification,
                 $"Akbura span translation failed: " +
                 $"{exception}");
 
@@ -150,7 +150,8 @@ internal sealed class AkburaClassifier : IClassifier
             /*
              * A classifier failure must never break an editor command.
              */
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Classification,
                 $"Akbura classification failed: " +
                 $"{exception}");
 

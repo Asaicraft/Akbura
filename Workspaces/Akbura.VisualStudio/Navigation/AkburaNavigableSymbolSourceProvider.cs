@@ -90,13 +90,13 @@ internal sealed class AkburaNavigableSymbolSourceProvider :
                 "<untitled>";
         }
 
-        AkburaNavigationTrace.Write(
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Navigation,
             $"Provider created: " +
             $"file='{filePath}', " +
             $"contentType='{buffer.ContentType.TypeName}', " +
             $"snapshot={buffer.CurrentSnapshot.Version.VersionNumber}, " +
-            $"length={buffer.CurrentSnapshot.Length}, " +
-            $"log='{AkburaNavigationTrace.LogFilePath}'.");
+            $"length={buffer.CurrentSnapshot.Length}.");
 
         /*
          * The classifier and navigation provider share the same

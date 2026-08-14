@@ -1,8 +1,8 @@
 using Akbura.VisualStudio.CSharp;
 using Akbura.VisualStudio.Editor;
+using Akbura.Workspaces;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
-using System.Diagnostics;
 using RoslynQuickInfoService =
     Microsoft.CodeAnalysis.QuickInfo.QuickInfoService;
 using VisualStudioQuickInfoItem =
@@ -134,8 +134,9 @@ internal sealed class AkburaQuickInfoSource : IAsyncQuickInfoSource
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                "[Akbura.QuickInfo] Projected C# Quick Info failed: " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.QuickInfo,
+                "Projected C# Quick Info failed: " +
                 exception);
             return null;
         }

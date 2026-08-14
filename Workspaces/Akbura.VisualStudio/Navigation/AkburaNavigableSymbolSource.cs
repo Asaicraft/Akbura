@@ -2,7 +2,6 @@
 using Akbura.Workspaces;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
-using System.Diagnostics;
 
 namespace Akbura.VisualStudio.Navigation;
 
@@ -54,7 +53,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             SnapshotSpan triggerSpan,
             CancellationToken cancellationToken)
     {
-        AkburaNavigationTrace.Write(
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Navigation,
             $"Query received: " +
             $"trigger={triggerSpan.Start.Position}, " +
             $"length={triggerSpan.Length}, " +
@@ -64,7 +64,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
         if (Volatile.Read(
                 ref _disposeState) != 0)
         {
-            AkburaNavigationTrace.Write(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
                 "Query ignored: source is disposed.");
             return null;
         }
@@ -76,7 +77,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                         triggerSpan.Snapshot,
                         out var state))
             {
-                AkburaNavigationTrace.Write(
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Navigation,
                     "Query failed: no semantic buffer state " +
                     "has been published yet.");
                 return null;
@@ -90,7 +92,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             if (parsedTriggerSpan.Start.Position >=
                 state.Snapshot.Length)
             {
-                AkburaNavigationTrace.Write(
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Navigation,
                     $"Query failed: translated position " +
                     $"{parsedTriggerSpan.Start.Position} is outside " +
                     $"semantic snapshot length " +
@@ -101,7 +104,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             var parsedPosition =
                 parsedTriggerSpan.Start.Position;
 
-            AkburaNavigationTrace.Write(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
                 $"Semantic state found: " +
                 $"file='{state.Context.Document.FilePath}', " +
                 $"assembly='{state.Context.Project.CSharpCompilation.AssemblyName}', " +
@@ -125,7 +129,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                 Volatile.Read(
                     ref _disposeState) != 0)
             {
-                AkburaNavigationTrace.Write(
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Navigation,
                     definition == null
                         ? "Query failed: definition service returned null."
                         : "Query cancelled after definition lookup.");
@@ -136,14 +141,16 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                     definition,
                     state.Snapshot))
             {
-                AkburaNavigationTrace.Write(
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Navigation,
                     $"Query failed: definition source span " +
                     $"{definition.SourceSpan} is invalid for " +
                     $"snapshot length {state.Snapshot.Length}.");
                 return null;
             }
 
-            AkburaNavigationTrace.Write(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
                 $"Definition found: " +
                 $"sourceSpan={definition.SourceSpan}, " +
                 $"target='{definition.TargetFilePath}', " +
@@ -165,12 +172,14 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
 
             if (currentSymbolSpan.Length == 0)
             {
-                AkburaNavigationTrace.Write(
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Navigation,
                     "Query failed: translated symbol span is empty.");
                 return null;
             }
 
-            AkburaNavigationTrace.Write(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
                 $"Navigable symbol returned: " +
                 $"span={currentSymbolSpan.Start.Position}.." +
                 $"{currentSymbolSpan.End.Position}.");
@@ -185,7 +194,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             when (cancellationToken
                 .IsCancellationRequested)
         {
-            AkburaNavigationTrace.Write(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
                 "Query cancelled by Visual Studio.");
             throw;
         }
@@ -195,12 +205,9 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
              * Snapshot translation can fail when the editor no longer
              * retains a compatible version chain.
              */
-            Debug.WriteLine(
-                $"[Akbura] Definition span translation failed: " +
-                $"{exception}");
-
-            AkburaNavigationTrace.Write(
-                "Query failed while translating editor spans.",
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                "Definition span translation failed.",
                 exception);
 
             return null;
@@ -210,12 +217,9 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             /*
              * A navigation lookup failure must not break the editor.
              */
-            Debug.WriteLine(
-                $"[Akbura] Definition lookup failed: " +
-                $"{exception}");
-
-            AkburaNavigationTrace.Write(
-                "Query failed with an exception.",
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                "Definition lookup failed.",
                 exception);
 
             return null;
@@ -348,7 +352,8 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
 
     public void Dispose()
     {
-        AkburaNavigationTrace.Write(
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Navigation,
             "Navigable symbol source disposed.");
 
         Interlocked.Exchange(

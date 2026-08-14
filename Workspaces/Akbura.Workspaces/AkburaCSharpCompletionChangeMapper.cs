@@ -2,7 +2,6 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Text;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -74,8 +73,9 @@ internal static class AkburaCSharpCompletionChangeMapper
             }
 
             hasOutsideChanges = true;
-            Debug.WriteLine(
-                "[Akbura.Completion] Projected edit is outside a " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                "Projected edit is outside a " +
                 $"known mapping: {change.Span}.");
         }
 
@@ -191,8 +191,9 @@ internal static class AkburaCSharpCompletionChangeMapper
                 directRoot.WithUsings(default),
                 changedRoot.WithUsings(default)))
         {
-            Debug.WriteLine(
-                "[Akbura.Completion] Unsupported projected edit changed " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                "Unsupported projected edit changed " +
                 "the generated C# wrapper.");
             return false;
         }
@@ -205,8 +206,9 @@ internal static class AkburaCSharpCompletionChangeMapper
             .ToImmutableArray();
         if (!IsSubsequence(oldKeys, newKeys))
         {
-            Debug.WriteLine(
-                "[Akbura.Completion] Unsupported projected edit removed, " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                "Unsupported projected edit removed, " +
                 "rewrote, or reordered a using directive.");
             return false;
         }
@@ -227,8 +229,9 @@ internal static class AkburaCSharpCompletionChangeMapper
                 key.Alias != null ||
                 string.IsNullOrWhiteSpace(key.Name))
             {
-                Debug.WriteLine(
-                    "[Akbura.Completion] Unsupported auto-import using: " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Completion,
+                    "Unsupported auto-import using: " +
                     key.Name);
                 return false;
             }
@@ -238,8 +241,9 @@ internal static class AkburaCSharpCompletionChangeMapper
 
         if (added.Count == 0)
         {
-            Debug.WriteLine(
-                "[Akbura.Completion] Projected changes outside known " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                "Projected changes outside known " +
                 "mappings did not add a supported using directive.");
             return false;
         }

@@ -2,7 +2,6 @@ using Akbura.Workspaces;
 using Akbura.VisualStudio.CSharp;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Text;
-using System.Diagnostics;
 using RoslynCompletionItem =
     Microsoft.CodeAnalysis.Completion.CompletionItem;
 using RoslynCompletionList =
@@ -72,8 +71,9 @@ internal sealed class AkburaRoslynCompletionService
             RoslynCompletionService.GetService(document);
         if (completionService == null)
         {
-            Debug.WriteLine(
-                "[Akbura.Completion] Roslyn completion service was not found.");
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                "Roslyn completion service was not found.");
             return null;
         }
 
@@ -91,13 +91,15 @@ internal sealed class AkburaRoslynCompletionService
             .ConfigureAwait(false);
         if (completionList == null)
         {
-            Debug.WriteLine(
-                "[Akbura.Completion] Roslyn returned no completion list.");
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                "Roslyn returned no completion list.");
             return null;
         }
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Roslyn returned " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Roslyn returned " +
             $"{completionList.ItemsList.Count} raw items.");
 
         var state = new AkburaRoslynCompletionSessionState(

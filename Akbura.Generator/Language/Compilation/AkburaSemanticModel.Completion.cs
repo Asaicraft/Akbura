@@ -205,7 +205,9 @@ internal partial class AkburaSemanticModel
                 static candidate => candidate.DisplayName,
                 StringComparer.Ordinal)
             .ToImmutableArray();
-        TraceMarkupExtensionCatalogStage(timer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Markup extension catalog",
+            timer.Elapsed);
         return result;
     }
 
@@ -214,8 +216,8 @@ internal partial class AkburaSemanticModel
     {
         var timer = Stopwatch.StartNew();
         var visibleNamespaces = GetVisibleMarkupNamespaces();
-        TraceCompletionCatalogStage(
-            "visible namespaces",
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Component catalog visible namespaces",
             timer.Elapsed);
 
         timer.Restart();
@@ -225,8 +227,8 @@ internal partial class AkburaSemanticModel
         var csharpCompilation = Compilation.CSharpProbeCompilation;
         var akburaControlType = csharpCompilation.GetTypeByMetadataName(
             "Akbura.AkburaControl");
-        TraceCompletionCatalogStage(
-            "probe compilation",
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Component catalog probe compilation",
             timer.Elapsed);
 
         timer.Restart();
@@ -298,8 +300,8 @@ internal partial class AkburaSemanticModel
                 static candidate => candidate.DisplayName,
                 StringComparer.Ordinal)
             .ToImmutableArray();
-        TraceCompletionCatalogStage(
-            "namespace members",
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Component catalog namespace members",
             timer.Elapsed);
         return result;
     }
@@ -872,25 +874,6 @@ internal partial class AkburaSemanticModel
         }
 
         return false;
-    }
-
-    [Conditional("DEBUG")]
-    private static void TraceCompletionCatalogStage(
-        string stage,
-        TimeSpan elapsed)
-    {
-        Debug.WriteLine(
-            $"[Akbura.Completion.Performance] Component catalog " +
-            $"{stage}: {elapsed.TotalMilliseconds:F2} ms");
-    }
-
-    [Conditional("DEBUG")]
-    private static void TraceMarkupExtensionCatalogStage(
-        TimeSpan elapsed)
-    {
-        Debug.WriteLine(
-            $"[Akbura.Completion.Performance] Markup extension " +
-            $"catalog: {elapsed.TotalMilliseconds:F2} ms");
     }
 
     private static string GetTypeMetadataName(INamedTypeSymbol type)

@@ -7,7 +7,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using AkburaSymbol =
     Akbura.Language.Symbols.ISymbol;
 using AkburaPropertySymbol =
@@ -390,8 +389,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             GetTailwindUtilitySourceSpan(attribute);
         if (!sourceSpan.Contains(position))
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility span " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility span " +
                 $"{sourceSpan} does not contain position " +
                 $"{position}.");
             return null;
@@ -402,8 +402,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         if (operation is not
             ITailwindUtilityAttributeOperation utilityOperation)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility operation was " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility operation was " +
                 $"not available for '{attribute}'; " +
                 $"actual operation: " +
                 $"'{operation?.GetType().FullName ?? "<null>"}'.");
@@ -426,14 +427,34 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         if (utilityOperation.Utility is not { } utility)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility " +
                 $"'{utilityOperation.UtilityName}' was not resolved; " +
                 $"candidate count: " +
                 $"{utilityOperation.Utilities.Length}, " +
                 $"operation errors: " +
                 $"{utilityOperation.HasErrors}.");
-            LogAkcssCompilationReferences(context);
+            AkburaWorkspaceDiagnostics.WriteAkcssCompilationReferences(
+                context.Project.Compilation.SyntaxTrees.Select(
+                    static tree => Path.GetFileName(tree.FilePath)),
+                context.Project.Compilation.GlobalAkburaUsingDirectives
+                    .Select(static directive =>
+                        directive.Name.ToFullString().Trim())
+                    .Where(static name => name.EndsWith(
+                        ".akcss",
+                        StringComparison.Ordinal)),
+                context.Project.Compilation.AkcssSyntaxTrees.Select(
+                    static tree => tree.LogicalName),
+                context.Project.Compilation.CompilationReferences.Select(
+                    static reference =>
+                    {
+                        var compilation = reference.Compilation;
+                        return
+                            $"assembly='{compilation.CSharpCompilation.AssemblyName}', " +
+                            $"rootNamespace='{compilation.RootNamespace}', " +
+                            $"AKCSS modules=[{string.Join(", ", compilation.AkcssSyntaxTrees.Select(static tree => tree.LogicalName))}]";
+                    }));
 
             utility = FindReferencedUtilityFallback(
                 context.Project.Compilation,
@@ -445,8 +466,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 return null;
             }
 
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility " +
                 $"'{utilityOperation.UtilityName}' was recovered " +
                 $"from project-reference syntax as " +
                 $"'{utility.MetadataName}'.");
@@ -461,45 +483,14 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         if (definition == null)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Definition target was " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Definition target was " +
                 $"not found for utility " +
                 $"'{utility.MetadataName}'.");
         }
 
         return definition;
-    }
-
-    private static void LogAkcssCompilationReferences(
-        AkburaDocumentContext context)
-    {
-#if DEBUG
-        var compilation = context.Project.Compilation;
-        Debug.WriteLine(
-            $"[Akbura.Navigation] Current component files: " +
-            $"[{string.Join(", ", compilation.SyntaxTrees.Select(static tree => Path.GetFileName(tree.FilePath)))}]; " +
-            $"global AKCSS imports: " +
-            $"[{string.Join(", ", compilation.GlobalAkburaUsingDirectives.Select(static directive => directive.Name.ToFullString().Trim()).Where(static name => name.EndsWith(".akcss", StringComparison.Ordinal)))}].");
-        Debug.WriteLine(
-            $"[Akbura.Navigation] Current AKCSS modules: " +
-            $"[{string.Join(", ", compilation.AkcssSyntaxTrees.Select(static tree => tree.LogicalName))}]; " +
-            $"compilation references: " +
-            $"{compilation.CompilationReferences.Length}.");
-
-        foreach (var reference in
-                 compilation.CompilationReferences)
-        {
-            var referencedCompilation =
-                reference.Compilation;
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Referenced project " +
-                $"'{referencedCompilation.CSharpCompilation.AssemblyName}', " +
-                $"rootNamespace=" +
-                $"'{referencedCompilation.RootNamespace}', " +
-                $"AKCSS modules=" +
-                $"[{string.Join(", ", referencedCompilation.AkcssSyntaxTrees.Select(static tree => tree.LogicalName))}].");
-        }
-#endif
     }
 
     private static ITailwindUtilitySymbol?
@@ -828,8 +819,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 apply) is not
             IAkcssApplyOperation operation)
         {
-            Debug.WriteLine(
-                "[Akbura.Navigation] @apply operation was " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                "@apply operation was " +
                 "not available.");
             return null;
         }
@@ -841,8 +833,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 out var item,
                 out var sourceSpan))
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] No @apply item contains " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"No @apply item contains " +
                 $"position {position}.");
             return null;
         }
@@ -860,8 +853,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         if (symbol == null)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] @apply item '{item}' " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"@apply item '{item}' " +
                 $"could not be resolved.");
             return null;
         }
@@ -875,8 +869,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         if (definition == null)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Definition target was " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Definition target was " +
                 $"not found for @apply item '{item}'.");
         }
 

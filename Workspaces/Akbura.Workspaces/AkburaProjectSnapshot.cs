@@ -2,7 +2,6 @@ using Akbura.Language;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace Akbura.Workspaces;
 
@@ -139,7 +138,9 @@ public sealed class AkburaProjectSnapshot
             throw new KeyNotFoundException($"Document '{document.Id}' was not found.");
         }
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: compilation started");
 
         var compilation =
             ReferenceEquals(
@@ -151,16 +152,22 @@ public sealed class AkburaProjectSnapshot
                         oldDocument.SyntaxTree,
                         document.SyntaxTree);
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation completed");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: compilation completed");
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: dictionary started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: dictionary started");
 
         var documents =
             Documents.SetItem(
                 document.Id,
                 document);
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: dictionary completed");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: dictionary completed");
 
         return new AkburaProjectSnapshot(
             Id,

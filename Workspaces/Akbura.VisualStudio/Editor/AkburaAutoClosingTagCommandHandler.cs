@@ -1,3 +1,4 @@
+using Akbura.Workspaces;
 using Microsoft.VisualStudio.Commanding;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
@@ -6,7 +7,6 @@ using Microsoft.VisualStudio.Text.Editor.Commanding.Commands;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.VisualStudio.Utilities;
 using System.ComponentModel.Composition;
-using System.Diagnostics;
 
 namespace Akbura.VisualStudio.Editor;
 
@@ -27,8 +27,9 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             throw new ArgumentNullException(
                 nameof(parserService));
 
-        Debug.WriteLine(
-            "[Akbura.AutoClose] Command handler created.");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+            "Command handler created.");
     }
 
     public string DisplayName =>
@@ -67,8 +68,9 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             caretPosition,
             PointTrackingMode.Positive);
 
-        Debug.WriteLine(
-            $"[Akbura.AutoClose] '>' received: " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+            $"'>' received: " +
             $"position={caretPosition}, " +
             $"snapshot={snapshot.Version.VersionNumber}.");
 
@@ -98,14 +100,16 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                 .GetAutoClosingTagText(caretPosition);
             if (closingTag == null)
             {
-                Debug.WriteLine(
-                    "[Akbura.AutoClose] No closing tag was " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                    "No closing tag was " +
                     "produced by the syntactic document.");
                 return;
             }
 
-            Debug.WriteLine(
-                $"[Akbura.AutoClose] Parsed closing tag " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                $"Parsed closing tag " +
                 $"'{closingTag}'.");
 
             await ThreadHelper.JoinableTaskFactory
@@ -113,8 +117,9 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
 
             if (args.TextView.IsClosed)
             {
-                Debug.WriteLine(
-                    "[Akbura.AutoClose] Text view was closed " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                    "Text view was closed " +
                     "before insertion.");
                 return;
             }
@@ -130,8 +135,9 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                     insertionPosition,
                     closingTag))
             {
-                Debug.WriteLine(
-                    "[Akbura.AutoClose] Matching closing tag " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                    "Matching closing tag " +
                     "already exists.");
                 return;
             }
@@ -148,8 +154,9 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                     insertionPosition,
                     closingTag))
             {
-                Debug.WriteLine(
-                    "[Akbura.AutoClose] Subject buffer rejected " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                    "Subject buffer rejected " +
                     "the insertion.");
                 return;
             }
@@ -166,14 +173,16 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                         insertionPosition));
             }
 
-            Debug.WriteLine(
-                $"[Akbura.AutoClose] Inserted '{closingTag}' " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                $"Inserted '{closingTag}' " +
                 $"at {insertionPosition}.");
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                "[Akbura] Automatic closing tag failed: " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                "Automatic closing tag failed: " +
                 exception);
         }
     }

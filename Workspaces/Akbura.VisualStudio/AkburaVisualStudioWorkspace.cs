@@ -76,12 +76,15 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 
         var stageTimer = Stopwatch.StartNew();
         var project = FindContainingProject(fullPath);
-        TracePerformance("FindContainingProject", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "FindContainingProject",
+            stageTimer.Elapsed);
 
         if (project == null)
         {
-            Debug.WriteLine(
-                $"[Akbura] Roslyn project was not found " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Roslyn project was not found " +
                 $"for '{fullPath}'.");
 
             return null;
@@ -96,7 +99,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 cancellationToken)
             .ConfigureAwait(false);
 
-        TracePerformance("Synchronization total", totalTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Synchronization total",
+            totalTimer.Elapsed);
 
         return synchronized
             ? new AkburaProjectId(project.Id.Id)
@@ -214,7 +219,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                     activeFilePath: null)
                 .ConfigureAwait(false);
         }
-        TracePerformance("Referenced projects", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Referenced projects",
+            stageTimer.Elapsed);
 
         stageTimer.Restart();
         var compilation =
@@ -222,13 +229,16 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 .GetCompilationAsync(
                     cancellationToken)
                 .ConfigureAwait(false);
-        TracePerformance("GetCompilationAsync", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "GetCompilationAsync",
+            stageTimer.Elapsed);
 
         if (compilation is not
             CSharpCompilation csharpCompilation)
         {
-            Debug.WriteLine(
-                $"[Akbura] C# compilation was not available " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"C# compilation was not available " +
                 $"for project '{project.Name}'.");
 
             return false;
@@ -242,7 +252,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 activeFilePath ??
                     project.FilePath ??
                     Environment.CurrentDirectory);
-        TracePerformance("CreateProjectContext", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "CreateProjectContext",
+            stageTimer.Elapsed);
 
         stageTimer.Restart();
         var akburaProject =
@@ -254,19 +266,20 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 activeFilePath,
                 cancellationToken)
             .ConfigureAwait(false);
-        TracePerformance(
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
             "SynchronizeAkburaDocumentsAsync",
             stageTimer.Elapsed);
 
-        Debug.WriteLine(
-            $"[Akbura] Roslyn project synchronized: " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Roslyn project synchronized: " +
             $"name={project.Name}, " +
             $"assembly={csharpCompilation.AssemblyName}, " +
             $"trees={csharpCompilation.SyntaxTrees.Count()}, " +
             $"references={csharpCompilation.References.Count()}, " +
             $"projectReferences={project.ProjectReferences.Count()}");
 
-        TracePerformance(
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
             "SynchronizeProjectAndReferencesAsync total",
             totalTimer.Elapsed);
         return true;
@@ -498,8 +511,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                             : 1)
                 .ToImmutableArray();
 
-        Debug.WriteLine(
-            $"[Akbura] Found {documents.Length} " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Found {documents.Length} " +
             $"Akbura documents in " +
             $"project '{project.Name}'.");
 
@@ -523,8 +537,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             inputs.ToImmutable(),
             cancellationToken);
 
-        Debug.WriteLine(
-            $"[Akbura] Synchronized {inputs.Count} " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Synchronized {inputs.Count} " +
             $"Akbura documents for " +
             $"project '{project.Name}'.");
 
@@ -669,8 +684,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                     sourcePath!,
                     out filePath))
             {
-                Debug.WriteLine(
-                    $"[Akbura] Embedded source resolved to " +
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Workspace,
+                    $"Embedded source resolved to " +
                     $"solution project file '{filePath}'.");
 
                 return true;
@@ -897,16 +913,6 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         }
     }
 #pragma warning restore VSTHRD003
-
-    [Conditional("DEBUG")]
-    private static void TracePerformance(
-        string stage,
-        TimeSpan elapsed)
-    {
-        Debug.WriteLine(
-            $"[Akbura.Completion.Performance] " +
-            $"{stage}: {elapsed.TotalMilliseconds:F2} ms");
-    }
 
     private sealed class ProjectSynchronizationState
     {

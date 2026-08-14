@@ -1,11 +1,11 @@
-using Akbura.VisualStudio.Editor;
 using Akbura.VisualStudio.CSharp;
+using Akbura.VisualStudio.Editor;
+using Akbura.Workspaces;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
 using System.ComponentModel.Composition;
-using System.Diagnostics;
 
 namespace Akbura.VisualStudio.Completion;
 
@@ -45,8 +45,9 @@ internal sealed class AkburaCompletionSourceProvider :
             throw new ArgumentNullException(
                 nameof(projectedDocumentService));
 
-        Debug.WriteLine(
-            "[Akbura.Completion] Source provider created.");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            "Source provider created.");
     }
 
     public IAsyncCompletionSource GetOrCreate(ITextView textView)
@@ -66,8 +67,9 @@ internal sealed class AkburaCompletionSourceProvider :
                 ".akbura",
                 StringComparison.OrdinalIgnoreCase);
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Source requested: " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Source requested: " +
             $"contentType='{buffer.ContentType.TypeName}', " +
             $"file='{textDocument?.FilePath ?? "<untitled>"}', " +
             $"isAkbura={isAkburaDocument}.");

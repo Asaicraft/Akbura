@@ -182,8 +182,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 .DoesNotParticipateInCompletion;
         }
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Participating: " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Participating: " +
             $"reason={trigger.Reason}, " +
             $"character='{trigger.Character}', " +
             $"position={triggerLocation.Position}, " +
@@ -222,8 +223,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         var position =
             triggerLocation.Position;
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Context requested: " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Context requested: " +
             $"position={position}, " +
             $"snapshot={snapshot.Version.VersionNumber}.");
 
@@ -232,7 +234,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             await _parserService
                 .GetSyntacticDocumentAsync(snapshot)
                 .ConfigureAwait(false);
-        TracePerformance("Syntax document", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Syntax document", stageTimer.Elapsed);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -241,10 +243,11 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             syntacticDocument.GetCompletionContext(
                 position,
                 cancellationToken);
-        TracePerformance("Syntax context", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Syntax context", stageTimer.Elapsed);
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Syntax context: " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Syntax context: " +
             $"kind={syntaxContext.Kind}, " +
             $"prefix='{syntaxContext.Prefix}'.");
 
@@ -264,7 +267,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                     position,
                     cancellationToken)
                 : default;
-            TracePerformance(
+            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                 "C# semantic context",
                 stageTimer.Elapsed);
 
@@ -278,10 +281,10 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                     trigger,
                     cancellationToken)
                 .ConfigureAwait(false);
-            TracePerformance(
+            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                 "Roslyn completion",
                 stageTimer.Elapsed);
-            TracePerformance(
+            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                 "Total",
                 totalTimer.Elapsed);
 
@@ -307,7 +310,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         stageTimer.Restart();
         var documentContext = GetLatestSemanticContext(
             snapshot);
-        TracePerformance("Semantic context", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Semantic context", stageTimer.Elapsed);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -318,12 +321,13 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 documentContext,
                 position,
                 cancellationToken);
-        TracePerformance("Core completion", stageTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Core completion", stageTimer.Elapsed);
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Core returned " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Core returned " +
             $"{result.Items.Length} items.");
-        TracePerformance("Total", totalTimer.Elapsed);
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Total", totalTimer.Elapsed);
         return CreateCoreCompletionContext(
             snapshot,
             result,
@@ -460,8 +464,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             }
         }
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Roslyn returned " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Roslyn returned " +
             $"{items.Count} mapped items.");
 
         return new CompletionContext(
@@ -480,8 +485,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     {
         if (!IsValidSpan(snapshot, result.ApplicableSpan))
         {
-            Debug.WriteLine(
-                $"[Akbura.Completion] Invalid applicable span: " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"Invalid applicable span: " +
                 $"{result.ApplicableSpan}.");
             return CompletionContext.Empty;
         }
@@ -497,8 +503,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 completion));
         }
 
-        Debug.WriteLine(
-            $"[Akbura.Completion] Returning " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Returning " +
             $"{items.Count} VS items.");
         return new CompletionContext(
             items.ToImmutable(),
@@ -867,16 +874,6 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaCompletionKind.Keyword => KeywordFilters,
             _ => PropertyFilters,
         };
-    }
-
-    [Conditional("DEBUG")]
-    private static void TracePerformance(
-        string stage,
-        TimeSpan elapsed)
-    {
-        Debug.WriteLine(
-            $"[Akbura.Completion.Performance] " +
-            $"{stage}: {elapsed.TotalMilliseconds:F2} ms");
     }
 
 }

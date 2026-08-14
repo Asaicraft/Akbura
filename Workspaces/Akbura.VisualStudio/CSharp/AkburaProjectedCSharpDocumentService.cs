@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Text;
 using System.ComponentModel.Composition;
-using System.Diagnostics;
 using System.Text;
 
 namespace Akbura.VisualStudio.CSharp;
@@ -44,8 +43,9 @@ internal sealed class AkburaProjectedCSharpDocumentService : IDisposable
 
         if (semanticContext == null)
         {
-            Debug.WriteLine(
-                "[Akbura.CSharp] Projection unavailable: no semantic " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.CSharp,
+                "Projection unavailable: no semantic " +
                 "project snapshot has been published yet.");
             return null;
         }
@@ -100,8 +100,9 @@ internal sealed class AkburaProjectedCSharpDocumentService : IDisposable
                 out var projection,
                 cancellationToken))
         {
-            Debug.WriteLine(
-                "[Akbura.CSharp] Projection could not be created for " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.CSharp,
+                "Projection could not be created for " +
                 "the current embedded C# fragment.");
             return null;
         }
@@ -111,8 +112,9 @@ internal sealed class AkburaProjectedCSharpDocumentService : IDisposable
             syntacticDocument.FilePath);
         if (project == null)
         {
-            Debug.WriteLine(
-                "[Akbura.CSharp] Roslyn project was not found for the " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.CSharp,
+                "Roslyn project was not found for the " +
                 "current Akbura document.");
             return null;
         }

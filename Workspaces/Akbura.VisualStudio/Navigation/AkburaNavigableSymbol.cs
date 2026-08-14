@@ -4,7 +4,6 @@ using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.TextManager.Interop;
-using System.Diagnostics;
 using System.Text;
 
 using VsTextSpan =
@@ -65,7 +64,8 @@ internal sealed class AkburaNavigableSymbol :
     public void Navigate(
         INavigableRelationship relationship)
     {
-        AkburaNavigationTrace.Write(
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Navigation,
             $"Navigate requested: " +
             $"relationship='{relationship.GetType().FullName}'.");
 
@@ -74,7 +74,8 @@ internal sealed class AkburaNavigableSymbol :
                 PredefinedNavigableRelationships
                     .Definition))
         {
-            AkburaNavigationTrace.Write(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
                 "Navigate ignored: unsupported relationship.");
             return;
         }
@@ -95,12 +96,9 @@ internal sealed class AkburaNavigableSymbol :
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                $"[Akbura] Navigation failed: " +
-                $"{exception}");
-
-            AkburaNavigationTrace.Write(
-                "Navigate failed with an exception.",
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                "Navigation failed.",
                 exception);
         }
     }
@@ -118,7 +116,8 @@ internal sealed class AkburaNavigableSymbol :
             ? projectSourcePath
             : _definition.TargetFilePath;
 
-        AkburaNavigationTrace.Write(
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Navigation,
             $"Navigation target selected: " +
             $"path='{filePath}', " +
             $"physicalProjectSource={hasPhysicalProjectSource}, " +
@@ -132,11 +131,8 @@ internal sealed class AkburaNavigableSymbol :
 
         if (!File.Exists(filePath))
         {
-            Debug.WriteLine(
-                $"[Akbura] Definition file was not found: " +
-                $"'{filePath}'.");
-
-            AkburaNavigationTrace.Write(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
                 $"Navigate failed: target file '{filePath}' " +
                 $"does not exist.");
 
@@ -188,7 +184,8 @@ internal sealed class AkburaNavigableSymbol :
             textView.EnsureSpanVisible(
                 visibleSpan));
 
-        AkburaNavigationTrace.Write(
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Navigation,
             $"Navigate completed: " +
             $"path='{filePath}', " +
             $"selection={start.Line}:{start.Character}.." +

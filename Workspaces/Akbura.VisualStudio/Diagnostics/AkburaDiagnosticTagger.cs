@@ -1,9 +1,9 @@
 using Akbura.Language.Syntax;
 using Akbura.VisualStudio.Editor;
+using Akbura.Workspaces;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
 using Microsoft.VisualStudio.Text.Tagging;
-using System.Diagnostics;
 
 namespace Akbura.VisualStudio.Diagnostics;
 
@@ -98,7 +98,8 @@ internal sealed class AkburaDiagnosticTagger :
         }
         catch (ArgumentException exception)
         {
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Diagnostics,
                 $"Akbura diagnostic span translation failed: " +
                 $"{exception}");
 
@@ -107,7 +108,8 @@ internal sealed class AkburaDiagnosticTagger :
         catch (Exception exception)
         {
             // A tagger failure must never break an editor command.
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Diagnostics,
                 $"Akbura diagnostic tagging failed: " +
                 $"{exception}");
 

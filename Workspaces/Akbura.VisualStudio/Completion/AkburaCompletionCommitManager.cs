@@ -4,8 +4,10 @@ using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.Text.Operations;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.VisualStudio.Utilities;
+using Microsoft.CodeAnalysis.Text;
 using System.ComponentModel.Composition;
 
 namespace Akbura.VisualStudio.Completion;
@@ -19,13 +21,19 @@ internal sealed class AkburaCompletionCommitManagerProvider :
 {
     private readonly IAsyncCompletionBroker _completionBroker;
 
+    private readonly ITextUndoHistoryRegistry _undoHistoryRegistry;
+
     [ImportingConstructor]
     public AkburaCompletionCommitManagerProvider(
-        IAsyncCompletionBroker completionBroker)
+        IAsyncCompletionBroker completionBroker,
+        ITextUndoHistoryRegistry undoHistoryRegistry)
     {
         _completionBroker = completionBroker ??
             throw new ArgumentNullException(
                 nameof(completionBroker));
+        _undoHistoryRegistry = undoHistoryRegistry ??
+            throw new ArgumentNullException(
+                nameof(undoHistoryRegistry));
     }
 
     public IAsyncCompletionCommitManager GetOrCreate(ITextView textView)
@@ -37,7 +45,8 @@ internal sealed class AkburaCompletionCommitManagerProvider :
 
         return textView.Properties.GetOrCreateSingletonProperty(
             () => new AkburaCompletionCommitManager(
-                _completionBroker));
+                _completionBroker,
+                _undoHistoryRegistry));
     }
 }
 
@@ -54,12 +63,18 @@ internal sealed class AkburaCompletionCommitManager :
 
     private readonly IAsyncCompletionBroker _completionBroker;
 
+    private readonly ITextUndoHistoryRegistry _undoHistoryRegistry;
+
     public AkburaCompletionCommitManager(
-        IAsyncCompletionBroker completionBroker)
+        IAsyncCompletionBroker completionBroker,
+        ITextUndoHistoryRegistry undoHistoryRegistry)
     {
         _completionBroker = completionBroker ??
             throw new ArgumentNullException(
                 nameof(completionBroker));
+        _undoHistoryRegistry = undoHistoryRegistry ??
+            throw new ArgumentNullException(
+                nameof(undoHistoryRegistry));
     }
 
     public IEnumerable<char> PotentialCommitCharacters =>
@@ -164,7 +179,7 @@ internal sealed class AkburaCompletionCommitManager :
             : CommitResult.Handled;
     }
 
-    private static CommitResult TryCommitRoslynCompletion(
+    private CommitResult TryCommitRoslynCompletion(
         IAsyncCompletionSession session,
         ITextBuffer buffer,
         AkburaRoslynCompletionItemData data,
@@ -178,40 +193,47 @@ internal sealed class AkburaCompletionCommitManager :
             return CommitResult.Unhandled;
         }
 
-        var completionChange = ThreadHelper
+        var roslynChange = ThreadHelper
             .JoinableTaskFactory
-            .Run(async () => await data.State.Service
-                .GetChangeAsync(
-                    data.State.Document,
-                    data.Item,
-                    typedChar,
-                    cancellationToken)
-                .ConfigureAwait(false));
-        var changes = completionChange.TextChanges.IsDefaultOrEmpty
-            ? [completionChange.TextChange]
-            : completionChange.TextChanges;
+            .Run(async () =>
+            {
+                var completionChange = await data.State.Service
+                    .GetChangeAsync(
+                        data.State.Document,
+                        data.Item,
+                        typedChar,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                var projectedText = await data.State.Document
+                    .GetTextAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                return (completionChange, projectedText);
+            });
+        if (!AkburaCSharpCompletionChangeMapper.TryMapCompletionChange(
+                SourceText.From(data.State.HostSnapshot.GetText()),
+                roslynChange.projectedText,
+                data.State.Projection,
+                roslynChange.completionChange,
+                out var mapped))
+        {
+            return CommitResult.Unhandled;
+        }
+
         var currentSnapshot = buffer.CurrentSnapshot;
         var mappedChanges = new List<MappedCompletionChange>(
-            changes.Length);
+            mapped.Changes.Length);
 
-        foreach (var change in changes)
+        foreach (var change in mapped.Changes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!data.State.Projection.TryMapToHost(
-                    change.Span,
-                    out var hostSpan))
-            {
-                return CommitResult.Unhandled;
-            }
-
             SnapshotSpan currentSpan;
             try
             {
                 currentSpan = new SnapshotSpan(
                         data.State.HostSnapshot,
                         new Span(
-                            hostSpan.Start,
-                            hostSpan.Length))
+                            change.Span.Start,
+                            change.Span.Length))
                     .TranslateTo(
                         currentSnapshot,
                         SpanTrackingMode.EdgeInclusive);
@@ -223,39 +245,42 @@ internal sealed class AkburaCompletionCommitManager :
 
             mappedChanges.Add(new MappedCompletionChange(
                 currentSpan.Span,
-                change.NewText ?? string.Empty));
+                change.NewText ?? string.Empty,
+                IsImportChange(change, data.State.Projection)));
         }
 
         int? caretPosition = null;
-        if (completionChange.NewPosition is { } projectedPosition)
+        if (mapped.NewHostPosition is { } mappedHostPosition)
         {
-            var relativePosition = projectedPosition -
-                data.State.Projection.ProjectedSpan.Start;
-            var projectedLengthAfterChanges =
-                data.State.Projection.ProjectedSpan.Length;
-            foreach (var change in changes)
-            {
-                projectedLengthAfterChanges +=
-                    (change.NewText?.Length ?? 0) -
-                    change.Span.Length;
-            }
-
-            if (relativePosition < 0 ||
-                relativePosition > projectedLengthAfterChanges)
+            var originalActiveStartAfterChanges =
+                GetActiveStartAfterChanges(
+                    data.State.Projection.HostSpan.Start,
+                    mapped.Changes.Select(change =>
+                        new MappedCompletionChange(
+                            new Span(change.Span.Start, change.Span.Length),
+                            change.NewText ?? string.Empty,
+                            IsImportChange(
+                                change,
+                                data.State.Projection))));
+            var relativePosition = mappedHostPosition -
+                originalActiveStartAfterChanges;
+            if (relativePosition < 0)
             {
                 return CommitResult.Unhandled;
             }
 
             try
             {
-                var currentHostStart = new SnapshotPoint(
+                var currentActiveStart = new SnapshotPoint(
                         data.State.HostSnapshot,
                         data.State.Projection.HostSpan.Start)
                     .TranslateTo(
                         currentSnapshot,
                         PointTrackingMode.Negative)
                     .Position;
-                caretPosition = currentHostStart +
+                caretPosition = GetActiveStartAfterChanges(
+                        currentActiveStart,
+                        mappedChanges) +
                     relativePosition;
             }
             catch (ArgumentException)
@@ -264,6 +289,15 @@ internal sealed class AkburaCompletionCommitManager :
             }
         }
 
+        if (!_undoHistoryRegistry.TryGetHistory(
+                buffer,
+                out var undoHistory))
+        {
+            undoHistory = _undoHistoryRegistry.RegisterHistory(buffer);
+        }
+
+        using var transaction = undoHistory.CreateTransaction(
+            "Akbura C# completion");
         using var edit = buffer.CreateEdit();
         foreach (var change in mappedChanges
                      .OrderByDescending(static change =>
@@ -278,6 +312,7 @@ internal sealed class AkburaCompletionCommitManager :
         }
 
         var appliedSnapshot = edit.Apply();
+        transaction.Complete();
         if (caretPosition is { } position &&
             ReferenceEquals(
                 session.TextView.TextBuffer,
@@ -291,11 +326,43 @@ internal sealed class AkburaCompletionCommitManager :
                     position));
         }
 
-        return completionChange.IncludesCommitCharacter
+        return mapped.IncludesCommitCharacter
             ? new CommitResult(
                 isHandled: true,
                 CommitBehavior.SuppressFurtherTypeCharCommandHandlers)
             : CommitResult.Handled;
+    }
+
+    private static bool IsImportChange(
+        TextChange change,
+        AkburaCSharpProjection projection)
+    {
+        return change.Span.Length == 0 &&
+            change.Span.Start ==
+                projection.ImportContext.InsertionPosition &&
+            (change.NewText?.IndexOf(
+                "using ",
+                StringComparison.Ordinal) ?? -1) >= 0;
+    }
+
+    private static int GetActiveStartAfterChanges(
+        int activeStart,
+        IEnumerable<MappedCompletionChange> changes)
+    {
+        var result = activeStart;
+        foreach (var change in changes.OrderBy(static change =>
+                     change.Span.Start))
+        {
+            if (change.IsImport &&
+                change.Span.Start <= activeStart ||
+                change.Span.End <= activeStart &&
+                change.Span.Start < activeStart)
+            {
+                result += change.NewText.Length - change.Span.Length;
+            }
+        }
+
+        return result;
     }
 
     private void TriggerNextCompletion(
@@ -346,14 +413,18 @@ internal sealed class AkburaCompletionCommitManager :
     {
         public MappedCompletionChange(
             Span span,
-            string newText)
+            string newText,
+            bool isImport)
         {
             Span = span;
             NewText = newText;
+            IsImport = isImport;
         }
 
         public Span Span { get; }
 
         public string NewText { get; }
+
+        public bool IsImport { get; }
     }
 }

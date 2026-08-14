@@ -168,6 +168,14 @@ public sealed partial class AkburaSyntacticDocument
             return null;
         }
 
+        if (TryGetEmbeddedCSharpContext(
+                position - 1,
+                out _,
+                cancellationToken))
+        {
+            return null;
+        }
+
         var root = SyntaxTree.GetRootSyntax();
         var startTag = root
             .DescendantNodes()
@@ -402,10 +410,7 @@ public sealed partial class AkburaSyntacticDocument
 
         if (owner != null)
         {
-            if (owner is not CSharpStatementSyntax
-                {
-                    Body: null
-                } statement ||
+            if (owner is not CSharpStatementSyntax statement ||
                 statement.Span.Start > applicableSpan.Start ||
                 !ContainsOnlyWhitespace(
                     Text,

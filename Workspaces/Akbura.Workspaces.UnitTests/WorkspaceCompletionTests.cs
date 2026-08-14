@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
@@ -8,6 +9,16 @@ namespace Akbura.Workspaces.UnitTests;
 
 public sealed class WorkspaceCompletionTests
 {
+    [Fact]
+    public void CompletionResult_DefaultValueHasEmptyItems()
+    {
+        var result = default(AkburaCompletionResult);
+
+        Assert.Empty(result.Items);
+        Assert.True(result.Items.Length == 0);
+        Assert.True(result.IsEmpty);
+    }
+
     private const string CardSource = """
         namespace Gallery;
 
@@ -63,6 +74,45 @@ public sealed class WorkspaceCompletionTests
                 source.Length);
 
         Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public void Completion_TopLevelOffersStateBeforeExistingMarkup()
+    {
+        const string sourceWithCaret = """
+            state int count = 0;
+
+            stat|
+
+            <StackPanel gap-3>
+                <Button Click={count--}/>
+            </StackPanel>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        Assert.True(document.TryGetCSharpCompletionContext(
+            position,
+            out var csharpContext));
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.Statement,
+            csharpContext.Kind);
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                position);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal("state", item.DisplayText);
+        Assert.Equal(
+            "stat",
+            document.Text.ToString(result.ApplicableSpan));
     }
 
     [Fact]
@@ -1759,6 +1809,468 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Fact]
+    public void CSharpCompletionChangeMapper_MapsAutoImportAndPreservesCrLf()
+    {
+        const string sourceWithCaret =
+            "global using System;\r\n" +
+            "using Avalonia.Controls;\r\n" +
+            "using Gallery.Styles.akcss;\r\n" +
+            "\r\n" +
+            "state Observ| items = default;\r\n" +
+            "<StackPanel/>\r\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var projectedText = SourceText.From(
+                    projection.Root.ToFullString());
+                var replacementSpan = new TextSpan(
+                    projection.ActiveMapping.ProjectedSpan.Start,
+                    "Observ".Length);
+                var replacement = new TextChange(
+                    replacementSpan,
+                    "ObservableCollection");
+                const string importText =
+                    "using System.Collections.ObjectModel;\r\n";
+                var import = new TextChange(
+                    new TextSpan(0, 0),
+                    importText);
+                var changes = ImmutableArray.Create(import, replacement);
+                var newProjectedPosition =
+                    replacementSpan.Start +
+                    importText.Length +
+                    "ObservableCollection".Length;
+                var changedProjectedText = projectedText.WithChanges(changes);
+                var completionChange = CompletionChange.Create(
+                    new TextChange(
+                        new TextSpan(0, projectedText.Length),
+                        changedProjectedText.ToString()),
+                    changes,
+                    newProjectedPosition,
+                    includesCommitCharacter: false);
+
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            projectedText,
+                            projection,
+                            completionChange,
+                            out var mapped));
+
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                const string expected =
+                    "global using System;\r\n" +
+                    "using Avalonia.Controls;\r\n" +
+                    "using System.Collections.ObjectModel;\r\n" +
+                    "using Gallery.Styles.akcss;\r\n" +
+                    "\r\n" +
+                    "state ObservableCollection items = default;\r\n" +
+                    "<StackPanel/>\r\n";
+                Assert.Equal(expected, changedHostText);
+                Assert.Equal(
+                    expected.IndexOf(
+                        "ObservableCollection",
+                        StringComparison.Ordinal) +
+                    "ObservableCollection".Length,
+                    mapped.NewHostPosition);
+                Assert.False(mapped.IncludesCommitCharacter);
+            });
+    }
+
+    [Fact]
+    public void CSharpCompletionChangeMapper_RejectsWrapperChanges()
+    {
+        const string sourceWithCaret = """
+            using Avalonia.Controls;
+
+            state int count = 0;
+            var text = cou|;
+
+            <StackPanel/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var projectedText = SourceText.From(
+                    projection.Root.ToFullString());
+                var wrapperNameStart = projectedText.ToString().IndexOf(
+                    "__akbura_statement_probe",
+                    StringComparison.Ordinal);
+                Assert.True(wrapperNameStart >= 0);
+                var directChange = new TextChange(
+                    projection.ActiveMapping.ProjectedSpan,
+                    "count;");
+                var wrapperChange = new TextChange(
+                    new TextSpan(wrapperNameStart, 1),
+                    "X");
+                var changes = ImmutableArray.Create(
+                    wrapperChange,
+                    directChange);
+                var changedProjectedText = projectedText.WithChanges(changes);
+                var completionChange = CompletionChange.Create(
+                    new TextChange(
+                        new TextSpan(0, projectedText.Length),
+                        changedProjectedText.ToString()),
+                    changes,
+                    newPosition: null,
+                    includesCommitCharacter: false);
+
+                Assert.False(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            projectedText,
+                            projection,
+                            completionChange,
+                            out _));
+            });
+    }
+
+    [Fact]
+    public void CSharpCompletionChangeMapper_MapsRoslynTypeAutoImport()
+    {
+        const string sourceWithCaret = """
+            using Avalonia.Controls;
+
+            state ObservableCollec| items = default;
+
+            <StackPanel/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var completion = RoslynCompletionTestHost
+                    .GetImportCompletionAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        "ObservableCollection",
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completion);
+                Assert.Contains(
+                    "System.Collections.ObjectModel",
+                    completion.Value.Item.InlineDescription,
+                    StringComparison.Ordinal);
+
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                Assert.Contains(
+                    "using System.Collections.ObjectModel;",
+                    changedHostText,
+                    StringComparison.Ordinal);
+                Assert.Contains(
+                    "state ObservableCollection items",
+                    changedHostText,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void CSharpCompletionChangeMapper_DoesNotDuplicateExistingImport()
+    {
+        const string sourceWithCaret = """
+            using System.Collections.ObjectModel;
+            using Avalonia.Controls;
+
+            state ObservableCollec| items = default;
+
+            <StackPanel/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var completion = RoslynCompletionTestHost
+                    .GetCompletionChangeAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        "ObservableCollection",
+                        requireComplexTextEdit: false,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completion);
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                Assert.Equal(
+                    1,
+                    CountOccurrences(
+                        changedHostText,
+                        "using System.Collections.ObjectModel;"));
+                Assert.Contains(
+                    "state ObservableCollection items",
+                    changedHostText,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "var value = JsonSerializ|;",
+        "JsonSerializer",
+        "System.Text.Json",
+        "var value = JsonSerializer;")]
+    [InlineData(
+        "command void Save(CancellationTok| token);",
+        "CancellationToken",
+        "System.Threading",
+        "command void Save(CancellationToken token);")]
+    [InlineData(
+        "state string name = \"\";\nvar result = name.SomeExtens|;",
+        "SomeExtension",
+        "Gallery.Extensions",
+        "name.SomeExtension")]
+    public void CSharpCompletionChangeMapper_MapsRoslynAutoImports(
+        string fragmentWithCaret,
+        string displayText,
+        string expectedNamespace,
+        string expectedFragment)
+    {
+        var sourceWithCaret =
+            "using Avalonia.Controls;\n\n" +
+            fragmentWithCaret +
+            "\n\n<StackPanel/>\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var completion = RoslynCompletionTestHost
+                    .GetImportCompletionAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        displayText,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completion);
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                Assert.Contains(
+                    $"using {expectedNamespace};",
+                    changedHostText,
+                    StringComparison.Ordinal);
+                Assert.Contains(
+                    expectedFragment,
+                    changedHostText,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_MapsRoslynQuickInfoToHost()
+    {
+        const string sourceWithCaret = """
+            using Avalonia.Controls;
+
+            state string title = "Akbura";
+            var length = title.Len|gth;
+
+            <StackPanel/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var quickInfo = RoslynCompletionTestHost
+                    .GetQuickInfoAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(quickInfo);
+                Assert.True(projection.TryMapToHost(
+                    quickInfo!.Span,
+                    out var hostSpan));
+                Assert.Equal("Length", source.Substring(
+                    hostSpan.Start,
+                    hostSpan.Length));
+                Assert.Contains(
+                    "Length",
+                    string.Concat(
+                        quickInfo.Sections.SelectMany(static section =>
+                            section.TaggedParts)
+                        .Select(static part => part.Text)),
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "state string title = string.Emp|ty;",
+        "Empty")]
+    [InlineData(
+        "param string title = string.Emp|ty;",
+        "Empty")]
+    [InlineData(
+        "string Format(string value) { return value.Tri|m(); }",
+        "Trim")]
+    [InlineData(
+        "command void Save(System.Threading.CancellationTok|en token);",
+        "CancellationToken")]
+    public void CSharpProjection_MapsRoslynQuickInfoAcrossContexts(
+        string fragmentWithCaret,
+        string expectedToken)
+    {
+        var sourceWithCaret =
+            "using Avalonia.Controls;\n\n" +
+            fragmentWithCaret +
+            "\n\n<StackPanel/>\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var quickInfo = RoslynCompletionTestHost
+                    .GetQuickInfoAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(quickInfo);
+                Assert.True(projection.TryMapToHost(
+                    quickInfo!.Span,
+                    out var hostSpan));
+                Assert.Equal(
+                    expectedToken,
+                    source.Substring(
+                        hostSpan.Start,
+                        hostSpan.Length));
+            });
+    }
+
     private static void WithCSharpProjection(
         string sourceWithCaret,
         Action<
@@ -1801,6 +2313,24 @@ public sealed class WorkspaceCompletionTests
                     projection,
                     position);
             });
+    }
+
+    private static int CountOccurrences(
+        string value,
+        string search)
+    {
+        var count = 0;
+        var position = 0;
+        while ((position = value.IndexOf(
+                   search,
+                   position,
+                   StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            position += search.Length;
+        }
+
+        return count;
     }
 
     private static void AssertCompletionContains(
@@ -1953,6 +2483,12 @@ public sealed class WorkspaceCompletionTests
 
             namespace Gallery.Extensions
             {
+                public static class StringExtensions
+                {
+                    public static int SomeExtension(
+                        this string value) => value.Length;
+                }
+
                 public sealed class CustomExtension
                 {
                     public object ProvideValue() => new();

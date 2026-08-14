@@ -1,4 +1,5 @@
 using Akbura.VisualStudio.Editor;
+using Akbura.VisualStudio.CSharp;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
@@ -21,11 +22,15 @@ internal sealed class AkburaCompletionSourceProvider :
 
     private readonly AkburaParserService _parserService;
 
+    private readonly AkburaProjectedCSharpDocumentService
+        _projectedDocumentService;
+
     [ImportingConstructor]
     public AkburaCompletionSourceProvider(
         ITextDocumentFactoryService textDocumentFactory,
         AkburaVisualStudioWorkspace workspaceHost,
-        AkburaParserService parserService)
+        AkburaParserService parserService,
+        AkburaProjectedCSharpDocumentService projectedDocumentService)
     {
         _textDocumentFactory = textDocumentFactory ??
             throw new ArgumentNullException(
@@ -36,6 +41,9 @@ internal sealed class AkburaCompletionSourceProvider :
         _parserService = parserService ??
             throw new ArgumentNullException(
                 nameof(parserService));
+        _projectedDocumentService = projectedDocumentService ??
+            throw new ArgumentNullException(
+                nameof(projectedDocumentService));
 
         Debug.WriteLine(
             "[Akbura.Completion] Source provider created.");
@@ -83,6 +91,6 @@ internal sealed class AkburaCompletionSourceProvider :
                         .Completion,
                     _parserService,
                     new AkburaRoslynCompletionService(
-                        _workspaceHost)));
+                        _projectedDocumentService)));
     }
 }

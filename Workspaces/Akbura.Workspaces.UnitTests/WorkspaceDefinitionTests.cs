@@ -20,6 +20,413 @@ public sealed class WorkspaceDefinitionTests
         """;
 
     [Fact]
+    public void Definition_ProjectedAkburaSymbolsUseHostDeclarations()
+    {
+        const string source = """
+            using System;
+            using Avalonia.Controls;
+
+            param string title;
+            inject IServiceProvider services;
+            command void Save();
+            state int count = 0;
+
+            var titleLength = title.Length;
+            var service = services.GetService(typeof(string));
+            var countText = count.ToString();
+            var canSave = Save.CanExecute;
+            var first = count;
+            var second = first.ToString();
+
+            string Format(string value)
+            {
+                return value.Trim();
+            }
+
+            var formatted = Format(title);
+            var named = panel;
+
+            <StackPanel x.Name="panel"/>
+            """;
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var libraryReference = CreateLibraryReference(
+                directory,
+                "@utilities { }");
+            var compilation = CreateApplicationCompilation(
+                libraryReference);
+            var projectContext = new ProjectContext(
+                ProjectId.CreateNewId(),
+                projectFilePath: string.Empty,
+                projectDirectory: directory,
+                rootNamespace: string.Empty,
+                compilation,
+                ImmutableArray<ProjectReference>.Empty);
+            using var workspace = new AkburaWorkspace(projectContext);
+            var filePath = Path.Combine(directory, "Counter.akbura");
+            File.WriteAllText(filePath, source);
+            var context = workspace.OpenOrChangeDocumentContext(
+                new Uri(filePath),
+                SourceText.From(source));
+
+            AssertHostDefinition("title", "title.Length");
+            AssertHostDefinition("services", "services.GetService");
+            AssertHostDefinition("count", "count.ToString");
+            AssertHostDefinition("Save", "Save.CanExecute");
+            AssertHostDefinition("first", "first.ToString");
+            AssertHostDefinition("value", "value.Trim");
+            AssertHostDefinition("Format", "Format(title)");
+            AssertHostDefinition("panel", "panel;");
+
+            void AssertHostDefinition(
+                string declarationName,
+                string referenceText)
+            {
+                var referencePosition = source.IndexOf(
+                    referenceText,
+                    StringComparison.Ordinal);
+                Assert.True(referencePosition >= 0);
+
+                var definition = workspace.LanguageServices.Definition
+                    .GetDefinition(context, referencePosition);
+
+                Assert.NotNull(definition);
+                Assert.Equal(
+                    Path.GetFullPath(filePath),
+                    definition!.TargetFilePath);
+                Assert.Equal(
+                    declarationName,
+                    GetTargetText(definition));
+                Assert.Equal(
+                    declarationName,
+                    source.Substring(
+                        definition.SourceSpan.Start,
+                        definition.SourceSpan.Length));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Definition_ProjectedAkcssUtilityParameterUsesHostDeclaration()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            @akcss {
+                @utilities {
+                    StackPanel.gap-(double value) {
+                        Spacing: value;
+                    }
+                }
+            }
+
+            <StackPanel/>
+            """;
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var libraryReference = CreateLibraryReference(
+                directory,
+                "@utilities { }");
+            var compilation = CreateApplicationCompilation(
+                libraryReference);
+            using var workspace = new AkburaWorkspace(
+                new ProjectContext(
+                    ProjectId.CreateNewId(),
+                    projectFilePath: string.Empty,
+                    projectDirectory: directory,
+                    rootNamespace: string.Empty,
+                    compilation,
+                    ImmutableArray<ProjectReference>.Empty));
+            var filePath = Path.Combine(directory, "Counter.akbura");
+            var context = workspace.OpenOrChangeDocumentContext(
+                new Uri(filePath),
+                SourceText.From(source));
+            var referencePosition = source.IndexOf(
+                "Spacing: value",
+                StringComparison.Ordinal) +
+                "Spacing: ".Length;
+
+            var definition = workspace.LanguageServices.Definition
+                .GetDefinition(context, referencePosition);
+
+            Assert.NotNull(definition);
+            Assert.Equal(
+                Path.GetFullPath(filePath),
+                definition!.TargetFilePath);
+            Assert.Equal("value", GetTargetText(definition));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Definition_ProjectedProjectReferenceSymbolsUseCSharpSource()
+    {
+        const string librarySource = """
+            namespace Library.Api;
+
+            public sealed class ProjectService
+            {
+                public string DisplayName => "Library";
+            }
+            """;
+        const string applicationSource = """
+            namespace Avalonia.Controls
+            {
+                public class Control
+                {
+                }
+
+                public sealed class StackPanel : Control
+                {
+                }
+            }
+
+            namespace Akbura
+            {
+                public class AkburaControl : Avalonia.Controls.Control
+                {
+                }
+            }
+
+            public partial class Counter : Akbura.AkburaControl
+            {
+            }
+            """;
+        const string componentSource = """
+            using Avalonia.Controls;
+            using Library.Api;
+
+            state ProjectService service = new();
+            var name = service.DisplayName;
+
+            <StackPanel/>
+            """;
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        var libraryDirectory = Path.Combine(
+            directory,
+            "Library");
+        var applicationDirectory = Path.Combine(
+            directory,
+            "Application");
+        Directory.CreateDirectory(libraryDirectory);
+        Directory.CreateDirectory(applicationDirectory);
+
+        try
+        {
+            var librarySourcePath = Path.Combine(
+                libraryDirectory,
+                "LibraryApi.cs");
+            var componentPath = Path.Combine(
+                applicationDirectory,
+                "Counter.akbura");
+            File.WriteAllText(librarySourcePath, librarySource);
+            File.WriteAllText(componentPath, componentSource);
+
+            var libraryProjectId =
+                ProjectId.CreateNewId("Library");
+            var applicationProjectId =
+                ProjectId.CreateNewId("Application");
+            var platformReferences =
+                CreatePlatformReferences();
+            var libraryCompilation = CSharpCompilation.Create(
+                "Library",
+                [CSharpSyntaxTree.ParseText(
+                    librarySource,
+                    path: librarySourcePath)],
+                platformReferences,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+            var applicationCompilation = CSharpCompilation.Create(
+                "Application",
+                [CSharpSyntaxTree.ParseText(applicationSource)],
+                platformReferences.Append(
+                    libraryCompilation.ToMetadataReference()),
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+
+            using var workspace = new AkburaWorkspace();
+            workspace.AddOrUpdateProject(
+                new ProjectContext(
+                    libraryProjectId,
+                    Path.Combine(
+                        libraryDirectory,
+                        "Library.csproj"),
+                    libraryDirectory,
+                    "Library",
+                    libraryCompilation,
+                    ImmutableArray<ProjectReference>.Empty));
+            var applicationProject = workspace.AddOrUpdateProject(
+                new ProjectContext(
+                    applicationProjectId,
+                    Path.Combine(
+                        applicationDirectory,
+                        "Application.csproj"),
+                    applicationDirectory,
+                    "Application",
+                    applicationCompilation,
+                    [new ProjectReference(libraryProjectId)]));
+            var context = workspace.OpenOrChangeDocumentContext(
+                applicationProject.Id,
+                new Uri(componentPath),
+                SourceText.From(componentSource));
+
+            AssertCSharpDefinition(
+                "ProjectService",
+                "ProjectService service");
+            AssertCSharpDefinition(
+                "DisplayName",
+                "service.DisplayName",
+                "service.".Length);
+            AssertCSharpDefinition(
+                "Api",
+                "Library.Api",
+                "Library.".Length);
+
+            void AssertCSharpDefinition(
+                string expectedTarget,
+                string referenceText,
+                int referenceOffset = 0)
+            {
+                var referencePosition = componentSource.IndexOf(
+                    referenceText,
+                    StringComparison.Ordinal) + referenceOffset;
+                var definition = workspace.LanguageServices.Definition
+                    .GetDefinition(context, referencePosition);
+
+                Assert.NotNull(definition);
+                Assert.Null(definition!.TargetText);
+                Assert.Equal(
+                    Path.GetFullPath(librarySourcePath),
+                    definition.TargetFilePath);
+                Assert.Equal(
+                    expectedTarget,
+                    GetTargetText(definition));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Definition_ProjectedCSharpContextsNavigateToMetadata()
+    {
+        const string source = """
+            using System;
+            using System.Threading;
+            using Avalonia.Controls;
+
+            param string title = string.Empty;
+            state DateTime now = DateTime.Now;
+            command void Save(CancellationToken token);
+
+            var parsed = DateTime.Parse(title);
+
+            <StackPanel/>
+            """;
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var libraryReference = CreateLibraryReference(
+                directory,
+                "@utilities { }");
+            var compilation = CreateApplicationCompilation(
+                libraryReference);
+            using var workspace = new AkburaWorkspace(
+                new ProjectContext(
+                    ProjectId.CreateNewId(),
+                    projectFilePath: string.Empty,
+                    projectDirectory: directory,
+                    rootNamespace: string.Empty,
+                    compilation,
+                    ImmutableArray<ProjectReference>.Empty));
+            var filePath = Path.Combine(directory, "Counter.akbura");
+            var context = workspace.OpenOrChangeDocumentContext(
+                new Uri(filePath),
+                SourceText.From(source));
+
+            AssertMetadataDefinition(
+                "Empty",
+                "string.Empty",
+                "string.".Length);
+            AssertMetadataDefinition("DateTime", "DateTime now");
+            AssertMetadataDefinition(
+                "CancellationToken",
+                "CancellationToken token");
+            AssertMetadataDefinition("Parse", "DateTime.Parse", 9);
+
+            var commandParameterPosition = source.IndexOf(
+                "token);",
+                StringComparison.Ordinal);
+            var commandParameterDefinition = workspace.LanguageServices
+                .Definition.GetDefinition(
+                    context,
+                    commandParameterPosition);
+            Assert.NotNull(commandParameterDefinition);
+            Assert.Equal(
+                Path.GetFullPath(filePath),
+                commandParameterDefinition!.TargetFilePath);
+            Assert.Equal(
+                "token",
+                GetTargetText(commandParameterDefinition));
+
+            void AssertMetadataDefinition(
+                string expectedTarget,
+                string referenceText,
+                int referenceOffset = 0)
+            {
+                var referencePosition = source.IndexOf(
+                    referenceText,
+                    StringComparison.Ordinal) + referenceOffset;
+                var definition = workspace.LanguageServices.Definition
+                    .GetDefinition(context, referencePosition);
+
+                Assert.NotNull(definition);
+                Assert.NotNull(definition!.TargetText);
+                Assert.Equal(
+                    expectedTarget,
+                    GetTargetText(definition));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Definition_MetadataMarkupTypeCreatesNavigableSource()
     {
         WithWorkspace(

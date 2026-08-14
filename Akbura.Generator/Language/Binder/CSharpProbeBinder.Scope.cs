@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis.Text;
 using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
 using AkburaSymbol = Akbura.Language.Symbols.ISymbol;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -20,6 +21,9 @@ internal sealed partial class CSharpProbeBinder
 {
     internal const string StateCompletionAnnotationKind =
         "AkburaCSharpCompletionState";
+
+    internal const string ProjectedSymbolAnnotationKind =
+        "AkburaProjectedSymbol";
 
     internal CSharpProbeScope CreateProbeScope(
         AkburaSyntax scope,
@@ -204,7 +208,23 @@ internal sealed partial class CSharpProbeBinder
                 return false;
             }
 
-            method = parsedMethod;
+            var hostOffset = statement.Tokens.FullSpan.Start;
+            parsedMethod = parsedMethod.ReplaceNodes(
+                parsedMethod.ParameterList.Parameters,
+                (original, _) => original.WithAdditionalAnnotations(
+                    CreateProjectedSymbolAnnotation(
+                        AkburaSymbolKind.CSharpSymbol,
+                        original.Identifier.ValueText,
+                        new TextSpan(
+                            hostOffset + original.Identifier.Span.Start,
+                            original.Identifier.Span.Length))));
+            method = parsedMethod.WithAdditionalAnnotations(
+                CreateProjectedSymbolAnnotation(
+                    AkburaSymbolKind.CSharpSymbol,
+                    parsedMethod.Identifier.ValueText,
+                    new TextSpan(
+                        hostOffset + parsedMethod.Identifier.Span.Start,
+                        parsedMethod.Identifier.Span.Length)));
             return true;
         }
         catch (ArgumentException)
@@ -354,6 +374,7 @@ internal sealed partial class CSharpProbeBinder
                     localStatements,
                     state.Name,
                     state.Type,
+                    symbol,
                     StateCompletionAnnotationKind);
                 break;
             }
@@ -361,49 +382,77 @@ internal sealed partial class CSharpProbeBinder
             case AkburaSymbolKind.Parameter:
             {
                 var parameter = (IParamSymbol)symbol;
-                AddProbeLocal(localStatements, parameter.Name, parameter.Type);
+                AddProbeLocal(
+                    localStatements,
+                    parameter.Name,
+                    parameter.Type,
+                    symbol);
                 break;
             }
 
             case AkburaSymbolKind.CommandParameter:
             {
                 var parameter = (ICommandParameterSymbol)symbol;
-                AddProbeLocal(localStatements, parameter.Name, parameter.Type);
+                AddProbeLocal(
+                    localStatements,
+                    parameter.Name,
+                    parameter.Type,
+                    symbol);
                 break;
             }
 
             case AkburaSymbolKind.TailwindUtilityParameter:
             {
                 var parameter = (ITailwindUtilityParameterSymbol)symbol;
-                AddProbeLocal(localStatements, parameter.Name, parameter.Type);
+                AddProbeLocal(
+                    localStatements,
+                    parameter.Name,
+                    parameter.Type,
+                    symbol);
                 break;
             }
 
             case AkburaSymbolKind.MarkupItem:
             {
                 var item = (IMarkupItemSymbol)symbol;
-                AddProbeLocal(localStatements, item.Name, item.Type);
+                AddProbeLocal(
+                    localStatements,
+                    item.Name,
+                    item.Type,
+                    symbol);
                 break;
             }
 
             case AkburaSymbolKind.MarkupName:
             {
                 var markupName = (IMarkupNameSymbol)symbol;
-                AddProbeLocal(localStatements, markupName.IdentifierText, markupName.Type);
+                AddProbeLocal(
+                    localStatements,
+                    markupName.IdentifierText,
+                    markupName.Type,
+                    symbol);
                 break;
             }
 
             case AkburaSymbolKind.InjectedService:
             {
                 var inject = (IInjectSymbol)symbol;
-                AddProbeLocal(localStatements, inject.Name, inject.Type);
+                AddProbeLocal(
+                    localStatements,
+                    inject.Name,
+                    inject.Type,
+                    symbol);
                 break;
             }
 
             case AkburaSymbolKind.CSharpSymbol:
             {
                 var local = (CSharpLocalSymbol)symbol;
-                AddProbeLocal(localStatements, local.Name, new CSharpSymbolDefinition(local.Local.Type));
+                AddProbeLocal(
+                    localStatements,
+                    local.Name,
+                    new CSharpSymbolDefinition(local.Local.Type),
+                    symbol);
                 break;
             }
 
@@ -420,6 +469,7 @@ internal sealed partial class CSharpProbeBinder
         ImmutableArrayBuilder<CSharp.StatementSyntax> localStatements,
         string name,
         CSharpSymbolDefinition type,
+        AkburaSymbol? sourceSymbol,
         string? annotationKind = null)
     {
         if (string.IsNullOrWhiteSpace(name) ||
@@ -441,6 +491,16 @@ internal sealed partial class CSharpProbeBinder
                 new SyntaxAnnotation(annotationKind));
         }
 
+        if (sourceSymbol != null &&
+            TryCreateProjectedSymbolAnnotation(
+                sourceSymbol,
+                name,
+                out var projectedSymbolAnnotation))
+        {
+            declarator = declarator.WithAdditionalAnnotations(
+                projectedSymbolAnnotation);
+        }
+
         localStatements.Add(CSharpSyntaxFactory.LocalDeclarationStatement(
             CSharpSyntaxFactory.VariableDeclaration(typeSyntax)
                 .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
@@ -458,7 +518,10 @@ internal sealed partial class CSharpProbeBinder
                 CSharpSyntaxFactory.Token(CSharpSyntaxKind.PrivateKeyword),
                 CSharpSyntaxFactory.Token(CSharpSyntaxKind.SealedKeyword)))
             .WithMembers(CSharpSyntaxFactory.List(CreateCommandProbeTypeMembers(command))));
-        memberDeclarations.Add(CreateProbeField(commandType, command.Name));
+        memberDeclarations.Add(CreateProbeField(
+            commandType,
+            command.Name,
+            command));
     }
 
     private static ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(ICommandSymbol command)
@@ -533,13 +596,167 @@ internal sealed partial class CSharpProbeBinder
 
     private static CSharp.FieldDeclarationSyntax CreateProbeField(
         CSharp.TypeSyntax type,
-        string name)
+        string name,
+        AkburaSymbol? sourceSymbol)
     {
+        var declarator = CSharpSyntaxFactory.VariableDeclarator(
+            CSharpSyntaxFactory.Identifier(name));
+        if (sourceSymbol != null &&
+            TryCreateProjectedSymbolAnnotation(
+                sourceSymbol,
+                name,
+                out var annotation))
+        {
+            declarator = declarator.WithAdditionalAnnotations(annotation);
+        }
+
         return CSharpSyntaxFactory.FieldDeclaration(
                 CSharpSyntaxFactory.VariableDeclaration(type)
                     .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
-                        CSharpSyntaxFactory.VariableDeclarator(CSharpSyntaxFactory.Identifier(name)))))
+                        declarator)))
             .WithModifiers(CSharpSyntaxFactory.TokenList(CSharpSyntaxFactory.Token(CSharpSyntaxKind.PrivateKeyword)));
+    }
+
+    private static bool TryCreateProjectedSymbolAnnotation(
+        AkburaSymbol symbol,
+        string name,
+        out SyntaxAnnotation annotation)
+    {
+        if (!TryGetDeclarationSpan(symbol, out var declarationSpan))
+        {
+            annotation = null!;
+            return false;
+        }
+
+        var origin = new CSharpProbeSymbolOrigin(
+            Guid.NewGuid().ToString("N"),
+            symbol.Kind,
+            name,
+            declarationSpan);
+        annotation = new SyntaxAnnotation(
+            ProjectedSymbolAnnotationKind,
+            origin.Serialize());
+        return true;
+    }
+
+    private static SyntaxAnnotation CreateProjectedSymbolAnnotation(
+        AkburaSymbolKind kind,
+        string name,
+        TextSpan declarationSpan)
+    {
+        var origin = new CSharpProbeSymbolOrigin(
+            Guid.NewGuid().ToString("N"),
+            kind,
+            name,
+            declarationSpan);
+        return new SyntaxAnnotation(
+            ProjectedSymbolAnnotationKind,
+            origin.Serialize());
+    }
+
+    private static bool TryGetDeclarationSpan(
+        AkburaSymbol symbol,
+        out TextSpan span)
+    {
+        switch (symbol)
+        {
+            case IStateSymbol state:
+                span = state.DeclarationSyntax.Name.Span;
+                return true;
+            case IParamSymbol parameter:
+                span = parameter.DeclarationSyntax.Name.Span;
+                return true;
+            case IInjectSymbol inject:
+                span = inject.DeclarationSyntax.Name.Span;
+                return true;
+            case ICommandSymbol command:
+                span = command.DeclarationSyntax.Name.Span;
+                return true;
+            case ITailwindUtilityParameterSymbol
+                {
+                    DeclarationSyntax: { } declaration
+                }:
+                span = declaration.ParamName.Identifier.Span;
+                return true;
+            case IMarkupNameSymbol markupName:
+                span = GetMarkupValueDeclarationSpan(
+                    markupName.DeclarationSyntax,
+                    markupName.IdentifierText);
+                return true;
+            case IMarkupItemSymbol item:
+                span = GetMarkupValueDeclarationSpan(
+                    item.DeclarationSyntax,
+                    item.Name);
+                return true;
+            case CSharpLocalSymbol local:
+                if (local.DeclarationSyntax is
+                        CSharpStatementSyntax statementSyntax &&
+                    EmbeddedCSharpSyntaxFacts.TryGetStatement(
+                        statementSyntax,
+                        out var statement,
+                        out var hostSpan) &&
+                    statement is
+                        CSharp.LocalDeclarationStatementSyntax localDeclaration)
+                {
+                    var variable = localDeclaration.Declaration.Variables
+                        .FirstOrDefault(candidate => string.Equals(
+                            candidate.Identifier.ValueText,
+                            local.Name,
+                            StringComparison.Ordinal));
+                    if (variable != null)
+                    {
+                        span = new TextSpan(
+                            hostSpan.Start + variable.Identifier.Span.Start,
+                            variable.Identifier.Span.Length);
+                        return true;
+                    }
+                }
+
+                span = local.DeclarationSyntax.Span;
+                return true;
+        }
+
+        if (!symbol.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+        {
+            span = symbol.DeclaringSyntaxReferences[0].Span;
+            return true;
+        }
+
+        foreach (var location in symbol.Locations)
+        {
+            if (location.IsInSource)
+            {
+                span = location.SourceSpan;
+                return true;
+            }
+        }
+
+        span = default;
+        return false;
+    }
+
+    private static TextSpan GetMarkupValueDeclarationSpan(
+        MarkupAttachedPropertyAttributeSyntax declaration,
+        string identifier)
+    {
+        var value = declaration.Value;
+        if (value == null)
+        {
+            return declaration.Span;
+        }
+
+        var rawText = value.ToFullString();
+        var identifierOffset = rawText.IndexOf(
+            identifier,
+            StringComparison.Ordinal);
+        if (identifierOffset < 0)
+        {
+            return value.Span;
+        }
+
+        return new TextSpan(
+            value.FullSpan.Start + identifierOffset,
+            identifier.Length);
     }
 
     private static string ToCSharpIdentifier(string value)
@@ -561,6 +778,94 @@ internal sealed partial class CSharpProbeBinder
         return builder.ToString();
     }
 
+}
+
+internal readonly struct CSharpProbeSymbolOrigin
+{
+    private const char Separator = ';';
+
+    public CSharpProbeSymbolOrigin(
+        string annotationId,
+        AkburaSymbolKind kind,
+        string name,
+        TextSpan declarationSpan)
+    {
+        AnnotationId = annotationId;
+        Kind = kind;
+        Name = name;
+        DeclarationSpan = declarationSpan;
+    }
+
+    public string AnnotationId { get; }
+
+    public AkburaSymbolKind Kind { get; }
+
+    public string Name { get; }
+
+    public TextSpan DeclarationSpan { get; }
+
+    public string Serialize()
+    {
+        var encodedName = Convert.ToBase64String(
+            Encoding.UTF8.GetBytes(Name));
+        return string.Join(
+            Separator.ToString(),
+            AnnotationId,
+            ((int)Kind).ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            DeclarationSpan.Start.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            DeclarationSpan.Length.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            encodedName);
+    }
+
+    public static bool TryParse(
+        string? value,
+        out CSharpProbeSymbolOrigin origin)
+    {
+        var parts = value?.Split(Separator);
+        if (parts == null ||
+            parts.Length != 5 ||
+            string.IsNullOrWhiteSpace(parts[0]) ||
+            !int.TryParse(
+                parts[1],
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var kindValue) ||
+            !int.TryParse(
+                parts[2],
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var start) ||
+            !int.TryParse(
+                parts[3],
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var length) ||
+            start < 0 ||
+            length < 0)
+        {
+            origin = default;
+            return false;
+        }
+
+        try
+        {
+            origin = new CSharpProbeSymbolOrigin(
+                parts[0],
+                (AkburaSymbolKind)kindValue,
+                Encoding.UTF8.GetString(
+                    Convert.FromBase64String(parts[4])),
+                new TextSpan(start, length));
+            return true;
+        }
+        catch (FormatException)
+        {
+            origin = default;
+            return false;
+        }
+    }
 }
 
 internal readonly struct CSharpProbeScope

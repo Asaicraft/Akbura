@@ -4,7 +4,9 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using Akbura.Pools;
 using System.Collections.Immutable;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Workspaces;
 
@@ -12,36 +14,122 @@ internal sealed class AkburaCSharpProjection
 {
     public AkburaCSharpProjection(
         CompilationUnitSyntax root,
-        TextSpan hostSpan,
-        TextSpan projectedSpan,
+        AkburaCSharpProjectionMapping activeMapping,
+        ImmutableArray<AkburaCSharpProjectionMapping> mappings,
         int projectedPosition,
-        ImmutableArray<string> stateNames)
+        ImmutableArray<string> stateNames,
+        AkburaCSharpImportContext importContext,
+        ImmutableArray<AkburaProjectedSymbolOrigin> syntheticSymbols)
     {
         Root = root ?? throw new ArgumentNullException(nameof(root));
-        HostSpan = hostSpan;
-        ProjectedSpan = projectedSpan;
+        ActiveMapping = activeMapping;
+        Mappings = mappings.IsDefault
+            ? ImmutableArray<AkburaCSharpProjectionMapping>.Empty
+            : mappings;
         ProjectedPosition = projectedPosition;
         StateNames = stateNames.IsDefault
             ? ImmutableArray<string>.Empty
             : stateNames;
+        ImportContext = importContext ??
+            throw new ArgumentNullException(nameof(importContext));
+        SyntheticSymbols = syntheticSymbols.IsDefault
+            ? ImmutableArray<AkburaProjectedSymbolOrigin>.Empty
+            : syntheticSymbols;
 
-        if (hostSpan.Length != projectedSpan.Length)
+        if (Mappings.IsDefaultOrEmpty ||
+            Mappings[0].Kind !=
+                AkburaCSharpProjectionMappingKind.ActiveFragment ||
+            !Mappings[0].Equals(activeMapping))
         {
             throw new ArgumentException(
-                "The host and projected C# fragments must have equal lengths.",
-                nameof(projectedSpan));
+                "The active C# mapping must be the first mapping.",
+                nameof(mappings));
         }
     }
 
     public CompilationUnitSyntax Root { get; }
 
-    public TextSpan HostSpan { get; }
+    public AkburaCSharpProjectionMapping ActiveMapping { get; }
 
-    public TextSpan ProjectedSpan { get; }
+    public ImmutableArray<AkburaCSharpProjectionMapping> Mappings { get; }
+
+    public TextSpan HostSpan => ActiveMapping.HostSpan;
+
+    public TextSpan ProjectedSpan => ActiveMapping.ProjectedSpan;
 
     public int ProjectedPosition { get; }
 
     public ImmutableArray<string> StateNames { get; }
+
+    public AkburaCSharpImportContext ImportContext { get; }
+
+    public ImmutableArray<AkburaProjectedSymbolOrigin> SyntheticSymbols { get; }
+
+    public AkburaCSharpProjection WithProjectedPosition(
+        int projectedPosition)
+    {
+        if (projectedPosition < ActiveMapping.ProjectedSpan.Start ||
+            projectedPosition > ActiveMapping.ProjectedSpan.End)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(projectedPosition));
+        }
+
+        if (projectedPosition == ProjectedPosition)
+        {
+            return this;
+        }
+
+        return new AkburaCSharpProjection(
+            Root,
+            ActiveMapping,
+            Mappings,
+            projectedPosition,
+            StateNames,
+            ImportContext,
+            SyntheticSymbols);
+    }
+
+    public bool TryGetSyntheticOrigin(
+        SyntaxNode declarationSyntax,
+        out AkburaProjectedSymbolOrigin origin)
+    {
+        if (declarationSyntax == null)
+        {
+            throw new ArgumentNullException(nameof(declarationSyntax));
+        }
+
+        for (var current = declarationSyntax;
+             current != null;
+             current = current.Parent)
+        {
+            foreach (var annotation in current.GetAnnotations(
+                         CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+            {
+                if (!CSharpProbeSymbolOrigin.TryParse(
+                        annotation.Data,
+                        out var probeOrigin))
+                {
+                    continue;
+                }
+
+                foreach (var candidate in SyntheticSymbols)
+                {
+                    if (string.Equals(
+                            candidate.AnnotationId,
+                            probeOrigin.AnnotationId,
+                            StringComparison.Ordinal))
+                    {
+                        origin = candidate;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        origin = null!;
+        return false;
+    }
 
     public bool IsStateName(string name)
     {
@@ -53,45 +141,136 @@ internal sealed class AkburaCSharpProjection
         TextSpan projectedSpan,
         out TextSpan hostSpan)
     {
-        if (projectedSpan.Start < ProjectedSpan.Start ||
-            projectedSpan.End > ProjectedSpan.End)
+        foreach (var mapping in Mappings)
         {
-            hostSpan = default;
-            return false;
+            if (!Contains(mapping.ProjectedSpan, projectedSpan))
+            {
+                continue;
+            }
+
+            hostSpan = Translate(
+                projectedSpan,
+                mapping.ProjectedSpan,
+                mapping.HostSpan);
+            return true;
         }
 
-        hostSpan = new TextSpan(
-            HostSpan.Start +
-                projectedSpan.Start -
-                ProjectedSpan.Start,
-            projectedSpan.Length);
-        return true;
+        hostSpan = default;
+        return false;
+    }
+
+    public bool TryMapToProjected(
+        TextSpan hostSpan,
+        out TextSpan projectedSpan)
+    {
+        foreach (var mapping in Mappings)
+        {
+            if (!Contains(mapping.HostSpan, hostSpan))
+            {
+                continue;
+            }
+
+            projectedSpan = Translate(
+                hostSpan,
+                mapping.HostSpan,
+                mapping.ProjectedSpan);
+            return true;
+        }
+
+        projectedSpan = default;
+        return false;
     }
 
     public bool TryMapPositionToHost(
         int projectedPosition,
         out int hostPosition)
     {
-        if (projectedPosition < ProjectedSpan.Start ||
-            projectedPosition > ProjectedSpan.End)
+        foreach (var mapping in Mappings)
         {
-            hostPosition = default;
-            return false;
+            if (projectedPosition < mapping.ProjectedSpan.Start ||
+                projectedPosition > mapping.ProjectedSpan.End)
+            {
+                continue;
+            }
+
+            hostPosition = mapping.HostSpan.Start +
+                projectedPosition -
+                mapping.ProjectedSpan.Start;
+            return true;
         }
 
-        hostPosition = HostSpan.Start +
-            projectedPosition -
-            ProjectedSpan.Start;
-        return true;
+        hostPosition = default;
+        return false;
+    }
+
+    public bool TryMapPositionToProjected(
+        int hostPosition,
+        out int projectedPosition)
+    {
+        foreach (var mapping in Mappings)
+        {
+            if (hostPosition < mapping.HostSpan.Start ||
+                hostPosition > mapping.HostSpan.End)
+            {
+                continue;
+            }
+
+            projectedPosition = mapping.ProjectedSpan.Start +
+                hostPosition -
+                mapping.HostSpan.Start;
+            return true;
+        }
+
+        projectedPosition = default;
+        return false;
+    }
+
+    private static bool Contains(TextSpan container, TextSpan value)
+    {
+        return value.Start >= container.Start &&
+            value.End <= container.End;
+    }
+
+    private static TextSpan Translate(
+        TextSpan value,
+        TextSpan source,
+        TextSpan target)
+    {
+        return new TextSpan(
+            target.Start + value.Start - source.Start,
+            value.Length);
     }
 }
 
 internal static class AkburaCSharpProjectionFactory
 {
+    private const string UsingMappingAnnotationKind =
+        "AkburaCSharpUsingMapping";
+
     public static bool TryCreate(
         AkburaSyntacticDocument syntacticDocument,
         AkburaDocumentContext semanticContext,
         AkburaCSharpCompletionContext completionContext,
+        out AkburaCSharpProjection projection,
+        CancellationToken cancellationToken = default)
+    {
+        return TryCreate(
+            syntacticDocument,
+            semanticContext,
+            new AkburaEmbeddedCSharpContext(
+                completionContext.Kind,
+                completionContext.OwnerKind,
+                completionContext.OwnerSpan,
+                completionContext.HostSpan,
+                completionContext.HostPosition),
+            out projection,
+            cancellationToken);
+    }
+
+    public static bool TryCreate(
+        AkburaSyntacticDocument syntacticDocument,
+        AkburaDocumentContext semanticContext,
+        AkburaEmbeddedCSharpContext embeddedContext,
         out AkburaCSharpProjection projection,
         CancellationToken cancellationToken = default)
     {
@@ -125,39 +304,39 @@ internal static class AkburaCSharpProjectionFactory
         CSharpProbeProjection probe;
         try
         {
-            probe = completionContext.Kind switch
+            probe = embeddedContext.Kind switch
             {
                 AkburaCSharpCompletionContextKind.Expression =>
                     CreateExpressionProjection(
                         semanticModel,
                         root,
-                        completionContext),
+                        embeddedContext),
 
                 AkburaCSharpCompletionContextKind.Statement =>
                     CreateStatementProjection(
                         semanticModel,
                         root,
-                        completionContext),
+                        embeddedContext),
 
                 AkburaCSharpCompletionContextKind.Type =>
                     CreateTypeProjection(
                         semanticModel,
                         root,
-                        completionContext),
+                        embeddedContext),
 
                 AkburaCSharpCompletionContextKind
                     .UsingDirectiveName =>
                     CreateUsingProjection(
                         semanticModel,
                         root,
-                        completionContext),
+                        embeddedContext),
 
                 AkburaCSharpCompletionContextKind
                     .CommandParameterList =>
                     CreateCommandParameterProjection(
                         semanticModel,
                         root,
-                        completionContext),
+                        embeddedContext),
 
                 _ => throw new InvalidOperationException(
                     "The C# completion context is not supported."),
@@ -182,25 +361,53 @@ internal static class AkburaCSharpProjectionFactory
         cancellationToken.ThrowIfCancellationRequested();
 
         if (probe.ProjectedSpan.Length !=
-            completionContext.HostSpan.Length)
+            embeddedContext.HostSpan.Length)
         {
             projection = null!;
             return false;
         }
 
+        var projectedRoot = AddUsingMappings(
+            syntacticDocument,
+            embeddedContext,
+            probe,
+            out var projectedActiveSpan,
+            out var usingMappings);
+        var activeMapping = new AkburaCSharpProjectionMapping(
+            AkburaCSharpProjectionMappingKind.ActiveFragment,
+            embeddedContext.HostSpan,
+            projectedActiveSpan);
+        using var mappings =
+            ImmutableArrayBuilder<AkburaCSharpProjectionMapping>.Rent();
+        mappings.Add(activeMapping);
+        mappings.AddRange(usingMappings);
+        using var syntheticSymbols =
+            ImmutableArrayBuilder<AkburaProjectedSymbolOrigin>.Rent();
+        foreach (var symbolOrigin in probe.SymbolOrigins)
+        {
+            syntheticSymbols.Add(new AkburaProjectedSymbolOrigin(
+                symbolOrigin.AnnotationId,
+                symbolOrigin.Kind,
+                symbolOrigin.Name,
+                symbolOrigin.DeclarationSpan));
+        }
+
         projection = new AkburaCSharpProjection(
-            probe.Root,
-            completionContext.HostSpan,
-            probe.ProjectedSpan,
-            probe.ProjectedPosition,
-            probe.StateNames);
+            projectedRoot,
+            activeMapping,
+            mappings.ToImmutable(),
+            projectedActiveSpan.Start +
+                embeddedContext.RelativePosition,
+            probe.StateNames,
+            CreateImportContext(syntacticDocument),
+            syntheticSymbols.ToImmutable());
         return true;
     }
 
     private static CSharpProbeProjection CreateExpressionProjection(
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
-        AkburaCSharpCompletionContext context)
+        AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpExpressionSyntax>(root, context);
         if (syntax == null ||
@@ -218,7 +425,7 @@ internal static class AkburaCSharpProjectionFactory
     private static CSharpProbeProjection CreateStatementProjection(
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
-        AkburaCSharpCompletionContext context)
+        AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpStatementSyntax>(root, context);
         if (syntax == null ||
@@ -240,7 +447,7 @@ internal static class AkburaCSharpProjectionFactory
     private static CSharpProbeProjection CreateTypeProjection(
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
-        AkburaCSharpCompletionContext context)
+        AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpTypeSyntax>(root, context);
         if (syntax == null ||
@@ -258,7 +465,7 @@ internal static class AkburaCSharpProjectionFactory
     private static CSharpProbeProjection CreateUsingProjection(
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
-        AkburaCSharpCompletionContext context)
+        AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<
             Akbura.Language.Syntax.UsingDirectiveSyntax>(root, context);
@@ -278,7 +485,7 @@ internal static class AkburaCSharpProjectionFactory
         CreateCommandParameterProjection(
             AkburaSemanticModel semanticModel,
             AkburaSyntax root,
-            AkburaCSharpCompletionContext context)
+            AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpParameterListSyntax>(root, context);
         if (syntax == null ||
@@ -295,7 +502,7 @@ internal static class AkburaCSharpProjectionFactory
 
     private static TSyntax? FindSyntax<TSyntax>(
         AkburaSyntax root,
-        AkburaCSharpCompletionContext context)
+        AkburaEmbeddedCSharpContext context)
         where TSyntax : AkburaSyntax
     {
         return root.DescendantNodes()
@@ -358,5 +565,228 @@ internal static class AkburaCSharpProjectionFactory
             currentContext = null!;
             return false;
         }
+    }
+
+    private static CompilationUnitSyntax AddUsingMappings(
+        AkburaSyntacticDocument document,
+        AkburaEmbeddedCSharpContext context,
+        CSharpProbeProjection probe,
+        out TextSpan projectedActiveSpan,
+        out ImmutableArray<AkburaCSharpProjectionMapping> mappings)
+    {
+        var root = probe.Root;
+        var replacements = new Dictionary<
+            Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax,
+            Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax>();
+        var mappingSources = new List<UsingMappingSource>();
+        var claimedUsings = new HashSet<
+            Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax>();
+        var hostRoot = document.SyntaxTree.GetRootSyntax();
+
+        foreach (var hostUsing in hostRoot.DescendantNodes()
+                     .OfType<Akbura.Language.Syntax.UsingDirectiveSyntax>())
+        {
+            if (hostUsing.FullSpan == context.OwnerSpan ||
+                IsAkcssUsingDirective(hostUsing))
+            {
+                continue;
+            }
+
+            Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax
+                hostCSharpUsing;
+            try
+            {
+                hostCSharpUsing = hostUsing.ToCSharp();
+            }
+            catch (Exception exception)
+                when (exception is InvalidOperationException ||
+                      exception is ArgumentException ||
+                      exception is InvalidCastException)
+            {
+                continue;
+            }
+
+            var key = CSharpUsingKey.Create(hostCSharpUsing);
+            var projectedUsing = root.Usings.FirstOrDefault(candidate =>
+                !claimedUsings.Contains(candidate) &&
+                CSharpUsingKey.Create(candidate).Equals(key));
+            if (projectedUsing == null)
+            {
+                continue;
+            }
+
+            var hostSpan = hostUsing.Span;
+            var parsedUsing = CSharpSyntaxFactory
+                .ParseCompilationUnit(document.Text.ToString(hostSpan))
+                .Usings
+                .SingleOrDefault();
+            if (parsedUsing == null ||
+                parsedUsing.Span.Length != hostSpan.Length)
+            {
+                continue;
+            }
+
+            var annotation = new SyntaxAnnotation(
+                UsingMappingAnnotationKind,
+                Guid.NewGuid().ToString("N"));
+            claimedUsings.Add(projectedUsing);
+            replacements.Add(
+                projectedUsing,
+                parsedUsing.WithAdditionalAnnotations(annotation));
+            mappingSources.Add(new UsingMappingSource(
+                annotation,
+                hostSpan));
+        }
+
+        if (replacements.Count != 0)
+        {
+            root = root.ReplaceNodes(
+                replacements.Keys,
+                (original, _) => replacements[original]);
+        }
+
+        var activeNode = root
+            .GetAnnotatedNodes(probe.ActiveAnnotation)
+            .Single();
+        projectedActiveSpan = activeNode.FullSpan;
+
+        using var builder =
+            ImmutableArrayBuilder<AkburaCSharpProjectionMapping>.Rent();
+        foreach (var source in mappingSources)
+        {
+            var projectedUsing = root
+                .GetAnnotatedNodes(source.Annotation)
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax>()
+                .Single();
+            if (projectedUsing.Span.Length != source.HostSpan.Length)
+            {
+                continue;
+            }
+
+            builder.Add(new AkburaCSharpProjectionMapping(
+                AkburaCSharpProjectionMappingKind.UsingDirective,
+                source.HostSpan,
+                projectedUsing.Span));
+        }
+
+        mappings = builder.ToImmutable();
+        return root;
+    }
+
+    private static AkburaCSharpImportContext CreateImportContext(
+        AkburaSyntacticDocument document)
+    {
+        var root = document.SyntaxTree.GetRootSyntax();
+        using var ordinaryUsings =
+            ImmutableArrayBuilder<Akbura.Language.Syntax.UsingDirectiveSyntax>.Rent();
+        using var globalUsings =
+            ImmutableArrayBuilder<Akbura.Language.Syntax.UsingDirectiveSyntax>.Rent();
+        var existingImports = ImmutableHashSet.CreateBuilder<CSharpUsingKey>();
+        Akbura.Language.Syntax.NamespaceDeclarationSyntax? namespaceDeclaration = null;
+        AkburaSyntax? firstTopLevelMember = null;
+
+        if (root is AkburaDocumentSyntax documentRoot)
+        {
+            foreach (var member in documentRoot.Members)
+            {
+                firstTopLevelMember ??= member;
+                if (member is Akbura.Language.Syntax.NamespaceDeclarationSyntax currentNamespace)
+                {
+                    namespaceDeclaration ??= currentNamespace;
+                    continue;
+                }
+
+                if (member is not Akbura.Language.Syntax.UsingDirectiveSyntax usingDirective ||
+                    IsAkcssUsingDirective(usingDirective))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    existingImports.Add(CSharpUsingKey.Create(
+                        usingDirective.ToCSharp()));
+                }
+                catch (Exception exception)
+                    when (exception is InvalidOperationException ||
+                          exception is ArgumentException ||
+                          exception is InvalidCastException)
+                {
+                    continue;
+                }
+
+                if (usingDirective.GlobalKeyword.RawKind != 0)
+                {
+                    globalUsings.Add(usingDirective);
+                }
+                else
+                {
+                    ordinaryUsings.Add(usingDirective);
+                }
+            }
+        }
+
+        var insertionPosition = ordinaryUsings.Count != 0
+            ? ordinaryUsings.WrittenSpan[ordinaryUsings.Count - 1].Span.End
+            : globalUsings.Count != 0
+                ? globalUsings.WrittenSpan[globalUsings.Count - 1].Span.End
+                : namespaceDeclaration != null
+                    ? namespaceDeclaration.Span.End
+                    : firstTopLevelMember?.Span.Start ?? 0;
+        var text = document.Text;
+        var needsLeadingLineBreak = insertionPosition > 0 &&
+            text[insertionPosition - 1] != '\r' &&
+            text[insertionPosition - 1] != '\n';
+        var needsTrailingLineBreak = insertionPosition < text.Length &&
+            text[insertionPosition] != '\r' &&
+            text[insertionPosition] != '\n';
+
+        return new AkburaCSharpImportContext(
+            insertionPosition,
+            DetectNewLine(text),
+            needsLeadingLineBreak,
+            needsTrailingLineBreak,
+            existingImports.ToImmutable());
+    }
+
+    private static string DetectNewLine(SourceText text)
+    {
+        foreach (var line in text.Lines)
+        {
+            var lineBreakSpan = TextSpan.FromBounds(
+                line.End,
+                line.EndIncludingLineBreak);
+            if (lineBreakSpan.Length != 0)
+            {
+                return text.ToString(lineBreakSpan);
+            }
+        }
+
+        return Environment.NewLine;
+    }
+
+    private static bool IsAkcssUsingDirective(
+        Akbura.Language.Syntax.UsingDirectiveSyntax usingDirective)
+    {
+        return usingDirective.Alias == null &&
+            usingDirective.StaticKeyword.RawKind == 0 &&
+            usingDirective.Name.ToFullString()
+                .Trim()
+                .EndsWith(".akcss", StringComparison.Ordinal);
+    }
+
+    private readonly struct UsingMappingSource
+    {
+        public UsingMappingSource(
+            SyntaxAnnotation annotation,
+            TextSpan hostSpan)
+        {
+            Annotation = annotation;
+            HostSpan = hostSpan;
+        }
+
+        public SyntaxAnnotation Annotation { get; }
+
+        public TextSpan HostSpan { get; }
     }
 }

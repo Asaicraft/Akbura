@@ -8,6 +8,8 @@ namespace Akbura.Workspaces;
 /// </summary>
 public readonly struct AkburaCompletionResult
 {
+    private readonly ImmutableArray<AkburaCompletionItem> _items;
+
     public AkburaCompletionResult(
         TextSpan applicableSpan,
         ImmutableArray<AkburaCompletionItem> items)
@@ -21,7 +23,7 @@ public readonly struct AkburaCompletionResult
         bool isIncomplete)
     {
         ApplicableSpan = applicableSpan;
-        Items = items.IsDefault
+        _items = items.IsDefault
             ? ImmutableArray<AkburaCompletionItem>.Empty
             : items;
         IsIncomplete = isIncomplete;
@@ -29,7 +31,9 @@ public readonly struct AkburaCompletionResult
 
     public TextSpan ApplicableSpan { get; }
 
-    public ImmutableArray<AkburaCompletionItem> Items { get; }
+    public ImmutableArray<AkburaCompletionItem> Items => _items.IsDefault
+        ? ImmutableArray<AkburaCompletionItem>.Empty
+        : _items;
 
     /// <summary>
     /// Gets whether another completion request should be made after the user
@@ -37,5 +41,5 @@ public readonly struct AkburaCompletionResult
     /// </summary>
     public bool IsIncomplete { get; }
 
-    public bool IsEmpty => Items.IsDefaultOrEmpty;
+    public bool IsEmpty => _items.IsDefaultOrEmpty;
 }

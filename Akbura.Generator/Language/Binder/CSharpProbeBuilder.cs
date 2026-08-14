@@ -217,7 +217,21 @@ internal sealed class CSharpProbeBuilder
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
-        var annotatedParameters = parameters
+        var hostOffset = command.Parameters.Parameters.FullSpan.Start;
+        var parametersWithOrigins = parameters.ReplaceNodes(
+            parameters.Parameters,
+            (original, _) => original.WithAdditionalAnnotations(
+                new SyntaxAnnotation(
+                    CSharpProbeBinder.ProjectedSymbolAnnotationKind,
+                    new CSharpProbeSymbolOrigin(
+                        Guid.NewGuid().ToString("N"),
+                        Akbura.Language.Symbols.SymbolKind.CommandParameter,
+                        original.Identifier.ValueText,
+                        new TextSpan(
+                            hostOffset + original.Identifier.Span.Start,
+                            original.Identifier.Span.Length))
+                    .Serialize())));
+        var annotatedParameters = parametersWithOrigins
             .WithAdditionalAnnotations(annotation);
         CSharp.TypeSyntax returnType;
         try
@@ -383,12 +397,30 @@ internal sealed class CSharpProbeBuilder
                 !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
+        using var symbolOrigins =
+            ImmutableArrayBuilder<CSharpProbeSymbolOrigin>.Rent();
+        foreach (var node in root.GetAnnotatedNodes(
+                     CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+        {
+            foreach (var symbolAnnotation in node.GetAnnotations(
+                         CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+            {
+                if (CSharpProbeSymbolOrigin.TryParse(
+                        symbolAnnotation.Data,
+                        out var origin))
+                {
+                    symbolOrigins.Add(origin);
+                }
+            }
+        }
 
         return new CSharpProbeProjection(
             root,
             projectedNode.FullSpan,
             projectedNode.FullSpan.Start + relativePosition,
-            stateNames);
+            stateNames,
+            annotation,
+            symbolOrigins.ToImmutable());
     }
 
     private static CSharp.MethodDeclarationSyntax?
@@ -470,7 +502,20 @@ internal sealed class CSharpProbeBuilder
                 statement.GetRawCSharpStatement() is
                     CSharp.LocalDeclarationStatementSyntax localDeclaration)
             {
-                builder.Add(localDeclaration);
+                var hostOffset = statement.Tokens.FullSpan.Start;
+                builder.Add(localDeclaration.ReplaceNodes(
+                    localDeclaration.Declaration.Variables,
+                    (original, _) => original.WithAdditionalAnnotations(
+                        new SyntaxAnnotation(
+                            CSharpProbeBinder.ProjectedSymbolAnnotationKind,
+                            new CSharpProbeSymbolOrigin(
+                                Guid.NewGuid().ToString("N"),
+                                Akbura.Language.Symbols.SymbolKind.CSharpSymbol,
+                                original.Identifier.ValueText,
+                                new TextSpan(
+                                    hostOffset + original.Identifier.Span.Start,
+                                    original.Identifier.Span.Length))
+                            .Serialize()))));
             }
         }
     }
@@ -482,7 +527,9 @@ internal readonly struct CSharpProbeProjection
         CSharp.CompilationUnitSyntax root,
         TextSpan projectedSpan,
         int projectedPosition,
-        ImmutableArray<string> stateNames)
+        ImmutableArray<string> stateNames,
+        SyntaxAnnotation activeAnnotation,
+        ImmutableArray<CSharpProbeSymbolOrigin> symbolOrigins)
     {
         Root = root ?? throw new ArgumentNullException(nameof(root));
         ProjectedSpan = projectedSpan;
@@ -490,6 +537,11 @@ internal readonly struct CSharpProbeProjection
         StateNames = stateNames.IsDefault
             ? ImmutableArray<string>.Empty
             : stateNames;
+        ActiveAnnotation = activeAnnotation ??
+            throw new ArgumentNullException(nameof(activeAnnotation));
+        SymbolOrigins = symbolOrigins.IsDefault
+            ? ImmutableArray<CSharpProbeSymbolOrigin>.Empty
+            : symbolOrigins;
     }
 
     public CSharp.CompilationUnitSyntax Root { get; }
@@ -499,4 +551,8 @@ internal readonly struct CSharpProbeProjection
     public int ProjectedPosition { get; }
 
     public ImmutableArray<string> StateNames { get; }
+
+    public SyntaxAnnotation ActiveAnnotation { get; }
+
+    public ImmutableArray<CSharpProbeSymbolOrigin> SymbolOrigins { get; }
 }

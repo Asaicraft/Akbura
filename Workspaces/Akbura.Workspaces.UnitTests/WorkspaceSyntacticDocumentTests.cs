@@ -125,6 +125,12 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("sta|", "sta")]
     [InlineData("\n    st|", "st")]
     [InlineData("<Button/>\nst|", "st")]
+    [InlineData(
+        "state int count = 0;\n\nstat|\n\n<StackPanel/>",
+        "stat")]
+    [InlineData(
+        "state int count = 0;\n\nstat|\n\n<StackPanel gap-3>\n<Button Click={count--}/>\n</StackPanel>",
+        "stat")]
     public void SyntacticDocument_DetectsTopLevelKeywordCompletion(
         string sourceWithCaret,
         string expectedPrefix)
@@ -503,6 +509,27 @@ public sealed class WorkspaceSyntacticDocumentTests
         Assert.Equal(
             "</Card>",
             document.GetAutoClosingTagText(source.Length));
+    }
+
+    [Theory]
+    [InlineData(
+        "state double value = Amx.DynamicResource<double>|;")]
+    [InlineData(
+        "state Dictionary<string, List<int>> value = Create<Dictionary<string, List<int>>>|();")]
+    [InlineData(
+        "<Button Tag={GetValue<double>|()}/>")]
+    public void SyntacticDocument_DoesNotAutoCloseCSharpGeneric(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf(
+            '|',
+            StringComparison.Ordinal);
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.Null(document.GetAutoClosingTagText(position));
     }
 
     [Fact]

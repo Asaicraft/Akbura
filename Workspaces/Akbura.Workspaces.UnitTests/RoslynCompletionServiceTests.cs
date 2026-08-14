@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Reflection;
@@ -69,6 +70,116 @@ internal static class RoslynCompletionTestHost
     {
         using var workspace = new AdhocWorkspace(
             MefHostServices.Create(s_assemblies));
+        var document = CreateDocument(
+            workspace,
+            compilation,
+            root,
+            cancellationToken);
+        var service = CompletionService.GetService(document);
+        if (service == null)
+        {
+            return null;
+        }
+
+        return await service.GetCompletionsAsync(
+            document,
+            position,
+            CompletionTrigger.Invoke,
+            cancellationToken: cancellationToken);
+    }
+
+    public static async Task<RoslynImportCompletionResult?>
+        GetImportCompletionAsync(
+            CSharpCompilation compilation,
+            Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax root,
+            int position,
+            string displayText,
+            CancellationToken cancellationToken)
+    {
+        return await GetCompletionChangeAsync(
+            compilation,
+            root,
+            position,
+            displayText,
+            requireComplexTextEdit: true,
+            cancellationToken);
+    }
+
+    public static async Task<RoslynImportCompletionResult?>
+        GetCompletionChangeAsync(
+            CSharpCompilation compilation,
+            Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax root,
+            int position,
+            string displayText,
+            bool requireComplexTextEdit,
+            CancellationToken cancellationToken)
+    {
+        using var workspace = new AdhocWorkspace(
+            MefHostServices.Create(s_assemblies));
+        var document = CreateDocument(
+            workspace,
+            compilation,
+            root,
+            cancellationToken);
+        var service = CompletionService.GetService(document);
+        if (service == null)
+        {
+            return null;
+        }
+
+        var completions = await service.GetCompletionsAsync(
+            document,
+            position,
+            CompletionTrigger.Invoke,
+            cancellationToken: cancellationToken);
+        var item = completions?.ItemsList.FirstOrDefault(candidate =>
+            candidate.DisplayText == displayText &&
+            (!requireComplexTextEdit || candidate.IsComplexTextEdit));
+        if (item == null)
+        {
+            return null;
+        }
+
+        var change = await service.GetChangeAsync(
+            document,
+            item,
+            commitCharacter: null,
+            cancellationToken);
+        var text = await document.GetTextAsync(cancellationToken);
+        return new RoslynImportCompletionResult(
+            item,
+            change,
+            text);
+    }
+
+    public static async Task<QuickInfoItem?> GetQuickInfoAsync(
+        CSharpCompilation compilation,
+        Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax root,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        using var workspace = new AdhocWorkspace(
+            MefHostServices.Create(s_assemblies));
+        var document = CreateDocument(
+            workspace,
+            compilation,
+            root,
+            cancellationToken);
+        var service = QuickInfoService.GetService(document);
+        return service == null
+            ? null
+            : await service.GetQuickInfoAsync(
+                document,
+                position,
+                cancellationToken);
+    }
+
+    private static Document CreateDocument(
+        AdhocWorkspace workspace,
+        CSharpCompilation compilation,
+        Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax root,
+        CancellationToken cancellationToken)
+    {
         var parseOptions = compilation.SyntaxTrees
             .Select(static tree => tree.Options)
             .OfType<CSharpParseOptions>()
@@ -102,17 +213,7 @@ internal static class RoslynCompletionTestHost
             SourceText.From(root.ToFullString()),
             filePath: "Counter.akbura.completion.cs")
             .WithSyntaxRoot(root);
-        var service = CompletionService.GetService(document);
-        if (service == null)
-        {
-            return null;
-        }
-
-        return await service.GetCompletionsAsync(
-            document,
-            position,
-            CompletionTrigger.Invoke,
-            cancellationToken: cancellationToken);
+        return document;
     }
 
     public static ImmutableArray<MetadataReference>
@@ -135,4 +236,23 @@ internal static class RoslynCompletionTestHost
                 MetadataReference.CreateFromFile(path))
             .ToImmutableArray<MetadataReference>();
     }
+}
+
+internal readonly struct RoslynImportCompletionResult
+{
+    public RoslynImportCompletionResult(
+        CompletionItem item,
+        CompletionChange change,
+        SourceText projectedText)
+    {
+        Item = item;
+        Change = change;
+        ProjectedText = projectedText;
+    }
+
+    public CompletionItem Item { get; }
+
+    public CompletionChange Change { get; }
+
+    public SourceText ProjectedText { get; }
 }

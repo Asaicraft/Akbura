@@ -4,6 +4,7 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -42,6 +43,16 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         cancellationToken
             .ThrowIfCancellationRequested();
+
+        var projectedDefinition =
+            GetProjectedCSharpDefinition(
+                context,
+                position,
+                cancellationToken);
+        if (projectedDefinition != null)
+        {
+            return projectedDefinition;
+        }
 
         var root = document.SyntaxTree.GetRootSyntax();
 
@@ -186,6 +197,181 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
                         break;
                     }
+            }
+        }
+
+        return null;
+    }
+
+    private static AkburaDefinition?
+        GetProjectedCSharpDefinition(
+            AkburaDocumentContext context,
+            int position,
+            CancellationToken cancellationToken)
+    {
+        var document = context.Document;
+        AkburaSyntacticDocument syntacticDocument;
+        try
+        {
+            syntacticDocument = AkburaSyntacticDocument.Parse(
+                document.Text,
+                document.FilePath,
+                cancellationToken);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or
+                  InvalidOperationException or
+                  InvalidCastException)
+        {
+            return null;
+        }
+
+        if (!syntacticDocument.TryGetEmbeddedCSharpContext(
+                position,
+                out var embeddedContext,
+                cancellationToken) ||
+            !AkburaCSharpProjectionFactory.TryCreate(
+                syntacticDocument,
+                context,
+                embeddedContext,
+                out var projection,
+                cancellationToken))
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var probeCompilation =
+            context.Project.Compilation.CSharpProbeCompilation;
+        var parseOptions = probeCompilation.SyntaxTrees
+                .FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(
+                LanguageVersion.Preview);
+        var syntaxTree = CSharpSyntaxTree.Create(
+            projection.Root,
+            parseOptions,
+            path: document.FilePath + ".projection.cs",
+            encoding: document.Text.Encoding);
+        var compilation = probeCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var projectedRoot = syntaxTree.GetRoot(cancellationToken);
+        var projectedPosition = Math.Min(
+            projection.ProjectedPosition,
+            Math.Max(0, projectedRoot.FullSpan.End - 1));
+        var token = projectedRoot.FindToken(
+            projectedPosition,
+            findInsideTrivia: true);
+
+        if (!projection.TryMapToHost(
+                token.Span,
+                out var sourceSpan) ||
+            !sourceSpan.Contains(position))
+        {
+            sourceSpan = new TextSpan(
+                position,
+                Math.Min(1, document.Text.Length - position));
+        }
+
+        var symbol = GetBestProjectedSymbol(
+            semanticModel,
+            token.Parent,
+            projection.ActiveMapping.ProjectedSpan,
+            cancellationToken);
+        if (symbol == null)
+        {
+            return null;
+        }
+
+        foreach (var declarationReference in
+                 symbol.DeclaringSyntaxReferences)
+        {
+            if (!ReferenceEquals(
+                    declarationReference.SyntaxTree,
+                    syntaxTree))
+            {
+                continue;
+            }
+
+            var declaration = declarationReference.GetSyntax(
+                cancellationToken);
+            if (!projection.TryGetSyntheticOrigin(
+                    declaration,
+                    out var origin))
+            {
+                continue;
+            }
+
+            var targetSpan = ClampSpan(
+                origin.DeclarationSpan,
+                document.Text.Length);
+            return new AkburaDefinition(
+                sourceSpan,
+                document.FilePath,
+                document.Text.Lines.GetLinePositionSpan(targetSpan),
+                document.Text);
+        }
+
+        return CreateDefinition(
+            context,
+            sourceSpan,
+            akburaSymbol: null,
+            symbol,
+            cancellationToken);
+    }
+
+    private static RoslynSymbol? GetBestProjectedSymbol(
+        Microsoft.CodeAnalysis.SemanticModel semanticModel,
+        Microsoft.CodeAnalysis.SyntaxNode? node,
+        TextSpan activeSpan,
+        CancellationToken cancellationToken)
+    {
+        for (var current = node;
+             current != null &&
+             current.Span.IntersectsWith(activeSpan);
+             current = current.Parent)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (current is CSharp.NameSyntax name)
+            {
+                var alias = semanticModel.GetAliasInfo(
+                    name,
+                    cancellationToken);
+                if (alias != null)
+                {
+                    return alias;
+                }
+            }
+
+            var declaredSymbol = semanticModel.GetDeclaredSymbol(
+                current,
+                cancellationToken);
+            if (declaredSymbol != null)
+            {
+                return declaredSymbol;
+            }
+
+            var symbolInfo = semanticModel.GetSymbolInfo(
+                current,
+                cancellationToken);
+            if (symbolInfo.Symbol != null)
+            {
+                return symbolInfo.Symbol;
+            }
+
+            if (symbolInfo.CandidateSymbols.Length == 1)
+            {
+                return symbolInfo.CandidateSymbols[0];
+            }
+
+            var type = semanticModel.GetTypeInfo(
+                current,
+                cancellationToken).Type;
+            if (type != null &&
+                type.TypeKind != TypeKind.Error)
+            {
+                return type;
             }
         }
 
@@ -957,6 +1143,16 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 return csharpDefinition;
             }
 
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    context,
+                    sourceSpan,
+                    csharpSymbol,
+                    cancellationToken,
+                    out csharpDefinition))
+            {
+                return csharpDefinition;
+            }
+
             if (TryCreateAkburaComponentDefinition(
                     context,
                     sourceSpan,
@@ -976,6 +1172,16 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                     sourceSpan,
                     underlyingSymbol,
                     out var underlyingDefinition))
+            {
+                return underlyingDefinition;
+            }
+
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    context,
+                    sourceSpan,
+                    underlyingSymbol,
+                    cancellationToken,
+                    out underlyingDefinition))
             {
                 return underlyingDefinition;
             }
@@ -1372,6 +1578,102 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             if (TryCreatePhysicalDefinition(
                     sourceSpan,
                     lineSpan,
+                    out definition))
+            {
+                return true;
+            }
+        }
+
+        definition = null!;
+        return false;
+    }
+
+    private static bool TryCreateCompilationReferenceCSharpDefinition(
+        AkburaDocumentContext context,
+        TextSpan sourceSpan,
+        RoslynSymbol symbol,
+        CancellationToken cancellationToken,
+        out AkburaDefinition definition)
+    {
+        symbol = GetNavigationSymbol(symbol);
+
+        var documentationId =
+            symbol.GetDocumentationCommentId();
+        if (documentationId == null)
+        {
+            definition = null!;
+            return false;
+        }
+
+        var targetAssemblyName =
+            symbol.ContainingAssembly?.Identity.Name;
+        var visited =
+            new HashSet<AkburaCompilation>();
+
+        foreach (var reference in
+                 context.Project.Compilation
+                     .CompilationReferences)
+        {
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    reference.Compilation,
+                    sourceSpan,
+                    documentationId,
+                    targetAssemblyName,
+                    cancellationToken,
+                    visited,
+                    out definition))
+            {
+                return true;
+            }
+        }
+
+        definition = null!;
+        return false;
+    }
+
+    private static bool TryCreateCompilationReferenceCSharpDefinition(
+        AkburaCompilation compilation,
+        TextSpan sourceSpan,
+        string documentationId,
+        string? targetAssemblyName,
+        CancellationToken cancellationToken,
+        HashSet<AkburaCompilation> visited,
+        out AkburaDefinition definition)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!visited.Add(compilation))
+        {
+            definition = null!;
+            return false;
+        }
+
+        if ((targetAssemblyName == null ||
+             string.Equals(
+                 compilation.CSharpCompilation.AssemblyName,
+                 targetAssemblyName,
+                 StringComparison.Ordinal)) &&
+            DocumentationCommentId.GetFirstSymbolForReferenceId(
+                documentationId,
+                compilation.CSharpCompilation) is { } candidate &&
+            TryCreateCSharpDefinition(
+                sourceSpan,
+                candidate,
+                out definition))
+        {
+            return true;
+        }
+
+        foreach (var reference in
+                 compilation.CompilationReferences)
+        {
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    reference.Compilation,
+                    sourceSpan,
+                    documentationId,
+                    targetAssemblyName,
+                    cancellationToken,
+                    visited,
                     out definition))
             {
                 return true;

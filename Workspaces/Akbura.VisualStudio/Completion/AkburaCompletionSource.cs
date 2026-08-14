@@ -392,11 +392,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         foreach (var completion in result.List.ItemsList)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // Auto-import and expanded items can edit generated C# outside
-            // the single source span that maps back to the Akbura document.
-            if (completion.IsComplexTextEdit ||
-                !result.State.Projection.TryMapToHost(
-                    completion.Span,
+            if (!result.State.Projection.TryMapToHost(
+                     completion.Span,
                     out var hostSpan) ||
                 hostSpan.Start < 0 ||
                 hostSpan.End > snapshot.Length)
@@ -404,6 +401,12 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 continue;
             }
 
+            var suffix = string.IsNullOrWhiteSpace(
+                    completion.InlineDescription)
+                ? completion.DisplayTextSuffix
+                : completion.DisplayTextSuffix +
+                  "  " +
+                  completion.InlineDescription;
             var item = new CompletionItem(
                 displayText: completion.DisplayText,
                 source: this,
@@ -411,7 +414,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                     result.State.Projection,
                     completion),
                 filters: ImmutableArray<CompletionFilter>.Empty,
-                suffix: completion.DisplayTextSuffix,
+                suffix,
                 insertText: completion.DisplayText,
                 sortText: completion.SortText,
                 filterText: completion.FilterText,

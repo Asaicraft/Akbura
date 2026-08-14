@@ -1,10 +1,8 @@
 using Akbura.Workspaces;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
+using Akbura.VisualStudio.CSharp;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Text;
 using System.Diagnostics;
-using System.Text;
 using RoslynCompletionItem =
     Microsoft.CodeAnalysis.Completion.CompletionItem;
 using RoslynCompletionList =
@@ -18,13 +16,15 @@ namespace Akbura.VisualStudio.Completion;
 
 internal sealed class AkburaRoslynCompletionService
 {
-    private readonly AkburaVisualStudioWorkspace _workspaceHost;
+    private readonly AkburaProjectedCSharpDocumentService
+        _projectedDocumentService;
 
     public AkburaRoslynCompletionService(
-        AkburaVisualStudioWorkspace workspaceHost)
+        AkburaProjectedCSharpDocumentService projectedDocumentService)
     {
-        _workspaceHost = workspaceHost ??
-            throw new ArgumentNullException(nameof(workspaceHost));
+        _projectedDocumentService = projectedDocumentService ??
+            throw new ArgumentNullException(
+                nameof(projectedDocumentService));
     }
 
     public async Task<AkburaRoslynCompletionResult?>
@@ -46,43 +46,28 @@ internal sealed class AkburaRoslynCompletionService
             throw new ArgumentNullException(nameof(syntacticDocument));
         }
 
-        if (semanticContext == null)
-        {
-            Debug.WriteLine(
-                "[Akbura.Completion] Roslyn projection unavailable: " +
-                "no semantic project snapshot has been published yet.");
-            return null;
-        }
-
-        if (!AkburaCSharpProjectionFactory.TryCreate(
+        var embeddedContext = new AkburaEmbeddedCSharpContext(
+            completionContext.Kind,
+            completionContext.OwnerKind,
+            completionContext.OwnerSpan,
+            completionContext.HostSpan,
+            completionContext.HostPosition);
+        var projected = await _projectedDocumentService
+            .GetProjectedDocumentAsync(
+                snapshot,
                 syntacticDocument,
                 semanticContext,
-                completionContext,
-                out var projection,
-                cancellationToken))
+                embeddedContext,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (projected == null)
         {
-            Debug.WriteLine(
-                "[Akbura.Completion] Roslyn projection could not be " +
-                "created for the current C# fragment.");
             return null;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-
-        var project = _workspaceHost
-            .FindRoslynProjectForDocument(
-                syntacticDocument.FilePath);
-        if (project == null)
-        {
-            Debug.WriteLine(
-                "[Akbura.Completion] Roslyn projection project was not found.");
-            return null;
-        }
-
-        var document = CreateProjectionDocument(
-            project,
-            projection,
-            syntacticDocument.FilePath);
+        var document = projected.RoslynDocument;
+        var projection = projected.Projection;
         var completionService =
             RoslynCompletionService.GetService(document);
         if (completionService == null)
@@ -116,8 +101,7 @@ internal sealed class AkburaRoslynCompletionService
             $"{completionList.ItemsList.Count} raw items.");
 
         var state = new AkburaRoslynCompletionSessionState(
-            snapshot,
-            document,
+            projected,
             completionService,
             projection);
         return new AkburaRoslynCompletionResult(
@@ -125,49 +109,29 @@ internal sealed class AkburaRoslynCompletionService
             completionList);
     }
 
-    private static Document CreateProjectionDocument(
-        Project project,
-        AkburaCSharpProjection projection,
-        string akburaFilePath)
-    {
-        var name = Path.GetFileNameWithoutExtension(
-                akburaFilePath) +
-            ".AkburaCompletion.cs";
-        var filePath = akburaFilePath +
-            ".completion.cs";
-        var text = SourceText.From(
-            projection.Root.ToFullString(),
-            Encoding.UTF8);
-
-        var document = project.AddDocument(
-            name,
-            text,
-            filePath: filePath);
-        return document.WithSyntaxRoot(projection.Root);
-    }
 }
 
 internal sealed class AkburaRoslynCompletionSessionState
 {
     public AkburaRoslynCompletionSessionState(
-        ITextSnapshot hostSnapshot,
-        Document document,
+        AkburaProjectedCSharpDocument projectedDocument,
         RoslynCompletionService service,
         AkburaCSharpProjection projection)
     {
-        HostSnapshot = hostSnapshot ??
-            throw new ArgumentNullException(nameof(hostSnapshot));
-        Document = document ??
-            throw new ArgumentNullException(nameof(document));
+        ProjectedDocument = projectedDocument ??
+            throw new ArgumentNullException(nameof(projectedDocument));
         Service = service ??
             throw new ArgumentNullException(nameof(service));
         Projection = projection ??
             throw new ArgumentNullException(nameof(projection));
     }
 
-    public ITextSnapshot HostSnapshot { get; }
+    public AkburaProjectedCSharpDocument ProjectedDocument { get; }
 
-    public Document Document { get; }
+    public ITextSnapshot HostSnapshot => ProjectedDocument.HostSnapshot;
+
+    public Microsoft.CodeAnalysis.Document Document =>
+        ProjectedDocument.RoslynDocument;
 
     public RoslynCompletionService Service { get; }
 

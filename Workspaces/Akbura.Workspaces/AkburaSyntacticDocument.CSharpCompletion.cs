@@ -15,6 +15,24 @@ public sealed partial class AkburaSyntacticDocument
         out AkburaCSharpCompletionContext context,
         CancellationToken cancellationToken = default)
     {
+        if (!TryGetEmbeddedCSharpContext(
+                position,
+                out var embeddedContext,
+                cancellationToken))
+        {
+            context = default;
+            return false;
+        }
+
+        context = embeddedContext.ToCompletionContext();
+        return true;
+    }
+
+    internal bool TryGetEmbeddedCSharpContext(
+        int position,
+        out AkburaEmbeddedCSharpContext context,
+        CancellationToken cancellationToken = default)
+    {
         ValidatePosition(position);
         if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
             Text.Length == 0)
@@ -26,7 +44,7 @@ public sealed partial class AkburaSyntacticDocument
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = SyntaxTree.GetRootSyntax();
-        CSharpCompletionCandidate? best = null;
+        EmbeddedCSharpCandidate? best = null;
 
         if (position < Text.Length)
         {
@@ -140,8 +158,8 @@ public sealed partial class AkburaSyntacticDocument
                 return;
             }
 
-            var candidate = new CSharpCompletionCandidate(
-                new AkburaCSharpCompletionContext(
+            var candidate = new EmbeddedCSharpCandidate(
+                new AkburaEmbeddedCSharpContext(
                     kind,
                     owner.Kind,
                     owner.FullSpan,
@@ -167,17 +185,17 @@ public sealed partial class AkburaSyntacticDocument
             position <= span.End;
     }
 
-    private readonly struct CSharpCompletionCandidate
+    private readonly struct EmbeddedCSharpCandidate
     {
-        public CSharpCompletionCandidate(
-            AkburaCSharpCompletionContext context,
+        public EmbeddedCSharpCandidate(
+            AkburaEmbeddedCSharpContext context,
             int priority)
         {
             Context = context;
             Priority = priority;
         }
 
-        public AkburaCSharpCompletionContext Context { get; }
+        public AkburaEmbeddedCSharpContext Context { get; }
 
         public int Priority { get; }
     }

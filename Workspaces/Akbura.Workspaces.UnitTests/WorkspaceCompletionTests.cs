@@ -59,6 +59,298 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void Completion_AkcssOffersTopLevelKeywordsWithoutSemanticContext()
+    {
+        const string source = "@u";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        var item = Assert.Single(
+            result.Items,
+            static item => item.DisplayText == "@using");
+        Assert.Equal("@using ;", item.InsertText);
+        Assert.Equal(1, item.CaretOffsetFromEnd);
+        Assert.True(item.TriggerCompletionAfterInsert);
+        Assert.False(result.IsIncomplete);
+    }
+
+    [Fact]
+    public void Completion_AkcssBodyOffersDirectivesWhileSemanticContextIsPending()
+    {
+        const string sourceWithCaret =
+            ".card {\n    @a|\n}";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                position);
+
+        var item = Assert.Single(
+            result.Items,
+            static item => item.DisplayText == "@apply");
+        Assert.Equal(
+            "@a",
+            source.Substring(
+                result.ApplicableSpan.Start,
+                result.ApplicableSpan.Length));
+        Assert.Equal("@apply ;", item.InsertText);
+        Assert.True(result.IsIncomplete);
+    }
+
+    [Fact]
+    public void Completion_AkcssPropertyContextIsIncompleteWithoutSemanticModel()
+    {
+        const string sourceWithCaret =
+            ".card {\n    Wid|\n}";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                position);
+
+        Assert.Empty(result.Items);
+        Assert.True(result.IsIncomplete);
+    }
+
+    [Theory]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card {\n    Wid|\n}",
+        "Width",
+        "Width: ")]
+    [InlineData(
+        "@using Gallery;\n" +
+        "Options.card {\n    Na|\n}",
+        "Name",
+        "Name: ")]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card {\n    Grid.Ro|\n}",
+        "Grid.Row",
+        "Row: ")]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card {\n" +
+        "    @if(true) {\n        Wid|\n    }\n" +
+        "}",
+        "Width",
+        "Width: ")]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card {\n    Width: 10;\n    Wid|\n}",
+        "Width",
+        "Width: ")]
+    public void Completion_AkcssOffersSemanticProperties(
+        string sourceWithCaret,
+        string expectedDisplayText,
+        string expectedInsertText)
+    {
+        WithAkcssWorkspace(
+            sourceWithCaret,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var item = Assert.Single(
+                    result.Items,
+                    item => item.DisplayText == expectedDisplayText);
+                Assert.Equal(expectedInsertText, item.InsertText);
+                Assert.Equal(AkburaCompletionKind.Property, item.Kind);
+                Assert.True(item.TriggerCompletionAfterInsert);
+                Assert.False(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssApplyOffersCompatibleLocalDeclarations()
+    {
+        const string source = """
+            @using Avalonia.Controls;
+            @using Gallery;
+
+            Control.base-card {
+                Width: 10;
+            }
+
+            Options.incompatible {
+                Name: "ignored";
+            }
+
+            @utilities {
+                Control.gap-(double value) {
+                    Width: value;
+                }
+            }
+
+            Control.card {
+                @apply |;
+            }
+            """;
+
+        WithAkcssWorkspace(
+            source,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "base-card" &&
+                        item.Kind == AkburaCompletionKind.AkcssStyle);
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "gap-(double value)" &&
+                        item.Kind ==
+                            AkburaCompletionKind.TailwindUtility);
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item => item.DisplayText == "card");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item => item.DisplayText == "incompatible");
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssApplyUsesImportedResolutionLayer()
+    {
+        const string importedStyles = """
+            @using Avalonia.Controls;
+
+            Control.base-card {
+                Width: 10;
+            }
+
+            @utilities {
+                Control.gap-(double value) {
+                    Width: value;
+                }
+            }
+            """;
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "@using Imported.akcss;\n\n" +
+            "Control.card {\n    @apply base-card ga|;\n}";
+
+        WithAkcssWorkspace(
+            source,
+            importedStyles,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var utility = Assert.Single(
+                    result.Items,
+                    static item => item.Kind ==
+                        AkburaCompletionKind.TailwindUtility);
+                Assert.Equal("gap-(double value)", utility.DisplayText);
+                Assert.Equal("gap-", utility.InsertText);
+                Assert.Equal(
+                    "utility \u00B7 Imported.akcss",
+                    utility.Suffix);
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssApplyPreservesTypedUtilityArgument()
+    {
+        const string importedStyles = """
+            @using Avalonia.Controls;
+
+            @utilities {
+                Control.gap-(double value) {
+                    Width: value;
+                }
+            }
+            """;
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "@using Imported.akcss;\n\n" +
+            "Control.card {\n    @apply gap-12|;\n}";
+
+        WithAkcssWorkspace(
+            source,
+            importedStyles,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var utility = Assert.Single(
+                    result.Items,
+                    static item => item.Kind ==
+                        AkburaCompletionKind.TailwindUtility);
+                Assert.Equal("gap-12", utility.InsertText);
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssUsingOffersFullModuleName()
+    {
+        const string source = "@using Imp|";
+        WithAkcssWorkspace(
+            source,
+            ".imported { Width: 1; }",
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var module = Assert.Single(
+                    result.Items,
+                    static item => item.Kind ==
+                        AkburaCompletionKind.AkcssModule);
+                Assert.Equal("Imported.akcss", module.DisplayText);
+                Assert.Equal(module.DisplayText, module.InsertText);
+                Assert.False(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
     public void Completion_TopLevelFiltersStateByPrefix()
     {
         const string source = "par";
@@ -1210,6 +1502,71 @@ public sealed class WorkspaceCompletionTests
             source,
             stylesSource: null,
             assertion);
+    }
+
+    private static void WithAkcssWorkspace(
+        string sourceWithCaret,
+        string? importedStylesSource,
+        Action<
+            AkburaWorkspace,
+            AkburaDocumentContext,
+            AkburaSyntacticDocument,
+            int> assertion)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = position >= 0
+            ? sourceWithCaret.Remove(position, 1)
+            : sourceWithCaret;
+        if (position < 0)
+        {
+            position = source.Length;
+        }
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceCompletionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var projectContext = new ProjectContext(
+                ProjectId.CreateNewId(),
+                projectFilePath: string.Empty,
+                projectDirectory: directory,
+                rootNamespace: string.Empty,
+                CreateCompilation(),
+                ImmutableArray<ProjectReference>.Empty);
+            using var workspace = new AkburaWorkspace(projectContext);
+            if (importedStylesSource != null)
+            {
+                workspace.OpenOrChangeDocumentContext(
+                    new Uri(Path.Combine(
+                        directory,
+                        "Imported.akcss")),
+                    SourceText.From(importedStylesSource));
+            }
+
+            var filePath = Path.Combine(directory, "Styles.akcss");
+            var text = SourceText.From(source);
+            var semanticContext =
+                workspace.OpenOrChangeDocumentContext(
+                    new Uri(filePath),
+                    text);
+            var syntacticDocument = AkburaSyntacticDocument.Parse(
+                text,
+                filePath);
+
+            assertion(
+                workspace,
+                semanticContext,
+                syntacticDocument,
+                position);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     private static void WithWorkspace(
@@ -2490,6 +2847,36 @@ public sealed class WorkspaceCompletionTests
                 public abstract class AbstractView : Control
                 {
                 }
+
+                public static class Grid
+                {
+                    public static readonly
+                        Avalonia.AttachedProperty<int> RowProperty = new();
+
+                    public static int GetRow(Control control) => 0;
+
+                    public static void SetRow(
+                        Control control,
+                        int value)
+                    {
+                    }
+                }
+            }
+
+            namespace Avalonia
+            {
+                public class AvaloniaProperty
+                {
+                }
+
+                public class AvaloniaProperty<T> : AvaloniaProperty
+                {
+                }
+
+                public class AttachedProperty<T> :
+                    AvaloniaProperty<T>
+                {
+                }
             }
 
             namespace Avalonia.Data
@@ -2621,6 +3008,11 @@ public sealed class WorkspaceCompletionTests
 
             namespace Gallery
             {
+                public sealed class Options
+                {
+                    public string Name { get; set; } = "";
+                }
+
                 public partial class Card : Akbura.AkburaControl
                 {
                 }

@@ -68,7 +68,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         }
 
         var sourceOffset =
-            typeSyntax.Tokens.FullSpan.Start -
+            typeSyntax.Tokens.Span.Start -
             csharpType.FullSpan.Start;
 
         AddTypeClassifications(

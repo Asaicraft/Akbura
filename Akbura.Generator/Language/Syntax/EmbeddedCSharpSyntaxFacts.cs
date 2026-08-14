@@ -71,7 +71,7 @@ internal static class EmbeddedCSharpSyntaxFacts
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        hostSpan = syntax.Tokens.FullSpan;
+        hostSpan = syntax.Tokens.Span;
         try
         {
             type = syntax.ToCSharp();

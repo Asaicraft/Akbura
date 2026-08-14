@@ -62,7 +62,8 @@ internal sealed class AkburaParserService
             return document.FilePath;
         }
 
-        return "untitled.akbura";
+        return AkburaEditorDocumentKindFacts.GetUntitledFileName(
+            AkburaEditorDocumentKindFacts.GetOrDefault(textBuffer));
     }
 
     private sealed class SnapshotCache

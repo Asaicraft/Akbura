@@ -89,10 +89,35 @@ internal sealed class AkcssSyntaxTree : AkburaSyntaxTree
             return this;
         }
 
-        var lexer = new Lexer(newText);
-        using var parser = new Parser(lexer, cancellationToken, GetRoot(), changeRanges);
+        var oldRoot = GetRoot();
+        if (oldRoot.ContainsDiagnostics || oldRoot.ContainsSkippedText)
+        {
+            // Recovery nodes are deliberately not a stable reuse boundary.
+            return ParseText(
+                newText,
+                FilePath,
+                LogicalName,
+                cancellationToken);
+        }
 
-        return new AkcssSyntaxTree(newText, FilePath, LogicalName, parser.ParseAkcssDocumentSyntax());
+        var lexer = new Lexer(newText);
+        using var parser = new Parser(lexer, cancellationToken, oldRoot, changeRanges);
+
+        var newRoot = parser.ParseAkcssDocumentSyntax();
+
+        if (newRoot.ContainsDiagnostics || newRoot.ContainsSkippedText)
+        {
+            // A clean reuse tree can still choose an invalid boundary for the
+            // current edit. Reparse immediately so one edit cannot publish
+            // diagnostics absent from a full parse of the same text.
+            return ParseText(
+                newText,
+                FilePath,
+                LogicalName,
+                cancellationToken);
+        }
+
+        return new AkcssSyntaxTree(newText, FilePath, LogicalName, newRoot);
     }
 
     public AkcssSyntaxTree WithChangedText(

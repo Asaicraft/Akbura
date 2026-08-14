@@ -826,11 +826,10 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return null;
         }
 
-        if (!TryGetAkcssApplyItem(
+        if (!AkcssApplyTextFacts.TryGetItemSpan(
                 context.Document.Text,
                 apply,
                 position,
-                out var item,
                 out var sourceSpan))
         {
             AkburaWorkspaceDiagnostics.Write(
@@ -844,6 +843,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             ImmutableArrayBuilder<
                 AkburaSemanticDiagnostic>.Rent();
 
+        var item = context.Document.Text.ToString(sourceSpan);
         var symbol =
             semanticModel.ResolveAkcssApplyItem(
                 apply,
@@ -878,77 +878,6 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         return definition;
     }
 
-    private static bool TryGetAkcssApplyItem(
-        SourceText text,
-        AkcssApplyDirectiveSyntax apply,
-        int position,
-        out string item,
-        out TextSpan sourceSpan)
-    {
-        var itemsSpan =
-            apply.Items.FullSpan;
-
-        var current =
-            Math.Max(
-                0,
-                itemsSpan.Start);
-
-        var end =
-            Math.Min(
-                text.Length,
-                itemsSpan.End);
-
-        while (current < end)
-        {
-            while (current < end &&
-                   char.IsWhiteSpace(
-                       text[current]))
-            {
-                current++;
-            }
-
-            if (current >= end)
-            {
-                break;
-            }
-
-            var start =
-                current;
-
-            while (current < end &&
-                   !char.IsWhiteSpace(
-                       text[current]))
-            {
-                current++;
-            }
-
-            var span =
-                TextSpan.FromBounds(
-                    start,
-                    current);
-
-            if (!span.Contains(position))
-            {
-                continue;
-            }
-
-            item =
-                text.ToString(span);
-
-            sourceSpan =
-                span;
-
-            return true;
-        }
-
-        item =
-            string.Empty;
-
-        sourceSpan =
-            default;
-
-        return false;
-    }
 
     private static AkburaDefinition? GetCSharpDefinition(
         AkburaDocumentContext context,
@@ -1467,7 +1396,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         }
 
         var sourceOffset =
-            typeSyntax.Tokens.FullSpan.Start -
+            typeSyntax.Tokens.Span.Start -
             syntax.FullSpan.Start;
 
         var csharpSpan =

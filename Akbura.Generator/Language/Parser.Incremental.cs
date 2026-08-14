@@ -624,7 +624,9 @@ internal sealed partial class Parser
         GreenCSharpTypeSyntax? TargetType,
         GreenSyntaxToken? CloseParen) ParseIncrementalAkcssOptionalSelectorTarget()
     {
-        if (PeekIncrementalTokenKind() == SyntaxKind.OpenParenToken)
+        var currentKind = PeekIncrementalTokenKind();
+
+        if (currentKind == SyntaxKind.OpenParenToken)
         {
             var openParen = ReadRequiredIncrementalToken(SyntaxKind.OpenParenToken);
             var targetType = ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind.CloseParenToken);
@@ -632,11 +634,14 @@ internal sealed partial class Parser
             return (openParen, targetType, closeParen);
         }
 
-        if (IsIncrementalAkcssNameToken(PeekIncrementalTokenKind()) &&
+        if ((currentKind == SyntaxKind.CSharpRawToken ||
+             IsIncrementalAkcssNameToken(currentKind)) &&
             PeekIncrementalTokenKind(1) == SyntaxKind.DotToken)
         {
-            var targetText = ReadIncrementalToken().ToFullString();
-            return (null, CreateIncrementalAkcssCSharpTypeSyntax(targetText), null);
+            var targetToken = ReadIncrementalToken();
+            var targetType = GreenSyntaxFactory.CSharpTypeSyntax(
+                new GreenSyntaxList<GreenSyntaxToken>(targetToken));
+            return (null, targetType, null);
         }
 
         return (null, null, null);
@@ -2258,7 +2263,7 @@ internal sealed partial class Parser
 
     private static bool CanReuseIncrementalNode(GreenNode node)
     {
-        return node.FullWidth > 0 &&
+        return (node.FullWidth > 0 || node.Kind == SyntaxKind.EndOfFileToken) &&
                !ContainsDiagnosticsOrSkippedText(node);
     }
 

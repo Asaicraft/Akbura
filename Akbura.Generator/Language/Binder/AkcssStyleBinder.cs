@@ -643,6 +643,11 @@ internal sealed partial class AkcssStyleBinder : Binder
 
     private static ImmutableArray<string> GetAkcssApplyItems(AkcssApplyDirectiveSyntax applyDirective)
     {
+        if (applyDirective.Green.GetSlot(2) == null)
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
         var text = applyDirective.Items.ToFullString();
         if (string.IsNullOrWhiteSpace(text))
         {

@@ -48,89 +48,48 @@ internal sealed class AkburaClassifier : IClassifier
                 return Array.Empty<ClassificationSpan>();
             }
 
-            var parsedRequestSpan =
-                TranslateRequestedSpan(
-                    requestedSpan,
-                    state.Snapshot);
-
-            if (parsedRequestSpan.Length == 0)
-            {
-                return Array.Empty<ClassificationSpan>();
-            }
-
-            var classifications =
-                state.Classifications;
-
-            if (classifications.IsDefaultOrEmpty)
-            {
-                return Array.Empty<ClassificationSpan>();
-            }
-
-            var firstIndex =
-                FindFirstCandidate(
-                    classifications,
-                    parsedRequestSpan.Start.Position);
-
             var result =
-                new List<ClassificationSpan>();
+                new Dictionary<Span, ClassificationSpan>();
+            var occupiedRanges = new List<Span>();
 
-            for (var index = firstIndex;
-                 index < classifications.Length;
-                 index++)
+            /*
+             * A fast syntactic publication must not erase the last semantic
+             * colors from every unchanged token. Translate the previous
+             * semantic result to the requested snapshot and retain a token
+             * only while its text is identical. The fresh syntactic result
+             * then fills new and edited spans until the next semantic pass.
+             */
+            if (!state.IncludesSemanticClassifications &&
+                _bufferContext.TryGetPublishedState(
+                    requestedSpan.Snapshot,
+                    out var semanticState))
             {
-                var classification =
-                    classifications[index];
-
-                if (classification.Span.Start >=
-                    parsedRequestSpan.End.Position)
-                {
-                    break;
-                }
-
-                if (classification.Span.End <=
-                    parsedRequestSpan.Start.Position)
-                {
-                    continue;
-                }
-
-                if (classification.Span.Start < 0 ||
-                    classification.Span.End >
-                        state.Snapshot.Length ||
-                    classification.Span.Length == 0)
-                {
-                    continue;
-                }
-
-                var parsedClassificationSpan =
-                    new SnapshotSpan(
-                        state.Snapshot,
-                        Span.FromBounds(
-                            classification.Span.Start,
-                            classification.Span.End));
-
-                var currentClassificationSpan =
-                    TranslateClassificationSpan(
-                        parsedClassificationSpan,
-                        requestedSpan.Snapshot);
-
-                var intersection =
-                    currentClassificationSpan.Intersection(
-                        requestedSpan);
-
-                if (intersection == null ||
-                    intersection.Value.Length == 0)
-                {
-                    continue;
-                }
-
-                result.Add(
-                    new ClassificationSpan(
-                        intersection.Value,
-                        _typeMap.Get(
-                            classification.Kind)));
+                AddClassificationSpans(
+                    semanticState,
+                    requestedSpan,
+                    requireUnchangedText: true,
+                    overwriteExisting: false,
+                    result,
+                    occupiedRanges);
             }
 
-            return result;
+            AddClassificationSpans(
+                state,
+                requestedSpan,
+                requireUnchangedText: false,
+                overwriteExisting:
+                    state.IncludesSemanticClassifications,
+                result,
+                occupiedRanges);
+
+            if (result.Count == 0)
+            {
+                return Array.Empty<ClassificationSpan>();
+            }
+
+            var ordered = result.Values.ToList();
+            ordered.Sort(CompareClassificationSpans);
+            return ordered;
         }
         catch (ArgumentException exception)
         {
@@ -157,6 +116,222 @@ internal sealed class AkburaClassifier : IClassifier
 
             return Array.Empty<ClassificationSpan>();
         }
+    }
+
+    private void AddClassificationSpans(
+        AkburaClassifiedBufferState state,
+        SnapshotSpan requestedSpan,
+        bool requireUnchangedText,
+        bool overwriteExisting,
+        Dictionary<Span, ClassificationSpan> result,
+        List<Span> occupiedRanges)
+    {
+        var parsedRequestSpan =
+            TranslateRequestedSpan(
+                requestedSpan,
+                state.Snapshot);
+
+        if (parsedRequestSpan.Length == 0 ||
+            state.Classifications.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var classifications = state.Classifications;
+        var firstIndex = FindFirstCandidate(
+            classifications,
+            parsedRequestSpan.Start.Position);
+
+        for (var index = firstIndex;
+             index < classifications.Length;
+             index++)
+        {
+            var classification = classifications[index];
+
+            if (classification.Span.Start >=
+                parsedRequestSpan.End.Position)
+            {
+                break;
+            }
+
+            if (classification.Span.End <=
+                    parsedRequestSpan.Start.Position ||
+                classification.Span.Start < 0 ||
+                classification.Span.End > state.Snapshot.Length ||
+                classification.Span.Length == 0)
+            {
+                continue;
+            }
+
+            var parsedClassificationSpan =
+                new SnapshotSpan(
+                    state.Snapshot,
+                    Span.FromBounds(
+                        classification.Span.Start,
+                        classification.Span.End));
+
+            var currentClassificationSpan =
+                TranslateClassificationSpan(
+                    parsedClassificationSpan,
+                    requestedSpan.Snapshot);
+
+            if (currentClassificationSpan.Length == 0 ||
+                (requireUnchangedText &&
+                 (!HasStableBoundaries(
+                      parsedClassificationSpan,
+                      currentClassificationSpan) ||
+                  !HasSameText(
+                      parsedClassificationSpan,
+                      currentClassificationSpan))))
+            {
+                continue;
+            }
+
+            var intersection =
+                currentClassificationSpan.Intersection(
+                    requestedSpan);
+
+            if (intersection == null ||
+                intersection.Value.Length == 0)
+            {
+                continue;
+            }
+
+            var key = currentClassificationSpan.Span;
+            if (!overwriteExisting &&
+                OverlapsAny(occupiedRanges, key))
+            {
+                continue;
+            }
+
+            var isNewSpan = !result.ContainsKey(key);
+            result[key] =
+                new ClassificationSpan(
+                    intersection.Value,
+                    _typeMap.Get(
+                        classification.Kind));
+
+            if (isNewSpan)
+            {
+                AddOccupiedRange(occupiedRanges, key);
+            }
+        }
+    }
+
+    private static bool HasStableBoundaries(
+        SnapshotSpan previousSpan,
+        SnapshotSpan currentSpan)
+    {
+        if (IsSameSnapshotVersion(
+                previousSpan.Snapshot,
+                currentSpan.Snapshot))
+        {
+            return true;
+        }
+
+        var inclusiveSpan = previousSpan.TranslateTo(
+            currentSpan.Snapshot,
+            SpanTrackingMode.EdgeInclusive);
+
+        return inclusiveSpan.Span == currentSpan.Span;
+    }
+
+    private static bool OverlapsAny(
+        List<Span> occupiedRanges,
+        Span span)
+    {
+        var low = 0;
+        var high = occupiedRanges.Count;
+
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (occupiedRanges[middle].End <= span.Start)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low < occupiedRanges.Count &&
+               occupiedRanges[low].Start < span.End;
+    }
+
+    private static void AddOccupiedRange(
+        List<Span> occupiedRanges,
+        Span span)
+    {
+        var low = 0;
+        var high = occupiedRanges.Count;
+
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (occupiedRanges[middle].End < span.Start)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        var index = low;
+        var start = span.Start;
+        var end = span.End;
+
+        while (index < occupiedRanges.Count &&
+               occupiedRanges[index].Start <= end)
+        {
+            start = Math.Min(start, occupiedRanges[index].Start);
+            end = Math.Max(end, occupiedRanges[index].End);
+            occupiedRanges.RemoveAt(index);
+        }
+
+        occupiedRanges.Insert(
+            index,
+            Span.FromBounds(start, end));
+    }
+
+    private static bool HasSameText(
+        SnapshotSpan previousSpan,
+        SnapshotSpan currentSpan)
+    {
+        if (previousSpan.Length != currentSpan.Length)
+        {
+            return false;
+        }
+
+        for (var offset = 0;
+             offset < previousSpan.Length;
+             offset++)
+        {
+            if (previousSpan.Snapshot[
+                    previousSpan.Start.Position + offset] !=
+                currentSpan.Snapshot[
+                    currentSpan.Start.Position + offset])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int CompareClassificationSpans(
+        ClassificationSpan left,
+        ClassificationSpan right)
+    {
+        var start = left.Span.Start.Position.CompareTo(
+            right.Span.Start.Position);
+
+        return start != 0
+            ? start
+            : left.Span.Length.CompareTo(right.Span.Length);
     }
 
     private static SnapshotSpan TranslateRequestedSpan(

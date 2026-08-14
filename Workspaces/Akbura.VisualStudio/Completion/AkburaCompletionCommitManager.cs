@@ -125,8 +125,9 @@ internal sealed class AkburaCompletionCommitManager :
         SnapshotSpan applicableSpan;
         try
         {
-            applicableSpan = session.ApplicableToSpan.GetSpan(
-                currentSnapshot);
+            applicableSpan = item.ApplicableToSpan.TranslateTo(
+                currentSnapshot,
+                SpanTrackingMode.EdgeInclusive);
         }
         catch (ArgumentException)
         {
@@ -135,8 +136,20 @@ internal sealed class AkburaCompletionCommitManager :
 
         var triggerNextCompletion =
             completion.TriggerCompletionAfterInsert &&
-            typedChar == ' ';
-        var replacementText = triggerNextCompletion
+            (typedChar == ' ' ||
+             completion.CaretOffsetFromEnd > 0 ||
+             completion.Kind == AkburaCompletionKind.Property &&
+             completion.InsertText.EndsWith(
+                 " ",
+                 StringComparison.Ordinal));
+        var appendTypedCharacter =
+            triggerNextCompletion &&
+            typedChar == ' ' &&
+            completion.CaretOffsetFromEnd == 0 &&
+            !completion.InsertText.EndsWith(
+                " ",
+                StringComparison.Ordinal);
+        var replacementText = appendTypedCharacter
             ? completion.InsertText + typedChar
             : completion.InsertText;
 
@@ -164,7 +177,7 @@ internal sealed class AkburaCompletionCommitManager :
                     currentSnapshot,
                     appliedSnapshot,
                     caretPosition,
-                    typedChar);
+                    typedChar == ' ' ? typedChar : ' ');
             }
         }
 

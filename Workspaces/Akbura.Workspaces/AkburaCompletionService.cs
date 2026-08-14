@@ -14,6 +14,9 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
 {
     private const int MaximumCompletionItems = 50;
 
+    private readonly AkcssCompletionService _akcssCompletionService =
+        new();
+
     private static readonly ConditionalWeakTable<
         AkburaSemanticModel,
         SemanticModelCompletionCache> CompletionCaches = new();
@@ -30,6 +33,15 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (document.SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        {
+            return _akcssCompletionService.GetCompletions(
+                document,
+                semanticContext,
+                position,
+                cancellationToken);
+        }
+
         if (document.TryGetCSharpCompletionContext(
                 position,
                 out var csharpContext,

@@ -270,6 +270,208 @@ public sealed class WorkspaceClassificationTests
     }
 
     [Fact]
+    public void SemanticClassification_AkcssEditClassifiesWholeSelectorTarget()
+    {
+        const string oldSource =
+            "@using Avalonia.Controls;\r\n" +
+            "@utilities {\r\n" +
+            "\tControl.w-auto { Width: double.NaN; }\r\n" +
+            "\tControl.w-full { Width: double.NaN; }\r\n" +
+            "\tControl.w-px { Width: 1d; }\r\n" +
+            "}\r\n";
+        var insertion = oldSource.IndexOf(
+            " }\r\n\tControl.w-px",
+            StringComparison.Ordinal) + 1;
+        var newSource = oldSource.Insert(insertion, "\r\n");
+        var path = Path.GetFullPath("Styles.akcss");
+
+        using var workspace = CreateSemanticWorkspace();
+        workspace.OpenOrChangeDocumentContext(
+            new Uri(path),
+            SourceText.From(oldSource));
+        var text = SourceText.From(newSource);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(path),
+            text);
+
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+
+        for (var start = newSource.IndexOf(
+                 "\tControl",
+                 StringComparison.Ordinal) + 1;
+             start >= 0;
+             start = newSource.IndexOf(
+                 "Control",
+                 start + "Control".Length,
+                 StringComparison.Ordinal))
+        {
+            var targetSpan = new TextSpan(start, "Control".Length);
+
+            Assert.True(
+                classifications.Any(
+                    classification =>
+                        classification.Span == targetSpan &&
+                        classification.Kind ==
+                            AkburaClassificationKind.ClassName),
+                string.Join(
+                    Environment.NewLine,
+                    classifications
+                        .Where(classification =>
+                            classification.Span.OverlapsWith(targetSpan))
+                        .Select(classification =>
+                            $"{classification.Span}: " +
+                            $"{classification.Kind} " +
+                            $"'{text.ToString(classification.Span)}'")));
+            Assert.DoesNotContain(
+                classifications,
+                classification =>
+                    classification.Span.OverlapsWith(targetSpan) &&
+                    classification.Span != targetSpan);
+        }
+    }
+
+    [Fact]
+    public void SemanticClassification_AkcssRecoveryRoundTripRestoresDiagnosticsAndSelectorSpans()
+    {
+        const string originalSource =
+            "@using Avalonia.Controls;\r\n" +
+            "@utilities {\r\n" +
+            "\tControl.w-auto {\r\n" +
+            "\t\tWidth: double.NaN;\r\n" +
+            "\t}\r\n" +
+            "\r\n" +
+            "\tControl.w-full {\r\n" +
+            "\t\tWidth: double.NaN;\r\n" +
+            "\t\tHorizontalAlignment: Stretch;\r\n" +
+            "\t}\r\n" +
+            "\r\n" +
+            "\tControl.w-px {\r\n" +
+            "\t\tWidth: 1d;\r\n" +
+            "\t}\r\n" +
+            "}\r\n";
+        var editPosition = originalSource.IndexOf(
+            "\t}\r\n\r\n\tControl.w-px",
+            StringComparison.Ordinal);
+        var source = originalSource;
+        var path = Path.GetFullPath("Styles.akcss");
+
+        using var workspace = CreateSemanticWorkspace();
+        var context = Update(source);
+
+        Replace(editPosition, oldLength: 0, "\r\n");
+        var lineStart = editPosition + "\r\n".Length;
+        Replace(lineStart, oldLength: 0, "@");
+        Replace(lineStart + 1, oldLength: 0, "a");
+        Replace(lineStart + 2, oldLength: 0, "p");
+        Replace(lineStart + 1, oldLength: 2, "@apply");
+        Replace(lineStart, oldLength: "@@apply".Length, "");
+
+        var text = SourceText.From(source);
+        var requestedSpan = new TextSpan(0, text.Length);
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetDiagnostics(context, requestedSpan);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(context, requestedSpan);
+
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Code is
+                ErrorCodes.ERR_SyntaxError or
+                ErrorCodes.ERR_LbraceExpected);
+
+        for (var markerStart = source.IndexOf(
+                 "\tControl",
+                 StringComparison.Ordinal);
+             markerStart >= 0;
+             markerStart = source.IndexOf(
+                 "\tControl",
+                 markerStart + "\tControl".Length,
+                 StringComparison.Ordinal))
+        {
+            var start = markerStart + 1;
+            var targetSpan = new TextSpan(start, "Control".Length);
+
+            Assert.True(
+                classifications.Any(
+                    classification =>
+                        classification.Span == targetSpan &&
+                        classification.Kind ==
+                            AkburaClassificationKind.ClassName),
+                $"Missing ClassName for '{text.ToString(targetSpan)}' " +
+                $"at {targetSpan}. Overlaps: " +
+                string.Join(
+                    ", ",
+                    classifications
+                        .Where(classification =>
+                            classification.Span.OverlapsWith(targetSpan))
+                        .Select(classification =>
+                            $"{classification.Span}:{classification.Kind}=" +
+                            $"'{text.ToString(classification.Span)}'")));
+            Assert.DoesNotContain(
+                classifications,
+                classification =>
+                    classification.Span.OverlapsWith(targetSpan) &&
+                    classification.Span != targetSpan);
+        }
+
+        AkburaDocumentContext Update(string currentSource)
+        {
+            return workspace.OpenOrChangeDocumentContext(
+                new Uri(path),
+                SourceText.From(currentSource));
+        }
+
+        void Replace(int start, int oldLength, string newText)
+        {
+            source = source.Remove(start, oldLength)
+                .Insert(start, newText);
+            context = Update(source);
+        }
+    }
+
+    [Fact]
+    public void SemanticClassification_IncompleteApplyKeepsFollowingUtilityTarget()
+    {
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "@utilities {\n" +
+            "    Control.first {\n" +
+            "        Width: 1;\n" +
+            "        @apply ;\n" +
+            "    }\n" +
+            "    Control.second {\n" +
+            "        Width: 2;\n" +
+            "    }\n" +
+            "}\n";
+        var path = Path.GetFullPath("Styles.akcss");
+        var text = SourceText.From(source);
+
+        using var workspace = CreateSemanticWorkspace();
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(path),
+            text);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+        var targetStart = source.IndexOf(
+            "Control.second",
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            classifications,
+            classification =>
+                classification.Span == new TextSpan(
+                    targetStart,
+                    "Control".Length) &&
+                classification.Kind ==
+                    AkburaClassificationKind.ClassName);
+    }
+
+    [Fact]
     public void SemanticClassification_RefinesSyntacticClassification()
     {
         const string source = """

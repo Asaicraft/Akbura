@@ -307,7 +307,7 @@ internal sealed class
         }
 
         var sourceOffset =
-            propertySyntax.Tokens.FullSpan.Start -
+            propertySyntax.Tokens.Span.Start -
             syntax.FullSpan.Start;
 
         switch (syntax)

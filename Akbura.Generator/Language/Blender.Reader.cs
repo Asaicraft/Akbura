@@ -306,7 +306,8 @@ internal readonly partial struct Blender
 				if (parent.IsFinished ||
 					parent.Current.FullSpan.Start != cursor.Current.FullSpan.Start ||
 					parent.Current.RequiredUnderlyingNode.IsList ||
-					parent.Current.Kind == SyntaxKind.AkburaDocumentSyntax)
+					parent.Current.Kind is SyntaxKind.AkburaDocumentSyntax or
+						SyntaxKind.AkcssDocumentSyntax)
 				{
 					break;
 				}

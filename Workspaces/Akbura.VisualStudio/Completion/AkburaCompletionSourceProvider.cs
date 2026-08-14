@@ -58,21 +58,22 @@ internal sealed class AkburaCompletionSourceProvider :
         }
 
         var buffer = textView.TextBuffer;
-        var isAkburaDocument =
-            !_textDocumentFactory.TryGetTextDocument(
-                buffer,
-                out var textDocument) ||
-            string.Equals(
-                Path.GetExtension(textDocument.FilePath),
-                ".akbura",
-                StringComparison.OrdinalIgnoreCase);
+        _textDocumentFactory.TryGetTextDocument(
+            buffer,
+            out var textDocument);
+        var documentKind = textDocument == null
+            ? AkburaEditorDocumentKindFacts.GetOrDefault(buffer)
+            : AkburaEditorDocumentKindFacts.FromFilePath(
+                textDocument.FilePath);
+        buffer.Properties[typeof(AkburaEditorDocumentKind)] =
+            documentKind;
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Completion,
             $"Source requested: " +
             $"contentType='{buffer.ContentType.TypeName}', " +
             $"file='{textDocument?.FilePath ?? "<untitled>"}', " +
-            $"isAkbura={isAkburaDocument}.");
+            $"documentKind={documentKind}.");
 
         var bufferContext = buffer.Properties
             .GetOrCreateSingletonProperty(
@@ -86,7 +87,7 @@ internal sealed class AkburaCompletionSourceProvider :
             .GetOrCreateSingletonProperty(
                 () => new AkburaCompletionSource(
                     buffer,
-                    isAkburaDocument,
+                    documentKind,
                     bufferContext,
                     _workspaceHost.Workspace
                         .LanguageServices

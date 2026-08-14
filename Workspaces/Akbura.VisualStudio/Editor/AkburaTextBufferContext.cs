@@ -18,6 +18,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private static readonly TimeSpan UpdateDelay =
         TimeSpan.FromMilliseconds(100);
 
+    private static readonly TimeSpan ProjectRetryDelay =
+        TimeSpan.FromMilliseconds(500);
+
     private readonly ITextBuffer _textBuffer;
 
     private readonly AkburaVisualStudioWorkspace _visualStudioWorkspace;
@@ -153,9 +156,16 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         else
         {
+            var documentKind =
+                AkburaEditorDocumentKindFacts.GetOrDefault(
+                    textBuffer);
+            var extension = documentKind ==
+                    AkburaEditorDocumentKind.Akcss
+                ? ".akcss"
+                : ".akbura";
             _uri = new Uri(
                 $"untitled://akbura/" +
-                $"{Guid.NewGuid():N}.akbura");
+                $"{Guid.NewGuid():N}{extension}");
         }
 
         _textBuffer.ChangedLowPriority +=
@@ -430,17 +440,21 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            if (initializationVersion != Volatile.Read(
+                    ref _projectContextVersion))
+            {
+                continue;
+            }
+
             if (synchronizedProjectId is { } result)
             {
-                _projectId = result;
                 return result;
             }
 
-            if (initializationVersion == Volatile.Read(
-                    ref _projectContextVersion))
-            {
-                return null;
-            }
+            ForgetFailedProjectInitialization(
+                initializationTask,
+                initializationVersion);
+            return null;
         }
     }
 
@@ -474,11 +488,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
             initializationVersion = projectContextVersion;
             return _projectInitializationTask =
                 InitializeProjectAsync(
+                    projectContextVersion,
                     _disposeCancellation.Token);
         }
     }
 
     private async Task<AkburaProjectId?> InitializeProjectAsync(
+        int projectContextVersion,
         CancellationToken cancellationToken)
     {
         var filePath = _textDocument?.FilePath;
@@ -495,24 +511,58 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         if (projectId is { } result)
         {
-            _projectId = result;
+            lock (_projectInitializationGate)
+            {
+                if (_projectContextVersion == projectContextVersion &&
+                    _projectInitializationVersion ==
+                        projectContextVersion)
+                {
+                    _projectId = result;
+                }
+            }
         }
 
         return projectId;
+    }
+
+    private void ForgetFailedProjectInitialization(
+        Task<AkburaProjectId?> initializationTask,
+        int initializationVersion)
+    {
+        lock (_projectInitializationGate)
+        {
+            if (ReferenceEquals(
+                    _projectInitializationTask,
+                    initializationTask) &&
+                _projectInitializationVersion ==
+                    initializationVersion)
+            {
+                _projectInitializationTask = null;
+                _projectInitializationVersion = -1;
+            }
+        }
     }
 
     private async Task WarmUpProjectAsync()
     {
         try
         {
-            var projectId = await GetProjectIdAsync(
-                    _disposeCancellation.Token)
-                .ConfigureAwait(false);
-            if (projectId is { } result)
+            while (Volatile.Read(ref _disposeState) == 0)
             {
-                _projectId = result;
-                EnqueueSnapshot(
-                    _textBuffer.CurrentSnapshot);
+                var projectId = await GetProjectIdAsync(
+                        _disposeCancellation.Token)
+                    .ConfigureAwait(false);
+                if (projectId != null)
+                {
+                    EnqueueSnapshot(
+                        _textBuffer.CurrentSnapshot);
+                    return;
+                }
+
+                await Task.Delay(
+                        ProjectRetryDelay,
+                        _disposeCancellation.Token)
+                    .ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -1003,6 +1053,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         previous),
                     previous))
             {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Classification,
+                    $"Classification state published: " +
+                    $"request={state.RequestVersion}, " +
+                    $"snapshot={state.Snapshot.Version.VersionNumber}, " +
+                    $"semantic={state.IncludesSemanticClassifications}, " +
+                    $"spans={state.Classifications.Length}.");
                 return;
             }
         }
@@ -1052,6 +1109,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     currentSnapshot,
                     0,
                     currentSnapshot.Length)));
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Classification,
+            $"Classification refresh raised: " +
+            $"request={state.RequestVersion}, " +
+            $"snapshot={currentSnapshot.Version.VersionNumber}, " +
+            $"semantic={state.IncludesSemanticClassifications}.");
     }
 
     private bool IsCurrentRequest(

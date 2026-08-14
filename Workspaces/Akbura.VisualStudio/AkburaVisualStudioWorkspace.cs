@@ -168,6 +168,19 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                         activeFilePath,
                         cancellationToken)
                     .ConfigureAwait(false);
+
+                if (!result)
+                {
+                    /*
+                     * Visual Studio can expose a provisional project while
+                     * CPS and Roslyn are still loading it. Do not retain a
+                     * failed synchronization for the same version forever;
+                     * the next retry must be able to inspect the project
+                     * again.
+                     */
+                    RemoveFailedSynchronization(project.Id, state);
+                }
+
                 state.TrySetResult(result);
             }
             finally
@@ -195,6 +208,18 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (!project.Documents.Any() &&
+            !project.MetadataReferences.Any() &&
+            !project.ProjectReferences.Any())
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Roslyn project '{project.Name}' is still empty. " +
+                "Synchronization will be retried.");
+
+            return false;
+        }
 
         var totalTimer = Stopwatch.StartNew();
         var stageTimer = Stopwatch.StartNew();
@@ -240,6 +265,17 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"C# compilation was not available " +
                 $"for project '{project.Name}'.");
+
+            return false;
+        }
+
+        if (!csharpCompilation.References.Any())
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"C# compilation for project '{project.Name}' " +
+                "is provisional and has no metadata references. " +
+                "Synchronization will be retried.");
 
             return false;
         }
@@ -329,6 +365,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
          */
         Project? bestProject = null;
         var bestDirectoryLength = -1;
+        var bestReadinessScore = -1;
 
         foreach (var project in csharpProjects)
         {
@@ -363,8 +400,12 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                         projectDirectory)
                     .Length;
 
-            if (directoryLength <=
-                bestDirectoryLength)
+            var readinessScore =
+                GetProjectReadinessScore(project);
+
+            if (directoryLength < bestDirectoryLength ||
+                directoryLength == bestDirectoryLength &&
+                readinessScore <= bestReadinessScore)
             {
                 continue;
             }
@@ -372,9 +413,32 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             bestProject = project;
             bestDirectoryLength =
                 directoryLength;
+            bestReadinessScore = readinessScore;
         }
 
         return bestProject;
+    }
+
+    private static int GetProjectReadinessScore(Project project)
+    {
+        var score = 0;
+
+        if (project.Documents.Any())
+        {
+            score += 4;
+        }
+
+        if (project.MetadataReferences.Any())
+        {
+            score += 2;
+        }
+
+        if (project.ProjectReferences.Any())
+        {
+            score++;
+        }
+
+        return score;
     }
 
     private static bool ContainsFile(

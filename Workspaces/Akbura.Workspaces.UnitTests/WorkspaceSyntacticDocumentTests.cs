@@ -572,9 +572,109 @@ public sealed class WorkspaceSyntacticDocumentTests
             SourceText.From(source),
             "Styles.akcss");
 
-        Assert.True(
-            document.GetCompletionContext(source.Length).IsDefault);
+        Assert.Equal(
+            AkcssCompletionContextKind.SelectorSnippet,
+            document.GetAkcssCompletionContext(source.Length).Kind);
         Assert.Null(
             document.GetAutoClosingTagText(source.Length));
+    }
+
+    [Theory]
+    [InlineData(
+        "@u|",
+        AkcssCompletionContextKind.TopLevel,
+        "@u",
+        "")]
+    [InlineData(
+        "@using Gallery.St|;",
+        AkcssCompletionContextKind.AkcssModuleName,
+        "Gallery.St",
+        "")]
+    [InlineData(
+        ".card {\n    Wid|\n}",
+        AkcssCompletionContextKind.PropertyName,
+        "Wid",
+        "")]
+    [InlineData(
+        ".card {\n    Grid.Ro|\n}",
+        AkcssCompletionContextKind.PropertyName,
+        "Ro",
+        "Grid")]
+    [InlineData(
+        ".card {\n    global::Grid.Ro|\n}",
+        AkcssCompletionContextKind.PropertyName,
+        "Ro",
+        "global::Grid")]
+    [InlineData(
+        ".card {\n    Width: tr|;\n}",
+        AkcssCompletionContextKind.PropertyValue,
+        "tr",
+        "")]
+    [InlineData(
+        ".card {\n    @apply ga|;\n}",
+        AkcssCompletionContextKind.ApplyItem,
+        "ga",
+        "")]
+    [InlineData(
+        ".card {\n    @a|\n}",
+        AkcssCompletionContextKind.BodyMember,
+        "@a",
+        "")]
+    [InlineData(
+        ".card {\n    |\n}",
+        AkcssCompletionContextKind.BodyMember,
+        "",
+        "")]
+    [InlineData(
+        "Con|trol.card {\n}",
+        AkcssCompletionContextKind.SelectorSnippet,
+        "Con",
+        "")]
+    [InlineData(
+        "@utilities {\n" +
+        "    Control.gap-(double value) {\n" +
+        "        @if(value > 0) {\n" +
+        "            Wid|\n" +
+        "        }\n" +
+        "    }\n" +
+        "}",
+        AkcssCompletionContextKind.PropertyName,
+        "Wid",
+        "")]
+    public void SyntacticDocument_DetectsAkcssCompletionContext(
+        string sourceWithCaret,
+        AkcssCompletionContextKind expectedKind,
+        string expectedPrefix,
+        string expectedQualifier)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
+
+        var context = document.GetAkcssCompletionContext(position);
+
+        Assert.Equal(expectedKind, context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+        Assert.Equal(expectedQualifier, context.Qualifier);
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(context.ApplicableSpan));
+    }
+
+    [Fact]
+    public void SyntacticDocument_DoesNotOfferAkcssCompletionInsideComment()
+    {
+        const string sourceWithCaret =
+            ".card {\n    // Wid|\n}";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
+
+        Assert.True(
+            document.GetAkcssCompletionContext(position).IsDefault);
     }
 }

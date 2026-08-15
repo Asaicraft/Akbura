@@ -361,7 +361,7 @@ internal sealed class CSharpProbeBuilder
             .ToImmutableArray();
     }
 
-    private static CSharpProbeProjection CreateProjection<TNode>(
+    internal static CSharpProbeProjection CreateProjection<TNode>(
         CSharp.CompilationUnitSyntax root,
         TNode sourceNode,
         SyntaxAnnotation annotation,

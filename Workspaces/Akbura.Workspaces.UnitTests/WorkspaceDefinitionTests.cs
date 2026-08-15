@@ -180,6 +180,99 @@ public sealed class WorkspaceDefinitionTests
     }
 
     [Fact]
+    public void Definition_ProjectedStandaloneAkcssContextsNavigate()
+    {
+        const string source = """
+            @using System;
+            @using System.Collections.ObjectModel;
+            @using Avalonia.Controls;
+
+            @utilities {
+                StackPanel.gap-(double value) {
+                    Spacing: value;
+                }
+            }
+
+            StackPanel.card {
+                Tag: new ObservableCollection<int>();
+                Width: Math.Max(1, 2);
+            }
+            """;
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var libraryReference = CreateLibraryReference(
+                directory,
+                "@utilities { }");
+            var compilation = CreateApplicationCompilation(
+                libraryReference);
+            using var workspace = new AkburaWorkspace(
+                new ProjectContext(
+                    ProjectId.CreateNewId(),
+                    projectFilePath: string.Empty,
+                    projectDirectory: directory,
+                    rootNamespace: string.Empty,
+                    compilation,
+                    ImmutableArray<ProjectReference>.Empty));
+            var filePath = Path.Combine(directory, "Styles.akcss");
+            var context = workspace.OpenOrChangeDocumentContext(
+                new Uri(filePath),
+                SourceText.From(source));
+
+            var parameterPosition = source.IndexOf(
+                "Spacing: value",
+                StringComparison.Ordinal) +
+                "Spacing: ".Length;
+            var parameterDefinition = workspace.LanguageServices
+                .Definition.GetDefinition(context, parameterPosition);
+            Assert.NotNull(parameterDefinition);
+            Assert.Equal(
+                Path.GetFullPath(filePath),
+                parameterDefinition!.TargetFilePath);
+            Assert.Equal("value", GetTargetText(parameterDefinition));
+
+            AssertMetadataDefinition(
+                "StackPanel",
+                "StackPanel.gap-");
+            AssertMetadataDefinition(
+                "ObservableCollection",
+                "ObservableCollection<int>");
+            AssertMetadataDefinition(
+                "Max",
+                "Math.Max",
+                "Math.".Length);
+
+            void AssertMetadataDefinition(
+                string expectedTarget,
+                string referenceText,
+                int referenceOffset = 0)
+            {
+                var referencePosition = source.IndexOf(
+                    referenceText,
+                    StringComparison.Ordinal) + referenceOffset;
+                var definition = workspace.LanguageServices.Definition
+                    .GetDefinition(context, referencePosition);
+
+                Assert.NotNull(definition);
+                Assert.NotNull(definition!.TargetText);
+                Assert.Equal(
+                    expectedTarget,
+                    GetTargetText(definition));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Definition_ProjectedProjectReferenceSymbolsUseCSharpSource()
     {
         const string librarySource = """

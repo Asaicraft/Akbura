@@ -442,21 +442,105 @@ public sealed class WorkspaceSyntacticDocumentTests
             out _));
     }
 
-    [Fact]
-    public void SyntacticDocument_AkcssDoesNotProjectEmbeddedCSharp()
+    [Theory]
+    [InlineData(
+        "Button.card { Width: Math.Ro|; }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "Math.Ro")]
+    [InlineData(
+        "Button.card { @if(IsPointerO|) { } }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "IsPointerO")]
+    [InlineData(
+        "But|.card { }",
+        AkburaCSharpCompletionContextKind.Type,
+        "But")]
+    [InlineData(
+        "(global::Gallery.Car|).card { }",
+        AkburaCSharpCompletionContextKind.Type,
+        "global::Gallery.Car")]
+    [InlineData(
+        "@utilities { StackP|.gap { } }",
+        AkburaCSharpCompletionContextKind.Type,
+        "StackP")]
+    [InlineData(
+        "@utilities { .gap-(dou| value) { } }",
+        AkburaCSharpCompletionContextKind.Type,
+        "dou ")]
+    [InlineData(
+        "@intercept MyAkcssSty|;",
+        AkburaCSharpCompletionContextKind.Type,
+        "MyAkcssSty")]
+    [InlineData(
+        "@using Avalonia.Con|;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "Avalonia.Con")]
+    [InlineData(
+        "Button.card { Width: |; }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "")]
+    [InlineData(
+        "Button.card { @if(|) { } }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "")]
+    [InlineData(
+        "@intercept |;",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "@using |;",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "")]
+    public void SyntacticDocument_DetectsAkcssEmbeddedCSharp(
+        string sourceWithCaret,
+        AkburaCSharpCompletionContextKind expectedKind,
+        string expectedHost)
     {
-        const string sourceWithCaret = """
-            @utilities {
-                Control.w-(double value) {
-                    Width: Math.M|;
-                }
-            }
-            """;
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
             "Styles.akcss");
+
+        Assert.True(document.TryGetCSharpCompletionContext(
+            position,
+            out var context));
+        Assert.Equal(expectedKind, context.Kind);
+        Assert.Equal(expectedHost, document.Text.ToString(context.HostSpan));
+    }
+
+    [Theory]
+    [InlineData("Button.card { Wid| }")]
+    [InlineData(".card { Grid.Ro| }")]
+    [InlineData(".card { @apply gap-| }")]
+    [InlineData("@using Shared.akcss|;")]
+    public void SyntacticDocument_DoesNotProjectAkcssNativeSyntax(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Styles.akcss");
+
+        Assert.False(document.TryGetCSharpCompletionContext(
+            position,
+            out _));
+    }
+
+    [Theory]
+    [InlineData("@akcss { .card { Wid| } }")]
+    [InlineData("@akcss { .card { Grid.Ro| } }")]
+    [InlineData("@akcss { .card { @apply gap-| } }")]
+    [InlineData("@akcss { @using Shared.akcss|; }")]
+    public void SyntacticDocument_DoesNotProjectInlineAkcssNativeSyntax(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
 
         Assert.False(document.TryGetCSharpCompletionContext(
             position,

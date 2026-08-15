@@ -467,10 +467,26 @@ internal static class AkburaCSharpProjectionFactory
         AkburaSyntax root,
         AkburaEmbeddedCSharpContext context)
     {
-        var syntax = FindSyntax<
-            Akbura.Language.Syntax.UsingDirectiveSyntax>(root, context);
-        if (syntax == null ||
-            syntax.Name.Tokens.FullSpan != context.HostSpan)
+        var akcssUsing = FindSyntax<AkcssUsingDirectiveSyntax>(
+            root,
+            context);
+        if (akcssUsing != null)
+        {
+            if (akcssUsing.Name.Tokens.FullSpan != context.HostSpan)
+            {
+                throw new InvalidOperationException(
+                    "The AKCSS using directive no longer matches the current document.");
+            }
+
+            return semanticModel.CreateCSharpCompletionProjection(
+                akcssUsing,
+                context.RelativePosition);
+        }
+
+        var syntax = FindSyntax<Akbura.Language.Syntax.UsingDirectiveSyntax>(
+            root,
+            context);
+        if (syntax == null || syntax.Name.Tokens.FullSpan != context.HostSpan)
         {
             throw new InvalidOperationException(
                 "The C# using directive no longer matches the current document.");
@@ -638,6 +654,53 @@ internal static class AkburaCSharpProjectionFactory
                 hostSpan));
         }
 
+        foreach (var hostUsing in hostRoot.DescendantNodes()
+                     .OfType<AkcssUsingDirectiveSyntax>())
+        {
+            if (hostUsing.FullSpan == context.OwnerSpan ||
+                hostUsing.IsAkcssModuleImport)
+            {
+                continue;
+            }
+
+            Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax
+                hostCSharpUsing;
+            try
+            {
+                hostCSharpUsing = hostUsing.ToCSharp();
+            }
+            catch (Exception exception)
+                when (exception is InvalidOperationException ||
+                      exception is ArgumentException ||
+                      exception is InvalidCastException)
+            {
+                continue;
+            }
+
+            var key = CSharpUsingKey.Create(hostCSharpUsing);
+            var projectedUsing = root.Usings.FirstOrDefault(candidate =>
+                !claimedUsings.Contains(candidate) &&
+                CSharpUsingKey.Create(candidate).Equals(key));
+            if (projectedUsing?.Name == null)
+            {
+                continue;
+            }
+
+            var hostSpan = hostUsing.Name.Tokens.FullSpan;
+            var annotation = new SyntaxAnnotation(
+                UsingMappingAnnotationKind,
+                Guid.NewGuid().ToString("N"));
+            claimedUsings.Add(projectedUsing);
+            replacements.Add(
+                projectedUsing,
+                projectedUsing.WithName(
+                    projectedUsing.Name.WithAdditionalAnnotations(
+                        annotation)));
+            mappingSources.Add(new UsingMappingSource(
+                annotation,
+                hostSpan));
+        }
+
         if (replacements.Count != 0)
         {
             root = root.ReplaceNodes(
@@ -654,11 +717,10 @@ internal static class AkburaCSharpProjectionFactory
             ImmutableArrayBuilder<AkburaCSharpProjectionMapping>.Rent();
         foreach (var source in mappingSources)
         {
-            var projectedUsing = root
+            var projectedNode = root
                 .GetAnnotatedNodes(source.Annotation)
-                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax>()
                 .Single();
-            if (projectedUsing.Span.Length != source.HostSpan.Length)
+            if (projectedNode.Span.Length != source.HostSpan.Length)
             {
                 continue;
             }
@@ -666,7 +728,7 @@ internal static class AkburaCSharpProjectionFactory
             builder.Add(new AkburaCSharpProjectionMapping(
                 AkburaCSharpProjectionMappingKind.UsingDirective,
                 source.HostSpan,
-                projectedUsing.Span));
+                projectedNode.Span));
         }
 
         mappings = builder.ToImmutable();
@@ -677,6 +739,13 @@ internal static class AkburaCSharpProjectionFactory
         AkburaSyntacticDocument document)
     {
         var root = document.SyntaxTree.GetRootSyntax();
+        if (root is AkcssDocumentSyntax akcssRoot)
+        {
+            return CreateAkcssImportContext(
+                document.Text,
+                akcssRoot);
+        }
+
         using var ordinaryUsings =
             ImmutableArrayBuilder<Akbura.Language.Syntax.UsingDirectiveSyntax>.Rent();
         using var globalUsings =
@@ -742,6 +811,67 @@ internal static class AkburaCSharpProjectionFactory
             text[insertionPosition] != '\n';
 
         return new AkburaCSharpImportContext(
+            AkburaCSharpImportSyntaxKind.Component,
+            insertionPosition,
+            DetectNewLine(text),
+            needsLeadingLineBreak,
+            needsTrailingLineBreak,
+            existingImports.ToImmutable());
+    }
+
+    private static AkburaCSharpImportContext CreateAkcssImportContext(
+        SourceText text,
+        AkcssDocumentSyntax root)
+    {
+        using var csharpUsings =
+            ImmutableArrayBuilder<AkcssUsingDirectiveSyntax>.Rent();
+        AkcssUsingDirectiveSyntax? firstModuleImport = null;
+        AkburaSyntax? firstDeclaration = null;
+        var existingImports = ImmutableHashSet.CreateBuilder<CSharpUsingKey>();
+
+        foreach (var member in root.Members)
+        {
+            if (member is AkcssUsingDirectiveSyntax usingDirective)
+            {
+                if (usingDirective.IsAkcssModuleImport)
+                {
+                    firstModuleImport ??= usingDirective;
+                    continue;
+                }
+
+                try
+                {
+                    existingImports.Add(CSharpUsingKey.Create(
+                        usingDirective.ToCSharp()));
+                    csharpUsings.Add(usingDirective);
+                }
+                catch (Exception exception)
+                    when (exception is InvalidOperationException ||
+                          exception is ArgumentException ||
+                          exception is InvalidCastException)
+                {
+                }
+
+                continue;
+            }
+
+            firstDeclaration ??= member;
+        }
+
+        var insertionPosition = csharpUsings.Count != 0
+            ? csharpUsings.WrittenSpan[csharpUsings.Count - 1].Span.End
+            : firstModuleImport?.Span.Start ??
+              firstDeclaration?.Span.Start ??
+              0;
+        var needsLeadingLineBreak = insertionPosition > 0 &&
+            text[insertionPosition - 1] != '\r' &&
+            text[insertionPosition - 1] != '\n';
+        var needsTrailingLineBreak = insertionPosition < text.Length &&
+            text[insertionPosition] != '\r' &&
+            text[insertionPosition] != '\n';
+
+        return new AkburaCSharpImportContext(
+            AkburaCSharpImportSyntaxKind.Akcss,
             insertionPosition,
             DetectNewLine(text),
             needsLeadingLineBreak,

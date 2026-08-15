@@ -5234,26 +5234,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         IAkcssSymbol containingSymbol,
         ITypeSymbol? targetType = null)
     {
-        var targetParameterName = GetAkcssTargetParameterName(containingSymbol);
-        var boundExpression = RewriteAkcssTargetMemberAccess(
+        var compilationUnit = CreateAkcssExpressionProbe(
             expressionSyntax,
             containingSymbol,
-            targetParameterName);
-        var returnStatement = CSharpSyntaxFactory.ReturnStatement(boundExpression);
-        var method = CSharpSyntaxFactory.MethodDeclaration(
-                CreateCSharpProbeReturnType(targetType),
-                "__AkburaSemanticProbe")
-            .WithParameterList(CreateAkcssExpressionParameterList(
-                containingSymbol,
-                targetParameterName))
-            .WithBody(CSharpSyntaxFactory.Block(returnStatement));
-
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.SingletonList<CSharp.MemberDeclarationSyntax>(method));
-
-        var compilationUnit = CreateCSharpProbeCompilationUnit(
-            probeClass,
-            GetAkcssCSharpUsingDirectives(containingSymbol));
+            targetType,
+            includeCompletionMembers: false,
+            completionScope: null);
 
         if (containingSymbol.DeclarationSyntax is not { } declarationSyntax)
         {
@@ -5270,10 +5256,134 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             targetType);
     }
 
-    private static CSharp.ExpressionSyntax RewriteAkcssTargetMemberAccess(
+    private CSharp.CompilationUnitSyntax CreateAkcssExpressionProbe(
+        CSharp.ExpressionSyntax expressionSyntax,
+        IAkcssSymbol containingSymbol,
+        ITypeSymbol? targetType,
+        bool includeCompletionMembers,
+        AkburaSyntax? completionScope)
+    {
+        var targetParameterName = GetAkcssTargetParameterName(containingSymbol);
+        var usingDirectives = GetAkcssCSharpUsingDirectives(
+            containingSymbol);
+        var boundExpression = RewriteAkcssTargetMemberAccess(
+            expressionSyntax,
+            containingSymbol,
+            targetParameterName,
+            usingDirectives);
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(boundExpression);
+        var probeScope = includeCompletionMembers && completionScope != null
+            ? BindingSession.GetCSharpProbeBinder(
+                    completionScope,
+                    BinderUsage.Expression)
+                .CreateCompletionProbeScope(
+                    completionScope,
+                    expressionSyntax)
+            : CSharpProbeScope.Empty;
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CreateCSharpProbeReturnType(targetType),
+                "__AkburaSemanticProbe")
+            .WithParameterList(CreateAkcssExpressionParameterList(
+                containingSymbol,
+                targetParameterName,
+                includeUtilityParameters: !includeCompletionMembers))
+            .WithBody(CSharpSyntaxFactory.Block(
+                probeScope.LocalStatements.Add(returnStatement)));
+
+        using var members =
+            ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        if (includeCompletionMembers)
+        {
+            AddAkcssTargetCompletionMembers(
+                members,
+                containingSymbol);
+        }
+
+        members.AddRange(probeScope.MemberDeclarations);
+        members.Add(method);
+        var probeClass = CSharpSyntaxFactory
+            .ClassDeclaration("__AkburaSemanticProbe")
+            .WithMembers(CSharpSyntaxFactory.List(members.ToImmutable()));
+        return CreateCSharpProbeCompilationUnit(
+            probeClass,
+            usingDirectives);
+    }
+
+    private static void AddAkcssTargetCompletionMembers(
+        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> members,
+        IAkcssSymbol containingSymbol)
+    {
+        if (containingSymbol.TargetType.Symbol is not
+                INamedTypeSymbol targetType)
+        {
+            return;
+        }
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        AddAkcssTargetCompletionMembers(
+            members,
+            names,
+            targetType,
+            includeBaseTypes: true);
+        foreach (var @interface in targetType.AllInterfaces)
+        {
+            AddAkcssTargetCompletionMembers(
+                members,
+                names,
+                @interface,
+                includeBaseTypes: false);
+        }
+    }
+
+    private static void AddAkcssTargetCompletionMembers(
+        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> members,
+        HashSet<string> names,
+        INamedTypeSymbol type,
+        bool includeBaseTypes)
+    {
+        for (var current = type;
+             current != null;
+             current = includeBaseTypes ? current.BaseType : null)
+        {
+            foreach (var property in current.GetMembers()
+                         .OfType<RoslynPropertySymbol>())
+            {
+                if (property.IsStatic ||
+                    property.Parameters.Length != 0 ||
+                    property.GetMethod == null ||
+                    property.DeclaredAccessibility !=
+                        Accessibility.Public ||
+                    !names.Add(property.Name))
+                {
+                    continue;
+                }
+
+                var propertyType = CSharpSyntaxFactory.ParseTypeName(
+                    property.Type.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat));
+                members.Add(CSharpSyntaxFactory.PropertyDeclaration(
+                        propertyType,
+                        property.Name)
+                    .WithExpressionBody(
+                        CSharpSyntaxFactory.ArrowExpressionClause(
+                            CSharpSyntaxFactory.PostfixUnaryExpression(
+                                Microsoft.CodeAnalysis.CSharp.SyntaxKind
+                                    .SuppressNullableWarningExpression,
+                                CSharpSyntaxFactory.LiteralExpression(
+                                    Microsoft.CodeAnalysis.CSharp.SyntaxKind
+                                        .DefaultLiteralExpression))))
+                    .WithSemicolonToken(CSharpSyntaxFactory.Token(
+                        Microsoft.CodeAnalysis.CSharp.SyntaxKind
+                            .SemicolonToken)));
+            }
+        }
+    }
+
+    private CSharp.ExpressionSyntax RewriteAkcssTargetMemberAccess(
         CSharp.ExpressionSyntax expression,
         IAkcssSymbol containingSymbol,
-        string targetParameterName)
+        string targetParameterName,
+        ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives)
     {
         if (containingSymbol.TargetType.Symbol is not INamedTypeSymbol targetType)
         {
@@ -5318,9 +5428,141 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return (CSharp.ExpressionSyntax)new AkcssTargetMemberAccessRewriter(
+            this,
+            containingSymbol,
             targetType,
             targetParameterName,
+            usingDirectives,
             shadowedNames).Visit(expression)!;
+    }
+
+    private bool TryCreateAkcssAttachedPropertyRead(
+        CSharp.MemberAccessExpressionSyntax memberAccess,
+        IAkcssSymbol containingSymbol,
+        INamedTypeSymbol targetType,
+        string targetParameterName,
+        ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives,
+        out CSharp.ExpressionSyntax expression)
+    {
+        expression = null!;
+        if (memberAccess.Name is not CSharp.IdentifierNameSyntax name ||
+            name.Identifier.IsMissing)
+        {
+            return false;
+        }
+
+        var propertyName = name.Identifier.ValueText;
+        if (propertyName.EndsWith("Property", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        INamedTypeSymbol ownerType;
+        try
+        {
+            if (!TryBindAttachedPropertyOwner(
+                    memberAccess.Expression.ToString(),
+                    usingDirectives,
+                    out ownerType))
+            {
+                return false;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+
+        if (HasPublicStaticMember(ownerType, propertyName) ||
+            !TryCreateAttachedPropertySymbol(
+                ownerType,
+                propertyName,
+                targetType,
+                SymbolLanguage.Akcss,
+                containingSymbol,
+                out var property) ||
+            !property.CanRead)
+        {
+            return false;
+        }
+
+        CSharp.ExpressionSyntax rewritten;
+        if (property.ReadKind == PropertyAccessKind.AttachedAccessor &&
+            property.AttachedGetterDefinition.Symbol is
+                RoslynMethodSymbol getter)
+        {
+            var getterReference = CSharpSyntaxFactory.ParseExpression(
+                getter.ContainingType.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat) +
+                "." + getter.Name);
+            var targetArgument = CSharpSyntaxFactory.CastExpression(
+                CSharpSyntaxFactory.ParseTypeName(
+                    getter.Parameters[0].Type.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat)),
+                CSharpSyntaxFactory.IdentifierName(
+                    targetParameterName));
+            rewritten = CSharpSyntaxFactory.InvocationExpression(
+                getterReference,
+                CSharpSyntaxFactory.ArgumentList(
+                    CSharpSyntaxFactory.SingletonSeparatedList(
+                        CSharpSyntaxFactory.Argument(targetArgument))));
+        }
+        else if (property.AttachedPropertyDefinition.Symbol is
+                     RoslynFieldSymbol attachedProperty &&
+                 Compilation.CSharpCompilation.GetTypeByMetadataName(
+                     "Avalonia.AvaloniaObject") is { } avaloniaObjectType)
+        {
+            var target = CSharpSyntaxFactory.ParenthesizedExpression(
+                CSharpSyntaxFactory.CastExpression(
+                    CSharpSyntaxFactory.ParseTypeName(
+                        avaloniaObjectType.ToDisplayString(
+                            SymbolDisplayFormat.FullyQualifiedFormat)),
+                    CSharpSyntaxFactory.IdentifierName(
+                        targetParameterName)));
+            var getValue = CSharpSyntaxFactory.MemberAccessExpression(
+                Microsoft.CodeAnalysis.CSharp.SyntaxKind
+                    .SimpleMemberAccessExpression,
+                target,
+                CSharpSyntaxFactory.IdentifierName("GetValue"));
+            var propertyReference = CSharpSyntaxFactory.ParseExpression(
+                attachedProperty.ContainingType.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat) +
+                "." + attachedProperty.Name);
+            rewritten = CSharpSyntaxFactory.InvocationExpression(
+                getValue,
+                CSharpSyntaxFactory.ArgumentList(
+                    CSharpSyntaxFactory.SingletonSeparatedList(
+                        CSharpSyntaxFactory.Argument(
+                            propertyReference))));
+        }
+        else
+        {
+            return false;
+        }
+
+        expression = memberAccess.CopyAnnotationsTo(
+            rewritten.WithTriviaFrom(memberAccess));
+        return true;
+    }
+
+    private static bool HasPublicStaticMember(
+        INamedTypeSymbol type,
+        string memberName)
+    {
+        for (var current = type;
+             current != null;
+             current = current.BaseType)
+        {
+            if (current.GetMembers(memberName).Any(static member =>
+                    member.IsStatic &&
+                    member.DeclaredAccessibility ==
+                        Accessibility.Public))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static CSharp.TypeSyntax CreateCSharpProbeReturnType(
@@ -5335,7 +5577,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private CSharp.ParameterListSyntax CreateAkcssExpressionParameterList(
         IAkcssSymbol containingSymbol,
-        string targetParameterName)
+        string targetParameterName,
+        bool includeUtilityParameters = true)
     {
         using var builder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
         if (containingSymbol.HasTargetType)
@@ -5347,7 +5590,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                         Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword))));
         }
 
-        if (containingSymbol is ITailwindUtilitySymbol utilitySymbol)
+        if (includeUtilityParameters &&
+            containingSymbol is ITailwindUtilitySymbol utilitySymbol)
         {
             foreach (var parameter in utilitySymbol.Parameters)
             {
@@ -5388,18 +5632,42 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private sealed class AkcssTargetMemberAccessRewriter : CSharpSyntaxRewriter
     {
+        private readonly AkburaSemanticModel _semanticModel;
+        private readonly IAkcssSymbol _containingSymbol;
         private readonly INamedTypeSymbol _targetType;
         private readonly string _targetParameterName;
+        private readonly ImmutableArray<CSharp.UsingDirectiveSyntax>
+            _usingDirectives;
         private readonly HashSet<string> _shadowedNames;
 
         public AkcssTargetMemberAccessRewriter(
+            AkburaSemanticModel semanticModel,
+            IAkcssSymbol containingSymbol,
             INamedTypeSymbol targetType,
             string targetParameterName,
+            ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives,
             HashSet<string> shadowedNames)
         {
+            _semanticModel = semanticModel;
+            _containingSymbol = containingSymbol;
             _targetType = targetType;
             _targetParameterName = targetParameterName;
+            _usingDirectives = usingDirectives;
             _shadowedNames = shadowedNames;
+        }
+
+        public override SyntaxNode? VisitMemberAccessExpression(
+            CSharp.MemberAccessExpressionSyntax node)
+        {
+            return _semanticModel.TryCreateAkcssAttachedPropertyRead(
+                    node,
+                    _containingSymbol,
+                    _targetType,
+                    _targetParameterName,
+                    _usingDirectives,
+                    out var expression)
+                ? expression
+                : base.VisitMemberAccessExpression(node);
         }
 
         public override SyntaxNode? VisitIdentifierName(CSharp.IdentifierNameSyntax node)
@@ -5732,19 +6000,18 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         {
             foreach (var usingDirective in GetAkcssUsingDirectives(akcssSyntax))
             {
-                if (IsAkcssUsingDirective(usingDirective))
+                if (usingDirective.IsAkcssModuleImport)
                 {
                     continue;
                 }
 
-                var name = usingDirective.Name.ToFullString().Trim();
-                if (!string.IsNullOrWhiteSpace(name))
+                if (!string.IsNullOrWhiteSpace(
+                        usingDirective.Name.ToFullString()))
                 {
                     AddCSharpUsingDirective(
                         builder,
                         directives,
-                        CSharpSyntaxFactory.UsingDirective(
-                            CSharpSyntaxFactory.ParseName(name)));
+                        usingDirective.ToCSharp());
                 }
             }
         }
@@ -5825,7 +6092,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     }
 
     private static bool IsAkcssUsingDirective(AkcssUsingDirectiveSyntax usingDirective)
-        => TryGetAkcssImportName(usingDirective, out _);
+        => usingDirective.IsAkcssModuleImport;
 
     private static bool IsAkcssUsingDirective(UsingDirectiveSyntax usingDirective)
         => TryGetAkcssImportName(usingDirective, out _);
@@ -5835,7 +6102,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         out string importName)
     {
         importName = usingDirective.Name.ToFullString().Trim();
-        return importName.EndsWith(".akcss", StringComparison.Ordinal);
+        return usingDirective.IsAkcssModuleImport;
     }
 
     private static bool TryGetAkcssImportName(

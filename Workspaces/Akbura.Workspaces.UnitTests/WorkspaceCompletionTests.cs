@@ -141,6 +141,11 @@ public sealed class WorkspaceCompletionTests
         "Width",
         "Width: ")]
     [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card {\n    Heig|\n}",
+        "Height",
+        "Height: ")]
+    [InlineData(
         "@using Gallery;\n" +
         "Options.card {\n    Na|\n}",
         "Name",
@@ -2214,6 +2219,519 @@ public sealed class WorkspaceCompletionTests
         }
     }
 
+    [Theory]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "@using Avalonia.Layout;\n" +
+        "Control.card { HorizontalAlignment: Cen|; }",
+        "Center",
+        AkburaCompletionKind.AkcssValue)]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { Background: Dod|; }",
+        "DodgerBlue",
+        AkburaCompletionKind.AkcssColor)]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { Tint: Dod|; }",
+        "DodgerBlue",
+        AkburaCompletionKind.AkcssColor)]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { Padding: |; }",
+        "(horizontal: 0, vertical: 0)",
+        AkburaCompletionKind.AkcssValue)]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { Padding: (hori|; }",
+        "horizontal:",
+        AkburaCompletionKind.AkcssValue)]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { CornerRadius: new Cor|; }",
+        "new CornerRadius(0)",
+        AkburaCompletionKind.AkcssValue)]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { Variant: Pri|; }",
+        "Primary",
+        AkburaCompletionKind.AkcssValue)]
+    public void Completion_AkcssOffersExpectedTypeValues(
+        string sourceWithCaret,
+        string expectedDisplayText,
+        AkburaCompletionKind expectedKind)
+    {
+        WithAkcssWorkspace(
+            sourceWithCaret,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var akcssContext = syntacticDocument
+                    .GetAkcssCompletionContext(position);
+                Assert.True(
+                    akcssContext.Kind ==
+                        AkcssCompletionContextKind.PropertyValue,
+                    $"Prefix '{akcssContext.Prefix}', property " +
+                    $"'{akcssContext.PropertyName}', owner " +
+                    $"{akcssContext.OwnerSpan}, declaration " +
+                    $"{akcssContext.ContainingDeclarationSpan}.");
+                var semanticModel = semanticContext.Project.Compilation
+                    .GetSemanticModel(semanticContext.Document.SyntaxTree);
+                Assert.True(
+                    semanticModel.TryGetAkcssValueCompletionInfo(
+                        akcssContext.ContainingDeclarationSpan,
+                        akcssContext.PropertyName,
+                        out _),
+                    $"Property '{akcssContext.PropertyName}', " +
+                    $"declaration {akcssContext.ContainingDeclarationSpan}.");
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var item = Assert.Single(
+                    result.Items,
+                    item => item.DisplayText == expectedDisplayText);
+                Assert.Equal(expectedKind, item.Kind);
+                Assert.False(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssIfOffersAttachedPropertyShorthand()
+    {
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "Control.card { @if(Grid.Ro| > 0) { Width: 10; } }";
+
+        WithAkcssWorkspace(
+            source,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var context = syntacticDocument
+                    .GetAkcssCompletionContext(position);
+                Assert.Equal(
+                    AkcssCompletionContextKind
+                        .AttachedPropertyExpression,
+                    context.Kind);
+                Assert.Equal("Grid", context.Qualifier);
+                Assert.Equal("Ro", context.Prefix);
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var item = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "RowSpan");
+
+                Assert.Equal("RowSpan", item.InsertText);
+                Assert.Equal(
+                    AkburaCompletionKind.Property,
+                    item.Kind);
+                Assert.Equal("Ro", syntacticDocument.Text.ToString(
+                    result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssQualifiedPropertyNameOffersOnlyAttachedProperties()
+    {
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "Control.card { Grid.R| }";
+
+        WithAkcssWorkspace(
+            source,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var context = syntacticDocument
+                    .GetAkcssCompletionContext(position);
+                Assert.Equal(
+                    AkcssCompletionContextKind.PropertyName,
+                    context.Kind);
+                Assert.Equal("Grid", context.Qualifier);
+                Assert.Equal("R", context.Prefix);
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.Row" &&
+                        item.InsertText == "Row: ");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.RowSpan" &&
+                        item.InsertText == "RowSpan: ");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.ShowGridLines");
+                Assert.False(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssPropertyNameOffersAttachedOwnerBeforeDot()
+    {
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "Control.card { Gr| }";
+
+        WithAkcssWorkspace(
+            source,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var context = syntacticDocument
+                    .GetAkcssCompletionContext(position);
+                Assert.Equal(
+                    AkcssCompletionContextKind.PropertyName,
+                    context.Kind);
+                Assert.Equal(string.Empty, context.Qualifier);
+                Assert.Equal("Gr", context.Prefix);
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.Row" &&
+                        item.InsertText == "Grid.Row: ");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.RowSpan" &&
+                        item.InsertText == "Grid.RowSpan: ");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.ShowGridLines");
+                Assert.False(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssPropertyCatalogSurvivesPrefixReplacement()
+    {
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "Control.card { H| }";
+
+        WithAkcssWorkspace(
+            source,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Height" &&
+                        item.InsertText == "Height: ");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.Row" &&
+                        item.InsertText == "Grid.Row: ");
+                Assert.False(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_AkcssCornerRadiusDoesNotOfferThicknessTuple()
+    {
+        const string source =
+            "@using Avalonia.Controls;\n" +
+            "Control.card { CornerRadius: |; }";
+
+        WithAkcssWorkspace(
+            source,
+            importedStylesSource: null,
+            (workspace, semanticContext, syntacticDocument, position) =>
+            {
+                var context = syntacticDocument
+                    .GetAkcssCompletionContext(position);
+                var semanticModel = semanticContext.Project.Compilation
+                    .GetSemanticModel(semanticContext.Document.SyntaxTree);
+                Assert.True(
+                    semanticModel.TryGetAkcssValueCompletionInfo(
+                        context.ContainingDeclarationSpan,
+                        context.PropertyName,
+                        out var info),
+                    $"Kind {context.Kind}, property " +
+                    $"'{context.PropertyName}'.");
+                Assert.NotNull(info.ExpectedType);
+                Assert.True(
+                    semanticModel.IsAvaloniaCornerRadiusType(
+                        info.ExpectedType!),
+                    info.ExpectedType!.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat));
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText ==
+                        "new CornerRadius(0)");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item => item.DisplayText ==
+                        "(0, 0, 0, 0)");
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "@using System;\nStackPanel.card { Width: Math.Ro|; }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "Round")]
+    [InlineData(
+        "@using System;\n@utilities { " +
+        "StackPanel.gap-(double value) { " +
+        "Spacing: value.ToStr|; } }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "ToString")]
+    [InlineData(
+        "@using System;\nStackPanel.card { Width: Wid|; }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "Width")]
+    [InlineData(
+        "@using System;\nStackP|.card { }",
+        AkburaCSharpCompletionContextKind.Type,
+        "StackPanel")]
+    [InlineData(
+        "@using System;\n@utilities { " +
+        "StackPanel.gap-(dou| value) { } }",
+        AkburaCSharpCompletionContextKind.Type,
+        "double")]
+    [InlineData(
+        "@using System;\n@using Avalonia.Controls;\n" +
+        "Control.card { @if(string.IsNullOrEmp|ty(\"\")) { } }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "IsNullOrEmpty")]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "@utilities { StackP|.gap { } }",
+        AkburaCSharpCompletionContextKind.Type,
+        "StackPanel")]
+    [InlineData(
+        "@using Avalonia.Controls;\n@intercept StackP|;",
+        AkburaCSharpCompletionContextKind.Type,
+        "StackPanel")]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { Width: |; }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "Width")]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "Control.card { @if(|) { } }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "false")]
+    [InlineData(
+        "@using System.Collections.Gen|;\n.card { }",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "Generic")]
+    public void CSharpProjection_AkcssContextsUseRoslynCompletion(
+        string sourceWithCaret,
+        AkburaCSharpCompletionContextKind expectedKind,
+        string expectedItem)
+    {
+        WithAkcssWorkspace(
+            sourceWithCaret,
+            importedStylesSource: null,
+            (_, semanticContext, syntacticDocument, position) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.Equal(expectedKind, completionContext.Kind);
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+                Assert.Equal(
+                    syntacticDocument.Text.ToString(
+                        completionContext.HostSpan),
+                    projection.Root.ToFullString().Substring(
+                        projection.ProjectedSpan.Start,
+                        projection.ProjectedSpan.Length));
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    expectedItem);
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_AkcssUsesCurrentTextWithStaleSemantics()
+    {
+        const string semanticSource =
+            "@using System;\n" +
+            "@using Avalonia.Controls;\n" +
+            "Control.card { Width: Math.R; }";
+        const string currentSourceWithCaret =
+            "@using System;\n" +
+            "@using Avalonia.Controls;\n" +
+            "Control.card { Width: Math.Ro|; }";
+        var position = currentSourceWithCaret.IndexOf('|');
+        var currentSource = currentSourceWithCaret.Remove(position, 1);
+
+        WithAkcssWorkspace(
+            semanticSource,
+            importedStylesSource: null,
+            (_, semanticContext, _, _) =>
+            {
+                var syntacticDocument = AkburaSyntacticDocument.Parse(
+                    SourceText.From(currentSource),
+                    semanticContext.Document.FilePath);
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                Assert.Equal(
+                    "Math.Ro",
+                    projection.Root.ToFullString().Substring(
+                        projection.ProjectedSpan.Start,
+                        projection.ProjectedSpan.Length));
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Round");
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "@akcss { @utilities { " +
+        "StackPanel.gap-(double value) { " +
+        "Spacing: value.ToStr|; } } }",
+        AkburaCSharpCompletionContextKind.Expression,
+        "ToString")]
+    [InlineData(
+        "@akcss { @using System.Collections.Gen|; .card { } }",
+        AkburaCSharpCompletionContextKind.UsingDirectiveName,
+        "Generic")]
+    [InlineData(
+        "@akcss { StackP|.card { } }",
+        AkburaCSharpCompletionContextKind.Type,
+        "StackPanel")]
+    public void CSharpProjection_InlineAkcssUsesRoslynCompletion(
+        string inlineAkcssWithCaret,
+        AkburaCSharpCompletionContextKind expectedKind,
+        string expectedItem)
+    {
+        var sourceWithCaret =
+            "using Avalonia.Controls;\n\n" +
+            inlineAkcssWithCaret +
+            "\n\n<StackPanel/>\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.Equal(expectedKind, completionContext.Kind);
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+                Assert.Equal(
+                    AkburaCSharpImportSyntaxKind.Component,
+                    projection.ImportContext.SyntaxKind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    expectedItem);
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "@using System;\n" +
+        "@using Avalonia.Controls;\n" +
+        "Control.card { Width: Math.Ma|x(1, 2); }",
+        "Max")]
+    [InlineData(
+        "@using Avalonia.Controls;\n" +
+        "@utilities { StackPanel.gap-(double value) { " +
+        "Spacing: val|ue; } }",
+        "value")]
+    public void CSharpProjection_AkcssMapsRoslynQuickInfoToHost(
+        string sourceWithCaret,
+        string expectedToken)
+    {
+        WithAkcssWorkspace(
+            sourceWithCaret,
+            importedStylesSource: null,
+            (_, semanticContext, syntacticDocument, position) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var quickInfo = RoslynCompletionTestHost
+                    .GetQuickInfoAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(quickInfo);
+                Assert.True(projection.TryMapToHost(
+                    quickInfo!.Span,
+                    out var hostSpan));
+                Assert.Equal(
+                    expectedToken,
+                    syntacticDocument.Text.ToString(hostSpan));
+            });
+    }
+
     [Fact]
     public void CSharpProjection_StatementUsesCurrentTextWithStaleSemantics()
     {
@@ -2352,6 +2870,208 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void CSharpCompletionChangeMapper_MapsAkcssAutoImportBeforeModules()
+    {
+        const string sourceWithCaret =
+            "@using Avalonia.Controls;\r\n" +
+            "@using Imported.akcss;\r\n" +
+            "\r\n" +
+            "Control.card {\r\n" +
+            "    Tag: new ObservableCollec|;\r\n" +
+            "}\r\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithAkcssWorkspace(
+            sourceWithCaret,
+            importedStylesSource: ".imported { Width: 1; }",
+            (_workspace, semanticContext, syntacticDocument, _) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+                Assert.Equal(
+                    AkburaCSharpImportSyntaxKind.Akcss,
+                    projection.ImportContext.SyntaxKind);
+
+                var completion = RoslynCompletionTestHost
+                    .GetImportCompletionAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        "ObservableCollection",
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completion);
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                Assert.Contains(
+                    "@using Avalonia.Controls;\r\n" +
+                    "@using System.Collections.ObjectModel;\r\n" +
+                    "@using Imported.akcss;",
+                    changedHostText,
+                    StringComparison.Ordinal);
+                Assert.Contains(
+                    "new ObservableCollection",
+                    changedHostText,
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain(
+                    "\r\nusing System.Collections.ObjectModel;",
+                    changedHostText,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void CSharpCompletionChangeMapper_InsertsFirstAkcssImportWithLf()
+    {
+        const string sourceWithCaret =
+            "@using Imported.akcss;\n" +
+            "\n" +
+            "Control.card {\n" +
+            "    Tag: new ObservableCollec|;\n" +
+            "}\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithAkcssWorkspace(
+            sourceWithCaret,
+            importedStylesSource: ".imported { Width: 1; }",
+            (_, semanticContext, syntacticDocument, _) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var completion = RoslynCompletionTestHost
+                    .GetImportCompletionAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        "ObservableCollection",
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completion);
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                Assert.StartsWith(
+                    "@using System.Collections.ObjectModel;\n" +
+                    "@using Imported.akcss;",
+                    changedHostText,
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain('\r', changedHostText);
+            });
+    }
+
+    [Fact]
+    public void CSharpCompletionChangeMapper_DoesNotDuplicateAkcssImport()
+    {
+        const string sourceWithCaret =
+            "@using System.Collections.ObjectModel;\n" +
+            "@using Avalonia.Controls;\n" +
+            "\n" +
+            "Control.card {\n" +
+            "    Tag: new ObservableCollec|;\n" +
+            "}\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithAkcssWorkspace(
+            sourceWithCaret,
+            importedStylesSource: null,
+            (_, semanticContext, syntacticDocument, _) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var projectedText = SourceText.From(
+                    projection.Root.ToFullString());
+                var replacementSpan = new TextSpan(
+                    projection.ActiveMapping.ProjectedSpan.Start,
+                    "new ObservableCollec".Length);
+                var replacement = new TextChange(
+                    replacementSpan,
+                    "new ObservableCollection");
+                var duplicateImport = new TextChange(
+                    new TextSpan(0, 0),
+                    "using System.Collections.ObjectModel;\n");
+                var changes = ImmutableArray.Create(
+                    duplicateImport,
+                    replacement);
+                var changedProjectedText = projectedText.WithChanges(changes);
+                var completion = CompletionChange.Create(
+                    new TextChange(
+                        new TextSpan(0, projectedText.Length),
+                        changedProjectedText.ToString()),
+                    changes,
+                    newPosition: null,
+                    includesCommitCharacter: false);
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            projectedText,
+                            projection,
+                            completion,
+                            out var mapped));
+
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                Assert.Equal(
+                    1,
+                    CountOccurrences(
+                        changedHostText,
+                        "@using System.Collections.ObjectModel;"));
+                Assert.Contains(
+                    "new ObservableCollection",
+                    changedHostText,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
     public void CSharpCompletionChangeMapper_RejectsWrapperChanges()
     {
         const string sourceWithCaret = """
@@ -2393,6 +3113,69 @@ public sealed class WorkspaceCompletionTests
                     "X");
                 var changes = ImmutableArray.Create(
                     wrapperChange,
+                    directChange);
+                var changedProjectedText = projectedText.WithChanges(changes);
+                var completionChange = CompletionChange.Create(
+                    new TextChange(
+                        new TextSpan(0, projectedText.Length),
+                        changedProjectedText.ToString()),
+                    changes,
+                    newPosition: null,
+                    includesCommitCharacter: false);
+
+                Assert.False(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            projectedText,
+                            projection,
+                            completionChange,
+                            out _));
+            });
+    }
+
+    [Fact]
+    public void CSharpCompletionChangeMapper_RejectsUnknownTriviaChanges()
+    {
+        const string sourceWithCaret = """
+            using Avalonia.Controls;
+
+            state int count = 0;
+            var text = cou|;
+
+            <StackPanel/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+
+                var projectedText = SourceText.From(
+                    projection.Root.ToFullString());
+                var wrapperNameStart = projectedText.ToString().IndexOf(
+                    "__akbura_statement_probe",
+                    StringComparison.Ordinal);
+                Assert.True(wrapperNameStart >= 0);
+                var directChange = new TextChange(
+                    projection.ActiveMapping.ProjectedSpan,
+                    "count;");
+                var triviaChange = new TextChange(
+                    new TextSpan(wrapperNameStart, 0),
+                    " ");
+                var changes = ImmutableArray.Create(
+                    triviaChange,
                     directChange);
                 var changedProjectedText = projectedText.WithChanges(changes);
                 var completionChange = CompletionChange.Create(
@@ -2836,6 +3619,23 @@ public sealed class WorkspaceCompletionTests
                 {
                     public double Width { get; set; }
 
+                    public double Height { get; set; }
+
+                    public object? Tag { get; set; }
+
+                    public Avalonia.Layout.HorizontalAlignment
+                        HorizontalAlignment { get; set; }
+
+                    public Avalonia.Media.IBrush? Background { get; set; }
+
+                    public Avalonia.Media.Color Tint { get; set; }
+
+                    public Avalonia.Thickness Padding { get; set; }
+
+                    public Avalonia.CornerRadius CornerRadius { get; set; }
+
+                    public Gallery.Variant Variant { get; set; }
+
                     public event System.EventHandler? Loaded;
                 }
 
@@ -2848,14 +3648,27 @@ public sealed class WorkspaceCompletionTests
                 {
                 }
 
-                public static class Grid
+                public sealed class Grid : Control
                 {
+                    public bool ShowGridLines { get; set; }
+
                     public static readonly
                         Avalonia.AttachedProperty<int> RowProperty = new();
 
+                    public static readonly
+                        Avalonia.AttachedProperty<int> RowSpanProperty = new();
+
                     public static int GetRow(Control control) => 0;
 
+                    public static int GetRowSpan(Control control) => 0;
+
                     public static void SetRow(
+                        Control control,
+                        int value)
+                    {
+                    }
+
+                    public static void SetRowSpan(
                         Control control,
                         int value)
                     {
@@ -2865,6 +3678,26 @@ public sealed class WorkspaceCompletionTests
 
             namespace Avalonia
             {
+                public readonly struct Thickness
+                {
+                }
+
+                public readonly struct CornerRadius
+                {
+                    public CornerRadius(double uniformRadius)
+                    {
+                    }
+
+                    public CornerRadius(
+                        double topLeft,
+                        double topRight,
+                        double bottomRight,
+                        double bottomLeft)
+                    {
+                    }
+
+                }
+
                 public class AvaloniaProperty
                 {
                 }
@@ -2876,6 +3709,39 @@ public sealed class WorkspaceCompletionTests
                 public class AttachedProperty<T> :
                     AvaloniaProperty<T>
                 {
+                }
+            }
+
+            namespace Avalonia.Layout
+            {
+                public enum HorizontalAlignment
+                {
+                    Left,
+                    Center,
+                    Right,
+                    Stretch,
+                }
+            }
+
+            namespace Avalonia.Media
+            {
+                public interface IBrush
+                {
+                }
+
+                public readonly struct Color
+                {
+                }
+
+                public static class Colors
+                {
+                    public static Color AliceBlue => default;
+
+                    public static Color Black => default;
+
+                    public static Color DodgerBlue => default;
+
+                    public static Color White => default;
                 }
             }
 
@@ -2913,6 +3779,15 @@ public sealed class WorkspaceCompletionTests
                     }
 
                     public object ProvideValue() => new();
+                }
+            }
+
+            namespace Gallery
+            {
+                public enum Variant
+                {
+                    Primary,
+                    Secondary,
                 }
             }
 

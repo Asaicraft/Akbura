@@ -241,10 +241,14 @@ internal static class AkburaCSharpCompletionChangeMapper
 
         if (added.Count == 0)
         {
+            if (newKeys.Length > oldKeys.Length)
+            {
+                return true;
+            }
+
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Completion,
-                "Projected changes outside known " +
-                "mappings did not add a supported using directive.");
+                "Projected changes outside known mappings did not add a supported using directive.");
             return false;
         }
 
@@ -278,7 +282,10 @@ internal static class AkburaCSharpCompletionChangeMapper
                 builder.Append(context.NewLine);
             }
 
-            builder.Append("using ");
+            builder.Append(context.SyntaxKind ==
+                    AkburaCSharpImportSyntaxKind.Akcss
+                ? "@using "
+                : "using ");
             builder.Append(imports[i].Name);
             builder.Append(';');
         }

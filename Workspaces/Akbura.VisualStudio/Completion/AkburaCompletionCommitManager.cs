@@ -350,12 +350,7 @@ internal sealed class AkburaCompletionCommitManager :
         TextChange change,
         AkburaCSharpProjection projection)
     {
-        return change.Span.Length == 0 &&
-            change.Span.Start ==
-                projection.ImportContext.InsertionPosition &&
-            (change.NewText?.IndexOf(
-                "using ",
-                StringComparison.Ordinal) ?? -1) >= 0;
+        return projection.ImportContext.IsImportInsertion(change);
     }
 
     private static int GetActiveStartAfterChanges(

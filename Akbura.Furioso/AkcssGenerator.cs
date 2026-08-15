@@ -1696,11 +1696,98 @@ internal static class AkcssGenerator
         {
             propertyNames.Add(propertyReference.Property.Name);
         }
+        else if (operation is IInvocationOperation invocation &&
+                 TryGetObservedAttachedPropertyName(
+                     invocation,
+                     targetParameterName,
+                     out var attachedPropertyName))
+        {
+            propertyNames.Add(attachedPropertyName);
+        }
 
         foreach (var child in operation.ChildOperations)
         {
             CollectObservedPropertyNames(child, targetParameterName, propertyNames);
         }
+    }
+
+    private static bool TryGetObservedAttachedPropertyName(
+        IInvocationOperation invocation,
+        string targetParameterName,
+        out string propertyName)
+    {
+        propertyName = string.Empty;
+        var method = invocation.TargetMethod;
+        if (method.IsStatic &&
+            method.Name.StartsWith("Get", StringComparison.Ordinal) &&
+            method.Name.Length > "Get".Length &&
+            invocation.Arguments.Length == 1 &&
+            IsTargetReference(
+                invocation.Arguments[0].Value,
+                targetParameterName))
+        {
+            var candidateName = method.Name["Get".Length..];
+            if (HasAvaloniaPropertyField(
+                    method.ContainingType,
+                    candidateName))
+            {
+                propertyName = candidateName;
+                return true;
+            }
+        }
+
+        if (!string.Equals(
+                method.Name,
+                "GetValue",
+                StringComparison.Ordinal) ||
+            !IsTargetReference(
+                invocation.Instance,
+                targetParameterName) ||
+            invocation.Arguments.Length != 1 ||
+            invocation.Arguments[0].Value is not
+                IFieldReferenceOperation fieldReference ||
+            !fieldReference.Field.IsStatic ||
+            !IsAvaloniaPropertyType(fieldReference.Field.Type))
+        {
+            return false;
+        }
+
+        const string propertySuffix = "Property";
+        var fieldName = fieldReference.Field.Name;
+        if (!fieldName.EndsWith(
+                propertySuffix,
+                StringComparison.Ordinal) ||
+            fieldName.Length == propertySuffix.Length)
+        {
+            return false;
+        }
+
+        propertyName = fieldName[..^propertySuffix.Length];
+        return true;
+    }
+
+    private static bool HasAvaloniaPropertyField(
+        INamedTypeSymbol type,
+        string propertyName)
+    {
+        var fieldName = propertyName + "Property";
+        for (var current = type;
+             current != null;
+             current = current.BaseType)
+        {
+            if (current.GetMembers(fieldName).Any(static member =>
+                    member is RoslynFieldSymbol
+                    {
+                        IsStatic: true,
+                        DeclaredAccessibility: Accessibility.Public,
+                    } field &&
+                    IsAvaloniaPropertyType(field.Type)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsTargetReference(

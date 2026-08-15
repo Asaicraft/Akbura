@@ -16,6 +16,15 @@ internal abstract partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(expressionSyntax);
 
+        if (expressionSyntax.Parent is
+                AkcssAssignmentSyntax or
+                AkcssIfDirectiveSyntax)
+        {
+            return CreateAkcssCSharpCompletionProjection(
+                expressionSyntax,
+                relativePosition);
+        }
+
         if (!EmbeddedCSharpSyntaxFacts.TryGetExpression(
                 expressionSyntax,
                 out var expression,
@@ -81,6 +90,18 @@ internal abstract partial class AkburaSemanticModel
         }
 
         ValidateSyntaxTreeOwnership(typeSyntax);
+
+        if (typeSyntax.Parent is
+                AkcssStyleSelectorSyntax or
+                AkcssUtilitySelectorSyntax or
+                AkcssUtilityParameterSyntax or
+                AkcssInterceptDirectiveSyntax)
+        {
+            return CreateAkcssCSharpCompletionProjection(
+                typeSyntax,
+                relativePosition);
+        }
+
         if (!EmbeddedCSharpSyntaxFacts.TryGetType(
                 typeSyntax,
                 out var type,
@@ -120,6 +141,21 @@ internal abstract partial class AkburaSemanticModel
             .CreateUsingDirectiveProjection(
                 usingSyntax,
                 relativePosition);
+    }
+
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(
+        AkcssUsingDirectiveSyntax usingSyntax,
+        int relativePosition)
+    {
+        if (usingSyntax == null)
+        {
+            throw new ArgumentNullException(nameof(usingSyntax));
+        }
+
+        ValidateSyntaxTreeOwnership(usingSyntax);
+        return CreateAkcssCSharpCompletionProjection(
+            usingSyntax,
+            relativePosition);
     }
 
     internal CSharpProbeProjection CreateCSharpCompletionProjection(

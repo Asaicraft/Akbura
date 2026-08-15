@@ -29,6 +29,33 @@ internal partial class AkburaSemanticModel
             string qualifier,
             CancellationToken cancellationToken = default)
     {
+        return LookupAkcssPropertiesForCompletion(
+            containingDeclarationSpan,
+            qualifier,
+            requireReadable: false,
+            cancellationToken);
+    }
+
+    internal ImmutableArray<AkcssPropertyLookupCandidate>
+        LookupReadableAkcssPropertiesForCompletion(
+            TextSpan containingDeclarationSpan,
+            string qualifier,
+            CancellationToken cancellationToken = default)
+    {
+        return LookupAkcssPropertiesForCompletion(
+            containingDeclarationSpan,
+            qualifier,
+            requireReadable: true,
+            cancellationToken);
+    }
+
+    private ImmutableArray<AkcssPropertyLookupCandidate>
+        LookupAkcssPropertiesForCompletion(
+            TextSpan containingDeclarationSpan,
+            string qualifier,
+            bool requireReadable,
+            CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         var declaration = FindAkcssCompletionDeclaration(
             containingDeclarationSpan);
@@ -39,7 +66,8 @@ internal partial class AkburaSemanticModel
 
         var key = new AkcssPropertyCompletionKey(
             declaration.FullSpan,
-            qualifier);
+            qualifier,
+            requireReadable);
         lock (_completionAkcssPropertiesGate)
         {
             if (_completionAkcssProperties.TryGetValue(
@@ -53,6 +81,7 @@ internal partial class AkburaSemanticModel
         var candidates = ComputeAkcssPropertiesForCompletion(
             declaration,
             qualifier,
+            requireReadable,
             cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -70,10 +99,208 @@ internal partial class AkburaSemanticModel
         }
     }
 
+    internal bool TryGetAkcssValueCompletionInfo(
+        TextSpan containingDeclarationSpan,
+        string propertyReference,
+        out AkcssValueCompletionInfo info)
+    {
+        info = default;
+        var declaration = FindAkcssCompletionDeclaration(
+            containingDeclarationSpan);
+        if (declaration == null ||
+            string.IsNullOrWhiteSpace(propertyReference) ||
+            !TryGetAkcssCompletionContainingSymbol(
+                declaration,
+                out var containingSymbol))
+        {
+            return false;
+        }
+
+        propertyReference = propertyReference.Trim();
+        var separator = propertyReference.LastIndexOf('.');
+        var qualifier = separator > 0
+            ? propertyReference[..separator]
+            : string.Empty;
+        var propertyName = separator >= 0
+            ? propertyReference[(separator + 1)..]
+            : propertyReference;
+        if (propertyName.Length == 0 ||
+            !TryGetAkcssCompletionOwnerType(
+                declaration,
+                containingSymbol,
+                qualifier,
+                out var ownerType))
+        {
+            return false;
+        }
+
+        var appliedTargetType =
+            containingSymbol.TargetType.Symbol as ITypeSymbol;
+        if (appliedTargetType == null &&
+            TryGetDefaultAkcssStyleTargetType(
+                out var defaultTargetType))
+        {
+            appliedTargetType = defaultTargetType;
+        }
+
+        if (!TryCreateAkcssCompletionProperty(
+                ownerType,
+                propertyName,
+                appliedTargetType,
+                containingSymbol,
+                preferAttached: qualifier.Length > 0,
+                out var property) ||
+            !property.CanWrite)
+        {
+            return false;
+        }
+
+        info = new AkcssValueCompletionInfo(
+            containingSymbol,
+            property);
+        return true;
+    }
+
+    internal ImmutableArray<AkcssExpectedValueLookupCandidate>
+        LookupAkcssExpectedValuesForCompletion(
+            AkcssValueCompletionInfo info,
+            CancellationToken cancellationToken = default)
+    {
+        if (info.ExpectedType is not { } expectedType ||
+            !TryGetStaticMemberOwnerType(
+                expectedType,
+                out var ownerType))
+        {
+            return ImmutableArray<AkcssExpectedValueLookupCandidate>.Empty;
+        }
+
+        using var names = ImmutableArrayBuilder<string>.Rent();
+        AddAkcssExpectedValueMemberNames(ownerType, names);
+        if (TryGetCompanionStaticMemberOwnerType(
+                ownerType,
+                out var companionOwnerType))
+        {
+            AddAkcssExpectedValueMemberNames(
+                companionOwnerType,
+                names);
+        }
+
+        using var candidates =
+            ImmutableArrayBuilder<AkcssExpectedValueLookupCandidate>.Rent();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in names.WrittenSpan)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!seen.Add(name))
+            {
+                continue;
+            }
+
+            var expression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+                .IdentifierName(name);
+            if (!TryBindExpectedTypeStaticMember(
+                    expression,
+                    expectedType,
+                    info.ContainingSymbol,
+                    out var binding) ||
+                binding.Symbol == null)
+            {
+                continue;
+            }
+
+            candidates.Add(new AkcssExpectedValueLookupCandidate(
+                name,
+                name,
+                expectedType.ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat),
+                binding.Symbol));
+        }
+
+        return candidates.ToImmutable();
+    }
+
+    internal ImmutableArray<AkcssExpectedValueLookupCandidate>
+        LookupAkcssNamedColorsForCompletion(
+            IAkcssSymbol containingSymbol,
+            CancellationToken cancellationToken = default)
+    {
+        var colorsType = Compilation.CSharpCompilation
+            .GetTypeByMetadataName("Avalonia.Media.Colors");
+        if (colorsType == null)
+        {
+            return ImmutableArray<AkcssExpectedValueLookupCandidate>.Empty;
+        }
+
+        using var candidates =
+            ImmutableArrayBuilder<AkcssExpectedValueLookupCandidate>.Rent();
+        foreach (var member in colorsType.GetMembers()
+                     .Where(static member => member.IsStatic &&
+                         member.DeclaredAccessibility == Accessibility.Public)
+                     .OrderBy(static member => member.Name,
+                         StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (member is not (Microsoft.CodeAnalysis.IFieldSymbol or
+                    Microsoft.CodeAnalysis.IPropertySymbol) ||
+                !TryBindAvaloniaNamedColor(
+                    member.Name,
+                    containingSymbol,
+                    out var binding) ||
+                binding.Symbol == null)
+            {
+                continue;
+            }
+
+            candidates.Add(new AkcssExpectedValueLookupCandidate(
+                member.Name,
+                member.Name,
+                "Color",
+                binding.Symbol));
+        }
+
+        return candidates.ToImmutable();
+    }
+
+    internal bool IsAvaloniaCornerRadiusType(ITypeSymbol type)
+    {
+        var cornerRadiusType = Compilation.CSharpCompilation
+            .GetTypeByMetadataName("Avalonia.CornerRadius");
+        return cornerRadiusType != null &&
+            IsSameType(type, cornerRadiusType);
+    }
+
+    private static void AddAkcssExpectedValueMemberNames(
+        INamedTypeSymbol ownerType,
+        ImmutableArrayBuilder<string> names)
+    {
+        foreach (var member in ownerType.GetMembers())
+        {
+            if (!member.IsStatic ||
+                member.DeclaredAccessibility != Accessibility.Public)
+            {
+                continue;
+            }
+
+            switch (member)
+            {
+                case Microsoft.CodeAnalysis.IFieldSymbol:
+                    names.Add(member.Name);
+                    break;
+                case Microsoft.CodeAnalysis.IPropertySymbol
+                {
+                    GetMethod: not null
+                }:
+                    names.Add(member.Name);
+                    break;
+            }
+        }
+    }
+
     private ImmutableArray<AkcssPropertyLookupCandidate>
         ComputeAkcssPropertiesForCompletion(
             AkburaSyntax declaration,
             string qualifier,
+            bool requireReadable,
             CancellationToken cancellationToken)
     {
         if (!TryGetAkcssCompletionContainingSymbol(
@@ -114,7 +341,9 @@ internal partial class AkburaSemanticModel
                     containingSymbol,
                     qualifier.Length > 0,
                     out var property) ||
-                !property.CanWrite)
+                !(requireReadable
+                    ? property.CanRead
+                    : property.CanWrite))
             {
                 continue;
             }
@@ -138,7 +367,169 @@ internal partial class AkburaSemanticModel
                 property.IsAttachedProperty));
         }
 
+        if (qualifier.Length == 0)
+        {
+            AddVisibleAttachedPropertiesForCompletion(
+                candidates,
+                declaration,
+                containingSymbol,
+                appliedTargetType,
+                requireReadable,
+                cancellationToken);
+        }
+
         return candidates.ToImmutable();
+    }
+
+    private void AddVisibleAttachedPropertiesForCompletion(
+        ImmutableArrayBuilder<AkcssPropertyLookupCandidate> candidates,
+        AkburaSyntax declaration,
+        IAkcssSymbol containingSymbol,
+        ITypeSymbol? appliedTargetType,
+        bool requireReadable,
+        CancellationToken cancellationToken)
+    {
+        var compilation = Compilation.CSharpCompilation;
+        var usingDirectives = GetAkcssCSharpUsingDirectives(declaration);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var visibleOwners = new Dictionary<
+            string,
+            INamedTypeSymbol?>(StringComparer.Ordinal);
+
+        foreach (var usingDirective in usingDirectives)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (usingDirective.StaticKeyword.RawKind != 0 ||
+                usingDirective.Name == null)
+            {
+                continue;
+            }
+
+            var namespaceName = NormalizeGlobalName(
+                usingDirective.Name.ToString());
+            var namespaceSymbol = GetNamespaceSymbol(
+                compilation.GlobalNamespace,
+                namespaceName);
+            if (namespaceSymbol == null)
+            {
+                continue;
+            }
+
+            var alias = usingDirective.Alias?.Name.Identifier.ValueText;
+            foreach (var ownerType in namespaceSymbol.GetTypeMembers())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!compilation.IsSymbolAccessibleWithin(
+                        ownerType,
+                        compilation.Assembly))
+                {
+                    continue;
+                }
+
+                var ownerReference = alias == null
+                    ? ownerType.Name
+                    : alias + "::" + ownerType.Name;
+                var attachedNames = new HashSet<string>(
+                    StringComparer.Ordinal);
+                AddAkcssAttachedPropertyNames(
+                    ownerType,
+                    attachedNames);
+                if (attachedNames.Count == 0)
+                {
+                    continue;
+                }
+
+                if (!visibleOwners.TryGetValue(
+                        ownerReference,
+                        out var existingOwner))
+                {
+                    visibleOwners.Add(ownerReference, ownerType);
+                }
+                else if (existingOwner != null &&
+                    !IsSameType(existingOwner, ownerType))
+                {
+                    visibleOwners[ownerReference] = null;
+                }
+            }
+        }
+
+        foreach (var pair in visibleOwners.OrderBy(
+                     static pair => pair.Key,
+                     StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var ownerType = pair.Value;
+            if (ownerType == null)
+            {
+                continue;
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            AddAkcssAttachedPropertyNames(ownerType, names);
+            foreach (var name in names.OrderBy(
+                         static name => name,
+                         StringComparer.Ordinal))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryCreateAkcssCompletionProperty(
+                        ownerType,
+                        name,
+                        appliedTargetType,
+                        containingSymbol,
+                        preferAttached: true,
+                        out var property) ||
+                    !(requireReadable
+                        ? property.CanRead
+                        : property.CanWrite))
+                {
+                    continue;
+                }
+
+                var fullName = pair.Key + "." + name;
+                if (!seen.Add(fullName))
+                {
+                    continue;
+                }
+
+                var definitionOwner = property.WriteDefinition.Symbol
+                        ?.ContainingType ??
+                    property.ReadDefinition.Symbol?.ContainingType ??
+                    ownerType;
+                candidates.Add(new AkcssPropertyLookupCandidate(
+                    fullName,
+                    fullName,
+                    definitionOwner.ToDisplayString(
+                        SymbolDisplayFormat.MinimallyQualifiedFormat),
+                    property.Type.ToDisplayString(
+                        SymbolDisplayFormat.MinimallyQualifiedFormat),
+                    property,
+                    isAttached: true));
+            }
+        }
+    }
+
+    private void AddAkcssAttachedPropertyNames(
+        INamedTypeSymbol ownerType,
+        HashSet<string> names)
+    {
+        const string propertySuffix = "Property";
+        foreach (var field in ownerType.GetMembers()
+                     .OfType<RoslynFieldSymbol>())
+        {
+            if (!field.IsStatic ||
+                field.DeclaredAccessibility != Accessibility.Public ||
+                !IsAttachedPropertyType(field.Type))
+            {
+                continue;
+            }
+
+            names.Add(field.Name.EndsWith(
+                    propertySuffix,
+                    StringComparison.Ordinal) &&
+                field.Name.Length > propertySuffix.Length
+                    ? field.Name[..^propertySuffix.Length]
+                    : field.Name);
+        }
     }
 
     internal ImmutableArray<AkcssApplyLookupCandidate>
@@ -234,7 +625,8 @@ internal partial class AkburaSemanticModel
 
     private readonly record struct AkcssPropertyCompletionKey(
         TextSpan DeclarationSpan,
-        string Qualifier);
+        string Qualifier,
+        bool RequireReadable);
 
     private AkburaSyntax? FindAkcssCompletionDeclaration(
         TextSpan declarationSpan)
@@ -373,16 +765,15 @@ internal partial class AkburaSemanticModel
         bool preferAttached,
         out PropertySymbol property)
     {
-        if (preferAttached &&
-            TryCreateAttachedPropertySymbol(
+        if (preferAttached)
+        {
+            return TryCreateAttachedPropertySymbol(
                 ownerType,
                 propertyName,
                 appliedTargetType,
                 SymbolLanguage.Akcss,
                 containingSymbol,
-                out property))
-        {
-            return true;
+                out property);
         }
 
         var clrProperty = FindPublicClrProperty(

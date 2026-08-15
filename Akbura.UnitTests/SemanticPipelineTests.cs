@@ -3084,6 +3084,44 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssIfDirective_BindsAttachedTargetProperty()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "@akcss {\n" +
+            "    Control.row-span {\n" +
+            "        @if(Grid.RowSpan > 1) {\n" +
+            "            Width: 10;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(
+            Assert.Single(rule.Members));
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rule).Symbol);
+        var ifOperation = Assert.IsAssignableFrom<IAkcssIfOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.Equal("Boolean", ifOperation.ConditionType.Name);
+        Assert.Contains(
+            "global::Avalonia.Controls.Grid.GetRowSpan(" +
+                "(global::Avalonia.Controls.Control)__target)",
+            ifOperation.ConditionOperation.Syntax!.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            EnumerateCSharpOperations(ifOperation),
+            operation => operation.CSharpTargetDefinition.Symbol is
+                IMethodSymbol { Name: "GetRowSpan" });
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(ifDirective));
+        Assert.False(ifOperation.HasErrors);
+    }
+
+    [Fact]
     public void SemanticModel_AkcssUtilityIfDirective_BindsConditionInUtilityParameterScope()
     {
         const string code =

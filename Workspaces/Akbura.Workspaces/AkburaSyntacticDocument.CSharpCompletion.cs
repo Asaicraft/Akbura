@@ -34,8 +34,7 @@ public sealed partial class AkburaSyntacticDocument
         CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
-        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
-            Text.Length == 0)
+        if (Text.Length == 0)
         {
             context = default;
             return false;
@@ -102,7 +101,8 @@ public sealed partial class AkburaSyntacticDocument
         {
             switch (syntax)
             {
-                case CSharpExpressionSyntax expression:
+                case CSharpExpressionSyntax expression
+                    when IsCSharpExpressionContext(expression):
                     AddCandidate(
                         AkburaCSharpCompletionContextKind.Expression,
                         expression,
@@ -111,18 +111,17 @@ public sealed partial class AkburaSyntacticDocument
                     break;
 
                 case CSharpTypeSyntax type:
-                    var usingDirective =
-                        type.Parent as UsingDirectiveSyntax;
-                    AddCandidate(
-                        usingDirective == null
-                            ? AkburaCSharpCompletionContextKind.Type
-                            : AkburaCSharpCompletionContextKind
-                                .UsingDirectiveName,
-                        usingDirective is null
-                            ? type
-                            : usingDirective,
-                        type.Tokens.FullSpan,
-                        priority: 1);
+                    if (TryGetCSharpTypeContext(
+                            type,
+                            out var kind,
+                            out var owner))
+                    {
+                        AddCandidate(
+                            kind,
+                            owner,
+                            type.Tokens.FullSpan,
+                            priority: 1);
+                    }
                     break;
 
                 case CSharpParameterListSyntax parameterList
@@ -145,6 +144,98 @@ public sealed partial class AkburaSyntacticDocument
                         priority: 3);
                     break;
             }
+        }
+
+        bool IsCSharpExpressionContext(CSharpExpressionSyntax expression)
+        {
+            if ((expression.Parent is AkcssAssignmentSyntax assignment &&
+                 ReferenceEquals(assignment.Expression, expression)) ||
+                (expression.Parent is AkcssIfDirectiveSyntax ifDirective &&
+                 ReferenceEquals(ifDirective.Condition, expression)))
+            {
+                return true;
+            }
+
+            return !IsInAkcssRegion(expression);
+        }
+
+        bool TryGetCSharpTypeContext(
+            CSharpTypeSyntax type,
+            out AkburaCSharpCompletionContextKind kind,
+            out AkburaSyntax owner)
+        {
+            if (type.Parent is AkcssUsingDirectiveSyntax akcssUsingDirective &&
+                ReferenceEquals(akcssUsingDirective.Name, type) &&
+                !akcssUsingDirective.IsAkcssModuleImport)
+            {
+                kind = AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName;
+                owner = akcssUsingDirective;
+                return true;
+            }
+
+            switch (type.Parent)
+            {
+                case AkcssStyleSelectorSyntax selector
+                    when ReferenceEquals(selector.TargetType, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+
+                case AkcssUtilitySelectorSyntax utilitySelector
+                    when ReferenceEquals(utilitySelector.TargetType, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+
+                case AkcssUtilityParameterSyntax parameter
+                    when ReferenceEquals(parameter.Type, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+
+                case AkcssInterceptDirectiveSyntax intercept
+                    when ReferenceEquals(intercept.Type, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+            }
+
+            if (IsInAkcssRegion(type))
+            {
+                kind = default;
+                owner = null!;
+                return false;
+            }
+
+            var usingDirective = type.Parent as UsingDirectiveSyntax;
+            kind = usingDirective == null
+                ? AkburaCSharpCompletionContextKind.Type
+                : AkburaCSharpCompletionContextKind.UsingDirectiveName;
+            owner = usingDirective is null
+                ? type
+                : usingDirective;
+            return true;
+        }
+
+        bool IsInAkcssRegion(AkburaSyntax syntax)
+        {
+            if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+            {
+                return true;
+            }
+
+            for (var current = syntax.Parent;
+                 current != null;
+                 current = current.Parent)
+            {
+                if (current is InlineAkcssBlockSyntax)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         void AddCandidate(

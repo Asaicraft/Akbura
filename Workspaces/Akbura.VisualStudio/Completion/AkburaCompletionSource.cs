@@ -306,29 +306,39 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             $"prefix='{(isAkcss ? akcssContext.Prefix : syntaxContext.Prefix)}'.");
 
         stageTimer.Restart();
-        if (!isAkcss &&
-            syntacticDocument.TryGetCSharpCompletionContext(
+        if (syntacticDocument.TryGetCSharpCompletionContext(
                 position,
                 out var csharpContext,
                 cancellationToken))
         {
             var semanticContext = GetLatestSemanticContext(
                 snapshot);
-            var supplementalResult = csharpContext.Kind ==
-                    AkburaCSharpCompletionContextKind.UsingDirectiveName
-                ? _completionService.GetCompletions(
-                    syntacticDocument,
-                    semanticContext,
-                    position,
-                    cancellationToken)
-                : syntaxContext.Kind ==
-                    AkburaCompletionContextKind.TopLevel
+            var supplementalResult = isAkcss
+                ? akcssContext.Kind is
+                    AkcssCompletionContextKind.PropertyValue or
+                    AkcssCompletionContextKind.AttachedPropertyExpression or
+                    AkcssCompletionContextKind.AkcssModuleName
                     ? _completionService.GetCompletions(
                         syntacticDocument,
-                        semanticContext: null,
+                        semanticContext,
                         position,
                         cancellationToken)
-                    : default;
+                    : default
+                : csharpContext.Kind ==
+                    AkburaCSharpCompletionContextKind.UsingDirectiveName
+                    ? _completionService.GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        cancellationToken)
+                    : syntaxContext.Kind ==
+                        AkburaCompletionContextKind.TopLevel
+                        ? _completionService.GetCompletions(
+                            syntacticDocument,
+                            semanticContext: null,
+                            position,
+                            cancellationToken)
+                        : default;
             AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                 "C# semantic context",
                 stageTimer.Elapsed);

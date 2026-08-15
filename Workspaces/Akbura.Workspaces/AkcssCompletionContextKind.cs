@@ -9,6 +9,7 @@ public enum AkcssCompletionContextKind
     TopLevel,
     BodyMember,
     PropertyName,
+    AttachedPropertyExpression,
     PropertyValue,
     ApplyItem,
     AkcssModuleName,

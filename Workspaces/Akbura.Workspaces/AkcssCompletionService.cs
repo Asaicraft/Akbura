@@ -12,6 +12,9 @@ internal sealed class AkcssCompletionService
 {
     private const int MaximumCompletionItems = 50;
 
+    private readonly AkcssValueCompletionService _valueCompletionService =
+        new();
+
     public AkburaCompletionResult GetCompletions(
         AkburaSyntacticDocument document,
         AkburaDocumentContext? semanticContext,
@@ -55,8 +58,17 @@ internal sealed class AkcssCompletionService
                     context,
                     cancellationToken),
 
+            AkcssCompletionContextKind.AttachedPropertyExpression =>
+                GetAttachedPropertyExpressionItems(
+                    semanticModel,
+                    context,
+                    cancellationToken),
+
             AkcssCompletionContextKind.PropertyValue =>
-                GetValueItems(context),
+                GetValueItems(
+                    semanticModel,
+                    context,
+                    cancellationToken),
 
             AkcssCompletionContextKind.ApplyItem =>
                 GetApplyItems(
@@ -195,13 +207,6 @@ internal sealed class AkcssCompletionService
                          cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!MatchesPrefix(
-                    candidate.InsertName,
-                    context.Prefix))
-            {
-                continue;
-            }
-
             var description = candidate.IsAttached
                 ? $"Attached property {candidate.DisplayName}: " +
                   candidate.TypeDisplay
@@ -218,6 +223,50 @@ internal sealed class AkcssCompletionService
                     candidate.OwnerTypeDisplay,
                 priority: candidate.IsAttached ? 1 : 0,
                 triggerCompletionAfterInsert: true));
+        }
+
+        return items.ToImmutable();
+    }
+
+    private static ImmutableArray<AkburaCompletionItem>
+        GetAttachedPropertyExpressionItems(
+            AkburaSemanticModel? semanticModel,
+            AkcssSyntacticCompletionContext context,
+            CancellationToken cancellationToken)
+    {
+        if (semanticModel == null)
+        {
+            return ImmutableArray<AkburaCompletionItem>.Empty;
+        }
+
+        using var items =
+            ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
+        foreach (var candidate in semanticModel
+                     .LookupReadableAkcssPropertiesForCompletion(
+                         context.ContainingDeclarationSpan,
+                         context.Qualifier,
+                         cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!candidate.IsAttached ||
+                !MatchesPrefix(
+                    candidate.InsertName,
+                    context.Prefix))
+            {
+                continue;
+            }
+
+            items.Add(new AkburaCompletionItem(
+                candidate.InsertName,
+                candidate.InsertName,
+                AkburaCompletionKind.Property,
+                $"Attached property {candidate.DisplayName}: " +
+                    candidate.TypeDisplay,
+                descriptionFactory: null,
+                filterText: candidate.InsertName,
+                suffix: candidate.TypeDisplay + " \u00B7 " +
+                    candidate.OwnerTypeDisplay,
+                priority: 0));
             if (items.Count == MaximumCompletionItems)
             {
                 break;
@@ -327,8 +376,21 @@ internal sealed class AkcssCompletionService
         return items.ToImmutable();
     }
 
+    private ImmutableArray<AkburaCompletionItem> GetValueItems(
+        AkburaSemanticModel? semanticModel,
+        AkcssSyntacticCompletionContext context,
+        CancellationToken cancellationToken)
+    {
+        return semanticModel == null
+            ? GetFallbackValueItems(context)
+            : _valueCompletionService.GetItems(
+                semanticModel,
+                context,
+                cancellationToken);
+    }
+
     private static ImmutableArray<AkburaCompletionItem>
-        GetValueItems(AkcssSyntacticCompletionContext context)
+        GetFallbackValueItems(AkcssSyntacticCompletionContext context)
     {
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
@@ -415,7 +477,10 @@ internal sealed class AkcssCompletionService
         return kind is
             AkcssCompletionContextKind.BodyMember or
             AkcssCompletionContextKind.PropertyName or
+            AkcssCompletionContextKind.AttachedPropertyExpression or
+            AkcssCompletionContextKind.PropertyValue or
             AkcssCompletionContextKind.ApplyItem or
             AkcssCompletionContextKind.AkcssModuleName;
     }
+
 }

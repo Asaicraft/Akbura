@@ -4922,6 +4922,65 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public void Generator_ObservesAttachedPropertiesUsedByAkcssConditions()
+    {
+        const string akcss =
+            "@using Avalonia.Controls;\n" +
+            "\n" +
+            "Control.row-span {\n" +
+            "    @if(Grid.RowSpan > 1) {\n" +
+            "        Width: 10;\n" +
+            "    }\n" +
+            "}\n";
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedObservedAttachedAkcssTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "AttachedReactive.akcss");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(akcss)),
+            ],
+            parseOptions: CSharpParseOptions.Default.WithLanguageVersion(
+                LanguageVersion.Preview));
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results)
+                .GeneratedSources);
+        var generatedText = generatedSource.SourceText.ToString();
+        Assert.Contains(
+            "[global::Akbura.CompilerAnotations." +
+                "ObservesPropertyAttribute(\"RowSpan\")]",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Avalonia.Controls.Grid.GetRowSpan(" +
+                "(global::Avalonia.Controls.Control)__target)",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public async Task Generator_GuardsMixedClassPropertiesByTargetCompatibility()
     {
         const string csharp =

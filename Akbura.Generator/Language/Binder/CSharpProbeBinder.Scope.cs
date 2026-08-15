@@ -156,6 +156,11 @@ internal sealed partial class CSharpProbeBinder
         string name,
         ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> memberDeclarations)
     {
+        if (SemanticModel.SyntaxTree.Kind != SyntaxTreeKind.Component)
+        {
+            return;
+        }
+
         foreach (var member in SemanticModel.SyntaxTree.GetRoot().Members)
         {
             if (member is CSharpStatementSyntax statement &&
@@ -174,6 +179,11 @@ internal sealed partial class CSharpProbeBinder
         ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>
             memberDeclarations)
     {
+        if (SemanticModel.SyntaxTree.Kind != SyntaxTreeKind.Component)
+        {
+            return;
+        }
+
         foreach (var member in
                  SemanticModel.SyntaxTree.GetRoot().Members)
         {

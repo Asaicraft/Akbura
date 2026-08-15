@@ -1,6 +1,8 @@
 using Akbura.Language;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Workspaces;
 
@@ -33,6 +35,15 @@ public sealed partial class AkburaSyntacticDocument
         var owner = FindContainingAkcssBodyOwner(
             declaration,
             position) ?? declaration;
+
+        if (TryGetAkcssAttachedPropertyExpressionContext(
+                declaration,
+                owner,
+                position,
+                out var attachedPropertyContext))
+        {
+            return attachedPropertyContext;
+        }
 
         var apply = FindContainingAkcssApply(
             declaration,
@@ -77,6 +88,23 @@ public sealed partial class AkburaSyntacticDocument
                         .Trim());
             }
 
+            var assignmentLine = Text.Lines.GetLineFromPosition(
+                position);
+            var recoveredColon = FindAkcssAssignmentColon(
+                assignmentLine.Start,
+                position);
+            if (recoveredColon >= 0)
+            {
+                return CreateAkcssContext(
+                    AkcssCompletionContextKind.PropertyValue,
+                    GetAkcssValueSpan(position),
+                    owner,
+                    declaration,
+                    propertyName: GetTextualAkcssPropertyName(
+                        assignmentLine.Start,
+                        recoveredColon));
+            }
+
             return CreateAkcssPropertyNameContext(
                 position,
                 owner,
@@ -110,19 +138,14 @@ public sealed partial class AkburaSyntacticDocument
             if (colon >= 0)
             {
                 var valueSpan = GetAkcssValueSpan(position);
-                var propertyName = Text.ToString(
-                        TextSpan.FromBounds(
-                            GetFirstNonWhitespacePosition(
-                                line.Start,
-                                colon),
-                            colon))
-                    .Trim();
                 return CreateAkcssContext(
                     AkcssCompletionContextKind.PropertyValue,
                     valueSpan,
                     owner,
                     declaration,
-                    propertyName: propertyName);
+                    propertyName: GetTextualAkcssPropertyName(
+                        line.Start,
+                        colon));
             }
 
             if (trimmedLinePrefix.Length == 0 ||
@@ -186,6 +209,71 @@ public sealed partial class AkburaSyntacticDocument
             declaration,
             qualifier,
             fullName);
+    }
+
+    private bool TryGetAkcssAttachedPropertyExpressionContext(
+        AkburaSyntax? declaration,
+        AkburaSyntax? owner,
+        int position,
+        out AkcssSyntacticCompletionContext context)
+    {
+        context = default;
+        if (declaration == null ||
+            !TryGetEmbeddedCSharpContext(
+                position,
+                out var embeddedContext) ||
+            embeddedContext.Kind !=
+                AkburaCSharpCompletionContextKind.Expression)
+        {
+            return false;
+        }
+
+        var expressionText = Text.ToString(
+            embeddedContext.HostSpan);
+        var expression = CSharpSyntaxFactory.ParseExpression(
+            expressionText);
+        var relativePosition = embeddedContext.RelativePosition;
+        var memberAccess = expression
+            .DescendantNodesAndSelf()
+            .OfType<CSharp.MemberAccessExpressionSyntax>()
+            .Where(candidate =>
+                candidate.Name is CSharp.IdentifierNameSyntax &&
+                candidate.OperatorToken.Span.End <= relativePosition &&
+                candidate.Name.Span.Start <= relativePosition &&
+                relativePosition <= Math.Max(
+                    candidate.Name.Span.End,
+                    candidate.OperatorToken.Span.End))
+            .OrderBy(static candidate => candidate.Name.Span.Length)
+            .ThenByDescending(static candidate => candidate.Span.Start)
+            .FirstOrDefault();
+        if (memberAccess == null)
+        {
+            return false;
+        }
+
+        var qualifier = memberAccess.Expression.ToString().Trim();
+        if (qualifier.Length == 0)
+        {
+            return false;
+        }
+
+        var nameStart = embeddedContext.HostSpan.Start +
+            memberAccess.Name.Span.Start;
+        if (nameStart > position)
+        {
+            return false;
+        }
+
+        var applicableSpan = TextSpan.FromBounds(
+            nameStart,
+            position);
+        context = CreateAkcssContext(
+            AkcssCompletionContextKind.AttachedPropertyExpression,
+            applicableSpan,
+            owner,
+            declaration,
+            qualifier);
+        return true;
     }
 
     private AkcssSyntacticCompletionContext CreateAkcssContext(
@@ -446,6 +534,28 @@ public sealed partial class AkburaSyntacticDocument
         }
 
         return start;
+    }
+
+    private string GetTextualAkcssPropertyName(
+        int lineStart,
+        int colon)
+    {
+        var start = lineStart;
+        for (var current = colon - 1;
+             current >= lineStart;
+             current--)
+        {
+            if (Text[current] is '{' or '}' or ';')
+            {
+                start = current + 1;
+                break;
+            }
+        }
+
+        start = GetFirstNonWhitespacePosition(start, colon);
+        return Text.ToString(
+                TextSpan.FromBounds(start, colon))
+            .Trim();
     }
 
     private static bool IsAkcssPropertyCharacter(char value)

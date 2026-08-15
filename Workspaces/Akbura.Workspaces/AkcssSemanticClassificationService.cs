@@ -8,8 +8,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
-using AkburaPropertySymbol =
-    Akbura.Language.Symbols.IPropertySymbol;
 using CSharp =
     Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynOperation =
@@ -22,7 +20,17 @@ namespace Akbura.Workspaces;
 internal sealed class
     AkcssSemanticClassificationService
 {
+    private readonly AkcssReferenceResolver _referenceResolver;
+
+    public AkcssSemanticClassificationService(
+        AkcssReferenceResolver referenceResolver)
+    {
+        _referenceResolver = referenceResolver ??
+            throw new ArgumentNullException(nameof(referenceResolver));
+    }
+
     public void AddClassifications(
+        AkburaDocumentContext context,
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
         TextSpan requestedSpan,
@@ -61,6 +69,7 @@ internal sealed class
 
                 case AkcssAssignmentSyntax assignment:
                     AddAssignmentClassifications(
+                        context,
                         semanticModel,
                         assignment,
                         requestedSpan,
@@ -84,7 +93,42 @@ internal sealed class
                         requestedSpan,
                         builder);
                     break;
+
+                case AkcssApplyDirectiveSyntax apply:
+                    AddApplyClassifications(
+                        context,
+                        apply,
+                        requestedSpan,
+                        builder,
+                        cancellationToken);
+                    break;
             }
+        }
+    }
+
+    private void AddApplyClassifications(
+        AkburaDocumentContext context,
+        AkcssApplyDirectiveSyntax apply,
+        TextSpan requestedSpan,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
+        CancellationToken cancellationToken)
+    {
+        foreach (var reference in _referenceResolver.GetApplyReferences(
+                     context,
+                     apply,
+                     cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (reference.Symbol == null)
+            {
+                continue;
+            }
+
+            AddClassification(
+                reference.SourceSpan,
+                requestedSpan,
+                AkburaClassificationKind.Utility,
+                builder);
         }
     }
 
@@ -190,28 +234,34 @@ internal sealed class
         }
     }
 
-    private static void AddAssignmentClassifications(
+    private void AddAssignmentClassifications(
+        AkburaDocumentContext context,
         AkburaSemanticModel semanticModel,
         AkcssAssignmentSyntax assignment,
         TextSpan requestedSpan,
         ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
+        foreach (var reference in _referenceResolver.GetPropertyReferences(
+                     context,
+                     assignment,
+                     cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AddClassification(
+                reference.SourceSpan,
+                requestedSpan,
+                reference.Kind == AkcssReferenceKind.PropertyOwnerType
+                    ? AkburaClassificationKind.ClassName
+                    : AkburaClassificationKind.PropertyName,
+                builder);
+        }
+
         if (semanticModel.GetOperation(
                 assignment) is not
             IAkcssPropertySetterOperation operation)
         {
             return;
-        }
-
-        if (operation.Property is
-            { } property)
-        {
-            AddPropertyClassifications(
-                assignment.PropertyName,
-                property,
-                requestedSpan,
-                builder);
         }
 
         AddExpressionClassifications(
@@ -286,130 +336,6 @@ internal sealed class
                 targetType,
                 requestedSpan,
                 builder);
-    }
-
-    private static void AddPropertyClassifications(
-        CSharpTypeSyntax propertySyntax,
-        AkburaPropertySymbol property,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
-    {
-        CSharp.TypeSyntax syntax;
-
-        try
-        {
-            syntax =
-                propertySyntax.ToCSharp();
-        }
-        catch (InvalidOperationException)
-        {
-            return;
-        }
-
-        var sourceOffset =
-            propertySyntax.Tokens.Span.Start -
-            syntax.FullSpan.Start;
-
-        switch (syntax)
-        {
-            case CSharp.IdentifierNameSyntax identifier:
-                AddMappedClassification(
-                    identifier.Identifier.Span,
-                    sourceOffset,
-                    requestedSpan,
-                    AkburaClassificationKind.PropertyName,
-                    builder);
-                break;
-
-            case CSharp.GenericNameSyntax genericName:
-                AddMappedClassification(
-                    genericName.Identifier.Span,
-                    sourceOffset,
-                    requestedSpan,
-                    AkburaClassificationKind.PropertyName,
-                    builder);
-                break;
-
-            case CSharp.QualifiedNameSyntax qualifiedName:
-                AddPropertyOwnerClassification(
-                    qualifiedName.Left,
-                    property,
-                    sourceOffset,
-                    requestedSpan,
-                    builder);
-
-                AddMappedClassification(
-                    qualifiedName.Right.Identifier.Span,
-                    sourceOffset,
-                    requestedSpan,
-                    AkburaClassificationKind.PropertyName,
-                    builder);
-                break;
-
-            case CSharp.AliasQualifiedNameSyntax aliasName:
-                AddMappedClassification(
-                    aliasName.Name.Identifier.Span,
-                    sourceOffset,
-                    requestedSpan,
-                    AkburaClassificationKind.PropertyName,
-                    builder);
-                break;
-        }
-    }
-
-    private static void AddPropertyOwnerClassification(
-        CSharp.TypeSyntax ownerSyntax,
-        AkburaPropertySymbol property,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
-    {
-        var ownerType =
-            GetPropertyOwnerType(
-                property);
-
-        if (ownerType == null)
-        {
-            return;
-        }
-
-        EmbeddedCSharpSemanticClassificationService
-            .AddTypeClassifications(
-                ownerSyntax,
-                ownerType,
-                sourceOffset,
-                requestedSpan,
-                builder);
-    }
-
-    private static ITypeSymbol?
-        GetPropertyOwnerType(
-            AkburaPropertySymbol property)
-    {
-        return
-            property.WriteDefinition
-                .Symbol
-                ?.ContainingType ??
-
-            property.ReadDefinition
-                .Symbol
-                ?.ContainingType ??
-
-            property.ClrPropertyDefinition
-                .Symbol
-                ?.ContainingType ??
-
-            property.AttachedSetterDefinition
-                .Symbol
-                ?.ContainingType ??
-
-            property.AttachedGetterDefinition
-                .Symbol
-                ?.ContainingType ??
-
-            property.AvaloniaPropertyDefinition
-                .Symbol
-                ?.ContainingType;
     }
 
     private static void AddExpressionClassifications(

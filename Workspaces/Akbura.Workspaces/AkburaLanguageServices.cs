@@ -4,13 +4,17 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
 {
     public AkburaLanguageServices()
     {
-        Classification = new AkburaClassificationService();
+        var referenceResolver = new AkcssReferenceResolver();
+
+        Classification = new AkburaClassificationService(referenceResolver);
 
         Diagnostics = new AkburaDiagnosticService();
 
-        Definition = new AkburaDefinitionService();
+        Definition = new AkburaDefinitionService(referenceResolver);
 
         Completion = new AkburaCompletionService();
+
+        QuickInfo = new AkburaQuickInfoService(referenceResolver);
     }
 
     public IAkburaClassificationService Classification { get; }
@@ -20,4 +24,6 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
     public IAkburaDefinitionService Definition { get; }
 
     public IAkburaCompletionService Completion { get; }
+
+    public IAkburaQuickInfoService QuickInfo { get; }
 }

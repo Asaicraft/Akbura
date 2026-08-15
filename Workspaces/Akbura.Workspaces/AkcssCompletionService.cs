@@ -348,13 +348,21 @@ internal sealed class AkcssCompletionService
             return ImmutableArray<AkburaCompletionItem>.Empty;
         }
 
+        var currentLogicalName =
+            (semanticContext.Document.SyntaxTree as AkcssSyntaxTree)?
+                .LogicalName;
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
         foreach (var name in semanticContext.Project.Compilation
                      .GetAvailableAkcssModuleNames(cancellationToken)
                      .OrderBy(static name => name, StringComparer.Ordinal))
         {
-            if (!MatchesPrefix(name, context.Prefix))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.Equals(
+                    name,
+                    currentLogicalName,
+                    StringComparison.Ordinal) ||
+                !MatchesPrefix(name, context.Prefix))
             {
                 continue;
             }

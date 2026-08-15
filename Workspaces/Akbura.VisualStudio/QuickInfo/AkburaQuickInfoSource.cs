@@ -21,13 +21,16 @@ internal sealed class AkburaQuickInfoSource : IAsyncQuickInfoSource
     private readonly AkburaProjectedCSharpDocumentService
         _projectedDocumentService;
 
+    private readonly IAkburaQuickInfoService _quickInfoService;
+
     private int _disposeState;
 
     public AkburaQuickInfoSource(
         ITextBuffer buffer,
         AkburaTextBufferContext bufferContext,
         AkburaParserService parserService,
-        AkburaProjectedCSharpDocumentService projectedDocumentService)
+        AkburaProjectedCSharpDocumentService projectedDocumentService,
+        IAkburaQuickInfoService quickInfoService)
     {
         _buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
         _bufferContext = bufferContext ??
@@ -37,6 +40,8 @@ internal sealed class AkburaQuickInfoSource : IAsyncQuickInfoSource
         _projectedDocumentService = projectedDocumentService ??
             throw new ArgumentNullException(
                 nameof(projectedDocumentService));
+        _quickInfoService = quickInfoService ??
+            throw new ArgumentNullException(nameof(quickInfoService));
     }
 
     public async Task<VisualStudioQuickInfoItem?> GetQuickInfoItemAsync(
@@ -57,10 +62,51 @@ internal sealed class AkburaQuickInfoSource : IAsyncQuickInfoSource
 
         try
         {
+            var projected = await TryGetProjectedQuickInfoAsync(
+                    snapshot,
+                    triggerPoint.Value.Position,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (projected != null)
+            {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.QuickInfo,
+                    "Projected Quick Info hit.");
+                return projected;
+            }
+
+            return await TryGetNativeQuickInfoAsync(
+                    snapshot,
+                    triggerPoint.Value,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.QuickInfo,
+                "Quick Info lookup failed.",
+                exception);
+            return null;
+        }
+    }
+
+    private async Task<VisualStudioQuickInfoItem?>
+        TryGetProjectedQuickInfoAsync(
+            ITextSnapshot snapshot,
+            int position,
+            CancellationToken cancellationToken)
+    {
+        try
+        {
             var syntacticDocument = await _parserService
                 .GetSyntacticDocumentAsync(snapshot)
                 .ConfigureAwait(false);
-            var position = triggerPoint.Value.Position;
             if (!syntacticDocument.TryGetEmbeddedCSharpContext(
                     position,
                     out var embeddedContext,
@@ -140,6 +186,75 @@ internal sealed class AkburaQuickInfoSource : IAsyncQuickInfoSource
                 exception);
             return null;
         }
+    }
+
+    private async Task<VisualStudioQuickInfoItem?>
+        TryGetNativeQuickInfoAsync(
+            ITextSnapshot currentSnapshot,
+            SnapshotPoint triggerPoint,
+            CancellationToken cancellationToken)
+    {
+        if (!_bufferContext.TryGetPublishedState(
+                currentSnapshot,
+                out var state))
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.QuickInfo,
+                "Native Quick Info skipped: no semantic state.");
+            return null;
+        }
+
+        var semanticPoint = AkburaSnapshotTranslationFacts.TranslatePoint(
+            triggerPoint,
+            state.Snapshot);
+        if (semanticPoint.Position >= state.Snapshot.Length)
+        {
+            return null;
+        }
+
+        var quickInfo = await Task.Run(
+                () => _quickInfoService.GetQuickInfo(
+                    state.Context,
+                    semanticPoint.Position,
+                    cancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (quickInfo == null ||
+            quickInfo.SourceSpan.Length == 0 ||
+            quickInfo.SourceSpan.Start < 0 ||
+            quickInfo.SourceSpan.End > state.Snapshot.Length)
+        {
+            return null;
+        }
+
+        var semanticSpan = new SnapshotSpan(
+            state.Snapshot,
+            new Span(
+                quickInfo.SourceSpan.Start,
+                quickInfo.SourceSpan.Length));
+        var currentSpan = AkburaSnapshotTranslationFacts.TranslateSourceSpan(
+            semanticSpan,
+            currentSnapshot);
+        if (currentSpan.Length == 0)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.QuickInfo,
+                "Native Quick Info translated to an empty span.");
+            return null;
+        }
+
+        var content = quickInfo.Details.Length == 0
+            ? quickInfo.Signature
+            : quickInfo.Signature + Environment.NewLine +
+              string.Join(Environment.NewLine, quickInfo.Details);
+        var trackingSpan = currentSnapshot.CreateTrackingSpan(
+            currentSpan.Span,
+            SpanTrackingMode.EdgeExclusive);
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.QuickInfo,
+            $"Native Quick Info hit: kind={quickInfo.Kind}, " +
+            $"span={quickInfo.SourceSpan}.");
+        return new VisualStudioQuickInfoItem(trackingSpan, content);
     }
 
     public void Dispose()

@@ -3931,6 +3931,18 @@ internal partial class AkburaSemanticModel
             [command.Name, expected, actual]);
     }
 
+    private static AkburaSemanticDiagnostic
+        CreateAkcssSelfImportDiagnostic(
+            AkcssUsingDirectiveSyntax usingDirective,
+            string importName)
+    {
+        return new AkburaSemanticDiagnostic(
+            usingDirective,
+            ErrorCodes.AKBURA_SEMANTIC_AkcssSelfImport,
+            [importName],
+            span: usingDirective.Name.Tokens.Span);
+    }
+
     internal AkburaSemanticDiagnostic CreateAkcssImportNotFoundDiagnostic(string importName)
     {
         return new AkburaSemanticDiagnostic(

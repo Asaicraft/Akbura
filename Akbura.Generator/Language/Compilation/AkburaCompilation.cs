@@ -21,6 +21,10 @@ internal sealed partial class AkburaCompilation
     private ImmutableArray<AkcssUsingDirectiveSyntax> _lazyGlobalAkcssUsingDirectives;
     private ImmutableArray<CSharp.UsingDirectiveSyntax> _lazyGlobalCSharpUsingDirectives;
     private ImmutableArray<string> _lazyAvailableAkcssModuleNames;
+    private readonly ConcurrentDictionary<
+        string,
+        ImmutableArray<IAkcssModuleSymbol>>
+        _akcssModuleLookup = new(StringComparer.Ordinal);
     private CSharpCompilation? _lazyCSharpProbeCompilation;
 
     public AkburaCompilation(
@@ -437,6 +441,49 @@ internal sealed partial class AkburaCompilation
         string logicalName)
     {
         return _referenceManager.GetAkcssModuleSymbolsByLogicalName(logicalName);
+    }
+
+    internal ImmutableArray<IAkcssModuleSymbol>
+        LookupAkcssModulesByLogicalName(
+            string logicalName,
+            CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(logicalName))
+        {
+            return ImmutableArray<IAkcssModuleSymbol>.Empty;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_akcssModuleLookup.TryGetValue(logicalName, out var cached))
+        {
+            return cached;
+        }
+
+        using var local = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+        foreach (var syntaxTree in AkcssSyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(
+                    syntaxTree.LogicalName,
+                    logicalName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (GetSemanticModel(syntaxTree)
+                    .GetDeclaredSymbol(syntaxTree.GetRoot()) is
+                IAkcssModuleSymbol module)
+            {
+                local.Add(module);
+            }
+        }
+
+        var result = local.Count > 0
+            ? local.ToImmutable()
+            : _referenceManager.GetAkcssModuleSymbolsByLogicalName(logicalName);
+        cancellationToken.ThrowIfCancellationRequested();
+        return _akcssModuleLookup.GetOrAdd(logicalName, result);
     }
 
     internal ImmutableArray<string> GetAvailableAkcssModuleNames(

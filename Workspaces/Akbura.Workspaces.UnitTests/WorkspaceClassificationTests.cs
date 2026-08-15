@@ -172,6 +172,126 @@ public sealed class WorkspaceClassificationTests
     }
 
     [Fact]
+    public void SemanticDiagnostics_AkcssSelectorRequiresVisibleNamespaceAfterDocumentChange()
+    {
+        const string sourceWithUsing = """
+            @using Avalonia.Controls;
+
+            @utilities {
+                // Sizing utilities.
+                Control.w-auto {
+                    Width: double.NaN;
+                }
+            }
+            """;
+        const string sourceWithoutUsing = """
+            @utilities {
+                // Sizing utilities.
+                Control.w-auto {
+                    Width: double.NaN;
+                }
+            }
+            """;
+
+        using (var baselineWorkspace = CreateSemanticWorkspace())
+        {
+            var baselineContext = baselineWorkspace
+                .OpenOrChangeDocumentContext(
+                    new Uri(Path.GetFullPath("BaselineStyles.akcss")),
+                    SourceText.From(sourceWithoutUsing));
+            AssertSelectorTargetNotFound(
+                baselineWorkspace,
+                baselineContext,
+                sourceWithoutUsing);
+        }
+
+        using var workspace = CreateSemanticWorkspace();
+        var filePath = Path.GetFullPath("Styles.akcss");
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(filePath),
+            SourceText.From(sourceWithUsing));
+        var initialDiagnostics = workspace.LanguageServices.Diagnostics
+            .GetDiagnostics(
+                context,
+                new TextSpan(0, sourceWithUsing.Length));
+
+        Assert.DoesNotContain(
+            initialDiagnostics,
+            static diagnostic => diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_AkcssSelectorTargetNotFound);
+
+        context = workspace.OpenOrChangeDocumentContext(
+            new Uri(filePath),
+            SourceText.From(sourceWithoutUsing));
+        AssertSelectorTargetNotFound(
+            workspace,
+            context,
+            sourceWithoutUsing);
+
+        static void AssertSelectorTargetNotFound(
+            AkburaWorkspace workspace,
+            AkburaDocumentContext context,
+            string source)
+        {
+            var diagnostics = workspace.LanguageServices.Diagnostics
+                .GetDiagnostics(
+                    context,
+                    new TextSpan(0, source.Length));
+            var diagnostic = Assert.Single(
+                diagnostics,
+                static diagnostic => diagnostic.Code ==
+                    ErrorCodes.AKBURA_SEMANTIC_AkcssSelectorTargetNotFound);
+            Assert.Equal(
+                new TextSpan(
+                    source.IndexOf("Control", StringComparison.Ordinal),
+                    "Control".Length),
+                diagnostic.Span);
+            Assert.Equal(
+                "AKCSS selector target type 'Control' was not found.",
+                diagnostic.Message);
+        }
+    }
+
+    [Fact]
+    public void SemanticDiagnostics_AkcssModuleCannotImportItself()
+    {
+        const string source = "@using Styles.akcss;";
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Styles.akcss")),
+            text);
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetDiagnostics(
+                context,
+                new TextSpan(0, text.Length));
+        var diagnostic = Assert.Single(
+            diagnostics,
+            static diagnostic => diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_AkcssSelfImport);
+
+        Assert.Equal(
+            new TextSpan(
+                source.IndexOf("Styles.akcss", StringComparison.Ordinal),
+                "Styles.akcss".Length),
+            diagnostic.Span);
+        Assert.Equal(
+            "AKCSS module 'Styles.akcss' cannot import itself.",
+            diagnostic.Message);
+
+        var usingDirective = Assert.Single(
+            context.Document.SyntaxTree.GetRootSyntax()
+                .DescendantNodes()
+                .OfType<AkcssUsingDirectiveSyntax>());
+        var semanticModel = context.Project.Compilation
+            .GetSemanticModel(context.Document.SyntaxTree);
+        Assert.False(semanticModel.TryResolveAkcssModuleImport(
+            usingDirective,
+            out _));
+    }
+
+    [Fact]
     public void SyntacticClassification_DoesNotRequireSemanticContext()
     {
         const string source = """

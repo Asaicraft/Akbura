@@ -10,6 +10,101 @@ internal static class AkburaMarkupEditingFacts
             value is '_' or '-' or '.' or ':';
     }
 
+    public static bool IsUsingDirectiveNamePosition(
+        ITextSnapshot snapshot,
+        int position,
+        bool isAkcss)
+    {
+        if (position < 0 || position > snapshot.Length)
+        {
+            return false;
+        }
+
+        var lineStart = position;
+        while (lineStart > 0 &&
+               snapshot[lineStart - 1] is not '\r' and not '\n')
+        {
+            lineStart--;
+        }
+
+        var index = SkipWhitespace(snapshot, lineStart, position);
+        if (isAkcss)
+        {
+            if (index >= position || snapshot[index] != '@')
+            {
+                return false;
+            }
+
+            index++;
+        }
+        else if (MatchesKeyword(snapshot, index, position, "global"))
+        {
+            index += "global".Length;
+            if (index >= position || !char.IsWhiteSpace(snapshot[index]))
+            {
+                return false;
+            }
+
+            index = SkipWhitespace(snapshot, index, position);
+        }
+
+        if (!MatchesKeyword(snapshot, index, position, "using"))
+        {
+            return false;
+        }
+
+        index += "using".Length;
+        if (index >= position || !char.IsWhiteSpace(snapshot[index]))
+        {
+            return false;
+        }
+
+        for (; index < position; index++)
+        {
+            if (snapshot[index] == ';')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int SkipWhitespace(
+        ITextSnapshot snapshot,
+        int start,
+        int end)
+    {
+        while (start < end && char.IsWhiteSpace(snapshot[start]))
+        {
+            start++;
+        }
+
+        return start;
+    }
+
+    private static bool MatchesKeyword(
+        ITextSnapshot snapshot,
+        int start,
+        int end,
+        string keyword)
+    {
+        if (start + keyword.Length > end)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < keyword.Length; index++)
+        {
+            if (snapshot[start + index] != keyword[index])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static bool IsPotentialCompletionPosition(
         ITextSnapshot snapshot,
         int position)

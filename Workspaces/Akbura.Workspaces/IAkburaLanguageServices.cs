@@ -9,4 +9,6 @@ public interface IAkburaLanguageServices
     IAkburaDefinitionService Definition { get; }
 
     IAkburaCompletionService Completion { get; }
+
+    IAkburaQuickInfoService QuickInfo { get; }
 }

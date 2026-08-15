@@ -531,7 +531,10 @@ partial class Parser
 
         try
         {
-            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.SemicolonToken))
+            while (CurrentToken.Kind is not (
+                       SyntaxKind.EndOfFileToken or
+                       SyntaxKind.SemicolonToken or
+                       SyntaxKind.CloseBraceToken))
             {
                 items.Add(EatToken());
             }

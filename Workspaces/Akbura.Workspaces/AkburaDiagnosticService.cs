@@ -60,7 +60,7 @@ internal sealed class AkburaDiagnosticService :
 
             AddDiagnostic(
                 diagnostic,
-                diagnostic.Syntax.Span,
+                diagnostic.Span,
                 document.Text.Length,
                 requested,
                 result);

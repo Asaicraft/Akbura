@@ -49,14 +49,14 @@ public sealed partial class AkburaSyntacticDocument
             declaration,
             position);
         if (apply != null &&
-            AkcssApplyTextFacts.TryGetItemSpan(
+            AkcssApplyItemFacts.TryGetCompletionItem(
                 Text,
                 apply,
                 position,
-                out var itemSpan))
+                out var item))
         {
             var clampedSpan = ClampToPosition(
-                itemSpan,
+                item.Span,
                 position);
             return CreateAkcssContext(
                 AkcssCompletionContextKind.ApplyItem,

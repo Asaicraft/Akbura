@@ -2325,6 +2325,37 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssApply_ReferencesRemainAlignedAcrossUnresolvedItem()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .first { }\n" +
+            "    .second { }\n" +
+            "    .target { @apply first missing second; }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var apply = Assert.Single(
+            syntaxTree.GetRoot().DescendantNodes()
+                .OfType<AkcssApplyDirectiveSyntax>());
+
+        var references = semanticModel.GetAkcssApplyItemReferences(apply);
+
+        Assert.Equal(["first", "missing", "second"],
+            references.Select(static reference => reference.Text));
+        Assert.Equal("first", references[0].Symbol?.ClassName);
+        Assert.Null(references[1].Symbol);
+        Assert.Equal("second", references[2].Symbol?.ClassName);
+        Assert.All(references, reference =>
+            Assert.Equal(
+                reference.Text,
+                syntaxTree.Text.ToString(reference.SourceSpan)));
+        Assert.True(
+            references == semanticModel.GetAkcssApplyItemReferences(apply));
+    }
+
+    [Fact]
     public void SemanticModel_AkcssIntercept_ResolvesAkcssStyleSubtype()
     {
         const string code =

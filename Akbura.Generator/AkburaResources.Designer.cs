@@ -97,6 +97,15 @@ namespace Akbura {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to AKCSS module &apos;{0}&apos; cannot import itself..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_AkcssSelfImport {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_AkcssSelfImport", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to AKCSS member &apos;{0}&apos; is ignored because &apos;{1}&apos; is intercepted by &apos;{2}&apos;..
         /// </summary>
         internal static string AKBURA_SEMANTIC_AkcssInterceptIgnoresMember {

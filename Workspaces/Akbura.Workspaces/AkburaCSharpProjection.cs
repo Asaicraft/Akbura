@@ -159,6 +159,7 @@ internal sealed class AkburaCSharpProjection
         return false;
     }
 
+
     public bool TryMapToProjected(
         TextSpan hostSpan,
         out TextSpan projectedSpan)

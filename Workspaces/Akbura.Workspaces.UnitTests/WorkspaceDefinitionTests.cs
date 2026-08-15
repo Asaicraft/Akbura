@@ -860,6 +860,20 @@ public sealed class WorkspaceDefinitionTests
                 var utilityStart = akcssSource.IndexOf(
                     "gap-4",
                     StringComparison.Ordinal);
+                var quickInfo = workspace.LanguageServices.QuickInfo
+                    .GetQuickInfo(akcssContext, utilityStart);
+
+                Assert.NotNull(quickInfo);
+                Assert.Equal(AkburaQuickInfoKind.Utility, quickInfo!.Kind);
+                Assert.Equal(
+                    "utility gap(double value)",
+                    quickInfo.Signature);
+                Assert.Contains(
+                    workspace.LanguageServices.Classification.GetClassifications(
+                        akcssContext,
+                        new TextSpan(utilityStart, "gap-4".Length)),
+                    item => item.Span == quickInfo.SourceSpan &&
+                        item.Kind == AkburaClassificationKind.Utility);
 
                 for (var offset = 0;
                      offset < "gap-4".Length;
@@ -879,6 +893,120 @@ public sealed class WorkspaceDefinitionTests
                         GetTargetText(definition));
                 }
             });
+    }
+
+    [Fact]
+    public void Definition_EmbeddedAkcssModuleImportMaterializesOnlyOnNavigation()
+    {
+        const string akcssSource = """
+            @using Library.Styles.akcss;
+            """;
+
+        WithWorkspace(
+            (workspace, context, _) =>
+            {
+                var referencedModule = Assert.Single(
+                    context.Project.Compilation.ReferencedModules);
+                Assert.False(
+                    referencedModule.IsSyntaxTreeMaterialized(
+                        "Styles.akcss"));
+                var path = Path.Combine(
+                    Path.GetDirectoryName(context.Document.FilePath)!,
+                    "LocalStyles.akcss");
+                var text = SourceText.From(akcssSource);
+                var akcssContext = workspace.OpenOrChangeDocumentContext(
+                    new Uri(path),
+                    text);
+                var importStart = akcssSource.IndexOf(
+                    "Library.Styles.akcss",
+                    StringComparison.Ordinal);
+
+                var quickInfo = workspace.LanguageServices.QuickInfo
+                    .GetQuickInfo(akcssContext, importStart);
+
+                Assert.NotNull(quickInfo);
+                Assert.Equal(
+                    AkburaQuickInfoKind.Module,
+                    quickInfo!.Kind);
+                Assert.Equal(
+                    "AKCSS module Library.Styles.akcss",
+                    quickInfo.Signature);
+                Assert.False(
+                    referencedModule.IsSyntaxTreeMaterialized(
+                        "Styles.akcss"));
+
+                var definition = workspace.LanguageServices.Definition
+                    .GetDefinition(akcssContext, importStart);
+
+                Assert.NotNull(definition);
+                Assert.NotNull(definition!.TargetText);
+                Assert.Equal("Library", definition.TargetAssemblyName);
+                Assert.Equal("Styles.akcss", definition.TargetSourcePath);
+                Assert.Equal(
+                    "Library.Styles.akcss",
+                    text.ToString(definition.SourceSpan));
+                Assert.True(
+                    referencedModule.IsSyntaxTreeMaterialized(
+                        "Styles.akcss"));
+            });
+    }
+
+    [Fact]
+    public void Definition_MetadataAkcssModuleWithoutEmbeddedSourceUsesCarrier()
+    {
+        const string stylesSource = """
+            @utilities {
+                .gap-(double value) {
+                }
+            }
+            """;
+        const string consumerSource = "@using Library.Styles.akcss;";
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var libraryReference = CreateLibraryReference(
+                directory,
+                stylesSource,
+                includeEmbeddedSource: false);
+            var compilation = CreateApplicationCompilation(libraryReference);
+            using var workspace = new AkburaWorkspace(new ProjectContext(
+                ProjectId.CreateNewId(),
+                projectFilePath: string.Empty,
+                projectDirectory: directory,
+                rootNamespace: string.Empty,
+                compilation,
+                ImmutableArray<ProjectReference>.Empty));
+            var text = SourceText.From(consumerSource);
+            var context = workspace.OpenOrChangeDocumentContext(
+                new Uri(Path.Combine(directory, "Consumer.akcss")),
+                text);
+            var position = consumerSource.IndexOf(
+                "Library.Styles.akcss",
+                StringComparison.Ordinal);
+
+            var definition = workspace.LanguageServices.Definition
+                .GetDefinition(context, position);
+
+            Assert.NotNull(definition);
+            Assert.NotNull(definition!.TargetText);
+            Assert.EndsWith(
+                ".metadata.cs",
+                definition.TargetFilePath,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("StylesModule", GetTargetText(definition));
+            Assert.Equal(
+                "Library.Styles.akcss",
+                text.ToString(definition.SourceSpan));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
@@ -1179,7 +1307,8 @@ public sealed class WorkspaceDefinitionTests
 
     private static PortableExecutableReference CreateLibraryReference(
         string directory,
-        string stylesSource)
+        string stylesSource,
+        bool includeEmbeddedSource = true)
     {
         const string librarySource = """
             using System;
@@ -1291,15 +1420,18 @@ public sealed class WorkspaceDefinitionTests
             manifestStream,
             manifest);
 
-        var resources = new[]
+        var resources = new List<ResourceDescription>
         {
             CreateResource(
                 AkburaModuleManifest.ResourceName,
                 manifestStream.ToArray()),
-            CreateEmbeddedSourceResource(
-                "Styles.akcss",
-                stylesSource),
         };
+        if (includeEmbeddedSource)
+        {
+            resources.Add(CreateEmbeddedSourceResource(
+                "Styles.akcss",
+                stylesSource));
+        }
         var assemblyPath = Path.Combine(
             directory,
             "Library.dll");

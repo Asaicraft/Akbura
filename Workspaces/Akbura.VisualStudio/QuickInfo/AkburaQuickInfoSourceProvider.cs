@@ -1,5 +1,6 @@
 using Akbura.VisualStudio.CSharp;
 using Akbura.VisualStudio.Editor;
+using Akbura.Workspaces;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Utilities;
@@ -22,6 +23,8 @@ internal sealed class AkburaQuickInfoSourceProvider :
     private readonly AkburaProjectedCSharpDocumentService
         _projectedDocumentService;
 
+    private readonly IAkburaQuickInfoService _quickInfoService;
+
     [ImportingConstructor]
     public AkburaQuickInfoSourceProvider(
         ITextDocumentFactoryService textDocumentFactory,
@@ -38,6 +41,9 @@ internal sealed class AkburaQuickInfoSourceProvider :
         _projectedDocumentService = projectedDocumentService ??
             throw new ArgumentNullException(
                 nameof(projectedDocumentService));
+        _quickInfoService = workspaceHost.Workspace
+            .LanguageServices
+            .QuickInfo;
     }
 
     public IAsyncQuickInfoSource TryCreateQuickInfoSource(
@@ -59,6 +65,7 @@ internal sealed class AkburaQuickInfoSourceProvider :
             textBuffer,
             bufferContext,
             _parserService,
-            _projectedDocumentService);
+            _projectedDocumentService,
+            _quickInfoService);
     }
 }

@@ -12,7 +12,14 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
     private readonly EmbeddedCSharpSemanticClassificationService _semanticCSharp = new();
 
-    private readonly AkcssSemanticClassificationService _semanticAkcss = new();
+    private readonly AkcssSemanticClassificationService _semanticAkcss;
+
+    public AkburaClassificationService(AkcssReferenceResolver referenceResolver)
+    {
+        _semanticAkcss = new AkcssSemanticClassificationService(
+            referenceResolver ??
+            throw new ArgumentNullException(nameof(referenceResolver)));
+    }
 
     public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
         SourceText text,
@@ -102,6 +109,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             cancellationToken);
 
         _semanticAkcss.AddClassifications(
+            context,
             semanticModel,
             root,
             span,
@@ -179,22 +187,31 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             ImmutableArray<AkburaClassifiedSpan> semanticSpans)
     {
 
-        var semanticSpanSet =
-            new HashSet<TextSpan>(
-                semanticSpans.Select(
-                    static item => item.Span));
+        var orderedSemantic = semanticSpans.ToArray();
+        Array.Sort(orderedSemantic, CompareClassifications);
+        var prefixMaximumEnd = new int[orderedSemantic.Length];
+        var maximumEnd = 0;
+        for (var index = 0; index < orderedSemantic.Length; index++)
+        {
+            maximumEnd = Math.Max(
+                maximumEnd,
+                orderedSemantic[index].Span.End);
+            prefixMaximumEnd[index] = maximumEnd;
+        }
 
         var items =
             new List<AkburaClassifiedSpan>(
                 syntacticSpans.Length +
                 semanticSpans.Length);
 
-        items.AddRange(semanticSpans);
+        items.AddRange(orderedSemantic);
 
         foreach (var syntactic in syntacticSpans)
         {
-            if (!semanticSpanSet.Contains(
-                    syntactic.Span))
+            if (!IsCoveredBySemanticSpan(
+                    syntactic.Span,
+                    orderedSemantic,
+                    prefixMaximumEnd))
             {
                 items.Add(syntactic);
             }
@@ -203,6 +220,32 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         items.Sort(CompareClassifications);
 
         return [.. items];
+    }
+
+    private static bool IsCoveredBySemanticSpan(
+        TextSpan syntacticSpan,
+        AkburaClassifiedSpan[] semanticSpans,
+        int[] prefixMaximumEnd)
+    {
+        var low = 0;
+        var high = semanticSpans.Length - 1;
+        var candidate = -1;
+        while (low <= high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (semanticSpans[middle].Span.Start <= syntacticSpan.Start)
+            {
+                candidate = middle;
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        return candidate >= 0 &&
+            prefixMaximumEnd[candidate] >= syntacticSpan.End;
     }
 
     private static int CompareClassifications(

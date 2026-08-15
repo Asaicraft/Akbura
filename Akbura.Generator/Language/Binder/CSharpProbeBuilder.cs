@@ -380,6 +380,7 @@ internal sealed class CSharpProbeBuilder
             .GetAnnotatedNodes(annotation)
             .OfType<TNode>()
             .Single();
+        var normalizedLeadingTrivia = normalizedNode.GetLeadingTrivia();
         root = normalizedRoot.ReplaceNode(
             normalizedNode,
             sourceNode);
@@ -387,6 +388,29 @@ internal sealed class CSharpProbeBuilder
             .GetAnnotatedNodes(annotation)
             .OfType<TNode>()
             .Single();
+        if (sourceNode.FullSpan.Length == 0 &&
+            normalizedNode.Parent is CSharp.UsingDirectiveSyntax)
+        {
+            var separatorTrivia = normalizedLeadingTrivia.Count != 0
+                ? normalizedLeadingTrivia
+                : CSharpSyntaxFactory.TriviaList(
+                    CSharpSyntaxFactory.Whitespace(" "));
+            var firstToken = projectedNode.GetFirstToken(
+                includeZeroWidth: true);
+            var previousToken = firstToken.GetPreviousToken(
+                includeZeroWidth: true);
+            if (previousToken.RawKind != 0)
+            {
+                root = root.ReplaceToken(
+                    previousToken,
+                    previousToken.WithTrailingTrivia(
+                        separatorTrivia));
+                projectedNode = root
+                    .GetAnnotatedNodes(annotation)
+                    .OfType<TNode>()
+                    .Single();
+            }
+        }
         var stateNames = root
             .GetAnnotatedNodes(
                 CSharpProbeBinder.StateCompletionAnnotationKind)

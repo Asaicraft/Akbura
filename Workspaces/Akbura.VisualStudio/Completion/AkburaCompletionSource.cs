@@ -230,12 +230,23 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             $"snapshot={triggerLocation.Snapshot.Version.VersionNumber}.");
 
         var snapshot = triggerLocation.Snapshot;
+        var isUsingDirectiveName =
+            AkburaMarkupEditingFacts.IsUsingDirectiveNamePosition(
+                snapshot,
+                triggerLocation.Position,
+                _documentKind == AkburaEditorDocumentKind.Akcss);
         var start = triggerLocation.Position;
         while (start > 0 &&
                AkburaMarkupEditingFacts
                    .IsCompletionNameCharacter(
                        snapshot[start - 1]))
         {
+            if (isUsingDirectiveName &&
+                snapshot[start - 1] is '.' or ':')
+            {
+                break;
+            }
+
             start--;
         }
 
@@ -473,7 +484,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!result.State.Projection.TryMapToHost(
-                     completion.Span,
+                    completion.Span,
                     out var hostSpan) ||
                 hostSpan.Start < 0 ||
                 hostSpan.End > snapshot.Length)

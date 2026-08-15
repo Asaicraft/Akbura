@@ -84,25 +84,24 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                 return null;
             }
 
-            var parsedTriggerSpan =
-                TranslateTriggerSpan(
-                    triggerSpan,
+            var parsedTriggerPoint =
+                AkburaSnapshotTranslationFacts.TranslatePoint(
+                    triggerSpan.Start,
                     state.Snapshot);
 
-            if (parsedTriggerSpan.Start.Position >=
+            if (parsedTriggerPoint.Position >=
                 state.Snapshot.Length)
             {
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.Navigation,
                     $"Query failed: translated position " +
-                    $"{parsedTriggerSpan.Start.Position} is outside " +
+                    $"{parsedTriggerPoint.Position} is outside " +
                     $"semantic snapshot length " +
                     $"{state.Snapshot.Length}.");
                 return null;
             }
 
-            var parsedPosition =
-                parsedTriggerSpan.Start.Position;
+            var parsedPosition = parsedTriggerPoint.Position;
 
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Navigation,
@@ -166,7 +165,7 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
                         definition.SourceSpan.Length));
 
             var currentSymbolSpan =
-                TranslateSymbolSpan(
+                AkburaSnapshotTranslationFacts.TranslateSourceSpan(
                     parsedSymbolSpan,
                     triggerSpan.Snapshot);
 
@@ -246,50 +245,6 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
         }
     }
 
-    private static SnapshotSpan TranslateTriggerSpan(
-        SnapshotSpan triggerSpan,
-        ITextSnapshot parsedSnapshot)
-    {
-        if (IsSameSnapshotVersion(
-                triggerSpan.Snapshot,
-                parsedSnapshot))
-        {
-            return new SnapshotSpan(
-                parsedSnapshot,
-                triggerSpan.Span);
-        }
-
-        /*
-         * Include both edges while translating the user's hover position
-         * back to the parsed snapshot.
-         */
-        return triggerSpan.TranslateTo(
-            parsedSnapshot,
-            SpanTrackingMode.EdgeInclusive);
-    }
-
-    private static SnapshotSpan TranslateSymbolSpan(
-        SnapshotSpan parsedSpan,
-        ITextSnapshot currentSnapshot)
-    {
-        if (IsSameSnapshotVersion(
-                parsedSpan.Snapshot,
-                currentSnapshot))
-        {
-            return new SnapshotSpan(
-                currentSnapshot,
-                parsedSpan.Span);
-        }
-
-        /*
-         * Newly inserted adjacent text must not become part of the
-         * clickable symbol.
-         */
-        return parsedSpan.TranslateTo(
-            currentSnapshot,
-            SpanTrackingMode.EdgeExclusive);
-    }
-
     private static bool IsValidSourceSpan(
         AkburaDefinition definition,
         ITextSnapshot snapshot)
@@ -298,17 +253,6 @@ internal sealed class AkburaNavigableSymbolSource : INavigableSymbolSource
             definition.SourceSpan.Length > 0 &&
             definition.SourceSpan.End <=
                 snapshot.Length;
-    }
-
-    private static bool IsSameSnapshotVersion(
-        ITextSnapshot left,
-        ITextSnapshot right)
-    {
-        return ReferenceEquals(
-                   left.TextBuffer,
-                   right.TextBuffer) &&
-               left.Version.VersionNumber ==
-               right.Version.VersionNumber;
     }
 
     private static string GetCharacter(

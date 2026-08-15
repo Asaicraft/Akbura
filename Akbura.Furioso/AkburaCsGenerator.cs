@@ -412,7 +412,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             "Akbura",
             severity,
             isEnabledByDefault: true);
-        var span = diagnostic.Syntax.Span;
+        var span = diagnostic.Span;
         var location = Microsoft.CodeAnalysis.Location.Create(
             syntaxTree.FilePath,
             span,

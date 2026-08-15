@@ -6,6 +6,7 @@ using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -151,6 +152,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return CreateComponentSemanticDiagnostics(Unsafe.As<AkburaDocumentSyntax>(syntax));
         }
 
+        if (syntax.Kind == AkburaSyntaxKind.AkcssDocumentSyntax)
+        {
+            return CreateAkcssDocumentSemanticDiagnostics(
+                Unsafe.As<AkcssDocumentSyntax>(syntax));
+        }
+
         if (syntax.Kind is AkburaSyntaxKind.StateDeclarationSyntax or
             AkburaSyntaxKind.ParamDeclarationSyntax or
             AkburaSyntaxKind.InjectDeclarationSyntax or
@@ -202,6 +209,44 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return CreateSemanticDiagnosticsFromBoundTree(
             BindingSession.BindSemanticSyntax(document),
             GetCachedSemanticDiagnostics(document));
+    }
+
+    private ImmutableArray<AkburaSemanticDiagnostic>
+        CreateAkcssDocumentSemanticDiagnostics(
+            AkcssDocumentSyntax document)
+    {
+        var diagnostics = CreateSemanticDiagnosticsFromBoundTree(
+            BindingSession.BindSemanticSyntax(document),
+            GetCachedSemanticDiagnostics(document));
+        if (SyntaxTree is not AkcssSyntaxTree syntaxTree)
+        {
+            return diagnostics;
+        }
+
+        using var builder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent(
+                diagnostics.Length + 1);
+        builder.AddRange(diagnostics);
+        foreach (var member in document.Members)
+        {
+            if (member is not AkcssUsingDirectiveSyntax usingDirective ||
+                !TryGetAkcssImportName(
+                    usingDirective,
+                    out var importName) ||
+                !string.Equals(
+                    importName,
+                    syntaxTree.LogicalName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            builder.Add(CreateAkcssSelfImportDiagnostic(
+                usingDirective,
+                importName));
+        }
+
+        return builder.ToImmutable();
     }
 
     private static ImmutableArray<AkburaSemanticDiagnostic> CreateSemanticDiagnosticsFromBoundTree(
@@ -723,12 +768,13 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
-        if (!TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var targetType))
+        var targetTypeSyntax = styleRule.Selector.TargetType;
+        if (!TryResolveAkcssTargetType(targetTypeSyntax, out var targetType))
         {
             var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             diagnosticsBag.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     styleRule,
-                    styleRule.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
+                    targetTypeSyntax));
             diagnosticsBag.AddRange(CreateDuplicateAkcssSymbolDiagnostics(styleRule));
             SetSemanticDiagnostics(styleRule, diagnosticsBag);
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
@@ -750,12 +796,13 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
-        if (!TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var targetType))
+        var targetTypeSyntax = utilityDeclaration.Selector.TargetType;
+        if (!TryResolveAkcssTargetType(targetTypeSyntax, out var targetType))
         {
             var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             diagnosticsBag.Add(CreateAkcssSelectorTargetNotFoundDiagnostic(
                     utilityDeclaration,
-                    utilityDeclaration.Selector.TargetType?.ToFullString().Trim() ?? string.Empty));
+                    targetTypeSyntax));
             diagnosticsBag.AddRange(CreateDuplicateAkcssSymbolDiagnostics(utilityDeclaration));
             SetSemanticDiagnostics(utilityDeclaration, diagnosticsBag);
             return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
@@ -1221,6 +1268,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<IAkcssSymbol>>.Rent();
         foreach (var importName in GetAkcssImportNames(syntax))
         {
+            if (IsSelfAkcssImport(importName))
+            {
+                continue;
+            }
+
             var matches = Compilation.GetLocalAkcssSyntaxTreesByLogicalName(importName);
             if (matches.Length == 0)
             {
@@ -2050,12 +2102,36 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private AkburaSemanticDiagnostic CreateAkcssSelectorTargetNotFoundDiagnostic(
         AkburaSyntax syntax,
-        string targetTypeName)
+        CSharpTypeSyntax? targetTypeSyntax)
     {
+        var targetTypeName = string.Empty;
+        var span = syntax.Span;
+        if (targetTypeSyntax != null)
+        {
+            if (EmbeddedCSharpSyntaxFacts.TryGetType(
+                    targetTypeSyntax,
+                    out var targetType,
+                    out var targetTypeHostSpan))
+            {
+                targetTypeName = targetType.ToString();
+                var positionOffset =
+                    targetTypeHostSpan.Start -
+                    targetType.FullSpan.Start;
+                span = new TextSpan(
+                    positionOffset + targetType.Span.Start,
+                    targetType.Span.Length);
+            }
+            else
+            {
+                targetTypeName = targetTypeSyntax.ToString().Trim();
+            }
+        }
+
         return new AkburaSemanticDiagnostic(
             syntax,
             ErrorCodes.AKBURA_SEMANTIC_AkcssSelectorTargetNotFound,
-            [targetTypeName]);
+            [targetTypeName],
+            span: span);
     }
 
     internal bool TryResolveAkcssTargetType(
@@ -2068,7 +2144,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return true;
         }
 
-        var targetTypeName = targetTypeSyntax.ToFullString().Trim();
+        var targetTypeName = targetTypeSyntax.ToString().Trim();
         if (string.IsNullOrWhiteSpace(targetTypeName))
         {
             return false;
@@ -2088,15 +2164,6 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         if (TryGetAkcssTargetType(binding, out var boundType))
         {
             targetType = new CSharpSymbolDefinition(boundType);
-            return true;
-        }
-
-        var avaloniaType = Compilation.CSharpCompilation.GetTypeByMetadataName(
-            "Avalonia.Controls." + targetTypeName);
-        if (avaloniaType != null &&
-            IsAvaloniaControlTargetType(avaloniaType))
-        {
-            targetType = new CSharpSymbolDefinition(avaloniaType);
             return true;
         }
 
@@ -6075,6 +6142,15 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return null;
+    }
+
+    private bool IsSelfAkcssImport(string importName)
+    {
+        return SyntaxTree is AkcssSyntaxTree syntaxTree &&
+            string.Equals(
+                syntaxTree.LogicalName,
+                importName,
+                StringComparison.Ordinal);
     }
 
     private ImmutableArray<string> GetAkcssImportNames(AkburaSyntax syntax)

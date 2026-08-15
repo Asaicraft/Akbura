@@ -183,7 +183,7 @@ Observable and binding results reapply only the affected utility conflict.
 When an extension argument contains a C# expression, it is recreated on each
 component update so it sees the current state and parameter values.
 
-See [Markup Extensions](markup-extensions.md) for the full value and lifecycle
+See [Markup Extensions](akcss/markup-extensions) for the full value and lifecycle
 contract.
 
 ## Conditional utilities
@@ -234,7 +234,12 @@ These are ordinary Avalonia markup extensions. No `UtilityVariantAttribute` is
 required. The attribute only changes conflict ordering for extensions that opt
 into it.
 
-Akbura also includes ordered breakpoint extensions:
+Akbura includes built-in interaction, theme, control-state, structural,
+direction, platform, and responsive variants. See
+[Built-in Utility Variants](akcss/built-in-utility-variants) for the complete
+catalog and Avalonia mappings.
+
+It also includes ordered breakpoint extensions:
 
 ```akbura
 using Akbura.Markup;
@@ -379,8 +384,9 @@ using Akbura.Markup;
 | `${xxl}` | `>= 1536` | `40` |
 
 All built-in breakpoints belong to one conflict group and use
-`UnprefixedUtilityPrecedence.Above`. Therefore the largest active breakpoint
-wins even when an unprefixed utility appears later.
+`UnprefixedUtilityPrecedence.Above`. Their winning operations are installed at
+`BindingPriority.StyleTrigger`. Therefore the largest active breakpoint wins
+even when an unprefixed utility appears later.
 
 ## Conditional declarations inside utilities
 

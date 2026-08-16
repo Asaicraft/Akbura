@@ -1,3 +1,1659 @@
+# Using Akbura Components in AXAML
+Source: Akbura/akbura/axaml-integration
+
+Akbura components can be used directly inside regular Avalonia AXAML.
+
+A separate host control is not required. Every generated Akbura component is an Avalonia control, so it can be referenced through an XML namespace and placed in the visual tree like any other custom control.
+
+## Basic usage
+
+Suppose the project contains the following component:
+
+```akbura
+// Counter.akbura
+
+namespace MyControls;
+
+state int count = 0;
+
+<Button Click={count++}>
+    Count: {count}
+</Button>
+```
+
+Import its namespace in AXAML:
+
+```xml
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:myControls="using:MyControls">
+
+    <myControls:Counter />
+
+</UserControl>
+```
+
+The XML namespace points to the C# namespace declared by the `.akbura` component:
+
+```xml
+xmlns:myControls="using:MyControls"
+```
+
+The component can then be created directly:
+
+```xml
+<myControls:Counter />
+```
+
+## Passing parameters
+
+Akbura parameters are exposed as Avalonia properties and can be assigned through AXAML attributes.
+
+Consider this component:
+
+```akbura
+// AkParams.akbura
+
+namespace MyControls;
+
+param int Count = 1;
+param int B;
+
+<StackPanel>
+    <TextBlock Text={$"Count: {Count}"} />
+    <TextBlock Text={$"B: {B}"} />
+</StackPanel>
+```
+
+The component declares two parameters:
+
+| Parameter | Required | Reason                       |
+| --------- | -------- | ---------------------------- |
+| `Count`   | No       | It has the default value `1` |
+| `B`       | Yes      | It has no default value      |
+
+You can use the component from AXAML:
+
+```xml
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:myControls="using:MyControls">
+
+    <StackPanel>
+        <myControls:AkParams Count="10" />
+
+        <myControls:AkParams B="10" />
+
+        <myControls:AkParams
+            Count="1"
+            B="10" />
+    </StackPanel>
+
+</UserControl>
+```
+
+The first component is invalid:
+
+```xml
+<myControls:AkParams Count="10" />
+```
+
+Although `Count` is set, the required `B` parameter is missing.
+
+When the component is initialized, Akbura throws:
+
+```text
+AkburaParameterNotSettedException
+```
+
+The following component is valid:
+
+```xml
+<myControls:AkParams B="10" />
+```
+
+`B` is explicitly set, while `Count` uses its default value of `1`.
+
+Both parameters may also be set explicitly:
+
+```xml
+<myControls:AkParams
+    Count="10"
+    B="20" />
+```
+
+## Binding parameters
+
+Because parameters are Avalonia properties, normal AXAML bindings can be used:
+
+```xml
+<myControls:AkParams
+    Count="{Binding CurrentCount}"
+    B="{Binding RequiredValue}" />
+```
+
+The binding result must be compatible with the parameter type.
+
+For example, the view model may expose:
+
+```csharp
+public sealed class MyViewModel
+{
+    public int CurrentCount { get; set; }
+
+    public int RequiredValue { get; set; }
+}
+```
+
+## Passing injected services
+
+Services declared with `inject` are also exposed as Avalonia properties.
+
+Consider the following component:
+
+```akbura
+// Counter.akbura
+
+namespace MyControls;
+
+inject ILogger<Counter> Logger;
+
+state int count = 0;
+
+useEffect(() =>
+{
+    Logger.LogInformation("Count changed to {Count}", count);
+}, [count]);
+
+<Button Click={count++}>
+    Count: {count}
+</Button>
+```
+
+Normally, Akbura attempts to resolve `Logger` through its service provider.
+
+The service may instead be passed directly from AXAML:
+
+```xml
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:myControls="using:MyControls">
+
+    <myControls:Counter
+        Logger="{Binding Logger}" />
+
+</UserControl>
+```
+
+The AXAML view model must expose a compatible service:
+
+```csharp
+public sealed class MyViewModel
+{
+    public ILogger<Counter> Logger { get; }
+
+    public MyViewModel(ILogger<Counter> logger)
+    {
+        Logger = logger;
+    }
+}
+```
+
+When an injected service property already contains a value, Akbura keeps that value and does not replace it through dependency injection.
+
+This makes it possible to provide services through:
+
+* an AXAML binding;
+* a property assignment in C#;
+* Akbura's configured service provider.
+
+## Setting services from code
+
+An injected service can also be assigned when creating the component from C#:
+
+```csharp
+var counter = new Counter
+{
+    Logger = logger
+};
+```
+
+The explicitly assigned service is used when the component initializes.
+
+## Complete example
+
+Akbura component:
+
+```akbura
+// UserCard.akbura
+
+namespace MyControls;
+
+param int UserId;
+param string Title = "User";
+
+inject IUserService UserService;
+
+state string userName = "";
+
+useEffect(async () =>
+{
+    var user = await UserService.GetUser(UserId);
+    userName = user.Name;
+}, [UserId]);
+
+<StackPanel>
+    <TextBlock Text={Title} />
+    <TextBlock Text={userName} />
+</StackPanel>
+```
+
+Avalonia view:
+
+```xml
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:myControls="using:MyControls">
+
+    <StackPanel>
+        <myControls:UserCard
+            UserId="{Binding SelectedUserId}"
+            Title="Profile"
+            UserService="{Binding UserService}" />
+    </StackPanel>
+
+</UserControl>
+```
+
+
+# Differences between XML, XAML and AXAML
+Source: Akbura/akbura/xml-xaml-axaml
+
+Akbura uses an XML-like element structure, but an `.akbura` file is not an XML, XAML or AXAML document. It is an Akbura component that can contain normal C# declarations and expressions.
+
+This distinction matters when syntax from XML or AXAML is copied into an Akbura component.
+
+## XML, XAML and AXAML
+
+**XML** is a general-purpose markup format.
+
+**XAML** is an XML-based language for declaring .NET object graphs and user interfaces.
+
+**AXAML** means Avalonia XAML. Avalonia uses the `.axaml` extension to distinguish its XAML dialect from XAML files used by other frameworks.
+
+Akbura keeps familiar concepts such as elements, attributes and property elements, but it is compiled by the Akbura compiler rather than treated as an XML document.
+
+## Whitespace and `xml:space`
+
+CDATA and `xml:space` solve different problems.
+
+CDATA prevents its contents from being interpreted as XML markup:
+
+```xml
+<![CDATA[
+<Button Content="Hello" />
+]]>
+```
+
+The `xml:space` attribute controls how whitespace inside an XML element should be handled:
+
+```xml
+<poem xml:space="preserve">
+    First line
+        Indented line
+    Last line
+</poem>
+```
+
+XML defines two values:
+
+| Value | Meaning |
+| --- | --- |
+| `default` | The application's default whitespace processing is acceptable |
+| `preserve` | The application should preserve the whitespace |
+
+The value is inherited by descendant elements until it is overridden:
+
+```xml
+<root xml:space="preserve">
+    <first>
+        Whitespace is preserved here.
+    </first>
+
+    <second xml:space="default">
+        Default processing is restored here.
+    </second>
+</root>
+```
+
+### `xml:space` in XAML and AXAML
+
+XAML processors normally normalize whitespace found in element content. Depending on the content model, line breaks and tabs may be converted to spaces, repeated spaces may be collapsed, and whitespace near element boundaries may be removed.
+
+Use `xml:space="preserve"` when the text must retain its authored whitespace:
+
+```xml
+<TextBlock xml:space="preserve">
+    First line
+        Indented line
+    Last line
+</TextBlock>
+```
+
+### Whitespace in Akbura
+
+Akbura files are not XML documents, so `xml:space` has no special meaning.
+
+Use a C# raw string to define the exact text value:
+
+```akbura
+<TextBlock Text={"""
+First line
+    Indented line
+Last line
+"""}/>
+```
+
+The indentation of the closing delimiter determines the common indentation removed from every content line:
+
+```akbura
+<Border>
+    <TextBlock Text={"""
+        First line
+            Indented line
+        Last line
+        """}/>
+</Border>
+```
+
+The indentation needed to align the raw string with the surrounding component is removed. Additional indentation inside the content remains in the resulting string.
+
+### Comparison
+
+| Construct | Purpose |
+| --- | --- |
+| `<![CDATA[ ... ]]>` | Prevent XML content from being parsed as markup |
+| `xml:space="preserve"` | Request preservation of whitespace in XML or XAML content |
+| `{""" ... """}` | Produce a C# string value inside an Akbura expression |
+
+Raw strings replace CDATA in Akbura. They also make `xml:space` unnecessary for defining multiline text because whitespace belongs directly to the resulting C# string.
+
+## CDATA is not supported
+
+XML can use a CDATA section when text must contain characters that would otherwise be interpreted as markup:
+
+```xml
+<FeatureView.Code>
+    <![CDATA[
+    <Button Content="Hello" />
+    ]]>
+</FeatureView.Code>
+```
+
+Akbura does not use CDATA. Place a C# raw string inside an Akbura expression instead:
+
+```akbura
+<FeatureView.Code>
+    {"""
+    <Button Content="Hello" />
+    """}
+</FeatureView.Code>
+```
+
+The outer `{ ... }` is an Akbura C# expression. The `""" ... """` part is a standard [C# raw string literal](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/raw-string).
+
+## Why raw strings are preferable in Akbura
+
+### Indentation is normalized
+
+A multiline raw string uses the indentation of its closing delimiter to determine which leading whitespace should be removed.
+
+This lets the embedded text stay aligned with the surrounding component:
+
+```akbura
+<TextBlock Text={"""
+    First line
+        Nested line
+    Last line
+    """}/>
+```
+
+The indentation required by the component source is not included in the resulting string.
+
+### Quotes and backslashes need less escaping
+
+A raw string can contain ordinary quote characters and backslashes without the escaping required by a regular C# string:
+
+```akbura
+<TextBlock Text={"""
+Path: C:\Projects\Akbura
+Message: "Hello"
+"""}/>
+```
+
+When the content itself contains three consecutive quote characters, use a longer delimiter:
+
+```csharp
+var text = """"
+The content may contain """ without ending the string.
+"""";
+```
+
+The opening and closing delimiters must contain more consecutive quote characters than any quote sequence inside the content.
+
+### Raw strings support interpolation
+
+Add `$` before the delimiter to create an interpolated raw string:
+
+```akbura
+param string name = "Akbura";
+
+<TextBlock Text={$"""
+Hello, {name}!
+"""}/>
+```
+
+The interpolation expression is normal C# and can use:
+
+- component state;
+- parameters;
+- injected services;
+- local variables;
+- method calls;
+- other C# expressions.
+
+For example:
+
+```akbura
+state int count = 3;
+
+<TextBlock Text={$"""
+The current count is {count}.
+The next value is {count + 1}.
+"""}/>
+```
+
+### Literal braces can be preserved
+
+Interpolated raw strings can use multiple `$` characters. The number of `$` characters determines how many braces start an interpolation.
+
+This is useful when the resulting text itself contains braces:
+
+```csharp
+var json = $$"""
+{
+    "name": "{{name}}"
+}
+""";
+```
+
+Here, single braces remain part of the text, while `{{name}}` is the interpolation.
+
+## Comparison
+
+| XML or AXAML | Akbura |
+| --- | --- |
+| `<![CDATA[ ... ]]>` | `{""" ... """}` |
+| XML text container | C# string expression |
+| No C# interpolation | Supports C# interpolation with `$"""` |
+| XML whitespace rules | C# raw-string indentation rules |
+| XML escaping model | Raw-string delimiter rules |
+
+## Summary
+
+Do not copy CDATA sections into `.akbura` files.
+
+Use:
+
+```akbura
+{"""
+Raw text
+"""}
+```
+
+Use an interpolated raw string when the text depends on component data:
+
+```akbura
+{$"""
+Value: {value}
+"""}
+```
+
+
+# Grid
+Source: Akbura/akbura/grid
+
+Avalonia's `Grid` arranges child controls into rows and columns.
+
+In `.akbura` markup, the `RowDefinitions` and `ColumnDefinitions` properties support a compact literal syntax:
+
+```akbura
+<Grid
+    ColumnDefinitions="*, 100, Auto"
+    RowDefinitions="Auto 2* 48">
+    <!-- content -->
+</Grid>
+```
+
+This syntax creates the corresponding Avalonia row and column definitions without requiring each definition to be declared separately.
+
+::: info
+Grid definition literals are available in `.akbura` markup attributes.
+:::
+
+They are not currently supported as a special AKCSS assignment value.
+
+## Grid lengths
+
+Each definition contains a Grid length.
+
+The following forms are supported:
+
+| Syntax | Meaning                               |
+| ------ | ------------------------------------- |
+| `Auto` | Size the row or column to its content |
+| `100`  | Use `100` device-independent pixels   |
+| `*`    | Use one proportional star unit        |
+| `2*`   | Use two proportional star units       |
+
+For example:
+
+```akbura
+<Grid ColumnDefinitions="Auto, *, 2*, 100" />
+```
+
+This creates four columns:
+
+1. An automatically sized column.
+2. A column using one share of the available space.
+3. A column using two shares of the available space.
+4. A fixed-width column of `100` device-independent pixels.
+
+## Separating definitions
+
+Definitions may be separated either by commas or by whitespace.
+
+Using commas:
+
+```akbura
+<Grid ColumnDefinitions="*, 100, Auto" />
+```
+
+Using whitespace:
+
+```akbura
+<Grid RowDefinitions="Auto * 2* 48" />
+```
+
+Use one separator style within the same value.
+
+When the value contains top-level commas, those commas delimit the definitions. Otherwise, the definitions are separated by whitespace.
+
+## Minimum and maximum sizes
+
+Grid definitions may include minimum and maximum constraints.
+
+```akbura
+<Grid
+    ColumnDefinitions="
+        min(100),
+        max(300),
+        min-max(100, 300),
+        min-max(100, *, 300),
+        min-max(0, Auto, 100)" />
+```
+
+### Minimum size
+
+Use `min(...)` to create a star-sized definition with a minimum size:
+
+```akbura
+<Grid ColumnDefinitions="min(100)" />
+```
+
+This is equivalent to a `*` column whose minimum width is `100`.
+
+### Maximum size
+
+Use `max(...)` to create a star-sized definition with a maximum size:
+
+```akbura
+<Grid ColumnDefinitions="max(300)" />
+```
+
+This is equivalent to a `*` column whose maximum width is `300`.
+
+### Minimum and maximum size
+
+Use `min-max(...)` to specify both constraints:
+
+```akbura
+<Grid ColumnDefinitions="min-max(100, 300)" />
+```
+
+The two-argument form uses `*` as the Grid length.
+
+You may also provide the Grid length explicitly:
+
+```akbura
+<Grid
+    ColumnDefinitions="
+        min-max(100, 2*, 300),
+        min-max(0, Auto, 100)" />
+```
+
+Supported forms include:
+
+| Syntax                  | Result                          |
+| ----------------------- | ------------------------------- |
+| `min(100)`              | `*` with a minimum of `100`     |
+| `max(300)`              | `*` with a maximum of `300`     |
+| `min-max(100, 300)`     | `*` constrained to `100...300`  |
+| `min-max(100, *, 300)`  | `*` constrained to `100...300`  |
+| `min-max(100, 2*, 300)` | `2*` constrained to `100...300` |
+| `min-max(0, Auto, 100)` | `Auto` constrained to `0...100` |
+
+## Validation rules
+
+Grid definition values are validated by the Akbura compiler.
+
+The following rules apply:
+
+* Pixel values must be non-negative.
+* Minimum values must be non-negative.
+* Maximum values must be non-negative.
+* In `min-max(...)`, the minimum value cannot be greater than the maximum value.
+
+Invalid definitions produce a compiler diagnostic instead of being deferred until runtime.
+
+## Complete example
+
+```akbura
+<Grid
+    ColumnDefinitions="Auto, min-max(120, *, 320), 2*"
+    RowDefinitions="Auto * 48">
+
+    <!-- Grid content -->
+</Grid>
+```
+
+This Grid contains:
+
+* Three columns:
+
+  * an automatically sized column;
+  * a star-sized column constrained to `120...320`;
+  * a column receiving two proportional shares of the remaining space;
+* Three rows:
+
+  * an automatically sized row;
+  * a row filling the remaining space;
+  * a fixed row with a height of `48`.
+
+
+Для файла хорошо подойдёт путь:
+
+```text
+AkburaDocs/_pages/akbura/grid.md
+````
+
+
+# ItemsControl
+Source: Akbura/akbura/items-control
+
+Avalonia's `ItemsControl` renders a collection by creating template content for every item.
+
+In Akbura, assign a collection to `ItemsSource` and declare the item template through the `ItemsControl.ItemTemplate` property element:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate>
+        <TextBlock Text=${Binding Name} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+For every object in `Vm.Items`, Avalonia creates one `TextBlock`.
+
+Akbura provides two ways to access the current item inside a template:
+
+1. A compiled binding such as `${Binding Name}`.
+2. A typed C# variable declared with `x.ItemName`.
+
+Both approaches can use a type inferred automatically from `ItemsSource` or provided explicitly through `x.DataType`.
+
+## Example model
+
+The examples on this page use the following types:
+
+```csharp
+namespace Demo.Models;
+
+public sealed class TaskItem
+{
+    public int Id { get; init; }
+
+    public string Title { get; init; } = "";
+
+    public string Description { get; init; } = "";
+
+    public bool IsCompleted { get; init; }
+}
+```
+
+```csharp
+namespace Demo.ViewModels;
+
+public sealed class TasksViewModel
+{
+    public IReadOnlyList<TaskItem> Items { get; init; } = [];
+}
+```
+
+The view model can be injected or stored in state:
+
+```akbura
+using Demo.ViewModels;
+
+inject TasksViewModel Vm;
+```
+
+## Basic item template
+
+The shortest form uses a compiled binding:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate>
+        <TextBlock Text=${Binding Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+Inside `ItemTemplate`, the binding source is the current item rather than the component itself.
+
+Therefore:
+
+```akbura
+<TextBlock Text=${Binding Title} />
+```
+
+reads `Title` from the current `TaskItem`.
+
+Conceptually, this template is applied once for every item:
+
+```text
+Vm.Items[0] -> TextBlock
+Vm.Items[1] -> TextBlock
+Vm.Items[2] -> TextBlock
+```
+
+## Automatic item type inference
+
+Akbura attempts to determine the item type from `ItemsSource`.
+
+In this example:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate>
+        <TextBlock Text=${Binding Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+`Vm.Items` has the type:
+
+```csharp
+IReadOnlyList<TaskItem>
+```
+
+Because that type implements `IEnumerable<TaskItem>`, Akbura infers that the template data type is `TaskItem`.
+
+The compiled binding is therefore checked as though its source were a `TaskItem`:
+
+```csharp
+TaskItem item;
+var value = item.Title;
+```
+
+This provides compile-time validation of the binding path.
+
+For example, this is valid:
+
+```akbura
+<TextBlock Text=${Binding Title} />
+```
+
+This produces a compiler diagnostic because `TaskItem` has no `FullName` property:
+
+```akbura
+<TextBlock Text=${Binding FullName} />
+```
+
+Akbura can infer item types from:
+
+* arrays such as `TaskItem[]`;
+* `IEnumerable<T>`;
+* types implementing `IEnumerable<T>`;
+* typed C# expressions assigned to `ItemsSource`;
+* typed binding expressions whose result type is known.
+
+## Compiled bindings
+
+The `${Binding ...}` syntax accesses the current template item through an Avalonia binding.
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate>
+        <StackPanel>
+            <TextBlock Text=${Binding Title} />
+            <TextBlock Text=${Binding Description} />
+        </StackPanel>
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+Binding paths may contain nested properties:
+
+```akbura
+<TextBlock Text=${Binding Author.DisplayName} />
+```
+
+They may also contain supported indexers:
+
+```akbura
+<TextBlock Text=${Binding History[0].Title} />
+```
+
+The compiler resolves every path segment against the inferred or explicitly provided item type.
+
+A compiled binding is useful when the value should continue to follow the item's property through Avalonia's binding system.
+
+## `x.ItemName`
+
+Use `x.ItemName` when the template needs a direct typed C# reference to the current item:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <TextBlock Text={item.Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+The value of `x.ItemName` becomes a local variable inside the template.
+
+In this example, Akbura effectively introduces:
+
+```csharp
+TaskItem item;
+```
+
+The variable is available to expressions inside the template:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <StackPanel>
+            <TextBlock Text={item.Title} />
+
+            <TextBlock
+                Text={item.IsCompleted
+                    ? "Completed"
+                    : "Not completed"} />
+        </StackPanel>
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+Because `item` is a typed C# value, normal C# syntax can be used:
+
+```akbura
+<TextBlock Text={item.Title.ToUpperInvariant()} />
+```
+
+```akbura
+<TextBlock Text={$"Task #{item.Id}: {item.Title}"} />
+```
+
+```akbura
+<Border IsVisible={!item.IsCompleted} />
+```
+
+### Event handlers
+
+The item variable can also be captured by an event handler:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <Button Click={() => OpenTask(item.Id)}>
+            {item.Title}
+        </Button>
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+The expression is type-checked using the actual item type.
+
+For example, if `Id` is an `int`, the compiler knows that:
+
+```akbura
+OpenTask(item.Id)
+```
+
+passes an `int`.
+
+### Item name rules
+
+The value of `x.ItemName` must be a valid C# identifier.
+
+Valid names include:
+
+```akbura
+x.ItemName="item"
+x.ItemName="task"
+x.ItemName="user"
+x.ItemName="currentItem"
+```
+
+Invalid names include:
+
+```akbura
+x.ItemName="current-item"
+x.ItemName="1item"
+x.ItemName="current item"
+```
+
+`x.ItemName` is a compile-time directive. It does not set an Avalonia property and does not assign a name to the generated control.
+
+## `x.ItemName` and `x.Name`
+
+`x.ItemName` and `x.Name` serve different purposes.
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <Button
+            x.Name="itemButton"
+            Content={item.Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+Here:
+
+* `item` refers to the current object from `ItemsSource`;
+* `itemButton` refers to the generated `Button`.
+
+| Directive    | Refers to                                  |
+| ------------ | ------------------------------------------ |
+| `x.ItemName` | The current template data item             |
+| `x.Name`     | A control created by markup                |
+| `x.DataType` | The compile-time type of the template item |
+
+## `x.DataType`
+
+Use `x.DataType` to specify the template item type explicitly:
+
+```akbura
+using Demo.Models;
+
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate
+        x.DataType="TaskItem">
+        <TextBlock Text=${Binding Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+`x.DataType` is especially useful when Akbura cannot infer the type from `ItemsSource`.
+
+It may also be combined with `x.ItemName`:
+
+```akbura
+using Demo.Models;
+
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate
+        x.DataType="TaskItem"
+        x.ItemName="item">
+
+        <TextBlock Text={item.Title} />
+
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+The declared item variable now has the explicit type:
+
+```csharp
+TaskItem item;
+```
+
+### Qualified type names
+
+A type imported through `using` can be written using its short name:
+
+```akbura
+using Demo.Models;
+
+<ItemsControl.ItemTemplate x.DataType="TaskItem">
+```
+
+A fully qualified type name may also be used:
+
+```akbura
+<ItemsControl.ItemTemplate
+    x.DataType="Demo.Models.TaskItem">
+```
+
+The global namespace qualifier can be used when necessary:
+
+```akbura
+<ItemsControl.ItemTemplate
+    x.DataType="global::Demo.Models.TaskItem">
+```
+
+## When `x.DataType` is required
+
+Automatic inference works only when the compiler can obtain a concrete generic item type.
+
+For example, inference works here:
+
+```akbura
+state IReadOnlyList<TaskItem> tasks = [];
+
+<ItemsControl ItemsSource={tasks}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <TextBlock Text={item.Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+The compiler can see `IEnumerable<TaskItem>` and infer `TaskItem`.
+
+Inference may not work when `ItemsSource` is typed as `object`:
+
+```akbura
+state object tasks = GetTasks();
+```
+
+```akbura
+<ItemsControl ItemsSource={tasks}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <TextBlock Text={item.Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+The static type of `tasks` does not expose `IEnumerable<T>`, so Akbura cannot determine the type of `item`.
+
+Provide it explicitly:
+
+```akbura
+using Demo.Models;
+
+<ItemsControl ItemsSource={tasks}>
+    <ItemsControl.ItemTemplate
+        x.DataType="TaskItem"
+        x.ItemName="item">
+
+        <TextBlock Text={item.Title} />
+
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+The same applies to a non-generic collection whose element type is unknown at compile time.
+
+::: info
+Akbura uses the static compile-time type of `ItemsSource`.
+
+The objects stored in the collection at runtime do not affect compile-time type inference.
+
+## Explicit type takes priority
+
+When `x.DataType` is present, it takes priority over automatic inference.
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate
+        x.DataType="TaskItem"
+        x.ItemName="item">
+
+        <TextBlock Text={item.Title} />
+
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+Even when `Vm.Items` already exposes `IEnumerable<TaskItem>`, the explicitly declared `TaskItem` type is used as the template data type.
+
+This can make template contracts clearer, but an incorrect explicit type may cause bindings or expressions to be checked against the wrong type.
+
+## Choosing between bindings and `x.ItemName`
+
+Use a compiled binding for direct property access:
+
+```akbura
+<TextBlock Text=${Binding Title} />
+```
+
+Use `x.ItemName` when you need a C# expression:
+
+```akbura
+<TextBlock Text={item.Title.ToUpperInvariant()} />
+```
+
+Use `x.ItemName` for conditions:
+
+```akbura
+<TextBlock
+    Text={item.IsCompleted ? "Completed" : "Pending"} />
+```
+
+Use `x.ItemName` in event handlers:
+
+```akbura
+<Button Click={() => DeleteTask(item.Id)}>
+    Delete
+</Button>
+```
+
+Both approaches may be used inside the same template:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <StackPanel>
+            <TextBlock Text=${Binding Title} />
+
+            <TextBlock
+                Text={$"Identifier: {item.Id}"} />
+
+            <Button Click={() => OpenTask(item)}>
+                Open
+            </Button>
+        </StackPanel>
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+## Complex item layouts
+
+The template may contain a complete control tree:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <Border
+            Padding="12"
+            Margin="0,0,0,8">
+
+            <Grid ColumnDefinitions="*, Auto">
+                <StackPanel>
+                    <TextBlock Text={item.Title} />
+                    <TextBlock Text={item.Description} />
+                </StackPanel>
+
+                <TextBlock
+                    Grid.Column="1"
+                    Text={item.IsCompleted ? "Done" : "Pending"} />
+            </Grid>
+
+        </Border>
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+If one item requires several sibling controls, place them inside a panel such as:
+
+* `StackPanel`;
+* `Grid`;
+* `DockPanel`;
+* another suitable Avalonia control.
+
+## Bindings in `ItemsSource`
+
+`ItemsSource` may itself use an Avalonia binding:
+
+```akbura
+<ItemsControl ItemsSource=${Binding Items}>
+    <ItemsControl.ItemTemplate>
+        <TextBlock Text=${Binding Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+When the result type of the outer binding is known, Akbura can use it to infer the template item type.
+
+For example, if `Items` has the type:
+
+```csharp
+IReadOnlyList<TaskItem>
+```
+
+the template data type is inferred as `TaskItem`.
+
+When the outer binding does not expose a concrete generic collection type, provide `x.DataType` explicitly.
+
+## Nested `ItemsControl`
+
+Each item template has its own item scope.
+
+Suppose a group contains a collection of tasks:
+
+```csharp
+public sealed class TaskGroup
+{
+    public string Name { get; init; } = "";
+
+    public IReadOnlyList<TaskItem> Tasks { get; init; } = [];
+}
+```
+
+Nested collections can use separate item names:
+
+```akbura
+<ItemsControl ItemsSource={Vm.Groups}>
+    <ItemsControl.ItemTemplate x.ItemName="group">
+        <StackPanel>
+            <TextBlock Text={group.Name} />
+
+            <ItemsControl ItemsSource={group.Tasks}>
+                <ItemsControl.ItemTemplate x.ItemName="task">
+                    <TextBlock Text={task.Title} />
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+Inside the inner template:
+
+* `task` refers to the current `TaskItem`;
+* `group` remains the outer template item.
+
+Using distinct item names makes nested template expressions easier to understand.
+
+## Common errors
+
+### The item variable is not found
+
+```akbura
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate>
+        <TextBlock Text={item.Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+`item` was never declared.
+
+Add `x.ItemName`:
+
+```akbura
+<ItemsControl.ItemTemplate x.ItemName="item">
+```
+
+### The compiler cannot determine the item type
+
+```akbura
+state object items = GetItems();
+
+<ItemsControl ItemsSource={items}>
+    <ItemsControl.ItemTemplate x.ItemName="item">
+        <TextBlock Text={item.Title} />
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+The static type of `items` is `object`.
+
+Add `x.DataType`:
+
+```akbura
+<ItemsControl.ItemTemplate
+    x.DataType="TaskItem"
+    x.ItemName="item">
+```
+
+### The compiled binding property is not found
+
+```akbura
+<TextBlock Text=${Binding FullName} />
+```
+
+If the item type has no `FullName` property, Akbura reports an invalid compiled binding path.
+
+Use an existing property:
+
+```akbura
+<TextBlock Text=${Binding Title} />
+```
+
+### `x.ItemName` contains an invalid identifier
+
+```akbura
+<ItemsControl.ItemTemplate x.ItemName="current-item">
+```
+
+Use a valid C# identifier:
+
+```akbura
+<ItemsControl.ItemTemplate x.ItemName="currentItem">
+```
+
+## Complete example
+
+```akbura
+using Avalonia.Controls;
+using Demo.Models;
+using Demo.ViewModels;
+
+inject TasksViewModel Vm;
+
+void OpenTask(TaskItem task)
+{
+    Console.WriteLine($"Opening task {task.Id}");
+}
+
+<ItemsControl ItemsSource={Vm.Items}>
+    <ItemsControl.ItemTemplate
+        x.DataType="TaskItem"
+        x.ItemName="task">
+
+        <Border
+            Padding="12"
+            Margin="0,0,0,8">
+
+            <Grid ColumnDefinitions="*, Auto">
+                <StackPanel>
+                    <TextBlock Text=${Binding Title} />
+
+                    <TextBlock
+                        Text={task.Description} />
+                </StackPanel>
+
+                <Button
+                    Grid.Column="1"
+                    Click={() => OpenTask(task)}>
+                    Open
+                </Button>
+            </Grid>
+
+        </Border>
+
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
+```
+
+In this example:
+
+1. `Vm.Items` supplies the collection.
+2. `x.DataType="TaskItem"` explicitly declares the item type.
+3. `x.ItemName="task"` creates a typed C# variable.
+4. `${Binding Title}` reads the current item through a compiled binding.
+5. `{task.Description}` uses a direct C# expression.
+6. The button event captures the current `task`.
+
+
+# Dependency Injection
+Source: Akbura/akbura/dependency-injection
+
+Akbura components can request application services with the `inject` declaration.
+
+```akbura
+inject IUserService UserService;
+```
+
+The generated component exposes `UserService` as a public Avalonia property and asks the configured service provider for an `IUserService` when the component is initialized.
+
+## Register a service provider
+
+Akbura accepts any standard `IServiceProvider`.
+
+The following example uses `Microsoft.Extensions.DependencyInjection`:
+
+```csharp
+using Akbura.Engine;
+using Microsoft.Extensions.DependencyInjection;
+
+var services = new ServiceCollection()
+    .AddSingleton<IUserService, UserService>()
+    .BuildServiceProvider();
+
+AppBuilder.Configure<App>()
+    .UsePlatformDetect()
+    .UseAkbura(akbura =>
+    {
+        akbura.WithServiceProvider(services);
+    });
+```
+
+`WithServiceProvider` adds the provider to the Akbura engine. Service lifetimes such as singleton, scoped, and transient are controlled by the registered provider.
+
+## Inject a required service
+
+A non-nullable injected type is required:
+
+```akbura
+inject IUserService UserService;
+
+state string userName = "Loading...";
+
+useEffect(async () =>
+{
+    var user = await UserService.GetCurrentUser();
+    userName = user.Name;
+}, []);
+
+<StackPanel>
+    <TextBlock Text="Current user" />
+    <TextBlock Text={userName} />
+</StackPanel>
+```
+
+Akbura resolves required services before the component performs its first update. If the provider cannot return the requested service, Akbura throws `AkburaServiceNotFoundException`.
+
+## Inject an optional service
+
+Add `?` to the injected type to make the dependency optional:
+
+```akbura
+inject IClipboardService? Clipboard;
+
+<Button
+    Content="Copy"
+    IsEnabled={Clipboard != null}
+    Click={() => Clipboard?.SetTextAsync("Akbura")} />
+```
+
+When an optional service is not registered, the generated property remains `null` and component initialization continues normally.
+
+## Explicit values take priority
+
+An injected service is also a public Avalonia property. It may be supplied directly instead of being resolved from the configured provider.
+
+From another Akbura component:
+
+```akbura
+<UserCard UserService={previewUserService} />
+```
+
+From AXAML:
+
+```xml
+<components:UserCard
+    UserService="{Binding UserService}" />
+```
+
+From C#:
+
+```csharp
+var card = new UserCard
+{
+    UserService = previewUserService
+};
+```
+
+When the property already contains a non-null value, Akbura keeps that value and does not call the service provider for that dependency. This is useful for previews, tests, and local overrides.
+
+## Configuration object example
+
+A service does not need to contain behavior. Configuration objects can also be injected.
+
+```csharp
+public sealed class GalleryOptions
+{
+    public string RepositoryUrl { get; set; } =
+        "https://github.com/Asaicraft/Akbura";
+
+    public string MainBranchName { get; set; } =
+        "master";
+
+    public string PathToGallery { get; set; } =
+        "Akbura.FeatureGallery/Akbura.FeatureGallery";
+}
+```
+
+Register one shared instance:
+
+```csharp
+var services = new ServiceCollection()
+    .AddSingleton(new GalleryOptions())
+    .BuildServiceProvider();
+
+builder.UseAkbura(akbura =>
+{
+    akbura.WithServiceProvider(services);
+});
+```
+
+Use it from a component:
+
+```akbura
+inject GalleryOptions GalleryOptions;
+
+param object Content;
+param string Url;
+
+<HyperlinkButton
+    NavigateUri={new Uri(
+        $"{GalleryOptions.RepositoryUrl}/blob/" +
+        $"{GalleryOptions.MainBranchName}/" +
+        $"{GalleryOptions.PathToGallery}/{Url}")}
+    Content={Content} />
+```
+
+The component only declares what it needs. Creation and lifetime of `GalleryOptions` remain outside the component.
+
+## Resolution process
+
+For every `inject` declaration, Akbura follows this process:
+
+1. Check whether the generated service property already contains a value.
+2. If it does, keep that value.
+3. Otherwise, request the service from the configured providers.
+4. Assign the resolved object to the generated property.
+5. Leave an unresolved optional dependency as `null`.
+6. Throw `AkburaServiceNotFoundException` for an unresolved required dependency.
+
+Injection happens before the first component update, so the dependency is available to the initial markup and subsequent effects.
+
+## Multiple service providers
+
+More than one provider may be registered:
+
+```csharp
+builder.UseAkbura(akbura =>
+{
+    akbura
+        .WithServiceProvider(featureProvider)
+        .WithServiceProvider(applicationProvider);
+});
+```
+
+Providers are queried in registration order. Standard `IServiceProvider` instances automatically continue to the next provider when they return `null`.
+
+## Custom Akbura service providers
+
+For contextual resolution, implement `IAkburaServiceProvider`:
+
+```csharp
+using Akbura.Engine;
+
+public sealed class FeatureServiceProvider : IAkburaServiceProvider
+{
+    private readonly FeatureState _state = new();
+
+    public object? GetService(
+        ref readonly InjectionInfo injectionInfo)
+    {
+        if (injectionInfo.RequestedService ==
+            typeof(FeatureState))
+        {
+            return _state;
+        }
+
+        return injectionInfo.NextProvider?
+            .GetService(in injectionInfo);
+    }
+}
+```
+
+`InjectionInfo` provides:
+
+| Property | Description |
+| --- | --- |
+| `RequestedService` | The requested service type |
+| `TargetControl` | The Akbura component requesting the service |
+| `FieldName` | The name declared after `inject` |
+| `IsOptional` | Whether the injected type is nullable |
+| `NextProvider` | The next provider in the configured chain |
+
+A custom provider must call `NextProvider` when it wants resolution to continue. Returning a value or returning `null` without forwarding stops the chain.
+
+## What Akbura generates
+
+For a declaration such as:
+
+```akbura
+inject IUserService UserService;
+```
+
+Akbura generates the equivalent of:
+
+```csharp
+private IUserService? __service_UserService;
+
+public static readonly
+    InjectService<MyComponent, IUserService>
+    UserServiceProperty =
+        InjectService.Create<MyComponent, IUserService>(
+            "UserService",
+            static owner => owner.__service_UserService,
+            static (owner, value) =>
+                owner.__SetService_UserService(value),
+            isOptional: false);
+
+public IUserService UserService
+{
+    get => __service_UserService!;
+    set => __SetService_UserService(value);
+}
+```
+
+The exact generated names are implementation details, but the important result is that every injected dependency becomes a settable Avalonia property backed by an `InjectService` descriptor.
+
+
 # AKCSS Getting Started
 Source: Akbura/akcss/getting-started
 
@@ -1021,7 +2677,7 @@ Observable and binding results reapply only the affected utility conflict.
 When an extension argument contains a C# expression, it is recreated on each
 component update so it sees the current state and parameter values.
 
-See [Markup Extensions](markup-extensions.md) for the full value and lifecycle
+See [Markup Extensions](akcss/markup-extensions) for the full value and lifecycle
 contract.
 
 ## Conditional utilities
@@ -1072,7 +2728,12 @@ These are ordinary Avalonia markup extensions. No `UtilityVariantAttribute` is
 required. The attribute only changes conflict ordering for extensions that opt
 into it.
 
-Akbura also includes ordered breakpoint extensions:
+Akbura includes built-in interaction, theme, control-state, structural,
+direction, platform, and responsive variants. See
+[Built-in Utility Variants](akcss/built-in-utility-variants) for the complete
+catalog and Avalonia mappings.
+
+It also includes ordered breakpoint extensions:
 
 ```akbura
 using Akbura.Markup;
@@ -1217,8 +2878,9 @@ using Akbura.Markup;
 | `${xxl}` | `>= 1536` | `40` |
 
 All built-in breakpoints belong to one conflict group and use
-`UnprefixedUtilityPrecedence.Above`. Therefore the largest active breakpoint
-wins even when an unprefixed utility appears later.
+`UnprefixedUtilityPrecedence.Above`. Their winning operations are installed at
+`BindingPriority.StyleTrigger`. Therefore the largest active breakpoint wins
+even when an unprefixed utility appears later.
 
 ## Conditional declarations inside utilities
 
@@ -1441,6 +3103,1309 @@ Built-in colors, radii, font sizes, weights, and shadows also use dynamic Avalon
 ```
 
 Because these are dynamic resources, applications can customize the theme without redefining every utility.
+
+
+# AKCSS Value Syntax
+Source: Akbura/akcss/value-syntax
+
+AKCSS property values are strongly typed. The compiler resolves the property first, then interprets the expression using that property's type.
+
+Most values are regular C# expressions:
+
+```akcss
+@using Avalonia;
+@using Avalonia.Media;
+
+Button.card {
+    Opacity: 0.85;
+    IsVisible: true;
+    HorizontalAlignment: Center;
+    FontWeight: FontWeight.Bold;
+    Background: Brushes.SlateBlue;
+    CornerRadius: new CornerRadius(8);
+}
+```
+
+AKCSS also provides concise syntax for several common Avalonia value types.
+
+## Expected-type values
+
+Static members of the target property type can be written without repeating the type name:
+
+```akcss
+Button.card {
+    HorizontalAlignment: Center;
+    VerticalAlignment: Bottom;
+}
+```
+
+The compiler uses the expected property type, so these values are resolved as:
+
+```csharp
+HorizontalAlignment.Center
+VerticalAlignment.Bottom
+```
+
+Qualified members and explicit casts are also supported:
+
+```akcss
+Button.card {
+    HorizontalAlignment: HorizontalAlignment.Right;
+    VerticalAlignment: (VerticalAlignment)2;
+    FontWeight: (FontWeight)700;
+}
+```
+
+This behavior also applies to custom enum properties.
+
+## Thickness
+
+Properties such as `Padding`, `Margin`, and `BorderThickness` use `Avalonia.Thickness`.
+
+### Uniform value
+
+A single number is applied to every side:
+
+```akcss
+Button.card {
+    Padding: 10;
+}
+```
+
+Equivalent C# value:
+
+```csharp
+new Thickness(10, 10, 10, 10)
+```
+
+### Horizontal and vertical values
+
+A two-item tuple uses the first value for left and right and the second value for top and bottom:
+
+```akcss
+Button.card {
+    Padding: (16, 8);
+}
+```
+
+```text
+Left   = 16
+Top    = 8
+Right  = 16
+Bottom = 8
+```
+
+### Individual sides
+
+A four-item tuple follows Avalonia's `left, top, right, bottom` order:
+
+```akcss
+Button.card {
+    Margin: (4, 8, 12, 16);
+}
+```
+
+### Named sides
+
+Named components make partial values easier to read:
+
+```akcss
+Button.card {
+    Padding: (top: 8, bottom: 12);
+    Margin: (horizontal: 16, vertical: 8);
+}
+```
+
+Supported names are:
+
+| Name | Applied sides |
+| --- | --- |
+| `left` | left |
+| `top` | top |
+| `right` | right |
+| `bottom` | bottom |
+| `horizontal` | left and right |
+| `vertical` | top and bottom |
+
+Sides omitted from a named tuple receive `0`.
+
+Tuple items may contain runtime expressions:
+
+```akcss
+@utilities {
+    Control.space-(double size) {
+        Margin: (
+            horizontal: size * Amx.DynamicResource<double>("--spacing"),
+            vertical: size
+        );
+    }
+}
+```
+
+Regular C# expressions returning `Thickness` remain available:
+
+```akcss
+Button.card {
+    Margin: new Thickness(10, 5) - new Thickness(3, 2);
+}
+```
+
+## Colors and brushes
+
+Color literals are available when the target property is `Avalonia.Media.Color` or `IBrush`.
+
+### Named colors
+
+Avalonia color names can be written as identifiers or strings:
+
+```akcss
+Button.primary {
+    Background: DodgerBlue;
+    Foreground: "White";
+}
+```
+
+Named values are resolved from `Avalonia.Media.Colors`.
+
+### Hex colors
+
+Hex values must be string literals:
+
+```akcss
+Button.primary {
+    Background: "#369";
+    BorderBrush: "#F369";
+    Foreground: "#336699";
+    Background: "#80336699";
+}
+```
+
+Supported formats are:
+
+| Format | Meaning |
+| --- | --- |
+| `#RGB` | red, green, blue |
+| `#ARGB` | alpha, red, green, blue |
+| `#RRGGBB` | red, green, blue |
+| `#AARRGGBB` | alpha, red, green, blue |
+
+### RGB, HSL, and HSV
+
+CSS-like color functions are also written as strings:
+
+```akcss
+Button.primary {
+    Background: "rgb(51, 102, 153)";
+    BorderBrush: "rgba(51, 102, 153, 0.5)";
+    Foreground: "hsl(210, 50%, 40%)";
+    Background: "hsla(210, 50%, 40%, 75%)";
+    BorderBrush: "hsv(210, 67%, 60%)";
+    Foreground: "hsva(210, 67%, 60%, 0.75)";
+}
+```
+
+RGB components accept byte values or percentages. Alpha accepts a value from `0` to `1` or a percentage. HSL and HSV hue values are expressed in degrees; their remaining components use percentages.
+
+When the target property is `IBrush`, AKCSS converts the parsed color to a `SolidColorBrush`. Other brush types can be supplied with regular C# expressions or resources:
+
+```akcss
+@using Avalonia.Media;
+
+Button.primary {
+    Background: Brushes.CornflowerBlue;
+    BorderBrush: Amx.DynamicResource<IBrush>("ControlBorderBrush");
+}
+```
+
+## CornerRadius
+
+There is currently no dedicated AKCSS literal or tuple syntax for `CornerRadius`. Use a regular C# expression, including for a uniform radius:
+
+```akcss
+@using Avalonia;
+
+Border.card {
+    CornerRadius: new CornerRadius(8);
+}
+```
+
+For individual corners, use the four-value constructor. The order is `topLeft, topRight, bottomRight, bottomLeft`:
+
+```akcss
+@using Avalonia;
+
+Border.card {
+    CornerRadius: new CornerRadius(8, 8, 0, 0);
+}
+```
+
+Resources containing a `CornerRadius` are also supported:
+
+```akcss
+Border.card {
+    CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-md");
+}
+```
+
+In `.akbura` markup, a plain `CornerRadius` attribute can use Avalonia's string parser:
+
+```akbura
+<Border CornerRadius="8,8,0,0" />
+```
+
+That markup literal conversion is separate from AKCSS value syntax.
+
+
+## Resource expressions
+
+Static and dynamic resources can participate in larger value expressions:
+
+```akcss
+Control.w-(double width) {
+    Width: width * Amx.DynamicResource<double>("--spacing");
+}
+```
+
+See [Markup Extensions](akcss/markup-extensions) for resource lookup and generated binding behavior.
+
+## Summary
+
+| Value type | Concise syntax |
+| --- | --- |
+| Enums and static members | `Center`, `FontWeight.Bold`, `(FontWeight)700` |
+| `Thickness` | `10`, `(16, 8)`, `(4, 8, 12, 16)`, `(horizontal: 16)` |
+| `Color` / `IBrush` | `White`, `"#336699"`, `"rgb(...)"`, `"hsl(...)"`, `"hsv(...)"` |
+| `CornerRadius` | regular C# such as `new CornerRadius(8)` or `new CornerRadius(8, 8, 0, 0)` |
+| Other values | regular typed C# expressions |
+
+
+# Utility Variants
+Source: Akbura/akcss/utility-variants
+
+## Utility variants
+
+A utility variant is a markup extension that controls whether a prefixed AKCSS
+utility is currently active.
+
+It does not need a dedicated base class or attribute. Standard markup
+extensions can be prefixes too:
+
+```akbura
+<ToggleSwitch x.Name="MyToggle" />
+
+<Border ${DynamicResource MyKey}:p-5
+        ${StaticResource MyBoolValue}:p-7
+        ${Binding #MyToggle.IsChecked}:p-10 />
+```
+
+```akbura
+using Akbura.Markup;
+
+<Border p-1
+        ${sm}:p-2
+        ${md}:p-3
+        ${lg}:p-4 />
+```
+
+In this example, `${sm}`, `${md}`, and `${lg}` are utility variants.
+
+A variant extension must return one of these types from `ProvideValue`:
+
+- `bool`
+- `IObservable<bool>`
+
+A candidate participates in the AKCSS cascade only while the returned value is
+`true`.
+
+When an observable has not produced a value yet, or when its latest value is
+`false`, the candidate is excluded. Another utility can then provide the
+property value.
+
+## Declaring ordering metadata
+
+`UtilityVariantAttribute` is optional. Apply it when a family of markup
+extensions needs explicit ordering or special precedence over unprefixed
+utilities:
+
+```csharp
+using Akbura.Markup;
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = "WindowBreakpoints",
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class WideExtension
+{
+    public IObservable<bool> ProvideValue(IServiceProvider services)
+    {
+        // Return whether the variant is currently active.
+    }
+}
+```
+
+The `Extension` suffix is omitted in markup:
+
+```akbura
+using Demo.Markup;
+
+<Border p-2
+        ${Wide}:p-6 />
+```
+
+Variant names follow the normal markup extension lookup rules. The namespace
+containing the extension must be imported explicitly.
+
+## Conflict resolution is property-based
+
+Utilities do not conflict simply because they have similar names, use the same
+variant, or belong to the same conflict group.
+
+Akbura expands every utility into individual property-writing operations and
+resolves each target property independently.
+
+For example, suppose one utility writes:
+
+```text
+Width
+Background
+Padding
+```
+
+and another utility writes:
+
+```text
+Width
+Height
+```
+
+Only the two `Width` operations compete.
+
+The following operations remain active independently:
+
+```text
+Background
+Padding
+Height
+```
+
+This also means that assigning two variants to the same `ConflictGroup` does
+not make unrelated utilities conflict.
+
+## Resolution algorithm
+
+For each target property, Akbura resolves active utility operations in the
+following order.
+
+### 1. Exclude inactive candidates
+
+A prefixed candidate is excluded when its variant returns `false` or when its
+observable has not produced a value yet.
+
+### 2. Respect AKCSS operation priority
+
+Variant ordering is considered only when candidates write the same target
+property and have the same AKCSS operation priority.
+
+For example, a regular style operation and an active style-trigger operation
+are not made equal merely because their variants share a conflict group.
+
+### 3. Resolve candidates inside each conflict group
+
+Active prefixed candidates with the same non-empty `ConflictGroup` are ordered
+by `Order`.
+
+The candidate with the greater value wins:
+
+```text
+Order 20 > Order 10 > Order 1
+```
+
+When two candidates have the same `Order`, the candidate written later in
+markup wins.
+
+### 4. Compare different groups by source order
+
+`Order` is not a global priority.
+
+Winners from different conflict groups are compared by their position in
+markup.
+
+Candidates without a conflict group are also compared by source order.
+
+For example, an `Order` of `1000` in one group does not automatically beat an
+`Order` of `1` from another group.
+
+### 5. Compare the prefixed winner with the unprefixed candidate
+
+After Akbura selects the winning prefixed candidate, it compares that candidate
+with the last unprefixed candidate writing the same property.
+
+This comparison is controlled by `UnprefixedPrecedence`.
+
+## UtilityVariantAttribute
+
+```csharp
+[AttributeUsage(
+    AttributeTargets.Class,
+    Inherited = false,
+    AllowMultiple = false)]
+public sealed class UtilityVariantAttribute : Attribute
+```
+
+The attribute can be applied once to a markup extension class. It does not
+control whether the extension is allowed before `:`. Its only purpose is to
+provide `Order`, `ConflictGroup`, and `UnprefixedPrecedence` during
+property-level conflict resolution.
+
+Without the attribute, the extension still works as a prefix with `Order = 0`,
+no conflict group, and source-order precedence.
+
+## Utility binding priority
+
+Variant ordering and Avalonia binding priority are separate decisions.
+
+1. AKCSS selects one winning operation for each target property using operation
+   priority, `Order`, `ConflictGroup`, `UnprefixedPrecedence`, and source order.
+2. If the winning prefix extension has `UtilityBindingPriorityAttribute`, that
+   operation is applied at the requested Avalonia `BindingPriority`.
+
+Changing Avalonia priority cannot make a losing AKCSS candidate win.
+
+Both attributes can be placed on one extension when both decisions are needed:
+
+```csharp
+using Akbura.Markup;
+using Avalonia.Data;
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = "Modes",
+    UnprefixedPrecedence =
+        UnprefixedUtilityPrecedence.Above)]
+[UtilityBindingPriority(
+    PriorityMember = nameof(Priority))]
+public sealed class priorityExtension
+{
+    public BindingPriority Priority { get; set; }
+
+    public bool ProvideValue(IServiceProvider services) => true;
+}
+```
+
+```akbura
+<Border ${priority Priority=Template}:p-4 />
+<Border ${priority Priority=Style}:p-6 />
+```
+
+The two attributes remain independent: `UtilityVariantAttribute` supplies
+conflict metadata, while `UtilityBindingPriorityAttribute` supplies either a
+constant priority or the name of a readable instance field/property of exact
+type `BindingPriority`.
+
+Only `Animation`, `StyleTrigger`, `Template`, and `Style` are supported because
+their contributions can be disposed without clearing unrelated values.
+`LocalValue`, `Inherited`, `Unset`, CLR properties, and direct properties are
+not supported by this feature.
+
+### Order
+
+```csharp
+public double Order { get; }
+```
+
+`Order` controls priority between active prefixed candidates only when all of
+the following conditions are true:
+
+1. The candidates write the same target property.
+2. The operations have the same AKCSS operation priority.
+3. Both variants have the same non-empty `ConflictGroup`.
+
+The greater value wins.
+
+When values are equal, source order is used.
+
+`Order` is ignored:
+
+- between different conflict groups;
+- when one or both variants have no group;
+- when comparing a prefixed candidate with an unprefixed candidate.
+
+Example:
+
+```csharp
+[UtilityVariant(
+    10d,
+    ConflictGroup = "Breakpoints")]
+public sealed class MediumExtension
+{
+}
+```
+
+```csharp
+[UtilityVariant(
+    20d,
+    ConflictGroup = "Breakpoints")]
+public sealed class LargeExtension
+{
+}
+```
+
+While both variants are active, `LargeExtension` wins conflicting property
+operations because `20` is greater than `10`.
+
+### ConflictGroup
+
+```csharp
+public string? ConflictGroup { get; init; }
+```
+
+`ConflictGroup` identifies variants whose active candidates can be ordered by
+`Order`.
+
+```csharp
+[UtilityVariant(
+    10d,
+    ConflictGroup = "Breakpoints")]
+```
+
+The group only affects operations that already conflict.
+
+It does not create a conflict between unrelated properties.
+
+A `null`, empty, or whitespace value means that the variant has no ordered
+group. Such candidates are compared with other groups by source order.
+
+Use the same group for variants that represent ordered alternatives, such as:
+
+- minimum-width breakpoints;
+- maximum-width breakpoints;
+- mutually ordered interaction modes;
+- ordered accessibility modes.
+
+Use different groups when the variants represent independent conditions whose
+relative priority should remain controlled by markup order.
+
+### UnprefixedPrecedence
+
+```csharp
+public UnprefixedUtilityPrecedence UnprefixedPrecedence
+{
+    get;
+    init;
+}
+```
+
+This setting controls how the winning active prefixed candidate competes with
+the last unprefixed candidate that writes the same property.
+
+The default is:
+
+```csharp
+UnprefixedUtilityPrecedence.SourceOrder
+```
+
+The setting is applied only after the prefixed winner has been selected.
+
+## UnprefixedUtilityPrecedence
+
+### Below
+
+```csharp
+UnprefixedUtilityPrecedence.Below
+```
+
+The unprefixed candidate always wins while both candidates are active.
+
+Markup order does not matter.
+
+```akbura
+<Border ${custom}:p-6
+        p-2 />
+```
+
+```akbura
+<Border p-2
+        ${custom}:p-6 />
+```
+
+In both cases, `p-2` wins.
+
+### SourceOrder
+
+```csharp
+UnprefixedUtilityPrecedence.SourceOrder
+```
+
+The candidate written later in markup wins.
+
+```akbura
+<Border ${custom}:p-6
+        p-2 />
+```
+
+Here, `p-2` wins.
+
+```akbura
+<Border p-2
+        ${custom}:p-6 />
+```
+
+Here, `${custom}:p-6` wins.
+
+### Above
+
+```csharp
+UnprefixedUtilityPrecedence.Above
+```
+
+The active prefixed candidate always wins.
+
+Markup order does not matter.
+
+```akbura
+<Border ${md}:p-6
+        p-2 />
+```
+
+```akbura
+<Border p-2
+        ${md}:p-6 />
+```
+
+While `${md}` is active, `p-6` wins in both cases.
+
+This behavior is used by the built-in breakpoint variants.
+
+## Built-in variants
+
+Akbura ships interaction, theme, state, structural, direction, platform, and
+responsive variants. See
+[Built-in Utility Variants](akcss/built-in-utility-variants) for their names,
+exact Avalonia conditions, supported targets, and current limitations. Every
+built-in variant uses `UnprefixedUtilityPrecedence.Above` and applies winning
+operations at `BindingPriority.StyleTrigger`.
+
+## Built-in breakpoint implementation
+
+The built-in `${sm}`, `${md}`, `${lg}`, `${xl}`, and `${xxl}` variants observe
+the current `TopLevel.ClientSize`.
+
+All variants belong to the same conflict group.
+
+Their increasing `Order` values ensure that the greatest active breakpoint
+wins. They also use `UnprefixedUtilityPrecedence.Above`, so an unprefixed
+utility cannot override an active breakpoint. Every breakpoint inherits
+`UtilityBindingPriorityAttribute` with `BindingPriority.StyleTrigger`.
+
+```csharp
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Markup.Xaml;
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace Akbura.Markup;
+
+using static BreakpointsGroupKey;
+
+file static class BreakpointsGroupKey
+{
+    public const string BreakpointsGroup = nameof(BreakpointsGroup);
+}
+
+[UtilityBindingPriority(Priority = BindingPriority.StyleTrigger)]
+public abstract class BreakpointMarkupExtension
+{
+    protected BreakpointPredicate IsActivatedPredicate
+    {
+        get;
+        init;
+    }
+
+
+    public IObservable<bool>? ProvideValue(IServiceProvider? serviceProvider)
+    {
+        if (serviceProvider == null)
+        {
+            return null;
+        }
+
+        if (serviceProvider.GetService(typeof(IProvideValueTarget))
+            is not IProvideValueTarget provideValueTarget)
+        {
+            return null;
+        }
+
+        if (provideValueTarget.TargetObject is not Visual target)
+        {
+            return null;
+        }
+
+        var topLevel = TopLevel.GetTopLevel(target);
+
+        if (topLevel == null &&
+            serviceProvider.GetService(typeof(IRootObjectProvider))
+                is IRootObjectProvider rootObjectProvider)
+        {
+            topLevel = rootObjectProvider.IntermediateRootObject as TopLevel
+                ?? rootObjectProvider.RootObject as TopLevel;
+        }
+
+        if (topLevel == null)
+        {
+            return null;
+        }
+
+        return new BreakpointObservable(
+            topLevel.GetObservable(TopLevel.ClientSizeProperty),
+            IsActivatedPredicate);
+    }
+
+    protected readonly unsafe struct BreakpointPredicate
+    {
+        private readonly delegate*<double, bool> _pointer;
+
+        public BreakpointPredicate(delegate*<double, bool> pointer)
+        {
+            if (pointer == null)
+            {
+                throw new ArgumentNullException(nameof(pointer));
+            }
+
+            _pointer = pointer;
+        }
+
+        public bool Invoke(double width)
+        {
+            return _pointer(width);
+        }
+    }
+
+    private sealed class BreakpointObservable : IObservable<bool>
+    {
+        private readonly IObservable<Size> _source;
+        private readonly BreakpointPredicate _isActivated;
+
+        public BreakpointObservable(
+            IObservable<Size> source,
+            BreakpointPredicate isActivated)
+        {
+            _source = source;
+            _isActivated = isActivated;
+        }
+
+        public IDisposable Subscribe(IObserver<bool> observer)
+        {
+            ArgumentNullException.ThrowIfNull(observer);
+
+            return _source.Subscribe(
+                new BreakpointObserver(observer, _isActivated));
+        }
+    }
+
+    private sealed class BreakpointObserver : IObserver<Size>
+    {
+        private readonly IObserver<bool> _observer;
+        private readonly BreakpointPredicate _isActivated;
+
+        private bool _hasValue;
+        private bool _lastValue;
+        private bool _isStopped;
+
+        public BreakpointObserver(
+            IObserver<bool> observer,
+            BreakpointPredicate isActivated)
+        {
+            _observer = observer;
+            _isActivated = isActivated;
+        }
+
+        public void OnNext(Size size)
+        {
+            if (_isStopped)
+            {
+                return;
+            }
+
+            bool currentValue;
+
+            try
+            {
+                currentValue = _isActivated.Invoke(size.Width);
+            }
+            catch (Exception exception)
+            {
+                _isStopped = true;
+                _observer.OnError(exception);
+                return;
+            }
+
+            if (_hasValue && currentValue == _lastValue)
+            {
+                return;
+            }
+
+            _hasValue = true;
+            _lastValue = currentValue;
+
+            _observer.OnNext(currentValue);
+        }
+
+        public void OnError(Exception error)
+        {
+            if (_isStopped)
+            {
+                return;
+            }
+
+            _isStopped = true;
+            _observer.OnError(error);
+        }
+
+        public void OnCompleted()
+        {
+            if (_isStopped)
+            {
+                return;
+            }
+
+            _isStopped = true;
+            _observer.OnCompleted();
+        }
+    }
+}
+
+
+#pragma warning disable IDE1006 // Naming Styles
+
+[UtilityVariant(
+    1,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class smExtension : BreakpointMarkupExtension
+{
+    public smExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width >= 640d;
+    }
+}
+
+[UtilityVariant(
+    10,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class mdExtension : BreakpointMarkupExtension
+{
+    public mdExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width >= 768d;
+    }
+}
+
+[UtilityVariant(
+    20,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class lgExtension : BreakpointMarkupExtension
+{
+    public lgExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width >= 1024d;
+    }
+}
+
+[UtilityVariant(
+    30,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class xlExtension : BreakpointMarkupExtension
+{
+    public xlExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width >= 1280d;
+    }
+}
+
+[UtilityVariant(
+    40,
+    ConflictGroup = BreakpointsGroup,
+    UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
+public sealed class xxlExtension : BreakpointMarkupExtension
+{
+    public xxlExtension()
+    {
+        unsafe
+        {
+            IsActivatedPredicate =
+                new BreakpointPredicate(&IsActivated);
+        }
+    }
+
+    private static bool IsActivated(double width)
+    {
+        return width >= 1536d;
+    }
+}
+
+
+#pragma warning restore IDE1006 // Naming Styles
+```
+
+## Breakpoint orders
+
+| Variant | Active width | Order |
+| --- | ---: | ---: |
+| `${sm}` | `>= 640` | `1` |
+| `${md}` | `>= 768` | `10` |
+| `${lg}` | `>= 1024` | `20` |
+| `${xl}` | `>= 1280` | `30` |
+| `${xxl}` | `>= 1536` | `40` |
+
+Consider this markup:
+
+```akbura
+<Border ${lg}:w-10
+        w-5
+        ${md}:w-7 />
+```
+
+At a width of `1100`:
+
+- `${md}` is active;
+- `${lg}` is active;
+- `${lg}` has the greater `Order`;
+- `${lg}:w-10` wins even though it appears before `w-5`;
+- `w-5` cannot override it because breakpoint variants use
+  `UnprefixedUtilityPrecedence.Above`.
+
+At a width of `800`:
+
+- `${md}` is active;
+- `${lg}` is inactive;
+- `${md}:w-7` wins.
+
+Below `768`:
+
+- both `${md}` and `${lg}` are inactive;
+- `w-5` wins.
+
+## Multiple properties
+
+Variant priority is resolved independently for every property-writing
+operation.
+
+```akbura
+<Border p-2
+        bg-slate-800
+        ${md}:p-6
+        ${lg}:bg-blue-600 />
+```
+
+At the `md` breakpoint:
+
+```text
+Padding = p-6
+Background = bg-slate-800
+```
+
+At the `lg` breakpoint:
+
+```text
+Padding = p-6
+Background = bg-blue-600
+```
+
+`${lg}:bg-blue-600` does not disable `${md}:p-6`, because the candidates write
+different properties.
+
+## Equal order
+
+When two active variants in the same group have equal `Order`, the candidate
+written later wins.
+
+```csharp
+[UtilityVariant(
+    10d,
+    ConflictGroup = "Modes")]
+public sealed class FirstExtension
+{
+}
+
+[UtilityVariant(
+    10d,
+    ConflictGroup = "Modes")]
+public sealed class SecondExtension
+{
+}
+```
+
+```akbura
+<Border ${First}:p-2
+        ${Second}:p-6 />
+```
+
+When both variants are active, `${Second}:p-6` wins.
+
+Reversing the markup reverses the result:
+
+```akbura
+<Border ${Second}:p-6
+        ${First}:p-2 />
+```
+
+Now `${First}:p-2` wins.
+
+## Practical guidelines
+
+Use a shared `ConflictGroup` when variants represent an ordered scale.
+
+```text
+sm < md < lg < xl < xxl
+```
+
+Use increasing `Order` values to represent that scale.
+
+Use `UnprefixedUtilityPrecedence.Above` when an active variant must override
+the default value regardless of markup order.
+
+Use `SourceOrder` when the author should be able to override a variant by
+placing another utility later.
+
+Use `Below` when an unprefixed value must always remain authoritative.
+
+Do not use `Order` as a global priority. It is intentionally local to one
+non-empty conflict group and one conflicting property operation.
+
+See also:
+
+- [AKCSS Utilities](akcss/utilities)
+- [Markup Extensions](akcss/markup-extensions)
+
+
+# Built-in Utility Variants
+Source: Akbura/akcss/built-in-utility-variants
+
+## Built-in utility variants
+
+Import the variants from `Akbura.Markup` and place a markup extension before
+an AKCSS utility:
+
+```akbura
+using Akbura.Markup;
+using Akbura.Styles.akcss;
+
+<Button p-2
+        ${hover}:p-3
+        ${focusVisible}:opacity-100 />
+
+<TextBox opacity-75
+         ${focus}:opacity-100
+         ${invalid}:border-red-500 />
+
+<Border bg-white
+        ${dark}:bg-slate-900
+        ${light}:bg-slate-50 />
+```
+
+Every built-in variant uses
+`UnprefixedUtilityPrecedence.Above` and installs the winning property
+operation at `BindingPriority.StyleTrigger`. When a condition becomes false,
+Akbura disposes only that contribution and Avalonia reveals the next winning
+value.
+
+Names that contain a hyphen in Tailwind use camel case in Akbura because
+markup-extension type names are C# identifiers. For example,
+`focus-within` becomes `${focusWithin}`, `max-md` becomes
+`${maxMd}`, and `out-of-range` becomes `${outOfRange}`.
+
+## Interaction and theme
+
+| Variant | Active condition | Conflict group | Order |
+| --- | --- | --- | ---: |
+| `${focusWithin}` | The target or a descendant has keyboard focus | Interaction | `5` |
+| `${hover}` | The target's `IsPointerOver` is `true` | Interaction | `10` |
+| `${focus}` | The target's own `IsFocused` is `true` | Interaction | `20` |
+| `${focusVisible}` | Avalonia exposes `:focus-visible` on the target | Interaction | `30` |
+| `${active}` | A supported control exposes `:pressed` | Interaction | `40` |
+| `${light}` | The effective theme inherits `ThemeVariant.Light` | Color scheme | `10` |
+| `${dark}` | The effective theme inherits `ThemeVariant.Dark` | Color scheme | `20` |
+
+`${focus}` is intentionally different from `${focusWithin}`: focusing a
+child activates only the latter. `${focusVisible}` follows Avalonia's input
+navigation state rather than treating every focused control as keyboard
+focused.
+
+Theme variants observe the target's effective `ActualThemeVariant`. They
+react to application, window, and inherited `ThemeVariantScope` changes. A
+custom theme variant also matches the light or dark variant it inherits.
+
+Tailwind has a built-in `dark` variant but normally uses unprefixed utilities
+for light mode. Explicit `${light}` is an Akbura convenience.
+
+## Control state
+
+| Variant | Avalonia condition | Supported target |
+| --- | --- | --- |
+| `${enabled}` | `IsEffectivelyEnabled == true` | Any `InputElement` |
+| `${disabled}` | `IsEffectivelyEnabled == false` | Any `InputElement` |
+| `${visited}` | Pseudo-class `:visited` | Controls that publish it, such as links |
+| `${open}` | `:open`, `:expanded`, `:dropdownopen`, or `:flyout-open` | Disclosure, menu, drop-down, and flyout controls |
+| `${checked}` | Pseudo-class `:checked` | Toggle controls |
+| `${indeterminate}` | Pseudo-class `:indeterminate` | Three-state toggle controls |
+| `${selected}` | Pseudo-class `:selected` | Selecting item containers |
+| `${optional}` | `AutomationProperties.IsRequiredForForm == false` | Any `StyledElement` |
+| `${required}` | `AutomationProperties.IsRequiredForForm == true` | Any `StyledElement` |
+| `${valid}` | `DataValidationErrors.HasErrors == false` | Any `StyledElement` |
+| `${invalid}` | `DataValidationErrors.HasErrors == true` | Any `StyledElement` |
+| `${inRange}` | Non-null `Value` is between `Minimum` and `Maximum`, inclusive | `NumericUpDown` |
+| `${outOfRange}` | Non-null `Value` is outside `Minimum` and `Maximum` | `NumericUpDown` |
+| `${readOnly}` | `IsReadOnly == true` | `TextBox`, `NumericUpDown` |
+| `${placeholderShown}` | Text is empty and `PlaceholderText` is non-empty | `TextBox` |
+| `${default}` | `IsDefault == true` | `Button` |
+
+Related opposite states share a conflict group, so the applicable state wins
+deterministically. Inherited disabling is respected because `${disabled}`
+uses `IsEffectivelyEnabled`, not only the target's local `IsEnabled`.
+
+These are Avalonia mappings, not an HTML validation engine. In particular,
+required state comes from automation metadata, valid state comes from
+Avalonia data-validation errors, and `${default}` means Avalonia's default
+button. `${selected}` is an Akbura convenience for item containers.
+
+Pseudo-class-backed variants activate only on controls that publish the
+corresponding Avalonia pseudo-class.
+
+## Logical-tree structure
+
+| Variant | Active condition |
+| --- | --- |
+| `${first}` | First logical child |
+| `${last}` | Last logical child |
+| `${only}` | Only logical child |
+| `${odd}` | Odd one-based logical-child position |
+| `${even}` | Even one-based logical-child position |
+| `${firstOfType}` | First sibling with the same `StyleKey` |
+| `${lastOfType}` | Last sibling with the same `StyleKey` |
+| `${onlyOfType}` | Only sibling with the same `StyleKey` |
+| `${empty}` | No logical children |
+
+The conditions update after insertions, removals, or reparenting. They use
+Avalonia's logical tree rather than CSS's DOM tree, and “of type” compares the
+effective Avalonia `StyleKey`.
+
+The parameterized variants model CSS's `an+b` positions:
+
+```akbura
+<Border ${nth Step=2, Offset=1}:bg-slate-100 />
+<Border ${nthLast Step=0, Offset=3}:font-bold />
+<Border ${nthOfType Step=2, Offset=0}:opacity-75 />
+<Border ${nthLastOfType Step=-1, Offset=3}:p-2 />
+```
+
+`Step=0` matches the single one-based position in `Offset`. The default is
+`Step=0, Offset=1`.
+
+## Direction, viewport, and platform
+
+| Variant | Active condition |
+| --- | --- |
+| `${ltr}` | Effective `FlowDirection.LeftToRight` |
+| `${rtl}` | Effective `FlowDirection.RightToLeft` |
+| `${portrait}` | Top-level client height is at least its width |
+| `${landscape}` | Top-level client width is greater than its height |
+| `${contrastMore}` | Platform contrast preference is `High` |
+
+Direction follows Avalonia's inherited flow direction. Orientation and
+contrast observe the target's current `TopLevel`; if no top level or platform
+settings are available, the extension does not produce a candidate.
+
+## Responsive variants
+
+The minimum breakpoints are mobile-first. Maximum breakpoints use an exclusive
+upper bound:
+
+| Minimum | Width | Maximum | Width |
+| --- | ---: | --- | ---: |
+| `${sm}` | `>= 640` | `${maxSm}` | `< 640` |
+| `${md}` | `>= 768` | `${maxMd}` | `< 768` |
+| `${lg}` | `>= 1024` | `${maxLg}` | `< 1024` |
+| `${xl}` | `>= 1280` | `${maxXl}` | `< 1280` |
+| `${xxl}` | `>= 1536` | `${maxXxl}` | `< 1536` |
+
+`${xxl}` and `${maxXxl}` correspond to Tailwind's `2xl` names because
+a C# type cannot begin with a digit. All fixed breakpoints share one conflict
+group. The largest active minimum breakpoint wins; among simultaneous maximum
+conditions, the narrowest active range wins.
+
+Arbitrary viewport thresholds use a named width in device-independent pixels:
+
+```akbura
+<Border ${min Width=900}:p-6 />
+<Border ${max Width=900}:p-2 />
+```
+
+`${min}` uses `>= Width`; `${max}` uses `< Width`. They intentionally
+use source order rather than joining the fixed-breakpoint scale.
+
+## Current limits
+
+Akbura currently accepts exactly one prefix per utility attribute. Native
+Tailwind stacking such as `dark:md:hover:...` is not yet parsed; write
+separate single-prefix attributes or a custom condition extension.
+
+Variants that would change the utility target or require a CSS selector model
+are not represented by a misleading approximation. This includes
+pseudo-elements, direct/all-child selectors, `group-*`, `peer-*`,
+`has-*`, `in-*`, `not-*`, arbitrary selector/data/ARIA variants,
+`target`, and `details-content`.
+
+The current Avalonia platform contract also has no portable reactive signal
+for browser autofill, user-valid interaction history, reduced motion,
+contrast-less, forced or inverted colors, pointer capability, scripting,
+print, CSS `@supports`, or starting-style. Tailwind container queries need a
+container-selection model and are therefore not treated as viewport queries.
+
+See the [Tailwind variant reference](https://tailwindcss.com/docs/hover-focus-and-other-states#appendix)
+and [responsive design documentation](https://tailwindcss.com/docs/responsive-design)
+for the CSS originals.
 
 
 # Margin and Padding

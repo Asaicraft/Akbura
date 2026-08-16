@@ -204,12 +204,27 @@ AKCSS									</span>
 										Utilities
 									</a>
 								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/value-syntax" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Value Syntax
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/utility-variants" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Utility Variants
+									</a>
+								</li>
 						</ul>
 								<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="block flex items-center whitespace-nowrap">
 									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
 Built-in Styles									</span>
 								</a>
 						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/built-in-utility-variants" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Built-in Utility Variants
+									</a>
+								</li>
 								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akcss/spacing" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Margin and Padding
@@ -497,13 +512,21 @@ the last unprefixed candidate that writes the same property.</p>
 </code></pre>
 <p>While <code>${md}</code> is active, <code>p-6</code> wins in both cases.</p>
 <p>This behavior is used by the built-in breakpoint variants.</p>
+<h2 id="built-in-variants">Built-in variants<a class="header-anchor" href="javascript:;" onclick="location.hash='#built-in-variants'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Akbura ships interaction, theme, state, structural, direction, platform, and
+responsive variants. See
+<a href="akcss/built-in-utility-variants">Built-in Utility Variants</a> for their names,
+exact Avalonia conditions, supported targets, and current limitations. Every
+built-in variant uses <code>UnprefixedUtilityPrecedence.Above</code> and applies winning
+operations at <code>BindingPriority.StyleTrigger</code>.</p>
 <h2 id="built-in-breakpoint-implementation">Built-in breakpoint implementation<a class="header-anchor" href="javascript:;" onclick="location.hash='#built-in-breakpoint-implementation'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>The built-in <code>${sm}</code>, <code>${md}</code>, <code>${lg}</code>, <code>${xl}</code>, and <code>${xxl}</code> variants observe
 the current <code>TopLevel.ClientSize</code>.</p>
 <p>All variants belong to the same conflict group.</p>
 <p>Their increasing <code>Order</code> values ensure that the greatest active breakpoint
 wins. They also use <code>UnprefixedUtilityPrecedence.Above</code>, so an unprefixed
-utility cannot override an active breakpoint.</p>
+utility cannot override an active breakpoint. Every breakpoint inherits
+<code>UtilityBindingPriorityAttribute</code> with <code>BindingPriority.StyleTrigger</code>.</p>
 <pre><code class="language-csharp">using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
@@ -521,6 +544,7 @@ file static class BreakpointsGroupKey
     public const string BreakpointsGroup = nameof(BreakpointsGroup);
 }
 
+[UtilityBindingPriority(Priority = BindingPriority.StyleTrigger)]
 public abstract class BreakpointMarkupExtension
 {
     protected BreakpointPredicate IsActivatedPredicate
@@ -928,6 +952,27 @@ non-empty conflict group and one conflicting property operation.</p>
 					</div>
 
 					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akcss/value-syntax" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												Value Syntax
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+											<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Built-in Styles
+												<!-- Heroicon name: mini/arrow-long-right -->
+												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+												</svg>
+											</a>
+									</div>
+								</nav>
 					</div>
 			</div>
 				
@@ -1044,6 +1089,11 @@ non-empty conflict group and one conflicting property operation.</p>
 														</span>
 													</li>
 											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#built-in-variants'" data-id="built-in-variants" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Built-in variants
+										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#built-in-breakpoint-implementation'" data-id="built-in-breakpoint-implementation" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">

@@ -204,12 +204,27 @@ AKCSS									</span>
 										Utilities
 									</a>
 								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/value-syntax" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Value Syntax
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/utility-variants" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Utility Variants
+									</a>
+								</li>
 						</ul>
 								<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="block flex items-center whitespace-nowrap">
 									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
 Built-in Styles									</span>
 								</a>
 						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/built-in-utility-variants" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Built-in Utility Variants
+									</a>
+								</li>
 								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akcss/spacing" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Margin and Padding
@@ -362,7 +377,7 @@ state double spacing = 4;
 <p>Observable and binding results reapply only the affected utility conflict.
 When an extension argument contains a C# expression, it is recreated on each
 component update so it sees the current state and parameter values.</p>
-<p>See <a href="markup-extensions.md">Markup Extensions</a> for the full value and lifecycle
+<p>See <a href="akcss/markup-extensions">Markup Extensions</a> for the full value and lifecycle
 contract.</p>
 <h2 id="conditional-utilities">Conditional utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>A utility can be applied conditionally with an expression prefix:</p>
@@ -396,7 +411,11 @@ state bool isBusy = false;
 <p>These are ordinary Avalonia markup extensions. No <code>UtilityVariantAttribute</code> is
 required. The attribute only changes conflict ordering for extensions that opt
 into it.</p>
-<p>Akbura also includes ordered breakpoint extensions:</p>
+<p>Akbura includes built-in interaction, theme, control-state, structural,
+direction, platform, and responsive variants. See
+<a href="akcss/built-in-utility-variants">Built-in Utility Variants</a> for the complete
+catalog and Avalonia mappings.</p>
+<p>It also includes ordered breakpoint extensions:</p>
 <pre><code class="language-akbura">using Akbura.Markup;
 using Akbura.Styles.akcss;
 
@@ -554,8 +573,9 @@ source-order precedence.</p>
 </tbody>
 </table>
 <p>All built-in breakpoints belong to one conflict group and use
-<code>UnprefixedUtilityPrecedence.Above</code>. Therefore the largest active breakpoint
-wins even when an unprefixed utility appears later.</p>
+<code>UnprefixedUtilityPrecedence.Above</code>. Their winning operations are installed at
+<code>BindingPriority.StyleTrigger</code>. Therefore the largest active breakpoint wins
+even when an unprefixed utility appears later.</p>
 <h2 id="conditional-declarations-inside-utilities">Conditional declarations inside utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-declarations-inside-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Utilities may also contain reactive <code>@if</code> declarations:</p>
 <pre><code class="language-akcss">@using Avalonia.Controls;
@@ -783,8 +803,8 @@ gap-4 → Spacing = 4 × 4 = 16
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
-											<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
-												Built-in Styles
+											<a href="https://asaicraft.github.io/Akbura/akcss/value-syntax" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Value Syntax
 												<!-- Heroicon name: mini/arrow-long-right -->
 												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>

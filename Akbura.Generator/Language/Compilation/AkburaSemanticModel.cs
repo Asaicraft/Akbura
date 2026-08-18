@@ -2700,6 +2700,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var startTag = markupElement.StartTag;
         if (startTag == null)
         {
+            SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
@@ -2707,6 +2708,13 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var componentNameText = componentName.ToFullString().Trim();
         if (string.IsNullOrWhiteSpace(componentNameText))
         {
+            SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
+            return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        if (markupElement.ContainsDiagnostics || IsIncompleteMarkupStartTag(startTag))
+        {
+            SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
@@ -2771,6 +2779,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                     componentName,
                     componentNameText)));
         return AkburaSymbolInfo.None(AkburaCandidateReason.NotFound);
+    }
+
+    private static bool IsIncompleteMarkupStartTag(MarkupStartTagSyntax startTag)
+    {
+        return startTag.ContainsDiagnostics || startTag.CloseToken.IsMissing;
     }
 
     private bool TryResolveMarkupPropertyElement(

@@ -2,6 +2,7 @@
 @using Akbura;
 @using Avalonia;
 @using Avalonia.Controls;
+@using Avalonia.Controls.Primitives;
 
 @utilities {
 	// Sizing. Numeric values use the shared Tailwind spacing scale.

@@ -11,4 +11,6 @@ public interface IAkburaLanguageServices
     IAkburaCompletionService Completion { get; }
 
     IAkburaQuickInfoService QuickInfo { get; }
+
+    IAkburaCodeActionService CodeActions { get; }
 }

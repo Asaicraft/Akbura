@@ -799,10 +799,18 @@ internal sealed partial class Parser
 
                     var incompleteTag = GreenSyntaxFactory.IncompleteTagSyntax(
                         candidateEndTag);
-                    body.Add(AddError(
-                        incompleteTag,
-                        ErrorCodes.ERR_SyntaxError,
-                        "start tag"));
+
+                    if (candidateEndTag.ContainsDiagnostics || candidateEndTag.GreaterToken.IsMissing)
+                    {
+                        body.Add(incompleteTag);
+                    }
+                    else
+                    {
+                        body.Add(AddError(
+                            incompleteTag,
+                            ErrorCodes.ERR_SyntaxError,
+                            "start tag"));
+                    }
                 }
 
                 openTags.Pop();

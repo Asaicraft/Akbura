@@ -7697,6 +7697,54 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_UnresolvedMarkupComponent_DoesNotReportTailwindUtilityNotFound()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<MissingControl gap-3 />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<TailwindFullAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var diagnostics = semanticModel.GetSemanticDiagnostics(element);
+
+        Assert.Contains(diagnostics, d => d.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound);
+        Assert.DoesNotContain(
+            diagnostics,
+            d => d.Code == ErrorCodes.AKBURA_SEMANTIC_TailwindUtilityNotFound);
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(semanticModel.GetOperation(attribute));
+        Assert.True(operation.HasErrors);
+        Assert.Null(operation.Utility);
+    }
+
+    [Fact]
+    public void SemanticModel_IncompleteMarkupComponent_StartTagDoesNotReportComponentNotFound()
+    {
+        const string code = "<B";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        Assert.NotNull(element.StartTag);
+        Assert.True(element.StartTag.CloseToken.IsMissing);
+
+        var symbolInfo = semanticModel.GetSymbolInfo(element);
+        var diagnostics = semanticModel.GetSemanticDiagnostics(element);
+
+        Assert.Null(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.UnsupportedSyntax, symbolInfo.CandidateReason);
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound);
+    }
+
+    [Fact]
     public void Compilation_GetSemanticModel_RejectsForeignSyntaxTree()
     {
         var ownedTree = AkburaSyntaxTree.ParseText("<Button />");

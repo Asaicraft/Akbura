@@ -2,7 +2,6 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
-using System.Text;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Workspaces;
@@ -258,44 +257,13 @@ internal static class AkburaCSharpCompletionChangeMapper
             return false;
         }
 
-        var text = CreateUsingText(added.WrittenSpan, importContext);
+        var text = AkburaUsingEditService.CreateUsingText(
+            added.WrittenSpan,
+            importContext);
         importChange = new TextChange(
             new TextSpan(importContext.InsertionPosition, 0),
             text);
         return true;
-    }
-
-    private static string CreateUsingText(
-        ReadOnlySpan<CSharpUsingKey> imports,
-        AkburaCSharpImportContext context)
-    {
-        var builder = new StringBuilder();
-        if (context.NeedsLeadingLineBreak)
-        {
-            builder.Append(context.NewLine);
-        }
-
-        for (var i = 0; i < imports.Length; i++)
-        {
-            if (i != 0)
-            {
-                builder.Append(context.NewLine);
-            }
-
-            builder.Append(context.SyntaxKind ==
-                    AkburaCSharpImportSyntaxKind.Akcss
-                ? "@using "
-                : "using ");
-            builder.Append(imports[i].Name);
-            builder.Append(';');
-        }
-
-        if (context.NeedsTrailingLineBreak)
-        {
-            builder.Append(context.NewLine);
-        }
-
-        return builder.ToString();
     }
 
     private static bool IsSubsequence(

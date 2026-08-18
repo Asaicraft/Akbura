@@ -15,6 +15,8 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
         Completion = new AkburaCompletionService();
 
         QuickInfo = new AkburaQuickInfoService(referenceResolver);
+
+        CodeActions = new AkburaCodeActionService();
     }
 
     public IAkburaClassificationService Classification { get; }
@@ -26,4 +28,6 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
     public IAkburaCompletionService Completion { get; }
 
     public IAkburaQuickInfoService QuickInfo { get; }
+
+    public IAkburaCodeActionService CodeActions { get; }
 }

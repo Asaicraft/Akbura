@@ -629,6 +629,11 @@ internal sealed partial class MarkupBinder
             }
         }
 
+        if (containingComponent?.ComponentType is null)
+        {
+            return ImmutableArray<ITailwindUtilitySymbol>.Empty;
+        }
+
         resolvedUtilityName = GetTailwindUtilityCandidateName(
             attribute,
             utilityName,

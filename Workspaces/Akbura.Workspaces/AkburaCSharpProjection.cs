@@ -400,7 +400,7 @@ internal static class AkburaCSharpProjectionFactory
             projectedActiveSpan.Start +
                 embeddedContext.RelativePosition,
             probe.StateNames,
-            CreateImportContext(syntacticDocument),
+            AkburaUsingEditService.CreateImportContext(syntacticDocument),
             syntheticSymbols.ToImmutable());
         return true;
     }
@@ -604,7 +604,7 @@ internal static class AkburaCSharpProjectionFactory
                      .OfType<Akbura.Language.Syntax.UsingDirectiveSyntax>())
         {
             if (hostUsing.FullSpan == context.OwnerSpan ||
-                IsAkcssUsingDirective(hostUsing))
+                AkburaUsingEditService.IsAkcssUsingDirective(hostUsing))
             {
                 continue;
             }
@@ -734,176 +734,6 @@ internal static class AkburaCSharpProjectionFactory
 
         mappings = builder.ToImmutable();
         return root;
-    }
-
-    private static AkburaCSharpImportContext CreateImportContext(
-        AkburaSyntacticDocument document)
-    {
-        var root = document.SyntaxTree.GetRootSyntax();
-        if (root is AkcssDocumentSyntax akcssRoot)
-        {
-            return CreateAkcssImportContext(
-                document.Text,
-                akcssRoot);
-        }
-
-        using var ordinaryUsings =
-            ImmutableArrayBuilder<Akbura.Language.Syntax.UsingDirectiveSyntax>.Rent();
-        using var globalUsings =
-            ImmutableArrayBuilder<Akbura.Language.Syntax.UsingDirectiveSyntax>.Rent();
-        var existingImports = ImmutableHashSet.CreateBuilder<CSharpUsingKey>();
-        Akbura.Language.Syntax.NamespaceDeclarationSyntax? namespaceDeclaration = null;
-        AkburaSyntax? firstTopLevelMember = null;
-
-        if (root is AkburaDocumentSyntax documentRoot)
-        {
-            foreach (var member in documentRoot.Members)
-            {
-                firstTopLevelMember ??= member;
-                if (member is Akbura.Language.Syntax.NamespaceDeclarationSyntax currentNamespace)
-                {
-                    namespaceDeclaration ??= currentNamespace;
-                    continue;
-                }
-
-                if (member is not Akbura.Language.Syntax.UsingDirectiveSyntax usingDirective ||
-                    IsAkcssUsingDirective(usingDirective))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    existingImports.Add(CSharpUsingKey.Create(
-                        usingDirective.ToCSharp()));
-                }
-                catch (Exception exception)
-                    when (exception is InvalidOperationException ||
-                          exception is ArgumentException ||
-                          exception is InvalidCastException)
-                {
-                    continue;
-                }
-
-                if (usingDirective.GlobalKeyword.RawKind != 0)
-                {
-                    globalUsings.Add(usingDirective);
-                }
-                else
-                {
-                    ordinaryUsings.Add(usingDirective);
-                }
-            }
-        }
-
-        var insertionPosition = ordinaryUsings.Count != 0
-            ? ordinaryUsings.WrittenSpan[ordinaryUsings.Count - 1].Span.End
-            : globalUsings.Count != 0
-                ? globalUsings.WrittenSpan[globalUsings.Count - 1].Span.End
-                : namespaceDeclaration != null
-                    ? namespaceDeclaration.Span.End
-                    : firstTopLevelMember?.Span.Start ?? 0;
-        var text = document.Text;
-        var needsLeadingLineBreak = insertionPosition > 0 &&
-            text[insertionPosition - 1] != '\r' &&
-            text[insertionPosition - 1] != '\n';
-        var needsTrailingLineBreak = insertionPosition < text.Length &&
-            text[insertionPosition] != '\r' &&
-            text[insertionPosition] != '\n';
-
-        return new AkburaCSharpImportContext(
-            AkburaCSharpImportSyntaxKind.Component,
-            insertionPosition,
-            DetectNewLine(text),
-            needsLeadingLineBreak,
-            needsTrailingLineBreak,
-            existingImports.ToImmutable());
-    }
-
-    private static AkburaCSharpImportContext CreateAkcssImportContext(
-        SourceText text,
-        AkcssDocumentSyntax root)
-    {
-        using var csharpUsings =
-            ImmutableArrayBuilder<AkcssUsingDirectiveSyntax>.Rent();
-        AkcssUsingDirectiveSyntax? firstModuleImport = null;
-        AkburaSyntax? firstDeclaration = null;
-        var existingImports = ImmutableHashSet.CreateBuilder<CSharpUsingKey>();
-
-        foreach (var member in root.Members)
-        {
-            if (member is AkcssUsingDirectiveSyntax usingDirective)
-            {
-                if (usingDirective.IsAkcssModuleImport)
-                {
-                    firstModuleImport ??= usingDirective;
-                    continue;
-                }
-
-                try
-                {
-                    existingImports.Add(CSharpUsingKey.Create(
-                        usingDirective.ToCSharp()));
-                    csharpUsings.Add(usingDirective);
-                }
-                catch (Exception exception)
-                    when (exception is InvalidOperationException ||
-                          exception is ArgumentException ||
-                          exception is InvalidCastException)
-                {
-                }
-
-                continue;
-            }
-
-            firstDeclaration ??= member;
-        }
-
-        var insertionPosition = csharpUsings.Count != 0
-            ? csharpUsings.WrittenSpan[csharpUsings.Count - 1].Span.End
-            : firstModuleImport?.Span.Start ??
-              firstDeclaration?.Span.Start ??
-              0;
-        var needsLeadingLineBreak = insertionPosition > 0 &&
-            text[insertionPosition - 1] != '\r' &&
-            text[insertionPosition - 1] != '\n';
-        var needsTrailingLineBreak = insertionPosition < text.Length &&
-            text[insertionPosition] != '\r' &&
-            text[insertionPosition] != '\n';
-
-        return new AkburaCSharpImportContext(
-            AkburaCSharpImportSyntaxKind.Akcss,
-            insertionPosition,
-            DetectNewLine(text),
-            needsLeadingLineBreak,
-            needsTrailingLineBreak,
-            existingImports.ToImmutable());
-    }
-
-    private static string DetectNewLine(SourceText text)
-    {
-        foreach (var line in text.Lines)
-        {
-            var lineBreakSpan = TextSpan.FromBounds(
-                line.End,
-                line.EndIncludingLineBreak);
-            if (lineBreakSpan.Length != 0)
-            {
-                return text.ToString(lineBreakSpan);
-            }
-        }
-
-        return Environment.NewLine;
-    }
-
-    private static bool IsAkcssUsingDirective(
-        Akbura.Language.Syntax.UsingDirectiveSyntax usingDirective)
-    {
-        return usingDirective.Alias == null &&
-            usingDirective.StaticKeyword.RawKind == 0 &&
-            usingDirective.Name.ToFullString()
-                .Trim()
-                .EndsWith(".akcss", StringComparison.Ordinal);
     }
 
     private readonly struct UsingMappingSource

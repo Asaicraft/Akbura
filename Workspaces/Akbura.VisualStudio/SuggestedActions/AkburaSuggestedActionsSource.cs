@@ -9,8 +9,7 @@ using System.Collections.Immutable;
 
 namespace Akbura.VisualStudio.SuggestedActions;
 
-internal sealed class AkburaSuggestedActionsSource :
-    ISuggestedActionsSource
+internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
 {
     private readonly ITextView _textView;
     private readonly ITextBuffer _textBuffer;
@@ -49,31 +48,48 @@ internal sealed class AkburaSuggestedActionsSource :
         SnapshotSpan range,
         CancellationToken cancellationToken)
     {
-        var result = await Task.Run(
-                () =>
-                {
-                    var actions = GetActions(
-                        range,
-                        cancellationToken,
-                        out var state);
-                    return new ActionQueryResult(actions, state);
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (result.State == null ||
-            Volatile.Read(ref _disposeState) != 0)
+        if (cancellationToken.IsCancellationRequested)
         {
             return false;
         }
 
-        Volatile.Write(
-            ref _cache,
-            new CachedActions(
-                result.State,
-                range,
-                result.Actions));
-        return !result.Actions.IsDefaultOrEmpty;
+        try
+        {
+            var result = await Task.Run(
+                    () =>
+                    {
+                        var actions = GetActionsHandlingCancellation(
+                            range,
+                            cancellationToken,
+                            out var state);
+
+                        return new ActionQueryResult(
+                            actions,
+                            state);
+                    })
+                .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested ||
+                result.State == null ||
+                Volatile.Read(ref _disposeState) != 0)
+            {
+                return false;
+            }
+
+            Volatile.Write(
+                ref _cache,
+                new CachedActions(
+                    result.State,
+                    range,
+                    result.Actions));
+
+            return !result.Actions.IsDefaultOrEmpty;
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     public IEnumerable<SuggestedActionSet> GetSuggestedActions(
@@ -81,7 +97,11 @@ internal sealed class AkburaSuggestedActionsSource :
         SnapshotSpan range,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Array.Empty<SuggestedActionSet>();
+        }
+
         var cache = Volatile.Read(ref _cache);
 
         ImmutableArray<AkburaCodeAction> actions;
@@ -93,7 +113,7 @@ internal sealed class AkburaSuggestedActionsSource :
         }
         else
         {
-            actions = GetActions(
+            actions = GetActionsHandlingCancellation(
                 range,
                 cancellationToken,
                 out state);
@@ -137,6 +157,26 @@ internal sealed class AkburaSuggestedActionsSource :
         _bufferContext.Changed -= OnBufferContextChanged;
         _textView.Closed -= OnTextViewClosed;
         Volatile.Write(ref _cache, null);
+    }
+
+    private ImmutableArray<AkburaCodeAction> GetActionsHandlingCancellation(
+        SnapshotSpan range,
+        CancellationToken cancellationToken,
+        out AkburaParsedBufferState? state)
+    {
+        try
+        {
+            return GetActions(
+                range,
+                cancellationToken,
+                out state);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            state = null;
+            return ImmutableArray<AkburaCodeAction>.Empty;
+        }
     }
 
     private ImmutableArray<AkburaCodeAction> GetActions(

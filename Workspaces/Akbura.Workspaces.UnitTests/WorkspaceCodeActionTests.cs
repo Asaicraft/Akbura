@@ -412,6 +412,25 @@ public sealed class WorkspaceCodeActionTests
             context.Document.Text.WithChanges(action.Changes).ToString());
     }
 
+    [Fact]
+    public void CodeAction_InsertsBeforeLeadingBlankLines()
+    {
+        const string source = "\n\n<TemplatedControl/>\n";
+        using var workspace = CreateWorkspace();
+        var context = Open(workspace, source);
+        var action = Assert.Single(GetActions(
+            workspace,
+            context,
+            source,
+            "TemplatedControl"));
+        var change = Assert.Single(action.Changes);
+
+        Assert.Equal(0, change.Span.Start);
+        Assert.Equal(
+            "using Avalonia.Controls.Primitives;" + source,
+            context.Document.Text.WithChanges(action.Changes).ToString());
+    }
+
     private static ImmutableArray<AkburaCodeAction> GetActions(
         AkburaWorkspace workspace,
         AkburaDocumentContext context,

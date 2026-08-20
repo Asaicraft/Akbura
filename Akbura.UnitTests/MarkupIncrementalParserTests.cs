@@ -796,6 +796,237 @@ public sealed class MarkupIncrementalParserTests
         Assert.Equal(newCode, incremental.ToFullString());
     }
 
+    [Fact]
+    public void CompletingStateInitializerBeforeExistingMarkup_ProducesSeparateMarkupRoot()
+    {
+        const string oldCode =
+            "state int hi = \n\n\n" +
+            "<Border>\n" +
+            "</Border>";
+        const string inserted = "1;";
+        var insertionPosition =
+            "state int hi = ".Length;
+        var newCode = oldCode.Insert(
+            insertionPosition,
+            inserted);
+        var oldSyntax = Parse(oldCode);
+
+        Assert.Equal(1, oldSyntax.Members.Count);
+
+        var oldState =
+            Assert.IsType<GreenStateDeclarationSyntax>(
+                oldSyntax.Members[0]);
+        var oldInitializer =
+            Assert.IsType<GreenSimpleStateInitializerSyntax>(
+                oldState.Initializer);
+
+        Assert.True(oldState.Semicolon.IsMissing);
+        Assert.Contains(
+            "<Border>",
+            oldInitializer.Expression.ToFullString());
+
+        var incremental = ParseIncremental(
+            newCode,
+            oldSyntax,
+            [
+                new TextChangeRange(
+                    new TextSpan(
+                        insertionPosition,
+                        length: 0),
+                    inserted.Length),
+            ]);
+
+        Assert.Equal(newCode, incremental.ToFullString());
+        Assert.Equal(2, incremental.Members.Count);
+
+        var state =
+            Assert.IsType<GreenStateDeclarationSyntax>(
+                incremental.Members[0]);
+        var initializer =
+            Assert.IsType<GreenSimpleStateInitializerSyntax>(
+                state.Initializer);
+
+        Assert.Equal(
+            "1",
+            initializer.Expression.ToFullString());
+        Assert.False(state.Semicolon.IsMissing);
+
+        var markup =
+            Assert.IsType<GreenMarkupRootSyntax>(
+                incremental.Members[1]);
+
+        Assert.Equal(
+            "Border",
+            markup.Element.StartTag!.Name.ToFullString());
+        Assert.Equal(
+            "Border",
+            markup.Element.EndTag!.Name.ToFullString());
+        AssertSameTree(
+            Parse(newCode),
+            incremental);
+    }
+
+    [Fact]
+    public void TypingComponentAndInsertingClosingTag_ProducesCompleteRoot()
+    {
+        var code = "<";
+        var syntax = Parse(code);
+
+        foreach (var character in "Border>")
+        {
+            var newCode =
+                code + character;
+
+            var change =
+                new TextChangeRange(
+                    new TextSpan(
+                        code.Length,
+                        length: 0),
+                    newLength: 1);
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [change]);
+
+            code = newCode;
+
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                Parse(code),
+                syntax);
+        }
+
+        const string closingTag =
+            "</Border>";
+
+        var codeWithClosingTag =
+            code + closingTag;
+
+        syntax = ParseIncremental(
+            codeWithClosingTag,
+            syntax,
+            [
+                new TextChangeRange(
+                new TextSpan(
+                    code.Length,
+                    length: 0),
+                closingTag.Length),
+            ]);
+
+        Assert.Equal(
+            1,
+            syntax.Members.Count);
+
+        var markup =
+            Assert.IsType<GreenMarkupRootSyntax>(
+                syntax.Members[0]);
+
+        Assert.NotNull(markup.Element.StartTag);
+
+        var startTag = markup.Element.StartTag;
+
+        Assert.Equal(
+            "Border",
+            startTag.Name.ToFullString());
+
+        Assert.Equal(
+            0,
+            startTag.Attributes.Count);
+
+        Assert.NotNull(markup.Element.EndTag);
+
+        var endTag = markup.Element.EndTag;
+
+        Assert.Equal(
+            "Border",
+            endTag.Name.ToFullString());
+
+        Assert.False(
+            markup.ContainsDiagnostics);
+
+        Assert.Equal(
+            codeWithClosingTag,
+            syntax.ToFullString());
+
+        AssertSameTree(
+            Parse(codeWithClosingTag),
+            syntax);
+    }
+
+    private static void AssertSameTree(
+        GreenNode expected,
+        GreenNode actual)
+    {
+        if (ReferenceEquals(expected, actual))
+        {
+            return;
+        }
+
+        Assert.Equal(
+            expected.Kind,
+            actual.Kind);
+
+        Assert.Equal(
+            expected.FullWidth,
+            actual.FullWidth);
+
+        Assert.Equal(
+            expected.SlotCount,
+            actual.SlotCount);
+
+        Assert.Equal(
+            expected.IsMissing,
+            actual.IsMissing);
+
+        Assert.Equal(
+            expected
+                .GetDiagnostics()
+                .Select(static diagnostic =>
+                    diagnostic.Code),
+            actual
+                .GetDiagnostics()
+                .Select(static diagnostic =>
+                    diagnostic.Code));
+
+        if (expected.SlotCount == 0)
+        {
+            Assert.Equal(
+                expected.ToFullString(),
+                actual.ToFullString());
+
+            return;
+        }
+
+        for (var i = 0;
+             i < expected.SlotCount;
+             i++)
+        {
+            var expectedChild =
+                expected.GetSlot(i);
+
+            var actualChild =
+                actual.GetSlot(i);
+
+            Assert.Equal(
+                expectedChild == null,
+                actualChild == null);
+
+            if (expectedChild == null ||
+                actualChild == null)
+            {
+                continue;
+            }
+
+            AssertSameTree(
+                expectedChild,
+                actualChild);
+        }
+    }
+
     private static GreenMarkupElementContentSyntax[] ElementContents(GreenMarkupRootSyntax markup)
     {
         var contents = new List<GreenMarkupElementContentSyntax>();

@@ -184,7 +184,7 @@ internal static class AkburaUsingEditService
                 ? globalUsings.WrittenSpan[^1].Span.End
                 : namespaceDeclaration != null
                     ? namespaceDeclaration.Span.End
-                    : firstTopLevelMember?.Span.Start ?? 0;
+                    : firstTopLevelMember?.FullSpan.Start ?? 0;
 
         return CreateContext(
             AkburaCSharpImportSyntaxKind.Component,
@@ -234,8 +234,8 @@ internal static class AkburaUsingEditService
 
         var insertionPosition = csharpUsings.Count != 0
             ? csharpUsings.WrittenSpan[^1].Span.End
-            : firstModuleImport?.Span.Start ??
-              firstDeclaration?.Span.Start ??
+            : firstModuleImport?.FullSpan.Start ??
+              firstDeclaration?.FullSpan.Start ??
               0;
 
         return CreateContext(

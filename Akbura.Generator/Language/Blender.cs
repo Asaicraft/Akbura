@@ -89,22 +89,6 @@ internal readonly partial struct Blender
         AkburaSyntax oldTree,
         TextChangeRange changeRange)
     {
-        if (oldTree == null || oldTree.FullWidth == 0)
-        {
-            return changeRange;
-        }
-
-        const int maxLookahead = 0;
-        var start = changeRange.Span.Start;
-
-        for (var i = 0; start > 0 && i < maxLookahead; i++)
-        {
-            start--;
-        }
-
-        var finalSpan = TextSpan.FromBounds(start, changeRange.Span.End);
-        var finalLength = changeRange.NewLength + (changeRange.Span.Start - start);
-
-        return new TextChangeRange(finalSpan, finalLength);
+        return changeRange;
     }
 }

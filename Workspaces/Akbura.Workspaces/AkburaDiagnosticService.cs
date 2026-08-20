@@ -2,6 +2,9 @@ using Akbura.Language;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+#if DEBUG
+using System.Diagnostics;
+#endif
 
 namespace Akbura.Workspaces;
 
@@ -37,12 +40,27 @@ internal sealed class AkburaDiagnosticService :
         }
 
         var document = context.Document;
+
+#if DEBUG
+        var totalTimer = Stopwatch.StartNew();
+        var stageTimer = Stopwatch.StartNew();
+        var activeStage = "Get syntax root";
+        var outcome = "completed";
+        var resultCount = 0;
+
+        try
+        {
+#endif
         var root = document.SyntaxTree.GetRootSyntax();
         var requested = ClampSpan(
             requestedSpan,
             document.Text.Length);
         var result = new HashSet<AkburaDiagnosticSpan>();
 
+#if DEBUG
+        activeStage = "Syntactic diagnostics";
+        stageTimer.Restart();
+#endif
         AddSyntacticDiagnostics(
             root,
             document.Text.Length,
@@ -50,11 +68,48 @@ internal sealed class AkburaDiagnosticService :
             result,
             cancellationToken);
 
+#if DEBUG
+        resultCount = result.Count;
+        WriteDiagnosticsStage(
+            document.FilePath,
+            requested,
+            activeStage,
+            stageTimer.Elapsed,
+            result.Count);
+
+        activeStage = "GetSemanticModel";
+        stageTimer.Restart();
+#endif
         var semanticModel = context.Project.Compilation
             .GetSemanticModel(document.SyntaxTree);
 
-        foreach (var diagnostic in
-                 semanticModel.GetSemanticDiagnostics(root))
+#if DEBUG
+        WriteDiagnosticsStage(
+            document.FilePath,
+            requested,
+            activeStage,
+            stageTimer.Elapsed,
+            count: null);
+
+        activeStage = "GetSemanticDiagnostics";
+        stageTimer.Restart();
+#endif
+        var semanticDiagnostics =
+            semanticModel.GetSemanticDiagnostics(root);
+
+#if DEBUG
+        WriteDiagnosticsStage(
+            document.FilePath,
+            requested,
+            activeStage,
+            stageTimer.Elapsed,
+            semanticDiagnostics.Length);
+
+        activeStage = "Map semantic diagnostics";
+        stageTimer.Restart();
+        var countBeforeMapping = result.Count;
+#endif
+        foreach (var diagnostic in semanticDiagnostics)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -66,8 +121,80 @@ internal sealed class AkburaDiagnosticService :
                 result);
         }
 
-        return ToSortedImmutableArray(result);
+#if DEBUG
+        resultCount = result.Count;
+        WriteDiagnosticsStage(
+            document.FilePath,
+            requested,
+            activeStage,
+            stageTimer.Elapsed,
+            result.Count - countBeforeMapping);
+
+        activeStage = "Sort diagnostics";
+        stageTimer.Restart();
+#endif
+        var diagnostics = ToSortedImmutableArray(result);
+
+#if DEBUG
+        resultCount = diagnostics.Length;
+        WriteDiagnosticsStage(
+            document.FilePath,
+            requested,
+            activeStage,
+            stageTimer.Elapsed,
+            diagnostics.Length);
+#endif
+
+        return diagnostics;
+#if DEBUG
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = "canceled";
+            throw;
+        }
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Diagnostics,
+                $"Semantic diagnostics total: " +
+                $"file='{document.FilePath}', " +
+                $"requestedSpan={requestedSpan}, " +
+                $"activeStage='{activeStage}', " +
+                $"outcome={outcome}, " +
+                $"elapsed={totalTimer.Elapsed.TotalMilliseconds:F2} ms, " +
+                $"diagnostics={resultCount}.");
+        }
+#endif
     }
+
+#if DEBUG
+    private static void WriteDiagnosticsStage(
+        string filePath,
+        TextSpan span,
+        string stage,
+        TimeSpan elapsed,
+        int? count)
+    {
+        var countSuffix = count is { } value
+            ? $", diagnostics={value}."
+            : ".";
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Diagnostics,
+            $"Semantic diagnostics stage: " +
+            $"file='{filePath}', " +
+            $"span={span}, " +
+            $"stage='{stage}', " +
+            $"elapsed={elapsed.TotalMilliseconds:F2} ms" +
+            countSuffix);
+    }
+#endif
 
     private static ImmutableArray<AkburaDiagnosticSpan>
         GetSyntacticDiagnostics(

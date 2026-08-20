@@ -2,6 +2,9 @@ using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+#if DEBUG
+using System.Diagnostics;
+#endif
 
 namespace Akbura.Workspaces;
 
@@ -77,15 +80,32 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
         var document = context.Document;
 
+#if DEBUG
+        var totalTimer = Stopwatch.StartNew();
+        var stageTimer = Stopwatch.StartNew();
+        var activeStage = "Clamp span";
+        var outcome = "completed";
+        var resultCount = 0;
+
+        try
+        {
+#endif
         var span = ClampSpan(requestedSpan, document.Text.Length);
 
         if (span.Length == 0)
         {
+#if DEBUG
+            activeStage = "Empty span";
+#endif
             return [];
         }
 
         var root = document.SyntaxTree.GetRootSyntax();
 
+#if DEBUG
+        activeStage = "Syntactic classifications";
+        stageTimer.Restart();
+#endif
         var syntacticSpans =
             GetSyntacticClassifications(
                 root,
@@ -93,14 +113,39 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
                 span,
                 cancellationToken);
 
+#if DEBUG
+        resultCount = syntacticSpans.Length;
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            syntacticSpans.Length);
+#endif
+
         using var semanticBuilder =
             ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
 
+#if DEBUG
+        activeStage = "GetSemanticModel";
+        stageTimer.Restart();
+#endif
         var semanticModel =
             context.Project.Compilation
                 .GetSemanticModel(
                     document.SyntaxTree);
 
+#if DEBUG
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            count: null);
+
+        activeStage = "Embedded C# classifications";
+        stageTimer.Restart();
+#endif
         _semanticCSharp.AddClassifications(
             semanticModel,
             root,
@@ -108,6 +153,18 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             semanticBuilder,
             cancellationToken);
 
+#if DEBUG
+        var csharpCount = semanticBuilder.Count;
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            csharpCount);
+
+        activeStage = "AKCSS classifications";
+        stageTimer.Restart();
+#endif
         _semanticAkcss.AddClassifications(
             context,
             semanticModel,
@@ -116,10 +173,81 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             semanticBuilder,
             cancellationToken);
 
-        return MergeClassifications(
+#if DEBUG
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            semanticBuilder.Count - csharpCount);
+
+        activeStage = "Merge classifications";
+        stageTimer.Restart();
+#endif
+        var result = MergeClassifications(
             syntacticSpans,
             semanticBuilder.ToImmutable());
+
+#if DEBUG
+        resultCount = result.Length;
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            result.Length);
+#endif
+
+        return result;
+#if DEBUG
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = "canceled";
+            throw;
+        }
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Classification,
+                $"Semantic classification total: " +
+                $"file='{document.FilePath}', " +
+                $"requestedSpan={requestedSpan}, " +
+                $"activeStage='{activeStage}', " +
+                $"outcome={outcome}, " +
+                $"elapsed={totalTimer.Elapsed.TotalMilliseconds:F2} ms, " +
+                $"spans={resultCount}.");
+        }
+#endif
     }
+
+#if DEBUG
+    private static void WriteClassificationStage(
+        string filePath,
+        TextSpan span,
+        string stage,
+        TimeSpan elapsed,
+        int? count)
+    {
+        var countSuffix = count is { } value
+            ? $", spans={value}."
+            : ".";
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Classification,
+            $"Semantic classification stage: " +
+            $"file='{filePath}', " +
+            $"span={span}, " +
+            $"stage='{stage}', " +
+            $"elapsed={elapsed.TotalMilliseconds:F2} ms" +
+            countSuffix);
+    }
+#endif
 
     private ImmutableArray<AkburaClassifiedSpan>
         GetSyntacticClassifications(

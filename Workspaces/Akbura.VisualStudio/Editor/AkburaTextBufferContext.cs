@@ -3,6 +3,9 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Threading;
+#if DEBUG
+using System.Diagnostics;
+#endif
 
 namespace Akbura.VisualStudio.Editor;
 
@@ -774,12 +777,51 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return;
             }
 
-            var state = await Task.Run(
-                    () => TryCreateParsedState(
-                        request,
-                        projectId,
-                        cancellationToken))
-                .ConfigureAwait(false);
+            AkburaParsedBufferState? state;
+#if DEBUG
+            var semanticTimer = Stopwatch.StartNew();
+            var semanticOutcome = "completed";
+
+            try
+            {
+#endif
+                state = await Task.Run(
+                        () => TryCreateParsedState(
+                            request,
+                            projectId,
+                            cancellationToken))
+                    .ConfigureAwait(false);
+#if DEBUG
+                if (state == null)
+                {
+                    semanticOutcome =
+                        cancellationToken.IsCancellationRequested
+                            ? "canceled"
+                            : "deferred";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                semanticOutcome = "canceled";
+                throw;
+            }
+            catch
+            {
+                semanticOutcome = "failed";
+                throw;
+            }
+            finally
+            {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Workspace,
+                    $"Semantic state Task.Run total: " +
+                    $"request={request.RequestVersion}, " +
+                    $"snapshot={request.Snapshot.Version.VersionNumber}, " +
+                    $"file='{_uri.LocalPath}', " +
+                    $"outcome={semanticOutcome}, " +
+                    $"elapsed={semanticTimer.Elapsed.TotalMilliseconds:F2} ms.");
+            }
+#endif
 
             if (state == null)
             {
@@ -881,15 +923,31 @@ internal sealed class AkburaTextBufferContext : IDisposable
         AkburaProjectId? projectId,
         CancellationToken cancellationToken)
     {
+#if DEBUG
+        var totalTimer = Stopwatch.StartNew();
+        var stageTimer = Stopwatch.StartNew();
+        var activeStage = "Validate request";
+        var outcome = "completed";
+        var classificationCount = 0;
+        var diagnosticCount = 0;
+#endif
+
         try
         {
             if (cancellationToken.IsCancellationRequested)
             {
+#if DEBUG
+                outcome = "canceled";
+#endif
                 return null;
             }
 
             if (projectId is not { } resolvedProjectId)
             {
+#if DEBUG
+                activeStage = "Resolve project";
+                outcome = "deferred";
+#endif
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.Workspace,
                     "Semantic state deferred: " +
@@ -897,6 +955,10 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return null;
             }
 
+#if DEBUG
+            activeStage = "OpenOrChangeDocumentContext";
+            stageTimer.Restart();
+#endif
             var context = _workspace.OpenOrChangeDocumentContext(
                 resolvedProjectId,
                 _uri,
@@ -904,6 +966,14 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 changes: null,
                 cancellationToken);
 
+#if DEBUG
+            WriteSemanticStateStage(
+                request,
+                activeStage,
+                stageTimer.Elapsed,
+                countName: null,
+                count: 0);
+#endif
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Document project: " +
@@ -913,6 +983,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
             if (cancellationToken.IsCancellationRequested)
             {
+#if DEBUG
+                outcome = "canceled";
+#endif
                 return null;
             }
 
@@ -922,6 +995,10 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     request.Snapshot,
                     context));
 
+#if DEBUG
+            activeStage = "GetClassifications";
+            stageTimer.Restart();
+#endif
             var classifications =
                 _classificationService.GetClassifications(
                     context,
@@ -930,6 +1007,18 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         length: request.Text.Length),
                     cancellationToken);
 
+#if DEBUG
+            classificationCount = classifications.Length;
+            WriteSemanticStateStage(
+                request,
+                activeStage,
+                stageTimer.Elapsed,
+                "spans",
+                classifications.Length);
+
+            activeStage = "GetDiagnostics";
+            stageTimer.Restart();
+#endif
             var diagnostics =
                 _diagnosticService.GetDiagnostics(
                     context,
@@ -938,11 +1027,26 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         length: request.Text.Length),
                     cancellationToken);
 
+#if DEBUG
+            diagnosticCount = diagnostics.Length;
+            WriteSemanticStateStage(
+                request,
+                activeStage,
+                stageTimer.Elapsed,
+                "diagnostics",
+                diagnostics.Length);
+#endif
             if (cancellationToken.IsCancellationRequested)
             {
+#if DEBUG
+                outcome = "canceled";
+#endif
                 return null;
             }
 
+#if DEBUG
+            activeStage = "Create parsed state";
+#endif
             return new AkburaParsedBufferState(
                 request.RequestVersion,
                 request.Snapshot,
@@ -954,9 +1058,57 @@ internal sealed class AkburaTextBufferContext : IDisposable
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
+#if DEBUG
+            outcome = "canceled";
+#endif
             return null;
         }
+#if DEBUG
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Semantic state computation: " +
+                $"request={request.RequestVersion}, " +
+                $"snapshot={request.Snapshot.Version.VersionNumber}, " +
+                $"file='{_uri.LocalPath}', " +
+                $"activeStage='{activeStage}', " +
+                $"outcome={outcome}, " +
+                $"elapsed={totalTimer.Elapsed.TotalMilliseconds:F2} ms, " +
+                $"spans={classificationCount}, " +
+                $"diagnostics={diagnosticCount}.");
+        }
+#endif
     }
+
+#if DEBUG
+    private void WriteSemanticStateStage(
+        UpdateRequest request,
+        string stage,
+        TimeSpan elapsed,
+        string? countName,
+        int count)
+    {
+        var countSuffix = countName == null
+            ? "."
+            : $", {countName}={count}.";
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Semantic state stage: " +
+            $"request={request.RequestVersion}, " +
+            $"snapshot={request.Snapshot.Version.VersionNumber}, " +
+            $"file='{_uri.LocalPath}', " +
+            $"stage='{stage}', " +
+            $"elapsed={elapsed.TotalMilliseconds:F2} ms" +
+            countSuffix);
+    }
+#endif
 
     private void PublishSemanticState(
         AkburaParsedBufferState state)

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
-state int counnt = 1;
+
+state int a = 0;
 
 <Border>
 

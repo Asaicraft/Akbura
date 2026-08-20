@@ -12,9 +12,9 @@ namespace Akbura.Workspaces;
 /// </summary>
 public sealed class AkburaWorkspace : IDisposable
 {
-    private readonly object _gate = new();
+    private readonly object _mutationGate = new();
     private AkburaSolutionSnapshot _currentSolution;
-    private bool _isDisposed;
+    private int _disposeState;
 
     public AkburaWorkspace()
         : this(ProjectContext.CreateSyntaxOnly())
@@ -40,16 +40,8 @@ public sealed class AkburaWorkspace : IDisposable
 
     public AkburaProjectId DefaultProjectId { get; }
 
-    public AkburaSolutionSnapshot CurrentSolution
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _currentSolution;
-            }
-        }
-    }
+    public AkburaSolutionSnapshot CurrentSolution =>
+        Volatile.Read(ref _currentSolution);
 
     public IAkburaLanguageServices LanguageServices { get; }
 
@@ -68,8 +60,10 @@ public sealed class AkburaWorkspace : IDisposable
         AkburaWorkspaceChangedEventArgs? eventArgs;
         AkburaProjectSnapshot result;
 
-        lock (_gate)
+        lock (_mutationGate)
         {
+            ThrowIfDisposed();
+
             var oldSolution = _currentSolution;
             var projectId =
                 AkburaProjectId.FromRoslyn(
@@ -97,7 +91,7 @@ public sealed class AkburaWorkspace : IDisposable
             result = newSolution.GetRequiredProject(
                 projectId);
 
-            _currentSolution = newSolution;
+            PublishSolution(newSolution);
 
             eventArgs = new AkburaWorkspaceChangedEventArgs(
                 kind,
@@ -159,8 +153,10 @@ public sealed class AkburaWorkspace : IDisposable
         AkburaWorkspaceChangedEventArgs? eventArgs = null;
         AkburaDocumentContext result;
 
-        lock (_gate)
+        lock (_mutationGate)
         {
+            ThrowIfDisposed();
+
             cancellationToken.ThrowIfCancellationRequested();
 
             var oldSolution =
@@ -210,8 +206,7 @@ public sealed class AkburaWorkspace : IDisposable
                     newSolution.GetRequiredProject(
                         projectId);
 
-                _currentSolution =
-                    newSolution;
+                PublishSolution(newSolution);
 
                 eventArgs =
                     new AkburaWorkspaceChangedEventArgs(
@@ -256,8 +251,7 @@ public sealed class AkburaWorkspace : IDisposable
                     newSolution.GetRequiredProject(
                         projectId);
 
-                _currentSolution =
-                    newSolution;
+                PublishSolution(newSolution);
 
                 eventArgs =
                     new AkburaWorkspaceChangedEventArgs(
@@ -300,8 +294,10 @@ public sealed class AkburaWorkspace : IDisposable
         AkburaWorkspaceChangedEventArgs eventArgs;
         AkburaDocumentSnapshot result;
 
-        lock (_gate)
+        lock (_mutationGate)
         {
+            ThrowIfDisposed();
+
             cancellationToken.ThrowIfCancellationRequested();
 
             var oldSolution = _currentSolution;
@@ -337,7 +333,7 @@ public sealed class AkburaWorkspace : IDisposable
             project = newSolution.GetRequiredProject(
                 projectId);
 
-            _currentSolution = newSolution;
+            PublishSolution(newSolution);
 
             eventArgs = new AkburaWorkspaceChangedEventArgs(
                 AkburaWorkspaceChangeKind.DocumentOpened,
@@ -366,8 +362,10 @@ public sealed class AkburaWorkspace : IDisposable
         AkburaWorkspaceChangedEventArgs? eventArgs = null;
         AkburaProjectSnapshot result;
 
-        lock (_gate)
+        lock (_mutationGate)
         {
+            ThrowIfDisposed();
+
             cancellationToken.ThrowIfCancellationRequested();
 
             var oldSolution = _currentSolution;
@@ -430,7 +428,7 @@ public sealed class AkburaWorkspace : IDisposable
             var newSolution = RebuildProjectReferences(
                 oldSolution.WithProject(newProject));
             result = newSolution.GetRequiredProject(projectId);
-            _currentSolution = newSolution;
+            PublishSolution(newSolution);
 
             eventArgs = new AkburaWorkspaceChangedEventArgs(
                 AkburaWorkspaceChangeKind.ProjectChanged,
@@ -458,8 +456,10 @@ public sealed class AkburaWorkspace : IDisposable
         AkburaWorkspaceChangedEventArgs eventArgs;
         AkburaDocumentSnapshot result;
 
-        lock (_gate)
+        lock (_mutationGate)
         {
+            ThrowIfDisposed();
+
             cancellationToken.ThrowIfCancellationRequested();
 
             var oldSolution = _currentSolution;
@@ -484,7 +484,7 @@ public sealed class AkburaWorkspace : IDisposable
             newProject = newSolution.GetRequiredProject(
                 project.Id);
 
-            _currentSolution = newSolution;
+            PublishSolution(newSolution);
 
             eventArgs = new AkburaWorkspaceChangedEventArgs(
                 AkburaWorkspaceChangeKind.DocumentChanged,
@@ -505,8 +505,10 @@ public sealed class AkburaWorkspace : IDisposable
 
         AkburaWorkspaceChangedEventArgs? eventArgs = null;
 
-        lock (_gate)
+        lock (_mutationGate)
         {
+            ThrowIfDisposed();
+
             var oldSolution = _currentSolution;
 
             if (!oldSolution.TryGetDocument(
@@ -533,7 +535,7 @@ public sealed class AkburaWorkspace : IDisposable
             newProject = newSolution.GetRequiredProject(
                 project.Id);
 
-            _currentSolution = newSolution;
+            PublishSolution(newSolution);
 
             eventArgs = new AkburaWorkspaceChangedEventArgs(
                 AkburaWorkspaceChangeKind.DocumentClosed,
@@ -553,8 +555,10 @@ public sealed class AkburaWorkspace : IDisposable
 
         AkburaWorkspaceChangedEventArgs? eventArgs = null;
 
-        lock (_gate)
+        lock (_mutationGate)
         {
+            ThrowIfDisposed();
+
             var oldSolution = _currentSolution;
 
             if (!oldSolution.TryGetDocument(
@@ -574,7 +578,7 @@ public sealed class AkburaWorkspace : IDisposable
                 RebuildProjectReferences(
                     oldSolution.WithProject(newProject));
 
-            _currentSolution = newSolution;
+            PublishSolution(newSolution);
 
             eventArgs = new AkburaWorkspaceChangedEventArgs(
                 AkburaWorkspaceChangeKind.DocumentRemoved,
@@ -593,12 +597,12 @@ public sealed class AkburaWorkspace : IDisposable
     {
         ThrowIfDisposed();
 
-        lock (_gate)
-        {
-            return _currentSolution.TryGetDocument(
-                documentId,
-                out document);
-        }
+        var solution = Volatile.Read(
+            ref _currentSolution);
+
+        return solution.TryGetDocument(
+            documentId,
+            out document);
     }
 
     public bool TryGetDocument(
@@ -611,20 +615,30 @@ public sealed class AkburaWorkspace : IDisposable
         }
         ThrowIfDisposed();
 
-        lock (_gate)
-        {
-            return _currentSolution.TryGetDocument(
-                uri,
-                out document);
-        }
+        var solution = Volatile.Read(
+            ref _currentSolution);
+
+        return solution.TryGetDocument(
+            uri,
+            out document);
     }
 
     public void Dispose()
     {
-        lock (_gate)
+        lock (_mutationGate)
         {
-            _isDisposed = true;
+            Volatile.Write(
+                ref _disposeState,
+                1);
         }
+    }
+
+    private void PublishSolution(
+        AkburaSolutionSnapshot solution)
+    {
+        Volatile.Write(
+            ref _currentSolution,
+            solution);
     }
 
     private static AkburaSolutionSnapshot
@@ -740,7 +754,8 @@ public sealed class AkburaWorkspace : IDisposable
 
     private void ThrowIfDisposed()
     {
-        if (_isDisposed)
+        if (Volatile.Read(
+                ref _disposeState) != 0)
         {
             throw new ObjectDisposedException(
                 nameof(AkburaWorkspace));

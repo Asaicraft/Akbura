@@ -9,12 +9,9 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
 {
     private readonly AkburaVisualStudioWorkspace _workspaceHost;
 
-    private readonly object _gate = new();
+    private ConditionalWeakTable<ITextSnapshot, ProjectionSnapshotCache> _snapshotCaches = new();
 
-    private ConditionalWeakTable<ITextSnapshot, ProjectionSnapshotCache>
-        _snapshotCaches = new();
-
-    private bool _disposed;
+    private int _disposeState;
 
     public AkburaProjectedCSharpDocumentCache(
         AkburaVisualStudioWorkspace workspaceHost)
@@ -39,20 +36,22 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
             throw new ArgumentNullException(nameof(factory));
         }
 
-        ProjectionSnapshotCache snapshotCache;
-        lock (_gate)
-        {
-            ThrowIfDisposed();
-            snapshotCache = _snapshotCaches.GetValue(
-                snapshot,
-                static _ => new ProjectionSnapshotCache());
-        }
+        ThrowIfDisposed();
+
+        var caches = Volatile.Read(
+            ref _snapshotCaches);
+
+        var snapshotCache = caches.GetValue(
+            snapshot,
+            static _ => new ProjectionSnapshotCache());
 
         var key = new ProjectionKey(
             context.OwnerKind,
             context.OwnerSpan,
             context.Kind);
+
         Task<AkburaProjectedCSharpDocument?> task;
+
         lock (snapshotCache.Gate)
         {
             if (snapshotCache.Documents.TryGetValue(key, out task!))
@@ -63,6 +62,15 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
             try
             {
                 task = factory();
+
+                if (task == null)
+                {
+                    task = Task.FromException<
+                        AkburaProjectedCSharpDocument?>(
+                            new InvalidOperationException(
+                                "The projected C# document factory " +
+                                "returned a null task."));
+                }
             }
             catch (Exception exception)
             {
@@ -81,25 +89,26 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+
         return task;
     }
 
     public void Dispose()
     {
-        lock (_gate)
+        if (Interlocked.Exchange(
+                ref _disposeState,
+                1) != 0)
         {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-            _snapshotCaches = new ConditionalWeakTable<
-                ITextSnapshot,
-                ProjectionSnapshotCache>();
+            return;
         }
 
         _workspaceHost.ProjectContextChanged -= OnProjectContextChanged;
+
+        Volatile.Write(
+            ref _snapshotCaches,
+            new ConditionalWeakTable<
+                ITextSnapshot,
+                ProjectionSnapshotCache>());
     }
 
     private static void RemoveFailedOrEmptyEntry(
@@ -129,22 +138,27 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
         }
     }
 
-    private void OnProjectContextChanged(object? sender, EventArgs eventArgs)
+    private void OnProjectContextChanged(
+        object? sender,
+        EventArgs eventArgs)
     {
-        lock (_gate)
+        if (Volatile.Read(
+                ref _disposeState) != 0)
         {
-            if (!_disposed)
-            {
-                _snapshotCaches = new ConditionalWeakTable<
-                    ITextSnapshot,
-                    ProjectionSnapshotCache>();
-            }
+            return;
         }
+
+        Volatile.Write(
+            ref _snapshotCaches,
+            new ConditionalWeakTable<
+                ITextSnapshot,
+                ProjectionSnapshotCache>());
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
+        if (Volatile.Read(
+                ref _disposeState) != 0)
         {
             throw new ObjectDisposedException(
                 nameof(AkburaProjectedCSharpDocumentCache));
@@ -159,45 +173,8 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
             Documents { get; } = new();
     }
 
-    private readonly struct ProjectionKey : IEquatable<ProjectionKey>
-    {
-        public ProjectionKey(
-            Akbura.Language.Syntax.SyntaxKind ownerKind,
-            TextSpan ownerSpan,
-            AkburaCSharpCompletionContextKind kind)
-        {
-            OwnerKind = ownerKind;
-            OwnerSpan = ownerSpan;
-            Kind = kind;
-        }
-
-        public Akbura.Language.Syntax.SyntaxKind OwnerKind { get; }
-
-        public TextSpan OwnerSpan { get; }
-
-        public AkburaCSharpCompletionContextKind Kind { get; }
-
-        public bool Equals(ProjectionKey other)
-        {
-            return OwnerKind == other.OwnerKind &&
-                OwnerSpan.Equals(other.OwnerSpan) &&
-                Kind == other.Kind;
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is ProjectionKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                var hashCode = (int)OwnerKind;
-                hashCode = (hashCode * 397) ^ OwnerSpan.GetHashCode();
-                hashCode = (hashCode * 397) ^ (int)Kind;
-                return hashCode;
-            }
-        }
-    }
+    private readonly record struct ProjectionKey(
+        Akbura.Language.Syntax.SyntaxKind OwnerKind,
+        TextSpan OwnerSpan,
+        AkburaCSharpCompletionContextKind Kind);
 }

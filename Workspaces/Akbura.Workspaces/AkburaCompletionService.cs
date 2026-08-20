@@ -499,7 +499,8 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                 semanticModel,
                 componentName!,
                 propertyElements,
-                cancellationToken));
+                cancellationToken),
+            cancellationToken);
 
         return catalog
             .Where(candidate =>
@@ -514,18 +515,17 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             .ToImmutableArray();
     }
 
-    private static ImmutableArray<CompletionMemberCandidate>
-        CreateMemberCatalog(
-            AkburaSemanticModel semanticModel,
-            string componentName,
-            bool propertyElements,
-            CancellationToken cancellationToken)
+    private static ImmutableArray<CompletionMemberCandidate> CreateMemberCatalog(
+        AkburaSemanticModel semanticModel,
+        string componentName,
+        bool propertyElements,
+        CancellationToken cancellationToken)
     {
         if (!semanticModel.TryResolveMarkupComponentForCompletion(
                 componentName,
                 out var target))
         {
-            return ImmutableArray<CompletionMemberCandidate>.Empty;
+            return [];
         }
 
         var items = new Dictionary<string, AkburaCompletionItem>(
@@ -916,38 +916,39 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
 
     private sealed class SemanticModelCompletionCache
     {
-        private readonly object _gate = new();
-        private readonly Dictionary<string,
-            ImmutableArray<CompletionMemberCandidate>> _catalogs =
-            new(StringComparer.Ordinal);
+        private ImmutableDictionary<CompletionMemberCatalogKey, ImmutableArray<CompletionMemberCandidate>> _catalogs =
+            ImmutableDictionary<CompletionMemberCatalogKey, ImmutableArray<CompletionMemberCandidate>>.Empty;
 
         public ImmutableArray<CompletionMemberCandidate> GetOrCreate(
             string componentName,
             bool propertyElements,
-            Func<ImmutableArray<CompletionMemberCandidate>> factory)
+            Func<ImmutableArray<CompletionMemberCandidate>> factory,
+            CancellationToken cancellationToken)
         {
-            var key = (propertyElements ? "P\0" : "A\0") +
-                componentName;
-            lock (_gate)
+            var key = new CompletionMemberCatalogKey(
+                componentName,
+                propertyElements);
+
+            var snapshot = Volatile.Read(ref _catalogs);
+
+            if (snapshot.TryGetValue(key, out var cached))
             {
-                if (_catalogs.TryGetValue(key, out var catalog))
-                {
-                    return catalog;
-                }
+                return cached;
             }
 
             var created = factory();
-            lock (_gate)
-            {
-                if (_catalogs.TryGetValue(key, out var catalog))
-                {
-                    return catalog;
-                }
 
-                _catalogs.Add(key, created);
-                return created;
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return ImmutableInterlocked.GetOrAdd(
+                ref _catalogs,
+                key,
+                created);
         }
+
+        private readonly record struct CompletionMemberCatalogKey(
+            string ComponentName,
+            bool PropertyElements);
     }
 
 }

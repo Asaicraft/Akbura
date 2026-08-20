@@ -12,16 +12,11 @@ namespace Akbura.Language;
 
 internal partial class AkburaSemanticModel
 {
-    private readonly object _completionAkcssPropertiesGate = new();
-    private readonly Dictionary<
-        AkcssPropertyCompletionKey,
-        ImmutableArray<AkcssPropertyLookupCandidate>>
-        _completionAkcssProperties = new();
-    private readonly object _completionAkcssApplyGate = new();
-    private readonly Dictionary<
-        TextSpan,
-        ImmutableArray<AkcssApplyLookupCandidate>>
-        _completionAkcssApplyItems = new();
+    private ImmutableDictionary<AkcssPropertyCompletionKey, ImmutableArray<AkcssPropertyLookupCandidate>> _completionAkcssProperties =
+        ImmutableDictionary<AkcssPropertyCompletionKey, ImmutableArray<AkcssPropertyLookupCandidate>>.Empty;
+
+    private ImmutableDictionary<TextSpan, ImmutableArray<AkcssApplyLookupCandidate>> _completionAkcssApplyItems =
+        ImmutableDictionary<TextSpan, ImmutableArray<AkcssApplyLookupCandidate>>.Empty;
 
     internal ImmutableArray<AkcssPropertyLookupCandidate>
         LookupAkcssPropertiesForCompletion(
@@ -49,54 +44,49 @@ internal partial class AkburaSemanticModel
             cancellationToken);
     }
 
-    private ImmutableArray<AkcssPropertyLookupCandidate>
-        LookupAkcssPropertiesForCompletion(
-            TextSpan containingDeclarationSpan,
-            string qualifier,
-            bool requireReadable,
-            CancellationToken cancellationToken)
+    private ImmutableArray<AkcssPropertyLookupCandidate> LookupAkcssPropertiesForCompletion(
+        TextSpan containingDeclarationSpan,
+        string qualifier,
+        bool requireReadable,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
         var declaration = FindAkcssCompletionDeclaration(
             containingDeclarationSpan);
+
         if (declaration == null)
         {
-            return ImmutableArray<AkcssPropertyLookupCandidate>.Empty;
+            return [];
         }
 
         var key = new AkcssPropertyCompletionKey(
             declaration.FullSpan,
             qualifier,
             requireReadable);
-        lock (_completionAkcssPropertiesGate)
+
+        var snapshot = Volatile.Read(ref _completionAkcssProperties);
+
+        if (snapshot.TryGetValue(
+                key,
+                out var cached))
         {
-            if (_completionAkcssProperties.TryGetValue(
-                    key,
-                    out var cached))
-            {
-                return cached;
-            }
+            return cached;
         }
 
-        var candidates = ComputeAkcssPropertiesForCompletion(
-            declaration,
-            qualifier,
-            requireReadable,
-            cancellationToken);
+        var candidates =
+            ComputeAkcssPropertiesForCompletion(
+                declaration,
+                qualifier,
+                requireReadable,
+                cancellationToken);
+
         cancellationToken.ThrowIfCancellationRequested();
 
-        lock (_completionAkcssPropertiesGate)
-        {
-            if (_completionAkcssProperties.TryGetValue(
-                    key,
-                    out var cached))
-            {
-                return cached;
-            }
-
-            _completionAkcssProperties.Add(key, candidates);
-            return candidates;
-        }
+        return ImmutableInterlocked.GetOrAdd(
+            ref _completionAkcssProperties,
+            key,
+            candidates);
     }
 
     internal bool TryGetAkcssValueCompletionInfo(
@@ -532,48 +522,42 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    internal ImmutableArray<AkcssApplyLookupCandidate>
-        LookupAkcssApplyItemsForCompletion(
-            TextSpan containingDeclarationSpan,
-            CancellationToken cancellationToken = default)
+    internal ImmutableArray<AkcssApplyLookupCandidate> LookupAkcssApplyItemsForCompletion(
+        TextSpan containingDeclarationSpan,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
         var declaration = FindAkcssCompletionDeclaration(
             containingDeclarationSpan);
+
         if (declaration == null)
         {
-            return ImmutableArray<AkcssApplyLookupCandidate>.Empty;
+            return [];
         }
 
-        lock (_completionAkcssApplyGate)
+        var key = declaration.FullSpan;
+
+        var snapshot = Volatile.Read(ref _completionAkcssApplyItems);
+
+        if (snapshot.TryGetValue(
+                key,
+                out var cached))
         {
-            if (_completionAkcssApplyItems.TryGetValue(
-                    declaration.FullSpan,
-                    out var cached))
-            {
-                return cached;
-            }
+            return cached;
         }
 
-        var candidates = ComputeAkcssApplyItemsForCompletion(
-            declaration,
-            cancellationToken);
+        var candidates =
+            ComputeAkcssApplyItemsForCompletion(
+                declaration,
+                cancellationToken);
+
         cancellationToken.ThrowIfCancellationRequested();
 
-        lock (_completionAkcssApplyGate)
-        {
-            if (_completionAkcssApplyItems.TryGetValue(
-                    declaration.FullSpan,
-                    out var cached))
-            {
-                return cached;
-            }
-
-            _completionAkcssApplyItems.Add(
-                declaration.FullSpan,
-                candidates);
-            return candidates;
-        }
+        return ImmutableInterlocked.GetOrAdd(
+            ref _completionAkcssApplyItems,
+            key,
+            candidates);
     }
 
     private ImmutableArray<AkcssApplyLookupCandidate>

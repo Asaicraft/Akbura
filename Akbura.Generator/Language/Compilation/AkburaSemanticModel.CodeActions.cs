@@ -33,55 +33,43 @@ internal readonly struct MarkupComponentImportCandidate
 
 internal abstract partial class AkburaSemanticModel
 {
-    private readonly object _componentImportsGate = new();
-    private readonly Dictionary<
-        string,
-        ImmutableArray<MarkupComponentImportCandidate>>
-        _componentImports = new(StringComparer.Ordinal);
+    private ImmutableDictionary<string, ImmutableArray<MarkupComponentImportCandidate>> _componentImports =
+            ImmutableDictionary.Create<string,ImmutableArray<MarkupComponentImportCandidate>>(StringComparer.Ordinal);
 
-    internal ImmutableArray<MarkupComponentImportCandidate>
-        LookupMarkupComponentImports(
-            string componentName,
-            CancellationToken cancellationToken = default)
+    internal ImmutableArray<MarkupComponentImportCandidate> LookupMarkupComponentImports(
+        string componentName,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(componentName))
         {
-            return ImmutableArray<MarkupComponentImportCandidate>.Empty;
+            return [];
         }
 
         componentName = componentName.Trim();
-        lock (_componentImportsGate)
+
+        var snapshot = Volatile.Read(ref _componentImports);
+
+        if (snapshot.TryGetValue(componentName,out var cached))
         {
-            if (_componentImports.TryGetValue(
-                    componentName,
-                    out var cached))
-            {
-                return cached;
-            }
+            return cached;
         }
 
-        var candidates = ComputeMarkupComponentImports(
+        var computed =
+            ComputeMarkupComponentImports(
+                componentName,
+                cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return ImmutableInterlocked.GetOrAdd(
+            ref _componentImports,
             componentName,
-            cancellationToken);
-
-        lock (_componentImportsGate)
-        {
-            if (_componentImports.TryGetValue(
-                    componentName,
-                    out var cached))
-            {
-                return cached;
-            }
-
-            _componentImports.Add(componentName, candidates);
-            return candidates;
-        }
+            computed);
     }
 
-    private ImmutableArray<MarkupComponentImportCandidate>
-        ComputeMarkupComponentImports(
-            string componentName,
-            CancellationToken cancellationToken)
+    private ImmutableArray<MarkupComponentImportCandidate> ComputeMarkupComponentImports(
+        string componentName,
+        CancellationToken cancellationToken)
     {
         var compilation = Compilation.CSharpProbeCompilation;
         var akburaControlType = compilation.GetTypeByMetadataName(

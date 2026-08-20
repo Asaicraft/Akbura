@@ -3,6 +3,7 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.VisualStudio.LanguageServices;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
@@ -15,21 +16,14 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 {
     private readonly VisualStudioWorkspace _visualStudioWorkspace;
 
-    private readonly object _synchronizationGate = new();
-
-    private readonly Dictionary<ProjectId, ProjectSynchronizationState>
-        _projectSynchronizations = new();
-
-    private readonly Dictionary<ProjectId, SemaphoreSlim>
-        _projectSynchronizationLocks = new();
+    private readonly ConcurrentDictionary<ProjectId, ProjectSynchronizationEntry> _projectSynchronizations = new();
 
     private readonly CancellationTokenSource _disposeCancellation = new();
 
     private int _disposeState;
 
     [ImportingConstructor]
-    public AkburaVisualStudioWorkspace(
-        VisualStudioWorkspace visualStudioWorkspace)
+    public AkburaVisualStudioWorkspace(VisualStudioWorkspace visualStudioWorkspace)
     {
         _visualStudioWorkspace =
             visualStudioWorkspace ??
@@ -117,31 +111,22 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             .GetDependentVersionAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        ProjectSynchronizationState state;
-        var startsSynchronization = false;
-        lock (_synchronizationGate)
-        {
-            if (_projectSynchronizations.TryGetValue(
-                    project.Id,
-                    out var current) &&
-                (!current.Task.IsCompleted ||
-                 current.Version.Equals(version)))
-            {
-                state = current;
-            }
-            else
-            {
-                state = new ProjectSynchronizationState(version);
-                _projectSynchronizations[project.Id] = state;
-                startsSynchronization = true;
-            }
-        }
+        var entry =
+            _projectSynchronizations.GetOrAdd(
+                project.Id,
+                static _ =>
+                    new ProjectSynchronizationEntry());
+
+        var state = entry.GetOrCreateState(
+            version,
+            out var startsSynchronization);
 
         if (startsSynchronization)
         {
             _ = CompleteProjectSynchronizationAsync(
                 project,
                 activeFilePath,
+                entry,
                 state);
         }
 
@@ -151,14 +136,13 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
     private async Task CompleteProjectSynchronizationAsync(
         Project project,
         string? activeFilePath,
+        ProjectSynchronizationEntry entry,
         ProjectSynchronizationState state)
     {
         var cancellationToken = _disposeCancellation.Token;
         try
         {
-            var synchronizationLock = GetProjectSynchronizationLock(
-                project.Id);
-            await synchronizationLock
+            await entry.SynchronizationGate
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
             try
@@ -178,25 +162,25 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                      * the next retry must be able to inspect the project
                      * again.
                      */
-                    RemoveFailedSynchronization(project.Id, state);
+                    entry.RemoveIfCurrent(state);
                 }
 
                 state.TrySetResult(result);
             }
             finally
             {
-                synchronizationLock.Release();
+                entry.SynchronizationGate.Release();
             }
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
-            RemoveFailedSynchronization(project.Id, state);
+            entry.RemoveIfCurrent(state);
             state.TrySetCanceled();
         }
         catch (Exception exception)
         {
-            RemoveFailedSynchronization(project.Id, state);
+            entry.RemoveIfCurrent(state);
             state.TrySetException(exception);
         }
     }
@@ -336,12 +320,6 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                         LanguageNames.CSharp)
                 .ToImmutableArray();
 
-        /*
-         * Prefer an explicit Roslyn document relationship.
-         *
-         * Akbura files will commonly appear as AdditionalDocuments
-         * when they are included through AdditionalFiles.
-         */
         foreach (var project in csharpProjects)
         {
             if (ContainsFile(
@@ -358,11 +336,6 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             }
         }
 
-        /*
-         * A custom project item may not be represented as a Roslyn
-         * document. In that case, choose the nearest containing
-         * project directory.
-         */
         Project? bestProject = null;
         var bestDirectoryLength = -1;
         var bestReadinessScore = -1;
@@ -895,11 +868,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 
         _disposeCancellation.Cancel();
 
-        lock (_synchronizationGate)
-        {
-            _projectSynchronizationLocks.Clear();
-            _projectSynchronizations.Clear();
-        }
+        _projectSynchronizations.Clear();
 
         Workspace.Dispose();
         ProjectContextChanged = null;
@@ -912,41 +881,6 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         if (Volatile.Read(ref _disposeState) == 0)
         {
             ProjectContextChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    private SemaphoreSlim GetProjectSynchronizationLock(
-        ProjectId projectId)
-    {
-        lock (_synchronizationGate)
-        {
-            if (!_projectSynchronizationLocks.TryGetValue(
-                    projectId,
-                    out var synchronizationLock))
-            {
-                synchronizationLock = new SemaphoreSlim(1, 1);
-                _projectSynchronizationLocks.Add(
-                    projectId,
-                    synchronizationLock);
-            }
-
-            return synchronizationLock;
-        }
-    }
-
-    private void RemoveFailedSynchronization(
-        ProjectId projectId,
-        ProjectSynchronizationState state)
-    {
-        lock (_synchronizationGate)
-        {
-            if (_projectSynchronizations.TryGetValue(
-                    projectId,
-                    out var current) &&
-                ReferenceEquals(current, state))
-            {
-                _projectSynchronizations.Remove(projectId);
-            }
         }
     }
 
@@ -977,6 +911,65 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         }
     }
 #pragma warning restore VSTHRD003
+
+    private sealed class ProjectSynchronizationEntry
+    {
+        private ProjectSynchronizationState? _current;
+
+        public SemaphoreSlim SynchronizationGate { get; } =
+            new(
+                initialCount: 1,
+                maxCount: 1);
+
+        public ProjectSynchronizationState GetOrCreateState(
+            VersionStamp version,
+            out bool created)
+        {
+            while (true)
+            {
+                var current =
+                    Volatile.Read(ref _current);
+
+                /*
+                 * While the current synchronization is running, every
+                 * request shares its task. After successful completion,
+                 * the result is reused for the same project version.
+                 */
+                if (current != null &&
+                    (!current.Task.IsCompleted ||
+                     current.Version.Equals(version)))
+                {
+                    created = false;
+                    return current;
+                }
+
+                var replacement =
+                    new ProjectSynchronizationState(
+                        version);
+                var observed =
+                    Interlocked.CompareExchange(
+                        ref _current,
+                        replacement,
+                        current);
+
+                if (ReferenceEquals(
+                        observed,
+                        current))
+                {
+                    created = true;
+                    return replacement;
+                }
+            }
+        }
+
+        public void RemoveIfCurrent(ProjectSynchronizationState state)
+        {
+            _ = Interlocked.CompareExchange(
+                ref _current,
+                value: null,
+                comparand: state);
+        }
+    }
 
     private sealed class ProjectSynchronizationState
     {

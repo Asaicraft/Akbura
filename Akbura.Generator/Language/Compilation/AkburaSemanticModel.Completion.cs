@@ -12,112 +12,95 @@ namespace Akbura.Language;
 
 internal partial class AkburaSemanticModel
 {
-    private readonly object _completionComponentsGate = new();
     private CompletionComponentCatalog? _completionComponentCatalog;
-    private readonly object _completionMarkupExtensionsGate = new();
     private CompletionMarkupExtensionCatalog? _completionMarkupExtensionCatalog;
-    private readonly object _completionTailwindUtilitiesGate = new();
-    private readonly Dictionary<
-        string,
-        ImmutableArray<TailwindUtilityLookupCandidate>>
-        _completionTailwindUtilities = new(StringComparer.Ordinal);
 
-    internal ImmutableArray<MarkupComponentLookupCandidate>
-        LookupMarkupComponents(CancellationToken cancellationToken = default)
+    private ImmutableDictionary<string, ImmutableArray<TailwindUtilityLookupCandidate>> _completionTailwindUtilities =
+        ImmutableDictionary.Create<string, ImmutableArray<TailwindUtilityLookupCandidate>>(StringComparer.Ordinal);
+
+    internal ImmutableArray<MarkupComponentLookupCandidate> LookupMarkupComponents(CancellationToken cancellationToken = default)
     {
-        var catalog = Volatile.Read(
-            ref _completionComponentCatalog);
+        var catalog = Volatile.Read(ref _completionComponentCatalog);
+
         if (catalog != null)
         {
             return catalog.Candidates;
         }
 
-        var candidates = ComputeMarkupComponents(cancellationToken);
+        var candidates =
+            ComputeMarkupComponents(
+                cancellationToken);
+
         cancellationToken.ThrowIfCancellationRequested();
 
-        lock (_completionComponentsGate)
-        {
-            catalog = _completionComponentCatalog;
-            if (catalog == null)
-            {
-                catalog = new CompletionComponentCatalog(candidates);
-                Volatile.Write(
-                    ref _completionComponentCatalog,
-                    catalog);
-            }
-        }
+        var created = new CompletionComponentCatalog(candidates);
 
-        return catalog.Candidates;
+        catalog = Interlocked.CompareExchange(
+            ref _completionComponentCatalog,
+            created,
+            comparand: null);
+
+        return (catalog ?? created).Candidates;
     }
 
-    internal ImmutableArray<MarkupExtensionLookupCandidate>
-        LookupMarkupExtensions(CancellationToken cancellationToken = default)
+    internal ImmutableArray<MarkupExtensionLookupCandidate> LookupMarkupExtensions(CancellationToken cancellationToken = default)
     {
-        var catalog = Volatile.Read(
-            ref _completionMarkupExtensionCatalog);
+        var catalog = Volatile.Read(ref _completionMarkupExtensionCatalog);
+
         if (catalog != null)
         {
             return catalog.Candidates;
         }
 
-        var candidates = ComputeMarkupExtensions(cancellationToken);
+        var candidates =
+            ComputeMarkupExtensions(
+                cancellationToken);
+
         cancellationToken.ThrowIfCancellationRequested();
 
-        lock (_completionMarkupExtensionsGate)
-        {
-            catalog = _completionMarkupExtensionCatalog;
-            if (catalog == null)
-            {
-                catalog = new CompletionMarkupExtensionCatalog(
-                    candidates);
-                Volatile.Write(
-                    ref _completionMarkupExtensionCatalog,
-                    catalog);
-            }
-        }
+        var created =
+            new CompletionMarkupExtensionCatalog(
+                candidates);
 
-        return catalog.Candidates;
+        catalog = Interlocked.CompareExchange(
+            ref _completionMarkupExtensionCatalog,
+            created,
+            comparand: null);
+
+        return (catalog ?? created).Candidates;
     }
 
-    internal ImmutableArray<TailwindUtilityLookupCandidate>
-        LookupTailwindUtilities(
-            string componentName,
-            CancellationToken cancellationToken = default)
+    internal ImmutableArray<TailwindUtilityLookupCandidate> LookupTailwindUtilities(
+        string componentName,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(componentName))
         {
-            return ImmutableArray<TailwindUtilityLookupCandidate>.Empty;
+            return [];
         }
 
-        lock (_completionTailwindUtilitiesGate)
+        componentName = componentName.Trim();
+
+        var snapshot = Volatile.Read(ref _completionTailwindUtilities);
+
+        if (snapshot.TryGetValue(
+                componentName,
+                out var cached))
         {
-            if (_completionTailwindUtilities.TryGetValue(
-                    componentName,
-                    out var cached))
-            {
-                return cached;
-            }
+            return cached;
         }
 
-        var candidates = ComputeTailwindUtilities(
-            componentName,
-            cancellationToken);
+        var candidates =
+            ComputeTailwindUtilities(
+                componentName,
+                cancellationToken);
+
         cancellationToken.ThrowIfCancellationRequested();
 
-        lock (_completionTailwindUtilitiesGate)
-        {
-            if (_completionTailwindUtilities.TryGetValue(
-                    componentName,
-                    out var cached))
-            {
-                return cached;
-            }
-
-            _completionTailwindUtilities.Add(
-                componentName,
-                candidates);
-            return candidates;
-        }
+        return ImmutableInterlocked.GetOrAdd(
+            ref _completionTailwindUtilities,
+            componentName,
+            candidates);
     }
 
     private ImmutableArray<TailwindUtilityLookupCandidate>
@@ -339,8 +322,7 @@ internal partial class AkburaSemanticModel
         CSharpBindingResult binding;
         try
         {
-            binding = BindCSharpType(
-                SyntaxFactory.ParseTypeName(name));
+            binding = BindCSharpType(SyntaxFactory.ParseTypeName(name));
         }
         catch (InvalidOperationException)
         {
@@ -477,8 +459,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private ImmutableArray<VisibleMarkupNamespace>
-        GetVisibleMarkupNamespaces()
+    private ImmutableArray<VisibleMarkupNamespace> GetVisibleMarkupNamespaces()
     {
         using var builder =
             ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();

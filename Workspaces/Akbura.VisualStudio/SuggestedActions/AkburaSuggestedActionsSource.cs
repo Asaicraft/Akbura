@@ -48,48 +48,39 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
         SnapshotSpan range,
         CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var result = await Task.Run(
+                () =>
+                {
+                    var actions = GetActions(
+                        range,
+                        cancellationToken,
+                        out var state);
+
+                    return new ActionQueryResult(
+                        actions,
+                        state);
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (result.State == null ||
+            Volatile.Read(ref _disposeState) != 0)
         {
             return false;
         }
 
-        try
-        {
-            var result = await Task.Run(
-                    () =>
-                    {
-                        var actions = GetActionsHandlingCancellation(
-                            range,
-                            cancellationToken,
-                            out var state);
+        Volatile.Write(
+            ref _cache,
+            new CachedActions(
+                result.State,
+                range,
+                result.Actions));
 
-                        return new ActionQueryResult(
-                            actions,
-                            state);
-                    })
-                .ConfigureAwait(false);
-
-            if (cancellationToken.IsCancellationRequested ||
-                result.State == null ||
-                Volatile.Read(ref _disposeState) != 0)
-            {
-                return false;
-            }
-
-            Volatile.Write(
-                ref _cache,
-                new CachedActions(
-                    result.State,
-                    range,
-                    result.Actions));
-
-            return !result.Actions.IsDefaultOrEmpty;
-        }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
+        return !result.Actions.IsDefaultOrEmpty;
     }
 
     public IEnumerable<SuggestedActionSet> GetSuggestedActions(
@@ -97,10 +88,7 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
         SnapshotSpan range,
         CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Array.Empty<SuggestedActionSet>();
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
         var cache = Volatile.Read(ref _cache);
 
@@ -113,7 +101,7 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
         }
         else
         {
-            actions = GetActionsHandlingCancellation(
+            actions = GetActions(
                 range,
                 cancellationToken,
                 out state);
@@ -157,26 +145,6 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
         _bufferContext.Changed -= OnBufferContextChanged;
         _textView.Closed -= OnTextViewClosed;
         Volatile.Write(ref _cache, null);
-    }
-
-    private ImmutableArray<AkburaCodeAction> GetActionsHandlingCancellation(
-        SnapshotSpan range,
-        CancellationToken cancellationToken,
-        out AkburaParsedBufferState? state)
-    {
-        try
-        {
-            return GetActions(
-                range,
-                cancellationToken,
-                out state);
-        }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
-        {
-            state = null;
-            return ImmutableArray<AkburaCodeAction>.Empty;
-        }
     }
 
     private ImmutableArray<AkburaCodeAction> GetActions(

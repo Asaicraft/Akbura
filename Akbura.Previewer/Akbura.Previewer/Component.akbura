@@ -1,7 +1,0 @@
-using Avalonia.Controls;
-
-state int a = 0;
-
-<Border>
-
-</Border>

@@ -78,10 +78,7 @@ internal sealed class AkburaRoslynCompletionService
         }
 
         var roslynTrigger = trigger.Reason ==
-                    CompletionTriggerReason.Insertion &&
-                !char.IsLetterOrDigit(trigger.Character) &&
-                trigger.Character != '_' &&
-                !char.IsWhiteSpace(trigger.Character)
+                CompletionTriggerReason.Insertion
             ? RoslynCompletionTrigger.CreateInsertionTrigger(
                 trigger.Character)
             : RoslynCompletionTrigger.Invoke;

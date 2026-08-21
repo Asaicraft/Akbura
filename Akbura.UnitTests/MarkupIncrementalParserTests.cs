@@ -957,6 +957,166 @@ public sealed class MarkupIncrementalParserTests
             syntax);
     }
 
+    [Fact]
+    public void
+        TypingChildBeforeExistingEndTag_MatchesFullParse()
+    {
+        var code =
+            "<StackPanel>\r\n" +
+            "\r\n" +
+            "</StackPanel>";
+
+        var syntax = Parse(code);
+        var insertionPosition =
+            code.IndexOf(
+                "</StackPanel>",
+                StringComparison.Ordinal);
+
+        const string inserted =
+            "\t<Button></Button>\r\n";
+
+        foreach (var character in inserted)
+        {
+            var newCode = code.Insert(
+                insertionPosition,
+                character.ToString());
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [
+                    new TextChangeRange(
+                        new TextSpan(
+                            insertionPosition,
+                            length: 0),
+                        newLength: 1),
+                ]);
+
+            code = newCode;
+            insertionPosition++;
+
+            var fullSyntax = Parse(code);
+
+            Assert.Equal(
+                code,
+                fullSyntax.ToFullString());
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                fullSyntax,
+                syntax);
+        }
+
+        Assert.False(
+            syntax.ContainsDiagnostics);
+    }
+
+    [Fact]
+    public void
+        TypingMarkupExpressionWithObjectInitializers_MatchesFullParse()
+    {
+        const string prefix =
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "state int count = 1;\r\n" +
+            "\r\n" +
+            "<Border>\r\n" +
+            "\t";
+
+        const string expressionBody =
+            "count % 2 == 0 \r\n" +
+            "\t\t? new Button() " +
+            "{ Content = $\"Increment {count}\" }\r\n" +
+            "\t\t: new Border() " +
+            "{ Width = 100, Height = 100 }\r\n" +
+            "\t";
+
+        const string suffix =
+            "\r\n" +
+            "</Border>";
+
+        var code =
+            prefix +
+            "{}" +
+            suffix;
+
+        var syntax = Parse(code);
+        var insertionPosition =
+            prefix.Length + 1;
+
+        foreach (var character in expressionBody)
+        {
+            var newCode = code.Insert(
+                insertionPosition,
+                character.ToString());
+
+            var change =
+                new TextChangeRange(
+                    new TextSpan(
+                        insertionPosition,
+                        length: 0),
+                    newLength: 1);
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [change]);
+
+            code = newCode;
+            insertionPosition++;
+
+            var fullSyntax = Parse(code);
+
+            Assert.Equal(
+                code,
+                fullSyntax.ToFullString());
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                fullSyntax,
+                syntax);
+        }
+
+        Assert.False(
+            syntax.ContainsDiagnostics);
+
+        var markup =
+            Assert.IsType<GreenMarkupRootSyntax>(
+                syntax.Members[
+                    syntax.Members.Count - 1]);
+
+        var inlineExpressions =
+            new List<GreenMarkupInlineExpressionSyntax>();
+        for (var i = 0; i < markup.Element.Body.Count; i++)
+        {
+            if (markup.Element.Body[i] is
+                GreenMarkupInlineExpressionSyntax expression)
+            {
+                inlineExpressions.Add(expression);
+            }
+        }
+
+        var inlineExpression =
+            Assert.Single(inlineExpressions);
+
+        Assert.False(
+            inlineExpression
+                .Expression
+                .CloseBrace
+                .IsMissing);
+
+        Assert.Equal(
+            expressionBody,
+            inlineExpression
+                .Expression
+                .Expression
+                .ToFullString());
+    }
+
     private static void AssertSameTree(
         GreenNode expected,
         GreenNode actual)

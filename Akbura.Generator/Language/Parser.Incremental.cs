@@ -1926,34 +1926,44 @@ internal sealed partial class Parser
         return ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode.InExpressionUntilSemicolon);
     }
 
-    private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode expressionMode)
+    private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpressionInMode(
+        Lexer.LexerMode expressionMode)
     {
-        if (TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(out var expression))
+        if (expressionMode != Lexer.LexerMode.InInlineExpression &&
+            TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(
+                out var expression))
         {
             return expression;
         }
 
-        var mode = _mode;
+        // Expression boundaries depend on this mode and nested delimiters.
+        var previousMode = _mode;
         _mode = expressionMode;
 
-        var token = EatToken();
-
-        _mode = mode;
-
-        if (token.Kind != SyntaxKind.CSharpRawToken)
+        try
         {
-            return GreenSyntaxFactory.CSharpExpressionSyntax(
-                GreenSyntaxFactory.CSharpRawToken(token.ToFullString()));
-        }
+            var token = EatToken();
 
-        return GreenSyntaxFactory.CSharpExpressionSyntax(
-            EnsureCSharpRawToken(
-                (GreenSyntaxToken.CSharpRawToken)token,
-                text => CSharpFactory.ParseExpression(
-                    text,
-                    offset: 0,
-                    options: null,
-                    consumeFullText: true)));
+            if (token.Kind != SyntaxKind.CSharpRawToken)
+            {
+                return GreenSyntaxFactory.CSharpExpressionSyntax(
+                    GreenSyntaxFactory.CSharpRawToken(
+                        token.ToFullString()));
+            }
+
+            return GreenSyntaxFactory.CSharpExpressionSyntax(
+                EnsureCSharpRawToken(
+                    (GreenSyntaxToken.CSharpRawToken)token,
+                    static text => CSharpFactory.ParseExpression(
+                        text,
+                        offset: 0,
+                        options: null,
+                        consumeFullText: true)));
+        }
+        finally
+        {
+            _mode = previousMode;
+        }
     }
 
     private static GreenSyntaxToken.CSharpRawToken EnsureCSharpRawToken<TNode>(
@@ -1966,7 +1976,8 @@ internal sealed partial class Parser
             return token;
         }
 
-        return GreenSyntaxFactory.CSharpRawToken(parse(token.ToFullString()));
+        var text = token.ToFullString();
+        return GreenSyntaxFactory.CSharpRawToken(text, parse(text));
     }
 
     private bool TryReadReusableIncrementalNode<TNode>(out TNode node)

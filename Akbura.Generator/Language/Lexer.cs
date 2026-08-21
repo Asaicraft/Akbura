@@ -2435,7 +2435,9 @@ internal sealed partial class Lexer : IDisposable
 
 			// no leading, trailing trivia
 			// also no diagnostics/annotations for now
-			return GreenSyntaxToken.CreateCSharpRawToken(tokenInfo.CSharpNode);
+			return tokenInfo.Text is { } rawText
+				? GreenSyntaxToken.CreateCSharpRawToken(rawText, tokenInfo.CSharpNode)
+				: GreenSyntaxToken.CreateCSharpRawToken(tokenInfo.CSharpNode);
 		}
 
 		if (tokenInfo.Kind == SyntaxKind.IdentifierToken)

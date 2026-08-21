@@ -592,6 +592,39 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void Completion_AttributeWithEmptyPrefixPreservesCompleteCatalog()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <WideControl |
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.True(result.Items.Length > 50);
+                var padding = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "Padding");
+                Assert.Equal("Padding=\"\"", padding.InsertText);
+                Assert.Empty(syntacticDocument.Text.ToString(
+                    result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
     public void Completion_AvaloniaPropertyUsesComponentType()
     {
         const string source = """
@@ -3787,6 +3820,65 @@ public sealed class WorkspaceCompletionTests
 
                 public abstract class AbstractView : Control
                 {
+                }
+
+                public sealed class WideControl : Control
+                {
+                    public object A00 { get; set; }
+                    public object A01 { get; set; }
+                    public object A02 { get; set; }
+                    public object A03 { get; set; }
+                    public object A04 { get; set; }
+                    public object A05 { get; set; }
+                    public object A06 { get; set; }
+                    public object A07 { get; set; }
+                    public object A08 { get; set; }
+                    public object A09 { get; set; }
+                    public object A10 { get; set; }
+                    public object A11 { get; set; }
+                    public object A12 { get; set; }
+                    public object A13 { get; set; }
+                    public object A14 { get; set; }
+                    public object A15 { get; set; }
+                    public object A16 { get; set; }
+                    public object A17 { get; set; }
+                    public object A18 { get; set; }
+                    public object A19 { get; set; }
+                    public object A20 { get; set; }
+                    public object A21 { get; set; }
+                    public object A22 { get; set; }
+                    public object A23 { get; set; }
+                    public object A24 { get; set; }
+                    public object A25 { get; set; }
+                    public object A26 { get; set; }
+                    public object A27 { get; set; }
+                    public object A28 { get; set; }
+                    public object A29 { get; set; }
+                    public object A30 { get; set; }
+                    public object A31 { get; set; }
+                    public object A32 { get; set; }
+                    public object A33 { get; set; }
+                    public object A34 { get; set; }
+                    public object A35 { get; set; }
+                    public object A36 { get; set; }
+                    public object A37 { get; set; }
+                    public object A38 { get; set; }
+                    public object A39 { get; set; }
+                    public object A40 { get; set; }
+                    public object A41 { get; set; }
+                    public object A42 { get; set; }
+                    public object A43 { get; set; }
+                    public object A44 { get; set; }
+                    public object A45 { get; set; }
+                    public object A46 { get; set; }
+                    public object A47 { get; set; }
+                    public object A48 { get; set; }
+                    public object A49 { get; set; }
+                    public object A50 { get; set; }
+                    public object A51 { get; set; }
+                    public object A52 { get; set; }
+                    public object A53 { get; set; }
+                    public object A54 { get; set; }
                 }
 
                 public sealed class Grid : Control

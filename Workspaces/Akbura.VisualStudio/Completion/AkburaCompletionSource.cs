@@ -354,6 +354,12 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 "C# semantic context",
                 stageTimer.Elapsed);
 
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"C# context: kind={csharpContext.Kind}, " +
+                $"hostSpan={csharpContext.HostSpan}, " +
+                $"position={csharpContext.HostPosition}.");
+
             stageTimer.Restart();
             var csharpResult = await _roslynCompletionService
                 .GetCompletionsAsync(
@@ -367,11 +373,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                 "Roslyn completion",
                 stageTimer.Elapsed);
-            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-                "Total",
-                totalTimer.Elapsed);
 
-            return csharpResult is { } roslynResult
+            stageTimer.Restart();
+            var completionContext = csharpResult is { } roslynResult
                 ? CreateRoslynCompletionContext(
                     roslynResult,
                     supplementalResult,
@@ -384,6 +388,14 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                         supplementalResult,
                         isIncomplete: true,
                         cancellationToken);
+            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+                "Map completion items",
+                stageTimer.Elapsed);
+            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+                "Total",
+                totalTimer.Elapsed);
+
+            return completionContext;
         }
 
         if (isAkcss

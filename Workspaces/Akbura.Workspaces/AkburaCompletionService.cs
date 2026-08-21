@@ -285,11 +285,7 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     triggerCompletionAfterInsert: true));
         }
 
-        return items.Values
-            .OrderBy(static item => item.SortText,
-                StringComparer.Ordinal)
-            .Take(MaximumCompletionItems)
-            .ToImmutableArray();
+        return OrderCompletionItems(items.Values, prefix);
     }
 
     private static ImmutableArray<AkburaCompletionItem>
@@ -332,11 +328,7 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     caretOffsetFromEnd: caretOffset));
         }
 
-        return items.Values
-            .OrderBy(static item => item.SortText,
-                StringComparer.Ordinal)
-            .Take(MaximumCompletionItems)
-            .ToImmutableArray();
+        return OrderCompletionItems(items.Values, prefix);
     }
 
     private static ImmutableArray<AkburaCompletionItem>
@@ -355,12 +347,9 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             context,
             cancellationToken);
 
-        return members
-            .Concat(utilities)
-            .OrderBy(static item => item.SortText,
-                StringComparer.Ordinal)
-            .Take(MaximumCompletionItems)
-            .ToImmutableArray();
+        return OrderCompletionItems(
+            members.Concat(utilities),
+            context.Prefix);
     }
 
     private static ImmutableArray<AkburaCompletionItem>
@@ -421,7 +410,6 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         return items.AsEnumerable()
             .OrderBy(static item => item.SortText,
                 StringComparer.Ordinal)
-            .Take(MaximumCompletionItems)
             .ToImmutableArray();
     }
 
@@ -511,8 +499,24 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             .Select(static candidate => candidate.Item)
             .OrderBy(static item => item.SortText,
                 StringComparer.Ordinal)
-            .Take(MaximumCompletionItems)
             .ToImmutableArray();
+    }
+
+    private static ImmutableArray<AkburaCompletionItem>
+        OrderCompletionItems(
+            IEnumerable<AkburaCompletionItem> items,
+            string prefix)
+    {
+        var ordered = items.OrderBy(
+            static item => item.SortText,
+            StringComparer.Ordinal);
+
+        // VS keeps filtering the original session after trigger characters.
+        return string.IsNullOrEmpty(prefix)
+            ? ordered.ToImmutableArray()
+            : ordered
+                .Take(MaximumCompletionItems)
+                .ToImmutableArray();
     }
 
     private static ImmutableArray<CompletionMemberCandidate> CreateMemberCatalog(

@@ -204,6 +204,13 @@ internal readonly partial struct Blender
             {
                 return true;
             }
+            if (changeSpan.IsEmpty &&
+                change.NewLength > 0 &&
+                oldSpan.Start < changeSpan.Start &&
+                changeSpan.Start < oldSpan.End)
+            {
+                return true;
+            }
 
             if (!changeSpan.IsEmpty ||
                 change.NewLength == 0 ||
@@ -222,6 +229,8 @@ internal readonly partial struct Blender
                         root.Element,
                     GreenMarkupElementSyntax element =>
                         element,
+                    GreenMarkupElementContentSyntax content =>
+                        content.Element,
                     _ => null,
                 };
 
@@ -259,12 +268,27 @@ internal readonly partial struct Blender
 
             var insertedCharacter =
                 text[insertedPosition];
+            if ((insertedCharacter == '\r' ||
+                 insertedCharacter == '\n') &&
+                (lastTerminal.Kind == SyntaxKind.GreaterThanToken ||
+                 lastTerminal.Kind == SyntaxKind.SlashGreaterToken))
+            {
+                return true;
+            }
+
+            if (underlyingNode is GreenMarkupTextLiteralSyntax &&
+                insertedCharacter != '<' &&
+                insertedCharacter != '{')
+            {
+                return true;
+            }
 
             if (lastTerminal.Kind ==
                 SyntaxKind.LessThanToken)
             {
-                return SyntaxFacts.IsIdentifierStartCharacter(
-                    insertedCharacter);
+                return insertedCharacter == '/' ||
+                    SyntaxFacts.IsIdentifierStartCharacter(
+                        insertedCharacter);
             }
 
             if (lastTerminal.Kind !=

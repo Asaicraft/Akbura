@@ -48,6 +48,51 @@ public sealed class RoslynCompletionServiceTests
             completions.ItemsList,
             static item => item.DisplayText == "count");
     }
+    [Theory]
+    [InlineData(' ', false)]
+    [InlineData('1', false)]
+    [InlineData('.', true)]
+    public async Task InsertionPreflight_UsesRoslynTriggerPolicy(
+        char triggerCharacter,
+        bool expected)
+    {
+        var source = """
+            partial class Counter
+            {
+                private int value;
+
+                private int Probe()
+                {
+                    return value|;
+                }
+            }
+            """.Replace(
+                "|",
+                triggerCharacter.ToString(),
+                StringComparison.Ordinal);
+        var position = source.IndexOf(
+            $"value{triggerCharacter}",
+            StringComparison.Ordinal) +
+            "value".Length +
+            1;
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create(
+            "CompletionPreflightTests",
+            [syntaxTree],
+            RoslynCompletionTestHost.CreatePlatformReferences(),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var shouldTrigger = await RoslynCompletionTestHost
+            .ShouldTriggerCompletionAsync(
+                compilation.RemoveSyntaxTrees(syntaxTree),
+                syntaxTree.GetCompilationUnitRoot(),
+                position,
+                triggerCharacter,
+                CancellationToken.None);
+
+        Assert.Equal(expected, shouldTrigger);
+    }
 }
 
 internal static class RoslynCompletionTestHost
@@ -86,6 +131,42 @@ internal static class RoslynCompletionTestHost
             position,
             CompletionTrigger.Invoke,
             cancellationToken: cancellationToken);
+    }
+
+    public static async Task<bool> ShouldTriggerCompletionAsync(
+        CSharpCompilation compilation,
+        Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax root,
+        int position,
+        char triggerCharacter,
+        CancellationToken cancellationToken)
+    {
+        using var workspace = new AdhocWorkspace(
+            MefHostServices.Create(s_assemblies));
+        var document = CreateDocument(
+            workspace,
+            compilation,
+            root,
+            cancellationToken);
+        var service = CompletionService.GetService(document);
+        if (service == null)
+        {
+            return false;
+        }
+
+        if (!AkburaRoslynCompletionTriggerPolicy
+                .IsSupportedInsertionCharacter(
+                    triggerCharacter))
+        {
+            return false;
+        }
+
+        var text = await document.GetTextAsync(
+            cancellationToken);
+        return service.ShouldTriggerCompletion(
+            text,
+            position,
+            CompletionTrigger.CreateInsertionTrigger(
+                triggerCharacter));
     }
 
     public static async Task<RoslynImportCompletionResult?>

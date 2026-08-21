@@ -1,0 +1,20 @@
+using Avalonia.Controls;
+using Avalonia.Media;
+
+state int count = 0;
+
+<StackPanel>
+	<Button Click={count++}>
+		Increment to {count + 1}
+	</Button>
+
+	<Border>
+		{count % 2 == 0 
+			? new Border() { Width = 100, Height = 100}
+			: new Button() { Width = 100, Height = 100, Background = Brushes.Red}
+		}
+	</Border>
+
+	
+
+</StackPanel>

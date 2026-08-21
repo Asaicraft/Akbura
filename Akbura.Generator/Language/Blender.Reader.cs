@@ -268,6 +268,15 @@ internal readonly partial struct Blender
 
             var insertedCharacter =
                 text[insertedPosition];
+
+            if (insertedCharacter is ' ' or '\t' &&
+                (lastTerminal.Kind == SyntaxKind.IdentifierToken ||
+                 SyntaxFacts.IsReservedKeyword(lastTerminal.Kind) ||
+                 SyntaxFacts.IsContextualKeyword(lastTerminal.Kind)))
+            {
+                return true;
+            }
+
             if ((insertedCharacter == '\r' ||
                  insertedCharacter == '\n') &&
                 (lastTerminal.Kind == SyntaxKind.GreaterThanToken ||
@@ -313,6 +322,12 @@ internal readonly partial struct Blender
             var node =
                 nodeOrToken.RequiredUnderlyingNode;
 
+            // Reuse cannot restore the parser's open-tag stack.
+            if (IsUnclosedMarkupElement(node))
+            {
+                return false;
+            }
+
             if (ContainsDiagnosticsOrSkippedText(node))
             {
                 return false;
@@ -339,6 +354,25 @@ internal readonly partial struct Blender
             // AKCSS also contains parser-created raw C# type and expression tokens.
             return mode == Lexer.LexerMode.InAkcss ||
                 !isCSharpRawToken;
+        }
+
+        private static bool IsUnclosedMarkupElement(GreenNode node)
+        {
+            var element =
+                node switch
+                {
+                    GreenMarkupRootSyntax root =>
+                        root.Element,
+                    GreenMarkupElementSyntax markupElement =>
+                        markupElement,
+                    GreenMarkupElementContentSyntax content =>
+                        content.Element,
+                    _ => null,
+                };
+
+            return element?.StartTag is
+                    { CloseToken.Kind: SyntaxKind.GreaterThanToken } &&
+                element.EndTag == null;
         }
 
         private static bool ExpectsCSharpRawToken(

@@ -26,13 +26,14 @@ internal sealed class AkburaRoslynCompletionService
                 nameof(projectedDocumentService));
     }
 
-    public async Task<AkburaRoslynCompletionResult?>
+    public async Task<AkburaRoslynCompletionResult>
         GetCompletionsAsync(
             ITextSnapshot snapshot,
             AkburaSyntacticDocument syntacticDocument,
             AkburaDocumentContext? semanticContext,
             AkburaCSharpCompletionContext completionContext,
             CompletionTrigger trigger,
+            bool allowNonTrigger,
             CancellationToken cancellationToken)
     {
         if (snapshot == null)
@@ -61,7 +62,7 @@ internal sealed class AkburaRoslynCompletionService
             .ConfigureAwait(false);
         if (projected == null)
         {
-            return null;
+            return AkburaRoslynCompletionResult.Unavailable;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -74,14 +75,77 @@ internal sealed class AkburaRoslynCompletionService
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Completion,
                 "Roslyn completion service was not found.");
-            return null;
+            return AkburaRoslynCompletionResult.Unavailable;
         }
 
-        var roslynTrigger = trigger.Reason ==
-                CompletionTriggerReason.Insertion
+        var isExplicit = IsExplicitTrigger(trigger);
+        var roslynTrigger = !isExplicit
             ? RoslynCompletionTrigger.CreateInsertionTrigger(
                 trigger.Character)
             : RoslynCompletionTrigger.Invoke;
+        Microsoft.CodeAnalysis.Text.SourceText? sourceText = null;
+        AkburaRoslynCompletionPreflight preflight;
+        if (isExplicit)
+        {
+            preflight =
+                AkburaRoslynCompletionTriggerPolicy.Evaluate(
+                    isExplicit: true,
+                    isIncompleteSession: false,
+                    isSupportedInsertion: false,
+                    shouldTriggerCompletion: false);
+        }
+        else if (allowNonTrigger)
+        {
+            preflight =
+                AkburaRoslynCompletionTriggerPolicy.Evaluate(
+                    isExplicit: false,
+                    isIncompleteSession: true,
+                    isSupportedInsertion: false,
+                    shouldTriggerCompletion: false);
+        }
+        else
+        {
+            var isSupportedInsertion =
+                AkburaRoslynCompletionTriggerPolicy
+                    .IsSupportedInsertionCharacter(
+                        trigger.Character);
+            if (isSupportedInsertion)
+            {
+                sourceText = await document
+                    .GetTextAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            preflight =
+                AkburaRoslynCompletionTriggerPolicy.Evaluate(
+                    isExplicit: false,
+                    isIncompleteSession: false,
+                    isSupportedInsertion,
+                    isSupportedInsertion &&
+                    completionService.ShouldTriggerCompletion(
+                        sourceText!,
+                        projection.ProjectedPosition,
+                        roslynTrigger));
+        }
+
+        if (preflight is
+            AkburaRoslynCompletionPreflight.UnsupportedInsertion or
+            AkburaRoslynCompletionPreflight.RoslynSuppressed)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"Roslyn completion suppressed: " +
+                $"preflight={preflight}, " +
+                $"insertion='{trigger.Character}'.");
+            return AkburaRoslynCompletionResult.Suppressed(
+                preflight);
+        }
+
+        sourceText ??= await document
+            .GetTextAsync(cancellationToken)
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var completionList = await completionService
             .GetCompletionsAsync(
                 document,
@@ -94,23 +158,46 @@ internal sealed class AkburaRoslynCompletionService
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Completion,
                 "Roslyn returned no completion list.");
-            return null;
+            return AkburaRoslynCompletionResult.Suppressed(
+                preflight);
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var selection =
+            AkburaRoslynCompletionItemSelector.Select(
+                completionList,
+                sourceText,
+                projection.ProjectedPosition,
+                isExplicit,
+                cancellationToken);
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Completion,
             $"Roslyn returned " +
-            $"{completionList.ItemsList.Count} raw items.");
+            $"{selection.RawItemCount} raw items, " +
+            $"selected {selection.Items.Length}, " +
+            $"prefix='{selection.Prefix}', " +
+            $"incomplete={selection.IsIncomplete}.");
 
         var state = new AkburaRoslynCompletionSessionState(
             projected,
             completionService,
             projection);
-        return new AkburaRoslynCompletionResult(
+        return AkburaRoslynCompletionResult.Completed(
             state,
-            completionList);
+            completionList,
+            selection,
+            preflight);
     }
 
+    private static bool IsExplicitTrigger(
+        CompletionTrigger trigger)
+    {
+        return trigger.Reason is
+            CompletionTriggerReason.Invoke or
+            CompletionTriggerReason.InvokeAndCommitIfUnique or
+            CompletionTriggerReason.InvokeMatchingType;
+    }
 }
 
 internal sealed class AkburaRoslynCompletionSessionState
@@ -142,17 +229,69 @@ internal sealed class AkburaRoslynCompletionSessionState
 
 internal readonly struct AkburaRoslynCompletionResult
 {
-    public AkburaRoslynCompletionResult(
-        AkburaRoslynCompletionSessionState state,
-        RoslynCompletionList list)
+    private AkburaRoslynCompletionResult(
+        AkburaRoslynCompletionResultKind kind,
+        AkburaRoslynCompletionPreflight preflight,
+        AkburaRoslynCompletionSessionState? state,
+        RoslynCompletionList? list,
+        AkburaRoslynCompletionSelection selection)
     {
+        Kind = kind;
+        Preflight = preflight;
         State = state;
         List = list;
+        Selection = selection;
     }
 
-    public AkburaRoslynCompletionSessionState State { get; }
+    public static AkburaRoslynCompletionResult Unavailable { get; } =
+        new(
+            AkburaRoslynCompletionResultKind.Unavailable,
+            AkburaRoslynCompletionPreflight.Unavailable,
+            state: null,
+            list: null,
+            selection: default);
 
-    public RoslynCompletionList List { get; }
+    public AkburaRoslynCompletionResultKind Kind { get; }
+
+    public AkburaRoslynCompletionPreflight Preflight { get; }
+
+    public AkburaRoslynCompletionSessionState? State { get; }
+
+    public RoslynCompletionList? List { get; }
+
+    public AkburaRoslynCompletionSelection Selection { get; }
+
+    public static AkburaRoslynCompletionResult Suppressed(
+        AkburaRoslynCompletionPreflight preflight)
+    {
+        return new AkburaRoslynCompletionResult(
+            AkburaRoslynCompletionResultKind.Suppressed,
+            preflight,
+            state: null,
+            list: null,
+            selection: default);
+    }
+
+    public static AkburaRoslynCompletionResult Completed(
+        AkburaRoslynCompletionSessionState state,
+        RoslynCompletionList list,
+        AkburaRoslynCompletionSelection selection,
+        AkburaRoslynCompletionPreflight preflight)
+    {
+        return new AkburaRoslynCompletionResult(
+            AkburaRoslynCompletionResultKind.Completed,
+            preflight,
+            state ?? throw new ArgumentNullException(nameof(state)),
+            list ?? throw new ArgumentNullException(nameof(list)),
+            selection);
+    }
+}
+
+internal enum AkburaRoslynCompletionResultKind
+{
+    Unavailable,
+    Suppressed,
+    Completed,
 }
 
 internal sealed class AkburaRoslynCompletionItemData

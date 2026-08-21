@@ -86,7 +86,7 @@ internal sealed class AkburaCompletionSourceProvider :
         return textView.Properties
             .GetOrCreateSingletonProperty(
                 () => new AkburaCompletionSource(
-                    buffer,
+                    textView,
                     documentKind,
                     bufferContext,
                     _workspaceHost.Workspace

@@ -1015,6 +1015,173 @@ public sealed class MarkupIncrementalParserTests
 
     [Fact]
     public void
+        ConvertingSelfClosingChildToPairedElement_MatchesFullParse()
+    {
+        var code =
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "state int a = 0;\r\n" +
+            "\r\n" +
+            "<StackPanel>\r\n" +
+            "\t<Button/>\r\n" +
+            "</StackPanel>";
+
+        var syntax = Parse(code);
+
+        void ApplyChange(
+            string updatedCode,
+            TextChangeRange change)
+        {
+            syntax = ParseIncremental(
+                updatedCode,
+                syntax,
+                [change]);
+
+            code = updatedCode;
+
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                Parse(code),
+                syntax);
+        }
+
+        var slashPosition =
+            code.IndexOf(
+                "/>",
+                StringComparison.Ordinal);
+
+        var updatedCode =
+            code.Insert(
+                slashPosition,
+                " ");
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    slashPosition,
+                    length: 0),
+                newLength: 1));
+
+        var spacePosition =
+            code.IndexOf(
+                " />",
+                StringComparison.Ordinal);
+
+        updatedCode =
+            code.Remove(
+                spacePosition,
+                count: 1);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    spacePosition,
+                    length: 1),
+                newLength: 0));
+
+        slashPosition =
+            code.IndexOf(
+                "/>",
+                StringComparison.Ordinal);
+
+        updatedCode =
+            code.Remove(
+                slashPosition,
+                count: 1);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    slashPosition,
+                    length: 1),
+                newLength: 0));
+
+        var insertionPosition =
+            code.IndexOf(
+                "</StackPanel>",
+                StringComparison.Ordinal);
+
+        const string blankLine =
+            "\r\n";
+
+        updatedCode =
+            code.Insert(
+                insertionPosition,
+                blankLine);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    insertionPosition,
+                    length: 0),
+                blankLine.Length));
+
+        insertionPosition +=
+            blankLine.Length;
+
+        const string indentationAndLess =
+            "\t\t<";
+
+        updatedCode =
+            code.Insert(
+                insertionPosition,
+                indentationAndLess);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    insertionPosition,
+                    length: 0),
+                indentationAndLess.Length));
+
+        insertionPosition +=
+            indentationAndLess.Length;
+
+        foreach (var character in "/Button>")
+        {
+            updatedCode =
+                code.Insert(
+                    insertionPosition,
+                    character.ToString());
+
+            ApplyChange(
+                updatedCode,
+                new TextChangeRange(
+                    new TextSpan(
+                        insertionPosition,
+                        length: 0),
+                    newLength: 1));
+
+            insertionPosition++;
+        }
+
+        updatedCode =
+            code.Insert(
+                insertionPosition,
+                "\r\n");
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    insertionPosition,
+                    length: 0),
+                newLength: 2));
+
+        Assert.False(
+            syntax.ContainsDiagnostics);
+    }
+
+    [Fact]
+    public void
         TypingMarkupExpressionWithObjectInitializers_MatchesFullParse()
     {
         const string prefix =

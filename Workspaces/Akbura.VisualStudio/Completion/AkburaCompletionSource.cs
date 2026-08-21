@@ -8,12 +8,16 @@ using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
+using Microsoft.VisualStudio.Text.Editor;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Akbura.VisualStudio.Completion;
 
-internal sealed class AkburaCompletionSource : IAsyncCompletionSource
+internal sealed class AkburaCompletionSource :
+    IAsyncCompletionSource,
+    IDisposable
 {
     private static readonly ImmutableArray<char>
         ComponentCommitCharacters = ['>', ' ', '\t', '\n'];
@@ -81,6 +85,43 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         CreateImageElement(
             KnownMonikers.IntellisenseKeyword,
             "Keyword");
+
+    private static readonly ImageElement ExtensionMethodIcon =
+        CreateImageElement(
+            KnownMonikers.ExtensionMethod,
+            "Extension method");
+
+    private static readonly ImageElement MethodIcon =
+        CreateImageElement(KnownMonikers.Method, "Method");
+
+    private static readonly ImageElement LocalVariableIcon =
+        CreateImageElement(
+            KnownMonikers.LocalVariable,
+            "Local variable");
+
+    private static readonly ImageElement NamespaceIcon =
+        CreateImageElement(KnownMonikers.Namespace, "Namespace");
+
+    private static readonly ImageElement EnumIcon =
+        CreateImageElement(KnownMonikers.Enumeration, "Enum");
+
+    private static readonly ImageElement DelegateIcon =
+        CreateImageElement(KnownMonikers.Delegate, "Delegate");
+
+    private static readonly ImageElement ConstantIcon =
+        CreateImageElement(KnownMonikers.Constant, "Constant");
+
+    private static readonly ImageElement ClassIcon =
+        CreateImageElement(KnownMonikers.Class, "Class");
+
+    private static readonly ImageElement StructureIcon =
+        CreateImageElement(KnownMonikers.Structure, "Structure");
+
+    private static readonly ImageElement InterfaceIcon =
+        CreateImageElement(KnownMonikers.Interface, "Interface");
+
+    private static readonly ImageElement FieldIcon =
+        CreateImageElement(KnownMonikers.Field, "Field");
 
     private static readonly CompletionFilter ComponentFilter =
         new("Components", "C", ComponentIcon);
@@ -164,6 +205,8 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             new(KeywordFilter, isAvailable: true),
         ];
 
+    private readonly ITextView _textView;
+
     private readonly ITextBuffer _buffer;
 
     private readonly AkburaEditorDocumentKind _documentKind;
@@ -177,16 +220,28 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private readonly AkburaRoslynCompletionService
         _roslynCompletionService;
 
+    private readonly AkburaLatestRequestCancellation
+        _completionRequests = new();
+
+    private readonly ConditionalWeakTable<
+        IAsyncCompletionSession,
+        CompletionSessionState> _sessionStates = new();
+
+    private int _completionSnapshotVersion = -1;
+
+    private int _disposeState;
+
     public AkburaCompletionSource(
-        ITextBuffer buffer,
+        ITextView textView,
         AkburaEditorDocumentKind documentKind,
         AkburaTextBufferContext bufferContext,
         IAkburaCompletionService completionService,
         AkburaParserService parserService,
         AkburaRoslynCompletionService roslynCompletionService)
     {
-        _buffer = buffer ??
-            throw new ArgumentNullException(nameof(buffer));
+        _textView = textView ??
+            throw new ArgumentNullException(nameof(textView));
+        _buffer = textView.TextBuffer;
         _documentKind = documentKind;
         _bufferContext = bufferContext ??
             throw new ArgumentNullException(
@@ -200,6 +255,9 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         _roslynCompletionService = roslynCompletionService ??
             throw new ArgumentNullException(
                 nameof(roslynCompletionService));
+
+        _buffer.Changed += OnBufferChanged;
+        _textView.Closed += OnTextViewClosed;
     }
 
     public CompletionStartData InitializeCompletion(
@@ -273,164 +331,300 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         SnapshotSpan applicableToSpan,
         CancellationToken cancellationToken)
     {
+        var snapshot = triggerLocation.Snapshot;
+        using var request =
+            _completionRequests.Begin(cancellationToken);
+        var requestToken = request.Token;
+        Volatile.Write(
+            ref _completionSnapshotVersion,
+            snapshot.Version.VersionNumber);
+#if DEBUG
         var totalTimer = Stopwatch.StartNew();
-        var snapshot =
-            triggerLocation.Snapshot;
-
-        var position =
-            triggerLocation.Position;
-
-        AkburaWorkspaceDiagnostics.Write(
-            AkburaWorkspaceDiagnostics.Category.Completion,
-            $"Context requested: " +
-            $"position={position}, " +
-            $"snapshot={snapshot.Version.VersionNumber}.");
-
         var stageTimer = Stopwatch.StartNew();
-        var syntacticDocument =
-            await _parserService
-                .GetSyntacticDocumentAsync(snapshot)
-                .ConfigureAwait(false);
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Syntax document", stageTimer.Elapsed);
+        var outcome = "completed";
+        var roslynStatus = "not-requested";
+        var preflight = "not-requested";
+        var truncated = false;
+        var rawItemCount = 0;
+        var selectedItemCount = 0;
+        var mappedItemCount = 0;
+#endif
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        stageTimer.Restart();
-        var isAkcss = _documentKind ==
-            AkburaEditorDocumentKind.Akcss;
-        var syntaxContext = isAkcss
-            ? default
-            : syntacticDocument.GetCompletionContext(
-                position,
-                cancellationToken);
-        var akcssContext = isAkcss
-            ? syntacticDocument.GetAkcssCompletionContext(
-                position,
-                cancellationToken)
-            : default;
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Syntax context", stageTimer.Elapsed);
-
-        AkburaWorkspaceDiagnostics.Write(
-            AkburaWorkspaceDiagnostics.Category.Completion,
-            $"Syntax context: " +
-            $"kind={(isAkcss ? akcssContext.Kind.ToString() : syntaxContext.Kind.ToString())}, " +
-            $"prefix='{(isAkcss ? akcssContext.Prefix : syntaxContext.Prefix)}'.");
-
-        stageTimer.Restart();
-        if (syntacticDocument.TryGetCSharpCompletionContext(
-                position,
-                out var csharpContext,
-                cancellationToken))
+        try
         {
-            var semanticContext = GetLatestSemanticContext(
-                snapshot);
-            var supplementalResult = isAkcss
-                ? akcssContext.Kind is
-                    AkcssCompletionContextKind.PropertyValue or
-                    AkcssCompletionContextKind.AttachedPropertyExpression or
-                    AkcssCompletionContextKind.AkcssModuleName
-                    ? _completionService.GetCompletions(
-                        syntacticDocument,
-                        semanticContext,
-                        position,
-                        cancellationToken)
-                    : default
-                : csharpContext.Kind ==
-                    AkburaCSharpCompletionContextKind.UsingDirectiveName
-                    ? _completionService.GetCompletions(
-                        syntacticDocument,
-                        semanticContext,
-                        position,
-                        cancellationToken)
-                    : syntaxContext.Kind ==
-                        AkburaCompletionContextKind.TopLevel
-                        ? _completionService.GetCompletions(
-                            syntacticDocument,
-                            semanticContext: null,
-                            position,
-                            cancellationToken)
-                        : default;
-            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-                "C# semantic context",
-                stageTimer.Elapsed);
+            EnsureCurrent(request, snapshot);
+
+            var position = triggerLocation.Position;
 
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Completion,
-                $"C# context: kind={csharpContext.Kind}, " +
-                $"hostSpan={csharpContext.HostSpan}, " +
-                $"position={csharpContext.HostPosition}.");
+                $"Context requested: " +
+                $"position={position}, " +
+                $"snapshot={snapshot.Version.VersionNumber}.");
 
-            stageTimer.Restart();
-            var csharpResult = await _roslynCompletionService
-                .GetCompletionsAsync(
-                    snapshot,
-                    syntacticDocument,
-                    semanticContext,
-                    csharpContext,
-                    trigger,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            var syntacticDocument =
+                await _parserService
+                    .GetSyntacticDocumentAsync(snapshot)
+                    .ConfigureAwait(false);
+#if DEBUG
             AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-                "Roslyn completion",
+                "Syntax document",
                 stageTimer.Elapsed);
+#endif
 
+            EnsureCurrent(request, snapshot);
+
+#if DEBUG
             stageTimer.Restart();
-            var completionContext = csharpResult is { } roslynResult
-                ? CreateRoslynCompletionContext(
-                    roslynResult,
-                    supplementalResult,
-                    csharpContext.Kind,
-                    cancellationToken)
-                : supplementalResult.IsEmpty
-                    ? CreateIncompleteCompletionContext()
-                    : CreateCoreCompletionContext(
+#endif
+            var isAkcss = _documentKind ==
+                AkburaEditorDocumentKind.Akcss;
+            var syntaxContext = isAkcss
+                ? default
+                : syntacticDocument.GetCompletionContext(
+                    position,
+                    requestToken);
+            var akcssContext = isAkcss
+                ? syntacticDocument.GetAkcssCompletionContext(
+                    position,
+                    requestToken)
+                : default;
+#if DEBUG
+            AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+                "Syntax context",
+                stageTimer.Elapsed);
+#endif
+
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"Syntax context: " +
+                $"kind={(isAkcss ? akcssContext.Kind.ToString() : syntaxContext.Kind.ToString())}, " +
+                $"prefix='{(isAkcss ? akcssContext.Prefix : syntaxContext.Prefix)}'.");
+
+#if DEBUG
+            stageTimer.Restart();
+#endif
+            if (syntacticDocument.TryGetCSharpCompletionContext(
+                    position,
+                    out var csharpContext,
+                    requestToken))
+            {
+                var sessionState = _sessionStates.GetValue(
+                    session,
+                    static _ => new CompletionSessionState());
+                var semanticContext = GetLatestSemanticContext(
+                    snapshot);
+                var supplementalResult = isAkcss
+                    ? akcssContext.Kind is
+                        AkcssCompletionContextKind.PropertyValue or
+                        AkcssCompletionContextKind.AttachedPropertyExpression or
+                        AkcssCompletionContextKind.AkcssModuleName
+                        ? _completionService.GetCompletions(
+                            syntacticDocument,
+                            semanticContext,
+                            position,
+                            requestToken)
+                        : default
+                    : csharpContext.Kind ==
+                        AkburaCSharpCompletionContextKind.UsingDirectiveName
+                        ? _completionService.GetCompletions(
+                            syntacticDocument,
+                            semanticContext,
+                            position,
+                            requestToken)
+                        : syntaxContext.Kind ==
+                            AkburaCompletionContextKind.TopLevel
+                            ? _completionService.GetCompletions(
+                                syntacticDocument,
+                                semanticContext: null,
+                                position,
+                                requestToken)
+                            : default;
+#if DEBUG
+                AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+                    "C# semantic context",
+                    stageTimer.Elapsed);
+#endif
+
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Completion,
+                    $"C# context: kind={csharpContext.Kind}, " +
+                    $"hostSpan={csharpContext.HostSpan}, " +
+                    $"position={csharpContext.HostPosition}.");
+
+                EnsureCurrent(request, snapshot);
+
+#if DEBUG
+                stageTimer.Restart();
+#endif
+                var csharpResult = await _roslynCompletionService
+                    .GetCompletionsAsync(
                         snapshot,
-                        supplementalResult,
-                        isIncomplete: true,
-                        cancellationToken);
+                        syntacticDocument,
+                        semanticContext,
+                        csharpContext,
+                        trigger,
+                        sessionState.AllowNonTrigger,
+                        requestToken)
+                    .ConfigureAwait(false);
+#if DEBUG
+                roslynStatus = csharpResult.Kind.ToString();
+                preflight = csharpResult.Preflight.ToString();
+                AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+                    "Roslyn completion",
+                    stageTimer.Elapsed);
+#endif
+
+                EnsureCurrent(request, snapshot);
+
+#if DEBUG
+                stageTimer.Restart();
+#endif
+                CompletionContext completionContext;
+                switch (csharpResult.Kind)
+                {
+                    case AkburaRoslynCompletionResultKind.Completed:
+                    {
+                        var isIncomplete =
+                            csharpResult.Selection.IsIncomplete ||
+                            csharpContext.Kind ==
+                                AkburaCSharpCompletionContextKind
+                                    .UsingDirectiveName;
+                        completionContext =
+                            CreateRoslynCompletionContext(
+                                csharpResult,
+                                supplementalResult,
+                                isIncomplete,
+                                request,
+                                snapshot,
+                                out var mappedCount);
+                        sessionState.SetAllowNonTrigger(isIncomplete);
+#if DEBUG
+                        rawItemCount =
+                            csharpResult.Selection.RawItemCount;
+                        selectedItemCount =
+                            csharpResult.Selection.Items.Length;
+                        mappedItemCount = mappedCount;
+                        truncated =
+                            csharpResult.Selection.IsIncomplete;
+#endif
+                        break;
+                    }
+
+                    case AkburaRoslynCompletionResultKind.Suppressed:
+                        sessionState.SetAllowNonTrigger(
+                            supplementalResult.IsIncomplete);
+                        completionContext =
+                            supplementalResult.IsEmpty
+                                ? CompletionContext.Empty
+                                : CreateCoreCompletionContext(
+                                    snapshot,
+                                    supplementalResult,
+                                    supplementalResult.IsIncomplete,
+                                    requestToken);
+                        break;
+
+                    default:
+                        sessionState.SetAllowNonTrigger(true);
+                        completionContext =
+                            supplementalResult.IsEmpty
+                                ? CreateIncompleteCompletionContext()
+                                : CreateCoreCompletionContext(
+                                    snapshot,
+                                    supplementalResult,
+                                    isIncomplete: true,
+                                    requestToken);
+                        break;
+                }
+
+                EnsureCurrent(request, snapshot);
+#if DEBUG
+                AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+                    "Map completion items",
+                    stageTimer.Elapsed);
+#endif
+
+                return completionContext;
+            }
+
+            if (isAkcss
+                    ? akcssContext.IsDefault
+                    : syntaxContext.IsDefault)
+            {
+                return CompletionContext.Empty;
+            }
+
+#if DEBUG
+            stageTimer.Restart();
+#endif
+            var documentContext = GetLatestSemanticContext(
+                snapshot);
+#if DEBUG
             AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-                "Map completion items",
+                "Semantic context",
                 stageTimer.Elapsed);
+#endif
+
+            EnsureCurrent(request, snapshot);
+
+#if DEBUG
+            stageTimer.Restart();
+#endif
+            var result =
+                _completionService.GetCompletions(
+                    syntacticDocument,
+                    documentContext,
+                    position,
+                    requestToken);
+#if DEBUG
             AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-                "Total",
-                totalTimer.Elapsed);
+                "Core completion",
+                stageTimer.Elapsed);
+#endif
 
-            return completionContext;
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"Core returned " +
+                $"{result.Items.Length} items.");
+
+            EnsureCurrent(request, snapshot);
+            return CreateCoreCompletionContext(
+                snapshot,
+                result,
+                result.IsIncomplete,
+                requestToken);
         }
-
-        if (isAkcss
-                ? akcssContext.IsDefault
-                : syntaxContext.IsDefault)
+        catch (OperationCanceledException)
         {
-            return CompletionContext.Empty;
+#if DEBUG
+            outcome = "canceled";
+#endif
+            throw;
         }
-
-        stageTimer.Restart();
-        var documentContext = GetLatestSemanticContext(
-            snapshot);
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Semantic context", stageTimer.Elapsed);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        stageTimer.Restart();
-        var result =
-            _completionService.GetCompletions(
-                syntacticDocument,
-                documentContext,
-                position,
-                cancellationToken);
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Core completion", stageTimer.Elapsed);
-
-        AkburaWorkspaceDiagnostics.Write(
-            AkburaWorkspaceDiagnostics.Category.Completion,
-            $"Core returned " +
-            $"{result.Items.Length} items.");
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Total", totalTimer.Elapsed);
-        return CreateCoreCompletionContext(
-            snapshot,
-            result,
-            result.IsIncomplete,
-            cancellationToken);
+        catch
+        {
+#if DEBUG
+            outcome = "failed";
+#endif
+            throw;
+        }
+        finally
+        {
+#if DEBUG
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+                $"Completion request: " +
+                $"snapshot={snapshot.Version.VersionNumber}, " +
+                $"outcome={outcome}, " +
+                $"roslyn={roslynStatus}, " +
+                $"preflight={preflight}, " +
+                $"truncated={truncated}, " +
+                $"raw={rawItemCount}, " +
+                $"selected={selectedItemCount}, " +
+                $"mapped={mappedItemCount}, " +
+                $"elapsed={totalTimer.Elapsed.TotalMilliseconds:F2} ms.");
+#endif
+        }
     }
 
     public async Task<object> GetDescriptionAsync(
@@ -484,22 +678,55 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
     private CompletionContext CreateRoslynCompletionContext(
         AkburaRoslynCompletionResult result,
         AkburaCompletionResult supplementalResult,
-        AkburaCSharpCompletionContextKind csharpContextKind,
-        CancellationToken cancellationToken)
+        bool isIncomplete,
+        AkburaLatestRequest request,
+        ITextSnapshot snapshot,
+        out int mappedItemCount)
     {
-        var snapshot = result.State.HostSnapshot;
+        var state = result.State ??
+            throw new InvalidOperationException(
+                "Completed Roslyn result has no session state.");
+        var list = result.List ??
+            throw new InvalidOperationException(
+                "Completed Roslyn result has no completion list.");
+        var selectedItems = result.Selection.Items;
         using var items = ImmutableArrayBuilder<CompletionItem>.Rent(
-            result.List.ItemsList.Count +
+            selectedItems.Length +
             supplementalResult.Items.Length);
+        var defaultCommitCharacters = AddCompletionGestures(
+            list.Rules.DefaultCommitCharacters);
+        Dictionary<
+            Microsoft.CodeAnalysis.Completion.CompletionItemRules,
+            ImmutableArray<char>>? customCommitCharacters = null;
+        var mappedSpans = new Dictionary<
+            Microsoft.CodeAnalysis.Text.TextSpan,
+            SnapshotSpan?>();
 
-        foreach (var completion in result.List.ItemsList)
+        foreach (var completion in selectedItems)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!result.State.Projection.TryMapToHost(
+            EnsureCurrent(request, snapshot);
+
+            if (!mappedSpans.TryGetValue(
                     completion.Span,
-                    out var hostSpan) ||
-                hostSpan.Start < 0 ||
-                hostSpan.End > snapshot.Length)
+                    out var applicableSpan))
+            {
+                applicableSpan = state.Projection.TryMapToHost(
+                        completion.Span,
+                        out var hostSpan) &&
+                    hostSpan.Start >= 0 &&
+                    hostSpan.End <= snapshot.Length
+                        ? new SnapshotSpan(
+                            snapshot,
+                            new Span(
+                                hostSpan.Start,
+                                hostSpan.Length))
+                        : null;
+                mappedSpans.Add(
+                    completion.Span,
+                    applicableSpan);
+            }
+
+            if (applicableSpan == null)
             {
                 continue;
             }
@@ -514,7 +741,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 displayText: completion.DisplayText,
                 source: this,
                 icon: GetRoslynIcon(
-                    result.State.Projection,
+                    state.Projection,
                     completion),
                 filters: ImmutableArray<CompletionFilter>.Empty,
                 suffix,
@@ -524,19 +751,17 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
                 automationText: completion.DisplayText,
                 attributeIcons: ImmutableArray<ImageElement>.Empty,
                 commitCharacters: GetRoslynCommitCharacters(
-                    result.List,
-                    completion),
-                applicableToSpan: new SnapshotSpan(
-                    snapshot,
-                    new Span(
-                        hostSpan.Start,
-                        hostSpan.Length)),
+                    list,
+                    completion,
+                    defaultCommitCharacters,
+                    ref customCommitCharacters),
+                applicableToSpan: applicableSpan.Value,
                 isCommittedAsSnippet: false,
                 isPreselected: false);
             item.Properties.AddProperty(
                 AkburaCompletionProperties.RoslynItem,
                 new AkburaRoslynCompletionItemData(
-                    result.State,
+                    state,
                     completion));
             items.Add(item);
         }
@@ -550,7 +775,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         {
             foreach (var completion in supplementalResult.Items)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                EnsureCurrent(request, snapshot);
                 if (ContainsDisplayText(
                         items.WrittenSpan,
                         completion.DisplayText))
@@ -565,6 +790,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             }
         }
 
+        mappedItemCount = items.Count;
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Completion,
             $"Combined completion contains {items.Count} mapped items " +
@@ -574,8 +800,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         return new CompletionContext(
             items.ToImmutable(),
             ImmutableArray<CompletionFilterWithState>.Empty,
-            isIncomplete: csharpContextKind ==
-                AkburaCSharpCompletionContextKind.UsingDirectiveName);
+            isIncomplete);
     }
 
     private CompletionContext CreateCoreCompletionContext(
@@ -669,13 +894,25 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
     private static ImmutableArray<char> GetRoslynCommitCharacters(
         Microsoft.CodeAnalysis.Completion.CompletionList list,
-        Microsoft.CodeAnalysis.Completion.CompletionItem item)
+        Microsoft.CodeAnalysis.Completion.CompletionItem item,
+        ImmutableArray<char> defaultCommitCharacters,
+        ref Dictionary<
+            Microsoft.CodeAnalysis.Completion.CompletionItemRules,
+            ImmutableArray<char>>? cache)
     {
-        var rules = item.Rules.CommitCharacterRules;
+        var itemRules = item.Rules;
+        var rules = itemRules.CommitCharacterRules;
         if (rules.IsDefaultOrEmpty)
         {
-            return AddCompletionGestures(
-                list.Rules.DefaultCommitCharacters);
+            return defaultCommitCharacters;
+        }
+
+        cache ??= [];
+        if (cache.TryGetValue(
+                itemRules,
+                out var cachedCharacters))
+        {
+            return cachedCharacters;
         }
 
         var characters = new HashSet<char>(
@@ -704,9 +941,11 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
         characters.Add('\t');
         characters.Add('\n');
-        return characters
+        var result = characters
             .OrderBy(static character => character)
             .ToImmutableArray();
+        cache.Add(itemRules, result);
+        return result;
     }
 
     private static ImmutableArray<char> AddCompletionGestures(
@@ -741,6 +980,76 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
             ImmutableArray<CompletionItem>.Empty,
             ImmutableArray<CompletionFilterWithState>.Empty,
             isIncomplete: true);
+    }
+
+    private void EnsureCurrent(
+        AkburaLatestRequest request,
+        ITextSnapshot snapshot)
+    {
+        var cancellationToken = request.Token;
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (request.IsCurrent &&
+            ReferenceEquals(
+                snapshot,
+                _buffer.CurrentSnapshot))
+        {
+            return;
+        }
+
+        request.Cancel();
+        throw new OperationCanceledException(
+            cancellationToken);
+    }
+
+    private void OnBufferChanged(
+        object? sender,
+        TextContentChangedEventArgs eventArgs)
+    {
+        if (Volatile.Read(
+                ref _completionSnapshotVersion) !=
+            eventArgs.After.Version.VersionNumber)
+        {
+            _completionRequests.CancelCurrent();
+        }
+    }
+
+    private void OnTextViewClosed(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        Dispose();
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(
+                ref _disposeState,
+                1) != 0)
+        {
+            return;
+        }
+
+        _buffer.Changed -=
+            OnBufferChanged;
+        _textView.Closed -= OnTextViewClosed;
+        _completionRequests.Dispose();
+    }
+
+    private sealed class CompletionSessionState
+    {
+        private int _allowNonTrigger;
+
+        public bool AllowNonTrigger =>
+            Volatile.Read(ref _allowNonTrigger) != 0;
+
+        public void SetAllowNonTrigger(
+            bool value)
+        {
+            Volatile.Write(
+                ref _allowNonTrigger,
+                value ? 1 : 0);
+        }
     }
 
     private static bool ShouldParticipate(
@@ -873,16 +1182,12 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
         var tags = item.Tags;
         if (tags.Contains("ExtensionMethod"))
         {
-            return CreateImageElement(
-                KnownMonikers.ExtensionMethod,
-                "Extension method");
+            return ExtensionMethodIcon;
         }
 
         if (tags.Contains("Method"))
         {
-            return CreateImageElement(
-                KnownMonikers.Method,
-                "Method");
+            return MethodIcon;
         }
 
         if (tags.Contains("Property"))
@@ -892,9 +1197,7 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
         if (tags.Contains("Local"))
         {
-            return CreateImageElement(
-                KnownMonikers.LocalVariable,
-                "Local variable");
+            return LocalVariableIcon;
         }
 
         if (tags.Contains("Parameter"))
@@ -904,72 +1207,52 @@ internal sealed class AkburaCompletionSource : IAsyncCompletionSource
 
         if (tags.Contains("Namespace"))
         {
-            return CreateImageElement(
-                KnownMonikers.Namespace,
-                "Namespace");
+            return NamespaceIcon;
         }
 
         if (tags.Contains("Enum"))
         {
-            return CreateImageElement(
-                KnownMonikers.Enumeration,
-                "Enum");
+            return EnumIcon;
         }
 
         if (tags.Contains("Delegate"))
         {
-            return CreateImageElement(
-                KnownMonikers.Delegate,
-                "Delegate");
+            return DelegateIcon;
         }
 
         if (tags.Contains("Constant"))
         {
-            return CreateImageElement(
-                KnownMonikers.Constant,
-                "Constant");
+            return ConstantIcon;
         }
 
         if (tags.Contains("Keyword"))
         {
-            return CreateImageElement(
-                KnownMonikers.IntellisenseKeyword,
-                "Keyword");
+            return KeywordIcon;
         }
 
         if (tags.Contains("Class"))
         {
-            return CreateImageElement(
-                KnownMonikers.Class,
-                "Class");
+            return ClassIcon;
         }
 
         if (tags.Contains("Structure"))
         {
-            return CreateImageElement(
-                KnownMonikers.Structure,
-                "Structure");
+            return StructureIcon;
         }
 
         if (tags.Contains("Interface"))
         {
-            return CreateImageElement(
-                KnownMonikers.Interface,
-                "Interface");
+            return InterfaceIcon;
         }
 
         if (tags.Contains("Field"))
         {
-            return CreateImageElement(
-                KnownMonikers.Field,
-                "Field");
+            return FieldIcon;
         }
 
         if (tags.Contains("Event"))
         {
-            return CreateImageElement(
-                KnownMonikers.Event,
-                "Event");
+            return EventIcon;
         }
 
         return PropertyIcon;

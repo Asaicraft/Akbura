@@ -288,19 +288,43 @@ internal sealed class AkburaCompletionSource :
             $"snapshot={triggerLocation.Snapshot.Version.VersionNumber}.");
 
         var snapshot = triggerLocation.Snapshot;
+        var position = triggerLocation.Position;
+        var isAkcss =
+            _documentKind == AkburaEditorDocumentKind.Akcss;
         var isUsingDirectiveName =
             AkburaMarkupEditingFacts.IsUsingDirectiveNamePosition(
                 snapshot,
-                triggerLocation.Position,
-                _documentKind == AkburaEditorDocumentKind.Akcss);
-        var start = triggerLocation.Position;
-        while (start > 0 &&
-               AkburaMarkupEditingFacts
-                   .IsCompletionNameCharacter(
-                       snapshot[start - 1]))
+                position,
+                isAkcss);
+        var isMarkupNamePosition =
+            isAkcss ||
+            !isUsingDirectiveName &&
+            AkburaMarkupEditingFacts.IsPotentialCompletionPosition(
+                snapshot,
+                position);
+
+        var start = position;
+        while (start > 0)
         {
-            if (isUsingDirectiveName &&
-                snapshot[start - 1] is '.' or ':')
+            var character = snapshot[start - 1];
+            if (isUsingDirectiveName)
+            {
+                if (character is '.' or ':' ||
+                    !AkburaMarkupEditingFacts
+                        .IsCompletionNameCharacter(character))
+                {
+                    break;
+                }
+            }
+            else if (isMarkupNamePosition)
+            {
+                if (!AkburaMarkupEditingFacts
+                        .IsCompletionNameCharacter(character))
+                {
+                    break;
+                }
+            }
+            else if (!IsCSharpCompletionNameCharacter(character))
             {
                 break;
             }
@@ -321,7 +345,13 @@ internal sealed class AkburaCompletionSource :
                 snapshot,
                 Span.FromBounds(
                     start,
-                    triggerLocation.Position)));
+                    position)));
+    }
+
+    private static bool IsCSharpCompletionNameCharacter(char character)
+    {
+        return char.IsLetterOrDigit(character) ||
+            character is '_' or '@';
     }
 
     public async Task<CompletionContext> GetCompletionContextAsync(
@@ -1080,7 +1110,7 @@ internal sealed class AkburaCompletionSource :
         }
 
         if (trigger.Character is
-            '<' or '/' or ' ' or '.' or ':')
+            '<' or '/' or ' ' or '.' or ':' or ',')
         {
             return true;
         }

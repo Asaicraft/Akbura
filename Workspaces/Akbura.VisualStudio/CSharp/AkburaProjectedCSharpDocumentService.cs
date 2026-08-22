@@ -98,12 +98,13 @@ internal sealed class AkburaProjectedCSharpDocumentService : IDisposable
                 semanticContext,
                 context,
                 out var projection,
+                out var failureReason,
                 cancellationToken))
         {
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.CSharp,
-                "Projection could not be created for " +
-                "the current embedded C# fragment.");
+                "Projection could not be created: " +
+                failureReason);
             return null;
         }
 

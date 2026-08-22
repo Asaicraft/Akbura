@@ -134,6 +134,8 @@ public sealed class CompletionPerformancePolicyTests
     [InlineData('\t', false)]
     [InlineData('1', false)]
     [InlineData('.', true)]
+    [InlineData('{', false)]
+    [InlineData(',', true)]
     [InlineData('a', true)]
     public void Preflight_FiltersMeaninglessInsertionCharacters(
         char character,

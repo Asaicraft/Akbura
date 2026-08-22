@@ -51,7 +51,8 @@ internal static class AkburaRoslynCompletionTriggerPolicy
     {
         return character != '\0' &&
             !char.IsWhiteSpace(character) &&
-            !char.IsDigit(character);
+            !char.IsDigit(character) &&
+            character != '{';
     }
 }
 

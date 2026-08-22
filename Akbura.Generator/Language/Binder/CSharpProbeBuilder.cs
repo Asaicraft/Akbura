@@ -89,16 +89,19 @@ internal sealed class CSharpProbeBuilder
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
-        var annotatedExpression = expression
+        var placeholder = CSharpSyntaxFactory
+            .IdentifierName("__akbura_completion_target")
             .WithAdditionalAnnotations(annotation);
         var root = CreateReturnExpressionProbe(
             scope,
-            annotatedExpression,
+            placeholder,
+            expression,
             targetType: null,
             includeAllVisibleSymbols: true);
-        return CreateProjection(
+
+        return CreateExpressionProjectionCore(
             root,
-            annotatedExpression,
+            expression,
             annotation,
             relativePosition);
     }
@@ -281,19 +284,35 @@ internal sealed class CSharpProbeBuilder
         ITypeSymbol? targetType,
         bool includeAllVisibleSymbols)
     {
+        return CreateReturnExpressionProbe(
+            scope,
+            expression,
+            expression,
+            targetType,
+            includeAllVisibleSymbols);
+    }
+
+    private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
+        AkburaSyntax scope,
+        CSharp.ExpressionSyntax probeExpression,
+        SyntaxNode completionScopeNode,
+        ITypeSymbol? targetType,
+        bool includeAllVisibleSymbols)
+    {
         var precedingLocals = GetPrecedingLocalDeclarations(scope);
         var containingMethod = GetContainingComponentMethodProbe(scope);
         var excludedNames = GetParameterNames(containingMethod);
         var probeScope = includeAllVisibleSymbols
             ? _binder.CreateCompletionProbeScope(
                 scope,
-                expression,
+                completionScopeNode,
                 excludedNames)
             : _binder.CreateProbeScope(
                 scope,
-                expression,
+                completionScopeNode,
                 excludedNames);
-        var returnStatement = CSharpSyntaxFactory.ReturnStatement(expression);
+        var returnStatement = CSharpSyntaxFactory.ReturnStatement(
+            probeExpression);
         var returnType = targetType == null
             ? CSharpSyntaxFactory.PredefinedType(
                 CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword))
@@ -411,6 +430,56 @@ internal sealed class CSharpProbeBuilder
                     .Single();
             }
         }
+
+        return CreateProjectionResult(
+            root,
+            projectedNode,
+            annotation,
+            relativePosition);
+    }
+
+    private static CSharpProbeProjection CreateExpressionProjectionCore(
+        CSharp.CompilationUnitSyntax root,
+        CSharp.ExpressionSyntax sourceExpression,
+        SyntaxAnnotation annotation,
+        int relativePosition)
+    {
+        if (relativePosition < 0 ||
+            relativePosition > sourceExpression.FullSpan.Length)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(relativePosition));
+        }
+
+        // Keep incomplete user code out of NormalizeWhitespace().
+        var normalizedRoot = root.NormalizeWhitespace();
+        var placeholder = normalizedRoot
+            .GetAnnotatedNodes(annotation)
+            .OfType<CSharp.ExpressionSyntax>()
+            .Single();
+        var projectedExpression = sourceExpression
+            .WithAdditionalAnnotations(annotation);
+        root = normalizedRoot.ReplaceNode(
+            placeholder,
+            projectedExpression);
+        var projectedNode = root
+            .GetAnnotatedNodes(annotation)
+            .OfType<CSharp.ExpressionSyntax>()
+            .Single();
+
+        return CreateProjectionResult(
+            root,
+            projectedNode,
+            annotation,
+            relativePosition);
+    }
+
+    private static CSharpProbeProjection CreateProjectionResult(
+        CSharp.CompilationUnitSyntax root,
+        SyntaxNode projectedNode,
+        SyntaxAnnotation annotation,
+        int relativePosition)
+    {
         var stateNames = root
             .GetAnnotatedNodes(
                 CSharpProbeBinder.StateCompletionAnnotationKind)

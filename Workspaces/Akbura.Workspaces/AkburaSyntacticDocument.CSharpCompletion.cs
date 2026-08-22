@@ -103,12 +103,21 @@ public sealed partial class AkburaSyntacticDocument
             {
                 case CSharpExpressionSyntax expression
                     when IsCSharpExpressionContext(expression):
-                    AddCandidate(
-                        AkburaCSharpCompletionContextKind.Expression,
-                        expression,
-                        expression.Tokens.FullSpan,
-                        priority: 0);
+                {
+                    if (EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                            expression,
+                            out _,
+                            out var hostSpan))
+                    {
+                        AddCandidate(
+                            AkburaCSharpCompletionContextKind.Expression,
+                            expression,
+                            hostSpan,
+                            priority: 0);
+                    }
+
                     break;
+                }
 
                 case CSharpTypeSyntax type:
                     if (TryGetCSharpTypeContext(

@@ -275,6 +275,25 @@ internal static class AkburaCSharpProjectionFactory
         out AkburaCSharpProjection projection,
         CancellationToken cancellationToken = default)
     {
+        return TryCreate(
+            syntacticDocument,
+            semanticContext,
+            embeddedContext,
+            out projection,
+            out _,
+            cancellationToken);
+    }
+
+    public static bool TryCreate(
+        AkburaSyntacticDocument syntacticDocument,
+        AkburaDocumentContext semanticContext,
+        AkburaEmbeddedCSharpContext embeddedContext,
+        out AkburaCSharpProjection projection,
+        out string? failureReason,
+        CancellationToken cancellationToken = default)
+    {
+        failureReason = null;
+
         if (syntacticDocument == null)
         {
             throw new ArgumentNullException(nameof(syntacticDocument));
@@ -291,6 +310,8 @@ internal static class AkburaCSharpProjectionFactory
                 out semanticContext))
         {
             projection = null!;
+            failureReason =
+                "current-semantic-context-unavailable";
             return false;
         }
 
@@ -343,19 +364,17 @@ internal static class AkburaCSharpProjectionFactory
                     "The C# completion context is not supported."),
             };
         }
-        catch (InvalidOperationException)
+        catch (Exception exception)
+            when (exception is
+                InvalidOperationException or
+                ArgumentException or
+                InvalidCastException)
         {
             projection = null!;
-            return false;
-        }
-        catch (ArgumentException)
-        {
-            projection = null!;
-            return false;
-        }
-        catch (InvalidCastException)
-        {
-            projection = null!;
+            failureReason =
+                exception.GetType().Name +
+                ": " +
+                exception.Message;
             return false;
         }
 
@@ -365,6 +384,10 @@ internal static class AkburaCSharpProjectionFactory
             embeddedContext.HostSpan.Length)
         {
             projection = null!;
+            failureReason =
+                "span-length-mismatch: " +
+                $"host={embeddedContext.HostSpan.Length}, " +
+                $"projected={probe.ProjectedSpan.Length}";
             return false;
         }
 
@@ -412,7 +435,11 @@ internal static class AkburaCSharpProjectionFactory
     {
         var syntax = FindSyntax<CSharpExpressionSyntax>(root, context);
         if (syntax == null ||
-            syntax.Tokens.FullSpan != context.HostSpan)
+            !EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                syntax,
+                out _,
+                out var hostSpan) ||
+            hostSpan != context.HostSpan)
         {
             throw new InvalidOperationException(
                 "The C# expression no longer matches the current document.");

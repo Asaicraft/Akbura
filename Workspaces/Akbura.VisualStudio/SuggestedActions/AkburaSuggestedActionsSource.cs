@@ -48,24 +48,33 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
         SnapshotSpan range,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
 
         var result = await Task.Run(
                 () =>
                 {
-                    var actions = GetActions(
-                        range,
-                        cancellationToken,
-                        out var state);
+                    if (!TryGetActions(
+                            range,
+                            cancellationToken,
+                            out var actions,
+                            out var state))
+                    {
+                        return default(ActionQueryResult);
+                    }
 
                     return new ActionQueryResult(
                         actions,
                         state);
-                },
-                cancellationToken)
+                })
             .ConfigureAwait(false);
 
-        cancellationToken.ThrowIfCancellationRequested();
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
 
         if (result.State == null ||
             Volatile.Read(ref _disposeState) != 0)
@@ -88,7 +97,10 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
         SnapshotSpan range,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Array.Empty<SuggestedActionSet>();
+        }
 
         var cache = Volatile.Read(ref _cache);
 
@@ -101,13 +113,19 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
         }
         else
         {
-            actions = GetActions(
-                range,
-                cancellationToken,
-                out state);
+            if (!TryGetActions(
+                    range,
+                    cancellationToken,
+                    out actions,
+                    out state))
+            {
+                return Array.Empty<SuggestedActionSet>();
+            }
         }
 
-        if (state == null || actions.IsDefaultOrEmpty)
+        if (cancellationToken.IsCancellationRequested ||
+            state == null ||
+            actions.IsDefaultOrEmpty)
         {
             return Array.Empty<SuggestedActionSet>();
         }
@@ -181,6 +199,41 @@ internal sealed class AkburaSuggestedActionsSource : ISuggestedActionsSource
                 semanticRange.Start.Position,
                 semanticRange.Length),
             cancellationToken);
+    }
+
+    private bool TryGetActions(
+        SnapshotSpan range,
+        CancellationToken cancellationToken,
+        out ImmutableArray<AkburaCodeAction> actions,
+        out AkburaParsedBufferState? state)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            actions = ImmutableArray<AkburaCodeAction>.Empty;
+            state = null;
+            return false;
+        }
+
+        try
+        {
+            actions = GetActions(
+                range,
+                cancellationToken,
+                out state);
+
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                return true;
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+
+        actions = ImmutableArray<AkburaCodeAction>.Empty;
+        state = null;
+        return false;
     }
 
     private void OnBufferContextChanged(

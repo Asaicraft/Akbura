@@ -673,6 +673,85 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("Grid")]
+    [InlineData("Grid.")]
+    [InlineData("Grid.Ro")]
+    public void Completion_AttributeOffersVisibleAttachedProperty(
+        string prefix)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            "<Button " +
+            prefix +
+            "|/>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, count: 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var row = Assert.Single(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.Row");
+
+                Assert.Equal("Grid.Row=\"\"", row.InsertText);
+                Assert.Equal(1, row.CaretOffsetFromEnd);
+                Assert.Equal(
+                    prefix,
+                    syntacticDocument.Text.ToString(
+                        result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
+    public void Completion_AttributeIncludesCompleteAttachedPropertyCatalog()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Button |/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, count: 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Grid.Row");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Grid.Column");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Grid.RowSpan");
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Grid.ColumnSpan");
+            });
+    }
+
     [Fact]
     public void Completion_AttributeWithEmptyPrefixPreservesCompleteCatalog()
     {
@@ -1871,6 +1950,96 @@ public sealed class WorkspaceCompletionTests
                     1,
                     localNames.Count(static name =>
                         name == "length"));
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "new Border() { | }",
+        "Width")]
+    [InlineData(
+        "count % 2 == 0 " +
+        "? new Border() { Wid| } " +
+        ": new Button() { }",
+        "Width")]
+    [InlineData(
+        "count % 2 == 0 " +
+        "? new Border() { } " +
+        ": new Button() { Hei| }",
+        "Height")]
+    public void CSharpProjection_ObjectInitializersSupportCompletion(
+        string expressionWithCaret,
+        string expectedItem)
+    {
+        var source =
+            "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            "state int count = 0;\n\n" +
+            "<Border>\n" +
+            "    {" +
+            expressionWithCaret +
+            "}\n" +
+            "</Border>";
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Expression,
+                    context.Kind);
+                Assert.Equal(
+                    context.HostSpan.Length,
+                    projection.ProjectedSpan.Length);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    expectedItem);
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "? new But|",
+        "Button")]
+    [InlineData(
+        "? new Button() { Wid| }",
+        "Width")]
+    public void CSharpProjection_MultilineConditionalWithIndentedClosingBrace(
+        string branchWithCaret,
+        string expectedItem)
+    {
+        var source =
+            "namespace Gallery;\r\n" +
+            "\r\n" +
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "state int count = 0;\r\n" +
+            "\r\n" +
+            "<StackPanel>\r\n" +
+            "\t<Border>\r\n" +
+            "\t\t{count % 2 == 0\r\n" +
+            "\t\t\t" +
+            branchWithCaret +
+            "\r\n" +
+            "\t\t}\r\n" +
+            "\t</Border>\r\n" +
+            "</StackPanel>\r\n";
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Expression,
+                    context.Kind);
+                Assert.Equal(
+                    context.HostSpan.Length,
+                    projection.ProjectedSpan.Length);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    expectedItem);
             });
     }
 
@@ -4002,6 +4171,10 @@ public sealed class WorkspaceCompletionTests
                 {
                 }
 
+                public sealed class Button : Control
+                {
+                }
+
                 public abstract class AbstractView : Control
                 {
                 }
@@ -4073,11 +4246,21 @@ public sealed class WorkspaceCompletionTests
                         Avalonia.AttachedProperty<int> RowProperty = new();
 
                     public static readonly
+                        Avalonia.AttachedProperty<int> ColumnProperty = new();
+
+                    public static readonly
                         Avalonia.AttachedProperty<int> RowSpanProperty = new();
+
+                    public static readonly
+                        Avalonia.AttachedProperty<int> ColumnSpanProperty = new();
 
                     public static int GetRow(Control control) => 0;
 
+                    public static int GetColumn(Control control) => 0;
+
                     public static int GetRowSpan(Control control) => 0;
+
+                    public static int GetColumnSpan(Control control) => 0;
 
                     public static void SetRow(
                         Control control,
@@ -4085,7 +4268,19 @@ public sealed class WorkspaceCompletionTests
                     {
                     }
 
+                    public static void SetColumn(
+                        Control control,
+                        int value)
+                    {
+                    }
+
                     public static void SetRowSpan(
+                        Control control,
+                        int value)
+                    {
+                    }
+
+                    public static void SetColumnSpan(
                         Control control,
                         int value)
                     {

@@ -16,9 +16,27 @@ internal static class EmbeddedCSharpSyntaxFacts
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        hostSpan = syntax.Tokens.FullSpan;
         expression = syntax.GetRawCSharpExpression()!;
-        return expression != null;
+        if (expression == null)
+        {
+            hostSpan = default;
+            return false;
+        }
+
+        // Map the Roslyn node's exact span, excluding Akbura trailing trivia
+        // while retaining skipped C# trivia used during incomplete input.
+        var tokensFullSpan = syntax.Tokens.FullSpan;
+        var expressionFullSpan = expression.FullSpan;
+        if (expressionFullSpan.End > tokensFullSpan.Length)
+        {
+            hostSpan = default;
+            return false;
+        }
+
+        hostSpan = new TextSpan(
+            tokensFullSpan.Start + expressionFullSpan.Start,
+            expressionFullSpan.Length);
+        return true;
     }
 
     public static bool TryGetStatement(

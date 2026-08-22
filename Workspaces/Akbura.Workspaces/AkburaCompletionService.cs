@@ -400,14 +400,78 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             context,
             propertyElements: false,
             cancellationToken);
+        var attachedProperties = GetAttachedPropertyItems(
+            semanticModel,
+            context,
+            cancellationToken);
         var utilities = GetTailwindUtilityItems(
             semanticModel,
             context,
             cancellationToken);
 
         return OrderCompletionItems(
-            members.Concat(utilities),
+            members
+                .Concat(attachedProperties)
+                .Concat(utilities),
             context.Prefix);
+    }
+
+    private static ImmutableArray<AkburaCompletionItem>
+        GetAttachedPropertyItems(
+            AkburaSemanticModel semanticModel,
+            AkburaSyntacticCompletionContext context,
+            CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(context.ComponentName))
+        {
+            return [];
+        }
+
+        var existing = new HashSet<string>(
+            context.ExistingAttributeNames,
+            StringComparer.Ordinal);
+        using var items =
+            ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
+
+        foreach (var candidate in semanticModel
+                     .LookupMarkupAttachedPropertiesForCompletion(
+                         context.ComponentName!,
+                         cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (existing.Contains(candidate.DisplayName) ||
+                !MatchesPrefix(
+                    candidate.DisplayName,
+                    context.Prefix))
+            {
+                continue;
+            }
+
+            const int priority = 40;
+            items.Add(
+                new AkburaCompletionItem(
+                    candidate.DisplayName,
+                    candidate.DisplayName + "=\"\"",
+                    AkburaCompletionKind.Property,
+                    candidate.TypeDisplay +
+                        " " +
+                        candidate.DisplayName +
+                        Environment.NewLine +
+                        "Attached property declared by " +
+                        candidate.OwnerTypeDisplay +
+                        ".",
+                    descriptionFactory: null,
+                    filterText: candidate.DisplayName,
+                    sortText:
+                        $"{priority:D2}_{candidate.DisplayName}",
+                    suffix:
+                        candidate.TypeDisplay +
+                        " (attached)",
+                    priority: priority,
+                    caretOffsetFromEnd: 1));
+        }
+
+        return items.ToImmutable();
     }
 
     private static ImmutableArray<AkburaCompletionItem>

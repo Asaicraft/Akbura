@@ -261,7 +261,7 @@ Control.w-(double width) {
 }
 ```
 
-See [Markup Extensions](/akcss/markup-extensions) for resource lookup and generated binding behavior.
+See [Markup Extensions](akcss/markup-extensions) for resource lookup and generated binding behavior.
 
 ## Summary
 

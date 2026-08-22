@@ -22,6 +22,14 @@
       {
         "text": "Utilities",
         "link": "/akcss/utilities"
+      },
+      {
+        "text": "Value Syntax",
+        "link": "/akcss/value-syntax"
+      },
+      {
+        "text": "Utility Variants",
+        "link": "/akcss/utility-variants"
       }
     ]
   },
@@ -29,6 +37,10 @@
     "text": "Built-in Styles",
     "link": "/akcss/built-in-styles",
     "children": [
+      {
+        "text": "Built-in Utility Variants",
+        "link": "/akcss/built-in-utility-variants"
+      },
       {
         "text": "Margin and Padding",
         "link": "/akcss/spacing"

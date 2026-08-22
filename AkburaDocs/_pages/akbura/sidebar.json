@@ -1,0 +1,28 @@
+[
+  {
+    "text": "Akbura",
+    "link": "/akbura/",
+    "children": [
+      {
+        "text": "Using Components in AXAML",
+        "link": "/akbura/axaml-integration"
+      },
+      {
+        "text": "XML, XAML and AXAML differences",
+        "link": "/akbura/xml-xaml-axaml"
+      },
+      {
+        "text": "Grid",
+        "link": "/akbura/grid"
+      },
+      {
+        "text": "ItemsControl",
+        "link": "/akbura/items-control"
+      },
+      {
+        "text": "Dependency Injection",
+        "link": "/akbura/dependency-injection"
+      }
+    ]
+  }
+]

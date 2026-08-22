@@ -25,6 +25,6 @@ Most built-in values come from dynamic Avalonia resources such as `--spacing`, `
 
 ## Categories
 
-- [Margin and padding](/akcss/spacing)
+- [Margin and padding](akcss/spacing)
 
 More built-in style categories will be documented here as they are added.

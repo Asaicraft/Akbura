@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Markup.Xaml;
@@ -15,6 +15,7 @@ file static class BreakpointsGroupKey
     public const string BreakpointsGroup = nameof(BreakpointsGroup);
 }
 
+[UtilityBindingPriority(Priority = BindingPriority.StyleTrigger)]
 public abstract class BreakpointMarkupExtension
 {
     protected BreakpointPredicate IsActivatedPredicate

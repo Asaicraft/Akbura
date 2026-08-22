@@ -397,6 +397,15 @@ While `${md}` is active, `p-6` wins in both cases.
 
 This behavior is used by the built-in breakpoint variants.
 
+## Built-in variants
+
+Akbura ships interaction, theme, state, structural, direction, platform, and
+responsive variants. See
+[Built-in Utility Variants](akcss/built-in-utility-variants) for their names,
+exact Avalonia conditions, supported targets, and current limitations. Every
+built-in variant uses `UnprefixedUtilityPrecedence.Above` and applies winning
+operations at `BindingPriority.StyleTrigger`.
+
 ## Built-in breakpoint implementation
 
 The built-in `${sm}`, `${md}`, `${lg}`, `${xl}`, and `${xxl}` variants observe
@@ -406,7 +415,8 @@ All variants belong to the same conflict group.
 
 Their increasing `Order` values ensure that the greatest active breakpoint
 wins. They also use `UnprefixedUtilityPrecedence.Above`, so an unprefixed
-utility cannot override an active breakpoint.
+utility cannot override an active breakpoint. Every breakpoint inherits
+`UtilityBindingPriorityAttribute` with `BindingPriority.StyleTrigger`.
 
 ```csharp
 using Avalonia;
@@ -426,6 +436,7 @@ file static class BreakpointsGroupKey
     public const string BreakpointsGroup = nameof(BreakpointsGroup);
 }
 
+[UtilityBindingPriority(Priority = BindingPriority.StyleTrigger)]
 public abstract class BreakpointMarkupExtension
 {
     protected BreakpointPredicate IsActivatedPredicate

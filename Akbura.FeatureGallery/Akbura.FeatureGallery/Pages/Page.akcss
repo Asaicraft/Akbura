@@ -1,5 +1,6 @@
 @using Akbura.Styles.akcss;
 @using Avalonia.Controls;
+@using Akbura.FeatureGallery.Markup;
 
 @utilities {
 
@@ -223,10 +224,10 @@
      */
 
     Grid.page-grid-2 {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto,Auto");
 
         ColumnSpacing: 0d;
@@ -234,10 +235,10 @@
     }
 
     Grid.page-grid-2-desktop {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*,*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto");
 
         ColumnSpacing: 16d;
@@ -259,10 +260,10 @@
      */
 
     Grid.page-grid-3 {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto,Auto,Auto");
 
         ColumnSpacing: 0d;
@@ -270,10 +271,10 @@
     }
 
     Grid.page-grid-3-desktop {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*,*,*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto");
 
         ColumnSpacing: 16d;
@@ -295,10 +296,10 @@
      */
 
     Grid.page-hero-grid {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto,Auto");
 
         ColumnSpacing: 0d;
@@ -306,10 +307,10 @@
     }
 
     Grid.page-hero-grid-desktop {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*,Auto");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto");
 
         ColumnSpacing: 32d;
@@ -321,10 +322,10 @@
      */
 
     Grid.page-flow-2 {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto,Auto");
 
         ColumnSpacing: 0d;
@@ -332,10 +333,10 @@
     }
 
     Grid.page-flow-2-desktop {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*,Auto,*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto");
 
         ColumnSpacing: 16d;
@@ -367,10 +368,10 @@
      */
 
     Grid.page-flow-3 {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto,Auto,Auto");
 
         ColumnSpacing: 0d;
@@ -378,10 +379,10 @@
     }
 
     Grid.page-flow-3-desktop {
-        ColumnDefinitions:
+        ResponsiveGrid.ColumnDefinitions:
             new ColumnDefinitions("*,Auto,*,Auto,*");
 
-        RowDefinitions:
+        ResponsiveGrid.RowDefinitions:
             new RowDefinitions("Auto");
 
         ColumnSpacing: 12d;

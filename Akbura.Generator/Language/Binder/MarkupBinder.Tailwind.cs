@@ -1444,7 +1444,7 @@ internal sealed partial class MarkupBinder
                     {
                         diagnosticsBuilder.Add(
                             AkburaSemanticModel.CreateUtilityBindingPriorityTargetNotSupportedDiagnostic(
-                                (AkburaSyntax?)propertySetter.Syntax ?? syntax,
+                                syntax,
                                 propertySetter.Property));
                     }
                     break;
@@ -1486,7 +1486,7 @@ internal sealed partial class MarkupBinder
                     {
                         diagnosticsBuilder.Add(
                             AkburaSemanticModel.CreateUtilityBindingPriorityTargetNotSupportedDiagnostic(
-                                (AkburaSyntax?)propertySetter.Syntax ?? syntax,
+                                syntax,
                                 propertySetter.Property));
                     }
                     break;

@@ -1,4 +1,10 @@
-﻿[*.cs]
+﻿root = true
+
+[*]
+end_of_line = crlf
+insert_final_newline = true
+
+[*.cs]
 
 # IDE0290: Use primary constructor
 csharp_style_prefer_primary_constructors = false

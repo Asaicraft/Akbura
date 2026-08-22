@@ -550,6 +550,74 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Theory]
+    [InlineData("<|", "")]
+    [InlineData("<Bord|", "Bord")]
+    public void Completion_ComponentNameOffersAutoImportableBorder(
+        string sourceWithCaret,
+        string expectedPrefix)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, count: 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var border = Assert.Single(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Border" &&
+                        item.NamespaceImport ==
+                            "Avalonia.Controls");
+
+                Assert.Equal("Border", border.InsertText);
+                Assert.Equal(
+                    "Avalonia.Controls  (using)",
+                    border.Suffix);
+                Assert.True(border.TriggerCompletionAfterInsert);
+                Assert.Equal(
+                    expectedPrefix,
+                    syntacticDocument.Text.ToString(
+                        result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
+    public void Completion_VisibleBorderDoesNotRequestDuplicateImport()
+    {
+        const string sourceWithCaret = """
+            using Avalonia.Controls;
+
+            <Bord|
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, count: 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var border = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "Border");
+
+                Assert.Null(border.NamespaceImport);
+            });
+    }
+
     [Fact]
     public void Completion_AttributeUsesAkburaParametersAndClrMembers()
     {
@@ -582,9 +650,23 @@ public sealed class WorkspaceCompletionTests
                 Assert.Contains(
                     result.Items,
                     static item => item.DisplayText == "Width");
-                Assert.Contains(
+
+                var loaded = Assert.Single(
                     result.Items,
                     static item => item.DisplayText == "Loaded");
+
+                Assert.Equal(
+                    AkburaCompletionKind.Event,
+                    loaded.Kind);
+                Assert.Equal(
+                    "Loaded={}",
+                    loaded.InsertText);
+                Assert.Equal(
+                    1,
+                    loaded.CaretOffsetFromEnd);
+                Assert.True(
+                    loaded.TriggerCompletionAfterInsert);
+
                 Assert.Contains(
                     result.Items,
                     static item => item.DisplayText == "x.Name");
@@ -3435,6 +3517,104 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Theory]
+    [InlineData("B", 'B', false)]
+    [InlineData("Brus", 's', true)]
+    public void CSharpCompletion_AutomaticallyImportsBrushes(
+        string prefix,
+        char triggerCharacter,
+        bool isIncompleteSession)
+    {
+        const string sourceTemplate = """
+            using Avalonia.Controls;
+
+            <Border>
+                {new Border()
+                {
+                    Background = PREFIX|
+                }}
+            </Border>
+            """;
+        var sourceWithCaret = sourceTemplate.Replace(
+            "PREFIX",
+            prefix,
+            StringComparison.Ordinal);
+        var position = sourceWithCaret.IndexOf(
+            '|',
+            StringComparison.Ordinal);
+        var source = sourceWithCaret.Remove(
+            position,
+            count: 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Expression,
+                    completionContext.Kind);
+                Assert.True(
+                    AkburaCSharpProjectionFactory.TryCreate(
+                        syntacticDocument,
+                        semanticContext,
+                        completionContext,
+                        out var projection));
+
+                var completion = RoslynCompletionTestHost
+                    .GetAutomaticImportCompletionAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        triggerCharacter,
+                        displayText: "Brushes",
+                        isIncompleteSession,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(completion);
+                Assert.Equal(
+                    "Brushes",
+                    completion.Value.Item.DisplayText);
+                Assert.True(
+                    completion.Value.Item.IsComplexTextEdit);
+                Assert.Contains(
+                    "Avalonia.Media",
+                    completion.Value.Item.InlineDescription,
+                    StringComparison.Ordinal);
+
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+                var changedText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+
+                Assert.Contains(
+                    "using Avalonia.Media;",
+                    changedText,
+                    StringComparison.Ordinal);
+                Assert.Contains(
+                    "Background = Brushes",
+                    changedText,
+                    StringComparison.Ordinal);
+                Assert.Equal(
+                    1,
+                    CountOccurrences(
+                        changedText,
+                        "using Avalonia.Media;"));
+            });
+    }
+
     [Fact]
     public void CSharpCompletionChangeMapper_DoesNotDuplicateExistingImport()
     {
@@ -3818,6 +3998,10 @@ public sealed class WorkspaceCompletionTests
                     public double Spacing { get; set; }
                 }
 
+                public sealed class Border : Control
+                {
+                }
+
                 public abstract class AbstractView : Control
                 {
                 }
@@ -3960,6 +4144,11 @@ public sealed class WorkspaceCompletionTests
             {
                 public interface IBrush
                 {
+                }
+
+                public static class Brushes
+                {
+                    public static IBrush Red => default!;
                 }
 
                 public readonly struct Color

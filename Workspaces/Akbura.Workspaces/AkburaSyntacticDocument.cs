@@ -92,6 +92,15 @@ public sealed partial class AkburaSyntacticDocument
         var position = GetFirstNonWhitespacePosition(
             Text,
             line);
+        return GetDesiredIndentationLevelAtPosition(
+            position,
+            cancellationToken);
+    }
+
+    private int GetDesiredIndentationLevelAtPosition(
+        int position,
+        CancellationToken cancellationToken)
+    {
         var level = 0;
         foreach (var boundaries in _indentationBlocks)
         {

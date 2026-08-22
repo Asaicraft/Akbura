@@ -8,8 +8,6 @@ using RoslynCompletionList =
     Microsoft.CodeAnalysis.Completion.CompletionList;
 using RoslynCompletionService =
     Microsoft.CodeAnalysis.Completion.CompletionService;
-using RoslynCompletionTrigger =
-    Microsoft.CodeAnalysis.Completion.CompletionTrigger;
 
 namespace Akbura.VisualStudio.Completion;
 
@@ -79,10 +77,12 @@ internal sealed class AkburaRoslynCompletionService
         }
 
         var isExplicit = IsExplicitTrigger(trigger);
-        var roslynTrigger = !isExplicit
-            ? RoslynCompletionTrigger.CreateInsertionTrigger(
-                trigger.Character)
-            : RoslynCompletionTrigger.Invoke;
+        var roslynTrigger =
+            AkburaRoslynCompletionTriggerPolicy
+                .CreateRoslynTrigger(
+                    isExplicit,
+                    allowNonTrigger,
+                    trigger.Character);
         Microsoft.CodeAnalysis.Text.SourceText? sourceText = null;
         AkburaRoslynCompletionPreflight preflight;
         if (isExplicit)

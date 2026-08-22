@@ -40,7 +40,8 @@ public sealed class AkburaCompletionItem
         string? suffix = null,
         int priority = 50,
         int caretOffsetFromEnd = 0,
-        bool triggerCompletionAfterInsert = false)
+        bool triggerCompletionAfterInsert = false,
+        string? namespaceImport = null)
     {
         if (string.IsNullOrWhiteSpace(displayText))
         {
@@ -64,6 +65,9 @@ public sealed class AkburaCompletionItem
         Suffix = suffix ?? string.Empty;
         CaretOffsetFromEnd = caretOffsetFromEnd;
         TriggerCompletionAfterInsert = triggerCompletionAfterInsert;
+        NamespaceImport = string.IsNullOrWhiteSpace(namespaceImport)
+            ? null
+            : namespaceImport;
     }
 
     public string DisplayText { get; }
@@ -81,6 +85,11 @@ public sealed class AkburaCompletionItem
     public int CaretOffsetFromEnd { get; }
 
     public bool TriggerCompletionAfterInsert { get; }
+
+    /// <summary>
+    /// Namespace that must be imported when this item is committed.
+    /// </summary>
+    public string? NamespaceImport { get; }
 
     public AkburaCompletionKind Kind { get; }
 

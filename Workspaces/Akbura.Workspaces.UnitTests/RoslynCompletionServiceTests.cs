@@ -187,6 +187,76 @@ internal static class RoslynCompletionTestHost
     }
 
     public static async Task<RoslynImportCompletionResult?>
+        GetAutomaticImportCompletionAsync(
+            CSharpCompilation compilation,
+            Microsoft.CodeAnalysis.CSharp.Syntax
+                .CompilationUnitSyntax root,
+            int position,
+            char triggerCharacter,
+            string displayText,
+            bool isIncompleteSession,
+            CancellationToken cancellationToken)
+    {
+        using var workspace = new AdhocWorkspace(
+            MefHostServices.Create(s_assemblies));
+        var document = CreateDocument(
+            workspace,
+            compilation,
+            root,
+            cancellationToken);
+        var service = CompletionService.GetService(document);
+        if (service == null)
+        {
+            return null;
+        }
+
+        var projectedText = await document
+            .GetTextAsync(cancellationToken);
+        var roslynTrigger =
+            AkburaRoslynCompletionTriggerPolicy
+                .CreateRoslynTrigger(
+                    isExplicit: false,
+                    isIncompleteSession,
+                    triggerCharacter);
+        var completionList = await service
+            .GetCompletionsAsync(
+                document,
+                position,
+                roslynTrigger,
+                cancellationToken: cancellationToken);
+        if (completionList == null)
+        {
+            return null;
+        }
+
+        var selection =
+            AkburaRoslynCompletionItemSelector.Select(
+                completionList,
+                projectedText,
+                position,
+                isExplicit: false,
+                cancellationToken);
+        var item = selection.Items.FirstOrDefault(
+            candidate =>
+                candidate.DisplayText == displayText &&
+                candidate.IsComplexTextEdit);
+        if (item == null)
+        {
+            return null;
+        }
+
+        var change = await service.GetChangeAsync(
+            document,
+            item,
+            commitCharacter: '\t',
+            cancellationToken);
+        return new RoslynImportCompletionResult(
+            item,
+            change,
+            projectedText);
+    }
+
+    public static async Task<RoslynImportCompletionResult?>
         GetCompletionChangeAsync(
             CSharpCompilation compilation,
             Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax root,

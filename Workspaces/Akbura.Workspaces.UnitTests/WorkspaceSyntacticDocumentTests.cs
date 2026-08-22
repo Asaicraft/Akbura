@@ -121,6 +121,44 @@ public sealed class WorkspaceSyntacticDocumentTests
     }
 
     [Theory]
+    [InlineData(
+        "<Button/|",
+        AkburaCompletionContextKind.ComponentName,
+        "Button")]
+    [InlineData(
+        "<Button /|",
+        AkburaCompletionContextKind.AttributeName,
+        "")]
+    [InlineData(
+        "<Button Width=\"100\"/|",
+        AkburaCompletionContextKind.AttributeName,
+        "")]
+    [InlineData(
+        "<Button Width=\"100\" /|",
+        AkburaCompletionContextKind.AttributeName,
+        "")]
+    [InlineData(
+        "<Button Wid/|",
+        AkburaCompletionContextKind.AttributeName,
+        "Wid")]
+    public void SyntacticDocument_DetectsSlashBoundaryContext(
+        string sourceWithCaret,
+        AkburaCompletionContextKind expectedKind,
+        string expectedPrefix)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(position - 1);
+
+        Assert.Equal(expectedKind, context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+    }
+
+    [Theory]
     [InlineData("|", "")]
     [InlineData("sta|", "sta")]
     [InlineData("\n    st|", "st")]
@@ -591,6 +629,108 @@ public sealed class WorkspaceSyntacticDocumentTests
         Assert.Equal(
             expected,
             document.GetAutoClosingTagText(position));
+    }
+
+    [Theory]
+    [InlineData(
+        "<Button/|",
+        ">")]
+    [InlineData(
+        "<StackPanel/|",
+        ">")]
+    [InlineData(
+        "<Button /|",
+        ">")]
+    [InlineData(
+        "<Button Width=\"100\"/|",
+        ">")]
+    [InlineData(
+        "<Button Width=\"100\" /|",
+        ">")]
+    [InlineData(
+        "<Button Wid/|",
+        null)]
+    [InlineData(
+        "<Button Width=/|",
+        null)]
+    [InlineData(
+        "<Button Text=\"value/|",
+        null)]
+    [InlineData(
+        "<Button/|>",
+        null)]
+    [InlineData(
+        "<Button /|>",
+        null)]
+    [InlineData(
+        "<Button>\n    </|",
+        "Button>")]
+    [InlineData(
+        "<StackPanel>\n" +
+        "    <Button></Button>\n" +
+        "    </|",
+        "StackPanel>")]
+    [InlineData(
+        "</|",
+        null)]
+    [InlineData(
+        "state double value = 4 /|;",
+        null)]
+    [InlineData(
+        "<Button Click={count /| 2 == 0}>",
+        null)]
+    [InlineData(
+        "<Button Text=\"a /|\">",
+        null)]
+    public void
+        SyntacticDocument_DeterminesSlashCompletion(
+            string sourceWithCaret,
+            string? expected)
+    {
+        var position =
+            sourceWithCaret.IndexOf(
+                '|',
+                StringComparison.Ordinal);
+        var source =
+            sourceWithCaret.Remove(
+                position,
+                count: 1);
+        var document =
+            AkburaSyntacticDocument.Parse(
+                SourceText.From(source),
+                "Component.akbura");
+
+        Assert.Equal(
+            expected,
+            document.GetSlashCompletionText(
+                position));
+    }
+
+    [Theory]
+    [InlineData(
+        "<Button>\n    </|",
+        0)]
+    [InlineData(
+        "<Grid>\n    <Button>\n        </|",
+        1)]
+    [InlineData(
+        "<Grid><Button>\n        </|",
+        1)]
+    public void
+        SyntacticDocument_DeterminesClosingTagIndentation(
+            string sourceWithCaret,
+            int expected)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.Equal(
+            expected,
+            document.GetSlashCompletionIndentationLevel(
+                position));
     }
 
     [Fact]

@@ -75,8 +75,10 @@ public sealed partial class AkburaSyntacticDocument
                 ImmutableArray<string>.Empty);
         }
 
-        var startTag = FindAncestor<MarkupStartTagSyntax>(
-            token.Parent);
+        var startTag = GetStartTagAtPosition(
+            root,
+            token.Parent,
+            position);
         if (startTag == null ||
             position < startTag.LessToken.Span.End ||
             !IsBeforeStartTagClose(
@@ -92,7 +94,6 @@ public sealed partial class AkburaSyntacticDocument
         }
 
         if (IsInsideAttributeValue(
-                token.Parent,
                 startTag,
                 position))
         {
@@ -207,6 +208,115 @@ public sealed partial class AkburaSyntacticDocument
         return $"</{name}>";
     }
 
+    /// <summary>
+    /// Returns text that should be inserted after a newly typed
+    /// <c>/</c>, or <see langword="null"/> when no insertion is needed.
+    /// </summary>
+    public string? GetSlashCompletionText(
+        int position,
+        CancellationToken cancellationToken = default)
+    {
+        ValidatePosition(position);
+        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
+            position == 0 ||
+            Text.Length == 0 ||
+            Text[position - 1] != '/')
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var slashPosition = position - 1;
+        if (TryGetEmbeddedCSharpContext(
+                slashPosition,
+                out _,
+                cancellationToken))
+        {
+            return null;
+        }
+
+        if (slashPosition > 0 &&
+            Text[slashPosition - 1] == '<')
+        {
+            var closingTagContext = GetCompletionContext(
+                position,
+                cancellationToken);
+            if (closingTagContext.Kind !=
+                    AkburaCompletionContextKind
+                        .ClosingComponentName ||
+                closingTagContext.Prefix.Length != 0 ||
+                string.IsNullOrWhiteSpace(
+                    closingTagContext.ParentComponentName))
+            {
+                return null;
+            }
+
+            return closingTagContext.ParentComponentName + ">";
+        }
+
+        var context = GetCompletionContext(
+            slashPosition,
+            cancellationToken);
+        var afterComponentName =
+            (context.Kind ==
+                 AkburaCompletionContextKind.ComponentName ||
+             context.Kind ==
+                 AkburaCompletionContextKind.PropertyElementName) &&
+            context.ApplicableSpan.End == slashPosition &&
+            context.Prefix.Length > 0;
+        var afterAttributeBoundary =
+            context.Kind ==
+                AkburaCompletionContextKind.AttributeName &&
+            context.Prefix.Length == 0 &&
+            !string.IsNullOrWhiteSpace(
+                context.ComponentName);
+        if (!afterComponentName &&
+            !afterAttributeBoundary)
+        {
+            return null;
+        }
+
+        if (position < Text.Length &&
+            Text[position] == '>')
+        {
+            return null;
+        }
+
+        return ">";
+    }
+
+    /// <summary>
+    /// Returns the structural indentation level for a closing tag completed
+    /// after <c>&lt;/</c>, or <see langword="null"/> for other slash uses.
+    /// </summary>
+    public int? GetSlashCompletionIndentationLevel(
+        int position,
+        CancellationToken cancellationToken = default)
+    {
+        var completionText = GetSlashCompletionText(
+            position,
+            cancellationToken);
+        if (completionText == null ||
+            string.Equals(
+                completionText,
+                ">",
+                StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var root = SyntaxTree.GetRootSyntax();
+        var startTag = GetOpenElementStartTag(
+            root,
+            position - 2);
+        return startTag == null
+            ? null
+            : GetDesiredIndentationLevelAtPosition(
+                startTag.Span.Start,
+                cancellationToken);
+    }
+
     private void ValidatePosition(int position)
     {
         if ((uint)position > (uint)Text.Length)
@@ -305,7 +415,41 @@ public sealed partial class AkburaSyntacticDocument
 
     private bool IsInsideMarkupStartTag(int position)
     {
-        var start = position;
+        return GetMarkupStartTagStart(position) >= 0;
+    }
+
+    private MarkupStartTagSyntax? GetStartTagAtPosition(
+        AkburaSyntax root,
+        AkburaSyntax? node,
+        int position)
+    {
+        var startTag = FindAncestor<MarkupStartTagSyntax>(node);
+        if (startTag != null)
+        {
+            return startTag;
+        }
+
+        var tagStart = GetMarkupStartTagStart(position);
+        if (tagStart < 0)
+        {
+            return null;
+        }
+
+        return root.DescendantNodes()
+            .OfType<MarkupStartTagSyntax>()
+            .LastOrDefault(candidate =>
+                candidate.LessToken.Span.Start == tagStart &&
+                !candidate.Name.IsMissing);
+    }
+
+    private int GetMarkupStartTagStart(int position)
+    {
+        if (Text.Length == 0 || position < 0)
+        {
+            return -1;
+        }
+
+        var start = Math.Min(position, Text.Length - 1);
         while (start >= 0 &&
                Text[start] is not ('<' or '>'))
         {
@@ -316,7 +460,7 @@ public sealed partial class AkburaSyntacticDocument
             (start + 1 < Text.Length &&
              Text[start + 1] is '/' or '!' or '?'))
         {
-            return false;
+            return -1;
         }
 
         var quote = '\0';
@@ -338,7 +482,7 @@ public sealed partial class AkburaSyntacticDocument
             }
         }
 
-        return quote == '\0';
+        return quote == '\0' ? start : -1;
     }
 
     private bool TryGetIncompleteClosingTagContext(
@@ -605,48 +749,103 @@ public sealed partial class AkburaSyntacticDocument
             position < startTag.Span.End;
     }
 
-    private static bool IsInsideAttributeValue(
-        AkburaSyntax? node,
+    private bool IsInsideAttributeValue(
         MarkupStartTagSyntax startTag,
         int position)
     {
-        for (var current = node;
-             current != null &&
-             !ReferenceEquals(current, startTag);
-             current = current.Parent)
+        foreach (var attribute in startTag.Attributes)
         {
-            if (current is MarkupAttributeValueSyntax value &&
-                position <= value.Span.End)
+            var inside = attribute switch
             {
-                return true;
-            }
-
-            if (current is MarkupPlainAttributeSyntax plain &&
-                !plain.EqualsToken.IsMissing &&
-                position >= plain.EqualsToken.Span.End &&
-                position <= plain.Span.End)
-            {
-                return true;
-            }
-
-            if (current is MarkupAttachedPropertyAttributeSyntax attached &&
-                !attached.EqualsToken.IsMissing &&
-                position >= attached.EqualsToken.Span.End &&
-                position <= attached.Span.End)
-            {
-                return true;
-            }
-
-            if (current is MarkupPrefixedAttributeSyntax prefixed &&
-                !prefixed.EqualsToken.IsMissing &&
-                position >= prefixed.EqualsToken.Span.End &&
-                position <= prefixed.Span.End)
+                MarkupPlainAttributeSyntax plain =>
+                    IsInsideAssignedAttributeValue(
+                        plain.EqualsToken,
+                        plain.Value,
+                        plain.Span,
+                        position),
+                MarkupAttachedPropertyAttributeSyntax attached =>
+                    IsInsideAssignedAttributeValue(
+                        attached.EqualsToken,
+                        attached.Value,
+                        attached.Span,
+                        position),
+                MarkupPrefixedAttributeSyntax prefixed =>
+                    IsInsideAssignedAttributeValue(
+                        prefixed.EqualsToken,
+                        prefixed.Value,
+                        prefixed.Span,
+                        position),
+                IncompleteAttributeSyntax incomplete =>
+                    !incomplete.EqualsToken.IsMissing &&
+                    position >= incomplete.EqualsToken.Span.End &&
+                    position <= incomplete.Span.End,
+                _ => false,
+            };
+            if (inside)
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private bool IsInsideAssignedAttributeValue(
+        SyntaxToken equalsToken,
+        MarkupAttributeValueSyntax? value,
+        TextSpan attributeSpan,
+        int position)
+    {
+        if (equalsToken.IsMissing ||
+            position < equalsToken.Span.End)
+        {
+            return false;
+        }
+
+        if (value != null &&
+            (position < value.Span.End ||
+             position == value.Span.End &&
+             !IsCompleteAttributeValue(value)))
+        {
+            return true;
+        }
+
+        return position < attributeSpan.End;
+    }
+
+    private bool IsCompleteAttributeValue(
+        MarkupAttributeValueSyntax value)
+    {
+        return value switch
+        {
+            MarkupLiteralAttributeValueSyntax literal =>
+                IsCompleteQuotedAttributeValue(literal),
+            MarkupDynamicAttributeValueSyntax dynamic =>
+                !dynamic.Expression.CloseBrace.IsMissing,
+            MarkupExtensionAttributeValueSyntax extension =>
+                !extension.Extension.CloseBrace.IsMissing,
+            _ => false,
+        };
+    }
+
+    private bool IsCompleteQuotedAttributeValue(
+        MarkupLiteralAttributeValueSyntax value)
+    {
+        if (value.Span.Length < 2)
+        {
+            return false;
+        }
+
+        var quote = Text[value.Span.Start];
+        var end = value.Span.End - 1;
+        while (end > value.Span.Start &&
+               char.IsWhiteSpace(Text[end]))
+        {
+            end--;
+        }
+
+        return quote is '\'' or '"' &&
+            Text[end] == quote;
     }
 
     private static ImmutableArray<string> GetExistingAttributeNames(
@@ -723,6 +922,15 @@ public sealed partial class AkburaSyntacticDocument
         AkburaSyntax root,
         int position)
     {
+        var best = GetOpenElementStartTag(root, position);
+        var name = best?.Name.ToFullString().Trim();
+        return string.IsNullOrEmpty(name) ? null : name;
+    }
+
+    private static MarkupStartTagSyntax? GetOpenElementStartTag(
+        AkburaSyntax root,
+        int position)
+    {
         MarkupStartTagSyntax? best = null;
         foreach (var element in root
                      .DescendantNodes()
@@ -746,8 +954,7 @@ public sealed partial class AkburaSyntacticDocument
             }
         }
 
-        var name = best?.Name.ToFullString().Trim();
-        return string.IsNullOrEmpty(name) ? null : name;
+        return best;
     }
 
     private static bool HasCompleteEndTag(

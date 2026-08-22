@@ -252,6 +252,7 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             string prefix,
             CancellationToken cancellationToken)
     {
+        // Display names are not unique across imported namespaces.
         var items = new Dictionary<string, AkburaCompletionItem>(
             StringComparer.Ordinal);
 
@@ -259,16 +260,18 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                  semanticModel.LookupMarkupComponents(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!MatchesPrefix(candidate.DisplayName, prefix) ||
-                items.ContainsKey(candidate.DisplayName))
+            if (!MatchesPrefix(candidate.DisplayName, prefix))
             {
                 continue;
             }
 
             var priority = GetComponentPriority(candidate);
-            var suffix = GetComponentSuffix(candidate);
+            var key = "visible\0" +
+                candidate.DisplayName +
+                "\0" +
+                candidate.MetadataName;
             items.Add(
-                candidate.DisplayName,
+                key,
                 new AkburaCompletionItem(
                     candidate.DisplayName,
                     candidate.DisplayName,
@@ -278,11 +281,66 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                         candidate.ComponentType?.ToDisplayString(
                             SymbolDisplayFormat.FullyQualifiedFormat) ??
                         candidate.MetadataName,
+                    filterText: candidate.DisplayName,
                     sortText:
                         $"{priority:D2}_{candidate.DisplayName}",
-                    suffix: suffix,
+                    suffix: GetComponentSuffix(candidate),
                     priority: priority,
                     triggerCompletionAfterInsert: true));
+        }
+
+        foreach (var candidate in semanticModel
+                     .LookupMarkupComponentCompletionImports(
+                         cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var displayName = candidate.Type?.Name ??
+                candidate.TypeDisplay;
+            if (!MatchesPrefix(displayName, prefix))
+            {
+                continue;
+            }
+
+            var priority = 30 + candidate.Priority;
+            var key = "import\0" +
+                candidate.AssemblyName +
+                "\0" +
+                candidate.NamespaceName +
+                "\0" +
+                displayName;
+            items.Add(
+                key,
+                new AkburaCompletionItem(
+                    displayName,
+                    displayName,
+                    AkburaCompletionKind.Component,
+                    description: string.Empty,
+                    descriptionFactory: () =>
+                    {
+                        var typeName = candidate.Type?
+                                .ToDisplayString(
+                                    SymbolDisplayFormat
+                                        .FullyQualifiedFormat) ??
+                            candidate.NamespaceName +
+                            "." +
+                            displayName;
+
+                        return typeName +
+                            Environment.NewLine +
+                            "Adds using " +
+                            candidate.NamespaceName +
+                            ".";
+                    },
+                    filterText: displayName,
+                    sortText:
+                        $"{priority:D2}_{displayName}_" +
+                        candidate.NamespaceName,
+                    suffix:
+                        candidate.NamespaceName +
+                        "  (using)",
+                    priority: priority,
+                    triggerCompletionAfterInsert: true,
+                    namespaceImport: candidate.NamespaceName));
         }
 
         return OrderCompletionItems(items.Values, prefix);
@@ -729,18 +787,36 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         var displayName = propertyElements
             ? ownerName + "." + memberName
             : memberName;
+
         if (items.ContainsKey(displayName))
         {
             return;
+        }
+
+        var insertText = displayName;
+        var caretOffsetFromEnd = 0;
+        var triggerCompletionAfterInsert = false;
+
+        if (!propertyElements)
+        {
+            if (kind == AkburaCompletionKind.Event)
+            {
+                insertText += "={}";
+                caretOffsetFromEnd = 1;
+                triggerCompletionAfterInsert = true;
+            }
+            else
+            {
+                insertText += "=\"\"";
+                caretOffsetFromEnd = 1;
+            }
         }
 
         items.Add(
             displayName,
             new AkburaCompletionItem(
                 displayName,
-                propertyElements
-                    ? displayName
-                    : displayName + "=\"\"",
+                insertText,
                 propertyElements
                     ? AkburaCompletionKind.PropertyElement
                     : kind,
@@ -749,7 +825,10 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                     : typeDisplay + " " + memberName,
                 descriptionFactory: null,
                 suffix: typeDisplay,
-                caretOffsetFromEnd: propertyElements ? 0 : 1));
+                caretOffsetFromEnd:
+                    caretOffsetFromEnd,
+                triggerCompletionAfterInsert:
+                    triggerCompletionAfterInsert));
     }
 
     private static bool IsSemanticCompletionContext(

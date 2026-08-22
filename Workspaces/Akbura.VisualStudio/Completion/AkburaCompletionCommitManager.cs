@@ -1,3 +1,4 @@
+using Akbura.VisualStudio.Editor;
 using Akbura.Workspaces;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
@@ -23,10 +24,13 @@ internal sealed class AkburaCompletionCommitManagerProvider :
 
     private readonly ITextUndoHistoryRegistry _undoHistoryRegistry;
 
+    private readonly AkburaParserService _parserService;
+
     [ImportingConstructor]
     public AkburaCompletionCommitManagerProvider(
         IAsyncCompletionBroker completionBroker,
-        ITextUndoHistoryRegistry undoHistoryRegistry)
+        ITextUndoHistoryRegistry undoHistoryRegistry,
+        AkburaParserService parserService)
     {
         _completionBroker = completionBroker ??
             throw new ArgumentNullException(
@@ -34,6 +38,9 @@ internal sealed class AkburaCompletionCommitManagerProvider :
         _undoHistoryRegistry = undoHistoryRegistry ??
             throw new ArgumentNullException(
                 nameof(undoHistoryRegistry));
+        _parserService = parserService ??
+            throw new ArgumentNullException(
+                nameof(parserService));
     }
 
     public IAsyncCompletionCommitManager GetOrCreate(ITextView textView)
@@ -46,7 +53,8 @@ internal sealed class AkburaCompletionCommitManagerProvider :
         return textView.Properties.GetOrCreateSingletonProperty(
             () => new AkburaCompletionCommitManager(
                 _completionBroker,
-                _undoHistoryRegistry));
+                _undoHistoryRegistry,
+                _parserService));
     }
 }
 
@@ -65,9 +73,12 @@ internal sealed class AkburaCompletionCommitManager :
 
     private readonly ITextUndoHistoryRegistry _undoHistoryRegistry;
 
+    private readonly AkburaParserService _parserService;
+
     public AkburaCompletionCommitManager(
         IAsyncCompletionBroker completionBroker,
-        ITextUndoHistoryRegistry undoHistoryRegistry)
+        ITextUndoHistoryRegistry undoHistoryRegistry,
+        AkburaParserService parserService)
     {
         _completionBroker = completionBroker ??
             throw new ArgumentNullException(
@@ -75,6 +86,9 @@ internal sealed class AkburaCompletionCommitManager :
         _undoHistoryRegistry = undoHistoryRegistry ??
             throw new ArgumentNullException(
                 nameof(undoHistoryRegistry));
+        _parserService = parserService ??
+            throw new ArgumentNullException(
+                nameof(parserService));
     }
 
     public IEnumerable<char> PotentialCommitCharacters =>
@@ -134,6 +148,11 @@ internal sealed class AkburaCompletionCommitManager :
             return CommitResult.Unhandled;
         }
 
+        var namespaceImportChange = CreateNamespaceImportChange(
+            currentSnapshot,
+            completion.NamespaceImport,
+            token);
+
         var triggerNextCompletion =
             completion.TriggerCompletionAfterInsert &&
             (typedChar == ' ' ||
@@ -161,10 +180,40 @@ internal sealed class AkburaCompletionCommitManager :
             return CommitResult.Unhandled;
         }
 
+        var importDeltaBeforeCompletion = 0;
+        if (namespaceImportChange is { } importChange)
+        {
+            var importText = importChange.NewText ?? string.Empty;
+            if ((uint)importChange.Span.Start >
+                    (uint)currentSnapshot.Length ||
+                (uint)importChange.Span.End >
+                    (uint)currentSnapshot.Length)
+            {
+                return CommitResult.Unhandled;
+            }
+
+            var importSpan = new Span(
+                importChange.Span.Start,
+                importChange.Span.Length);
+            if (!edit.Replace(importSpan, importText))
+            {
+                return CommitResult.Unhandled;
+            }
+
+            if (importChange.Span.End <=
+                applicableSpan.Start.Position)
+            {
+                importDeltaBeforeCompletion =
+                    importText.Length -
+                    importChange.Span.Length;
+            }
+        }
+
         var appliedSnapshot = edit.Apply();
         if (ReferenceEquals(session.TextView.TextBuffer, buffer))
         {
             var caretPosition = applicableSpan.Start.Position +
+                importDeltaBeforeCompletion +
                 replacementText.Length -
                 completion.CaretOffsetFromEnd;
             session.TextView.Caret.MoveTo(
@@ -190,6 +239,32 @@ internal sealed class AkburaCompletionCommitManager :
                 isHandled: true,
                 CommitBehavior.SuppressFurtherTypeCharCommandHandlers)
             : CommitResult.Handled;
+    }
+
+    private TextChange? CreateNamespaceImportChange(
+        ITextSnapshot snapshot,
+        string? namespaceName,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(namespaceName))
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var document = ThreadHelper.JoinableTaskFactory.Run(
+            async () => await _parserService
+                .GetSyntacticDocumentAsync(snapshot)
+                .ConfigureAwait(false));
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return AkburaUsingEditService.TryCreateNamespaceImportChange(
+            document.Text,
+            document.SyntaxTree,
+            namespaceName!,
+            out var change)
+                ? change
+                : null;
     }
 
     private CommitResult TryCommitRoslynCompletion(

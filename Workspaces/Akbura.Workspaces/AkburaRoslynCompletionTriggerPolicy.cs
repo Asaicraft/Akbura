@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.Completion;
+
 namespace Akbura.Workspaces;
 
 internal static class AkburaRoslynCompletionTriggerPolicy
@@ -28,6 +30,20 @@ internal static class AkburaRoslynCompletionTriggerPolicy
         return shouldTriggerCompletion
             ? AkburaRoslynCompletionPreflight.Triggered
             : AkburaRoslynCompletionPreflight.RoslynSuppressed;
+    }
+
+    public static CompletionTrigger CreateRoslynTrigger(
+        bool isExplicit,
+        bool isIncompleteSession,
+        char triggerCharacter)
+    {
+        // Roslyn suppresses identifier-continuation insertion triggers.
+        // An incomplete VS session still needs a refreshed full catalog,
+        // which is filtered by Akbura's automatic item selector afterwards.
+        return isExplicit || isIncompleteSession
+            ? CompletionTrigger.Invoke
+            : CompletionTrigger.CreateInsertionTrigger(
+                triggerCharacter);
     }
 
     public static bool IsSupportedInsertionCharacter(

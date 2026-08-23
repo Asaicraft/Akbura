@@ -1,5 +1,6 @@
 using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language;
 
@@ -120,6 +121,41 @@ internal abstract partial class AkburaSemanticModel
                 type,
                 relativePosition)
             : builder.CreateTypeProjection(
+                type,
+                relativePosition);
+    }
+
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(
+        AkburaSyntax declarationSyntax,
+        CSharp.TypeSyntax type,
+        int relativePosition)
+    {
+        if (declarationSyntax == null)
+        {
+            throw new ArgumentNullException(nameof(declarationSyntax));
+        }
+
+        if (type == null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
+
+        ValidateSyntaxTreeOwnership(declarationSyntax);
+        if (declarationSyntax is not (
+                StateDeclarationSyntax or
+                ParamDeclarationSyntax or
+                InjectDeclarationSyntax))
+        {
+            throw new ArgumentException(
+                "Only component declarations support a synthetic type projection.",
+                nameof(declarationSyntax));
+        }
+
+        var binder = BindingSession.GetCSharpProbeBinder(
+            declarationSyntax,
+            BinderUsage.Expression);
+        return new CSharpProbeBuilder(binder)
+            .CreateTypeProjection(
                 type,
                 relativePosition);
     }

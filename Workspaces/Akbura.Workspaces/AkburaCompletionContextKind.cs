@@ -12,4 +12,5 @@ public enum AkburaCompletionContextKind
     PropertyElementName = 4,
     MarkupExtensionType = 5,
     TopLevel = 6,
+    DeclarationModifier = 7,
 }

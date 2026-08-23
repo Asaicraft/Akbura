@@ -344,6 +344,7 @@ internal static class AkburaCSharpProjectionFactory
                     CreateTypeProjection(
                         semanticModel,
                         root,
+                        syntacticDocument,
                         embeddedContext),
 
                 AkburaCSharpCompletionContextKind
@@ -475,18 +476,35 @@ internal static class AkburaCSharpProjectionFactory
     private static CSharpProbeProjection CreateTypeProjection(
         AkburaSemanticModel semanticModel,
         AkburaSyntax root,
+        AkburaSyntacticDocument syntacticDocument,
         AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpTypeSyntax>(root, context);
-        if (syntax == null ||
-            syntax.Tokens.FullSpan != context.HostSpan)
+        if (syntax != null &&
+            syntax.Tokens.FullSpan == context.HostSpan)
+        {
+            return semanticModel.CreateCSharpCompletionProjection(
+                syntax,
+                context.RelativePosition);
+        }
+
+        var declaration = FindSyntax<AkburaSyntax>(
+            root,
+            context);
+        if (declaration is not (
+                StateDeclarationSyntax or
+                ParamDeclarationSyntax or
+                InjectDeclarationSyntax))
         {
             throw new InvalidOperationException(
                 "The C# type no longer matches the current document.");
         }
 
+        var type = CSharpSyntaxFactory.ParseTypeName(
+            syntacticDocument.Text.ToString(context.HostSpan));
         return semanticModel.CreateCSharpCompletionProjection(
-            syntax,
+            declaration,
+            type,
             context.RelativePosition);
     }
 

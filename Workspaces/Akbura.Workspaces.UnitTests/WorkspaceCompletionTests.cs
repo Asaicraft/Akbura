@@ -26,16 +26,59 @@ public sealed class WorkspaceCompletionTests
 
         param string Title;
         param bool Compact = false;
+        command void Save();
 
         <StackPanel/>
         """;
 
+    [Fact]
+    public void Completion_TopLevelOffersCatalogWithoutSemanticContext()
+    {
+        const string source = "";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        foreach (var keyword in new[]
+                 {
+                     "state",
+                     "param",
+                     "inject",
+                     "command",
+                 })
+        {
+            var item = Assert.Single(
+                result.Items,
+                candidate => candidate.DisplayText == keyword);
+            Assert.Equal(
+                keyword + " ",
+                item.InsertText);
+            Assert.Equal(AkburaCompletionKind.Keyword, item.Kind);
+            Assert.True(item.TriggerCompletionAfterInsert);
+        }
+
+        Assert.Equal(
+            3,
+            result.Items.Count(static item =>
+                item.Kind == AkburaCompletionKind.Hook));
+        Assert.False(result.IsIncomplete);
+    }
+
     [Theory]
-    [InlineData("", "")]
-    [InlineData("st", "st")]
-    public void Completion_TopLevelOffersStateWithoutSemanticContext(
+    [InlineData("st", "state")]
+    [InlineData("par", "param")]
+    [InlineData("inj", "inject")]
+    [InlineData("comm", "command")]
+    public void Completion_TopLevelFiltersCatalogByPrefix(
         string source,
-        string expectedPrefix)
+        string expectedItem)
     {
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
@@ -49,13 +92,167 @@ public sealed class WorkspaceCompletionTests
                 source.Length);
 
         var item = Assert.Single(result.Items);
-        Assert.Equal("state", item.DisplayText);
-        Assert.Equal("state", item.InsertText);
-        Assert.Equal(AkburaCompletionKind.Keyword, item.Kind);
+        Assert.Equal(expectedItem, item.DisplayText);
         Assert.Equal(
-            expectedPrefix,
+            expectedItem + " ",
+            item.InsertText);
+        Assert.Equal(
+            source,
             document.Text.ToString(result.ApplicableSpan));
-        Assert.False(result.IsIncomplete);
+    }
+
+    [Fact]
+    public void Completion_UseEffectOffersIndentedSnippets()
+    {
+        const string source = "\n    useE";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        var hooks = result.Items
+            .Where(static item =>
+                item.Kind == AkburaCompletionKind.Hook)
+            .ToArray();
+        Assert.Equal(3, hooks.Length);
+        Assert.All(
+            hooks,
+            static item =>
+                Assert.Equal("Akbura.Hooks", item.NamespaceImport));
+
+        var everyUpdate = Assert.Single(
+            hooks,
+            static item => item.DisplayText == "useEffect");
+        Assert.Equal(
+            "useEffect(() =>\n    {\n        \n    });",
+            everyUpdate.InsertText);
+        Assert.Equal(
+            everyUpdate.InsertText.IndexOf(
+                "\n    });",
+                StringComparison.Ordinal),
+            everyUpdate.InsertText.Length -
+                everyUpdate.CaretOffsetFromEnd);
+    }
+
+    [Theory]
+    [InlineData("using Akbura.Hooks;\n\nuseE")]
+    [InlineData("global using Akbura.Hooks;\n\nuseE")]
+    [InlineData(
+        "using static Akbura.Hooks.EffectHooks;\n\nuseE")]
+    [InlineData("namespace Akbura.Hooks;\n\nuseE")]
+    public void Completion_UseEffectDoesNotOfferRedundantImport(
+        string source)
+    {
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        var hooks = result.Items
+            .Where(static item =>
+                item.Kind == AkburaCompletionKind.Hook)
+            .ToArray();
+        Assert.Equal(3, hooks.Length);
+        Assert.All(
+            hooks,
+            static item => Assert.Null(item.NamespaceImport));
+    }
+
+    [Fact]
+    public void Completion_UseEffectAliasStillImportsHooksNamespace()
+    {
+        const string source =
+            "using Hooks = Akbura.Hooks;\n\nuseE";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        var hooks = result.Items
+            .Where(static item =>
+                item.Kind == AkburaCompletionKind.Hook)
+            .ToArray();
+        Assert.Equal(3, hooks.Length);
+        Assert.All(
+            hooks,
+            static item =>
+                Assert.Equal("Akbura.Hooks", item.NamespaceImport));
+    }
+
+    [Fact]
+    public void Completion_UseEffectUsesProjectGlobalHooksImport()
+    {
+        const string source = "useE";
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        source.Length);
+
+                var hooks = result.Items
+                    .Where(static item =>
+                        item.Kind == AkburaCompletionKind.Hook)
+                    .ToArray();
+                Assert.Equal(3, hooks.Length);
+                Assert.All(
+                    hooks,
+                    static item =>
+                        Assert.Null(item.NamespaceImport));
+            },
+            globalUsingsSource: "using Akbura.Hooks;");
+    }
+
+    [Fact]
+    public void Completion_UseEffectPreservesCrLfAndTabIndentation()
+    {
+        const string source = "\r\n\tuseE";
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Counter.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+
+        var everyUpdate = Assert.Single(
+            result.Items,
+            static item => item.DisplayText == "useEffect");
+        Assert.Equal(
+            "useEffect(() =>\r\n\t{\r\n\t\t\r\n\t});",
+            everyUpdate.InsertText);
+        Assert.Equal(
+            everyUpdate.InsertText.IndexOf(
+                "\r\n\t});",
+                StringComparison.Ordinal),
+            everyUpdate.InsertText.Length -
+                everyUpdate.CaretOffsetFromEnd);
     }
 
     [Fact]
@@ -383,10 +580,17 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
-    [Fact]
-    public void Completion_TopLevelFiltersStateByPrefix()
+    [Theory]
+    [InlineData("param |", "", 2)]
+    [InlineData("param b|", "b", 1)]
+    [InlineData("param ou|", "ou", 1)]
+    public void Completion_ParamOffersBindingModifiers(
+        string sourceWithCaret,
+        string expectedPrefix,
+        int expectedCount)
     {
-        const string source = "par";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
             "Counter.akbura");
@@ -396,9 +600,25 @@ public sealed class WorkspaceCompletionTests
             .GetCompletions(
                 document,
                 semanticContext: null,
-                source.Length);
+                position);
 
-        Assert.Empty(result.Items);
+        Assert.Equal(expectedCount, result.Items.Length);
+        Assert.All(
+            result.Items,
+            static item =>
+            {
+                Assert.Contains(
+                    item.DisplayText,
+                    new[] { "bind", "out" });
+                Assert.EndsWith(
+                    " ",
+                    item.InsertText,
+                    StringComparison.Ordinal);
+                Assert.True(item.TriggerCompletionAfterInsert);
+            });
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(result.ApplicableSpan));
     }
 
     [Fact]
@@ -666,6 +886,20 @@ public sealed class WorkspaceCompletionTests
                     loaded.CaretOffsetFromEnd);
                 Assert.True(
                     loaded.TriggerCompletionAfterInsert);
+                var save = Assert.Single(
+                    result.Items,
+                    static item => item.DisplayText == "Save");
+                Assert.Equal(
+                    AkburaCompletionKind.Command,
+                    save.Kind);
+                Assert.Equal(
+                    "Save={}",
+                    save.InsertText);
+                Assert.Equal(
+                    1,
+                    save.CaretOffsetFromEnd);
+                Assert.True(
+                    save.TriggerCompletionAfterInsert);
 
                 Assert.Contains(
                     result.Items,
@@ -2438,6 +2672,63 @@ public sealed class WorkspaceCompletionTests
                 Source: """
                     namespace Gallery;
                     using Avalonia.Controls;
+                    state |
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    param |
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    param bind |
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    param Car|
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    inject |
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    inject Car|
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    inject Car|? Service;
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind.Type,
+                Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
                     state Car| current = null;
                     <StackPanel/>
                     """,
@@ -2528,6 +2819,16 @@ public sealed class WorkspaceCompletionTests
                 Kind: AkburaCSharpCompletionContextKind
                     .CommandParameterList,
                 Item: "Card"),
+            (
+                Source: """
+                    namespace Gallery;
+                    using Avalonia.Controls;
+                    command void Save(string name, Car| model);
+                    <StackPanel/>
+                    """,
+                Kind: AkburaCSharpCompletionContextKind
+                    .CommandParameterList,
+                Item: "Card"),
         };
 
         foreach (var testCase in cases)
@@ -2543,6 +2844,128 @@ public sealed class WorkspaceCompletionTests
                         testCase.Item);
                 });
         }
+    }
+    [Fact]
+    public void CSharpProjection_CommandOffersSyntheticMembers()
+    {
+        const string source = """
+            namespace Gallery;
+            using Avalonia.Controls;
+
+            command void Save();
+            var commandMember = Save.|;
+
+            <StackPanel/>
+            """;
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Execute");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "CanExecute");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "IsExecuting");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_UseEffectCallbackOffersComponentMembers()
+    {
+        const string source = """
+            namespace Gallery;
+            using System;
+            using Avalonia.Controls;
+            using Akbura.Hooks;
+
+            state int count = 0;
+            param string Title;
+            inject IServiceProvider Services;
+            command void Save();
+
+            useEffect(() =>
+            {
+                |
+            });
+
+            <StackPanel/>
+            """;
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "count");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Title");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Services");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Save");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_UseEffectDependenciesOfferComponentMembers()
+    {
+        const string source = """
+            namespace Gallery;
+            using System;
+            using Avalonia.Controls;
+            using Akbura.Hooks;
+
+            state int count = 0;
+            param string Title;
+            inject IServiceProvider Services;
+
+            useEffect(() => { }, [|]);
+
+            <StackPanel/>
+            """;
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Statement,
+                    context.Kind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "count");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Title");
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Services");
+            });
     }
 
     [Theory]
@@ -3858,6 +4281,21 @@ public sealed class WorkspaceCompletionTests
         "CancellationToken",
         "System.Threading",
         "command void Save(CancellationToken token);")]
+    [InlineData(
+        "param object Items = new ObservableCollec|();",
+        "ObservableCollection",
+        "System.Collections.ObjectModel",
+        "param object Items = new ObservableCollection();")]
+    [InlineData(
+        "inject CancellationTok| CancellationToken;",
+        "CancellationToken",
+        "System.Threading",
+        "inject CancellationToken CancellationToken;")]
+    [InlineData(
+        "command Tas| Save();",
+        "Task",
+        "System.Threading.Tasks",
+        "command Task Save();")]
     [InlineData(
         "state string name = \"\";\nvar result = name.SomeExtens|;",
         "SomeExtension",

@@ -13,6 +13,43 @@ namespace Akbura.Workspaces;
 internal sealed class AkburaCompletionService : IAkburaCompletionService
 {
     private const int MaximumCompletionItems = 50;
+    private const string HooksNamespace = "Akbura.Hooks";
+    private const string EffectHooksTypeName =
+        HooksNamespace + ".EffectHooks";
+
+    private static readonly ImmutableArray<TopLevelCompletionDescriptor>
+        TopLevelItems =
+        [
+            new(
+                "state",
+                "state ",
+                "Declares reactive component state."),
+            new(
+                "param",
+                "param ",
+                "Declares a public component parameter."),
+            new(
+                "inject",
+                "inject ",
+                "Declares an injected service."),
+            new(
+                "command",
+                "command ",
+                "Declares a component command contract."),
+        ];
+
+    private static readonly ImmutableArray<TopLevelCompletionDescriptor>
+        ParamModifierItems =
+        [
+            new(
+                "bind",
+                "bind ",
+                "Declares a two-way bindable parameter."),
+            new(
+                "out",
+                "out ",
+                "Declares an output parameter."),
+        ];
 
     private readonly AkcssCompletionService _akcssCompletionService =
         new();
@@ -75,7 +112,20 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         if (syntaxContext.Kind ==
                 AkburaCompletionContextKind.TopLevel)
         {
-            return CreateTopLevelResult(syntaxContext);
+            return CreateTopLevelResult(
+                document,
+                semanticContext,
+                syntaxContext,
+                position,
+                cancellationToken);
+        }
+
+        if (syntaxContext.Kind ==
+                AkburaCompletionContextKind.DeclarationModifier)
+        {
+            return CreateDescriptorResult(
+                syntaxContext,
+                ParamModifierItems);
         }
 
         if (semanticContext == null ||
@@ -159,26 +209,415 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
     }
 
     private static AkburaCompletionResult CreateTopLevelResult(
-        AkburaSyntacticCompletionContext context)
+        AkburaSyntacticDocument document,
+        AkburaDocumentContext? semanticContext,
+        AkburaSyntacticCompletionContext context,
+        int position,
+        CancellationToken cancellationToken)
     {
-        const string stateKeyword = "state";
-        if (!MatchesPrefix(stateKeyword, context.Prefix))
-        {
-            return new AkburaCompletionResult(
-                context.ApplicableSpan,
-                ImmutableArray<AkburaCompletionItem>.Empty);
-        }
+        using var items =
+            ImmutableArrayBuilder<AkburaCompletionItem>.Rent(
+                TopLevelItems.Length + 3);
+        AddDescriptorItems(
+            items,
+            context.Prefix,
+            TopLevelItems);
+        AddUseEffectItems(
+            items,
+            document,
+            semanticContext,
+            context,
+            position,
+            cancellationToken);
 
         return new AkburaCompletionResult(
             context.ApplicableSpan,
-            ImmutableArray.Create(
-                new AkburaCompletionItem(
-                    stateKeyword,
-                    stateKeyword,
-                    AkburaCompletionKind.Keyword,
-                    "Declares component state.",
-                    descriptionFactory: null,
-                    priority: 0)));
+            items.ToImmutable());
+    }
+
+    private static AkburaCompletionResult CreateDescriptorResult(
+        AkburaSyntacticCompletionContext context,
+        ImmutableArray<TopLevelCompletionDescriptor> descriptors)
+    {
+        using var items =
+            ImmutableArrayBuilder<AkburaCompletionItem>.Rent(
+                descriptors.Length);
+        AddDescriptorItems(
+            items,
+            context.Prefix,
+            descriptors);
+        return new AkburaCompletionResult(
+            context.ApplicableSpan,
+            items.ToImmutable());
+    }
+
+    private static void AddDescriptorItems(
+        ImmutableArrayBuilder<AkburaCompletionItem> items,
+        string prefix,
+        ImmutableArray<TopLevelCompletionDescriptor> descriptors)
+    {
+        foreach (var descriptor in descriptors)
+        {
+            if (!MatchesPrefix(descriptor.DisplayText, prefix))
+            {
+                continue;
+            }
+
+            items.Add(new AkburaCompletionItem(
+                descriptor.DisplayText,
+                descriptor.InsertText,
+                AkburaCompletionKind.Keyword,
+                descriptor.Description,
+                descriptionFactory: null,
+                priority: 0,
+                triggerCompletionAfterInsert: true));
+        }
+    }
+
+    private static void AddUseEffectItems(
+        ImmutableArrayBuilder<AkburaCompletionItem> items,
+        AkburaSyntacticDocument document,
+        AkburaDocumentContext? semanticContext,
+        AkburaSyntacticCompletionContext context,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        const string filterText = "useEffect";
+        if (!MatchesPrefix(filterText, context.Prefix))
+        {
+            return;
+        }
+
+        var newLine = GetNewLine(document.Text);
+        var indentation = GetIndentation(
+            document.Text,
+            context.ApplicableSpan.Start);
+        var bodyIndentation = indentation +
+            GetIndentationUnit(document.Text, position, indentation);
+        var namespaceImport = IsUseEffectVisible(
+                document,
+                semanticContext,
+                cancellationToken)
+            ? null
+            : HooksNamespace;
+
+        AddHookItem(
+            items,
+            displayText: "useEffect",
+            suffix: "every update",
+            beforeCaret: string.Concat(
+                "useEffect(() =>",
+                newLine,
+                indentation,
+                "{",
+                newLine,
+                bodyIndentation),
+            afterCaret: string.Concat(
+                newLine,
+                indentation,
+                "});"),
+            description: "Runs an effect after every component update.",
+            sortText: "01_useEffect_0",
+            namespaceImport);
+        AddHookItem(
+            items,
+            displayText: "useEffect with dependencies",
+            suffix: "dependency list",
+            beforeCaret: string.Concat(
+                "useEffect(() =>",
+                newLine,
+                indentation,
+                "{",
+                newLine,
+                bodyIndentation),
+            afterCaret: string.Concat(
+                newLine,
+                indentation,
+                "}, []);"),
+            description: "Runs an effect when one of its dependencies changes.",
+            sortText: "01_useEffect_1",
+            namespaceImport);
+        AddHookItem(
+            items,
+            displayText: "useEffect async",
+            suffix: "async with cancellation",
+            beforeCaret: string.Concat(
+                "useEffect(async cancellationToken =>",
+                newLine,
+                indentation,
+                "{",
+                newLine,
+                bodyIndentation),
+            afterCaret: string.Concat(
+                newLine,
+                indentation,
+                "}, []);"),
+            description: "Runs an asynchronous effect with cancellation.",
+            sortText: "01_useEffect_2",
+            namespaceImport);
+    }
+
+    private static void AddHookItem(
+        ImmutableArrayBuilder<AkburaCompletionItem> items,
+        string displayText,
+        string suffix,
+        string beforeCaret,
+        string afterCaret,
+        string description,
+        string sortText,
+        string? namespaceImport)
+    {
+        items.Add(new AkburaCompletionItem(
+            displayText,
+            beforeCaret + afterCaret,
+            AkburaCompletionKind.Hook,
+            description,
+            descriptionFactory: null,
+            filterText: "useEffect",
+            sortText,
+            suffix,
+            priority: 1,
+            caretOffsetFromEnd: afterCaret.Length,
+            namespaceImport: namespaceImport));
+    }
+
+    private static bool IsUseEffectVisible(
+        AkburaSyntacticDocument document,
+        AkburaDocumentContext? semanticContext,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        foreach (var node in document.SyntaxTree
+                     .GetRootSyntax()
+                     .DescendantNodesAndSelf())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (node is NamespaceDeclarationSyntax namespaceDeclaration &&
+                IsHooksNamespace(namespaceDeclaration))
+            {
+                return true;
+            }
+
+            if (node is UsingDirectiveSyntax usingDirective &&
+                !AkburaUsingEditService.IsAkcssUsingDirective(
+                    usingDirective) &&
+                IsUseEffectUsing(usingDirective))
+            {
+                return true;
+            }
+        }
+
+        if (semanticContext == null)
+        {
+            return false;
+        }
+
+        foreach (var usingDirective in semanticContext.Project
+                     .Compilation
+                     .GlobalAkburaUsingDirectives)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!AkburaUsingEditService.IsAkcssUsingDirective(
+                    usingDirective) &&
+                IsUseEffectUsing(usingDirective))
+            {
+                return true;
+            }
+        }
+
+        foreach (var usingDirective in semanticContext.Project
+                     .Compilation
+                     .GlobalCSharpUsingDirectives)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsUseEffectUsing(usingDirective))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsHooksNamespace(
+        NamespaceDeclarationSyntax namespaceDeclaration)
+    {
+        try
+        {
+            return IsQualifiedName(
+                namespaceDeclaration.ToCSharp().Name.ToString(),
+                HooksNamespace);
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException or
+                  ArgumentException or InvalidCastException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsUseEffectUsing(
+        UsingDirectiveSyntax usingDirective)
+    {
+        try
+        {
+            return IsUseEffectUsing(usingDirective.ToCSharp());
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException or
+                  ArgumentException or InvalidCastException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsUseEffectUsing(
+        Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax
+            usingDirective)
+    {
+        if (usingDirective.Alias != null ||
+            usingDirective.Name == null)
+        {
+            return false;
+        }
+
+        return IsQualifiedName(
+            usingDirective.Name.ToString(),
+            usingDirective.StaticKeyword.RawKind != 0
+                ? EffectHooksTypeName
+                : HooksNamespace);
+    }
+
+    private static bool IsQualifiedName(
+        string name,
+        string expectedName)
+    {
+        const string globalAlias = "global::";
+        var normalizedName = name.Trim();
+        if (normalizedName.StartsWith(
+                globalAlias,
+                StringComparison.Ordinal))
+        {
+            normalizedName = normalizedName[globalAlias.Length..];
+        }
+
+        return string.Equals(
+            normalizedName,
+            expectedName,
+            StringComparison.Ordinal);
+    }
+
+    private static string GetNewLine(SourceText text)
+    {
+        foreach (var line in text.Lines)
+        {
+            var lineBreakLength =
+                line.EndIncludingLineBreak - line.End;
+            if (lineBreakLength > 0)
+            {
+                return text.ToString(new TextSpan(
+                    line.End,
+                    lineBreakLength));
+            }
+        }
+
+        return Environment.NewLine;
+    }
+
+    private static string GetIndentation(
+        SourceText text,
+        int position)
+    {
+        var line = text.Lines.GetLineFromPosition(
+            Math.Min(position, text.Length));
+        var length = Math.Max(0, position - line.Start);
+        for (var index = 0; index < length; index++)
+        {
+            if (!char.IsWhiteSpace(text[line.Start + index]))
+            {
+                return string.Empty;
+            }
+        }
+
+        return text.ToString(new TextSpan(line.Start, length));
+    }
+
+    private static string GetIndentationUnit(
+        SourceText text,
+        int position,
+        string currentIndentation)
+    {
+        if (currentIndentation.IndexOf('	') >= 0)
+        {
+            return "	";
+        }
+
+        var currentLine = text.Lines.GetLinePosition(
+            Math.Min(position, text.Length)).Line;
+        for (var distance = 1;
+             distance < text.Lines.Count;
+             distance++)
+        {
+            var previous = currentLine - distance;
+            if (previous >= 0 &&
+                TryGetIndentationDelta(
+                    text,
+                    text.Lines[previous],
+                    currentIndentation,
+                    out var previousDelta))
+            {
+                return previousDelta;
+            }
+
+            var next = currentLine + distance;
+            if (next < text.Lines.Count &&
+                TryGetIndentationDelta(
+                    text,
+                    text.Lines[next],
+                    currentIndentation,
+                    out var nextDelta))
+            {
+                return nextDelta;
+            }
+        }
+
+        return "    ";
+    }
+
+    private static bool TryGetIndentationDelta(
+        SourceText text,
+        TextLine line,
+        string currentIndentation,
+        out string delta)
+    {
+        var position = line.Start;
+        while (position < line.End &&
+               text[position] is ' ' or '	')
+        {
+            position++;
+        }
+
+        if (position == line.End)
+        {
+            delta = string.Empty;
+            return false;
+        }
+
+        var indentation = text.ToString(TextSpan.FromBounds(
+            line.Start,
+            position));
+        if (indentation.Length > currentIndentation.Length &&
+            indentation.StartsWith(
+                currentIndentation,
+                StringComparison.Ordinal))
+        {
+            delta = indentation[currentIndentation.Length..];
+            return true;
+        }
+
+        delta = string.Empty;
+        return false;
     }
 
     private static AkburaCompletionResult CreateAkcssModuleImportResult(
@@ -863,7 +1302,9 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
 
         if (!propertyElements)
         {
-            if (kind == AkburaCompletionKind.Event)
+            if (kind is
+                AkburaCompletionKind.Event or
+                AkburaCompletionKind.Command)
             {
                 insertText += "={}";
                 caretOffsetFromEnd = 1;
@@ -1045,6 +1486,11 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             ? displayName
             : displayName[(separator + 1)..];
     }
+
+    private readonly record struct TopLevelCompletionDescriptor(
+        string DisplayText,
+        string InsertText,
+        string Description);
 
     private readonly struct CompletionMemberCandidate
     {

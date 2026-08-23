@@ -987,6 +987,21 @@ partial class Parser
                 var kind =
                     CurrentToken.Kind;
 
+                if (parenDepth == 0 &&
+                    bracketDepth == 0 &&
+                    braceDepth == 0 &&
+                    tokens.Count > 0 &&
+                    IsAtTopLevelMemberAfterNewLine() &&
+                    IsCompleteCSharpExpressionStatement(tokens))
+                {
+                    tokens.Add(EatToken(SyntaxKind.SemicolonToken));
+
+                    return GreenSyntaxFactory
+                        .CSharpStatementSyntax(
+                            tokens.ToList(),
+                            body: null);
+                }
+
                 if (kind ==
                         SyntaxKind.CloseBraceToken &&
                     braceDepth == 0)
@@ -1073,6 +1088,25 @@ partial class Parser
         }
     }
 
+    private static bool IsCompleteCSharpExpressionStatement(
+        GreenSyntaxListBuilder<GreenSyntaxToken> tokens)
+    {
+        var text = new StringBuilder();
+
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            text.Append(tokens[index].ToFullString());
+        }
+
+        text.Append(';');
+
+        var statement =
+            CSharpFactory.ParseStatement(text.ToString());
+
+        return statement is
+            CSharp.ExpressionStatementSyntax &&
+            !statement.ContainsDiagnostics;
+    }
 
     private static bool IsCSharpLocalFunctionHeader(
         GreenSyntaxListBuilder<GreenSyntaxToken> tokens)
@@ -2525,9 +2559,15 @@ partial class Parser
 
     private GreenCSharpParameterListSyntax ParseCSharpParameterList()
     {
+        if (CurrentToken.Kind != SyntaxKind.OpenParenToken)
+        {
+            return CreateMissingCSharpParameterList();
+        }
+
         if (_currentToken != null)
         {
             ReturnToken();
+            _tokenOffset++;
         }
 
         var mode = _mode;
@@ -2538,12 +2578,33 @@ partial class Parser
 
         _mode = mode;
 
-        AkburaDebug.Assert(parameters.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
-        AkburaDebug.Assert(((GreenSyntaxToken.CSharpRawToken)parameters).RawNode is CSharp.ParameterListSyntax, "Expected ParameterListSyntax");
+        var rawToken =
+            parameters as GreenSyntaxToken.CSharpRawToken;
 
-        return GreenSyntaxFactory.CSharpParameterListSyntax(parameters);
+        if (rawToken == null)
+        {
+            var text = parameters.ToFullString();
+            rawToken = GreenSyntaxFactory.CSharpRawToken(
+                text,
+                CSharpFactory.ParseParameterList(text));
+        }
+
+        return GreenSyntaxFactory.CSharpParameterListSyntax(
+            EnsureCSharpRawToken(
+                rawToken,
+                text => CSharpFactory.ParseParameterList(text)));
     }
 
+    private static GreenCSharpParameterListSyntax
+        CreateMissingCSharpParameterList()
+    {
+        const string text = "";
+
+        return GreenSyntaxFactory.CSharpParameterListSyntax(
+            GreenSyntaxFactory.CSharpRawToken(
+                text,
+                CSharpFactory.ParseParameterList(text)));
+    }
     #endregion
 
     #region CSharpArgumentListSyntax

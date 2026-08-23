@@ -156,6 +156,9 @@ internal sealed class AkburaCompletionSource :
     private static readonly CompletionFilter KeywordFilter =
         new("Keywords", "K", KeywordIcon);
 
+    private static readonly CompletionFilter HookFilter =
+        new("Hooks", "H", MethodIcon);
+
     private static readonly ImmutableArray<CompletionFilter>
         ComponentFilters = [ComponentFilter];
 
@@ -189,6 +192,9 @@ internal sealed class AkburaCompletionSource :
     private static readonly ImmutableArray<CompletionFilter>
         KeywordFilters = [KeywordFilter];
 
+    private static readonly ImmutableArray<CompletionFilter>
+        HookFilters = [HookFilter];
+
     private static readonly ImmutableArray<CompletionFilterWithState>
         CompletionFilters =
         [
@@ -203,6 +209,7 @@ internal sealed class AkburaCompletionSource :
             new(TailwindUtilityFilter, isAvailable: true),
             new(AkcssValueFilter, isAvailable: true),
             new(KeywordFilter, isAvailable: true),
+            new(HookFilter, isAvailable: true),
         ];
 
     private readonly ITextView _textView;
@@ -462,11 +469,13 @@ internal sealed class AkburaCompletionSource :
                             semanticContext,
                             position,
                             requestToken)
-                        : syntaxContext.Kind ==
-                            AkburaCompletionContextKind.TopLevel
+                        : syntaxContext.Kind is
+                            AkburaCompletionContextKind.TopLevel or
+                            AkburaCompletionContextKind
+                                .DeclarationModifier
                             ? _completionService.GetCompletions(
                                 syntacticDocument,
-                                semanticContext: null,
+                                semanticContext,
                                 position,
                                 requestToken)
                             : default;
@@ -475,6 +484,13 @@ internal sealed class AkburaCompletionSource :
                     "C# semantic context",
                     stageTimer.Elapsed);
 #endif
+
+                var allowNonTrigger =
+                    sessionState.AllowNonTrigger ||
+                    csharpContext.Kind ==
+                        AkburaCSharpCompletionContextKind.Type &&
+                    trigger.Reason == CompletionTriggerReason.Insertion &&
+                    trigger.Character == ' ';
 
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.Completion,
@@ -494,7 +510,7 @@ internal sealed class AkburaCompletionSource :
                         semanticContext,
                         csharpContext,
                         trigger,
-                        sessionState.AllowNonTrigger,
+                        allowNonTrigger,
                         requestToken)
                     .ConfigureAwait(false);
 #if DEBUG
@@ -736,6 +752,13 @@ internal sealed class AkburaCompletionSource :
         {
             EnsureCurrent(request, snapshot);
 
+            if (ContainsDisplayText(
+                    supplementalResult.Items,
+                    completion.DisplayText))
+            {
+                continue;
+            }
+
             if (!mappedSpans.TryGetValue(
                     completion.Span,
                     out var applicableSpan))
@@ -899,6 +922,24 @@ internal sealed class AkburaCompletionSource :
 
     private static bool ContainsDisplayText(
         ReadOnlySpan<CompletionItem> items,
+        string displayText)
+    {
+        foreach (var item in items)
+        {
+            if (string.Equals(
+                    item.DisplayText,
+                    displayText,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsDisplayText(
+        ImmutableArray<AkburaCompletionItem> items,
         string displayText)
     {
         foreach (var item in items)
@@ -1109,6 +1150,14 @@ internal sealed class AkburaCompletionSource :
                 trigger.Character == '_';
         }
 
+        if (trigger.Character == '(' &&
+            AkburaMarkupEditingFacts
+                .IsCommandParameterListStartPosition(
+                    triggerLocation.Snapshot,
+                    triggerLocation.Position))
+        {
+            return true;
+        }
         if (trigger.Character is
             '<' or '/' or ' ' or '.' or ':' or ',')
         {
@@ -1167,7 +1216,8 @@ internal sealed class AkburaCompletionSource :
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityCommitCharacters,
 
-            AkburaCompletionKind.Keyword =>
+            AkburaCompletionKind.Keyword or
+            AkburaCompletionKind.Hook =>
                 KeywordCommitCharacters,
 
             _ => MemberCommitCharacters,
@@ -1196,6 +1246,7 @@ internal sealed class AkburaCompletionSource :
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityIcon,
             AkburaCompletionKind.Keyword => KeywordIcon,
+            AkburaCompletionKind.Hook => MethodIcon,
             _ => PropertyIcon,
         };
     }
@@ -1319,6 +1370,7 @@ internal sealed class AkburaCompletionSource :
             AkburaCompletionKind.TailwindUtility =>
                 TailwindUtilityFilters,
             AkburaCompletionKind.Keyword => KeywordFilters,
+            AkburaCompletionKind.Hook => HookFilters,
             _ => PropertyFilters,
         };
     }

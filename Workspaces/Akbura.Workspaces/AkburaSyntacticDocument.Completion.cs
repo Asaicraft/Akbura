@@ -24,6 +24,14 @@ public sealed partial class AkburaSyntacticDocument
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = SyntaxTree.GetRootSyntax();
+        if (TryGetDeclarationModifierContext(
+                root,
+                position,
+                out var declarationModifierContext))
+        {
+            return declarationModifierContext;
+        }
+
         if (TryGetMarkupExtensionTypeContext(
                 root,
                 position,
@@ -526,6 +534,62 @@ public sealed partial class AkburaSyntacticDocument
         return true;
     }
 
+    private bool TryGetDeclarationModifierContext(
+        AkburaSyntax root,
+        int position,
+        out AkburaSyntacticCompletionContext context)
+    {
+        context = default;
+        if (root is not AkburaDocumentSyntax document ||
+            IsInsideComment(root, position))
+        {
+            return false;
+        }
+
+        var applicableSpan = GetTopLevelKeywordSpan(position);
+        foreach (var declaration in document.Members
+                     .OfType<ParamDeclarationSyntax>())
+        {
+            if (position < declaration.ParamKeyword.Span.End ||
+                position > declaration.FullSpan.End ||
+                declaration.Type is { IsMissing: false })
+            {
+                continue;
+            }
+
+            var bindingKeyword = declaration.BindingKeyword;
+            if (bindingKeyword.RawKind != 0)
+            {
+                if (applicableSpan.Start !=
+                        bindingKeyword.Span.Start ||
+                    position > bindingKeyword.Span.End)
+                {
+                    continue;
+                }
+            }
+            else if (applicableSpan.Start <
+                         declaration.ParamKeyword.Span.End ||
+                     !ContainsOnlyWhitespace(
+                         Text,
+                         declaration.ParamKeyword.Span.End,
+                         applicableSpan.Start))
+            {
+                continue;
+            }
+
+            context = new AkburaSyntacticCompletionContext(
+                AkburaCompletionContextKind.DeclarationModifier,
+                applicableSpan,
+                Text.ToString(applicableSpan),
+                componentName: null,
+                parentComponentName: null,
+                ImmutableArray<string>.Empty);
+            return true;
+        }
+
+        return false;
+    }
+
     private bool TryGetTopLevelKeywordContext(
         AkburaSyntax root,
         int position,
@@ -537,8 +601,9 @@ public sealed partial class AkburaSyntacticDocument
             TryGetEmbeddedCSharpContext(
                 position,
                 out var embeddedContext) &&
-            embeddedContext.Kind ==
-                AkburaCSharpCompletionContextKind.UsingDirectiveName)
+            embeddedContext.Kind is
+                AkburaCSharpCompletionContextKind.UsingDirectiveName or
+                AkburaCSharpCompletionContextKind.Type)
         {
             return false;
         }

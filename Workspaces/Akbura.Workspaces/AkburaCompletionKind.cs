@@ -19,4 +19,5 @@ public enum AkburaCompletionKind
     AkcssColor,
     TailwindUtility,
     Keyword,
+    Hook,
 }

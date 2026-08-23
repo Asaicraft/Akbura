@@ -191,8 +191,62 @@ public sealed class WorkspaceSyntacticDocumentTests
     }
 
     [Theory]
+    [InlineData("param |", "")]
+    [InlineData("param b|", "b")]
+    [InlineData("param ou|", "ou")]
+    [InlineData("param bind|", "bind")]
+    public void SyntacticDocument_DetectsParamModifierCompletion(
+        string sourceWithCaret,
+        string expectedPrefix)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(
+            AkburaCompletionContextKind.DeclarationModifier,
+            context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(context.ApplicableSpan));
+    }
+
+    [Theory]
+    [InlineData("state |")]
+    [InlineData("param |")]
+    [InlineData("param bind |")]
+    [InlineData("param out |")]
+    [InlineData("inject |")]
+    [InlineData("command |")]
+    public void SyntacticDocument_DoesNotTreatDeclarationTypeAsTopLevel(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.NotEqual(
+            AkburaCompletionContextKind.TopLevel,
+            document.GetCompletionContext(position).Kind);
+        Assert.True(document.TryGetCSharpCompletionContext(
+            position,
+            out var csharpContext));
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.Type,
+            csharpContext.Kind);
+    }
+
+    [Theory]
     [InlineData("<Button>st|</Button>")]
     [InlineData("var st| = 0;")]
+    [InlineData("var text = \"st|\";")]
     [InlineData("void Update()\n{\n    st|\n}")]
     [InlineData("// st|")]
     [InlineData("/* st| */")]
@@ -341,6 +395,30 @@ public sealed class WorkspaceSyntacticDocumentTests
 
     [Theory]
     [InlineData(
+        "state |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "param |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "param bind |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "inject |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "param ObservableCollec|",
+        AkburaCSharpCompletionContextKind.Type,
+        "ObservableCollec")]
+    [InlineData(
+        "inject IUserSer|",
+        AkburaCSharpCompletionContextKind.Type,
+        "IUserSer")]
+    [InlineData(
         "state int maximum = Math.M|;",
         AkburaCSharpCompletionContextKind.Expression,
         "Math.M")]
@@ -444,6 +522,8 @@ public sealed class WorkspaceSyntacticDocumentTests
 
     [Theory]
     [InlineData("state co|unt = 0;")]
+    [InlineData("param Ti|tle = \"\";")]
+    [InlineData("param Ti|tle;")]
     [InlineData("<Button Text=\"DateTime.No|\"/>")]
     [InlineData("<Button Content=${Binding Path=Us|}/>")]
     [InlineData("<But|")]

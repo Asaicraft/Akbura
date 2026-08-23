@@ -77,6 +77,24 @@ public sealed partial class AkburaSyntacticDocument
             }
         }
 
+        if (root is AkburaDocumentSyntax document)
+        {
+            foreach (var member in document.Members)
+            {
+                if (TryGetDeclarationTypeSpan(
+                        member,
+                        position,
+                        out var hostSpan))
+                {
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind.Type,
+                        member,
+                        hostSpan,
+                        priority: -1);
+                }
+            }
+        }
+
         if (best == null)
         {
             context = default;
@@ -275,6 +293,75 @@ public sealed partial class AkburaSyntacticDocument
                 best = candidate;
             }
         }
+    }
+
+    private bool TryGetDeclarationTypeSpan(
+        AkTopLevelMemberSyntax member,
+        int position,
+        out TextSpan hostSpan)
+    {
+        SimpleNameSyntax name;
+        int typeStart;
+        switch (member)
+        {
+            case StateDeclarationSyntax state
+                when state.Type == null &&
+                     state.EqualsToken.IsMissing &&
+                     state.Semicolon.IsMissing:
+                name = state.Name;
+                typeStart = state.StateKeyword.Span.End;
+                break;
+
+            case ParamDeclarationSyntax parameter
+                when parameter.Type == null &&
+                     parameter.EqualsToken.RawKind == 0 &&
+                     parameter.Semicolon.IsMissing:
+                name = parameter.Name;
+                typeStart = parameter.BindingKeyword.RawKind == 0
+                    ? parameter.ParamKeyword.Span.End
+                    : parameter.BindingKeyword.Span.End;
+                break;
+
+            case InjectDeclarationSyntax inject
+                when inject.Type.Tokens.FullSpan.Length == 0:
+                name = inject.Name;
+                typeStart = inject.InjectKeyword.Span.End;
+                break;
+
+            default:
+                hostSpan = default;
+                return false;
+        }
+
+        if (position < typeStart ||
+            position > member.FullSpan.End)
+        {
+            hostSpan = default;
+            return false;
+        }
+
+        if (name.IsMissing)
+        {
+            if (!ContainsOnlyWhitespace(Text, typeStart, position))
+            {
+                hostSpan = default;
+                return false;
+            }
+
+            hostSpan = new TextSpan(position, 0);
+            return true;
+        }
+
+        if (position < name.Span.Start ||
+            position > name.Span.End ||
+            !ContainsOnlyWhitespace(Text, typeStart, name.Span.Start))
+        {
+            hostSpan = default;
+            return false;
+        }
+
+        hostSpan = name.Span;
+        return true;
     }
 
     private static bool ContainsPosition(

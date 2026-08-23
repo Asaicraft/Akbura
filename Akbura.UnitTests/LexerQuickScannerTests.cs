@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Akbura.UnitTests;
 
-#if STATS
+#if STATS && ENABLE_QUICK_SCAN_BENCHMARK
 
 public class LexerQuickScannerTests
 {

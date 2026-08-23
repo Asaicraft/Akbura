@@ -594,7 +594,6 @@ public sealed class SemanticSnapshotLazyBenchmarkConfig : ManualConfig
             Job.ShortRun.WithMsBuildArguments(
                 "/p:EnableQuickScanBenchmark=true",
                 "/p:EnableAkburaStats=true",
-                "/p:DefineConstants=ENABLE_QUICK_SCAN_BENCHMARK",
                 "/p:EnableSourceLink=false",
                 "/p:ContinuousIntegrationBuild=false"));
     }

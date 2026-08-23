@@ -866,7 +866,8 @@ partial class Parser
         var staticKeyword = TryEatToken(SyntaxKind.StaticKeyword);
         var unsafeKeyword = TryEatToken(SyntaxKind.UnsafeKeyword);
         var alias = TryParseUsingAliasSyntax();
-        var name = ParseRequiredCSharpTypeSyntax();
+        var name = ParseRequiredCSharpTypeSyntax(
+            stopAtTopLevelMemberAfterNewLine: true);
         var semicolon = EatToken(SyntaxKind.SemicolonToken);
 
         return GreenSyntaxFactory.UsingDirectiveSyntax(
@@ -902,17 +903,46 @@ partial class Parser
         return GreenSyntaxFactory.NamespaceDeclarationSyntax(namespaceKeyword, name, semicolon);
     }
 
-    private GreenCSharpTypeSyntax ParseRequiredCSharpTypeSyntax()
+    private GreenCSharpTypeSyntax ParseRequiredCSharpTypeSyntax(
+        bool stopAtTopLevelMemberAfterNewLine = false)
     {
         var rawText = new StringBuilder();
 
-        while (CurrentToken.Kind is not (SyntaxKind.SemicolonToken or SyntaxKind.EndOfFileToken))
+        while (CurrentToken.Kind is not (SyntaxKind.SemicolonToken or SyntaxKind.EndOfFileToken) &&
+               (!stopAtTopLevelMemberAfterNewLine ||
+                !IsAtTopLevelMemberAfterNewLine()))
         {
             rawText.Append(EatToken().ToFullString());
         }
 
         return GreenSyntaxFactory.CSharpTypeSyntax(
             GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText.ToString())));
+    }
+
+    private bool IsAtTopLevelMemberAfterNewLine()
+    {
+        if (_prevTokenTrailingTrivia is null ||
+            !new GreenSyntaxList<GreenNode>(_prevTokenTrailingTrivia)
+                .Any((int)SyntaxKind.EndOfLineTrivia))
+        {
+            return false;
+        }
+
+        return CurrentToken.Kind switch
+        {
+            SyntaxKind.StateKeyword or
+            SyntaxKind.ParamKeyword or
+            SyntaxKind.InjectKeyword or
+            SyntaxKind.CommandKeyword or
+            SyntaxKind.UsingKeyword or
+            SyntaxKind.NamespaceKeyword or
+            SyntaxKind.LessThanToken => true,
+            SyntaxKind.GlobalKeyword =>
+                PeekToken(1).Kind == SyntaxKind.UsingKeyword,
+            SyntaxKind.AtToken =>
+                PeekToken(1).Kind == SyntaxKind.AkcssKeyword,
+            _ => false
+        };
     }
 
     #endregion

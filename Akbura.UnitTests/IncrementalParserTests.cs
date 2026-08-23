@@ -116,6 +116,32 @@ public sealed class IncrementalParserTests
         Assert.Same(oldSyntax.Members[2], incremental.Members[1]);
     }
 
+    [Fact]
+    public void DeleteUsingSemicolon_PreservesFollowingStateAndMarkup()
+    {
+        const string oldCode =
+            "using Akbura.Styles.akcss;\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Content={count}/>";
+        var semicolonPosition = oldCode.IndexOf(';');
+        var newCode = oldCode.Remove(semicolonPosition, count: 1);
+        var oldSyntax = Parse(oldCode);
+        var change = new TextChangeRange(
+            new TextSpan(semicolonPosition, length: 1),
+            newLength: 0);
+
+        var incremental = ParseIncremental(newCode, oldSyntax, [change]);
+
+        Assert.Equal(newCode, incremental.ToFullString());
+        Assert.Equal(3, incremental.Members.Count);
+        var usingDirective = Assert.IsType<GreenUsingDirectiveSyntax>(incremental.Members[0]);
+        Assert.True(usingDirective.Semicolon.IsMissing);
+        var state = Assert.IsType<GreenStateDeclarationSyntax>(incremental.Members[1]);
+        Assert.Equal("count", state.Name.Identifier.ValueText);
+        Assert.IsType<GreenMarkupRootSyntax>(incremental.Members[2]);
+    }
+
     private static GreenAkburaDocumentSyntax Parse(string code)
     {
         using var parser = ParserHelper.MakeParser(code);

@@ -434,6 +434,36 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MissingUsingSemicolon_PreservesFollowingStateReferences()
+    {
+        const string code =
+            "using Avalonia.Controls\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Content={count}/>";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var state = Assert.Single(root.Members.OfType<StateDeclarationSyntax>());
+        var button = GetOnlyMarkupElement(syntaxTree);
+        var contentAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(button.StartTag!.Attributes));
+
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            semanticModel.GetDeclaredSymbol(state));
+        var countReference = Assert.Single(
+            semanticModel.GetCSharpSymbolReferences(contentAttribute),
+            static reference => reference.Name == "count");
+
+        Assert.Equal("count", stateSymbol.Name);
+        Assert.Same(stateSymbol, countReference.AkburaSymbol);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(contentAttribute),
+            static diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
     public void SemanticModel_ComponentPartialClassWithoutBase_InheritsAkburaControlAndBindsPrivateMembers()
     {
         const string code =

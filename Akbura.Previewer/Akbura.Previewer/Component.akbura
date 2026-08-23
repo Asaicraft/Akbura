@@ -1,0 +1,21 @@
+using Avalonia.Controls;
+using Avalonia.Media;
+using Akbura.Styles.akcss
+
+
+state int count = 0;
+
+<StackPanel gap-4>
+
+	<Button Content={$"Increment count to {count+1}"} Click={count++}/>
+
+	<Border>
+	
+		{ count % 2 == 0 
+			? new Border() { Width = 100, Height = 100,  Background = Brushes.Red }
+			: new Button() { Content = $"count is odd", Background = Brushes.Black}
+		}
+	
+	</Border>
+
+</StackPanel>

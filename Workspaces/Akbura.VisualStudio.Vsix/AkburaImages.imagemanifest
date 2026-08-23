@@ -16,6 +16,7 @@
 
 		<ID Name="AkburaFile" Value="1" />
 		<ID Name="AkcssFile" Value="2" />
+		<ID Name="State" Value="3" />
 	</Symbols>
 
 	<Images>
@@ -35,6 +36,24 @@
             AllowColorInversion="false">
 
 			<Source Uri="$(Resources)/akcss_64.png">
+				<Size Value="64" />
+			</Source>
+		</Image>
+
+		<Image
+            Guid="$(AkburaImagesGuid)"
+            ID="$(State)"
+            AllowColorInversion="false">
+
+			<Source Uri="$(Resources)/state_16.png">
+				<Size Value="16" />
+			</Source>
+
+			<Source Uri="$(Resources)/state_32.png">
+				<Size Value="32" />
+			</Source>
+
+			<Source Uri="$(Resources)/state_64.png">
 				<Size Value="64" />
 			</Source>
 		</Image>

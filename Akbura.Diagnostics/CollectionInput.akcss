@@ -42,17 +42,17 @@ Border.collection-input-item {
 TextBlock.collection-input-index {
     HorizontalAlignment: HorizontalAlignment.Left;
     VerticalAlignment: VerticalAlignment.Center;
+    Padding: new Thickness(4d, 0d);
 
-    @apply px-1
-        text-xs
+    @apply text-xs
         font-medium
         text-slate-500;
 }
 
 TextBlock.collection-input-empty {
     HorizontalAlignment: HorizontalAlignment.Center;
+    Padding: new Thickness(0d, 12d);
 
-    @apply py-3
-        text-sm
+    @apply text-sm
         text-slate-500;
 }

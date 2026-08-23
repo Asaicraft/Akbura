@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -138,7 +139,8 @@ internal static class GridDefinitionLiteralParser
             return false;
         }
 
-        var builder = ImmutableArray.CreateBuilder<GridDefinitionValue>(items.Count);
+        using var builder =
+            ImmutableArrayBuilder<GridDefinitionValue>.Rent(items.Count);
         foreach (var item in items)
         {
             if (!TryParseDefinition(item, out var definition))

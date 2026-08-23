@@ -409,6 +409,7 @@ internal abstract class BindingDiagnosticBag
             diagnostic.Code,
             diagnostic.Severity.ToString(),
             diagnostic.Syntax.FullSpan.ToString(),
+            diagnostic.Span.ToString(),
             string.Join(",", diagnostic.Parameters.Select(parameter => parameter?.ToString() ?? "<null>")));
     }
 

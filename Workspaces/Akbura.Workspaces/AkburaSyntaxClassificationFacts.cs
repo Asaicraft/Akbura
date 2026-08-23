@@ -129,14 +129,6 @@ internal static class AkburaSyntaxClassificationFacts
                     return AkburaClassificationKind
                         .Directive;
 
-                case AkcssApplyDirectiveSyntax
-                    when token.Kind is
-                        SyntaxKind.IdentifierToken or
-                        SyntaxKind.NumericLiteralToken:
-
-                    return AkburaClassificationKind
-                        .Utility;
-
                 case AkcssInterceptDirectiveSyntax intercept
                     when HasSameSpan(
                              intercept.AtToken,

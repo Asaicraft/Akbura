@@ -200,7 +200,7 @@ internal sealed class DiagnosticBag
             return ImmutableArray<TDiagnostic>.Empty;
         }
 
-        var builder = ImmutableArray.CreateBuilder<TDiagnostic>();
+        using var builder = ImmutableArrayBuilder<TDiagnostic>.Rent();
         foreach (var diagnostic in oldBag)
         {
             builder.Add((TDiagnostic)diagnostic);

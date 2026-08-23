@@ -4,6 +4,7 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Threading;
@@ -53,6 +54,49 @@ internal sealed class AkburaReferencedModule
         return builder.ToImmutable();
     }
 
+    internal ImmutableArray<string> GetAkcssModuleNames()
+    {
+        using var builder = ImmutableArrayBuilder<string>.Rent();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var module in _akcssModules)
+        {
+            if (names.Add(module.MetadataName))
+            {
+                builder.Add(module.MetadataName);
+            }
+        }
+
+        if (_akcssModules.Length != 0)
+        {
+            return builder.ToImmutable();
+        }
+
+        foreach (var source in Manifest.Sources)
+        {
+            if (source.Kind != AkburaModuleSourceKind.Akcss)
+            {
+                continue;
+            }
+
+            foreach (var declaration in source.Declarations)
+            {
+                if (declaration.Kind != DeclarationKind.AkcssModule)
+                {
+                    continue;
+                }
+
+                var name = declaration.MetadataName ??
+                    source.SourceCodePath;
+                if (names.Add(name))
+                {
+                    builder.Add(name);
+                }
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
     internal bool IsSyntaxTreeMaterialized(string sourceCodePath)
     {
         if (!_lazyEmbeddedData.IsValueCreated)
@@ -88,6 +132,23 @@ internal sealed class AkburaReferencedModule
 
         symbol = null!;
         return false;
+    }
+
+    internal IEnumerable<IAkburaComponentSymbol> GetComponentSymbols()
+    {
+        foreach (var source in _lazyEmbeddedData.Value.Sources)
+        {
+            foreach (var declaration in source.Source.Declarations)
+            {
+                if (declaration.Kind == DeclarationKind.Component &&
+                    declaration.MetadataName is { Length: > 0 } metadataName &&
+                    source.TryGetComponentSymbol(metadataName, out var symbol))
+                {
+                    yield return symbol;
+                    break;
+                }
+            }
+        }
     }
 
     public ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(

@@ -12,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -21,6 +22,258 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class MarkupBinder
 {
+    internal ImmutableArray<TailwindUtilityLookupCandidate>
+        LookupTailwindUtilitiesForCompletion(
+            IMarkupComponentSymbol containingComponent,
+            CancellationToken cancellationToken)
+    {
+        using var diagnosticsBuilder =
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        using var resultBuilder =
+            ImmutableArrayBuilder<TailwindUtilityLookupCandidate>.Rent();
+        var claimedSelectors = new HashSet<string>(
+            StringComparer.Ordinal);
+        var visibleSignatures = new HashSet<string>(
+            StringComparer.Ordinal);
+        var targetTypeCache = new Dictionary<
+            AkburaSyntax,
+            Dictionary<string, CSharpSymbolDefinition>>();
+
+        AddTailwindUtilityCompletionLayer(
+            GetLocalAkcssUtilityDeclarations(diagnosticsBuilder),
+            containingComponent,
+            claimedSelectors,
+            visibleSignatures,
+            targetTypeCache,
+            resultBuilder,
+            cancellationToken);
+
+        foreach (var layer in GetImportedAkcssUtilitySymbolLayers())
+        {
+            AddTailwindUtilityCompletionLayer(
+                layer,
+                containingComponent,
+                claimedSelectors,
+                visibleSignatures,
+                resultBuilder,
+                cancellationToken);
+        }
+
+        foreach (var layer in
+                 GetImportedAkcssUtilityDeclarationLayers(
+                     diagnosticsBuilder))
+        {
+            AddTailwindUtilityCompletionLayer(
+                layer,
+                containingComponent,
+                claimedSelectors,
+                visibleSignatures,
+                targetTypeCache,
+                resultBuilder,
+                cancellationToken);
+        }
+
+        return resultBuilder.ToImmutable();
+    }
+
+    private void AddTailwindUtilityCompletionLayer(
+        ImmutableArray<AkcssUtilityDeclarationSyntax> declarations,
+        IMarkupComponentSymbol containingComponent,
+        HashSet<string> claimedSelectors,
+        HashSet<string> visibleSignatures,
+        Dictionary<AkburaSyntax, Dictionary<string, CSharpSymbolDefinition>>
+            targetTypeCache,
+        ImmutableArrayBuilder<TailwindUtilityLookupCandidate> resultBuilder,
+        CancellationToken cancellationToken)
+    {
+        var layerSelectors = new HashSet<string>(
+            StringComparer.Ordinal);
+        foreach (var declaration in declarations)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var selector = declaration.Selector;
+            var name = selector.Name.Identifier.ValueText;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            var selectorKey = GetTailwindCompletionSelectorKey(
+                name,
+                selector.Parameters.Count);
+            if (claimedSelectors.Contains(selectorKey) ||
+                !TryCreateTailwindUtilityLookupCandidate(
+                    declaration,
+                    containingComponent,
+                    targetTypeCache,
+                    out var candidate))
+            {
+                continue;
+            }
+
+            layerSelectors.Add(selectorKey);
+            if (visibleSignatures.Add(
+                    GetTailwindCompletionSignatureKey(candidate)))
+            {
+                resultBuilder.Add(candidate);
+            }
+        }
+
+        claimedSelectors.UnionWith(layerSelectors);
+    }
+
+    private void AddTailwindUtilityCompletionLayer(
+        ImmutableArray<ITailwindUtilitySymbol> utilities,
+        IMarkupComponentSymbol containingComponent,
+        HashSet<string> claimedSelectors,
+        HashSet<string> visibleSignatures,
+        ImmutableArrayBuilder<TailwindUtilityLookupCandidate> resultBuilder,
+        CancellationToken cancellationToken)
+    {
+        var layerSelectors = new HashSet<string>(
+            StringComparer.Ordinal);
+        foreach (var utility in utilities)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var selectorKey = GetTailwindCompletionSelectorKey(
+                utility.Name,
+                utility.Parameters.Length);
+            if (claimedSelectors.Contains(selectorKey) ||
+                !IsAkcssTargetCompatible(
+                    utility,
+                    containingComponent))
+            {
+                continue;
+            }
+
+            layerSelectors.Add(selectorKey);
+            var candidate = CreateTailwindUtilityLookupCandidate(
+                utility);
+            if (visibleSignatures.Add(
+                    GetTailwindCompletionSignatureKey(candidate)))
+            {
+                resultBuilder.Add(candidate);
+            }
+        }
+
+        claimedSelectors.UnionWith(layerSelectors);
+    }
+
+    private bool TryCreateTailwindUtilityLookupCandidate(
+        AkcssUtilityDeclarationSyntax declaration,
+        IMarkupComponentSymbol containingComponent,
+        Dictionary<AkburaSyntax, Dictionary<string, CSharpSymbolDefinition>>
+            targetTypeCache,
+        out TailwindUtilityLookupCandidate candidate)
+    {
+        var selector = declaration.Selector;
+        var targetType = default(CSharpSymbolDefinition);
+        if (selector.TargetType != null)
+        {
+            var targetText = selector.TargetType
+                .ToFullString()
+                .Trim();
+            var root = selector.TargetType.Root;
+            if (!targetTypeCache.TryGetValue(
+                    root,
+                    out var typesByName))
+            {
+                typesByName = new Dictionary<
+                    string,
+                    CSharpSymbolDefinition>(StringComparer.Ordinal);
+                targetTypeCache.Add(root, typesByName);
+            }
+
+            if (!typesByName.TryGetValue(
+                    targetText,
+                    out targetType))
+            {
+                if (!SemanticModel.TryResolveAkcssTargetType(
+                        selector.TargetType,
+                        out targetType))
+                {
+                    targetType = default;
+                }
+
+                typesByName.Add(targetText, targetType);
+            }
+
+            if (targetType.IsDefault ||
+                containingComponent.ComponentType == null ||
+                targetType.Symbol is not ITypeSymbol resolvedTarget ||
+                !AkburaSemanticModel.IsAssignableTo(
+                    containingComponent.ComponentType,
+                    resolvedTarget))
+            {
+                candidate = default;
+                return false;
+            }
+        }
+
+        using var parameters =
+            ImmutableArrayBuilder<TailwindUtilityParameterLookupCandidate>
+                .Rent(selector.Parameters.Count);
+        foreach (var parameter in selector.Parameters)
+        {
+            parameters.Add(
+                new TailwindUtilityParameterLookupCandidate(
+                    parameter.ParamName.Identifier.ValueText,
+                    parameter.Type.ToFullString().Trim(),
+                    isOptional: false));
+        }
+
+        candidate = new TailwindUtilityLookupCandidate(
+            selector.Name.Identifier.ValueText,
+            parameters.ToImmutable(),
+            targetType.ToDisplayString(
+                SymbolDisplayFormat.MinimallyQualifiedFormat));
+        return true;
+    }
+
+    private static TailwindUtilityLookupCandidate
+        CreateTailwindUtilityLookupCandidate(
+            ITailwindUtilitySymbol utility)
+    {
+        using var parameters =
+            ImmutableArrayBuilder<TailwindUtilityParameterLookupCandidate>
+                .Rent(utility.Parameters.Length);
+        foreach (var parameter in utility.Parameters)
+        {
+            parameters.Add(
+                new TailwindUtilityParameterLookupCandidate(
+                    parameter.Name,
+                    parameter.Type.ToDisplayString(
+                        SymbolDisplayFormat.MinimallyQualifiedFormat),
+                    parameter.IsOptional));
+        }
+
+        return new TailwindUtilityLookupCandidate(
+            utility.Name,
+            parameters.ToImmutable(),
+            utility.TargetType.ToDisplayString(
+                SymbolDisplayFormat.MinimallyQualifiedFormat));
+    }
+
+    private static string GetTailwindCompletionSelectorKey(
+        string name,
+        int parameterCount)
+    {
+        return name + "\0" + parameterCount;
+    }
+
+    private static string GetTailwindCompletionSignatureKey(
+        TailwindUtilityLookupCandidate candidate)
+    {
+        var builder = new StringBuilder(candidate.Name);
+        foreach (var parameter in candidate.Parameters)
+        {
+            builder.Append('\0');
+            builder.Append(parameter.TypeDisplay);
+        }
+
+        return builder.ToString();
+    }
+
     internal BoundNode CreateBoundTailwindUtilityAttribute(TailwindAttributeSyntax attribute)
     {
         var diagnosticsBag = BindingDiagnosticBag.GetInstance();
@@ -374,6 +627,11 @@ internal sealed partial class MarkupBinder
             {
                 return importedUtilities;
             }
+        }
+
+        if (containingComponent?.ComponentType is null)
+        {
+            return ImmutableArray<ITailwindUtilitySymbol>.Empty;
         }
 
         resolvedUtilityName = GetTailwindUtilityCandidateName(

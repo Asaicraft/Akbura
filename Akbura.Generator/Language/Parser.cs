@@ -267,25 +267,25 @@ internal sealed partial class Parser : IDisposable
         var mode = _mode;
         _mode = Lexer.LexerMode.InTypeName;
 
-        var token = EatToken();
+        var token = NormalizeCSharpTypeToken(EatToken());
 
         _mode = mode;
 
         AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
-        AkburaDebug.Assert(((CSharpRawToken)token).RawNode is CSharp.TypeSyntax, "Exprected TypeSyntax");
+        AkburaDebug.Assert(token.RawNode is CSharp.TypeSyntax, "Exprected TypeSyntax");
 
-        var typeOrIdentifier = (CSharp.TypeSyntax)((CSharpRawToken)token).RawNode!;
+        var typeOrIdentifier = (CSharp.TypeSyntax)token.RawNode!;
 
         // if it's not an identifier name, it's definitely a type
         if (typeOrIdentifier.Kind() != CSharpSyntaxKind.IdentifierName)
         {
-            return (CSharpRawToken)token;
+            return token;
         }
 
         // check for well-known types (int, string, etc.)
         if (SyntaxFacts.IsWellKnownType(typeOrIdentifier))
         {
-            return (CSharpRawToken)token;
+            return token;
         }
 
         var fastToken = FastPeekToken();
@@ -300,7 +300,7 @@ internal sealed partial class Parser : IDisposable
         if (fastToken.Kind == SyntaxKind.IdentifierToken)
         {
             // if the next token is an identifier, then it's definitely a type
-            return (CSharpRawToken)token;
+            return token;
         }
 
         ReturnToken();
@@ -318,25 +318,25 @@ internal sealed partial class Parser : IDisposable
             _tokenOffset++;
         }
 
-        var token = EatToken();
+        var token = NormalizeCSharpTypeToken(EatToken());
 
         _mode = mode;
 
         AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
-        AkburaDebug.Assert(((CSharpRawToken)token).RawNode is CSharp.TypeSyntax, "Exprected TypeSyntax");
+        AkburaDebug.Assert(token.RawNode is CSharp.TypeSyntax, "Exprected TypeSyntax");
 
-        var typeOrIdentifier = (CSharp.TypeSyntax)((CSharpRawToken)token).RawNode!;
+        var typeOrIdentifier = (CSharp.TypeSyntax)token.RawNode!;
 
         // if it's not an identifier name, it's definitely a type
         if (typeOrIdentifier.Kind() != CSharpSyntaxKind.IdentifierName)
         {
-            return (CSharpRawToken)token;
+            return token;
         }
 
         // check for well-known types (int, string, etc.)
         if (SyntaxFacts.IsWellKnownType(typeOrIdentifier))
         {
-            return (CSharpRawToken)token;
+            return token;
         }
 
         var fastToken = FastPeekToken();
@@ -345,17 +345,38 @@ internal sealed partial class Parser : IDisposable
         {
             // if the next token is '=', then it's a identifier used as a name, not a type
             ReturnToken();
-            return (CSharpRawToken)EatToken(SyntaxKind.CSharpRawToken);
+            return NormalizeCSharpTypeToken(
+                EatToken(SyntaxKind.CSharpRawToken));
         }
 
         if (fastToken.Kind == SyntaxKind.IdentifierToken)
         {
             // if the next token is an identifier, then it's definitely a type
-            return (CSharpRawToken)token;
+            return token;
         }
 
         ReturnToken();
-        return (CSharpRawToken)EatToken(SyntaxKind.CSharpRawToken);
+        return NormalizeCSharpTypeToken(
+            EatToken(SyntaxKind.CSharpRawToken));
+    }
+
+    private static CSharpRawToken NormalizeCSharpTypeToken(
+        GreenSyntaxToken token)
+    {
+        if (token is CSharpRawToken
+            {
+                RawNode: CSharp.TypeSyntax
+            } csharpToken)
+        {
+            return csharpToken;
+        }
+
+        return new CSharpRawToken(
+            CSharpFactory.ParseTypeName(token.Text),
+            token.GetLeadingTrivia(),
+            token.GetTrailingTrivia(),
+            token.GetDiagnostics(),
+            token.GetAnnotations());
     }
 
     // Consume a token if it is the right kind. Otherwise skip a token and replace it with one of the correct kind.
@@ -472,7 +493,9 @@ internal sealed partial class Parser : IDisposable
     }
 
 
-    private GreenSyntaxToken EatTokenWithPrejudice(string errorCode, params object[] args)
+    private GreenSyntaxToken EatTokenWithPrejudice(
+        string errorCode,
+        params ImmutableArray<object?> args)
     {
         var token = EatToken();
         token = WithAdditionalDiagnostics(token, MakeError(offset: 0, token.Width, errorCode, args));
@@ -576,13 +599,21 @@ internal sealed partial class Parser : IDisposable
         return AddError(node, errorCode, []);
     }
 
-    private TNode AddErrorAsWarning<TNode>(TNode node, string errorCode, params object[] args) where TNode : GreenNode
+    private TNode AddErrorAsWarning<TNode>(
+        TNode node,
+        string errorCode,
+        params ImmutableArray<object?> args)
+        where TNode : GreenNode
     {
         Debug.Assert(!node.IsMissing);
         return AddError(node, ErrorCodes.WRN_ErrorOverride, MakeError(node, errorCode, args), errorCode);
     }
 
-    private TNode AddError<TNode>(TNode nodeOrToken, string errorCode, params object[] args) where TNode : GreenNode
+    private TNode AddError<TNode>(
+        TNode nodeOrToken,
+        string errorCode,
+        params ImmutableArray<object?> args)
+        where TNode : GreenNode
     {
         if (!nodeOrToken.IsMissing)
         {
@@ -725,7 +756,12 @@ internal sealed partial class Parser : IDisposable
     /// Adds an error diagnostic to the node at the specified (offset,length).
     /// Works both for normal and missing nodes.
     /// </summary>
-    private TNode AddError<TNode>(TNode node, int offset, int length, string errorCode, params object[] args)
+    private TNode AddError<TNode>(
+        TNode node,
+        int offset,
+        int length,
+        string errorCode,
+        params ImmutableArray<object?> args)
         where TNode : GreenNode
     {
         return WithAdditionalDiagnostics(node, MakeError(offset, length, errorCode, args));
@@ -899,18 +935,8 @@ internal sealed partial class Parser : IDisposable
                 // Strip the leading trivia of the token, and add it to the target's final trivia list.
                 builder.Add(token.GetLeadingTrivia());
 
-                if (token.Width > 0)
+                if (diagnostic == null)
                 {
-                    // Then add the token (stripped of its own trivia) to the target's final trivia list.
-
-                    builder.Add(GreenSyntaxFactory.SkippedTokensTrivia(
-                        token.TokenWithLeadingTrivia(null).TokenWithTrailingTrivia(null)));
-                }
-                else
-                {
-                    // Do not bother adding zero-width tokens to target's final trivia list.  Lots of code (like
-                    // GetStructure) does not like it at all. But do keep around any diagnostics that might have
-                    // been on this zero width token, and move it to the target.
                     var existing = (SyntaxDiagnosticInfo)token.GetDiagnostics().FirstOrDefault()!;
                     if (existing != null)
                     {
@@ -918,6 +944,15 @@ internal sealed partial class Parser : IDisposable
                         finalDiagnosticOffset = currentOffset + token.GetLeadingTriviaWidth() + existing.Position;
                     }
                 }
+
+                if (token.Width > 0)
+                {
+                    // Then add the token (stripped of its own trivia) to the target's final trivia list.
+
+                    builder.Add(GreenSyntaxFactory.SkippedTokensTrivia(
+                        token.TokenWithLeadingTrivia(null).TokenWithTrailingTrivia(null)));
+                }
+                // Do not add zero-width tokens to trivia. Their diagnostics were preserved above.
 
                 // Finally strip the trailing trivia of the token, and add it to the target's final list.
                 builder.Add(token.GetTrailingTrivia());

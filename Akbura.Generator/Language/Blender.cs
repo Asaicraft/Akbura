@@ -89,22 +89,38 @@ internal readonly partial struct Blender
         AkburaSyntax oldTree,
         TextChangeRange changeRange)
     {
-        if (oldTree == null || oldTree.FullWidth == 0)
+        if (oldTree == null ||
+            oldTree.FullWidth == 0 ||
+            changeRange.Span.Start == 0 ||
+            changeRange.NewLength >= changeRange.Span.Length)
         {
             return changeRange;
         }
 
-        const int maxLookahead = 0;
-        var start = changeRange.Span.Start;
+        var originalStart = changeRange.Span.Start;
+        // Only partial edits of "/>" need a left anchor; broad expansion breaks node reuse.
+        var changedToken =
+            oldTree.FindToken(changeRange.Span.Start);
 
-        for (var i = 0; start > 0 && i < maxLookahead; i++)
+        if (changedToken.Kind != SyntaxKind.SlashGreaterToken ||
+            changeRange.Span.Start < changedToken.Span.Start ||
+            changeRange.Span.End > changedToken.Span.End ||
+            changeRange.Span.Length >= changedToken.Span.Length)
         {
-            start--;
+            return changeRange;
         }
 
-        var finalSpan = TextSpan.FromBounds(start, changeRange.Span.End);
-        var finalLength = changeRange.NewLength + (changeRange.Span.Start - start);
+        var affectedStart = originalStart - 1;
+        var affectedSpan = TextSpan.FromBounds(
+            affectedStart,
+            changeRange.Span.End);
+        var affectedNewLength =
+            changeRange.NewLength +
+            originalStart -
+            affectedStart;
 
-        return new TextChangeRange(finalSpan, finalLength);
+        return new TextChangeRange(
+            affectedSpan,
+            affectedNewLength);
     }
 }

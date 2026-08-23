@@ -1,5 +1,6 @@
 using Akbura.CompilerAnotations;
 using Akbura.Markup;
+using Akbura.RuntimePools;
 using Avalonia.Controls;
 using Avalonia.Data;
 using System.Collections.Immutable;
@@ -365,7 +366,8 @@ public sealed class AkcssUtilityCandidateActivator
         ImmutableArray<AkcssUtilityApplication> applications,
         int argumentCount)
     {
-        var builder = ImmutableArray.CreateBuilder<CandidateOperation>();
+        using var builder =
+            ImmutableArrayBuilder<CandidateOperation>.Rent();
         for (var applicationIndex = 0;
              applicationIndex < applications.Length;
              applicationIndex++)
@@ -401,7 +403,7 @@ public sealed class AkcssUtilityCandidateActivator
         ImmutableArray<CandidateOperation> operations)
     {
         var keys = new HashSet<string>(StringComparer.Ordinal);
-        var builder = ImmutableArray.CreateBuilder<string>();
+        using var builder = ImmutableArrayBuilder<string>.Rent();
         foreach (var operation in operations)
         {
             if (keys.Add(operation.ConflictKey))

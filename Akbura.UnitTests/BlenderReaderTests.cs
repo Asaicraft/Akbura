@@ -7,6 +7,62 @@ namespace Akbura.UnitTests;
 public sealed class BlenderReaderTests
 {
     [Fact]
+    public void ReadToken_AtChangedUtilityCloseBrace_PreservesSelectorTokens()
+    {
+        const string oldCode =
+            "@using System;\r\n" +
+            "@utilities {\r\n" +
+            "\tControl.w-(double width) { Width: width; }\r\n" +
+            "\tControl.w-auto { Width: double.NaN; }\r\n" +
+            "\tControl.w-full { HorizontalAlignment: Stretch; }\r\n" +
+            "\tControl.w-px { Width: 1d; }\r\n" +
+            "}\r\n";
+        var insertPosition = oldCode.IndexOf(
+            " }\r\n\tControl.w-px",
+            StringComparison.Ordinal) + 1;
+        const string insertedText = "\r\n";
+        var newCode = oldCode.Insert(insertPosition, insertedText);
+        using var lexer = new Lexer(SourceText.From(newCode));
+        var oldTree = AkcssSyntaxTree.ParseText(
+            SourceText.From(oldCode),
+            "Styles.akcss").GetRoot();
+        Assert.False(oldTree.ContainsDiagnostics);
+        Assert.False(oldTree.Members[0].ContainsSkippedText);
+        var change = new TextChangeRange(
+            new TextSpan(insertPosition, 0),
+            insertedText.Length);
+        var blender = new Blender(lexer, oldTree, [change]);
+
+        var usingDirective = blender.ReadNode(Lexer.LexerMode.InAkcss);
+        Assert.NotNull(usingDirective.Node);
+        blender = usingDirective.Blender;
+        var section = blender.ReadNode(Lexer.LexerMode.InAkcss);
+        Assert.Null(section.Node);
+
+        var atToken = blender.ReadToken(Lexer.LexerMode.InAkcss);
+        blender = atToken.Blender;
+        var utilitiesToken = blender.ReadToken(Lexer.LexerMode.InAkcss);
+        blender = utilitiesToken.Blender;
+        var openBrace = blender.ReadToken(Lexer.LexerMode.InAkcss);
+        blender = openBrace.Blender;
+        var firstUtility = blender.ReadNode(Lexer.LexerMode.InAkcss);
+        blender = firstUtility.Blender;
+        var secondUtility = blender.ReadNode(Lexer.LexerMode.InAkcss);
+        blender = secondUtility.Blender;
+        var changedUtility = blender.ReadNode(Lexer.LexerMode.InAkcss);
+        Assert.Null(changedUtility.Node);
+        var selector = blender.ReadNode(Lexer.LexerMode.InAkcss);
+        Assert.Null(selector.Node);
+
+        var target = blender.ReadToken(Lexer.LexerMode.InAkcss);
+        var dot = target.Blender.ReadToken(Lexer.LexerMode.InAkcss);
+
+        Assert.Equal(SyntaxKind.CSharpRawToken, target.Token.Kind);
+        Assert.EndsWith("Control", target.Token.ToFullString());
+        Assert.Equal(SyntaxKind.DotToken, dot.Token.Kind);
+    }
+
+    [Fact]
     public void ReadToken_WithoutChanges_ReusesOldTreeTokens()
     {
         const string code = "state count = 0;";

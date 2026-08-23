@@ -2,7 +2,6 @@ using Akbura.Language;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace Akbura.Workspaces;
 
@@ -92,8 +91,7 @@ public sealed class AkburaProjectSnapshot
         return false;
     }
 
-    internal AkburaProjectSnapshot AddDocument(
-        AkburaDocumentSnapshot document)
+    internal AkburaProjectSnapshot AddDocument(AkburaDocumentSnapshot document)
     {
         if (document == null)
         {
@@ -140,7 +138,9 @@ public sealed class AkburaProjectSnapshot
             throw new KeyNotFoundException($"Document '{document.Id}' was not found.");
         }
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: compilation started");
 
         var compilation =
             ReferenceEquals(
@@ -152,16 +152,22 @@ public sealed class AkburaProjectSnapshot
                         oldDocument.SyntaxTree,
                         document.SyntaxTree);
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: compilation completed");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: compilation completed");
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: dictionary started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: dictionary started");
 
         var documents =
             Documents.SetItem(
                 document.Id,
                 document);
 
-        Debug.WriteLine("[Akbura] Project.ReplaceDocument: dictionary completed");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            "Project.ReplaceDocument: dictionary completed");
 
         return new AkburaProjectSnapshot(
             Id,
@@ -257,6 +263,43 @@ public sealed class AkburaProjectSnapshot
             context,
             compilation,
             Documents);
+    }
+
+    internal AkburaProjectSnapshot WithDocuments(
+        ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents)
+    {
+        if (documents == null)
+        {
+            throw new ArgumentNullException(nameof(documents));
+        }
+
+        if (ReferenceEquals(documents, Documents))
+        {
+            return this;
+        }
+
+        var componentTrees = documents.Values
+            .Select(static document => document.SyntaxTree)
+            .Where(static syntaxTree => syntaxTree is not AkcssSyntaxTree)
+            .ToImmutableArray();
+        var akcssTrees = documents.Values
+            .Select(static document => document.SyntaxTree)
+            .OfType<AkcssSyntaxTree>()
+            .ToImmutableArray();
+        var compilation = new AkburaCompilation(
+            Context.CSharpCompilation,
+            componentTrees,
+            akcssTrees,
+            Context.RootNamespace,
+            Context.ProjectDirectory,
+            reuseFrom: Compilation);
+
+        return new AkburaProjectSnapshot(
+            Id,
+            VersionStamp.Create(),
+            Context,
+            compilation,
+            documents);
     }
 
     internal AkburaProjectSnapshot WithCompilationReferences(

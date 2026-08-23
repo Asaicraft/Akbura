@@ -1,6 +1,10 @@
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+#if DEBUG
+using System.Diagnostics;
+#endif
 
 namespace Akbura.Workspaces;
 
@@ -11,7 +15,14 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
     private readonly EmbeddedCSharpSemanticClassificationService _semanticCSharp = new();
 
-    private readonly AkcssSemanticClassificationService _semanticAkcss = new();
+    private readonly AkcssSemanticClassificationService _semanticAkcss;
+
+    public AkburaClassificationService(AkcssReferenceResolver referenceResolver)
+    {
+        _semanticAkcss = new AkcssSemanticClassificationService(
+            referenceResolver ??
+            throw new ArgumentNullException(nameof(referenceResolver)));
+    }
 
     public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
         SourceText text,
@@ -39,6 +50,24 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             cancellationToken);
     }
 
+    public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
+        AkburaSyntacticDocument document,
+        TextSpan requestedSpan,
+        CancellationToken cancellationToken = default)
+    {
+        if (document == null)
+        {
+            throw new ArgumentNullException(
+                nameof(document));
+        }
+
+        return GetSyntacticClassifications(
+            document.SyntaxTree.GetRootSyntax(),
+            document.Text.Length,
+            requestedSpan,
+            cancellationToken);
+    }
+
     public ImmutableArray<AkburaClassifiedSpan> GetClassifications(
         AkburaDocumentContext context,
         TextSpan requestedSpan,
@@ -51,15 +80,32 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
         var document = context.Document;
 
+#if DEBUG
+        var totalTimer = Stopwatch.StartNew();
+        var stageTimer = Stopwatch.StartNew();
+        var activeStage = "Clamp span";
+        var outcome = "completed";
+        var resultCount = 0;
+
+        try
+        {
+#endif
         var span = ClampSpan(requestedSpan, document.Text.Length);
 
         if (span.Length == 0)
         {
+#if DEBUG
+            activeStage = "Empty span";
+#endif
             return [];
         }
 
         var root = document.SyntaxTree.GetRootSyntax();
 
+#if DEBUG
+        activeStage = "Syntactic classifications";
+        stageTimer.Restart();
+#endif
         var syntacticSpans =
             GetSyntacticClassifications(
                 root,
@@ -67,14 +113,39 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
                 span,
                 cancellationToken);
 
-        var semanticBuilder =
-            ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
+#if DEBUG
+        resultCount = syntacticSpans.Length;
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            syntacticSpans.Length);
+#endif
 
+        using var semanticBuilder =
+            ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
+
+#if DEBUG
+        activeStage = "GetSemanticModel";
+        stageTimer.Restart();
+#endif
         var semanticModel =
             context.Project.Compilation
                 .GetSemanticModel(
                     document.SyntaxTree);
 
+#if DEBUG
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            count: null);
+
+        activeStage = "Embedded C# classifications";
+        stageTimer.Restart();
+#endif
         _semanticCSharp.AddClassifications(
             semanticModel,
             root,
@@ -82,17 +153,101 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             semanticBuilder,
             cancellationToken);
 
+#if DEBUG
+        var csharpCount = semanticBuilder.Count;
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            csharpCount);
+
+        activeStage = "AKCSS classifications";
+        stageTimer.Restart();
+#endif
         _semanticAkcss.AddClassifications(
+            context,
             semanticModel,
             root,
             span,
             semanticBuilder,
             cancellationToken);
 
-        return MergeClassifications(
+#if DEBUG
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            semanticBuilder.Count - csharpCount);
+
+        activeStage = "Merge classifications";
+        stageTimer.Restart();
+#endif
+        var result = MergeClassifications(
             syntacticSpans,
             semanticBuilder.ToImmutable());
+
+#if DEBUG
+        resultCount = result.Length;
+        WriteClassificationStage(
+            document.FilePath,
+            span,
+            activeStage,
+            stageTimer.Elapsed,
+            result.Length);
+#endif
+
+        return result;
+#if DEBUG
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = "canceled";
+            throw;
+        }
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Classification,
+                $"Semantic classification total: " +
+                $"file='{document.FilePath}', " +
+                $"requestedSpan={requestedSpan}, " +
+                $"activeStage='{activeStage}', " +
+                $"outcome={outcome}, " +
+                $"elapsed={totalTimer.Elapsed.TotalMilliseconds:F2} ms, " +
+                $"spans={resultCount}.");
+        }
+#endif
     }
+
+#if DEBUG
+    private static void WriteClassificationStage(
+        string filePath,
+        TextSpan span,
+        string stage,
+        TimeSpan elapsed,
+        int? count)
+    {
+        var countSuffix = count is { } value
+            ? $", spans={value}."
+            : ".";
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Classification,
+            $"Semantic classification stage: " +
+            $"file='{filePath}', " +
+            $"span={span}, " +
+            $"stage='{stage}', " +
+            $"elapsed={elapsed.TotalMilliseconds:F2} ms" +
+            countSuffix);
+    }
+#endif
 
     private ImmutableArray<AkburaClassifiedSpan>
         GetSyntacticClassifications(
@@ -110,8 +265,8 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             return [];
         }
 
-        var builder =
-            ImmutableArray.CreateBuilder<AkburaClassifiedSpan>();
+        using var builder =
+            ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
 
         AddEmbeddedCSharpNodes(
             root,
@@ -160,22 +315,31 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             ImmutableArray<AkburaClassifiedSpan> semanticSpans)
     {
 
-        var semanticSpanSet =
-            new HashSet<TextSpan>(
-                semanticSpans.Select(
-                    static item => item.Span));
+        var orderedSemantic = semanticSpans.ToArray();
+        Array.Sort(orderedSemantic, CompareClassifications);
+        var prefixMaximumEnd = new int[orderedSemantic.Length];
+        var maximumEnd = 0;
+        for (var index = 0; index < orderedSemantic.Length; index++)
+        {
+            maximumEnd = Math.Max(
+                maximumEnd,
+                orderedSemantic[index].Span.End);
+            prefixMaximumEnd[index] = maximumEnd;
+        }
 
         var items =
             new List<AkburaClassifiedSpan>(
                 syntacticSpans.Length +
                 semanticSpans.Length);
 
-        items.AddRange(semanticSpans);
+        items.AddRange(orderedSemantic);
 
         foreach (var syntactic in syntacticSpans)
         {
-            if (!semanticSpanSet.Contains(
-                    syntactic.Span))
+            if (!IsCoveredBySemanticSpan(
+                    syntactic.Span,
+                    orderedSemantic,
+                    prefixMaximumEnd))
             {
                 items.Add(syntactic);
             }
@@ -184,6 +348,32 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         items.Sort(CompareClassifications);
 
         return [.. items];
+    }
+
+    private static bool IsCoveredBySemanticSpan(
+        TextSpan syntacticSpan,
+        AkburaClassifiedSpan[] semanticSpans,
+        int[] prefixMaximumEnd)
+    {
+        var low = 0;
+        var high = semanticSpans.Length - 1;
+        var candidate = -1;
+        while (low <= high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (semanticSpans[middle].Span.Start <= syntacticSpan.Start)
+            {
+                candidate = middle;
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        return candidate >= 0 &&
+            prefixMaximumEnd[candidate] >= syntacticSpan.End;
     }
 
     private static int CompareClassifications(
@@ -224,7 +414,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
     private void AddEmbeddedCSharpNodes(
         AkburaSyntax root,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodes())
@@ -270,7 +460,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
     private void AddToken(
         SyntaxToken token,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         if (token.Kind == SyntaxKind.CSharpRawToken &&
@@ -301,7 +491,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
     private void AddTrivia(
         SyntaxTriviaList triviaList,
         TextSpan requestedSpan,
-        ImmutableArray<AkburaClassifiedSpan>.Builder builder,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
         foreach (var trivia in triviaList)

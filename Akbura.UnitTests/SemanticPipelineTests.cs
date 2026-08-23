@@ -2325,6 +2325,37 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_AkcssApply_ReferencesRemainAlignedAcrossUnresolvedItem()
+    {
+        const string code =
+            "@akcss {\n" +
+            "    .first { }\n" +
+            "    .second { }\n" +
+            "    .target { @apply first missing second; }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var apply = Assert.Single(
+            syntaxTree.GetRoot().DescendantNodes()
+                .OfType<AkcssApplyDirectiveSyntax>());
+
+        var references = semanticModel.GetAkcssApplyItemReferences(apply);
+
+        Assert.Equal(["first", "missing", "second"],
+            references.Select(static reference => reference.Text));
+        Assert.Equal("first", references[0].Symbol?.ClassName);
+        Assert.Null(references[1].Symbol);
+        Assert.Equal("second", references[2].Symbol?.ClassName);
+        Assert.All(references, reference =>
+            Assert.Equal(
+                reference.Text,
+                syntaxTree.Text.ToString(reference.SourceSpan)));
+        Assert.True(
+            references == semanticModel.GetAkcssApplyItemReferences(apply));
+    }
+
+    [Fact]
     public void SemanticModel_AkcssIntercept_ResolvesAkcssStyleSubtype()
     {
         const string code =
@@ -3079,6 +3110,44 @@ public class SemanticPipelineTests
             {
                 Name: "IsPointerOver",
             });
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(ifDirective));
+        Assert.False(ifOperation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_AkcssIfDirective_BindsAttachedTargetProperty()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "@akcss {\n" +
+            "    Control.row-span {\n" +
+            "        @if(Grid.RowSpan > 1) {\n" +
+            "            Width: 10;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var rule = GetOnlyAkcssStyleRule(syntaxTree);
+        var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(
+            Assert.Single(rule.Members));
+        var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(
+            semanticModel.GetSymbolInfo(rule).Symbol);
+        var ifOperation = Assert.IsAssignableFrom<IAkcssIfOperation>(
+            Assert.Single(symbol.Operations));
+
+        Assert.Equal("Boolean", ifOperation.ConditionType.Name);
+        Assert.Contains(
+            "global::Avalonia.Controls.Grid.GetRowSpan(" +
+                "(global::Avalonia.Controls.Control)__target)",
+            ifOperation.ConditionOperation.Syntax!.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            EnumerateCSharpOperations(ifOperation),
+            operation => operation.CSharpTargetDefinition.Symbol is
+                IMethodSymbol { Name: "GetRowSpan" });
         Assert.Empty(semanticModel.GetSemanticDiagnostics(ifDirective));
         Assert.False(ifOperation.HasErrors);
     }
@@ -7625,6 +7694,54 @@ public class SemanticPipelineTests
         Assert.Null(symbolInfo.Symbol);
         Assert.True(symbolInfo.CandidateSymbols.IsEmpty);
         Assert.Equal(AkburaCandidateReason.NotFound, symbolInfo.CandidateReason);
+    }
+
+    [Fact]
+    public void SemanticModel_UnresolvedMarkupComponent_DoesNotReportTailwindUtilityNotFound()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "\n" +
+            "<MissingControl gap-3 />";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+        var attribute = Assert.IsAssignableFrom<TailwindFullAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+
+        var diagnostics = semanticModel.GetSemanticDiagnostics(element);
+
+        Assert.Contains(diagnostics, d => d.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound);
+        Assert.DoesNotContain(
+            diagnostics,
+            d => d.Code == ErrorCodes.AKBURA_SEMANTIC_TailwindUtilityNotFound);
+
+        var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(semanticModel.GetOperation(attribute));
+        Assert.True(operation.HasErrors);
+        Assert.Null(operation.Utility);
+    }
+
+    [Fact]
+    public void SemanticModel_IncompleteMarkupComponent_StartTagDoesNotReportComponentNotFound()
+    {
+        const string code = "<B";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var element = GetOnlyMarkupElement(syntaxTree);
+
+        Assert.NotNull(element.StartTag);
+        Assert.True(element.StartTag.CloseToken.IsMissing);
+
+        var symbolInfo = semanticModel.GetSymbolInfo(element);
+        var diagnostics = semanticModel.GetSemanticDiagnostics(element);
+
+        Assert.Null(symbolInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.UnsupportedSyntax, symbolInfo.CandidateReason);
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound);
     }
 
     [Fact]

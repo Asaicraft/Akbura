@@ -5,7 +5,8 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<EnableQuickScanBenchmark Condition="'$(EnableQuickScanBenchmark)' == ''">true</EnableQuickScanBenchmark>
+		<EnableQuickScanBenchmark Condition="'$(EnableQuickScanBenchmark)' == '' And ('$(Configuration)' == 'DebugStats' Or '$(Configuration)' == 'ReleaseStats')">true</EnableQuickScanBenchmark>
+		<EnableQuickScanBenchmark Condition="'$(EnableQuickScanBenchmark)' == ''">false</EnableQuickScanBenchmark>
 		<Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
 		<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
 	</PropertyGroup>
@@ -20,7 +21,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" AdditionalProperties="EnableAkburaStats=true;EnableQuickScanBenchmark=true" />
+		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" AdditionalProperties="EnableAkburaStats=$(EnableQuickScanBenchmark);EnableQuickScanBenchmark=$(EnableQuickScanBenchmark)" />
 		<Compile Include="..\Akbura.TestUtilities\RealisticIncrementalScenario.cs" Link="RealisticIncrementalScenario.cs" />
 	</ItemGroup>
 

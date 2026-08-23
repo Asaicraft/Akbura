@@ -3,7 +3,9 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Threading;
+#if DEBUG
 using System.Diagnostics;
+#endif
 
 namespace Akbura.VisualStudio.Editor;
 
@@ -19,15 +21,30 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private static readonly TimeSpan UpdateDelay =
         TimeSpan.FromMilliseconds(100);
 
+    private static readonly TimeSpan ProjectRetryDelay =
+        TimeSpan.FromMilliseconds(500);
+
     private readonly ITextBuffer _textBuffer;
 
     private readonly AkburaVisualStudioWorkspace _visualStudioWorkspace;
 
     private readonly AkburaWorkspace _workspace;
 
+    private readonly AkburaParserService _parserService;
+
     private AkburaProjectId? _projectId;
 
+    private readonly object _projectInitializationGate = new();
+
+    private Task<AkburaProjectId?>? _projectInitializationTask;
+
+    private int _projectContextVersion;
+
+    private int _projectInitializationVersion = -1;
+
     private readonly IAkburaClassificationService _classificationService;
+
+    private readonly IAkburaDiagnosticService _diagnosticService;
 
     private readonly JoinableTaskFactory _joinableTaskFactory;
 
@@ -66,6 +83,15 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private AkburaParsedBufferState? _publishedSemanticState;
 
     /// <summary>
+    /// Stores the latest document context independently of semantic
+    /// classification. Completion can consume this state as soon as the
+    /// workspace has accepted the document.
+    /// </summary>
+    private PublishedDocumentContext? _publishedDocumentContext;
+
+    private event Action? DocumentContextPublished;
+
+    /// <summary>
     /// Monotonically increasing editor request version.
     /// </summary>
     private long _requestedVersion;
@@ -81,15 +107,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
     /// </summary>
     private int _disposeState;
 
-#if DEBUG
     private long _enqueueCount;
-    private long _processingCount;
-#endif
 
     public AkburaTextBufferContext(
         ITextBuffer textBuffer,
         ITextDocumentFactoryService textDocumentFactory,
-        AkburaVisualStudioWorkspace visualStudioWorkspace)
+        AkburaVisualStudioWorkspace visualStudioWorkspace,
+        AkburaParserService parserService)
     {
         _textBuffer = textBuffer ?? throw new ArgumentNullException(nameof(textBuffer));
 
@@ -97,12 +121,21 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         _workspace = visualStudioWorkspace.Workspace;
 
+        _parserService = parserService ??
+            throw new ArgumentNullException(
+                nameof(parserService));
+
         if (textDocumentFactory == null)
         {
             throw new ArgumentNullException(nameof(textDocumentFactory));
         }
 
         _classificationService = _workspace.LanguageServices.Classification;
+
+        _diagnosticService = _workspace.LanguageServices.Diagnostics;
+
+        _visualStudioWorkspace.ProjectContextChanged +=
+            OnProjectContextChanged;
 
         _joinableTaskFactory = ThreadHelper.JoinableTaskFactory;
 
@@ -126,19 +159,36 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         else
         {
+            var documentKind =
+                AkburaEditorDocumentKindFacts.GetOrDefault(
+                    textBuffer);
+            var extension = documentKind ==
+                    AkburaEditorDocumentKind.Akcss
+                ? ".akcss"
+                : ".akbura";
             _uri = new Uri(
                 $"untitled://akbura/" +
-                $"{Guid.NewGuid():N}.akbura");
+                $"{Guid.NewGuid():N}{extension}");
         }
 
         _textBuffer.ChangedLowPriority +=
             OnTextBufferChangedLowPriority;
+
+        _ = _joinableTaskFactory.RunAsync(
+            WarmUpProjectAsync);
 
         EnqueueSnapshot(
             _textBuffer.CurrentSnapshot);
     }
 
     public event EventHandler<AkburaBufferChangedEventArgs>? Changed;
+
+    internal event EventHandler? Disposed;
+
+    internal string FilePath => _textDocument?.FilePath ??
+        (_uri.IsFile
+            ? Path.GetFullPath(_uri.LocalPath)
+            : _uri.AbsoluteUri);
 
     /// <summary>
     /// Returns the newest syntactic or semantic classification state that is
@@ -197,6 +247,78 @@ internal sealed class AkburaTextBufferContext : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Returns a published document context, waiting only until the workspace
+    /// has accepted a document. Semantic classification may still be running.
+    /// </summary>
+    internal async Task<AkburaDocumentContext?>
+        GetPublishedDocumentContextAsync(
+        ITextSnapshot requestedSnapshot,
+        CancellationToken cancellationToken)
+    {
+        ValidateRequestedSnapshot(requestedSnapshot);
+
+        var current = Volatile.Read(
+            ref _publishedDocumentContext);
+        if (current != null &&
+            current.Snapshot.Version.VersionNumber <=
+                requestedSnapshot.Version.VersionNumber)
+        {
+            return current.Context;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            return null;
+        }
+
+        var completion =
+            new TaskCompletionSource<AkburaDocumentContext?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void OnPublished()
+        {
+            var published = Volatile.Read(
+                ref _publishedDocumentContext);
+            if (published != null)
+            {
+                completion.TrySetResult(published.Context);
+            }
+            else if (Volatile.Read(ref _disposeState) != 0)
+            {
+                completion.TrySetResult(null);
+            }
+        }
+
+        DocumentContextPublished += OnPublished;
+        try
+        {
+            /*
+             * A semantic publication can race with subscribing to Changed.
+             * Check once more before awaiting the next notification.
+             */
+            var published = Volatile.Read(
+                ref _publishedDocumentContext);
+            if (published != null)
+            {
+                return published.Context;
+            }
+
+            using (cancellationToken.Register(
+                       () => completion.TrySetCanceled()))
+            using (_disposeCancellation.Token.Register(
+                       () => completion.TrySetResult(null)))
+            {
+                return await completion.Task.ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            DocumentContextPublished -= OnPublished;
+        }
+    }
+
     private void ValidateRequestedSnapshot(
         ITextSnapshot requestedSnapshot)
     {
@@ -239,6 +361,25 @@ internal sealed class AkburaTextBufferContext : IDisposable
         return true;
     }
 
+    internal bool TryGetLatestDocumentContext(
+        out AkburaDocumentContext context,
+        out ITextSnapshot snapshot)
+    {
+        var published = Volatile.Read(ref _publishedDocumentContext);
+
+        if (published == null)
+        {
+            context = null!;
+            snapshot = null!;
+            return false;
+        }
+
+        context = published.Context;
+        snapshot = published.Snapshot;
+
+        return true;
+    }
+
     private void OnTextBufferChangedLowPriority(
         object sender,
         TextContentChangedEventArgs e)
@@ -275,14 +416,11 @@ internal sealed class AkburaTextBufferContext : IDisposable
         Interlocked.Exchange(
             ref _pendingRequest,
             request);
-#if DEBUG
-        var enqueueCount = Interlocked.Increment(ref _enqueueCount);
-
-        Debug.WriteLine(
-            $"[Akbura] Enqueue #{enqueueCount}, " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Enqueue #{Interlocked.Increment(ref _enqueueCount)}, " +
             $"request={requestVersion}, " +
             $"snapshot={snapshot.Version.VersionNumber}");
-#endif
 
         CancelActiveParse();
         EnsureWorker();
@@ -290,34 +428,185 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     private async Task<AkburaProjectId?> GetProjectIdAsync(CancellationToken cancellationToken)
     {
-        if (_projectId is { } projectId)
+        while (true)
         {
-            return projectId;
+            if (_projectId is { } projectId)
+            {
+                return projectId;
+            }
+
+            var initializationTask =
+                GetOrCreateProjectInitializationTaskAsync(
+                    out var initializationVersion);
+            var synchronizedProjectId = await AwaitWithoutCancelingSourceAsync(
+                    initializationTask,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (initializationVersion != Volatile.Read(
+                    ref _projectContextVersion))
+            {
+                continue;
+            }
+
+            if (synchronizedProjectId is { } result)
+            {
+                return result;
+            }
+
+            ForgetFailedProjectInitialization(
+                initializationTask,
+                initializationVersion);
+            return null;
         }
+    }
 
-        var filePath =
-            _textDocument?.FilePath;
+    private Task<AkburaProjectId?>
+        GetOrCreateProjectInitializationTaskAsync(
+            out int initializationVersion)
+    {
+        lock (_projectInitializationGate)
+        {
+            if (_projectId is { } projectId)
+            {
+                initializationVersion = Volatile.Read(
+                    ref _projectContextVersion);
+                return Task.FromResult<AkburaProjectId?>(
+                    projectId);
+            }
 
-        if (string.IsNullOrWhiteSpace(
-                filePath))
+            var projectContextVersion = Volatile.Read(
+                ref _projectContextVersion);
+            var current = _projectInitializationTask;
+            if (current != null &&
+                (!current.IsCompleted ||
+                 _projectInitializationVersion == projectContextVersion))
+            {
+                initializationVersion =
+                    _projectInitializationVersion;
+                return current;
+            }
+
+            _projectInitializationVersion = projectContextVersion;
+            initializationVersion = projectContextVersion;
+            return _projectInitializationTask =
+                InitializeProjectAsync(
+                    projectContextVersion,
+                    _disposeCancellation.Token);
+        }
+    }
+
+    private async Task<AkburaProjectId?> InitializeProjectAsync(
+        int projectContextVersion,
+        CancellationToken cancellationToken)
+    {
+        var filePath = _textDocument?.FilePath;
+        if (string.IsNullOrWhiteSpace(filePath))
         {
             return null;
         }
 
-        var synchronizedProjectId =
-            await _visualStudioWorkspace
-                .SynchronizeProjectAsync(
-                    filePath!,
-                    cancellationToken)
-                .ConfigureAwait(false);
+        var projectId = await _visualStudioWorkspace
+            .SynchronizeProjectAsync(
+                filePath!,
+                cancellationToken)
+            .ConfigureAwait(false);
 
-        if (synchronizedProjectId is { } result)
+        if (projectId is { } result)
         {
-            _projectId = result;
+            lock (_projectInitializationGate)
+            {
+                if (_projectContextVersion == projectContextVersion &&
+                    _projectInitializationVersion ==
+                        projectContextVersion)
+                {
+                    _projectId = result;
+                }
+            }
         }
 
-        return synchronizedProjectId;
+        return projectId;
     }
+
+    private void ForgetFailedProjectInitialization(
+        Task<AkburaProjectId?> initializationTask,
+        int initializationVersion)
+    {
+        lock (_projectInitializationGate)
+        {
+            if (ReferenceEquals(
+                    _projectInitializationTask,
+                    initializationTask) &&
+                _projectInitializationVersion ==
+                    initializationVersion)
+            {
+                _projectInitializationTask = null;
+                _projectInitializationVersion = -1;
+            }
+        }
+    }
+
+    private async Task WarmUpProjectAsync()
+    {
+        try
+        {
+            while (Volatile.Read(ref _disposeState) == 0)
+            {
+                var projectId = await GetProjectIdAsync(
+                        _disposeCancellation.Token)
+                    .ConfigureAwait(false);
+                if (projectId != null)
+                {
+                    EnqueueSnapshot(
+                        _textBuffer.CurrentSnapshot);
+                    return;
+                }
+
+                await Task.Delay(
+                        ProjectRetryDelay,
+                        _disposeCancellation.Token)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+            when (_disposeCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Project warm-up failed: {exception}");
+        }
+    }
+
+#pragma warning disable VSTHRD003 // The initialization task deliberately outlives an editor snapshot.
+    private static async Task<T> AwaitWithoutCancelingSourceAsync<T>(
+        Task<T> task,
+        CancellationToken cancellationToken)
+    {
+        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
+        {
+            return await task.ConfigureAwait(false);
+        }
+
+        var cancellation = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using (cancellationToken.Register(
+                   () => cancellation.TrySetResult(true)))
+        {
+            if (!ReferenceEquals(
+                    await Task.WhenAny(task, cancellation.Task)
+                        .ConfigureAwait(false),
+                    task))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            return await task.ConfigureAwait(false);
+        }
+    }
+#pragma warning restore VSTHRD003
 
     private void EnsureWorker()
     {
@@ -378,7 +667,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
             /*
              * A worker failure must not terminate Visual Studio editing.
              */
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Akbura update worker failed: " +
                 $"{exception}");
         }
@@ -435,12 +725,18 @@ internal sealed class AkburaTextBufferContext : IDisposable
             var cancellationToken =
                 parseCancellation.Token;
 
-            var syntacticState = await Task.Run(
-                    () => TryCreateSyntacticState(
-                        request,
-                        cancellationToken),
-                    cancellationToken)
+            var syntacticDocument = await _parserService
+                .GetSyntacticDocumentAsync(
+                    request.Snapshot)
                 .ConfigureAwait(false);
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            var syntacticState = TryCreateSyntacticState(
+                request,
+                syntacticDocument,
+                cancellationToken);
 
             if (!IsCurrentRequest(
                     request.RequestVersion))
@@ -481,12 +777,51 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 return;
             }
 
-            var state = await Task.Run(
-                    () => TryCreateParsedState(
-                        request,
-                        projectId,
-                        cancellationToken))
-                .ConfigureAwait(false);
+            AkburaParsedBufferState? state;
+#if DEBUG
+            var semanticTimer = Stopwatch.StartNew();
+            var semanticOutcome = "completed";
+
+            try
+            {
+#endif
+                state = await Task.Run(
+                        () => TryCreateParsedState(
+                            request,
+                            projectId,
+                            cancellationToken))
+                    .ConfigureAwait(false);
+#if DEBUG
+                if (state == null)
+                {
+                    semanticOutcome =
+                        cancellationToken.IsCancellationRequested
+                            ? "canceled"
+                            : "deferred";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                semanticOutcome = "canceled";
+                throw;
+            }
+            catch
+            {
+                semanticOutcome = "failed";
+                throw;
+            }
+            finally
+            {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Workspace,
+                    $"Semantic state Task.Run total: " +
+                    $"request={request.RequestVersion}, " +
+                    $"snapshot={request.Snapshot.Version.VersionNumber}, " +
+                    $"file='{_uri.LocalPath}', " +
+                    $"outcome={semanticOutcome}, " +
+                    $"elapsed={semanticTimer.Elapsed.TotalMilliseconds:F2} ms.");
+            }
+#endif
 
             if (state == null)
             {
@@ -513,7 +848,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Akbura background processing failed: " +
                 $"{exception}");
         }
@@ -529,6 +865,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private AkburaClassifiedBufferState?
         TryCreateSyntacticState(
             UpdateRequest request,
+            AkburaSyntacticDocument document,
             CancellationToken cancellationToken)
     {
         try
@@ -539,8 +876,16 @@ internal sealed class AkburaTextBufferContext : IDisposable
             var classifications =
                 _classificationService
                     .GetSyntacticClassifications(
-                        request.Text,
-                        GetClassificationFilePath(),
+                        document,
+                        new TextSpan(
+                            start: 0,
+                            length: request.Text.Length),
+                        cancellationToken);
+
+            var diagnostics =
+                _diagnosticService
+                    .GetSyntacticDiagnostics(
+                        document,
                         new TextSpan(
                             start: 0,
                             length: request.Text.Length),
@@ -554,6 +899,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 request.Snapshot,
                 request.Text,
                 classifications,
+                diagnostics,
                 includesSemanticClassifications: false);
         }
         catch (OperationCanceledException)
@@ -563,7 +909,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
                 $"Akbura syntactic classification failed: " +
                 $"{exception}");
 
@@ -571,58 +918,87 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private string GetClassificationFilePath()
-    {
-        var filePath =
-            _textDocument?.FilePath;
-
-        if (!string.IsNullOrWhiteSpace(
-                filePath))
-        {
-            return filePath!;
-        }
-
-        return _uri.IsFile
-            ? _uri.LocalPath
-            : _uri.AbsolutePath;
-    }
-
     private AkburaParsedBufferState? TryCreateParsedState(
         UpdateRequest request,
         AkburaProjectId? projectId,
         CancellationToken cancellationToken)
     {
+#if DEBUG
+        var totalTimer = Stopwatch.StartNew();
+        var stageTimer = Stopwatch.StartNew();
+        var activeStage = "Validate request";
+        var outcome = "completed";
+        var classificationCount = 0;
+        var diagnosticCount = 0;
+#endif
+
         try
         {
             if (cancellationToken.IsCancellationRequested)
             {
+#if DEBUG
+                outcome = "canceled";
+#endif
                 return null;
             }
 
-            var context = projectId is { } resolvedProjectId
-                ? _workspace.OpenOrChangeDocumentContext(
-                    resolvedProjectId,
-                    _uri,
-                    request.Text,
-                    changes: null,
-                    cancellationToken)
-                : _workspace.OpenOrChangeDocumentContext(
-                    _uri,
-                    request.Text,
-                    changes: null,
-                    cancellationToken);
+            if (projectId is not { } resolvedProjectId)
+            {
+#if DEBUG
+                activeStage = "Resolve project";
+                outcome = "deferred";
+#endif
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Workspace,
+                    "Semantic state deferred: " +
+                    "the owning Roslyn project is not available yet.");
+                return null;
+            }
 
-            Debug.WriteLine(
-                $"[Akbura] Document project: " +
+#if DEBUG
+            activeStage = "OpenOrChangeDocumentContext";
+            stageTimer.Restart();
+#endif
+            var context = _workspace.OpenOrChangeDocumentContext(
+                resolvedProjectId,
+                _uri,
+                request.Text,
+                changes: null,
+                cancellationToken);
+
+#if DEBUG
+            WriteSemanticStateStage(
+                request,
+                activeStage,
+                stageTimer.Elapsed,
+                countName: null,
+                count: 0);
+#endif
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Document project: " +
                 $"assembly={context.Project.CSharpCompilation.AssemblyName}, " +
                 $"trees={context.Project.CSharpCompilation.SyntaxTrees.Count()}, " +
                 $"references={context.Project.CSharpCompilation.References.Count()}");
 
             if (cancellationToken.IsCancellationRequested)
             {
+#if DEBUG
+                outcome = "canceled";
+#endif
                 return null;
             }
 
+            PublishDocumentContext(
+                new PublishedDocumentContext(
+                    request.RequestVersion,
+                    request.Snapshot,
+                    context));
+
+#if DEBUG
+            activeStage = "GetClassifications";
+            stageTimer.Restart();
+#endif
             var classifications =
                 _classificationService.GetClassifications(
                     context,
@@ -631,24 +1007,108 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         length: request.Text.Length),
                     cancellationToken);
 
+#if DEBUG
+            classificationCount = classifications.Length;
+            WriteSemanticStateStage(
+                request,
+                activeStage,
+                stageTimer.Elapsed,
+                "spans",
+                classifications.Length);
+
+            activeStage = "GetDiagnostics";
+            stageTimer.Restart();
+#endif
+            var diagnostics =
+                _diagnosticService.GetDiagnostics(
+                    context,
+                    new TextSpan(
+                        start: 0,
+                        length: request.Text.Length),
+                    cancellationToken);
+
+#if DEBUG
+            diagnosticCount = diagnostics.Length;
+            WriteSemanticStateStage(
+                request,
+                activeStage,
+                stageTimer.Elapsed,
+                "diagnostics",
+                diagnostics.Length);
+#endif
             if (cancellationToken.IsCancellationRequested)
             {
+#if DEBUG
+                outcome = "canceled";
+#endif
                 return null;
             }
 
+#if DEBUG
+            activeStage = "Create parsed state";
+#endif
             return new AkburaParsedBufferState(
                 request.RequestVersion,
                 request.Snapshot,
                 request.Text,
                 context,
-                classifications);
+                classifications,
+                diagnostics);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
+#if DEBUG
+            outcome = "canceled";
+#endif
             return null;
         }
+#if DEBUG
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Semantic state computation: " +
+                $"request={request.RequestVersion}, " +
+                $"snapshot={request.Snapshot.Version.VersionNumber}, " +
+                $"file='{_uri.LocalPath}', " +
+                $"activeStage='{activeStage}', " +
+                $"outcome={outcome}, " +
+                $"elapsed={totalTimer.Elapsed.TotalMilliseconds:F2} ms, " +
+                $"spans={classificationCount}, " +
+                $"diagnostics={diagnosticCount}.");
+        }
+#endif
     }
+
+#if DEBUG
+    private void WriteSemanticStateStage(
+        UpdateRequest request,
+        string stage,
+        TimeSpan elapsed,
+        string? countName,
+        int count)
+    {
+        var countSuffix = countName == null
+            ? "."
+            : $", {countName}={count}.";
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Workspace,
+            $"Semantic state stage: " +
+            $"request={request.RequestVersion}, " +
+            $"snapshot={request.Snapshot.Version.VersionNumber}, " +
+            $"file='{_uri.LocalPath}', " +
+            $"stage='{stage}', " +
+            $"elapsed={elapsed.TotalMilliseconds:F2} ms" +
+            countSuffix);
+    }
+#endif
 
     private void PublishSemanticState(
         AkburaParsedBufferState state)
@@ -676,6 +1136,37 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         previous),
                     previous))
             {
+                return;
+            }
+        }
+    }
+
+    private void PublishDocumentContext(
+        PublishedDocumentContext state)
+    {
+        while (true)
+        {
+            var previous = Volatile.Read(
+                ref _publishedDocumentContext);
+            if (previous != null &&
+                previous.RequestVersion >= state.RequestVersion)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(
+                        ref _publishedDocumentContext,
+                        state,
+                        previous),
+                    previous))
+            {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Completion,
+                    $"Document context published: " +
+                    $"request={state.RequestVersion}, " +
+                    $"snapshot={state.Snapshot.Version.VersionNumber}.");
+                DocumentContextPublished?.Invoke();
                 return;
             }
         }
@@ -714,6 +1205,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
                         previous),
                     previous))
             {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Classification,
+                    $"Classification state published: " +
+                    $"request={state.RequestVersion}, " +
+                    $"snapshot={state.Snapshot.Version.VersionNumber}, " +
+                    $"semantic={state.IncludesSemanticClassifications}, " +
+                    $"spans={state.Classifications.Length}.");
                 return;
             }
         }
@@ -763,6 +1261,13 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     currentSnapshot,
                     0,
                     currentSnapshot.Length)));
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Classification,
+            $"Classification refresh raised: " +
+            $"request={state.RequestVersion}, " +
+            $"snapshot={currentSnapshot.Version.VersionNumber}, " +
+            $"semantic={state.IncludesSemanticClassifications}.");
     }
 
     private bool IsCurrentRequest(
@@ -811,6 +1316,23 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
+    private void OnProjectContextChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (Volatile.Read(ref _disposeState) != 0 ||
+            _projectId != null)
+        {
+            return;
+        }
+
+        Interlocked.Increment(
+            ref _projectContextVersion);
+
+        EnqueueSnapshot(
+            _textBuffer.CurrentSnapshot);
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(
@@ -822,6 +1344,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         _textBuffer.ChangedLowPriority -=
             OnTextBufferChangedLowPriority;
+
+        _visualStudioWorkspace.ProjectContextChanged -=
+            OnProjectContextChanged;
 
         _subscribedDocumentFactory?.TextDocumentDisposed -=
                 OnTextDocumentDisposed;
@@ -840,10 +1365,24 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         CancelActiveParse();
 
+        try
+        {
+            Disposed?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception exception)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Akbura buffer disposal notification failed: " +
+                $"{exception}");
+        }
+
         /*
          * Release classifier subscriptions held by this context.
          */
         Changed = null;
+        Disposed = null;
+        DocumentContextPublished = null;
     }
 
     private sealed class UpdateRequest
@@ -869,5 +1408,24 @@ internal sealed class AkburaTextBufferContext : IDisposable
         public ITextSnapshot Snapshot { get; }
 
         public SourceText Text { get; }
+    }
+
+    private sealed class PublishedDocumentContext
+    {
+        public PublishedDocumentContext(
+            long requestVersion,
+            ITextSnapshot snapshot,
+            AkburaDocumentContext context)
+        {
+            RequestVersion = requestVersion;
+            Snapshot = snapshot;
+            Context = context;
+        }
+
+        public long RequestVersion { get; }
+
+        public ITextSnapshot Snapshot { get; }
+
+        public AkburaDocumentContext Context { get; }
     }
 }

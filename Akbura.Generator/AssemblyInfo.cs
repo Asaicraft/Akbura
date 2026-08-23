@@ -3,3 +3,5 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.Furioso")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.Workspaces")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.Workspaces.UnitTests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.VisualStudio")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.Workspaces.MSBuild")]

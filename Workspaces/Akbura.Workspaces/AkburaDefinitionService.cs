@@ -4,11 +4,13 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using AkburaSymbol =
     Akbura.Language.Symbols.ISymbol;
+using AkburaPropertySymbol =
+    Akbura.Language.Symbols.IPropertySymbol;
 using CSharp =
     Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynSymbol =
@@ -18,6 +20,14 @@ namespace Akbura.Workspaces;
 
 internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 {
+    private readonly AkcssReferenceResolver _referenceResolver;
+
+    public AkburaDefinitionService(AkcssReferenceResolver referenceResolver)
+    {
+        _referenceResolver = referenceResolver ??
+            throw new ArgumentNullException(nameof(referenceResolver));
+    }
+
     public AkburaDefinition? GetDefinition(
         AkburaDocumentContext context,
         int position,
@@ -40,6 +50,32 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         cancellationToken
             .ThrowIfCancellationRequested();
+
+        var projectedDefinition =
+            GetProjectedCSharpDefinition(
+                context,
+                position,
+                cancellationToken);
+        if (projectedDefinition != null)
+        {
+            return projectedDefinition;
+        }
+
+        if (_referenceResolver.TryResolve(
+                context,
+                position,
+                out var nativeReference,
+                cancellationToken))
+        {
+            var nativeDefinition = CreateResolvedAkcssDefinition(
+                context,
+                nativeReference,
+                cancellationToken);
+            if (nativeDefinition != null)
+            {
+                return nativeDefinition;
+            }
+        }
 
         var root = document.SyntaxTree.GetRootSyntax();
 
@@ -77,42 +113,6 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                         position,
                         cancellationToken);
 
-                case AkcssAssignmentSyntax assignment:
-                    {
-                        var definition =
-                            GetAkcssPropertyDefinition(
-                                context,
-                                semanticModel,
-                                assignment,
-                                position,
-                                cancellationToken);
-
-                        if (definition != null)
-                        {
-                            return definition;
-                        }
-
-                        break;
-                    }
-
-                case AkcssApplyDirectiveSyntax apply:
-                    {
-                        var definition =
-                            GetAkcssApplyDefinition(
-                                context,
-                                semanticModel,
-                                apply,
-                                position,
-                                cancellationToken);
-
-                        if (definition != null)
-                        {
-                            return definition;
-                        }
-
-                        break;
-                    }
-
                 case CSharpTypeSyntax type:
                     {
                         var definition =
@@ -149,6 +149,24 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                         break;
                     }
 
+                case MarkupAttributeSyntax attribute:
+                    {
+                        var definition =
+                            GetMarkupAttributeDefinition(
+                                context,
+                                semanticModel,
+                                attribute,
+                                position,
+                                cancellationToken);
+
+                        if (definition != null)
+                        {
+                            return definition;
+                        }
+
+                        break;
+                    }
+
                 case MarkupElementSyntax element:
                     {
                         var definition =
@@ -172,6 +190,200 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         return null;
     }
 
+    private static AkburaDefinition? CreateResolvedAkcssDefinition(
+        AkburaDocumentContext context,
+        AkcssResolvedReference reference,
+        CancellationToken cancellationToken)
+    {
+        var symbol = reference.Symbol;
+        if (symbol is AkburaPropertySymbol property)
+        {
+            symbol = GetPropertyNavigationSymbol(property);
+        }
+
+        return CreateDefinition(
+            context,
+            reference.SourceSpan,
+            symbol,
+            reference.CSharpDefinition.Symbol,
+            cancellationToken);
+    }
+
+    private static AkburaDefinition?
+        GetProjectedCSharpDefinition(
+            AkburaDocumentContext context,
+            int position,
+            CancellationToken cancellationToken)
+    {
+        var document = context.Document;
+        AkburaSyntacticDocument syntacticDocument;
+        try
+        {
+            syntacticDocument = AkburaSyntacticDocument.Parse(
+                document.Text,
+                document.FilePath,
+                cancellationToken);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or
+                  InvalidOperationException or
+                  InvalidCastException)
+        {
+            return null;
+        }
+
+        if (!syntacticDocument.TryGetEmbeddedCSharpContext(
+                position,
+                out var embeddedContext,
+                cancellationToken) ||
+            !AkburaCSharpProjectionFactory.TryCreate(
+                syntacticDocument,
+                context,
+                embeddedContext,
+                out var projection,
+                cancellationToken))
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var probeCompilation =
+            context.Project.Compilation.CSharpProbeCompilation;
+        var parseOptions = probeCompilation.SyntaxTrees
+                .FirstOrDefault()?.Options as CSharpParseOptions ??
+            CSharpParseOptions.Default.WithLanguageVersion(
+                LanguageVersion.Preview);
+        var syntaxTree = CSharpSyntaxTree.Create(
+            projection.Root,
+            parseOptions,
+            path: document.FilePath + ".projection.cs",
+            encoding: document.Text.Encoding);
+        var compilation = probeCompilation.AddSyntaxTrees(syntaxTree);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var projectedRoot = syntaxTree.GetRoot(cancellationToken);
+        var projectedPosition = Math.Min(
+            projection.ProjectedPosition,
+            Math.Max(0, projectedRoot.FullSpan.End - 1));
+        var token = projectedRoot.FindToken(
+            projectedPosition,
+            findInsideTrivia: true);
+
+        if (!projection.TryMapToHost(
+                token.Span,
+                out var sourceSpan) ||
+            !sourceSpan.Contains(position))
+        {
+            sourceSpan = new TextSpan(
+                position,
+                Math.Min(1, document.Text.Length - position));
+        }
+
+        var symbol = GetBestProjectedSymbol(
+            semanticModel,
+            token.Parent,
+            projection.ActiveMapping.ProjectedSpan,
+            cancellationToken);
+        if (symbol == null)
+        {
+            return null;
+        }
+
+        foreach (var declarationReference in
+                 symbol.DeclaringSyntaxReferences)
+        {
+            if (!ReferenceEquals(
+                    declarationReference.SyntaxTree,
+                    syntaxTree))
+            {
+                continue;
+            }
+
+            var declaration = declarationReference.GetSyntax(
+                cancellationToken);
+            if (!projection.TryGetSyntheticOrigin(
+                    declaration,
+                    out var origin))
+            {
+                continue;
+            }
+
+            var targetSpan = ClampSpan(
+                origin.DeclarationSpan,
+                document.Text.Length);
+            return new AkburaDefinition(
+                sourceSpan,
+                document.FilePath,
+                document.Text.Lines.GetLinePositionSpan(targetSpan),
+                document.Text);
+        }
+
+        return CreateDefinition(
+            context,
+            sourceSpan,
+            akburaSymbol: null,
+            symbol,
+            cancellationToken);
+    }
+
+    private static RoslynSymbol? GetBestProjectedSymbol(
+        Microsoft.CodeAnalysis.SemanticModel semanticModel,
+        Microsoft.CodeAnalysis.SyntaxNode? node,
+        TextSpan activeSpan,
+        CancellationToken cancellationToken)
+    {
+        for (var current = node;
+             current != null &&
+             current.Span.IntersectsWith(activeSpan);
+             current = current.Parent)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (current is CSharp.NameSyntax name)
+            {
+                var alias = semanticModel.GetAliasInfo(
+                    name,
+                    cancellationToken);
+                if (alias != null)
+                {
+                    return alias;
+                }
+            }
+
+            var declaredSymbol = semanticModel.GetDeclaredSymbol(
+                current,
+                cancellationToken);
+            if (declaredSymbol != null)
+            {
+                return declaredSymbol;
+            }
+
+            var symbolInfo = semanticModel.GetSymbolInfo(
+                current,
+                cancellationToken);
+            if (symbolInfo.Symbol != null)
+            {
+                return symbolInfo.Symbol;
+            }
+
+            if (symbolInfo.CandidateSymbols.Length == 1)
+            {
+                return symbolInfo.CandidateSymbols[0];
+            }
+
+            var type = semanticModel.GetTypeInfo(
+                current,
+                cancellationToken).Type;
+            if (type != null &&
+                type.TypeKind != TypeKind.Error)
+            {
+                return type;
+            }
+        }
+
+        return null;
+    }
+
     private static AkburaDefinition?
     GetTailwindUtilityDefinition(
         AkburaDocumentContext context,
@@ -184,8 +396,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             GetTailwindUtilitySourceSpan(attribute);
         if (!sourceSpan.Contains(position))
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility span " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility span " +
                 $"{sourceSpan} does not contain position " +
                 $"{position}.");
             return null;
@@ -196,8 +409,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         if (operation is not
             ITailwindUtilityAttributeOperation utilityOperation)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility operation was " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility operation was " +
                 $"not available for '{attribute}'; " +
                 $"actual operation: " +
                 $"'{operation?.GetType().FullName ?? "<null>"}'.");
@@ -220,14 +434,34 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         if (utilityOperation.Utility is not { } utility)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility " +
                 $"'{utilityOperation.UtilityName}' was not resolved; " +
                 $"candidate count: " +
                 $"{utilityOperation.Utilities.Length}, " +
                 $"operation errors: " +
                 $"{utilityOperation.HasErrors}.");
-            LogAkcssCompilationReferences(context);
+            AkburaWorkspaceDiagnostics.WriteAkcssCompilationReferences(
+                context.Project.Compilation.SyntaxTrees.Select(
+                    static tree => Path.GetFileName(tree.FilePath)),
+                context.Project.Compilation.GlobalAkburaUsingDirectives
+                    .Select(static directive =>
+                        directive.Name.ToFullString().Trim())
+                    .Where(static name => name.EndsWith(
+                        ".akcss",
+                        StringComparison.Ordinal)),
+                context.Project.Compilation.AkcssSyntaxTrees.Select(
+                    static tree => tree.LogicalName),
+                context.Project.Compilation.CompilationReferences.Select(
+                    static reference =>
+                    {
+                        var compilation = reference.Compilation;
+                        return
+                            $"assembly='{compilation.CSharpCompilation.AssemblyName}', " +
+                            $"rootNamespace='{compilation.RootNamespace}', " +
+                            $"AKCSS modules=[{string.Join(", ", compilation.AkcssSyntaxTrees.Select(static tree => tree.LogicalName))}]";
+                    }));
 
             utility = FindReferencedUtilityFallback(
                 context.Project.Compilation,
@@ -239,8 +473,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 return null;
             }
 
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Utility " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Utility " +
                 $"'{utilityOperation.UtilityName}' was recovered " +
                 $"from project-reference syntax as " +
                 $"'{utility.MetadataName}'.");
@@ -255,45 +490,14 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         if (definition == null)
         {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Definition target was " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Navigation,
+                $"Definition target was " +
                 $"not found for utility " +
                 $"'{utility.MetadataName}'.");
         }
 
         return definition;
-    }
-
-    private static void LogAkcssCompilationReferences(
-        AkburaDocumentContext context)
-    {
-#if DEBUG
-        var compilation = context.Project.Compilation;
-        Debug.WriteLine(
-            $"[Akbura.Navigation] Current component files: " +
-            $"[{string.Join(", ", compilation.SyntaxTrees.Select(static tree => Path.GetFileName(tree.FilePath)))}]; " +
-            $"global AKCSS imports: " +
-            $"[{string.Join(", ", compilation.GlobalAkburaUsingDirectives.Select(static directive => directive.Name.ToFullString().Trim()).Where(static name => name.EndsWith(".akcss", StringComparison.Ordinal)))}].");
-        Debug.WriteLine(
-            $"[Akbura.Navigation] Current AKCSS modules: " +
-            $"[{string.Join(", ", compilation.AkcssSyntaxTrees.Select(static tree => tree.LogicalName))}]; " +
-            $"compilation references: " +
-            $"{compilation.CompilationReferences.Length}.");
-
-        foreach (var reference in
-                 compilation.CompilationReferences)
-        {
-            var referencedCompilation =
-                reference.Compilation;
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Referenced project " +
-                $"'{referencedCompilation.CSharpCompilation.AssemblyName}', " +
-                $"rootNamespace=" +
-                $"'{referencedCompilation.RootNamespace}', " +
-                $"AKCSS modules=" +
-                $"[{string.Join(", ", referencedCompilation.AkcssSyntaxTrees.Select(static tree => tree.LogicalName))}].");
-        }
-#endif
     }
 
     private static ITailwindUtilitySymbol?
@@ -561,196 +765,20 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         return attribute.Span;
     }
 
-    private static AkburaDefinition?
-    GetAkcssPropertyDefinition(
-        AkburaDocumentContext context,
-        AkburaSemanticModel semanticModel,
-        AkcssAssignmentSyntax assignment,
-        int position,
-        CancellationToken cancellationToken)
+    private static AkburaSymbol GetPropertyNavigationSymbol(
+        AkburaPropertySymbol property)
     {
-        var sourceSpan = GetRightmostNameSpan(assignment.PropertyName);
-
-        if (!sourceSpan.Contains(position))
+        if (property.Parameter is { } parameter)
         {
-            return null;
+            return parameter;
         }
 
-        if (semanticModel.GetOperation(
-                assignment) is not
-            IAkcssPropertySetterOperation
-                {
-                    Property: { } property,
-                })
+        if (property.Command is { } command)
         {
-            return null;
+            return command;
         }
 
-        AkburaSymbol navigationSymbol;
-
-        if (property.Parameter is
-            { } parameter)
-        {
-            navigationSymbol =
-                parameter;
-        }
-        else if (property.Command is
-        { } command)
-        {
-            navigationSymbol =
-                command;
-        }
-        else
-        {
-            navigationSymbol =
-                property;
-        }
-
-        return CreateDefinition(
-            context,
-            sourceSpan,
-            navigationSymbol,
-            property.CSharpDefinition.Symbol,
-            cancellationToken);
-    }
-
-    private static AkburaDefinition?
-    GetAkcssApplyDefinition(
-        AkburaDocumentContext context,
-        AkburaSemanticModel semanticModel,
-        AkcssApplyDirectiveSyntax apply,
-        int position,
-        CancellationToken cancellationToken)
-    {
-        if (semanticModel.GetOperation(
-                apply) is not
-            IAkcssApplyOperation operation)
-        {
-            Debug.WriteLine(
-                "[Akbura.Navigation] @apply operation was " +
-                "not available.");
-            return null;
-        }
-
-        if (!TryGetAkcssApplyItem(
-                context.Document.Text,
-                apply,
-                position,
-                out var item,
-                out var sourceSpan))
-        {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] No @apply item contains " +
-                $"position {position}.");
-            return null;
-        }
-
-        using var diagnostics =
-            ImmutableArrayBuilder<
-                AkburaSemanticDiagnostic>.Rent();
-
-        var symbol =
-            semanticModel.ResolveAkcssApplyItem(
-                apply,
-                item,
-                operation.ContainingAkcssSymbol,
-                diagnostics);
-
-        if (symbol == null)
-        {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] @apply item '{item}' " +
-                $"could not be resolved.");
-            return null;
-        }
-
-        var definition = CreateDefinition(
-            context,
-            sourceSpan,
-            symbol,
-            symbol.CSharpDefinition.Symbol,
-            cancellationToken);
-
-        if (definition == null)
-        {
-            Debug.WriteLine(
-                $"[Akbura.Navigation] Definition target was " +
-                $"not found for @apply item '{item}'.");
-        }
-
-        return definition;
-    }
-
-    private static bool TryGetAkcssApplyItem(
-        SourceText text,
-        AkcssApplyDirectiveSyntax apply,
-        int position,
-        out string item,
-        out TextSpan sourceSpan)
-    {
-        var itemsSpan =
-            apply.Items.FullSpan;
-
-        var current =
-            Math.Max(
-                0,
-                itemsSpan.Start);
-
-        var end =
-            Math.Min(
-                text.Length,
-                itemsSpan.End);
-
-        while (current < end)
-        {
-            while (current < end &&
-                   char.IsWhiteSpace(
-                       text[current]))
-            {
-                current++;
-            }
-
-            if (current >= end)
-            {
-                break;
-            }
-
-            var start =
-                current;
-
-            while (current < end &&
-                   !char.IsWhiteSpace(
-                       text[current]))
-            {
-                current++;
-            }
-
-            var span =
-                TextSpan.FromBounds(
-                    start,
-                    current);
-
-            if (!span.Contains(position))
-            {
-                continue;
-            }
-
-            item =
-                text.ToString(span);
-
-            sourceSpan =
-                span;
-
-            return true;
-        }
-
-        item =
-            string.Empty;
-
-        sourceSpan =
-            default;
-
-        return false;
+        return property;
     }
 
     private static AkburaDefinition? GetCSharpDefinition(
@@ -797,6 +825,58 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             cancellationToken);
     }
 
+    private static AkburaDefinition? GetMarkupAttributeDefinition(
+        AkburaDocumentContext context,
+        AkburaSemanticModel semanticModel,
+        MarkupAttributeSyntax attribute,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        var sourceSpan = GetMarkupAttributeNameSpan(attribute);
+        if (sourceSpan == null ||
+            !sourceSpan.Value.Contains(position))
+        {
+            return null;
+        }
+
+        var symbol = semanticModel
+            .GetSymbolInfo(attribute)
+            .Symbol;
+        if (symbol == null)
+        {
+            return null;
+        }
+
+        var navigationSymbol = symbol is AkburaPropertySymbol property
+            ? GetPropertyNavigationSymbol(property)
+            : symbol;
+
+        return CreateDefinition(
+            context,
+            sourceSpan.Value,
+            navigationSymbol,
+            symbol.CSharpDefinition.Symbol,
+            cancellationToken);
+    }
+
+    private static TextSpan? GetMarkupAttributeNameSpan(
+        MarkupAttributeSyntax attribute)
+    {
+        return attribute switch
+        {
+            MarkupPlainAttributeSyntax plain =>
+                plain.Name.Span,
+
+            MarkupAttachedPropertyAttributeSyntax attached =>
+                attached.Name.Span,
+
+            MarkupPrefixedAttributeSyntax prefixed =>
+                prefixed.Name.Span,
+
+            _ => null,
+        };
+    }
+
     private static AkburaDefinition? GetMarkupComponentDefinition(
             AkburaDocumentContext context,
             AkburaSemanticModel semanticModel,
@@ -824,10 +904,14 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return null;
         }
 
+        var navigationSymbol = symbol is AkburaPropertySymbol property
+            ? GetPropertyNavigationSymbol(property)
+            : symbol;
+
         return CreateDefinition(
             context,
             sourceSpan.Value,
-            symbol,
+            navigationSymbol,
             symbol.CSharpDefinition.Symbol,
             cancellationToken);
     }
@@ -885,6 +969,16 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 return csharpDefinition;
             }
 
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    context,
+                    sourceSpan,
+                    csharpSymbol,
+                    cancellationToken,
+                    out csharpDefinition))
+            {
+                return csharpDefinition;
+            }
+
             if (TryCreateAkburaComponentDefinition(
                     context,
                     sourceSpan,
@@ -904,6 +998,16 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                     sourceSpan,
                     underlyingSymbol,
                     out var underlyingDefinition))
+            {
+                return underlyingDefinition;
+            }
+
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    context,
+                    sourceSpan,
+                    underlyingSymbol,
+                    cancellationToken,
+                    out underlyingDefinition))
             {
                 return underlyingDefinition;
             }
@@ -1051,6 +1155,17 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return true;
         }
 
+        if (symbol is IMetadataAkcssModuleSymbol metadataModule &&
+            TryCreateMetadataAkcssModuleDefinition(
+                context,
+                sourceSpan,
+                metadataModule,
+                cancellationToken,
+                out definition))
+        {
+            return true;
+        }
+
         if (symbol is IMetadataAkcssSymbol metadataSymbol &&
             TryCreateMetadataAkcssDefinition(
                 context,
@@ -1093,6 +1208,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             IAkcssSymbol akcss =>
                 akcss.DeclarationSyntax,
 
+            IAkcssModuleSymbol module =>
+                module.DeclaringSyntax,
+
             CSharpLocalSymbol local =>
                 local.DeclarationSyntax,
 
@@ -1131,6 +1249,16 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             AkburaDocumentSyntax =>
                 new TextSpan(
                     start: 0,
+                    length: 0),
+
+            AkcssDocumentSyntax =>
+                new TextSpan(
+                    start: 0,
+                    length: 0),
+
+            InlineAkcssBlockSyntax inline =>
+                new TextSpan(
+                    inline.Span.Start,
                     length: 0),
 
             _ => declaration.Span,
@@ -1194,7 +1322,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         }
 
         var sourceOffset =
-            typeSyntax.Tokens.FullSpan.Start -
+            typeSyntax.Tokens.Span.Start -
             syntax.FullSpan.Start;
 
         var csharpSpan =
@@ -1310,6 +1438,102 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         return false;
     }
 
+    private static bool TryCreateCompilationReferenceCSharpDefinition(
+        AkburaDocumentContext context,
+        TextSpan sourceSpan,
+        RoslynSymbol symbol,
+        CancellationToken cancellationToken,
+        out AkburaDefinition definition)
+    {
+        symbol = GetNavigationSymbol(symbol);
+
+        var documentationId =
+            symbol.GetDocumentationCommentId();
+        if (documentationId == null)
+        {
+            definition = null!;
+            return false;
+        }
+
+        var targetAssemblyName =
+            symbol.ContainingAssembly?.Identity.Name;
+        var visited =
+            new HashSet<AkburaCompilation>();
+
+        foreach (var reference in
+                 context.Project.Compilation
+                     .CompilationReferences)
+        {
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    reference.Compilation,
+                    sourceSpan,
+                    documentationId,
+                    targetAssemblyName,
+                    cancellationToken,
+                    visited,
+                    out definition))
+            {
+                return true;
+            }
+        }
+
+        definition = null!;
+        return false;
+    }
+
+    private static bool TryCreateCompilationReferenceCSharpDefinition(
+        AkburaCompilation compilation,
+        TextSpan sourceSpan,
+        string documentationId,
+        string? targetAssemblyName,
+        CancellationToken cancellationToken,
+        HashSet<AkburaCompilation> visited,
+        out AkburaDefinition definition)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!visited.Add(compilation))
+        {
+            definition = null!;
+            return false;
+        }
+
+        if ((targetAssemblyName == null ||
+             string.Equals(
+                 compilation.CSharpCompilation.AssemblyName,
+                 targetAssemblyName,
+                 StringComparison.Ordinal)) &&
+            DocumentationCommentId.GetFirstSymbolForReferenceId(
+                documentationId,
+                compilation.CSharpCompilation) is { } candidate &&
+            TryCreateCSharpDefinition(
+                sourceSpan,
+                candidate,
+                out definition))
+        {
+            return true;
+        }
+
+        foreach (var reference in
+                 compilation.CompilationReferences)
+        {
+            if (TryCreateCompilationReferenceCSharpDefinition(
+                    reference.Compilation,
+                    sourceSpan,
+                    documentationId,
+                    targetAssemblyName,
+                    cancellationToken,
+                    visited,
+                    out definition))
+            {
+                return true;
+            }
+        }
+
+        definition = null!;
+        return false;
+    }
+
     private static bool TryCreateMetadataAkcssDefinition(
         AkburaDocumentContext context,
         TextSpan sourceSpan,
@@ -1379,6 +1603,63 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         definition = null!;
         return false;
+    }
+
+    private static bool TryCreateMetadataAkcssModuleDefinition(
+        AkburaDocumentContext context,
+        TextSpan sourceSpan,
+        IMetadataAkcssModuleSymbol metadataModule,
+        CancellationToken cancellationToken,
+        out AkburaDefinition definition)
+    {
+        var metadataAssembly =
+            metadataModule.RuntimeModuleType.ContainingAssembly;
+        foreach (var referencedModule in
+                 context.Project.Compilation.ReferencedModules)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var referencedAssembly =
+                context.Project.CSharpCompilation.GetAssemblyOrModuleSymbol(
+                    referencedModule.Reference) as IAssemblySymbol;
+            if (!SymbolEqualityComparer.Default.Equals(
+                    referencedAssembly,
+                    metadataAssembly))
+            {
+                continue;
+            }
+
+            var trees = referencedModule.GetAkcssSyntaxTreesByLogicalName(
+                metadataModule.MetadataName);
+            if (trees.Length == 0 &&
+                !string.Equals(
+                    metadataModule.MetadataName,
+                    metadataModule.SourcePath,
+                    StringComparison.Ordinal))
+            {
+                trees = referencedModule.GetAkcssSyntaxTreesByLogicalName(
+                    metadataModule.SourcePath);
+            }
+
+            foreach (var tree in trees)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var root = tree.GetRootSyntax();
+                if (TryCreateReferencedAkburaDefinition(
+                        context,
+                        sourceSpan,
+                        root,
+                        new TextSpan(0, 0),
+                        out definition))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return MetadataSourceDefinition.TryCreate(
+            sourceSpan,
+            metadataModule.RuntimeModuleType,
+            out definition);
     }
 
     private static IEnumerable<AkburaSyntax>

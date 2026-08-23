@@ -80,6 +80,20 @@ public class InlineAkcssSyntaxParseTests
 	}
 
 	[Fact]
+	public void AkcssUtilityParameter_WithoutName_IsRecoverable()
+	{
+		const string code = "@utilities { .w-(MyType) { } }";
+
+		using var parser = MakeParser(code);
+
+		var syntax = parser.ParseAkcssUtilitiesSectionSyntax();
+
+		Assert.Equal(code, syntax.ToFullString());
+		Assert.True(syntax.ContainsDiagnostics);
+		Assert.Equal(1, syntax.Utilities[0]!.Selector.Parameters.Count);
+	}
+
+	[Fact]
 	public void AkcssDocument_WithUsingTypedSelectorsAndQualifiedProperty_RoundTrips()
 	{
 		const string code =

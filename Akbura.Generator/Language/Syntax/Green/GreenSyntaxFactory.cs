@@ -323,6 +323,11 @@ internal static partial class GreenSyntaxFactory
         return GreenSyntaxToken.CreateCSharpRawToken(csharpRawNode);
     }
 
+    public static GreenSyntaxToken.CSharpRawToken CSharpRawToken(string text, CsharpRawNode csharpRawNode)
+    {
+        return GreenSyntaxToken.CreateCSharpRawToken(text, csharpRawNode);
+    }
+
     public static GreenNode? AkTextLiteral(string text)
     {
         return GreenSyntaxToken.AkTextLiteral(text);

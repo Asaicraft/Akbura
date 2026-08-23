@@ -805,7 +805,7 @@ public static class ImmutableArrayExtensions
 
         if (comparer != null && builder.Count > 1)
         {
-            // PERF: Beware ImmutableArray<T>.Builder.Sort allocates a Comparer wrapper object
+            // PERF: Sorting through the framework builder allocates a Comparer wrapper object.
             builder.Sort(comparer);
         }
 

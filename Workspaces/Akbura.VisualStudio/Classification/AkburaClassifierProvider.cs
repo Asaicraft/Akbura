@@ -18,11 +18,14 @@ internal sealed class AkburaClassifierProvider :
 
     private readonly AkburaClassificationTypeMap _typeMap;
 
+    private readonly AkburaParserService _parserService;
+
     [ImportingConstructor]
     public AkburaClassifierProvider(
         ITextDocumentFactoryService textDocumentFactory,
         IClassificationTypeRegistryService classificationTypeRegistry,
-        AkburaVisualStudioWorkspace workspaceHost)
+        AkburaVisualStudioWorkspace workspaceHost,
+        AkburaParserService parserService)
     {
         _textDocumentFactory =
             textDocumentFactory ??
@@ -33,6 +36,10 @@ internal sealed class AkburaClassifierProvider :
             workspaceHost ??
             throw new ArgumentNullException(
                 nameof(workspaceHost));
+
+        _parserService = parserService ??
+            throw new ArgumentNullException(
+                nameof(parserService));
 
         _typeMap =
             new AkburaClassificationTypeMap(
@@ -54,7 +61,8 @@ internal sealed class AkburaClassifierProvider :
                         new AkburaTextBufferContext(
                             textBuffer,
                             _textDocumentFactory,
-                            _workspaceHost));
+                            _workspaceHost,
+                            _parserService));
 
         return textBuffer.Properties
             .GetOrCreateSingletonProperty(

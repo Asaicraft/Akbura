@@ -4,6 +4,7 @@ using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
@@ -152,7 +153,7 @@ internal static class ComponentGenerator
 
         private ImmutableArray<ElementPlan> BuildElementPlans(AkburaDocumentSyntax document)
         {
-            var roots = ImmutableArray.CreateBuilder<ElementPlan>();
+            using var roots = ImmutableArrayBuilder<ElementPlan>.Rent();
             foreach (var root in document.Members.OfType<MarkupRootSyntax>())
             {
                 if (TryBuildElement(root.Element, deferredOwner: null, out var plan))

@@ -16,12 +16,14 @@ internal sealed class AkburaParsedBufferState :
         ITextSnapshot snapshot,
         SourceText text,
         AkburaDocumentContext context,
-        ImmutableArray<AkburaClassifiedSpan> classifications)
+        ImmutableArray<AkburaClassifiedSpan> classifications,
+        ImmutableArray<AkburaDiagnosticSpan> diagnostics)
         : base(
             requestVersion,
             snapshot,
             text,
             classifications,
+            diagnostics,
             includesSemanticClassifications: true)
     {
         Context = context ??

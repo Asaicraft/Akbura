@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -265,9 +266,18 @@ internal sealed partial class SyntaxAndDeclarationManager
         ImmutableArray<AkburaSyntaxTree> syntaxTrees,
         ImmutableArray<AkburaSyntaxTree> addedTrees)
     {
-        var components = state.DeclarationTable.Components.ToBuilder();
+        using var components = ImmutableArrayBuilder<Declaration>.Rent(
+            state.DeclarationTable.Components.Length +
+            addedTrees.Length);
+        components.AddRange(
+            state.DeclarationTable.Components.AsSpan());
         foreach (var tree in addedTrees)
         {
+            if (GlobalUsings.IsComponentFile(tree))
+            {
+                continue;
+            }
+
             components.Add(DeclarationTreeBuilder.ForSyntaxDeclaration(tree));
         }
 
@@ -307,12 +317,32 @@ internal sealed partial class SyntaxAndDeclarationManager
         int index,
         AkburaSyntaxTree newTree)
     {
-        var components = state.DeclarationTable.Components.SetItem(
-            index,
-            DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
+        var oldTree = state.SyntaxTrees[index];
+        var declarationIndex = GetComponentDeclarationIndex(
+            state.SyntaxTrees,
+            index);
+        var oldHasDeclaration = !GlobalUsings.IsComponentFile(oldTree);
+        var newHasDeclaration = !GlobalUsings.IsComponentFile(newTree);
+        var components = state.DeclarationTable.Components;
+
+        if (oldHasDeclaration && newHasDeclaration)
+        {
+            components = components.SetItem(
+                declarationIndex,
+                DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
+        }
+        else if (oldHasDeclaration)
+        {
+            components = components.RemoveAt(declarationIndex);
+        }
+        else if (newHasDeclaration)
+        {
+            components = components.Insert(
+                declarationIndex,
+                DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
+        }
 
         var previousMemberNames = state.LastComputedMemberNames;
-        var oldTree = state.SyntaxTrees[index];
         if (previousMemberNames.TryGetValue(oldTree, out var memberNames))
         {
             previousMemberNames = previousMemberNames
@@ -330,14 +360,39 @@ internal sealed partial class SyntaxAndDeclarationManager
             state.LastComputedAkcssMemberNames);
     }
 
+    private static int GetComponentDeclarationIndex(
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        int treeIndex)
+    {
+        var declarationIndex = 0;
+        for (var index = 0; index < treeIndex; index++)
+        {
+            if (!GlobalUsings.IsComponentFile(syntaxTrees[index]))
+            {
+                declarationIndex++;
+            }
+        }
+
+        return declarationIndex;
+    }
+
     private static State AddAkcssSyntaxTrees(
         State state,
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
         ImmutableArray<AkcssSyntaxTree> addedTrees)
     {
-        var akcssModules = state.DeclarationTable.AkcssModules.ToBuilder();
+        using var akcssModules = ImmutableArrayBuilder<Declaration>.Rent(
+            state.DeclarationTable.AkcssModules.Length +
+            addedTrees.Length);
+        akcssModules.AddRange(
+            state.DeclarationTable.AkcssModules.AsSpan());
         foreach (var tree in addedTrees)
         {
+            if (GlobalUsings.IsAkcssFile(tree))
+            {
+                continue;
+            }
+
             akcssModules.Add(DeclarationTreeBuilder.ForSyntaxDeclaration(tree));
         }
 
@@ -377,12 +432,32 @@ internal sealed partial class SyntaxAndDeclarationManager
         int index,
         AkcssSyntaxTree newTree)
     {
-        var akcssModules = state.DeclarationTable.AkcssModules.SetItem(
-            index,
-            DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
+        var oldTree = state.AkcssSyntaxTrees[index];
+        var declarationIndex = GetAkcssDeclarationIndex(
+            state.AkcssSyntaxTrees,
+            index);
+        var oldHasDeclaration = !GlobalUsings.IsAkcssFile(oldTree);
+        var newHasDeclaration = !GlobalUsings.IsAkcssFile(newTree);
+        var akcssModules = state.DeclarationTable.AkcssModules;
+
+        if (oldHasDeclaration && newHasDeclaration)
+        {
+            akcssModules = akcssModules.SetItem(
+                declarationIndex,
+                DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
+        }
+        else if (oldHasDeclaration)
+        {
+            akcssModules = akcssModules.RemoveAt(declarationIndex);
+        }
+        else if (newHasDeclaration)
+        {
+            akcssModules = akcssModules.Insert(
+                declarationIndex,
+                DeclarationTreeBuilder.ForSyntaxDeclaration(newTree));
+        }
 
         var previousMemberNames = state.LastComputedAkcssMemberNames;
-        var oldTree = state.AkcssSyntaxTrees[index];
         if (previousMemberNames.TryGetValue(oldTree, out var memberNames))
         {
             previousMemberNames = previousMemberNames
@@ -398,5 +473,21 @@ internal sealed partial class SyntaxAndDeclarationManager
                 akcssModules),
             state.LastComputedMemberNames,
             previousMemberNames);
+    }
+
+    private static int GetAkcssDeclarationIndex(
+        ImmutableArray<AkcssSyntaxTree> syntaxTrees,
+        int treeIndex)
+    {
+        var declarationIndex = 0;
+        for (var index = 0; index < treeIndex; index++)
+        {
+            if (!GlobalUsings.IsAkcssFile(syntaxTrees[index]))
+            {
+                declarationIndex++;
+            }
+        }
+
+        return declarationIndex;
     }
 }

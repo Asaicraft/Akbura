@@ -1,3 +1,4 @@
+using Akbura.RuntimePools;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Avalonia.Controls;
@@ -22,7 +23,8 @@ internal static class AkburaComponentRegistry
     {
         lock (s_gate)
         {
-            var builder = ImmutableArray.CreateBuilder<AkburaControl>(s_components.Count);
+            using var builder =
+                ImmutableArrayBuilder<AkburaControl>.Rent(s_components.Count);
             for (var index = 0; index < s_components.Count;)
             {
                 if (s_components[index].TryGetTarget(out var component))

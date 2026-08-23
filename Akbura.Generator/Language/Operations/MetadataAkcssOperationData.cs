@@ -1,5 +1,6 @@
 using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
@@ -289,7 +290,8 @@ internal readonly struct MetadataAkcssOperationData
             return ImmutableArray<string>.Empty;
         }
 
-        var builder = ImmutableArray.CreateBuilder<string>(value.Values.Length);
+        using var builder =
+            ImmutableArrayBuilder<string>.Rent(value.Values.Length);
         foreach (var item in value.Values)
         {
             if (item.Value is string text)
@@ -298,6 +300,6 @@ internal readonly struct MetadataAkcssOperationData
             }
         }
 
-        return builder.MoveToImmutable();
+        return builder.ToImmutable();
     }
 }

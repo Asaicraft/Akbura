@@ -2,7 +2,6 @@ using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -70,24 +69,30 @@ internal sealed class ComponentSyntaxTree : AkburaSyntaxTree
     IEnumerable<TextChangeRange>? changes = null,
     CancellationToken cancellationToken = default)
     {
-        Debug.WriteLine("[Akbura] SyntaxTree: GetChangeRanges started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Syntax,
+            "SyntaxTree: GetChangeRanges started");
 
         var changeRanges = changes?.ToArray() ??
             [.. newText.GetChangeRanges(Text)];
 
-        Debug.WriteLine(
-            $"[Akbura] SyntaxTree: GetChangeRanges completed, " +
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Syntax,
+            $"SyntaxTree: GetChangeRanges completed, " +
             $"count={changeRanges.Length}");
 
         if (changeRanges.Length == 0)
         {
-            Debug.WriteLine("[Akbura] SyntaxTree: text comparison started");
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Syntax,
+                "SyntaxTree: text comparison started");
 
             var contentEquals =
                 newText.ContentEquals(Text);
 
-            Debug.WriteLine(
-                $"[Akbura] SyntaxTree: text comparison completed, " +
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Syntax,
+                $"SyntaxTree: text comparison completed, " +
                 $"equal={contentEquals}");
 
             if (contentEquals)
@@ -96,7 +101,9 @@ internal sealed class ComponentSyntaxTree : AkburaSyntaxTree
             }
         }
 
-        Debug.WriteLine("[Akbura] SyntaxTree: parser construction started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Syntax,
+            "SyntaxTree: parser construction started");
 
         var lexer = new Lexer(newText);
 
@@ -106,11 +113,15 @@ internal sealed class ComponentSyntaxTree : AkburaSyntaxTree
             GetRoot(),
             changeRanges);
 
-        Debug.WriteLine("[Akbura] SyntaxTree: ParseCompilationUnit started");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Syntax,
+            "SyntaxTree: ParseCompilationUnit started");
 
         var root = parser.ParseCompilationUnit();
 
-        Debug.WriteLine("[Akbura] SyntaxTree: ParseCompilationUnit completed");
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Syntax,
+            "SyntaxTree: ParseCompilationUnit completed");
 
         return new ComponentSyntaxTree(
             newText,

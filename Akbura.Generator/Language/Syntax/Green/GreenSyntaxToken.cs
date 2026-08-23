@@ -290,6 +290,11 @@ internal partial class GreenSyntaxToken : GreenNode
         return new CSharpRawToken(rawNode, null, null, null, null);
     }
 
+    public static CSharpRawToken CreateCSharpRawToken(string rawText, CsharpRawNode rawNode)
+    {
+        return new CSharpRawToken(rawText, rawNode, null, null, null, null);
+    }
+
     public static GreenSyntaxToken AkTextLiteral(string rawText)
     {
         return new SyntaxTokenWithValue<string>(SyntaxKind.AkTextLiteral, rawText, rawText);

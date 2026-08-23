@@ -475,7 +475,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             size: 16);
 
         private readonly ObjectPool<SyntaxDeclarationBuilder> _pool;
-        private readonly ImmutableArray<Declaration>.Builder _children = ImmutableArray.CreateBuilder<Declaration>();
+        private readonly ArrayBuilder<Declaration> _children = new();
         private AkburaSyntaxTree _syntaxTree;
         private AkcssSyntaxTree _akcssSyntaxTree;
 
@@ -701,7 +701,8 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
 
         private ImmutableArray<Declaration> CollectMarkupElementChildren(MarkupElementSyntax element)
         {
-            var builder = ImmutableArray.CreateBuilder<Declaration>();
+            using var builder =
+                ImmutableArrayBuilder<Declaration>.Rent();
             foreach (var content in element.Body)
             {
                 if (content.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)

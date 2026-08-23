@@ -305,4 +305,82 @@ public class MarkupNodeSyntaxParseTests
         Assert.True(syntax.Element.StartTag!.CloseToken.IsMissing);
         Assert.Equal(code, syntax.ToFullString());
     }
+
+    [Fact]
+    public void UnmatchedEndTag_ProducesIncompleteTagAndKeepsFollowingChildren()
+    {
+        const string code =
+            "<StackPanel></Button><Button/><Button/></StackPanel>";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+
+        Assert.Equal(3, syntax.Element.Body.Count);
+        var incomplete = Assert.IsType<GreenIncompleteTagSyntax>(
+            syntax.Element.Body[0]);
+        Assert.Equal("Button", incomplete.EndTag.Name.ToFullString());
+        Assert.IsType<GreenMarkupElementContentSyntax>(syntax.Element.Body[1]);
+        Assert.IsType<GreenMarkupElementContentSyntax>(syntax.Element.Body[2]);
+        Assert.Equal("StackPanel", syntax.Element.EndTag!.Name.ToFullString());
+        Assert.True(incomplete.ContainsDiagnostics);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void AncestorEndTag_IsNotConsumedByUnclosedChild()
+    {
+        const string code = "<StackPanel><Button></StackPanel>";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+        Assert.Equal(1, syntax.Element.Body.Count);
+        var childContent = Assert.IsType<GreenMarkupElementContentSyntax>(
+            syntax.Element.Body[0]);
+
+        Assert.Null(childContent.Element.EndTag);
+        Assert.Equal("StackPanel", syntax.Element.EndTag!.Name.ToFullString());
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void NewElementStart_RecoversMissingStartTagCloseToken()
+    {
+        const string code =
+            "<StackPanel gap-3<Button Content=\"Hello World!\"/></StackPanel>";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+
+        Assert.True(syntax.Element.StartTag!.CloseToken.IsMissing);
+        Assert.True(syntax.Element.StartTag.CloseToken.ContainsDiagnostics);
+        Assert.Equal(SyntaxKind.GreaterThanToken, syntax.Element.StartTag.CloseToken.Kind);
+        Assert.Equal(1, syntax.Element.Body.Count);
+        var child = Assert.IsType<GreenMarkupElementContentSyntax>(
+            syntax.Element.Body[0]);
+        Assert.Equal("Button", child.Element.StartTag!.Name.ToFullString().Trim());
+        Assert.Equal("StackPanel", syntax.Element.EndTag!.Name.ToFullString());
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void InvalidStartTagText_IsPreservedAsSkippedTrivia()
+    {
+        const string code =
+            "<HelloWorld !=1233fd3--- ><Button/></HelloWorld>";
+
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseMarkupRootSyntax();
+
+        Assert.Equal(0, syntax.Element.StartTag!.Attributes.Count);
+        Assert.True(syntax.Element.StartTag.CloseToken.ContainsSkippedText);
+        Assert.True(syntax.Element.StartTag.CloseToken.ContainsDiagnostics);
+        Assert.Equal(1, syntax.Element.Body.Count);
+        Assert.IsType<GreenMarkupElementContentSyntax>(
+            syntax.Element.Body[0]);
+        Assert.Equal(code, syntax.ToFullString());
+    }
 }

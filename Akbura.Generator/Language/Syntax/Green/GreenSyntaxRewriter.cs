@@ -8,6 +8,11 @@ using System.Text;
 namespace Akbura.Language.Syntax.Green;
 internal partial class GreenSyntaxRewriter : GreenSyntaxVisitor<GreenNode>
 {
+    public override GreenNode DefaultVisit(GreenNode node)
+    {
+        return node;
+    }
+
     [return: NotNullIfNotNull(nameof(token))]
     public override GreenNode? VisitToken(GreenSyntaxToken? token)
     {

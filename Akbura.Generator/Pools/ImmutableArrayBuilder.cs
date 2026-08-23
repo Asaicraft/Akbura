@@ -7,7 +7,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
 
+#if AKBURA_RUNTIME
+namespace Akbura.RuntimePools;
+#else
 namespace Akbura.Pools;
+#endif
 
 internal ref struct ImmutableArrayBuilder<T>
 {
@@ -47,7 +51,9 @@ internal ref struct ImmutableArrayBuilder<T>
 
 
 
-    /// <inheritdoc cref="ImmutableArray{T}.Builder.Count"/>
+    /// <summary>
+    /// Gets the number of items written to the builder.
+    /// </summary>
     public readonly int Count
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -64,7 +70,9 @@ internal ref struct ImmutableArrayBuilder<T>
         get => writer!.WrittenSpan;
     }
 
-    /// <inheritdoc cref="ImmutableArray{T}.Builder.Add(T)"/>
+    /// <summary>
+    /// Adds an item to the end of the builder.
+    /// </summary>
     public readonly void Add(T item)
     {
         writer!.Add(item);
@@ -87,7 +95,17 @@ internal ref struct ImmutableArrayBuilder<T>
         }
     }
 
-    /// <inheritdoc cref="ImmutableArray{T}.Builder.ToImmutable"/>
+    /// <summary>
+    /// Removes all items written to the underlying buffer.
+    /// </summary>
+    public readonly void Clear()
+    {
+        writer!.Clear();
+    }
+
+    /// <summary>
+    /// Creates an immutable array containing the written items.
+    /// </summary>
     public readonly ImmutableArray<T> ToImmutable()
     {
         var array = writer!.WrittenSpan.ToArray();
@@ -95,7 +113,9 @@ internal ref struct ImmutableArrayBuilder<T>
         return Unsafe.As<T[], ImmutableArray<T>>(ref array);
     }
 
-    /// <inheritdoc cref="ImmutableArray{T}.Builder.ToArray"/>
+    /// <summary>
+    /// Creates an array containing the written items.
+    /// </summary>
     public readonly T[] ToArray()
     {
         return writer!.WrittenSpan.ToArray();
@@ -192,6 +212,12 @@ internal ref struct ImmutableArrayBuilder<T>
             items.CopyTo(array.AsSpan(index)!);
 
             index += items.Length;
+        }
+
+        public void Clear()
+        {
+            Array.Clear(array!, 0, index);
+            index = 0;
         }
 
         /// <inheritdoc/>

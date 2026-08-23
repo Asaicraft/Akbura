@@ -101,8 +101,7 @@ public sealed class CSharpBlockIncrementalParserBenchmarkConfig : ManualConfig
             Job.Default
                 .WithMsBuildArguments(
                     "/p:EnableQuickScanBenchmark=true",
-                    "/p:EnableAkburaStats=true",
-                    "/p:DefineConstants=ENABLE_QUICK_SCAN_BENCHMARK"));
+                    "/p:EnableAkburaStats=true"));
     }
 }
 #endif

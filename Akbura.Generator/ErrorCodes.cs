@@ -62,6 +62,7 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_UtilityBindingPriorityNotSupported = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityNotSupported);
     public const string AKBURA_SEMANTIC_UtilityBindingPriorityTargetNotSupported = nameof(AKBURA_SEMANTIC_UtilityBindingPriorityTargetNotSupported);
     public const string AKBURA_SEMANTIC_AkcssImportNotFound = nameof(AKBURA_SEMANTIC_AkcssImportNotFound);
+    public const string AKBURA_SEMANTIC_AkcssSelfImport = nameof(AKBURA_SEMANTIC_AkcssSelfImport);
     public const string AKBURA_SEMANTIC_AkcssApplyItemNotFound = nameof(AKBURA_SEMANTIC_AkcssApplyItemNotFound);
     public const string AKBURA_SEMANTIC_AkcssApplyItemAmbiguous = nameof(AKBURA_SEMANTIC_AkcssApplyItemAmbiguous);
     public const string AKBURA_SEMANTIC_AkcssValueCannotConvert = nameof(AKBURA_SEMANTIC_AkcssValueCannotConvert);

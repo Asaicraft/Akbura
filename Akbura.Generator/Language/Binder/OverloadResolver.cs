@@ -1,4 +1,5 @@
 using Akbura.Language.BoundTree;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
@@ -31,7 +32,8 @@ internal sealed class OverloadResolver
         }
 
         var bestScore = int.MaxValue;
-        var bestCandidates = ImmutableArray.CreateBuilder<IMethodSymbol>();
+        using var bestCandidates =
+            ImmutableArrayBuilder<IMethodSymbol>.Rent();
 
         foreach (var candidate in candidates)
         {
@@ -57,7 +59,8 @@ internal sealed class OverloadResolver
         return bestCandidates.Count switch
         {
             0 => OverloadResolutionResult.NotFound(candidates),
-            1 => OverloadResolutionResult.Success(bestCandidates[0]),
+            1 => OverloadResolutionResult.Success(
+                bestCandidates.WrittenSpan[0]),
             _ => OverloadResolutionResult.Ambiguous(bestCandidates.ToImmutable()),
         };
     }

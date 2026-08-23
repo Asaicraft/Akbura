@@ -9,6 +9,7 @@
     <AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAkburaBuildTasks</TargetsForTfmSpecificContentInPackage>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);AKBURA_RUNTIME</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +23,11 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Styles.axaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Akbura.Generator\Pools\ImmutableArrayBuilder.cs"
+             Link="Pools\ImmutableArrayBuilder.cs" />
   </ItemGroup>
 
   <ItemGroup>

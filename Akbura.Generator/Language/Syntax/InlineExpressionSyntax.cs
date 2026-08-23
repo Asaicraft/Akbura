@@ -1,6 +1,4 @@
 ﻿using Akbura.Language.Syntax.Green;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -12,17 +10,13 @@ partial class InlineExpressionSyntax
     {
         var tokens = Green.Expression.Tokens;
 
-        if (tokens.Any() && tokens[0]!.Kind == SyntaxKind.CSharpRawToken)
+        if (tokens.Any() &&
+            tokens[0] is GreenSyntaxToken.CSharpRawToken
+            {
+                RawNode: CSharp.ExpressionSyntax expression
+            })
         {
-            var token = tokens[0];
-
-            Debug.Assert(tokens[0] is GreenSyntaxToken.CSharpRawToken);
-
-            var rawNode = Unsafe.As<GreenSyntaxToken.CSharpRawToken>(token).RawNode;
-
-            Debug.Assert(rawNode is CSharp.ExpressionSyntax);
-
-            return Unsafe.As<CSharp.ExpressionSyntax>(rawNode);
+            return expression;
         }
 
         try

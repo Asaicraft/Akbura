@@ -1,4 +1,5 @@
 using Akbura.Language.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
@@ -12,11 +13,15 @@ internal sealed class AkburaSemanticDiagnostic : AkburaDiagnostic
         AkburaSyntax syntax,
         string code,
         ImmutableArray<object?> parameters,
-        AkburaDiagnosticSeverity severity = AkburaDiagnosticSeverity.Error)
+        AkburaDiagnosticSeverity severity = AkburaDiagnosticSeverity.Error,
+        TextSpan? span = null)
         : base(parameters, code, severity)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
+        Span = span ?? syntax.Span;
     }
 
     public AkburaSyntax Syntax { get; }
+
+    public TextSpan Span { get; }
 }

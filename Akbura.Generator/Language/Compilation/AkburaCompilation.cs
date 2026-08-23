@@ -20,6 +20,11 @@ internal sealed partial class AkburaCompilation
     private ImmutableArray<UsingDirectiveSyntax> _lazyGlobalAkburaUsingDirectives;
     private ImmutableArray<AkcssUsingDirectiveSyntax> _lazyGlobalAkcssUsingDirectives;
     private ImmutableArray<CSharp.UsingDirectiveSyntax> _lazyGlobalCSharpUsingDirectives;
+    private ImmutableArray<string> _lazyAvailableAkcssModuleNames;
+    private readonly ConcurrentDictionary<
+        string,
+        ImmutableArray<IAkcssModuleSymbol>>
+        _akcssModuleLookup = new(StringComparer.Ordinal);
     private CSharpCompilation? _lazyCSharpProbeCompilation;
 
     public AkburaCompilation(
@@ -408,6 +413,14 @@ internal sealed partial class AkburaCompilation
         }
     }
 
+    internal IEnumerable<IAkburaComponentSymbol> GetReferencedComponentSymbols()
+    {
+        foreach (var symbol in _referenceManager.GetComponentSymbols())
+        {
+            yield return symbol;
+        }
+    }
+
     internal ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
     {
         var localMatches = GetLocalAkcssSyntaxTreesByLogicalName(logicalName);
@@ -428,6 +441,134 @@ internal sealed partial class AkburaCompilation
         string logicalName)
     {
         return _referenceManager.GetAkcssModuleSymbolsByLogicalName(logicalName);
+    }
+
+    internal ImmutableArray<IAkcssModuleSymbol>
+        LookupAkcssModulesByLogicalName(
+            string logicalName,
+            CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(logicalName))
+        {
+            return ImmutableArray<IAkcssModuleSymbol>.Empty;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_akcssModuleLookup.TryGetValue(logicalName, out var cached))
+        {
+            return cached;
+        }
+
+        using var local = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+        foreach (var syntaxTree in AkcssSyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(
+                    syntaxTree.LogicalName,
+                    logicalName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (GetSemanticModel(syntaxTree)
+                    .GetDeclaredSymbol(syntaxTree.GetRoot()) is
+                IAkcssModuleSymbol module)
+            {
+                local.Add(module);
+            }
+        }
+
+        var result = local.Count > 0
+            ? local.ToImmutable()
+            : _referenceManager.GetAkcssModuleSymbolsByLogicalName(logicalName);
+        cancellationToken.ThrowIfCancellationRequested();
+        return _akcssModuleLookup.GetOrAdd(logicalName, result);
+    }
+
+    internal ImmutableArray<string> GetAvailableAkcssModuleNames(
+        CancellationToken cancellationToken = default)
+    {
+        if (!_lazyAvailableAkcssModuleNames.IsDefault)
+        {
+            return _lazyAvailableAkcssModuleNames;
+        }
+
+        var builder = ImmutableArrayBuilder<string>.Rent();
+        try
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            var compilations = new HashSet<AkburaCompilation>();
+            AddCompilation(
+                this,
+                ref builder,
+                names,
+                compilations,
+                cancellationToken);
+
+            var result = builder.ToImmutable();
+            ImmutableInterlocked.InterlockedInitialize(
+                ref _lazyAvailableAkcssModuleNames,
+                result);
+            return _lazyAvailableAkcssModuleNames;
+        }
+        finally
+        {
+            builder.Dispose();
+        }
+
+        static void AddCompilation(
+            AkburaCompilation compilation,
+            ref ImmutableArrayBuilder<string> builder,
+            HashSet<string> names,
+            HashSet<AkburaCompilation> compilations,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!compilations.Add(compilation))
+            {
+                return;
+            }
+
+            foreach (var syntaxTree in compilation.AkcssSyntaxTrees)
+            {
+                AddName(
+                    syntaxTree.LogicalName,
+                    ref builder,
+                    names);
+            }
+
+            foreach (var reference in compilation.CompilationReferences)
+            {
+                AddCompilation(
+                    reference.Compilation,
+                    ref builder,
+                    names,
+                    compilations,
+                    cancellationToken);
+            }
+
+            foreach (var module in compilation.ReferencedModules)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var name in module.GetAkcssModuleNames())
+                {
+                    AddName(name, ref builder, names);
+                }
+            }
+        }
+
+        static void AddName(
+            string? name,
+            ref ImmutableArrayBuilder<string> builder,
+            HashSet<string> names)
+        {
+            if (!string.IsNullOrWhiteSpace(name) &&
+                names.Add(name!))
+            {
+                builder.Add(name!);
+            }
+        }
     }
 
     internal ImmutableArray<IAkcssModuleSymbol> GetExportedAkcssModuleSymbolsByLogicalName(
@@ -491,7 +632,8 @@ internal sealed partial class AkburaCompilation
 
     private ImmutableArray<UsingDirectiveSyntax> CreateGlobalAkburaUsingDirectives()
     {
-        var builder = ImmutableArray.CreateBuilder<UsingDirectiveSyntax>();
+        using var builder =
+            ImmutableArrayBuilder<UsingDirectiveSyntax>.Rent();
         foreach (var syntaxTree in SyntaxTrees)
         {
             var isGlobalUsingsFile =
@@ -512,8 +654,8 @@ internal sealed partial class AkburaCompilation
 
     private ImmutableArray<AkcssUsingDirectiveSyntax> CreateGlobalAkcssUsingDirectives()
     {
-        var builder =
-            ImmutableArray.CreateBuilder<AkcssUsingDirectiveSyntax>();
+        using var builder =
+            ImmutableArrayBuilder<AkcssUsingDirectiveSyntax>.Rent();
         foreach (var syntaxTree in AkcssSyntaxTrees)
         {
             if (!GlobalUsings.IsAkcssFile(syntaxTree))
@@ -535,8 +677,8 @@ internal sealed partial class AkburaCompilation
 
     private ImmutableArray<CSharp.UsingDirectiveSyntax> CreateGlobalCSharpUsingDirectives()
     {
-        var builder =
-            ImmutableArray.CreateBuilder<CSharp.UsingDirectiveSyntax>();
+        using var builder =
+            ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
         foreach (var syntaxTree in CSharpCompilation.SyntaxTrees)
         {
             if (syntaxTree.GetRoot() is not CSharp.CompilationUnitSyntax root)

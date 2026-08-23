@@ -1,3 +1,4 @@
+using Akbura.Language;
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
@@ -6,6 +7,218 @@ namespace Akbura.UnitTests;
 
 public sealed class AkcssIncrementalParserTests
 {
+    [Theory]
+    [InlineData("\r\n")]
+    [InlineData("\r\n\t\t")]
+    public void InsertBlankLineBeforeUtilityCloseBrace_MatchesFullParse(
+        string insertedText)
+    {
+        const string oldCode =
+            "@using System;\r\n" +
+            "@utilities {\r\n" +
+            "\tControl.w-(double width) {\r\n" +
+            "\t\tWidth: width;\r\n" +
+            "\t}\r\n" +
+            "\r\n" +
+            "\tControl.w-auto {\r\n" +
+            "\t\tWidth: double.NaN;\r\n" +
+            "\t}\r\n" +
+            "\r\n" +
+            "\tControl.w-full {\r\n" +
+            "\t\tWidth: double.NaN;\r\n" +
+            "\t\tHorizontalAlignment: Stretch;\r\n" +
+            "\t}\r\n" +
+            "\r\n" +
+            "\tControl.w-px {\r\n" +
+            "\t\tWidth: 1d;\r\n" +
+            "\t}\r\n" +
+            "}\r\n";
+        var insertPosition = oldCode.IndexOf(
+            "\t}\r\n\r\n\tControl.w-px",
+            StringComparison.Ordinal);
+        var newCode = oldCode.Insert(insertPosition, insertedText);
+        var oldTree = AkcssSyntaxTree.ParseText(
+            SourceText.From(oldCode),
+            "Styles.akcss");
+
+        var incrementalTree = oldTree.WithChangedText(
+            SourceText.From(newCode),
+            [new TextChangeRange(
+                new TextSpan(insertPosition, 0),
+                insertedText.Length)]);
+        var fullTree = AkcssSyntaxTree.ParseText(
+            SourceText.From(newCode),
+            "Styles.akcss");
+
+        Assert.Equal(newCode, incrementalTree.GetRoot().ToFullString());
+        Assert.Equal(
+            fullTree.GetRoot().ToFullString(),
+            incrementalTree.GetRoot().ToFullString());
+        Assert.False(fullTree.GetRoot().ContainsDiagnostics);
+        Assert.False(
+            incrementalTree.GetRoot().ContainsDiagnostics,
+            FormatDiagnostics(incrementalTree.GetRoot()));
+
+        foreach (var utility in incrementalTree.GetRoot()
+                     .DescendantNodes()
+                     .OfType<AkcssUtilityDeclarationSyntax>())
+        {
+            var targetType = utility.Selector.TargetType;
+            Assert.NotNull(targetType);
+
+            Assert.Equal(
+                "Control",
+                newCode.Substring(
+                    targetType!.Tokens[0].Span.End - "Control".Length,
+                    "Control".Length));
+        }
+    }
+
+    [Fact]
+    public void InsertBlankLineIntoBuiltInStyles_MatchesFullParseImmediately()
+    {
+        var stylesPath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Akbura",
+            "Styles.akcss"));
+        var oldCode = File.ReadAllText(stylesPath);
+        var lineBreak = oldCode.Contains("\r\n", StringComparison.Ordinal)
+            ? "\r\n"
+            : "\n";
+        var marker =
+            $"\t\tHorizontalAlignment: Stretch;{lineBreak}\t}}";
+        var markerStart = oldCode.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(markerStart >= 0, "Expected the w-full edit marker.");
+
+        var insertedLineBreakStart =
+            markerStart +
+            "\t\tHorizontalAlignment: Stretch;".Length +
+            lineBreak.Length;
+        var newCode = oldCode.Insert(
+            insertedLineBreakStart,
+            lineBreak);
+        var oldTree = AkcssSyntaxTree.ParseText(
+            SourceText.From(oldCode),
+            stylesPath);
+
+        var incrementalTree = oldTree.WithChangedText(
+            SourceText.From(newCode),
+            [new TextChangeRange(
+                new TextSpan(insertedLineBreakStart, 0),
+                lineBreak.Length)]);
+        var fullTree = AkcssSyntaxTree.ParseText(
+            SourceText.From(newCode),
+            stylesPath);
+
+        Assert.Equal(
+            fullTree.GetRoot().ToFullString(),
+            incrementalTree.GetRoot().ToFullString());
+        Assert.False(
+            incrementalTree.GetRoot().ContainsDiagnostics,
+            FormatDiagnostics(incrementalTree.GetRoot()));
+        Assert.Equal(
+            fullTree.GetRoot()
+                .DescendantNodes()
+                .OfType<AkcssUtilityDeclarationSyntax>()
+                .Count(),
+            incrementalTree.GetRoot()
+                .DescendantNodes()
+                .OfType<AkcssUtilityDeclarationSyntax>()
+                .Count());
+    }
+
+    [Fact]
+    public void RemoveTransientInvalidApply_RestoresCleanIncrementalTree()
+    {
+        const string originalCode =
+            "@using Avalonia.Controls;\r\n" +
+            "@utilities {\r\n" +
+            "\tControl.w-auto {\r\n" +
+            "\t\tWidth: double.NaN;\r\n" +
+            "\t}\r\n" +
+            "\r\n" +
+            "\tControl.w-full {\r\n" +
+            "\t\tWidth: double.NaN;\r\n" +
+            "\t\tHorizontalAlignment: Stretch;\r\n" +
+            "\t}\r\n" +
+            "\r\n" +
+            "\tControl.w-px {\r\n" +
+            "\t\tWidth: 1d;\r\n" +
+            "\t}\r\n" +
+            "}\r\n";
+        var editPosition = originalCode.IndexOf(
+            "\t}\r\n\r\n\tControl.w-px",
+            StringComparison.Ordinal);
+        var text = SourceText.From(originalCode);
+        var tree = AkcssSyntaxTree.ParseText(text, "Styles.akcss");
+
+        ApplyEdit(editPosition, oldLength: 0, "\r\n");
+        var lineStart = editPosition + "\r\n".Length;
+        ApplyEdit(lineStart, oldLength: 0, "@");
+        ApplyEdit(lineStart + 1, oldLength: 0, "a");
+        ApplyEdit(lineStart + 2, oldLength: 0, "p");
+        ApplyEdit(lineStart + 1, oldLength: 2, "@apply");
+        ApplyEdit(lineStart, oldLength: "@@apply".Length, "");
+
+        var fullTree = AkcssSyntaxTree.ParseText(text, "Styles.akcss");
+
+        Assert.Equal(text.ToString(), tree.GetRoot().ToFullString());
+        Assert.Equal(
+            fullTree.GetRoot().ToFullString(),
+            tree.GetRoot().ToFullString());
+        Assert.False(fullTree.GetRoot().ContainsDiagnostics);
+        Assert.False(
+            tree.GetRoot().ContainsDiagnostics,
+            FormatDiagnostics(tree.GetRoot()));
+
+        void ApplyEdit(
+            int start,
+            int oldLength,
+            string newText)
+        {
+            var changedText = text.WithChanges(
+                new TextChange(
+                    new TextSpan(start, oldLength),
+                    newText));
+            tree = tree.WithChangedText(changedText);
+            text = changedText;
+        }
+    }
+
+    [Theory]
+    [InlineData(".card {\n    Wid")]
+    [InlineData(".card {\n    @apply sur")]
+    [InlineData(".card {\n    @if(IsPoin")]
+    [InlineData(".card {\n    @intercept Cont")]
+    [InlineData("@using Avalonia.Con")]
+    [InlineData("@utilities {\n    StackPanel.gap-(dou")]
+    [InlineData("@utilities {\n    StackPanel.gap-(double")]
+    [InlineData("@utilities {\n    StackPanel.gap-(double value")]
+    public void CompletionFragment_IsRecoverable(
+        string source)
+    {
+        var tree = AkcssSyntaxTree.ParseText(
+            SourceText.From(source),
+            "Incomplete.akcss");
+
+        Assert.Equal(source, tree.GetRoot().ToFullString());
+
+        var updatedSource = source + " ";
+        var updated = tree.WithChangedText(
+            SourceText.From(updatedSource),
+            [new TextChangeRange(
+                new TextSpan(source.Length, 0),
+                newLength: 1)]);
+
+        Assert.Equal(
+            updatedSource,
+            updated.GetRoot().ToFullString());
+    }
+
     [Fact]
     public void UtilitySelector_ParsesHyphenatedStaticAndParameterizedNames()
     {
@@ -136,6 +349,35 @@ public sealed class AkcssIncrementalParserTests
     }
 
     [Fact]
+    public void UtilityParameterNameRemoval_IsRecoverable()
+    {
+        const string oldCode =
+            "@akcss {\n" +
+            "    @utilities {\n" +
+            "        .w-(MyType value) { Width: 10; }\n" +
+            "    }\n" +
+            "}";
+        const string removedText = " value";
+        var changeStart = oldCode.IndexOf(
+            removedText,
+            StringComparison.Ordinal);
+        var newCode = oldCode.Remove(
+            changeStart,
+            removedText.Length);
+        var oldSyntax = Parse(oldCode);
+
+        var syntax = ParseIncremental(
+            newCode,
+            oldSyntax,
+            [new TextChangeRange(
+                new TextSpan(changeStart, removedText.Length),
+                newLength: 0)]);
+
+        Assert.Equal(newCode, syntax.ToFullString());
+        Assert.True(syntax.ContainsDiagnostics);
+    }
+
+    [Fact]
     public void IfDirectiveAssignmentEdit_ReusesOuterBodySiblings()
     {
         const string oldCode =
@@ -250,5 +492,27 @@ public sealed class AkcssIncrementalParserTests
         var oldTree = (AkburaDocumentSyntax)oldSyntax.CreateRed();
         using var parser = ParserHelper.MakeIncrementalParser(code, oldTree, changes);
         return parser.ParseCompilationUnit();
+    }
+
+    private static string FormatDiagnostics(AkburaSyntax root)
+    {
+        var diagnostics = string.Join(
+            Environment.NewLine,
+            root.DescendantNodesAndTokensAndSelf()
+                .SelectMany(nodeOrToken => nodeOrToken.GetDiagnostics()
+                    .Select(diagnostic =>
+                        $"{nodeOrToken.Kind}@{nodeOrToken.FullSpan}: " +
+                        $"{diagnostic.Code} [{string.Join(", ", diagnostic.Parameters)}]")));
+        var utilities = root.DescendantNodes()
+            .OfType<AkcssUtilityDeclarationSyntax>()
+            .Select((utility, index) =>
+                $"utility[{index}]@{utility.FullSpan}: " +
+                $"selector='{utility.Selector.ToFullString().Replace("\r", "\\r").Replace("\n", "\\n")}', " +
+                $"target='{utility.Selector.TargetType?.ToFullString() ?? "<null>"}', " +
+                $"dotMissing={utility.Selector.DotToken.IsMissing}, " +
+                $"name='{utility.Selector.Name.ToFullString()}', " +
+                $"members={utility.Members.Count}");
+
+        return diagnostics + Environment.NewLine + string.Join(Environment.NewLine, utilities);
     }
 }

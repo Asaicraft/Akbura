@@ -352,13 +352,16 @@ internal sealed partial class AkcssStyleBinder : Binder
         using var itemsBuilder = ImmutableArrayBuilder<string>.Rent();
         using var symbolsBuilder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
 
-        foreach (var item in GetAkcssApplyItems(applyDirective))
+        var items = AkcssApplyItemFacts.GetItems(
+            SemanticModel.SyntaxTree.Text,
+            applyDirective);
+        foreach (var item in items)
         {
-            itemsBuilder.Add(item);
+            itemsBuilder.Add(item.Text);
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
             var resolved = SemanticModel.ResolveAkcssApplyItem(
                     applyDirective,
-                    item,
+                    item.Text,
                     containingSymbol,
                     diagnosticsBuilder);
             diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
@@ -639,19 +642,6 @@ internal sealed partial class AkcssStyleBinder : Binder
         }
 
         return builder.ToImmutable();
-    }
-
-    private static ImmutableArray<string> GetAkcssApplyItems(AkcssApplyDirectiveSyntax applyDirective)
-    {
-        var text = applyDirective.Items.ToFullString();
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return ImmutableArray<string>.Empty;
-        }
-
-        return text
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-            .ToImmutableArray();
     }
 
     private static CSharp.ExpressionSyntax? ParseAkcssAssignmentExpression(AkcssAssignmentSyntax assignment)

@@ -233,17 +233,57 @@ internal sealed partial class AkburaCompilation
             }
         }
 
-        public ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
+        public IEnumerable<IAkburaComponentSymbol> GetComponentSymbols()
         {
-            using var builder = ImmutableArrayBuilder<AkcssSyntaxTree>.Rent();
             foreach (var reference in _compilationReferences)
             {
-                builder.AddRange(reference.GetAkcssSyntaxTreesByLogicalName(logicalName));
+                foreach (var symbol in reference.GetComponentSymbols())
+                {
+                    yield return symbol;
+                }
             }
 
             foreach (var module in Modules)
             {
-                builder.AddRange(module.GetAkcssSyntaxTreesByLogicalName(logicalName));
+                foreach (var symbol in module.GetComponentSymbols())
+                {
+                    yield return symbol;
+                }
+            }
+        }
+
+        public ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
+        {
+            using var builder = ImmutableArrayBuilder<AkcssSyntaxTree>.Rent();
+            var seen = new HashSet<AkcssSyntaxTree>();
+            foreach (var reference in _compilationReferences)
+            {
+                foreach (var syntaxTree in
+                         reference.GetAkcssSyntaxTreesByLogicalName(logicalName))
+                {
+                    if (seen.Add(syntaxTree))
+                    {
+                        builder.Add(syntaxTree);
+                    }
+                }
+            }
+
+            var referencedCompilations = builder.ToImmutable();
+            if (referencedCompilations.Length > 0)
+            {
+                return referencedCompilations;
+            }
+
+            foreach (var module in Modules)
+            {
+                foreach (var syntaxTree in
+                         module.GetAkcssSyntaxTreesByLogicalName(logicalName))
+                {
+                    if (seen.Add(syntaxTree))
+                    {
+                        builder.Add(syntaxTree);
+                    }
+                }
             }
 
             return builder.ToImmutable();
@@ -253,9 +293,17 @@ internal sealed partial class AkburaCompilation
             string logicalName)
         {
             using var builder = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+            var seen = new HashSet<IAkcssModuleSymbol>();
             foreach (var reference in _compilationReferences)
             {
-                builder.AddRange(reference.GetAkcssModuleSymbolsByLogicalName(logicalName));
+                foreach (var module in
+                         reference.GetAkcssModuleSymbolsByLogicalName(logicalName))
+                {
+                    if (seen.Add(module))
+                    {
+                        builder.Add(module);
+                    }
+                }
             }
 
             var referencedCompilations = builder.ToImmutable();
@@ -265,10 +313,17 @@ internal sealed partial class AkburaCompilation
             }
 
             using var metadataModules = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+            seen.Clear();
             foreach (var module in Modules)
             {
-                metadataModules.AddRange(
-                    module.GetAkcssModuleSymbolsByLogicalName(logicalName));
+                foreach (var symbol in
+                         module.GetAkcssModuleSymbolsByLogicalName(logicalName))
+                {
+                    if (seen.Add(symbol))
+                    {
+                        metadataModules.Add(symbol);
+                    }
+                }
             }
 
             return metadataModules.ToImmutable();

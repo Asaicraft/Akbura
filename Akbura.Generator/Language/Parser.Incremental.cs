@@ -624,7 +624,9 @@ internal sealed partial class Parser
         GreenCSharpTypeSyntax? TargetType,
         GreenSyntaxToken? CloseParen) ParseIncrementalAkcssOptionalSelectorTarget()
     {
-        if (PeekIncrementalTokenKind() == SyntaxKind.OpenParenToken)
+        var currentKind = PeekIncrementalTokenKind();
+
+        if (currentKind == SyntaxKind.OpenParenToken)
         {
             var openParen = ReadRequiredIncrementalToken(SyntaxKind.OpenParenToken);
             var targetType = ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind.CloseParenToken);
@@ -632,11 +634,14 @@ internal sealed partial class Parser
             return (openParen, targetType, closeParen);
         }
 
-        if (IsIncrementalAkcssNameToken(PeekIncrementalTokenKind()) &&
+        if ((currentKind == SyntaxKind.CSharpRawToken ||
+             IsIncrementalAkcssNameToken(currentKind)) &&
             PeekIncrementalTokenKind(1) == SyntaxKind.DotToken)
         {
-            var targetText = ReadIncrementalToken().ToFullString();
-            return (null, CreateIncrementalAkcssCSharpTypeSyntax(targetText), null);
+            var targetToken = ReadIncrementalToken();
+            var targetType = GreenSyntaxFactory.CSharpTypeSyntax(
+                new GreenSyntaxList<GreenSyntaxToken>(targetToken));
+            return (null, targetType, null);
         }
 
         return (null, null, null);
@@ -724,11 +729,24 @@ internal sealed partial class Parser
             return false;
         }
 
-        markup = GreenSyntaxFactory.MarkupRootSyntax(ParseIncrementalMarkupElementSyntax());
-        return true;
+        var openTags = ArrayBuilder<GreenMarkupComponentNameSyntax>.GetInstance();
+
+        try
+        {
+            GreenMarkupEndTagSyntax? pendingEndTag = null;
+            markup = GreenSyntaxFactory.MarkupRootSyntax(
+                ParseIncrementalMarkupElementSyntax(openTags, ref pendingEndTag));
+            return true;
+        }
+        finally
+        {
+            openTags.Free();
+        }
     }
 
-    private GreenMarkupElementSyntax ParseIncrementalMarkupElementSyntax()
+    private GreenMarkupElementSyntax ParseIncrementalMarkupElementSyntax(
+        ArrayBuilder<GreenMarkupComponentNameSyntax> openTags,
+        ref GreenMarkupEndTagSyntax? pendingEndTag)
     {
         if (TryReadReusableIncrementalNode<GreenMarkupElementSyntax>(out var element))
         {
@@ -744,15 +762,58 @@ internal sealed partial class Parser
 
             if (startTag.CloseToken.Kind != SyntaxKind.SlashGreaterToken)
             {
-                while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.LessSlashToken))
+                openTags.Push(startTag.Name);
+
+                while (PeekIncrementalTokenKind() != SyntaxKind.EndOfFileToken || pendingEndTag != null)
                 {
-                    body.Add(ParseIncrementalMarkupContentSyntax());
+                    GreenMarkupEndTagSyntax? candidateEndTag;
+
+                    if (pendingEndTag != null)
+                    {
+                        candidateEndTag = pendingEndTag;
+                        pendingEndTag = null;
+                    }
+                    else if (PeekIncrementalTokenKind() == SyntaxKind.LessSlashToken)
+                    {
+                        candidateEndTag = ParseIncrementalMarkupEndTagSyntax();
+                    }
+                    else
+                    {
+                        body.Add(ParseIncrementalMarkupContentSyntax(
+                            openTags,
+                            ref pendingEndTag));
+                        continue;
+                    }
+
+                    if (MarkupComponentNamesMatch(startTag.Name, candidateEndTag.Name))
+                    {
+                        endTag = candidateEndTag;
+                        break;
+                    }
+
+                    if (MatchesOpenAncestor(openTags, candidateEndTag.Name))
+                    {
+                        pendingEndTag = candidateEndTag;
+                        break;
+                    }
+
+                    var incompleteTag = GreenSyntaxFactory.IncompleteTagSyntax(
+                        candidateEndTag);
+
+                    if (candidateEndTag.ContainsDiagnostics || candidateEndTag.GreaterToken.IsMissing)
+                    {
+                        body.Add(incompleteTag);
+                    }
+                    else
+                    {
+                        body.Add(AddError(
+                            incompleteTag,
+                            ErrorCodes.ERR_SyntaxError,
+                            "start tag"));
+                    }
                 }
 
-                if (PeekIncrementalTokenKind() == SyntaxKind.LessSlashToken)
-                {
-                    endTag = ParseIncrementalMarkupEndTagSyntax();
-                }
+                openTags.Pop();
             }
 
             return GreenSyntaxFactory.MarkupElementSyntax(startTag, body.ToList(), endTag);
@@ -776,16 +837,28 @@ internal sealed partial class Parser
 
         try
         {
+            GreenNode? skippedSyntax = null;
+
             while (PeekIncrementalTokenKind()
                    is not (
                        SyntaxKind.EndOfFileToken or
                        SyntaxKind.GreaterThanToken or
-                       SyntaxKind.SlashGreaterToken))
+                       SyntaxKind.SlashGreaterToken or
+                       SyntaxKind.LessThanToken or
+                       SyntaxKind.LessSlashToken))
             {
-                var attribute =
-                    IsIncrementalMarkupAttributeStart()
-                        ? ParseIncrementalMarkupAttributeSyntax()
-                        : ParseSkippedMarkupAttributeSyntax();
+                if (!IsIncrementalMarkupAttributeStart())
+                {
+                    skippedSyntax = ParseSkippedMarkupAttributeTokens(incremental: true);
+                    continue;
+                }
+
+                var attribute = ParseIncrementalMarkupAttributeSyntax();
+                if (skippedSyntax != null)
+                {
+                    attribute = AddLeadingSkippedSyntax(attribute, skippedSyntax);
+                    skippedSyntax = null;
+                }
 
                 attributes.Add(attribute);
             }
@@ -793,6 +866,11 @@ internal sealed partial class Parser
             var close = PeekIncrementalTokenKind() == SyntaxKind.SlashGreaterToken
                 ? ReadRequiredIncrementalToken(SyntaxKind.SlashGreaterToken)
                 : ReadRequiredIncrementalToken(SyntaxKind.GreaterThanToken);
+
+            if (skippedSyntax != null)
+            {
+                close = AddLeadingSkippedSyntax(close, skippedSyntax);
+            }
 
             return GreenSyntaxFactory.MarkupStartTagSyntax(
                 less,
@@ -820,7 +898,9 @@ internal sealed partial class Parser
         return GreenSyntaxFactory.MarkupEndTagSyntax(lessSlash, name, greater);
     }
 
-    private GreenMarkupContentSyntax ParseIncrementalMarkupContentSyntax()
+    private GreenMarkupContentSyntax ParseIncrementalMarkupContentSyntax(
+        ArrayBuilder<GreenMarkupComponentNameSyntax> openTags,
+        ref GreenMarkupEndTagSyntax? pendingEndTag)
     {
         if (TryReadReusableIncrementalNode<GreenMarkupContentSyntax>(out var content))
         {
@@ -830,7 +910,7 @@ internal sealed partial class Parser
         return PeekIncrementalTokenKind() switch
         {
             SyntaxKind.LessThanToken => GreenSyntaxFactory.MarkupElementContentSyntax(
-                ParseIncrementalMarkupElementSyntax()),
+                ParseIncrementalMarkupElementSyntax(openTags, ref pendingEndTag)),
             SyntaxKind.OpenBraceToken => GreenSyntaxFactory.MarkupInlineExpressionSyntax(
                 ParseIncrementalInlineExpressionSyntax()),
             _ => ParseIncrementalMarkupTextLiteralSyntax(),
@@ -869,7 +949,7 @@ internal sealed partial class Parser
         return ParseIncrementalTailwindAttributeSyntax();
     }
 
-    private GreenTailwindAttributeSyntax ParseIncrementalTailwindAttributeSyntax()
+    private GreenMarkupAttributeSyntax ParseIncrementalTailwindAttributeSyntax()
     {
         if (TryReadReusableIncrementalNode<GreenTailwindAttributeSyntax>(out var attribute))
         {
@@ -877,6 +957,17 @@ internal sealed partial class Parser
         }
 
         var prefix = TryParseIncrementalTailwindPrefixSegmentSyntax();
+
+        if (prefix != null && IsMarkupStartTagBoundary(PeekIncrementalTokenKind()))
+        {
+            var incomplete = GreenSyntaxFactory.IncompletePrefixedAttributeSyntax(prefix);
+            return AddError(
+                incomplete,
+                incomplete.Width,
+                length: 0,
+                ErrorCodes.ERR_IdentifierExpected);
+        }
+
         var name = ParseIncrementalTailwindSimpleName();
 
         if (PeekIncrementalTokenKind() != SyntaxKind.MinusToken)
@@ -1021,7 +1112,7 @@ internal sealed partial class Parser
             GreenSyntaxFactory.IdentifierName(identifier));
     }
 
-    private GreenMarkupPlainAttributeSyntax ParseIncrementalMarkupPlainAttributeSyntax()
+    private GreenMarkupAttributeSyntax ParseIncrementalMarkupPlainAttributeSyntax()
     {
         if (TryReadReusableIncrementalNode<GreenMarkupPlainAttributeSyntax>(out var attribute))
         {
@@ -1031,6 +1122,19 @@ internal sealed partial class Parser
         var name = ParseIncrementalMarkupSimpleName();
         var equals = ReadRequiredIncrementalToken(SyntaxKind.EqualsToken);
         var value = ParseIncrementalMarkupAttributeValueSyntax();
+
+        if (!equals.IsMissing && value == null)
+        {
+            var incomplete = GreenSyntaxFactory.IncompleteAttributeSyntax(
+                name,
+                equals);
+            return AddError(
+                incomplete,
+                incomplete.Width,
+                length: 0,
+                ErrorCodes.ERR_SyntaxError,
+                "attribute value");
+        }
 
         return GreenSyntaxFactory.MarkupPlainAttributeSyntax(name, equals, value);
     }
@@ -1588,7 +1692,8 @@ internal sealed partial class Parser
         var firstName = ParseIncrementalMarkupSimpleName();
         GreenMarkupGenericArgumentListSyntax? firstGenericArgs = null;
 
-        if (PeekIncrementalTokenKind() == SyntaxKind.OpenBraceToken)
+        if (PeekIncrementalTokenKind() == SyntaxKind.OpenBraceToken &&
+            AreAdjacent(firstName.Identifier, PeekIncrementalToken()))
         {
             firstGenericArgs = ParseIncrementalMarkupGenericArgumentListSyntax();
         }
@@ -1821,34 +1926,44 @@ internal sealed partial class Parser
         return ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode.InExpressionUntilSemicolon);
     }
 
-    private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode expressionMode)
+    private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpressionInMode(
+        Lexer.LexerMode expressionMode)
     {
-        if (TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(out var expression))
+        if (expressionMode != Lexer.LexerMode.InInlineExpression &&
+            TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(
+                out var expression))
         {
             return expression;
         }
 
-        var mode = _mode;
+        // Expression boundaries depend on this mode and nested delimiters.
+        var previousMode = _mode;
         _mode = expressionMode;
 
-        var token = EatToken();
-
-        _mode = mode;
-
-        if (token.Kind != SyntaxKind.CSharpRawToken)
+        try
         {
-            return GreenSyntaxFactory.CSharpExpressionSyntax(
-                GreenSyntaxFactory.CSharpRawToken(token.ToFullString()));
-        }
+            var token = EatToken();
 
-        return GreenSyntaxFactory.CSharpExpressionSyntax(
-            EnsureCSharpRawToken(
-                (GreenSyntaxToken.CSharpRawToken)token,
-                text => CSharpFactory.ParseExpression(
-                    text,
-                    offset: 0,
-                    options: null,
-                    consumeFullText: true)));
+            if (token.Kind != SyntaxKind.CSharpRawToken)
+            {
+                return GreenSyntaxFactory.CSharpExpressionSyntax(
+                    GreenSyntaxFactory.CSharpRawToken(
+                        token.ToFullString()));
+            }
+
+            return GreenSyntaxFactory.CSharpExpressionSyntax(
+                EnsureCSharpRawToken(
+                    (GreenSyntaxToken.CSharpRawToken)token,
+                    static text => CSharpFactory.ParseExpression(
+                        text,
+                        offset: 0,
+                        options: null,
+                        consumeFullText: true)));
+        }
+        finally
+        {
+            _mode = previousMode;
+        }
     }
 
     private static GreenSyntaxToken.CSharpRawToken EnsureCSharpRawToken<TNode>(
@@ -1861,7 +1976,8 @@ internal sealed partial class Parser
             return token;
         }
 
-        return GreenSyntaxFactory.CSharpRawToken(parse(token.ToFullString()));
+        var text = token.ToFullString();
+        return GreenSyntaxFactory.CSharpRawToken(text, parse(text));
     }
 
     private bool TryReadReusableIncrementalNode<TNode>(out TNode node)
@@ -2166,7 +2282,7 @@ internal sealed partial class Parser
 
     private static bool CanReuseIncrementalNode(GreenNode node)
     {
-        return node.FullWidth > 0 &&
+        return (node.FullWidth > 0 || node.Kind == SyntaxKind.EndOfFileToken) &&
                !ContainsDiagnosticsOrSkippedText(node);
     }
 

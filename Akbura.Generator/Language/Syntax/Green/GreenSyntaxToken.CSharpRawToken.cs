@@ -39,11 +39,16 @@ partial class GreenSyntaxToken
             Flags = flags;
         }
 
-        public CSharpRawToken(CsharpRawNode rawText, GreenNode? leading, GreenNode? trailing, ImmutableArray<AkburaDiagnostic>? diagnostics, ImmutableArray<AkburaSyntaxAnnotation>? annotations)
+        public CSharpRawToken(CsharpRawNode rawNode, GreenNode? leading, GreenNode? trailing, ImmutableArray<AkburaDiagnostic>? diagnostics, ImmutableArray<AkburaSyntaxAnnotation>? annotations)
+            : this(rawNode.ToFullString(), rawNode, leading, trailing, diagnostics, annotations)
+        {
+        }
+
+        public CSharpRawToken(string rawText, CsharpRawNode rawNode, GreenNode? leading, GreenNode? trailing, ImmutableArray<AkburaDiagnostic>? diagnostics, ImmutableArray<AkburaSyntaxAnnotation>? annotations)
             : base(SyntaxKind.CSharpRawToken, diagnostics, annotations)
         {
-            _rawNode = rawText;
-            _rawText = _rawNode.ToFullString();
+            _rawNode = rawNode;
+            _rawText = rawText;
             IsMissing = _rawNode.IsMissing;
 
             _leading = leading;
@@ -73,14 +78,14 @@ partial class GreenSyntaxToken
         public override GreenNode WithAnnotations(ImmutableArray<AkburaSyntaxAnnotation>? annotations)
         {
             return _rawNode != null
-                ? new CSharpRawToken(_rawNode, _leading, _trailing, GetDiagnostics(), annotations)
+                ? new CSharpRawToken(_rawText, _rawNode, _leading, _trailing, GetDiagnostics(), annotations)
                 : new CSharpRawToken(_rawText, _leading, _trailing, GetDiagnostics(), annotations);
         }
 
         public override GreenNode WithDiagnostics(ImmutableArray<AkburaDiagnostic>? diagnostics)
         {
             return _rawNode != null
-                ? new CSharpRawToken(_rawNode, _leading, _trailing, diagnostics, GetAnnotations())
+                ? new CSharpRawToken(_rawText, _rawNode, _leading, _trailing, diagnostics, GetAnnotations())
                 : new CSharpRawToken(_rawText, _leading, _trailing, diagnostics, GetAnnotations());
         }
 
@@ -98,7 +103,7 @@ partial class GreenSyntaxToken
         {
             if (_rawNode != null)
             {
-                return new CSharpRawToken(_rawNode, trivia, _trailing, GetDiagnostics(), GetAnnotations());
+                return new CSharpRawToken(_rawText, _rawNode, trivia, _trailing, GetDiagnostics(), GetAnnotations());
             }
 
             return new CSharpRawToken(_rawText, trivia, _trailing, GetDiagnostics(), GetAnnotations());
@@ -108,7 +113,7 @@ partial class GreenSyntaxToken
         {
             if (_rawNode != null)
             {
-                return new CSharpRawToken(_rawNode, _leading, trivia, GetDiagnostics(), GetAnnotations());
+                return new CSharpRawToken(_rawText, _rawNode, _leading, trivia, GetDiagnostics(), GetAnnotations());
             }
 
             return new CSharpRawToken(_rawText, _leading, trivia, GetDiagnostics(), GetAnnotations());

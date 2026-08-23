@@ -542,6 +542,195 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void RemovingPlainAttributeValue_ProducesIncompleteAttribute()
+    {
+        const string oldCode = "<Button Hello=\"World\" Role=\"Action\"/>";
+        const string removed = "\"World\"";
+        var changeStart = oldCode.IndexOf(removed, StringComparison.Ordinal);
+        var newCode = oldCode.Remove(changeStart, removed.Length);
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: removed.Length,
+            newLength: 0);
+
+        Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            oldMarkup.Element.StartTag!.Attributes[0]);
+        var incomplete = Assert.IsType<GreenIncompleteAttributeSyntax>(
+            newMarkup.Element.StartTag!.Attributes[0]);
+        Assert.Equal("Hello", incomplete.Name.Identifier.ValueText);
+        Assert.True(incomplete.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void RemovingPrefixedUtility_ProducesIncompletePrefixedAttribute()
+    {
+        const string oldCode = "<Button {condition}:p-5/>";
+        const string removed = "p-5";
+        var changeStart = oldCode.IndexOf(removed, StringComparison.Ordinal);
+        var newCode = oldCode.Remove(changeStart, removed.Length);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: removed.Length,
+            newLength: 0);
+
+        Assert.True(
+            newMarkup.Element.StartTag!.Attributes.Count > 0,
+            $"No attribute was parsed from '{newMarkup.ToFullString()}'; " +
+            $"close token: '{newMarkup.Element.StartTag.CloseToken.ToFullString()}'.");
+        var incomplete = Assert.IsType<GreenIncompletePrefixedAttributeSyntax>(
+            newMarkup.Element.StartTag.Attributes[0]);
+        Assert.IsType<GreenExpressionConditionalPrefixSyntax>(incomplete.Prefix);
+        Assert.True(incomplete.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void RemovingMarkupExtensionPrefixedUtility_ProducesIncompletePrefixedAttribute()
+    {
+        const string oldCode = "<Button ${md}:p-5/>";
+        const string removed = "p-5";
+        var changeStart = oldCode.IndexOf(removed, StringComparison.Ordinal);
+        var newCode = oldCode.Remove(changeStart, removed.Length);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: removed.Length,
+            newLength: 0);
+
+        var incomplete = Assert.IsType<GreenIncompletePrefixedAttributeSyntax>(
+            newMarkup.Element.StartTag!.Attributes[0]);
+        Assert.IsType<GreenMarkupExtensionConditionalPrefixSyntax>(incomplete.Prefix);
+        Assert.True(incomplete.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Theory]
+    [InlineData("<Button />", "<Button $/>")]
+    [InlineData("<Button $/>", "<Button ${/>")]
+    [InlineData("<Button ${/>", "<Button ${m/>")]
+    [InlineData("<Button ${m/>", "<Button ${md/>")]
+    [InlineData("<Button ${md/>", "<Button ${md}/>")]
+    [InlineData("<Button ${md}/>", "<Button ${md}:/>")]
+    public void TypingMarkupExtensionPrefix_DoesNotCrash(
+        string oldCode,
+        string newCode)
+    {
+        var change = GetSingleChange(oldCode, newCode);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            change.Span.Start,
+            change.Span.Length,
+            change.NewLength);
+
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void TypingDynamicAttributeExpression_ExtendsCSharpExpression()
+    {
+        var code = "<Button Click={}/>";
+        var syntax = Parse(code);
+        var insertionPosition = code.IndexOf('}');
+
+        foreach (var character in "count++")
+        {
+            var newCode = code.Insert(
+                insertionPosition,
+                character.ToString());
+            var change = new TextChangeRange(
+                new TextSpan(insertionPosition, 0),
+                newLength: 1);
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [change]);
+
+            Assert.Equal(newCode, syntax.ToFullString());
+            code = newCode;
+            insertionPosition++;
+        }
+
+        var markup = Assert.IsType<GreenMarkupRootSyntax>(
+            syntax.Members[0]);
+        Assert.Equal(1, markup.Element.StartTag!.Attributes.Count);
+        var attribute = Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            markup.Element.StartTag.Attributes[0]);
+        var value = Assert.IsType<GreenMarkupDynamicAttributeValueSyntax>(
+            attribute.Value);
+
+        Assert.Equal("{count++}", value.Expression.ToFullString());
+        Assert.False(value.Expression.ContainsDiagnostics);
+    }
+
+    [Fact]
+    public void SkippedTextBeforeAttributeWithLeadingTrivia_DoesNotCrash()
+    {
+        const string code = "<Button ! Content=\"Hello\"/>";
+
+        var syntax = Parse(code);
+        var markup = Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[0]);
+        var attribute = markup.Element.StartTag!.Attributes[0];
+
+        Assert.True(attribute.ContainsSkippedText);
+        Assert.Equal(code, markup.ToFullString());
+    }
+
+    [Fact]
+    public void InsertingUnmatchedEndTag_ProducesIncompleteTag()
+    {
+        const string oldCode = "<StackPanel><Button/></StackPanel>";
+        const string inserted = "</Button>";
+        var changeStart = oldCode.IndexOf("<Button", StringComparison.Ordinal);
+        var newCode = oldCode.Insert(changeStart, inserted);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: 0,
+            newLength: inserted.Length);
+
+        Assert.Equal(2, newMarkup.Element.Body.Count);
+        Assert.IsType<GreenIncompleteTagSyntax>(newMarkup.Element.Body[0]);
+        Assert.IsType<GreenMarkupElementContentSyntax>(newMarkup.Element.Body[1]);
+        Assert.Equal("StackPanel", newMarkup.Element.EndTag!.Name.ToFullString());
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
+    public void RemovingStartTagCloseToken_PreservesNestedElement()
+    {
+        const string oldCode = "<StackPanel gap-3><Button/></StackPanel>";
+        var changeStart = oldCode.IndexOf('>');
+        var newCode = oldCode.Remove(changeStart, 1);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            changeStart,
+            oldLength: 1,
+            newLength: 0);
+
+        Assert.True(newMarkup.Element.StartTag!.CloseToken.IsMissing);
+        Assert.Equal(1, newMarkup.Element.Body.Count);
+        Assert.IsType<GreenMarkupElementContentSyntax>(newMarkup.Element.Body[0]);
+        Assert.Equal("StackPanel", newMarkup.Element.EndTag!.Name.ToFullString());
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void OldMarkupWithDiagnostics_IsNotReusedAsWholeRoot()
     {
         const string code = "<Button>@if(isOpen){<FirstControl/>}</Button>";
@@ -607,6 +796,564 @@ public sealed class MarkupIncrementalParserTests
         Assert.Equal(newCode, incremental.ToFullString());
     }
 
+    [Fact]
+    public void CompletingStateInitializerBeforeExistingMarkup_ProducesSeparateMarkupRoot()
+    {
+        const string oldCode =
+            "state int hi = \n\n\n" +
+            "<Border>\n" +
+            "</Border>";
+        const string inserted = "1;";
+        var insertionPosition =
+            "state int hi = ".Length;
+        var newCode = oldCode.Insert(
+            insertionPosition,
+            inserted);
+        var oldSyntax = Parse(oldCode);
+
+        Assert.Equal(1, oldSyntax.Members.Count);
+
+        var oldState =
+            Assert.IsType<GreenStateDeclarationSyntax>(
+                oldSyntax.Members[0]);
+        var oldInitializer =
+            Assert.IsType<GreenSimpleStateInitializerSyntax>(
+                oldState.Initializer);
+
+        Assert.True(oldState.Semicolon.IsMissing);
+        Assert.Contains(
+            "<Border>",
+            oldInitializer.Expression.ToFullString());
+
+        var incremental = ParseIncremental(
+            newCode,
+            oldSyntax,
+            [
+                new TextChangeRange(
+                    new TextSpan(
+                        insertionPosition,
+                        length: 0),
+                    inserted.Length),
+            ]);
+
+        Assert.Equal(newCode, incremental.ToFullString());
+        Assert.Equal(2, incremental.Members.Count);
+
+        var state =
+            Assert.IsType<GreenStateDeclarationSyntax>(
+                incremental.Members[0]);
+        var initializer =
+            Assert.IsType<GreenSimpleStateInitializerSyntax>(
+                state.Initializer);
+
+        Assert.Equal(
+            "1",
+            initializer.Expression.ToFullString());
+        Assert.False(state.Semicolon.IsMissing);
+
+        var markup =
+            Assert.IsType<GreenMarkupRootSyntax>(
+                incremental.Members[1]);
+
+        Assert.Equal(
+            "Border",
+            markup.Element.StartTag!.Name.ToFullString());
+        Assert.Equal(
+            "Border",
+            markup.Element.EndTag!.Name.ToFullString());
+        AssertSameTree(
+            Parse(newCode),
+            incremental);
+    }
+
+    [Fact]
+    public void TypingComponentAndInsertingClosingTag_ProducesCompleteRoot()
+    {
+        var code = "<";
+        var syntax = Parse(code);
+
+        foreach (var character in "Border>")
+        {
+            var newCode =
+                code + character;
+
+            var change =
+                new TextChangeRange(
+                    new TextSpan(
+                        code.Length,
+                        length: 0),
+                    newLength: 1);
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [change]);
+
+            code = newCode;
+
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                Parse(code),
+                syntax);
+        }
+
+        const string closingTag =
+            "</Border>";
+
+        var codeWithClosingTag =
+            code + closingTag;
+
+        syntax = ParseIncremental(
+            codeWithClosingTag,
+            syntax,
+            [
+                new TextChangeRange(
+                new TextSpan(
+                    code.Length,
+                    length: 0),
+                closingTag.Length),
+            ]);
+
+        Assert.Equal(
+            1,
+            syntax.Members.Count);
+
+        var markup =
+            Assert.IsType<GreenMarkupRootSyntax>(
+                syntax.Members[0]);
+
+        Assert.NotNull(markup.Element.StartTag);
+
+        var startTag = markup.Element.StartTag;
+
+        Assert.Equal(
+            "Border",
+            startTag.Name.ToFullString());
+
+        Assert.Equal(
+            0,
+            startTag.Attributes.Count);
+
+        Assert.NotNull(markup.Element.EndTag);
+
+        var endTag = markup.Element.EndTag;
+
+        Assert.Equal(
+            "Border",
+            endTag.Name.ToFullString());
+
+        Assert.False(
+            markup.ContainsDiagnostics);
+
+        Assert.Equal(
+            codeWithClosingTag,
+            syntax.ToFullString());
+
+        AssertSameTree(
+            Parse(codeWithClosingTag),
+            syntax);
+    }
+
+    [Fact]
+    public void
+        TypingChildBeforeExistingEndTag_MatchesFullParse()
+    {
+        var code =
+            "<StackPanel>\r\n" +
+            "\r\n" +
+            "</StackPanel>";
+
+        var syntax = Parse(code);
+        var insertionPosition =
+            code.IndexOf(
+                "</StackPanel>",
+                StringComparison.Ordinal);
+
+        const string inserted =
+            "\t<Button></Button>\r\n";
+
+        foreach (var character in inserted)
+        {
+            var newCode = code.Insert(
+                insertionPosition,
+                character.ToString());
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [
+                    new TextChangeRange(
+                        new TextSpan(
+                            insertionPosition,
+                            length: 0),
+                        newLength: 1),
+                ]);
+
+            code = newCode;
+            insertionPosition++;
+
+            var fullSyntax = Parse(code);
+
+            Assert.Equal(
+                code,
+                fullSyntax.ToFullString());
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                fullSyntax,
+                syntax);
+        }
+
+        Assert.False(
+            syntax.ContainsDiagnostics);
+    }
+
+    [Fact]
+    public void
+        ConvertingSelfClosingChildToPairedElement_MatchesFullParse()
+    {
+        var code =
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "state int a = 0;\r\n" +
+            "\r\n" +
+            "<StackPanel>\r\n" +
+            "\t<Button/>\r\n" +
+            "</StackPanel>";
+
+        var syntax = Parse(code);
+
+        void ApplyChange(
+            string updatedCode,
+            TextChangeRange change)
+        {
+            syntax = ParseIncremental(
+                updatedCode,
+                syntax,
+                [change]);
+
+            code = updatedCode;
+
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                Parse(code),
+                syntax);
+        }
+
+        var slashPosition =
+            code.IndexOf(
+                "/>",
+                StringComparison.Ordinal);
+
+        var updatedCode =
+            code.Insert(
+                slashPosition,
+                " ");
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    slashPosition,
+                    length: 0),
+                newLength: 1));
+
+        var spacePosition =
+            code.IndexOf(
+                " />",
+                StringComparison.Ordinal);
+
+        updatedCode =
+            code.Remove(
+                spacePosition,
+                count: 1);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    spacePosition,
+                    length: 1),
+                newLength: 0));
+
+        slashPosition =
+            code.IndexOf(
+                "/>",
+                StringComparison.Ordinal);
+
+        updatedCode =
+            code.Remove(
+                slashPosition,
+                count: 1);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    slashPosition,
+                    length: 1),
+                newLength: 0));
+
+        var insertionPosition =
+            code.IndexOf(
+                "</StackPanel>",
+                StringComparison.Ordinal);
+
+        const string blankLine =
+            "\r\n";
+
+        updatedCode =
+            code.Insert(
+                insertionPosition,
+                blankLine);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    insertionPosition,
+                    length: 0),
+                blankLine.Length));
+
+        insertionPosition +=
+            blankLine.Length;
+
+        const string indentationAndLess =
+            "\t\t<";
+
+        updatedCode =
+            code.Insert(
+                insertionPosition,
+                indentationAndLess);
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    insertionPosition,
+                    length: 0),
+                indentationAndLess.Length));
+
+        insertionPosition +=
+            indentationAndLess.Length;
+
+        foreach (var character in "/Button>")
+        {
+            updatedCode =
+                code.Insert(
+                    insertionPosition,
+                    character.ToString());
+
+            ApplyChange(
+                updatedCode,
+                new TextChangeRange(
+                    new TextSpan(
+                        insertionPosition,
+                        length: 0),
+                    newLength: 1));
+
+            insertionPosition++;
+        }
+
+        updatedCode =
+            code.Insert(
+                insertionPosition,
+                "\r\n");
+
+        ApplyChange(
+            updatedCode,
+            new TextChangeRange(
+                new TextSpan(
+                    insertionPosition,
+                    length: 0),
+                newLength: 2));
+
+        Assert.False(
+            syntax.ContainsDiagnostics);
+    }
+
+    [Fact]
+    public void
+        TypingMarkupExpressionWithObjectInitializers_MatchesFullParse()
+    {
+        const string prefix =
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "state int count = 1;\r\n" +
+            "\r\n" +
+            "<Border>\r\n" +
+            "\t";
+
+        const string expressionBody =
+            "count % 2 == 0 \r\n" +
+            "\t\t? new Button() " +
+            "{ Content = $\"Increment {count}\" }\r\n" +
+            "\t\t: new Border() " +
+            "{ Width = 100, Height = 100 }\r\n" +
+            "\t";
+
+        const string suffix =
+            "\r\n" +
+            "</Border>";
+
+        var code =
+            prefix +
+            "{}" +
+            suffix;
+
+        var syntax = Parse(code);
+        var insertionPosition =
+            prefix.Length + 1;
+
+        foreach (var character in expressionBody)
+        {
+            var newCode = code.Insert(
+                insertionPosition,
+                character.ToString());
+
+            var change =
+                new TextChangeRange(
+                    new TextSpan(
+                        insertionPosition,
+                        length: 0),
+                    newLength: 1);
+
+            syntax = ParseIncremental(
+                newCode,
+                syntax,
+                [change]);
+
+            code = newCode;
+            insertionPosition++;
+
+            var fullSyntax = Parse(code);
+
+            Assert.Equal(
+                code,
+                fullSyntax.ToFullString());
+            Assert.Equal(
+                code,
+                syntax.ToFullString());
+
+            AssertSameTree(
+                fullSyntax,
+                syntax);
+        }
+
+        Assert.False(
+            syntax.ContainsDiagnostics);
+
+        var markup =
+            Assert.IsType<GreenMarkupRootSyntax>(
+                syntax.Members[
+                    syntax.Members.Count - 1]);
+
+        var inlineExpressions =
+            new List<GreenMarkupInlineExpressionSyntax>();
+        for (var i = 0; i < markup.Element.Body.Count; i++)
+        {
+            if (markup.Element.Body[i] is
+                GreenMarkupInlineExpressionSyntax expression)
+            {
+                inlineExpressions.Add(expression);
+            }
+        }
+
+        var inlineExpression =
+            Assert.Single(inlineExpressions);
+
+        Assert.False(
+            inlineExpression
+                .Expression
+                .CloseBrace
+                .IsMissing);
+
+        Assert.Equal(
+            expressionBody,
+            inlineExpression
+                .Expression
+                .Expression
+                .ToFullString());
+    }
+
+    private static void AssertSameTree(
+        GreenNode expected,
+        GreenNode actual)
+    {
+        if (ReferenceEquals(expected, actual))
+        {
+            return;
+        }
+
+        Assert.Equal(
+            expected.Kind,
+            actual.Kind);
+
+        Assert.Equal(
+            expected.FullWidth,
+            actual.FullWidth);
+
+        Assert.Equal(
+            expected.SlotCount,
+            actual.SlotCount);
+
+        Assert.Equal(
+            expected.IsMissing,
+            actual.IsMissing);
+
+        Assert.Equal(
+            expected
+                .GetDiagnostics()
+                .Select(static diagnostic =>
+                    diagnostic.Code),
+            actual
+                .GetDiagnostics()
+                .Select(static diagnostic =>
+                    diagnostic.Code));
+
+        if (expected.SlotCount == 0)
+        {
+            Assert.Equal(
+                expected.ToFullString(),
+                actual.ToFullString());
+
+            return;
+        }
+
+        for (var i = 0;
+             i < expected.SlotCount;
+             i++)
+        {
+            var expectedChild =
+                expected.GetSlot(i);
+
+            var actualChild =
+                actual.GetSlot(i);
+
+            Assert.Equal(
+                expectedChild == null,
+                actualChild == null);
+
+            if (expectedChild == null ||
+                actualChild == null)
+            {
+                continue;
+            }
+
+            AssertSameTree(
+                expectedChild,
+                actualChild);
+        }
+    }
+
     private static GreenMarkupElementContentSyntax[] ElementContents(GreenMarkupRootSyntax markup)
     {
         var contents = new List<GreenMarkupElementContentSyntax>();
@@ -637,6 +1384,31 @@ public sealed class MarkupIncrementalParserTests
 
         Assert.Equal(1, syntax.Members.Count);
         return (oldMarkup, Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[0]));
+    }
+
+    private static TextChangeRange GetSingleChange(string oldText, string newText)
+    {
+        var start = 0;
+        while (start < oldText.Length &&
+               start < newText.Length &&
+               oldText[start] == newText[start])
+        {
+            start++;
+        }
+
+        var oldEnd = oldText.Length;
+        var newEnd = newText.Length;
+        while (oldEnd > start &&
+               newEnd > start &&
+               oldText[oldEnd - 1] == newText[newEnd - 1])
+        {
+            oldEnd--;
+            newEnd--;
+        }
+
+        return new TextChangeRange(
+            new TextSpan(start, oldEnd - start),
+            newEnd - start);
     }
 
     private static GreenAkburaDocumentSyntax Parse(string code)

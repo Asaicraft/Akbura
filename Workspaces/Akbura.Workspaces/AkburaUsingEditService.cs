@@ -24,23 +24,70 @@ internal static class AkburaUsingEditService
     }
 
     public static AkburaCSharpImportContext CreateImportContext(
+        AkburaSyntacticDocument document,
+        int position)
+    {
+        if (document == null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
+        return CreateImportContext(
+            document.Text,
+            document.SyntaxTree,
+            position);
+    }
+
+    public static AkburaCSharpImportContext CreateImportContext(
         SourceText text,
         AkburaSyntaxTree syntaxTree)
     {
-        if (text == null)
+        ValidateArguments(text, syntaxTree);
+
+        var root = syntaxTree.GetRootSyntax();
+        if (root is AkcssDocumentSyntax &&
+            AkcssCompletionRegion.TryCreate(
+                syntaxTree,
+                text,
+                position: 0,
+                out var region))
         {
-            throw new ArgumentNullException(nameof(text));
+            return CreateAkcssImportContext(
+                text,
+                root,
+                region);
         }
 
-        if (syntaxTree == null)
+        return CreateComponentImportContext(
+            text,
+            root);
+    }
+
+    public static AkburaCSharpImportContext CreateImportContext(
+        SourceText text,
+        AkburaSyntaxTree syntaxTree,
+        int position)
+    {
+        ValidateArguments(text, syntaxTree);
+
+        if ((uint)position > (uint)text.Length)
         {
-            throw new ArgumentNullException(nameof(syntaxTree));
+            throw new ArgumentOutOfRangeException(nameof(position));
         }
 
         var root = syntaxTree.GetRootSyntax();
-        return root is AkcssDocumentSyntax akcssRoot
-            ? CreateAkcssImportContext(text, akcssRoot)
-            : CreateComponentImportContext(text, root);
+        return AkcssCompletionRegion.TryCreate(
+            syntaxTree,
+            text,
+            position,
+            out var region)
+            ? CreateAkcssImportContext(
+                text,
+                root,
+                region)
+            : CreateComponentImportContext(
+                text,
+                root);
     }
 
     public static bool TryCreateNamespaceImportChange(
@@ -49,42 +96,27 @@ internal static class AkburaUsingEditService
         string namespaceName,
         out TextChange change)
     {
-        change = default;
+        return TryCreateNamespaceImportChangeCore(
+            text,
+            syntaxTree,
+            namespaceName,
+            position: null,
+            out change);
+    }
 
-        if (text == null)
-        {
-            throw new ArgumentNullException(nameof(text));
-        }
-
-        if (syntaxTree == null)
-        {
-            throw new ArgumentNullException(nameof(syntaxTree));
-        }
-
-        if (string.IsNullOrWhiteSpace(namespaceName))
-        {
-            return false;
-        }
-
-        var parsedName = CSharpSyntaxFactory.ParseName(namespaceName);
-        if (parsedName.ContainsDiagnostics)
-        {
-            return false;
-        }
-
-        var key = CSharpUsingKey.Create(
-            CSharpSyntaxFactory.UsingDirective(parsedName));
-        var context = CreateImportContext(text, syntaxTree);
-        if (context.ExistingImports.Contains(key) ||
-            (uint)context.InsertionPosition > (uint)text.Length)
-        {
-            return false;
-        }
-
-        change = new TextChange(
-            new TextSpan(context.InsertionPosition, 0),
-            CreateUsingText([key], context));
-        return true;
+    public static bool TryCreateNamespaceImportChange(
+        SourceText text,
+        AkburaSyntaxTree syntaxTree,
+        string namespaceName,
+        int position,
+        out TextChange change)
+    {
+        return TryCreateNamespaceImportChangeCore(
+            text,
+            syntaxTree,
+            namespaceName,
+            position,
+            out change);
     }
 
     public static string CreateUsingText(
@@ -99,30 +131,83 @@ internal static class AkburaUsingEditService
         var builder = new StringBuilder();
         if (context.NeedsLeadingLineBreak)
         {
-            builder.Append(context.NewLine);
+            AppendLineBreakAndIndentation(
+                builder,
+                context);
+        }
+        else
+        {
+            builder.Append(context.Indentation);
         }
 
         for (var i = 0; i < imports.Length; i++)
         {
             if (i != 0)
             {
-                builder.Append(context.NewLine);
+                AppendLineBreakAndIndentation(
+                    builder,
+                    context);
             }
 
             builder.Append(context.SyntaxKind ==
-                    AkburaCSharpImportSyntaxKind.Akcss
-                ? "@using "
-                : "using ");
+                    AkburaCSharpImportSyntaxKind.Component
+                ? "using "
+                : "@using ");
             builder.Append(imports[i].Name);
             builder.Append(';');
         }
 
         if (context.NeedsTrailingLineBreak)
         {
-            builder.Append(context.NewLine);
+            AppendLineBreakAndIndentation(
+                builder,
+                context);
         }
 
         return builder.ToString();
+    }
+
+    private static bool TryCreateNamespaceImportChangeCore(
+        SourceText text,
+        AkburaSyntaxTree syntaxTree,
+        string namespaceName,
+        int? position,
+        out TextChange change)
+    {
+        change = default;
+        ValidateArguments(text, syntaxTree);
+
+        if (string.IsNullOrWhiteSpace(namespaceName))
+        {
+            return false;
+        }
+
+        var parsedName = CSharpSyntaxFactory.ParseName(namespaceName);
+        if (parsedName.ContainsDiagnostics)
+        {
+            return false;
+        }
+
+        var key = CSharpUsingKey.Create(
+            CSharpSyntaxFactory.UsingDirective(parsedName));
+        var context = position is int hostPosition
+            ? CreateImportContext(
+                text,
+                syntaxTree,
+                hostPosition)
+            : CreateImportContext(
+                text,
+                syntaxTree);
+        if (context.ExistingImports.Contains(key) ||
+            (uint)context.InsertionPosition > (uint)text.Length)
+        {
+            return false;
+        }
+
+        change = new TextChange(
+            new TextSpan(context.InsertionPosition, 0),
+            CreateUsingText([key], context));
+        return true;
     }
 
     private static AkburaCSharpImportContext CreateComponentImportContext(
@@ -155,14 +240,9 @@ internal static class AkburaUsingEditService
                     continue;
                 }
 
-                try
-                {
-                    existingImports.Add(CSharpUsingKey.Create(
-                        usingDirective.ToCSharp()));
-                }
-                catch (Exception exception)
-                    when (exception is InvalidOperationException or
-                          ArgumentException or InvalidCastException)
+                if (!TryAddImport(
+                        usingDirective,
+                        existingImports))
                 {
                     continue;
                 }
@@ -190,58 +270,53 @@ internal static class AkburaUsingEditService
             AkburaCSharpImportSyntaxKind.Component,
             text,
             insertionPosition,
+            indentation: string.Empty,
             existingImports.ToImmutable());
     }
 
     private static AkburaCSharpImportContext CreateAkcssImportContext(
         SourceText text,
-        AkcssDocumentSyntax root)
+        AkburaSyntax syntaxRoot,
+        AkcssCompletionRegion region)
     {
-        using var csharpUsings =
-            ImmutableArrayBuilder<AkcssUsingDirectiveSyntax>.Rent();
-        AkcssUsingDirectiveSyntax? firstModuleImport = null;
-        AkburaSyntax? firstDeclaration = null;
         var existingImports =
             ImmutableHashSet.CreateBuilder<CSharpUsingKey>();
 
-        foreach (var member in root.Members)
+        foreach (var member in region.GetMembers())
         {
-            if (member is AkcssUsingDirectiveSyntax usingDirective)
+            if (member is AkcssUsingDirectiveSyntax usingDirective &&
+                !usingDirective.IsAkcssModuleImport)
             {
-                if (usingDirective.IsAkcssModuleImport)
-                {
-                    firstModuleImport ??= usingDirective;
-                    continue;
-                }
-
-                try
-                {
-                    existingImports.Add(CSharpUsingKey.Create(
-                        usingDirective.ToCSharp()));
-                    csharpUsings.Add(usingDirective);
-                }
-                catch (Exception exception)
-                    when (exception is InvalidOperationException or
-                          ArgumentException or InvalidCastException)
-                {
-                }
-
-                continue;
+                TryAddImport(
+                    usingDirective,
+                    existingImports);
             }
-
-            firstDeclaration ??= member;
         }
 
-        var insertionPosition = csharpUsings.Count != 0
-            ? csharpUsings.WrittenSpan[^1].Span.End
-            : firstModuleImport?.FullSpan.Start ??
-              firstDeclaration?.FullSpan.Start ??
-              0;
+        if (region.Kind == AkcssCompletionRegionKind.InlineBlock &&
+            syntaxRoot is AkburaDocumentSyntax documentRoot)
+        {
+            foreach (var member in documentRoot.Members)
+            {
+                if (member is UsingDirectiveSyntax usingDirective &&
+                    !IsAkcssUsingDirective(usingDirective))
+                {
+                    TryAddImport(
+                        usingDirective,
+                        existingImports);
+                }
+            }
+        }
 
         return CreateContext(
-            AkburaCSharpImportSyntaxKind.Akcss,
+            region.Kind == AkcssCompletionRegionKind.StandaloneDocument
+                ? AkburaCSharpImportSyntaxKind.AkcssDocument
+                : AkburaCSharpImportSyntaxKind.InlineAkcssBlock,
             text,
-            insertionPosition,
+            region.ImportInsertionPosition,
+            DetectAkcssIndentation(
+                text,
+                region),
             existingImports.ToImmutable());
     }
 
@@ -249,6 +324,7 @@ internal static class AkburaUsingEditService
         AkburaCSharpImportSyntaxKind syntaxKind,
         SourceText text,
         int insertionPosition,
+        string indentation,
         ImmutableHashSet<CSharpUsingKey> existingImports)
     {
         var needsLeadingLineBreak = insertionPosition > 0 &&
@@ -262,9 +338,128 @@ internal static class AkburaUsingEditService
             syntaxKind,
             insertionPosition,
             DetectNewLine(text),
+            indentation,
             needsLeadingLineBreak,
             needsTrailingLineBreak,
             existingImports);
+    }
+
+    private static string DetectAkcssIndentation(
+        SourceText text,
+        AkcssCompletionRegion region)
+    {
+        if (region.Kind == AkcssCompletionRegionKind.StandaloneDocument)
+        {
+            return string.Empty;
+        }
+
+        foreach (var member in region.GetMembers())
+        {
+            var indentation = TryGetLineIndentation(
+                text,
+                member.Span.Start);
+            if (!string.IsNullOrEmpty(indentation))
+            {
+                return indentation!;
+            }
+        }
+
+        if (region.Root is not InlineAkcssBlockSyntax inlineBlock)
+        {
+            return string.Empty;
+        }
+
+        var parentIndentation = TryGetLineIndentation(
+                text,
+                inlineBlock.AtToken.Span.Start) ??
+            string.Empty;
+        return parentIndentation +
+            (parentIndentation.Contains('\t')
+                ? "\t"
+                : "    ");
+    }
+
+    private static string? TryGetLineIndentation(
+        SourceText text,
+        int position)
+    {
+        position = Math.Min(
+            Math.Max(position, 0),
+            text.Length);
+        var line = text.Lines.GetLineFromPosition(position);
+        var prefix = text.ToString(
+            TextSpan.FromBounds(
+                line.Start,
+                position));
+
+        for (var i = 0; i < prefix.Length; i++)
+        {
+            if (prefix[i] is not (' ' or '\t'))
+            {
+                return null;
+            }
+        }
+
+        return prefix;
+    }
+
+    private static bool TryAddImport(
+        UsingDirectiveSyntax usingDirective,
+        ImmutableHashSet<CSharpUsingKey>.Builder imports)
+    {
+        try
+        {
+            imports.Add(CSharpUsingKey.Create(
+                usingDirective.ToCSharp()));
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException or
+                  ArgumentException or InvalidCastException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryAddImport(
+        AkcssUsingDirectiveSyntax usingDirective,
+        ImmutableHashSet<CSharpUsingKey>.Builder imports)
+    {
+        try
+        {
+            imports.Add(CSharpUsingKey.Create(
+                usingDirective.ToCSharp()));
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException or
+                  ArgumentException or InvalidCastException)
+        {
+            return false;
+        }
+    }
+
+    private static void AppendLineBreakAndIndentation(
+        StringBuilder builder,
+        AkburaCSharpImportContext context)
+    {
+        builder.Append(context.NewLine);
+        builder.Append(context.Indentation);
+    }
+
+    private static void ValidateArguments(
+        SourceText text,
+        AkburaSyntaxTree syntaxTree)
+    {
+        if (text == null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        if (syntaxTree == null)
+        {
+            throw new ArgumentNullException(nameof(syntaxTree));
+        }
     }
 
     private static string DetectNewLine(SourceText text)

@@ -12,6 +12,37 @@ namespace Akbura.Workspaces.UnitTests;
 public sealed class WorkspaceClassificationTests
 {
     [Fact]
+    public void AkcssInvalidSelector_DoesNotReportBraceOnUsingDirective()
+    {
+        const string source =
+            "@using Akbura.Styles.akcss;\r\n\r\n" +
+            "..class {\n\n}";
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Styles.akcss");
+        using var workspace = new AkburaWorkspace();
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetSyntacticDiagnostics(
+                document,
+                new TextSpan(0, text.Length));
+        var selectorStart = source.IndexOf(
+            "..class",
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Code == ErrorCodes.ERR_LbraceExpected &&
+                diagnostic.Span.Start >= selectorStart);
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Code == ErrorCodes.ERR_LbraceExpected &&
+                diagnostic.Span.Start < selectorStart);
+    }
+    [Fact]
     public void SyntacticDiagnostics_ReportSkippedTextWithoutSemanticContext()
     {
         const string source =

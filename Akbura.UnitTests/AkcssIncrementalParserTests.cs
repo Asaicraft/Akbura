@@ -7,6 +7,40 @@ namespace Akbura.UnitTests;
 
 public sealed class AkcssIncrementalParserTests
 {
+    [Fact]
+    public void AppendAfterTrailingBlankLine_DoesNotReuseEndOfFile()
+    {
+        const string oldCode =
+            "@using Akbura.Styles.akcss;\r\n\r\n";
+        var oldText = SourceText.From(oldCode);
+        var oldTree = AkcssSyntaxTree.ParseText(
+            oldText,
+            "Styles.akcss");
+        var newText = SourceText.From(oldCode + ".");
+        var change = new TextChangeRange(
+            new TextSpan(oldText.Length, length: 0),
+            newLength: 1);
+
+        var incrementalTree = oldTree.WithChangedText(
+            newText,
+            [change]);
+        var fullTree = AkcssSyntaxTree.ParseText(
+            newText,
+            "Styles.akcss");
+
+        Assert.Equal(
+            newText.Length,
+            incrementalTree.GetRoot().FullWidth);
+        Assert.Equal(
+            newText.ToString(),
+            incrementalTree.GetRoot().ToFullString());
+        Assert.Equal(
+            fullTree.GetRoot().ToFullString(),
+            incrementalTree.GetRoot().ToFullString());
+        Assert.Equal(
+            fullTree.GetRoot().ContainsDiagnostics,
+            incrementalTree.GetRoot().ContainsDiagnostics);
+    }
     [Theory]
     [InlineData("\r\n")]
     [InlineData("\r\n\t\t")]

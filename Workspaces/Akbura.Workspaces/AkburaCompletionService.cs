@@ -70,12 +70,18 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (document.SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        var isAkcssRegion = document.TryGetAkcssCompletionRegion(
+            position,
+            out _);
+        var akcssContext = document.GetAkcssCompletionContext(
+            position,
+            cancellationToken);
+        if (isAkcssRegion)
         {
             return _akcssCompletionService.GetCompletions(
                 document,
                 semanticContext,
-                position,
+                akcssContext,
                 cancellationToken);
         }
 

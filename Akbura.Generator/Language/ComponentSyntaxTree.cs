@@ -123,6 +123,14 @@ internal sealed class ComponentSyntaxTree : AkburaSyntaxTree
             AkburaWorkspaceDiagnostics.Category.Syntax,
             "SyntaxTree: ParseCompilationUnit completed");
 
+        if (root.FullWidth != newText.Length)
+        {
+            return ParseText(
+                newText,
+                FilePath,
+                cancellationToken);
+        }
+
         return new ComponentSyntaxTree(
             newText,
             FilePath,

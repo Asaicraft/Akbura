@@ -885,6 +885,16 @@ public sealed class WorkspaceSyntacticDocumentTests
 
     [Theory]
     [InlineData(
+        ".|",
+        AkcssCompletionContextKind.SelectorSnippet,
+        ".",
+        "")]
+    [InlineData(
+        ".cl|",
+        AkcssCompletionContextKind.SelectorSnippet,
+        ".cl",
+        "")]
+    [InlineData(
         "@u|",
         AkcssCompletionContextKind.TopLevel,
         "@u",
@@ -965,8 +975,80 @@ public sealed class WorkspaceSyntacticDocumentTests
         Assert.Equal(
             expectedPrefix,
             document.Text.ToString(context.ApplicableSpan));
+
+        const string inlinePrefix = "@akcss {\n";
+        var inlineSourceWithCaret =
+            inlinePrefix +
+            sourceWithCaret +
+            "\n}\n\n<Border/>";
+        var inlinePosition = inlineSourceWithCaret.IndexOf('|');
+        var inlineSource = inlineSourceWithCaret.Remove(
+            inlinePosition,
+            1);
+        var inlineDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(inlineSource),
+            "Component.akbura");
+        var inlineContext = inlineDocument
+            .GetAkcssCompletionContext(inlinePosition);
+
+        Assert.Equal(expectedKind, inlineContext.Kind);
+        Assert.Equal(expectedPrefix, inlineContext.Prefix);
+        Assert.Equal(expectedQualifier, inlineContext.Qualifier);
+        Assert.Equal(
+            expectedPrefix,
+            inlineDocument.Text.ToString(
+                inlineContext.ApplicableSpan));
     }
 
+    [Fact]
+    public void UsingEditService_InsertsInlineImportBeforeAkcssModules()
+    {
+        const string source =
+            "@akcss {\r\n" +
+            "    @using Imported.akcss;\r\n" +
+            "\r\n" +
+            "    Control.card { }\r\n" +
+            "}\r\n" +
+            "\r\n" +
+            "<Border/>\r\n";
+        var position = source.IndexOf(
+            "Control",
+            StringComparison.Ordinal);
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Component.akbura");
+
+        Assert.True(
+            AkburaUsingEditService.TryCreateNamespaceImportChange(
+                text,
+                document.SyntaxTree,
+                "Avalonia.Media",
+                position,
+                out var change));
+
+        var changedText = text
+            .WithChanges(change)
+            .ToString();
+        var inlineBlockIndex = changedText.IndexOf(
+            "@akcss {",
+            StringComparison.Ordinal);
+        var namespaceImportIndex = changedText.IndexOf(
+            "    @using Avalonia.Media;",
+            StringComparison.Ordinal);
+        var moduleImportIndex = changedText.IndexOf(
+            "    @using Imported.akcss;",
+            StringComparison.Ordinal);
+        Assert.True(
+            inlineBlockIndex >= 0 &&
+            namespaceImportIndex > inlineBlockIndex &&
+            moduleImportIndex > namespaceImportIndex,
+            changedText);
+        Assert.DoesNotContain(
+            "\r\nusing Avalonia.Media;",
+            changedText,
+            StringComparison.Ordinal);
+    }
     [Fact]
     public void SyntacticDocument_DoesNotOfferAkcssCompletionInsideComment()
     {
@@ -980,5 +1062,22 @@ public sealed class WorkspaceSyntacticDocumentTests
 
         Assert.True(
             document.GetAkcssCompletionContext(position).IsDefault);
+
+        const string inlinePrefix = "@akcss {\n";
+        var inlineSourceWithCaret =
+            inlinePrefix +
+            sourceWithCaret +
+            "\n}\n\n<Border/>";
+        var inlinePosition = inlineSourceWithCaret.IndexOf('|');
+        var inlineSource = inlineSourceWithCaret.Remove(
+            inlinePosition,
+            1);
+        var inlineDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(inlineSource),
+            "Component.akbura");
+
+        Assert.True(
+            inlineDocument.GetAkcssCompletionContext(
+                inlinePosition).IsDefault);
     }
 }

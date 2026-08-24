@@ -5,7 +5,8 @@ namespace Akbura.Workspaces;
 internal enum AkburaCSharpImportSyntaxKind
 {
     Component,
-    Akcss,
+    AkcssDocument,
+    InlineAkcssBlock,
 }
 
 internal sealed class AkburaCSharpImportContext
@@ -14,6 +15,7 @@ internal sealed class AkburaCSharpImportContext
         AkburaCSharpImportSyntaxKind syntaxKind,
         int insertionPosition,
         string newLine,
+        string indentation,
         bool needsLeadingLineBreak,
         bool needsTrailingLineBreak,
         ImmutableHashSet<CSharpUsingKey> existingImports)
@@ -21,6 +23,8 @@ internal sealed class AkburaCSharpImportContext
         SyntaxKind = syntaxKind;
         InsertionPosition = insertionPosition;
         NewLine = newLine ?? throw new ArgumentNullException(nameof(newLine));
+        Indentation = indentation ??
+            throw new ArgumentNullException(nameof(indentation));
         NeedsLeadingLineBreak = needsLeadingLineBreak;
         NeedsTrailingLineBreak = needsTrailingLineBreak;
         ExistingImports = existingImports ??
@@ -32,6 +36,8 @@ internal sealed class AkburaCSharpImportContext
     public int InsertionPosition { get; }
 
     public string NewLine { get; }
+
+    public string Indentation { get; }
 
     public bool NeedsLeadingLineBreak { get; }
 

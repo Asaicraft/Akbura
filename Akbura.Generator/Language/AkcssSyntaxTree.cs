@@ -105,7 +105,9 @@ internal sealed class AkcssSyntaxTree : AkburaSyntaxTree
 
         var newRoot = parser.ParseAkcssDocumentSyntax();
 
-        if (newRoot.ContainsDiagnostics || newRoot.ContainsSkippedText)
+        if (newRoot.FullWidth != newText.Length ||
+            newRoot.ContainsDiagnostics ||
+            newRoot.ContainsSkippedText)
         {
             // A clean reuse tree can still choose an invalid boundary for the
             // current edit. Reparse immediately so one edit cannot publish

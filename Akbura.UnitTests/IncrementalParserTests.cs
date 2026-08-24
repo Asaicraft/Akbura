@@ -1,3 +1,4 @@
+using Akbura.Language;
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
@@ -6,6 +7,29 @@ namespace Akbura.UnitTests;
 
 public sealed class IncrementalParserTests
 {
+    [Fact]
+    public void AppendAfterTrailingBlankLine_CoversCompleteComponentText()
+    {
+        const string oldCode = "<Border/>\r\n\r\n";
+        var oldText = SourceText.From(oldCode);
+        var oldTree = ComponentSyntaxTree.ParseText(
+            oldText,
+            "Component.akbura");
+        var newText = SourceText.From(oldCode + "s");
+
+        var incrementalTree = oldTree.WithChangedText(
+            newText,
+            [new TextChangeRange(
+                new TextSpan(oldText.Length, length: 0),
+                newLength: 1)]);
+
+        Assert.Equal(
+            newText.Length,
+            incrementalTree.GetRoot().FullWidth);
+        Assert.Equal(
+            newText.ToString(),
+            incrementalTree.GetRoot().ToFullString());
+    }
     [Fact]
     public void NoChange_ReusesTopLevelMembersAndRoundTrips()
     {

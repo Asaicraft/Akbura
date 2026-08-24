@@ -1,0 +1,5 @@
+@using Akbura.Styles.akcss;
+
+.class {
+	Background: AliceBlue;
+}

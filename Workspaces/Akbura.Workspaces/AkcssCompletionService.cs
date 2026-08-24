@@ -18,12 +18,9 @@ internal sealed class AkcssCompletionService
     public AkburaCompletionResult GetCompletions(
         AkburaSyntacticDocument document,
         AkburaDocumentContext? semanticContext,
-        int position,
+        AkcssSyntacticCompletionContext context,
         CancellationToken cancellationToken)
     {
-        var context = document.GetAkcssCompletionContext(
-            position,
-            cancellationToken);
         if (context.IsDefault)
         {
             return new AkburaCompletionResult(
@@ -31,11 +28,10 @@ internal sealed class AkcssCompletionService
                 ImmutableArray<AkburaCompletionItem>.Empty);
         }
 
-        var semanticModel = semanticContext?.Document.SyntaxTree.Kind ==
-                SyntaxTreeKind.Akcss
-            ? semanticContext.Project.Compilation.GetSemanticModel(
-                semanticContext.Document.SyntaxTree)
-            : null;
+        var semanticModel = semanticContext == null
+            ? null
+            : semanticContext.Project.Compilation.GetSemanticModel(
+                semanticContext.Document.SyntaxTree);
 
         var items = context.Kind switch
         {

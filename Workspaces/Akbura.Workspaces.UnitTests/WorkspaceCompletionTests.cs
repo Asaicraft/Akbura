@@ -31,6 +31,45 @@ public sealed class WorkspaceCompletionTests
         <StackPanel/>
         """;
 
+    [Theory]
+    [InlineData(".")]
+    [InlineData(".cl")]
+    public void Completion_SelectorSnippetReplacesLeadingDot(
+        string source)
+    {
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Styles.akcss");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion
+            .GetCompletions(
+                document,
+                semanticContext: null,
+                source.Length);
+        var item = Assert.Single(
+            result.Items,
+            static candidate => candidate.DisplayText == ".class");
+        var changedText = text.WithChanges(
+            new TextChange(
+                result.ApplicableSpan,
+                item.InsertText));
+
+        Assert.Equal(
+            new TextSpan(0, source.Length),
+            result.ApplicableSpan);
+        Assert.StartsWith(
+            ".class {",
+            changedText.ToString(),
+            StringComparison.Ordinal);
+        Assert.False(
+            changedText.ToString().StartsWith(
+                "..",
+                StringComparison.Ordinal),
+            changedText.ToString());
+    }
+
     [Fact]
     public void Completion_TopLevelOffersCatalogWithoutSemanticContext()
     {
@@ -3207,6 +3246,156 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void Completion_InlineAkcssOffersSemanticPropertyCatalog()
+    {
+        const string sourceWithCaret =
+            "using Avalonia.Controls;\n\n" +
+            "@akcss {\n" +
+            "    Control.card { H| }\n" +
+            "}\n\n" +
+            "<Border/>\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var context = syntacticDocument
+                    .GetAkcssCompletionContext(position);
+                Assert.Equal(
+                    AkcssCompletionContextKind.PropertyName,
+                    context.Kind);
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Height" &&
+                        item.InsertText == "Height: ");
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Grid.Row" &&
+                        item.InsertText == "Grid.Row: ");
+                Assert.False(result.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_InlineAkcssMatchesStandalonePropertyItems()
+    {
+        const string standaloneSource =
+            "@using Avalonia.Controls;\n" +
+            "Control.card { H }\n";
+        const string inlineSourceWithCaret =
+            "using Avalonia.Controls;\n\n" +
+            "@akcss {\n" +
+            "    Control.card { H| }\n" +
+            "}\n\n" +
+            "<Border/>\n";
+        var inlinePosition = inlineSourceWithCaret.IndexOf('|');
+        var inlineSource = inlineSourceWithCaret.Remove(
+            inlinePosition,
+            1);
+
+        WithWorkspace(
+            inlineSource,
+            standaloneSource,
+            (workspace, inlineSemanticContext, inlineDocument) =>
+            {
+                var stylesPath = Path.Combine(
+                    Path.GetDirectoryName(
+                        inlineSemanticContext.Document.FilePath)!,
+                    "Styles.akcss");
+                var standaloneText = SourceText.From(
+                    standaloneSource);
+                var standaloneSemanticContext =
+                    workspace.OpenOrChangeDocumentContext(
+                        new Uri(stylesPath),
+                        standaloneText);
+                var standaloneDocument =
+                    AkburaSyntacticDocument.Parse(
+                        standaloneText,
+                        stylesPath);
+                var standalonePosition =
+                    standaloneSource.IndexOf(
+                        "H }",
+                        StringComparison.Ordinal) +
+                    1;
+
+                var standaloneResult =
+                    workspace.LanguageServices.Completion
+                        .GetCompletions(
+                            standaloneDocument,
+                            standaloneSemanticContext,
+                            standalonePosition);
+                var inlineResult =
+                    workspace.LanguageServices.Completion
+                        .GetCompletions(
+                            inlineDocument,
+                            inlineSemanticContext,
+                            inlinePosition);
+
+                Assert.Equal(
+                    standaloneResult.Items.Select(
+                        static item => (
+                            item.DisplayText,
+                            item.InsertText,
+                            item.Kind,
+                            item.NamespaceImport)),
+                    inlineResult.Items.Select(
+                        static item => (
+                            item.DisplayText,
+                            item.InsertText,
+                            item.Kind,
+                            item.NamespaceImport)));
+                Assert.Equal(
+                    standaloneResult.IsIncomplete,
+                    inlineResult.IsIncomplete);
+            });
+    }
+
+    [Fact]
+    public void Completion_InlineAkcssCommentDoesNotFallBackToMarkup()
+    {
+        const string sourceWithCaret =
+            "using Avalonia.Controls;\n\n" +
+            "@akcss {\n" +
+            "    // <Bor|\n" +
+            "}\n\n" +
+            "<Border/>\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetAkcssCompletionRegion(
+                        position,
+                        out _));
+                Assert.True(
+                    syntacticDocument.GetAkcssCompletionContext(
+                        position).IsDefault);
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Empty(result.Items);
+            });
+    }
+
+    [Fact]
     public void Completion_AkcssCornerRadiusDoesNotOfferThicknessTuple()
     {
         const string source =
@@ -3520,7 +3709,7 @@ public sealed class WorkspaceCompletionTests
                     completionContext,
                     out var projection));
                 Assert.Equal(
-                    AkburaCSharpImportSyntaxKind.Component,
+                    AkburaCSharpImportSyntaxKind.InlineAkcssBlock,
                     projection.ImportContext.SyntaxKind);
                 AssertCompletionContains(
                     semanticContext,
@@ -3743,7 +3932,7 @@ public sealed class WorkspaceCompletionTests
                     completionContext,
                     out var projection));
                 Assert.Equal(
-                    AkburaCSharpImportSyntaxKind.Akcss,
+                    AkburaCSharpImportSyntaxKind.AkcssDocument,
                     projection.ImportContext.SyntaxKind);
 
                 var completion = RoslynCompletionTestHost
@@ -3912,6 +4101,85 @@ public sealed class WorkspaceCompletionTests
                     CountOccurrences(
                         changedHostText,
                         "@using System.Collections.ObjectModel;"));
+                Assert.Contains(
+                    "new ObservableCollection",
+                    changedHostText,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void CSharpCompletionChangeMapper_MapsInlineAkcssAutoImportInsideBlock()
+    {
+        const string sourceWithCaret =
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "@akcss {\r\n" +
+            "    Control.card {\r\n" +
+            "        Tag: new ObservableCollec|;\r\n" +
+            "    }\r\n" +
+            "}\r\n" +
+            "\r\n" +
+            "<Border/>\r\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var completionContext));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    completionContext,
+                    out var projection));
+                Assert.Equal(
+                    AkburaCSharpImportSyntaxKind.InlineAkcssBlock,
+                    projection.ImportContext.SyntaxKind);
+                Assert.Equal(
+                    "    ",
+                    projection.ImportContext.Indentation);
+
+                var completion = RoslynCompletionTestHost
+                    .GetImportCompletionAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        "ObservableCollection",
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completion);
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+
+                var changedHostText = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+                Assert.Contains(
+                    "@akcss {\r\n" +
+                    "    @using System.Collections.ObjectModel;\r\n",
+                    changedHostText,
+                    StringComparison.Ordinal);
+                Assert.Equal(
+                    1,
+                    CountOccurrences(
+                        changedHostText,
+                        "@using System.Collections.ObjectModel;"));
+                Assert.DoesNotContain(
+                    "\r\nusing System.Collections.ObjectModel;",
+                    changedHostText,
+                    StringComparison.Ordinal);
                 Assert.Contains(
                     "new ObservableCollection",
                     changedHostText,

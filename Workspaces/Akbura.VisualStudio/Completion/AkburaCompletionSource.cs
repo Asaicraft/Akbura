@@ -416,16 +416,20 @@ internal sealed class AkburaCompletionSource :
 #endif
             var isAkcss = _documentKind ==
                 AkburaEditorDocumentKind.Akcss;
-            var syntaxContext = isAkcss
+            var akcssContext =
+                syntacticDocument.GetAkcssCompletionContext(
+                    position,
+                    requestToken);
+            var isAkcssRegion =
+                isAkcss ||
+                syntacticDocument.TryGetAkcssCompletionRegion(
+                    position,
+                    out _);
+            var syntaxContext = isAkcssRegion
                 ? default
                 : syntacticDocument.GetCompletionContext(
                     position,
                     requestToken);
-            var akcssContext = isAkcss
-                ? syntacticDocument.GetAkcssCompletionContext(
-                    position,
-                    requestToken)
-                : default;
 #if DEBUG
             AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                 "Syntax context",
@@ -435,8 +439,8 @@ internal sealed class AkburaCompletionSource :
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Completion,
                 $"Syntax context: " +
-                $"kind={(isAkcss ? akcssContext.Kind.ToString() : syntaxContext.Kind.ToString())}, " +
-                $"prefix='{(isAkcss ? akcssContext.Prefix : syntaxContext.Prefix)}'.");
+                $"kind={(isAkcssRegion ? akcssContext.Kind.ToString() : syntaxContext.Kind.ToString())}, " +
+                $"prefix='{(isAkcssRegion ? akcssContext.Prefix : syntaxContext.Prefix)}'.");
 
 #if DEBUG
             stageTimer.Restart();
@@ -451,7 +455,7 @@ internal sealed class AkburaCompletionSource :
                     static _ => new CompletionSessionState());
                 var semanticContext = GetLatestSemanticContext(
                     snapshot);
-                var supplementalResult = isAkcss
+                var supplementalResult = isAkcssRegion
                     ? akcssContext.Kind is
                         AkcssCompletionContextKind.PropertyValue or
                         AkcssCompletionContextKind.AttachedPropertyExpression or
@@ -593,7 +597,7 @@ internal sealed class AkburaCompletionSource :
                 return completionContext;
             }
 
-            if (isAkcss
+            if (isAkcssRegion
                     ? akcssContext.IsDefault
                     : syntaxContext.IsDefault)
             {
@@ -1159,7 +1163,7 @@ internal sealed class AkburaCompletionSource :
             return true;
         }
         if (trigger.Character is
-            '<' or '/' or ' ' or '.' or ':' or ',')
+            '<' or '/' or ' ' or '.' or ':' or ',' or '@' or '-')
         {
             return true;
         }

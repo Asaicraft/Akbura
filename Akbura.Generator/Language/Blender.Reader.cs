@@ -219,6 +219,11 @@ internal readonly partial struct Blender
                 return false;
             }
 
+            if (nodeOrToken.Kind == SyntaxKind.EndOfFileToken)
+            {
+                return true;
+            }
+
             var underlyingNode =
                 nodeOrToken.RequiredUnderlyingNode;
 

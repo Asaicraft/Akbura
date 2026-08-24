@@ -151,6 +151,7 @@ internal sealed class AkburaCompletionCommitManager :
         var namespaceImportChange = CreateNamespaceImportChange(
             currentSnapshot,
             completion.NamespaceImport,
+            applicableSpan.Start.Position,
             token);
 
         var triggerNextCompletion =
@@ -241,6 +242,7 @@ internal sealed class AkburaCompletionCommitManager :
     private TextChange? CreateNamespaceImportChange(
         ITextSnapshot snapshot,
         string? namespaceName,
+        int position,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(namespaceName))
@@ -259,6 +261,7 @@ internal sealed class AkburaCompletionCommitManager :
             document.Text,
             document.SyntaxTree,
             namespaceName!,
+            position,
             out var change)
                 ? change
                 : null;

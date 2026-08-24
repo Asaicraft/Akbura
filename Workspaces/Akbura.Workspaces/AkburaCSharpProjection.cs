@@ -424,7 +424,9 @@ internal static class AkburaCSharpProjectionFactory
             projectedActiveSpan.Start +
                 embeddedContext.RelativePosition,
             probe.StateNames,
-            AkburaUsingEditService.CreateImportContext(syntacticDocument),
+            AkburaUsingEditService.CreateImportContext(
+                syntacticDocument,
+                embeddedContext.HostPosition),
             syntheticSymbols.ToImmutable());
         return true;
     }
@@ -644,6 +646,11 @@ internal static class AkburaCSharpProjectionFactory
         var claimedUsings = new HashSet<
             Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax>();
         var hostRoot = document.SyntaxTree.GetRootSyntax();
+        var hasAkcssRegion = AkcssCompletionRegion.TryCreate(
+            document.SyntaxTree,
+            document.Text,
+            context.HostPosition,
+            out var akcssRegion);
 
         foreach (var hostUsing in hostRoot.DescendantNodes()
                      .OfType<Akbura.Language.Syntax.UsingDirectiveSyntax>())
@@ -703,8 +710,12 @@ internal static class AkburaCSharpProjectionFactory
         foreach (var hostUsing in hostRoot.DescendantNodes()
                      .OfType<AkcssUsingDirectiveSyntax>())
         {
-            if (hostUsing.FullSpan == context.OwnerSpan ||
-                hostUsing.IsAkcssModuleImport)
+            if (!hasAkcssRegion ||
+                hostUsing.FullSpan == context.OwnerSpan ||
+                hostUsing.IsAkcssModuleImport ||
+                akcssRegion.Kind == AkcssCompletionRegionKind.InlineBlock &&
+                (hostUsing.Span.Start < akcssRegion.MembersSpan.Start ||
+                 hostUsing.Span.End > akcssRegion.MembersSpan.End))
             {
                 continue;
             }

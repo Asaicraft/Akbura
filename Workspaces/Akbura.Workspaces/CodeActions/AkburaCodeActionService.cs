@@ -65,6 +65,7 @@ internal sealed class AkburaCodeActionService : IAkburaCodeActionService
                         document.Text,
                         document.SyntaxTree,
                         candidate.NamespaceName,
+                        diagnostic.Span.Start,
                         out var change))
                 {
                     continue;

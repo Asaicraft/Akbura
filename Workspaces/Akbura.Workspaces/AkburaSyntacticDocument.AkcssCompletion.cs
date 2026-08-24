@@ -8,6 +8,18 @@ namespace Akbura.Workspaces;
 
 public sealed partial class AkburaSyntacticDocument
 {
+    internal bool TryGetAkcssCompletionRegion(
+        int position,
+        out AkcssCompletionRegion region)
+    {
+        ValidatePosition(position);
+        return AkcssCompletionRegion.TryCreate(
+            SyntaxTree,
+            Text,
+            position,
+            out region);
+    }
+
     /// <summary>
     /// Determines the AKCSS completion construct at
     /// <paramref name="position"/>.
@@ -17,13 +29,15 @@ public sealed partial class AkburaSyntacticDocument
         CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
-        if (SyntaxTree.Kind != SyntaxTreeKind.Akcss)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryGetAkcssCompletionRegion(
+                position,
+                out var region))
         {
             return default;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var root = SyntaxTree.GetRootSyntax();
+        var root = region.Root!;
         if (IsInsideComment(root, position))
         {
             return default;
@@ -174,10 +188,14 @@ public sealed partial class AkburaSyntacticDocument
             return moduleContext;
         }
 
-        var topLevelSpan = GetAkcssKeywordSpan(position);
-        return new AkcssSyntacticCompletionContext(
+        var isTopLevelKeyword =
             trimmedLinePrefix.Length == 0 ||
-            trimmedLinePrefix[0] == '@'
+            trimmedLinePrefix[0] == '@';
+        var topLevelSpan = isTopLevelKeyword
+            ? GetAkcssKeywordSpan(position)
+            : GetAkcssSelectorSnippetSpan(position);
+        return new AkcssSyntacticCompletionContext(
+            isTopLevelKeyword
                 ? AkcssCompletionContextKind.TopLevel
                 : AkcssCompletionContextKind.SelectorSnippet,
             topLevelSpan,
@@ -472,6 +490,19 @@ public sealed partial class AkburaSyntacticDocument
         while (start > 0 &&
                (char.IsLetterOrDigit(Text[start - 1]) ||
                 Text[start - 1] is '_' or '@'))
+        {
+            start--;
+        }
+
+        return TextSpan.FromBounds(start, position);
+    }
+
+    private TextSpan GetAkcssSelectorSnippetSpan(int position)
+    {
+        var start = position;
+        while (start > 0 &&
+               (char.IsLetterOrDigit(Text[start - 1]) ||
+                Text[start - 1] is '_' or '-' or '.'))
         {
             start--;
         }

@@ -356,7 +356,7 @@ partial class Parser
     private GreenAkcssStyleRuleSyntax ParseAkcssStyleRuleSyntaxCore()
     {
         var selector = ParseAkcssStyleSelectorSyntax();
-        var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+        var openBrace = EatAkcssOpenBraceToken();
         var members = ParseAkcssBodyMemberList();
         var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
 
@@ -416,7 +416,7 @@ partial class Parser
     private GreenAkcssUtilityDeclarationSyntax ParseAkcssUtilityDeclarationSyntax()
     {
         var selector = ParseAkcssUtilitySelectorSyntax();
-        var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+        var openBrace = EatAkcssOpenBraceToken();
         var members = ParseAkcssBodyMemberList();
         var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
 
@@ -464,6 +464,26 @@ partial class Parser
             type,
             paramName,
             closeParen);
+    }
+
+    private GreenSyntaxToken EatAkcssOpenBraceToken()
+    {
+        if (CurrentToken.Kind != SyntaxKind.DoubleDotToken)
+        {
+            return EatToken(SyntaxKind.OpenBraceToken);
+        }
+
+        var current = CurrentToken;
+        var missing = GreenSyntaxFactory.MissingToken(
+            SyntaxKind.OpenBraceToken);
+
+        return WithAdditionalDiagnostics(
+            missing,
+            GetExpectedTokenError(
+                SyntaxKind.OpenBraceToken,
+                current.Kind,
+                current.GetLeadingTriviaWidth(),
+                current.Width));
     }
 
     private GreenSyntaxList<GreenAkcssBodyMemberSyntax> ParseAkcssBodyMemberList()

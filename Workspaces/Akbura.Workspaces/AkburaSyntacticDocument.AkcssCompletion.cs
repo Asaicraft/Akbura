@@ -10,10 +10,17 @@ public sealed partial class AkburaSyntacticDocument
 {
     internal bool TryGetAkcssCompletionRegion(
         int position,
-        out AkcssCompletionRegion region)
+        out AkcssLanguageRegion region)
+    {
+        return TryGetAkcssRegion(position, out region);
+    }
+
+    internal bool TryGetAkcssRegion(
+        int position,
+        out AkcssLanguageRegion region)
     {
         ValidatePosition(position);
-        return AkcssCompletionRegion.TryCreate(
+        return AkcssLanguageRegion.TryCreate(
             SyntaxTree,
             Text,
             position,

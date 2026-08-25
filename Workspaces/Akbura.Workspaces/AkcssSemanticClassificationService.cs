@@ -264,6 +264,19 @@ internal sealed class
             return;
         }
 
+        if (operation.ValueKind ==
+            AkcssPropertyValueKind.ThicknessTuple)
+        {
+            AddThicknessTupleExpressionClassifications(
+                assignment.Expression,
+                operation.ValueOperation,
+                requestedSpan,
+                builder,
+                cancellationToken);
+
+            return;
+        }
+
         AddExpressionClassifications(
             assignment.Expression,
             operation.ValueOperation,
@@ -394,6 +407,93 @@ internal sealed class
                     child);
             }
         }
+    }
+
+    private static void AddThicknessTupleExpressionClassifications(
+        CSharpExpressionSyntax expressionSyntax,
+        CSharpOperationDefinition definition,
+        TextSpan requestedSpan,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
+        CancellationToken cancellationToken)
+    {
+        using var temporary =
+            ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
+
+        AddExpressionClassifications(
+            expressionSyntax,
+            definition,
+            requestedSpan,
+            temporary,
+            cancellationToken);
+
+        var nameSpans =
+            GetThicknessTupleNameSpans(
+                expressionSyntax);
+
+        foreach (var classification in
+                 temporary.WrittenSpan)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            var overlapsTupleName = false;
+
+            foreach (var nameSpan in nameSpans)
+            {
+                if (classification.Span.OverlapsWith(
+                        nameSpan))
+                {
+                    overlapsTupleName = true;
+                    break;
+                }
+            }
+
+            if (!overlapsTupleName)
+            {
+                builder.Add(
+                    classification);
+            }
+        }
+    }
+
+    private static ImmutableArray<TextSpan>
+        GetThicknessTupleNameSpans(
+            CSharpExpressionSyntax expressionSyntax)
+    {
+        if (!EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                expressionSyntax,
+                out var expression,
+                out var sourceSpan) ||
+            expression is not
+                CSharp.TupleExpressionSyntax tupleExpression)
+        {
+            return [];
+        }
+
+        using var builder =
+            ImmutableArrayBuilder<TextSpan>.Rent();
+
+        var positionOffset =
+            sourceSpan.Start -
+            expression.FullSpan.Start;
+
+        foreach (var argument in
+                 tupleExpression.Arguments)
+        {
+            if (argument.NameColon is not
+                { } nameColon)
+            {
+                continue;
+            }
+
+            builder.Add(
+                new TextSpan(
+                    positionOffset +
+                        nameColon.Name.Span.Start,
+                    nameColon.Name.Span.Length));
+        }
+
+        return builder.ToImmutable();
     }
 
     private static void AddOperationClassification(

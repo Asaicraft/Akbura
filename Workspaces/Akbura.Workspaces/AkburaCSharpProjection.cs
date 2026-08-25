@@ -646,7 +646,7 @@ internal static class AkburaCSharpProjectionFactory
         var claimedUsings = new HashSet<
             Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax>();
         var hostRoot = document.SyntaxTree.GetRootSyntax();
-        var hasAkcssRegion = AkcssCompletionRegion.TryCreate(
+        var hasAkcssRegion = AkcssLanguageRegion.TryCreate(
             document.SyntaxTree,
             document.Text,
             context.HostPosition,
@@ -713,7 +713,7 @@ internal static class AkburaCSharpProjectionFactory
             if (!hasAkcssRegion ||
                 hostUsing.FullSpan == context.OwnerSpan ||
                 hostUsing.IsAkcssModuleImport ||
-                akcssRegion.Kind == AkcssCompletionRegionKind.InlineBlock &&
+                akcssRegion.Kind == AkcssLanguageRegionKind.InlineBlock &&
                 (hostUsing.Span.Start < akcssRegion.MembersSpan.Start ||
                  hostUsing.Span.End > akcssRegion.MembersSpan.End))
             {

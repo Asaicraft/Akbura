@@ -224,13 +224,28 @@ public sealed partial class AkburaSyntacticDocument
         int position,
         CancellationToken cancellationToken = default)
     {
+        return TryGetSlashCompletionEdit(
+                position,
+                out var edit,
+                cancellationToken) &&
+            edit.OvertypeLength == 0
+                ? edit.InsertionText
+                : null;
+    }
+
+    internal bool TryGetSlashCompletionEdit(
+        int position,
+        out AkburaSlashCompletionEdit edit,
+        CancellationToken cancellationToken = default)
+    {
         ValidatePosition(position);
+        edit = default;
         if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
             position == 0 ||
             Text.Length == 0 ||
             Text[position - 1] != '/')
         {
-            return null;
+            return false;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -241,9 +256,12 @@ public sealed partial class AkburaSyntacticDocument
                 out _,
                 cancellationToken))
         {
-            return null;
+            return false;
         }
 
+        var hasExistingGreater =
+            position < Text.Length &&
+            Text[position] == '>';
         if (slashPosition > 0 &&
             Text[slashPosition - 1] == '<')
         {
@@ -251,49 +269,45 @@ public sealed partial class AkburaSyntacticDocument
                 position,
                 cancellationToken);
             if (closingTagContext.Kind !=
-                    AkburaCompletionContextKind
-                        .ClosingComponentName ||
+                    AkburaCompletionContextKind.ClosingComponentName ||
                 closingTagContext.Prefix.Length != 0 ||
                 string.IsNullOrWhiteSpace(
                     closingTagContext.ParentComponentName))
             {
-                return null;
+                return false;
             }
 
-            return closingTagContext.ParentComponentName + ">";
+            edit = new AkburaSlashCompletionEdit(
+                closingTagContext.ParentComponentName +
+                    (hasExistingGreater ? string.Empty : ">"),
+                hasExistingGreater ? 1 : 0,
+                completesClosingTag: true);
+            return true;
         }
 
         var context = GetCompletionContext(
             slashPosition,
             cancellationToken);
         var afterComponentName =
-            (context.Kind ==
-                 AkburaCompletionContextKind.ComponentName ||
-             context.Kind ==
-                 AkburaCompletionContextKind.PropertyElementName) &&
+            (context.Kind == AkburaCompletionContextKind.ComponentName ||
+             context.Kind == AkburaCompletionContextKind.PropertyElementName) &&
             context.ApplicableSpan.End == slashPosition &&
             context.Prefix.Length > 0;
         var afterAttributeBoundary =
-            context.Kind ==
-                AkburaCompletionContextKind.AttributeName &&
+            context.Kind == AkburaCompletionContextKind.AttributeName &&
             context.Prefix.Length == 0 &&
-            !string.IsNullOrWhiteSpace(
-                context.ComponentName);
-        if (!afterComponentName &&
-            !afterAttributeBoundary)
+            !string.IsNullOrWhiteSpace(context.ComponentName);
+        if (!afterComponentName && !afterAttributeBoundary)
         {
-            return null;
+            return false;
         }
 
-        if (position < Text.Length &&
-            Text[position] == '>')
-        {
-            return null;
-        }
-
-        return ">";
+        edit = new AkburaSlashCompletionEdit(
+            hasExistingGreater ? string.Empty : ">",
+            hasExistingGreater ? 1 : 0,
+            completesClosingTag: false);
+        return true;
     }
-
     /// <summary>
     /// Returns the structural indentation level for a closing tag completed
     /// after <c>&lt;/</c>, or <see langword="null"/> for other slash uses.
@@ -302,18 +316,14 @@ public sealed partial class AkburaSyntacticDocument
         int position,
         CancellationToken cancellationToken = default)
     {
-        var completionText = GetSlashCompletionText(
-            position,
-            cancellationToken);
-        if (completionText == null ||
-            string.Equals(
-                completionText,
-                ">",
-                StringComparison.Ordinal))
+        if (!TryGetSlashCompletionEdit(
+                position,
+                out var edit,
+                cancellationToken) ||
+            !edit.CompletesClosingTag)
         {
             return null;
         }
-
         var root = SyntaxTree.GetRootSyntax();
         var startTag = GetOpenElementStartTag(
             root,

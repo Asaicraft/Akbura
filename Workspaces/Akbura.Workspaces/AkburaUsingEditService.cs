@@ -46,7 +46,7 @@ internal static class AkburaUsingEditService
 
         var root = syntaxTree.GetRootSyntax();
         if (root is AkcssDocumentSyntax &&
-            AkcssCompletionRegion.TryCreate(
+            AkcssLanguageRegion.TryCreate(
                 syntaxTree,
                 text,
                 position: 0,
@@ -76,7 +76,7 @@ internal static class AkburaUsingEditService
         }
 
         var root = syntaxTree.GetRootSyntax();
-        return AkcssCompletionRegion.TryCreate(
+        return AkcssLanguageRegion.TryCreate(
             syntaxTree,
             text,
             position,
@@ -277,7 +277,7 @@ internal static class AkburaUsingEditService
     private static AkburaCSharpImportContext CreateAkcssImportContext(
         SourceText text,
         AkburaSyntax syntaxRoot,
-        AkcssCompletionRegion region)
+        AkcssLanguageRegion region)
     {
         var existingImports =
             ImmutableHashSet.CreateBuilder<CSharpUsingKey>();
@@ -293,7 +293,7 @@ internal static class AkburaUsingEditService
             }
         }
 
-        if (region.Kind == AkcssCompletionRegionKind.InlineBlock &&
+        if (region.Kind == AkcssLanguageRegionKind.InlineBlock &&
             syntaxRoot is AkburaDocumentSyntax documentRoot)
         {
             foreach (var member in documentRoot.Members)
@@ -309,7 +309,7 @@ internal static class AkburaUsingEditService
         }
 
         return CreateContext(
-            region.Kind == AkcssCompletionRegionKind.StandaloneDocument
+            region.Kind == AkcssLanguageRegionKind.StandaloneDocument
                 ? AkburaCSharpImportSyntaxKind.AkcssDocument
                 : AkburaCSharpImportSyntaxKind.InlineAkcssBlock,
             text,
@@ -346,9 +346,9 @@ internal static class AkburaUsingEditService
 
     private static string DetectAkcssIndentation(
         SourceText text,
-        AkcssCompletionRegion region)
+        AkcssLanguageRegion region)
     {
-        if (region.Kind == AkcssCompletionRegionKind.StandaloneDocument)
+        if (region.Kind == AkcssLanguageRegionKind.StandaloneDocument)
         {
             return string.Empty;
         }

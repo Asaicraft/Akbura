@@ -82,9 +82,11 @@ internal sealed class AkburaQuickInfoSource : IAsyncQuickInfoSource
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
         {
-            throw;
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.QuickInfo,
+                "Quick Info lookup canceled.");
+            return null;
         }
         catch (Exception exception)
         {
@@ -212,14 +214,29 @@ internal sealed class AkburaQuickInfoSource : IAsyncQuickInfoSource
             return null;
         }
 
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+
         var quickInfo = await Task.Run(
-                () => _quickInfoService.GetQuickInfo(
-                    state.Context,
-                    semanticPoint.Position,
-                    cancellationToken),
-                cancellationToken)
+                () =>
+                {
+                    try
+                    {
+                        return _quickInfoService.GetQuickInfo(
+                            state.Context,
+                            semanticPoint.Position,
+                            cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return null;
+                    }
+                })
             .ConfigureAwait(false);
-        if (quickInfo == null ||
+        if (cancellationToken.IsCancellationRequested ||
+            quickInfo == null ||
             quickInfo.SourceSpan.Length == 0 ||
             quickInfo.SourceSpan.Start < 0 ||
             quickInfo.SourceSpan.End > state.Snapshot.Length)

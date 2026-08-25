@@ -217,10 +217,9 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             var document = await _parserService
                 .GetSyntacticDocumentAsync(snapshot)
                 .ConfigureAwait(false);
-            var completionText =
-                document.GetSlashCompletionText(
-                    caretPosition);
-            if (completionText == null)
+            if (!document.TryGetSlashCompletionEdit(
+                    caretPosition,
+                    out var completionEdit))
             {
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics
@@ -238,7 +237,9 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                 AkburaWorkspaceDiagnostics
                     .Category.AutoClosingTag,
                 $"Parsed slash completion " +
-                $"'{completionText}' with indentation " +
+                $"'{completionEdit.InsertionText}', " +
+                $"overtype={completionEdit.OvertypeLength}, " +
+                $"indentation=" +
                 $"{indentationLevel?.ToString() ?? "unchanged"}.");
 
             await ThreadHelper.JoinableTaskFactory
@@ -261,40 +262,38 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             if (!ReferenceEquals(
                     currentCaret.Snapshot.TextBuffer,
                     args.SubjectBuffer) ||
-                currentCaret.Position !=
-                    insertionPosition)
+                currentCaret.Position != insertionPosition ||
+                insertionPosition == 0 ||
+                currentSnapshot[insertionPosition - 1] != '/')
             {
                 return;
             }
 
-            if (insertionPosition == 0 ||
-                currentSnapshot[
-                    insertionPosition - 1] != '/')
-            {
-                return;
-            }
-
-            var completesClosingTag =
-                !string.Equals(
-                    completionText,
-                    ">",
-                    StringComparison.Ordinal);
-            if (completesClosingTag &&
+            if (completionEdit.CompletesClosingTag &&
                 (insertionPosition < 2 ||
-                 currentSnapshot[
-                     insertionPosition - 2] != '<'))
+                 currentSnapshot[insertionPosition - 2] != '<'))
             {
                 return;
             }
 
-            var completionAlreadyPresent = StartsWith(
-                currentSnapshot,
-                insertionPosition,
-                completionText);
+            if (completionEdit.OvertypeLength != 0 &&
+                (completionEdit.OvertypeLength != 1 ||
+                 insertionPosition >= currentSnapshot.Length ||
+                 currentSnapshot[insertionPosition] != '>'))
+            {
+                return;
+            }
+
+            var completionAlreadyPresent =
+                completionEdit.InsertionText.Length == 0 ||
+                StartsWith(
+                    currentSnapshot,
+                    insertionPosition,
+                    completionEdit.InsertionText);
             var indentationSpan = default(Span);
             var indentationText = string.Empty;
             var hasIndentationEdit =
-                completesClosingTag &&
+                completionEdit.CompletesClosingTag &&
                 indentationLevel is { } level &&
                 TryGetClosingTagIndentationEdit(
                     currentSnapshot,
@@ -304,49 +303,37 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                     out indentationSpan,
                     out indentationText);
 
-            if (completionAlreadyPresent &&
-                !hasIndentationEdit)
-            {
-                return;
-            }
-
-            using var edit =
-                args.SubjectBuffer.CreateEdit();
-
             var indentationDelta = 0;
-            if (hasIndentationEdit)
+            var appliedSnapshot = currentSnapshot;
+            if (!completionAlreadyPresent || hasIndentationEdit)
             {
-                if (!edit.Replace(
-                        indentationSpan,
-                        indentationText))
+                using var edit =
+                    args.SubjectBuffer.CreateEdit();
+
+                if (hasIndentationEdit)
                 {
-                    AkburaWorkspaceDiagnostics.Write(
-                        AkburaWorkspaceDiagnostics
-                            .Category.AutoClosingTag,
-                        "Subject buffer rejected " +
-                        "the closing tag indentation.");
+                    if (!edit.Replace(
+                            indentationSpan,
+                            indentationText))
+                    {
+                        return;
+                    }
+
+                    indentationDelta =
+                        indentationText.Length -
+                        indentationSpan.Length;
+                }
+
+                if (!completionAlreadyPresent &&
+                    !edit.Insert(
+                        insertionPosition,
+                        completionEdit.InsertionText))
+                {
                     return;
                 }
 
-                indentationDelta =
-                    indentationText.Length -
-                    indentationSpan.Length;
+                appliedSnapshot = edit.Apply();
             }
-
-            if (!completionAlreadyPresent &&
-                !edit.Insert(
-                    insertionPosition,
-                    completionText))
-            {
-                AkburaWorkspaceDiagnostics.Write(
-                    AkburaWorkspaceDiagnostics
-                        .Category.AutoClosingTag,
-                    "Subject buffer rejected " +
-                    "the slash completion.");
-                return;
-            }
-
-            var appliedSnapshot = edit.Apply();
 
             if (ReferenceEquals(
                     args.TextView.TextBuffer,
@@ -357,15 +344,17 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                         appliedSnapshot,
                         insertionPosition +
                         indentationDelta +
-                        completionText.Length));
+                        completionEdit.InsertionText.Length +
+                        completionEdit.OvertypeLength));
             }
 
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics
                     .Category.AutoClosingTag,
-                $"Inserted slash completion " +
-                $"'{completionText}' at " +
+                $"Applied slash completion at " +
                 $"{insertionPosition}; " +
+                $"inserted='{completionEdit.InsertionText}', " +
+                $"overtype={completionEdit.OvertypeLength}, " +
                 $"indentationChanged={hasIndentationEdit}.");
         }
         catch (Exception exception)
@@ -377,7 +366,6 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                 exception);
         }
     }
-
     private static bool TryGetClosingTagIndentationEdit(
         ITextSnapshot snapshot,
         int insertionPosition,

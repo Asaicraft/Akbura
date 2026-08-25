@@ -95,8 +95,8 @@ internal sealed class AkburaOutliningTagger :
     }
 
     private static bool TryGetCompletedDocument(
-        Task<Workspaces.AkburaSyntacticDocument> task,
-        out Workspaces.AkburaSyntacticDocument document)
+        Task<AkburaSyntacticDocument> task,
+        out AkburaSyntacticDocument document)
     {
 #pragma warning disable VSTHRD002 // Deliberately bounded to 100 ms to avoid editor flicker.
         try
@@ -127,7 +127,7 @@ internal sealed class AkburaOutliningTagger :
 
     private void ScheduleRefresh(
         ITextSnapshot snapshot,
-        Task<Workspaces.AkburaSyntacticDocument> task)
+        Task<AkburaSyntacticDocument> task)
     {
         _scheduledRefreshes.GetValue(
             snapshot,

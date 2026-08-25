@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace Akbura.Workspaces;
+namespace Akbura.Workspaces.AutomaticPairing;
 
 internal sealed class AkburaAutomaticPairService
 {

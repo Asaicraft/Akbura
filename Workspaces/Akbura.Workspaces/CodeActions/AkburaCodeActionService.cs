@@ -4,7 +4,7 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
-namespace Akbura.Workspaces;
+namespace Akbura.Workspaces.CodeActions;
 
 internal sealed class AkburaCodeActionService : IAkburaCodeActionService
 {

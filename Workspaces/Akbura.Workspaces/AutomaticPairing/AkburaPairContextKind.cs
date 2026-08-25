@@ -1,4 +1,4 @@
-namespace Akbura.Workspaces;
+namespace Akbura.Workspaces.AutomaticPairing;
 
 internal enum AkburaPairContextKind
 {

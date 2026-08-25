@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
-namespace Akbura.Workspaces;
+namespace Akbura.Workspaces.AutomaticPairing;
 
 internal sealed class AkburaCSharpPairProjection
 {

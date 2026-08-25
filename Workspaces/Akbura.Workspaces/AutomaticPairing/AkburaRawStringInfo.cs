@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis.Text;
 
-namespace Akbura.Workspaces;
+namespace Akbura.Workspaces.AutomaticPairing;
 
 internal readonly struct AkburaRawStringInfo
 {

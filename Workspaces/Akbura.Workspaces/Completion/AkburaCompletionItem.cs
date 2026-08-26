@@ -41,7 +41,8 @@ public sealed class AkburaCompletionItem
         int priority = 50,
         int caretOffsetFromEnd = 0,
         bool triggerCompletionAfterInsert = false,
-        string? namespaceImport = null)
+        string? namespaceImport = null,
+        string? resolveKey = null)
     {
         if (string.IsNullOrWhiteSpace(displayText))
         {
@@ -68,6 +69,14 @@ public sealed class AkburaCompletionItem
         NamespaceImport = string.IsNullOrWhiteSpace(namespaceImport)
             ? null
             : namespaceImport;
+        ResolveKey = resolveKey ?? string.Concat(
+            ((int)kind).ToString(),
+            "|",
+            displayText,
+            "|",
+            insertText,
+            "|",
+            NamespaceImport ?? string.Empty);
     }
 
     public string DisplayText { get; }
@@ -90,6 +99,11 @@ public sealed class AkburaCompletionItem
     /// Namespace that must be imported when this item is committed.
     /// </summary>
     public string? NamespaceImport { get; }
+
+    /// <summary>
+    /// Stable key used by hosts to resolve lazy completion details.
+    /// </summary>
+    public string ResolveKey { get; }
 
     public AkburaCompletionKind Kind { get; }
 

@@ -208,11 +208,12 @@ public sealed class BoundTreeArchitectureTests : SemanticArchitectureTestBase
         var boundMarkupComponent = markupModel.BindingSession.BindSemanticSyntax(markupRoot.Element);
         var markupSetter = markupModel.BindingSession.BindOperationSyntax(markupAttribute);
 
-        const string akcssCode = "@akcss { Button.card { Background: White; } }";
+        const string akcssCode =
+            "@akcss { @using Avalonia.Controls; Button.card { Background: White; } }";
         var akcssTree = AkburaSyntaxTree.ParseText(akcssCode, "Akcss.akbura");
         var akcssModel = CreateCompilation(akcssTree).GetSemanticModel(akcssTree);
         var akcssBlock = Assert.IsType<InlineAkcssBlockSyntax>(akcssTree.GetRoot().Members[0]);
-        var akcssRule = Assert.IsType<AkcssStyleRuleSyntax>(akcssBlock.Members[0]);
+        var akcssRule = Assert.Single(akcssBlock.Members.OfType<AkcssStyleRuleSyntax>());
         var akcssAssignment = Assert.IsType<AkcssAssignmentSyntax>(akcssRule.Members[0]);
         var boundAkcssModule = akcssModel.BindingSession.BindSemanticSyntax(akcssBlock);
         var boundAkcssStyle = akcssModel.BindingSession.BindSemanticSyntax(akcssRule);

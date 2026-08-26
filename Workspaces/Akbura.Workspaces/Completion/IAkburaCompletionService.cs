@@ -7,4 +7,11 @@ public interface IAkburaCompletionService
         AkburaDocumentContext? semanticContext,
         int position,
         CancellationToken cancellationToken = default);
+
+    AkburaCompletionChange GetCompletionChange(
+        AkburaSyntacticDocument document,
+        AkburaDocumentContext? semanticContext,
+        int position,
+        AkburaCompletionItem item,
+        CancellationToken cancellationToken = default);
 }

@@ -34,6 +34,8 @@ public sealed class OperationArchitectureTests : SemanticArchitectureTestBase
     {
         const string code =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    Button.card {\n" +
             "        @if(true) {\n" +
             "            Background: White;\n" +
@@ -44,7 +46,7 @@ public sealed class OperationArchitectureTests : SemanticArchitectureTestBase
         var compilation = CreateCompilation(tree);
         var model = compilation.GetSemanticModel(tree);
         var block = Assert.IsType<InlineAkcssBlockSyntax>(tree.GetRoot().Members[0]);
-        var rule = Assert.IsType<AkcssStyleRuleSyntax>(block.Members[0]);
+        var rule = Assert.Single(block.Members.OfType<AkcssStyleRuleSyntax>());
         var ifDirective = Assert.IsType<AkcssIfDirectiveSyntax>(rule.Members[0]);
 
         var operation = Assert.IsAssignableFrom<IAkcssIfOperation>(model.GetOperation(ifDirective));

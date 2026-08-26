@@ -1,7 +1,7 @@
 namespace Akbura.Workspaces.QuickInfo;
 
 /// <summary>
-/// Identifies the kind of native Akbura symbol described by Quick Info.
+/// Identifies the kind of native or projected symbol described by Quick Info.
 /// </summary>
 public enum AkburaQuickInfoKind
 {
@@ -11,4 +11,5 @@ public enum AkburaQuickInfoKind
     Utility,
     Parameter,
     Module,
+    Symbol,
 }

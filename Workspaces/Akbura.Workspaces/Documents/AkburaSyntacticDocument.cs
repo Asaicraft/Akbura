@@ -74,6 +74,77 @@ public sealed partial class AkburaSyntacticDocument
             indentationBlocks);
     }
 
+    internal static AkburaSyntacticDocument Create(
+        AkburaDocumentSnapshot document,
+        CancellationToken cancellationToken = default)
+    {
+        if (document == null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
+        var outliningRegions = CreateSyntacticFacts(
+            document.SyntaxTree.GetRootSyntax(),
+            document.Text,
+            out var indentationBlocks,
+            cancellationToken);
+
+        return new AkburaSyntacticDocument(
+            document.Text,
+            document.FilePath,
+            document.SyntaxTree,
+            outliningRegions,
+            indentationBlocks);
+    }
+    /// <summary>
+    /// Creates a syntax-only document by incrementally applying text changes
+    /// to this document's syntax tree.
+    /// </summary>
+    public AkburaSyntacticDocument WithText(
+        SourceText newText,
+        IEnumerable<TextChangeRange>? changes = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (newText == null)
+        {
+            throw new ArgumentNullException(nameof(newText));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (newText.ContentEquals(Text))
+        {
+            return this;
+        }
+
+        AkburaSyntaxTree syntaxTree = SyntaxTree switch
+        {
+            ComponentSyntaxTree componentTree =>
+                componentTree.WithChangedText(
+                    newText,
+                    changes,
+                    cancellationToken),
+
+            AkcssSyntaxTree akcssTree =>
+                akcssTree.WithChangedText(
+                    newText,
+                    changes,
+                    cancellationToken),
+
+            _ => throw new InvalidOperationException(
+                $"Unsupported syntax tree type " +
+                $"'{SyntaxTree.GetType().FullName}'."),
+        };
+        var outliningRegions = CreateSyntacticFacts(
+            syntaxTree.GetRootSyntax(),
+            newText,
+            out var indentationBlocks,
+            cancellationToken);
+        return new AkburaSyntacticDocument(
+            newText,
+            FilePath,
+            syntaxTree,
+            outliningRegions,
+            indentationBlocks);
+    }
     /// <summary>
     /// Returns the structural indentation level for the specified line.
     /// </summary>

@@ -104,6 +104,32 @@ public sealed class AkburaWorkspace : IDisposable
         return result;
     }
 
+    public void RemoveProject(AkburaProjectId projectId)
+    {
+        ThrowIfDisposed();
+        AkburaWorkspaceChangedEventArgs? eventArgs = null;
+
+        lock (_mutationGate)
+        {
+            ThrowIfDisposed();
+            var oldSolution = _currentSolution;
+            if (!oldSolution.TryGetProject(projectId, out _))
+            {
+                return;
+            }
+
+            var newSolution = RebuildProjectReferences(
+                oldSolution.RemoveProject(projectId));
+            PublishSolution(newSolution);
+            eventArgs = new AkburaWorkspaceChangedEventArgs(
+                AkburaWorkspaceChangeKind.ProjectRemoved,
+                oldSolution,
+                newSolution,
+                projectId);
+        }
+
+        Changed?.Invoke(this, eventArgs);
+    }
     public AkburaDocumentSnapshot OpenOrChangeDocument(
         Uri uri,
         SourceText text,

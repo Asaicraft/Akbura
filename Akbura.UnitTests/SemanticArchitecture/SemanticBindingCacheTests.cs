@@ -800,6 +800,8 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
     {
         const string oldCode =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    Button.unchanged {\n" +
             "        Background: White;\n" +
             "    }\n" +
@@ -810,6 +812,8 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
             "}";
         const string newCode =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    Button.unchanged {\n" +
             "        Background: White;\n" +
             "    }\n" +
@@ -824,8 +828,9 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
         var oldCompilation = CreateCompilation(oldTree);
         var oldModel = oldCompilation.GetSemanticModel(oldTree);
         var oldBlock = Assert.IsType<InlineAkcssBlockSyntax>(oldTree.GetRoot().Members[0]);
-        var oldUnchangedRule = Assert.IsType<AkcssStyleRuleSyntax>(oldBlock.Members[0]);
-        var oldChangedRule = Assert.IsType<AkcssStyleRuleSyntax>(oldBlock.Members[1]);
+        var oldRules = oldBlock.Members.OfType<AkcssStyleRuleSyntax>().ToArray();
+        var oldUnchangedRule = oldRules[0];
+        var oldChangedRule = oldRules[1];
         var oldBackground = Assert.IsType<AkcssAssignmentSyntax>(oldUnchangedRule.Members[0]);
         var oldPadding = Assert.IsType<AkcssAssignmentSyntax>(oldChangedRule.Members[0]);
         var oldBackgroundOperation = oldModel.GetOperation(oldBackground);
@@ -835,8 +840,9 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
         var newCompilation = oldCompilation.WithSyntaxTrees([newTree]);
         var newModel = newCompilation.GetSemanticModel(newTree);
         var newBlock = Assert.IsType<InlineAkcssBlockSyntax>(newTree.GetRoot().Members[0]);
-        var newUnchangedRule = Assert.IsType<AkcssStyleRuleSyntax>(newBlock.Members[0]);
-        var newChangedRule = Assert.IsType<AkcssStyleRuleSyntax>(newBlock.Members[1]);
+        var newRules = newBlock.Members.OfType<AkcssStyleRuleSyntax>().ToArray();
+        var newUnchangedRule = newRules[0];
+        var newChangedRule = newRules[1];
         var newBackground = Assert.IsType<AkcssAssignmentSyntax>(newUnchangedRule.Members[0]);
         var newPadding = Assert.IsType<AkcssAssignmentSyntax>(newChangedRule.Members[0]);
         var newBackgroundOperation = newModel.GetOperation(newBackground);

@@ -185,6 +185,105 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                 syntaxContext.Kind));
     }
 
+    public AkburaCompletionChange GetCompletionChange(
+        AkburaSyntacticDocument document,
+        AkburaDocumentContext? semanticContext,
+        int position,
+        AkburaCompletionItem item,
+        CancellationToken cancellationToken = default)
+    {
+        if (document == null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
+        if (item == null)
+        {
+            throw new ArgumentNullException(nameof(item));
+        }
+
+        if ((uint)position > (uint)document.Text.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(position));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var completion = GetCompletions(
+            document,
+            semanticContext,
+            position,
+            cancellationToken);
+        var applicableSpan = completion.ApplicableSpan;
+        if ((uint)applicableSpan.Start >
+                (uint)document.Text.Length ||
+            (uint)applicableSpan.End >
+                (uint)document.Text.Length)
+        {
+            applicableSpan = new TextSpan(position, 0);
+        }
+
+        var replacement = new TextChange(
+            applicableSpan,
+            item.InsertText);
+        TextChange? import = null;
+
+        if (!string.IsNullOrWhiteSpace(item.NamespaceImport) &&
+            AkburaUsingEditService.TryCreateNamespaceImportChange(
+                document.Text,
+                document.SyntaxTree,
+                item.NamespaceImport!,
+                position,
+                out var importChange))
+        {
+            import = importChange;
+        }
+
+        var newPosition = applicableSpan.Start +
+            item.InsertText.Length -
+            item.CaretOffsetFromEnd;
+        ImmutableArray<TextChange> changes;
+
+        if (import is not { } namespaceImport)
+        {
+            changes = ImmutableArray.Create(replacement);
+        }
+        else if (namespaceImport.Span.Start == applicableSpan.Start &&
+                 namespaceImport.Span.Length == 0 &&
+                 applicableSpan.Length == 0)
+        {
+            var importText = namespaceImport.NewText ?? string.Empty;
+            changes = ImmutableArray.Create(
+                new TextChange(
+                    applicableSpan,
+                    importText + item.InsertText));
+            newPosition += importText.Length;
+        }
+        else if (namespaceImport.Span.End <= applicableSpan.Start)
+        {
+            changes = ImmutableArray.Create(
+                namespaceImport,
+                replacement);
+            newPosition +=
+                (namespaceImport.NewText?.Length ?? 0) -
+                namespaceImport.Span.Length;
+        }
+        else if (applicableSpan.End <= namespaceImport.Span.Start)
+        {
+            changes = ImmutableArray.Create(
+                replacement,
+                namespaceImport);
+        }
+        else
+        {
+            changes = ImmutableArray.Create(replacement);
+        }
+
+        return new AkburaCompletionChange(
+            changes,
+            Math.Max(0, newPosition),
+            item.TriggerCompletionAfterInsert);
+    }
     private static AkburaCompletionResult CreateClosingTagResult(
         AkburaSyntacticCompletionContext context)
     {

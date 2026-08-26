@@ -53,6 +53,22 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/Workspaces/">
+    <Project Path="Workspaces/Akbura.LanguageServer.Protocol/Akbura.LanguageServer.Protocol.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Workspaces/Akbura.LanguageServer/Akbura.LanguageServer.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
     <Project Path="Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj" Id="e0c6426f-ece8-4de0-a40c-c22d196bbc1a">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />

@@ -85,6 +85,49 @@ public sealed class AkburaSolutionSnapshot
         return false;
     }
 
+    public bool TryGetDocumentContext(
+        AkburaDocumentId documentId,
+        out AkburaDocumentContext context)
+    {
+        if (!TryGetDocument(documentId, out var document) ||
+            !TryGetProject(document.ProjectId, out var project))
+        {
+            context = null!;
+            return false;
+        }
+
+        context = new AkburaDocumentContext(
+            this,
+            project,
+            document);
+
+        return true;
+    }
+
+    public bool TryGetDocumentContext(
+        Uri uri,
+        out AkburaDocumentContext context)
+    {
+        if (uri == null)
+        {
+            throw new ArgumentNullException(nameof(uri));
+        }
+
+        if (!TryGetDocument(uri, out var document) ||
+            !TryGetProject(document.ProjectId, out var project))
+        {
+            context = null!;
+            return false;
+        }
+
+        context = new AkburaDocumentContext(
+            this,
+            project,
+            document);
+
+        return true;
+    }
+
     public AkburaDocumentSnapshot GetRequiredDocument(
         AkburaDocumentId documentId)
     {

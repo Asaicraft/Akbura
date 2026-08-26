@@ -1,4 +1,4 @@
-﻿using Akbura.Workspaces;
+using Akbura.Workspaces;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,6 +15,8 @@ namespace Akbura.VisualStudio;
 internal sealed class AkburaVisualStudioWorkspace : IDisposable
 {
     private readonly VisualStudioWorkspace _visualStudioWorkspace;
+
+    private readonly AkburaProjectSynchronizer _projectSynchronizer;
 
     private readonly ConcurrentDictionary<ProjectId, ProjectSynchronizationEntry> _projectSynchronizations = new();
 
@@ -34,6 +36,8 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             OnVisualStudioWorkspaceChanged;
 
         Workspace = new AkburaWorkspace();
+        _projectSynchronizer =
+            new AkburaProjectSynchronizer(Workspace);
     }
 
     public AkburaWorkspace Workspace { get; }
@@ -265,29 +269,19 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         }
 
         stageTimer.Restart();
-        var context =
-            CreateProjectContext(
+        await _projectSynchronizer
+            .SynchronizeProjectAsync(
                 project,
                 csharpCompilation,
-                activeFilePath ??
-                    project.FilePath ??
-                    Environment.CurrentDirectory);
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-            "CreateProjectContext",
-            stageTimer.Elapsed);
-
-        stageTimer.Restart();
-        var akburaProject =
-            Workspace.AddOrUpdateProject(context);
-
-        await SynchronizeAkburaDocumentsAsync(
-                project,
-                akburaProject.Id,
-                activeFilePath,
+                openTextProvider: null,
+                excludedDocument:
+                    string.IsNullOrWhiteSpace(activeFilePath)
+                        ? null
+                        : new Uri(Path.GetFullPath(activeFilePath)),
                 cancellationToken)
             .ConfigureAwait(false);
         AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-            "SynchronizeAkburaDocumentsAsync",
+            "Shared project synchronization",
             stageTimer.Elapsed);
 
         AkburaWorkspaceDiagnostics.Write(

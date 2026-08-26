@@ -214,12 +214,14 @@ public sealed class RealisticSemanticProjectTests
         var dashboardModel = project.Compilation.GetSemanticModel(project.DashboardTree);
         var taskCardModel = project.Compilation.GetSemanticModel(project.TaskCardTree);
         var statusBadgeModel = project.Compilation.GetSemanticModel(project.StatusBadgeTree);
+        var dashboardAkcssModel = project.Compilation.GetSemanticModel(project.DashboardAkcssTree);
+        var sharedAkcssModel = project.Compilation.GetSemanticModel(project.SharedAkcssTree);
 
         AssertComponentBoundCoverage(dashboardModel, project.DashboardTree.GetRoot());
         AssertComponentBoundCoverage(taskCardModel, project.TaskCardTree.GetRoot());
         AssertComponentBoundCoverage(statusBadgeModel, project.StatusBadgeTree.GetRoot());
-        AssertAkcssDocumentBoundCoverage(dashboardModel, project.DashboardAkcssTree.GetRoot());
-        AssertAkcssDocumentBoundCoverage(dashboardModel, project.SharedAkcssTree.GetRoot());
+        AssertAkcssDocumentBoundCoverage(dashboardAkcssModel, project.DashboardAkcssTree.GetRoot());
+        AssertAkcssDocumentBoundCoverage(sharedAkcssModel, project.SharedAkcssTree.GetRoot());
     }
 
     private static void AssertComponentBoundCoverage(
@@ -1003,6 +1005,7 @@ public sealed class RealisticSemanticProjectTests
 
     private static readonly string DashboardAkcss =
         """
+    @using Avalonia.Controls;
     @using Demo.Styles;
     @using Demo.Styles.Shared.akcss;
 

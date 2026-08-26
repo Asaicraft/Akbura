@@ -2005,6 +2005,178 @@ public sealed class WorkspaceCompletionTests
         }
     }
 
+    [Fact]
+    public void ProjectedCSharpService_CompletesAndResolvesState()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <StackPanel Width={cou|}/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: true,
+                            IsIncomplete: false,
+                            Character: '\0'))
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(result);
+                var item = Assert.Single(
+                    result.Value.Items,
+                    static item => item.DisplayText == "count");
+                var resolution = workspace.LanguageServices.ProjectedCSharp
+                    .ResolveCompletionAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        item.ResolveKey)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(resolution);
+                var changed = SourceText.From(source)
+                    .WithChanges(resolution!.Change.Changes)
+                    .ToString();
+                Assert.Contains("Width={count}", changed);
+            });
+    }
+
+    [Fact]
+    public async Task ProjectedCSharpService_UsesCompilationProjectReferences()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+            using Library;
+
+            state Person person = new();
+
+            <TextBlock Text={person.Na|}/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var directory = Directory.CreateTempSubdirectory(
+            "akbura-projected-reference-tests-");
+
+        try
+        {
+            var libraryId = ProjectId.CreateNewId("Library");
+            var applicationId = ProjectId.CreateNewId("Application");
+            var libraryCompilation = CSharpCompilation.Create(
+                "Library",
+                [CSharpSyntaxTree.ParseText(
+                    "namespace Library { " +
+                    "public sealed class Person { " +
+                    "public string Name { get; } = string.Empty; " +
+                    "} }")],
+                CreatePlatformReferences(),
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+            var applicationCompilation = CreateCompilation()
+                .AddReferences(
+                    libraryCompilation.ToMetadataReference());
+            using var workspace = new AkburaWorkspace();
+            workspace.AddOrUpdateProject(new ProjectContext(
+                libraryId,
+                Path.Combine(directory.FullName, "Library.csproj"),
+                directory.FullName,
+                "Library",
+                libraryCompilation,
+                ImmutableArray<ProjectReference>.Empty));
+            var application = workspace.AddOrUpdateProject(
+                new ProjectContext(
+                    applicationId,
+                    Path.Combine(
+                        directory.FullName,
+                        "Application.csproj"),
+                    directory.FullName,
+                    "Gallery",
+                    applicationCompilation,
+                    [new ProjectReference(libraryId)]));
+            var path = Path.Combine(
+                directory.FullName,
+                "View.akbura");
+            var semanticContext = workspace.OpenOrChangeDocumentContext(
+                application.Id,
+                new Uri(path),
+                SourceText.From(source));
+            var syntacticDocument = AkburaSyntacticDocument.Parse(
+                SourceText.From(source),
+                path);
+
+            var result = await workspace.LanguageServices.ProjectedCSharp
+                .GetCompletionsAsync(
+                    syntacticDocument,
+                    semanticContext,
+                    position,
+                    new AkburaProjectedCompletionTrigger(
+                        IsExplicit: true,
+                        IsIncomplete: false,
+                        Character: '\0'));
+
+            Assert.NotNull(result);
+            Assert.Contains(
+                result.Value.Items,
+                static item => item.DisplayText == "Name");
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+    [Fact]
+    public void ProjectedCSharpService_MapsQuickInfoToHost()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <StackPanel Width={co|unt}/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var info = workspace.LanguageServices.ProjectedCSharp
+                    .GetQuickInfoAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(info);
+                Assert.Equal(
+                    "count",
+                    source.Substring(
+                        info!.SourceSpan.Start,
+                        info.SourceSpan.Length));
+                Assert.Contains("int", info.Signature);
+            });
+    }
     private static void WithWorkspace(
         string source,
         Action<

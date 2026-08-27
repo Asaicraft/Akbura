@@ -47,8 +47,14 @@ jobs:
           cache-dependency-path: >
             Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
 
-      - name: Restore .NET projects
-        run: dotnet restore Akbura.slnx
+      - name: Restore LSP projects
+        run: |
+          dotnet restore \
+            Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+          dotnet restore \
+            Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+          dotnet restore \
+            Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj
 
       - name: Test LSP unit tests
         run: >

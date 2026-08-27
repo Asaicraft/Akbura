@@ -151,13 +151,13 @@ internal sealed class AkburaCompletionCommitManager :
         var namespaceImportChange = CreateNamespaceImportChange(
             currentSnapshot,
             completion.NamespaceImport,
+            applicableSpan.Start.Position,
             token);
 
         var triggerNextCompletion =
             completion.TriggerCompletionAfterInsert &&
             (typedChar == ' ' ||
              completion.CaretOffsetFromEnd > 0 ||
-             completion.Kind == AkburaCompletionKind.Property &&
              completion.InsertText.EndsWith(
                  " ",
                  StringComparison.Ordinal));
@@ -223,10 +223,8 @@ internal sealed class AkburaCompletionCommitManager :
             {
                 TriggerNextCompletion(
                     session,
-                    currentSnapshot,
                     appliedSnapshot,
-                    caretPosition,
-                    typedChar == ' ' ? typedChar : ' ');
+                    caretPosition);
             }
         }
 
@@ -244,6 +242,7 @@ internal sealed class AkburaCompletionCommitManager :
     private TextChange? CreateNamespaceImportChange(
         ITextSnapshot snapshot,
         string? namespaceName,
+        int position,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(namespaceName))
@@ -262,6 +261,7 @@ internal sealed class AkburaCompletionCommitManager :
             document.Text,
             document.SyntaxTree,
             namespaceName!,
+            position,
             out var change)
                 ? change
                 : null;
@@ -450,19 +450,17 @@ internal sealed class AkburaCompletionCommitManager :
 
     private void TriggerNextCompletion(
         IAsyncCompletionSession currentSession,
-        ITextSnapshot snapshotBeforeCommit,
         ITextSnapshot snapshotAfterCommit,
-        int caretPosition,
-        char typedChar)
+        int caretPosition)
     {
         var textView = currentSession.TextView;
         var trackingPoint = snapshotAfterCommit.CreateTrackingPoint(
             caretPosition,
             PointTrackingMode.Positive);
         var trigger = new CompletionTrigger(
-            CompletionTriggerReason.Insertion,
-            snapshotBeforeCommit,
-            typedChar);
+            CompletionTriggerReason.Invoke,
+            snapshotAfterCommit,
+            '\0');
 
         currentSession.Dismiss();
 #pragma warning disable VSSDK007 // The commit API is synchronous; the task is deliberately detached after handling all work.

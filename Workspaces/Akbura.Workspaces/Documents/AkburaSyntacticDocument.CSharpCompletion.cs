@@ -1,0 +1,389 @@
+using Akbura.Language;
+using Akbura.Language.Syntax;
+using Microsoft.CodeAnalysis.Text;
+
+namespace Akbura.Workspaces.Documents;
+
+public sealed partial class AkburaSyntacticDocument
+{
+    /// <summary>
+    /// Determines whether <paramref name="position"/> is inside an embedded
+    /// C# fragment that can be projected for Roslyn completion.
+    /// </summary>
+    public bool TryGetCSharpCompletionContext(
+        int position,
+        out AkburaCSharpCompletionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetEmbeddedCSharpContext(
+                position,
+                out var embeddedContext,
+                cancellationToken))
+        {
+            context = default;
+            return false;
+        }
+
+        context = embeddedContext.ToCompletionContext();
+        return true;
+    }
+
+    internal bool TryGetEmbeddedCSharpContext(
+        int position,
+        out AkburaEmbeddedCSharpContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ValidatePosition(position);
+        if (Text.Length == 0)
+        {
+            context = default;
+            return false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var root = SyntaxTree.GetRootSyntax();
+        EmbeddedCSharpCandidate? best = null;
+
+        if (position < Text.Length)
+        {
+            CollectCandidates(
+                root.FindTokenInternal(position).Parent);
+        }
+
+        if (position > 0)
+        {
+            CollectCandidates(
+                root.FindTokenInternal(position - 1).Parent);
+        }
+
+        // Missing C# nodes can have a zero-width span and therefore are not
+        // necessarily ancestors of either adjacent token.
+        if (best == null)
+        {
+            foreach (var candidate in root.DescendantNodes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (candidate.FullSpan.Start > position)
+                {
+                    break;
+                }
+
+                if (candidate.FullSpan.Start <= position &&
+                    candidate.FullSpan.End >= position)
+                {
+                    TryAddCandidate(candidate);
+                }
+            }
+        }
+
+        if (root is AkburaDocumentSyntax document)
+        {
+            foreach (var member in document.Members)
+            {
+                if (TryGetDeclarationTypeSpan(
+                        member,
+                        position,
+                        out var hostSpan))
+                {
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind.Type,
+                        member,
+                        hostSpan,
+                        priority: -1);
+                }
+            }
+        }
+
+        if (best == null)
+        {
+            context = default;
+            return false;
+        }
+
+        context = best.Value.Context;
+        return true;
+
+        void CollectCandidates(AkburaSyntax? syntax)
+        {
+            for (var current = syntax;
+                 current != null;
+                 current = current.Parent)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                TryAddCandidate(current);
+            }
+        }
+
+        void TryAddCandidate(AkburaSyntax syntax)
+        {
+            switch (syntax)
+            {
+                case CSharpExpressionSyntax expression
+                    when IsCSharpExpressionContext(expression):
+                {
+                    if (EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                            expression,
+                            out _,
+                            out var hostSpan))
+                    {
+                        AddCandidate(
+                            AkburaCSharpCompletionContextKind.Expression,
+                            expression,
+                            hostSpan,
+                            priority: 0);
+                    }
+
+                    break;
+                }
+
+                case CSharpTypeSyntax type:
+                    if (TryGetCSharpTypeContext(
+                            type,
+                            out var kind,
+                            out var owner))
+                    {
+                        AddCandidate(
+                            kind,
+                            owner,
+                            type.Tokens.FullSpan,
+                            priority: 1);
+                    }
+                    break;
+
+                case CSharpParameterListSyntax parameterList
+                    when parameterList.Parent is
+                        CommandDeclarationSyntax:
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind
+                            .CommandParameterList,
+                        parameterList,
+                        parameterList.Parameters.FullSpan,
+                        priority: 2);
+                    break;
+
+                case CSharpStatementSyntax statement:
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind.Statement,
+                        statement,
+                        EmbeddedCSharpSyntaxFacts
+                            .GetStatementHostSpan(statement),
+                        priority: 3);
+                    break;
+            }
+        }
+
+        bool IsCSharpExpressionContext(CSharpExpressionSyntax expression)
+        {
+            if ((expression.Parent is AkcssAssignmentSyntax assignment &&
+                 ReferenceEquals(assignment.Expression, expression)) ||
+                (expression.Parent is AkcssIfDirectiveSyntax ifDirective &&
+                 ReferenceEquals(ifDirective.Condition, expression)))
+            {
+                return true;
+            }
+
+            return !IsInAkcssRegion(expression);
+        }
+
+        bool TryGetCSharpTypeContext(
+            CSharpTypeSyntax type,
+            out AkburaCSharpCompletionContextKind kind,
+            out AkburaSyntax owner)
+        {
+            if (type.Parent is AkcssUsingDirectiveSyntax akcssUsingDirective &&
+                ReferenceEquals(akcssUsingDirective.Name, type) &&
+                !akcssUsingDirective.IsAkcssModuleImport)
+            {
+                kind = AkburaCSharpCompletionContextKind
+                    .UsingDirectiveName;
+                owner = akcssUsingDirective;
+                return true;
+            }
+
+            switch (type.Parent)
+            {
+                case AkcssStyleSelectorSyntax selector
+                    when ReferenceEquals(selector.TargetType, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+
+                case AkcssUtilitySelectorSyntax utilitySelector
+                    when ReferenceEquals(utilitySelector.TargetType, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+
+                case AkcssUtilityParameterSyntax parameter
+                    when ReferenceEquals(parameter.Type, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+
+                case AkcssInterceptDirectiveSyntax intercept
+                    when ReferenceEquals(intercept.Type, type):
+                    kind = AkburaCSharpCompletionContextKind.Type;
+                    owner = type;
+                    return true;
+            }
+
+            if (IsInAkcssRegion(type))
+            {
+                kind = default;
+                owner = null!;
+                return false;
+            }
+
+            var usingDirective = type.Parent as UsingDirectiveSyntax;
+            kind = usingDirective == null
+                ? AkburaCSharpCompletionContextKind.Type
+                : AkburaCSharpCompletionContextKind.UsingDirectiveName;
+            owner = usingDirective is null
+                ? type
+                : usingDirective;
+            return true;
+        }
+
+        bool IsInAkcssRegion(AkburaSyntax syntax)
+        {
+            if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+            {
+                return true;
+            }
+
+            for (var current = syntax.Parent;
+                 current != null;
+                 current = current.Parent)
+            {
+                if (current is InlineAkcssBlockSyntax)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        void AddCandidate(
+            AkburaCSharpCompletionContextKind kind,
+            AkburaSyntax owner,
+            TextSpan hostSpan,
+            int priority)
+        {
+            if (!ContainsPosition(hostSpan, position))
+            {
+                return;
+            }
+
+            var candidate = new EmbeddedCSharpCandidate(
+                new AkburaEmbeddedCSharpContext(
+                    kind,
+                    owner.Kind,
+                    owner.FullSpan,
+                    hostSpan,
+                    position),
+                priority);
+            if (best == null ||
+                candidate.Priority < best.Value.Priority ||
+                candidate.Priority == best.Value.Priority &&
+                candidate.Context.HostSpan.Length <
+                    best.Value.Context.HostSpan.Length)
+            {
+                best = candidate;
+            }
+        }
+    }
+
+    private bool TryGetDeclarationTypeSpan(
+        AkTopLevelMemberSyntax member,
+        int position,
+        out TextSpan hostSpan)
+    {
+        SimpleNameSyntax name;
+        int typeStart;
+        switch (member)
+        {
+            case StateDeclarationSyntax state
+                when state.Type == null &&
+                     state.EqualsToken.IsMissing &&
+                     state.Semicolon.IsMissing:
+                name = state.Name;
+                typeStart = state.StateKeyword.Span.End;
+                break;
+
+            case ParamDeclarationSyntax parameter
+                when parameter.Type == null &&
+                     parameter.EqualsToken.RawKind == 0 &&
+                     parameter.Semicolon.IsMissing:
+                name = parameter.Name;
+                typeStart = parameter.BindingKeyword.RawKind == 0
+                    ? parameter.ParamKeyword.Span.End
+                    : parameter.BindingKeyword.Span.End;
+                break;
+
+            case InjectDeclarationSyntax inject
+                when inject.Type.Tokens.FullSpan.Length == 0:
+                name = inject.Name;
+                typeStart = inject.InjectKeyword.Span.End;
+                break;
+
+            default:
+                hostSpan = default;
+                return false;
+        }
+
+        if (position < typeStart ||
+            position > member.FullSpan.End)
+        {
+            hostSpan = default;
+            return false;
+        }
+
+        if (name.IsMissing)
+        {
+            if (!ContainsOnlyWhitespace(Text, typeStart, position))
+            {
+                hostSpan = default;
+                return false;
+            }
+
+            hostSpan = new TextSpan(position, 0);
+            return true;
+        }
+
+        if (position < name.Span.Start ||
+            position > name.Span.End ||
+            !ContainsOnlyWhitespace(Text, typeStart, name.Span.Start))
+        {
+            hostSpan = default;
+            return false;
+        }
+
+        hostSpan = name.Span;
+        return true;
+    }
+
+    private static bool ContainsPosition(
+        TextSpan span,
+        int position)
+    {
+        return position >= span.Start &&
+            position <= span.End;
+    }
+
+    private readonly struct EmbeddedCSharpCandidate
+    {
+        public EmbeddedCSharpCandidate(
+            AkburaEmbeddedCSharpContext context,
+            int priority)
+        {
+            Context = context;
+            Priority = priority;
+        }
+
+        public AkburaEmbeddedCSharpContext Context { get; }
+
+        public int Priority { get; }
+    }
+}

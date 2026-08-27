@@ -1,0 +1,85 @@
+name: Akbura VS Code Extension
+
+on:
+  pull_request:
+    paths:
+      - "Workspaces/Akbura.LanguageServer.VsCode/**"
+      - "Workspaces/Akbura.LanguageServer/**"
+      - "Workspaces/Akbura.LanguageServer.Protocol/**"
+      - "Workspaces/Akbura.LanguageServer.UnitTests/**"
+      - "Workspaces/Akbura.LanguageServer.IntegrationTests/**"
+      - "Workspaces/Akbura.Workspaces/**"
+      - "Workspaces/Akbura.Workspaces.MSBuild/**"
+      - ".github/workflows/akbura-vscode.yml"
+
+  push:
+    branches:
+      - master
+      - feature/akbura-workspaces
+    paths:
+      - "Workspaces/Akbura.LanguageServer.VsCode/**"
+      - "Workspaces/Akbura.LanguageServer/**"
+      - "Workspaces/Akbura.LanguageServer.Protocol/**"
+      - "Workspaces/Akbura.LanguageServer.UnitTests/**"
+      - "Workspaces/Akbura.LanguageServer.IntegrationTests/**"
+      - "Workspaces/Akbura.Workspaces/**"
+      - "Workspaces/Akbura.Workspaces.MSBuild/**"
+      - ".github/workflows/akbura-vscode.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: >
+            Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
+
+      - name: Restore .NET projects
+        run: dotnet restore Akbura.slnx
+
+      - name: Test LSP unit tests
+        run: >
+          dotnet test
+          Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Test LSP integration tests
+        run: >
+          dotnet test
+          Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Install extension dependencies
+        working-directory: Workspaces/Akbura.LanguageServer.VsCode
+        run: npm ci
+
+      - name: Package VSIX
+        working-directory: Workspaces/Akbura.LanguageServer.VsCode
+        run: npm run package:vsix
+
+      - name: Verify packaged language server
+        working-directory: Workspaces/Akbura.LanguageServer.VsCode
+        run: npm run verify-server
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: akbura-vscode-extension
+          path: >
+            Workspaces/Akbura.LanguageServer.VsCode/*.vsix
+          if-no-files-found: error

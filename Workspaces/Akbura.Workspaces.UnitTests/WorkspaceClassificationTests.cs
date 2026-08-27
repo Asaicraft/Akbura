@@ -12,6 +12,37 @@ namespace Akbura.Workspaces.UnitTests;
 public sealed class WorkspaceClassificationTests
 {
     [Fact]
+    public void AkcssInvalidSelector_DoesNotReportBraceOnUsingDirective()
+    {
+        const string source =
+            "@using Akbura.Styles.akcss;\r\n\r\n" +
+            "..class {\n\n}";
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Styles.akcss");
+        using var workspace = new AkburaWorkspace();
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetSyntacticDiagnostics(
+                document,
+                new TextSpan(0, text.Length));
+        var selectorStart = source.IndexOf(
+            "..class",
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Code == ErrorCodes.ERR_LbraceExpected &&
+                diagnostic.Span.Start >= selectorStart);
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic =>
+                diagnostic.Code == ErrorCodes.ERR_LbraceExpected &&
+                diagnostic.Span.Start < selectorStart);
+    }
+    [Fact]
     public void SyntacticDiagnostics_ReportSkippedTextWithoutSemanticContext()
     {
         const string source =
@@ -389,6 +420,138 @@ public sealed class WorkspaceClassificationTests
             AkburaClassificationKind.Number);
     }
 
+    [Fact]
+    public void SemanticClassification_AkcssThicknessTupleNamesRemainIdentifiers()
+    {
+        const string source = """
+            @using Avalonia.Controls;
+
+            Border.card {
+                Padding: (horizontal: 0, vertical: 0);
+            }
+            """;
+
+        using var workspace =
+            CreateSemanticWorkspace();
+
+        var text =
+            SourceText.From(source);
+        var context =
+            workspace.OpenOrChangeDocumentContext(
+                new Uri(
+                    Path.GetFullPath(
+                        "Styles.akcss")),
+                text);
+
+        var classifications =
+            workspace.LanguageServices
+                .Classification
+                .GetClassifications(
+                    context,
+                    new TextSpan(
+                        0,
+                        text.Length));
+
+        AssertOnlyIdentifier(
+            "horizontal");
+        AssertOnlyIdentifier(
+            "vertical");
+
+        void AssertOnlyIdentifier(
+            string value)
+        {
+            var start =
+                source.IndexOf(
+                    value,
+                    StringComparison.Ordinal);
+            var span =
+                new TextSpan(
+                    start,
+                    value.Length);
+
+            Assert.Contains(
+                classifications,
+                classification =>
+                    classification.Span == span &&
+                    classification.Kind ==
+                        AkburaClassificationKind.Identifier);
+
+            Assert.DoesNotContain(
+                classifications,
+                classification =>
+                    classification.Span.OverlapsWith(
+                        span) &&
+                    classification.Kind !=
+                        AkburaClassificationKind.Identifier);
+        }
+    }
+
+    [Fact]
+    public void SemanticClassification_AkcssThicknessTupleKeepsValueReferences()
+    {
+        const string source = """
+            @using Avalonia.Controls;
+
+            @utilities {
+                Border.space-(double size) {
+                    Padding: (
+                        horizontal: size * 2,
+                        vertical: size
+                    );
+                }
+            }
+            """;
+
+        using var workspace =
+            CreateSemanticWorkspace();
+
+        var text =
+            SourceText.From(source);
+        var context =
+            workspace.OpenOrChangeDocumentContext(
+                new Uri(
+                    Path.GetFullPath(
+                        "Styles.akcss")),
+                text);
+
+        var classifications =
+            workspace.LanguageServices
+                .Classification
+                .GetClassifications(
+                    context,
+                    new TextSpan(
+                        0,
+                        text.Length));
+
+        var firstUse =
+            source.IndexOf(
+                "size *",
+                StringComparison.Ordinal);
+        var secondUse =
+            source.LastIndexOf(
+                "size",
+                StringComparison.Ordinal);
+
+        Assert.Contains(
+            classifications,
+            classification =>
+                classification.Span ==
+                    new TextSpan(
+                        firstUse,
+                        "size".Length) &&
+                classification.Kind ==
+                    AkburaClassificationKind.ParameterName);
+
+        Assert.Contains(
+            classifications,
+            classification =>
+                classification.Span ==
+                    new TextSpan(
+                        secondUse,
+                        "size".Length) &&
+                classification.Kind ==
+                    AkburaClassificationKind.ParameterName);
+    }
     [Fact]
     public void SemanticClassification_AkcssEditClassifiesWholeSelectorTarget()
     {
@@ -987,11 +1150,23 @@ public sealed class WorkspaceClassificationTests
                 }
             }
 
+            namespace Avalonia
+            {
+                public readonly struct Thickness
+                {
+                }
+            }
+
             namespace Avalonia.Controls
             {
                 public class Control
                 {
                     public double Width { get; set; }
+                }
+
+                public sealed class Border : Control
+                {
+                    public Avalonia.Thickness Padding { get; set; }
                 }
 
                 public sealed class Button : Control

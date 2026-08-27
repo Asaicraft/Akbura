@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
-namespace Akbura.Workspaces;
+namespace Akbura.Workspaces.CodeActions;
 
 public sealed class AkburaCodeAction
 {

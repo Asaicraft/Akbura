@@ -1490,6 +1490,21 @@ internal sealed partial class Parser
 
                 var kind = PeekIncrementalTokenKind();
 
+                if (parenDepth == 0 &&
+                    bracketDepth == 0 &&
+                    braceDepth == 0 &&
+                    tokens.Count > 0 &&
+                    IsAtIncrementalTopLevelMemberAfterNewLine() &&
+                    IsCompleteCSharpExpressionStatement(tokens))
+                {
+                    tokens.Add(ReadRequiredIncrementalToken(
+                        SyntaxKind.SemicolonToken));
+
+                    return GreenSyntaxFactory.CSharpStatementSyntax(
+                        tokens.ToList(),
+                        body: null);
+                }
+
                 if (kind == SyntaxKind.CloseBraceToken && braceDepth == 0)
                 {
                     break;
@@ -1542,6 +1557,34 @@ internal sealed partial class Parser
             _mode = mode;
             _pool.Free(tokens);
         }
+    }
+
+    private bool IsAtIncrementalTopLevelMemberAfterNewLine()
+    {
+        if (_prevTokenTrailingTrivia is null ||
+            !new GreenSyntaxList<GreenNode>(_prevTokenTrailingTrivia)
+                .Any((int)SyntaxKind.EndOfLineTrivia))
+        {
+            return false;
+        }
+
+        return PeekIncrementalTokenKind() switch
+        {
+            SyntaxKind.StateKeyword or
+            SyntaxKind.ParamKeyword or
+            SyntaxKind.InjectKeyword or
+            SyntaxKind.CommandKeyword or
+            SyntaxKind.UsingKeyword or
+            SyntaxKind.NamespaceKeyword or
+            SyntaxKind.LessThanToken => true,
+            SyntaxKind.GlobalKeyword =>
+                PeekIncrementalTokenKind(1) ==
+                    SyntaxKind.UsingKeyword,
+            SyntaxKind.AtToken =>
+                PeekIncrementalTokenKind(1) ==
+                    SyntaxKind.AkcssKeyword,
+            _ => false,
+        };
     }
 
     private bool TryParseIncrementalCSharpBlockSyntax(out GreenCSharpBlockSyntax block)
@@ -1882,18 +1925,38 @@ internal sealed partial class Parser
         {
             return parameters;
         }
+        if (PeekIncrementalTokenKind() != SyntaxKind.OpenParenToken)
+        {
+            return CreateMissingCSharpParameterList();
+        }
 
         var mode = _mode;
+        if (_currentToken != null)
+        {
+            ReturnToken();
+            _tokenOffset++;
+        }
+
         _mode = Lexer.LexerMode.InCSharpParameterList;
 
         var token = EatToken();
 
         _mode = mode;
 
-        AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+        var rawToken =
+            token as GreenSyntaxToken.CSharpRawToken;
+
+        if (rawToken == null)
+        {
+            var text = token.ToFullString();
+            rawToken = GreenSyntaxFactory.CSharpRawToken(
+                text,
+                CSharpFactory.ParseParameterList(text));
+        }
+
         return GreenSyntaxFactory.CSharpParameterListSyntax(
             EnsureCSharpRawToken(
-                (GreenSyntaxToken.CSharpRawToken)token,
+                rawToken,
                 text => CSharpFactory.ParseParameterList(text)));
     }
 
@@ -1911,8 +1974,10 @@ internal sealed partial class Parser
             return initializer;
         }
 
-        if (TryReadIncrementalToken(IsStateBindingKeyword, out var bindingKeyword))
+        if (IsStateBindingKeyword(
+                PeekIncrementalTokenKind()))
         {
+            var bindingKeyword = ReadIncrementalToken();
             var expression = ParseIncrementalCSharpExpressionUntilSemicolon();
             return GreenSyntaxFactory.BindableStateInitializerSyntax(bindingKeyword, expression);
         }
@@ -1946,9 +2011,16 @@ internal sealed partial class Parser
 
             if (token.Kind != SyntaxKind.CSharpRawToken)
             {
+                var text = token.ToFullString();
+
                 return GreenSyntaxFactory.CSharpExpressionSyntax(
                     GreenSyntaxFactory.CSharpRawToken(
-                        token.ToFullString()));
+                        text,
+                        CSharpFactory.ParseExpression(
+                            text,
+                            offset: 0,
+                            options: null,
+                            consumeFullText: true)));
             }
 
             return GreenSyntaxFactory.CSharpExpressionSyntax(

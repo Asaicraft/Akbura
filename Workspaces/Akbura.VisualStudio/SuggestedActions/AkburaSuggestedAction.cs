@@ -146,6 +146,7 @@ internal sealed class AkburaSuggestedAction : ISuggestedAction
                 currentText,
                 syntacticDocument.SyntaxTree,
                 freshAction.NamespaceName,
+                currentDiagnosticSpan.Start.Position,
                 out var currentChange))
         {
             return;

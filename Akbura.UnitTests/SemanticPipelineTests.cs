@@ -434,6 +434,36 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_MissingUsingSemicolon_PreservesFollowingStateReferences()
+    {
+        const string code =
+            "using Avalonia.Controls\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Content={count}/>";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code, "Counter.akbura");
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var state = Assert.Single(root.Members.OfType<StateDeclarationSyntax>());
+        var button = GetOnlyMarkupElement(syntaxTree);
+        var contentAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(button.StartTag!.Attributes));
+
+        var stateSymbol = Assert.IsAssignableFrom<IStateSymbol>(
+            semanticModel.GetDeclaredSymbol(state));
+        var countReference = Assert.Single(
+            semanticModel.GetCSharpSymbolReferences(contentAttribute),
+            static reference => reference.Name == "count");
+
+        Assert.Equal("count", stateSymbol.Name);
+        Assert.Same(stateSymbol, countReference.AkburaSymbol);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(contentAttribute),
+            static diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
     public void SemanticModel_ComponentPartialClassWithoutBase_InheritsAkburaControlAndBindsPrivateMembers()
     {
         const string code =
@@ -934,7 +964,7 @@ public class SemanticPipelineTests
         const string code =
             "using System.Collections.Generic;\n" +
             "\n" +
-            "<List{MyObject}><MyObject/><MyObject/></List>";
+            "<List{MyObject}><MyObject/><MyObject/></List{MyObject}>";
 
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(
@@ -942,7 +972,15 @@ public class SemanticPipelineTests
             CreateCSharpCompilation("public class MyObject { }"));
         var element = GetOnlyMarkupElement(syntaxTree);
 
-        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var symbolInfo = semanticModel.GetSymbolInfo(element);
+        Assert.True(
+            symbolInfo.Symbol is MarkupComponentSymbol,
+            "CandidateReason: " + symbolInfo.CandidateReason + Environment.NewLine +
+            string.Join(
+                Environment.NewLine,
+                semanticModel.GetSemanticDiagnostics(element).Select(static diagnostic =>
+                    diagnostic.Code + ": " + diagnostic.Message)));
+        var symbol = (MarkupComponentSymbol)symbolInfo.Symbol!;
 
         Assert.True(semanticModel.GetSemanticDiagnostics(element).IsEmpty);
         Assert.True(symbol.ContentModel.IsCollection);
@@ -962,7 +1000,7 @@ public class SemanticPipelineTests
         const string code =
             "using System.Collections.Generic;\n" +
             "\n" +
-            "<List{MyObject}><OtherObject/></List>";
+            "<List{MyObject}><OtherObject/></List{MyObject}>";
 
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(
@@ -972,7 +1010,15 @@ public class SemanticPipelineTests
                 "public class OtherObject { }"));
         var element = GetOnlyMarkupElement(syntaxTree);
 
-        var symbol = Assert.IsType<MarkupComponentSymbol>(semanticModel.GetSymbolInfo(element).Symbol);
+        var symbolInfo = semanticModel.GetSymbolInfo(element);
+        Assert.True(
+            symbolInfo.Symbol is MarkupComponentSymbol,
+            "CandidateReason: " + symbolInfo.CandidateReason + Environment.NewLine +
+            string.Join(
+                Environment.NewLine,
+                semanticModel.GetSemanticDiagnostics(element).Select(static diagnostic =>
+                    diagnostic.Code + ": " + diagnostic.Message)));
+        var symbol = (MarkupComponentSymbol)symbolInfo.Symbol!;
         var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(element));
 
         Assert.Equal("MyObject", symbol.ContentModel.AllowedChildType.Name);
@@ -1719,6 +1765,8 @@ public class SemanticPipelineTests
     {
         const string code =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    .hello {\n" +
             "        Background: \"Red\";\n" +
             "    }\n" +
@@ -1731,8 +1779,9 @@ public class SemanticPipelineTests
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
-        var globalRule = Assert.IsType<AkcssStyleRuleSyntax>(inlineAkcss.Members[0]);
-        var buttonRule = Assert.IsType<AkcssStyleRuleSyntax>(inlineAkcss.Members[1]);
+        var rules = inlineAkcss.Members.OfType<AkcssStyleRuleSyntax>().ToArray();
+        var globalRule = rules[0];
+        var buttonRule = rules[1];
 
         var globalSymbolInfo = semanticModel.GetSymbolInfo(globalRule);
         var globalSymbol = Assert.IsType<AkcssStyleSymbol>(globalSymbolInfo.Symbol);
@@ -1839,6 +1888,8 @@ public class SemanticPipelineTests
     {
         const string code =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    @utilities {\n" +
             "        .w-(double value) {\n" +
             "            Width: value;\n" +
@@ -1853,7 +1904,7 @@ public class SemanticPipelineTests
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var inlineAkcss = Assert.IsType<InlineAkcssBlockSyntax>(syntaxTree.GetRoot().Members.Single());
-        var utilities = Assert.IsType<AkcssUtilitiesSectionSyntax>(Assert.Single(inlineAkcss.Members));
+        var utilities = Assert.Single(inlineAkcss.Members.OfType<AkcssUtilitiesSectionSyntax>());
 
         var widthUtilityInfo = semanticModel.GetSymbolInfo(utilities.Utilities[0]);
         var widthUtility = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(widthUtilityInfo.Symbol);
@@ -1922,6 +1973,8 @@ public class SemanticPipelineTests
     {
         const string code =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    Button.hello {\n" +
             "        Background: White;\n" +
             "    }\n" +
@@ -2206,6 +2259,8 @@ public class SemanticPipelineTests
     {
         const string code =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    @utilities {\n" +
             "        Control.self-start {\n" +
             "            HorizontalAlignment: Left;\n" +
@@ -2605,6 +2660,8 @@ public class SemanticPipelineTests
         const string code =
             """
             @akcss {
+                @using Avalonia.Controls;
+
                 TextBlock.hello {
                     FontWeight: Bold;
                 }
@@ -2628,6 +2685,8 @@ public class SemanticPipelineTests
         const string code =
             """
             @akcss {
+                @using Avalonia.Controls;
+
                 TextBlock.hello {
                     FontWeight: FontWeight.Bold;
                     FontWeight: (FontWeight)700;
@@ -2659,6 +2718,8 @@ public class SemanticPipelineTests
         const string code =
             """
             @akcss {
+                @using Avalonia.Controls;
+
                 Button.hello {
                     HorizontalAlignment: Center;
                     HorizontalAlignment: HorizontalAlignment.Right;
@@ -2936,6 +2997,8 @@ public class SemanticPipelineTests
     {
         const string code =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    Button.hello {\n" +
             "        Padding: (10, 20);\n" +
             "        Margin: (10, 20, 30, 40);\n" +
@@ -2993,6 +3056,8 @@ public class SemanticPipelineTests
     {
         const string code =
             "@akcss {\n" +
+            "    @using Avalonia.Controls;\n" +
+            "\n" +
             "    Button.hello {\n" +
             "        Margin: new Thickness(10, 5) - new Thickness(3, 17);\n" +
             "    }\n" +
@@ -6857,6 +6922,8 @@ public class SemanticPipelineTests
             """;
         const string akcss =
             """
+            @using Avalonia.Controls;
+
             .awesomeBg {
                 Background: White;
             }

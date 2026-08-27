@@ -191,8 +191,62 @@ public sealed class WorkspaceSyntacticDocumentTests
     }
 
     [Theory]
+    [InlineData("param |", "")]
+    [InlineData("param b|", "b")]
+    [InlineData("param ou|", "ou")]
+    [InlineData("param bind|", "bind")]
+    public void SyntacticDocument_DetectsParamModifierCompletion(
+        string sourceWithCaret,
+        string expectedPrefix)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(
+            AkburaCompletionContextKind.DeclarationModifier,
+            context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+        Assert.Equal(
+            expectedPrefix,
+            document.Text.ToString(context.ApplicableSpan));
+    }
+
+    [Theory]
+    [InlineData("state |")]
+    [InlineData("param |")]
+    [InlineData("param bind |")]
+    [InlineData("param out |")]
+    [InlineData("inject |")]
+    [InlineData("command |")]
+    public void SyntacticDocument_DoesNotTreatDeclarationTypeAsTopLevel(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.NotEqual(
+            AkburaCompletionContextKind.TopLevel,
+            document.GetCompletionContext(position).Kind);
+        Assert.True(document.TryGetCSharpCompletionContext(
+            position,
+            out var csharpContext));
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.Type,
+            csharpContext.Kind);
+    }
+
+    [Theory]
     [InlineData("<Button>st|</Button>")]
     [InlineData("var st| = 0;")]
+    [InlineData("var text = \"st|\";")]
     [InlineData("void Update()\n{\n    st|\n}")]
     [InlineData("// st|")]
     [InlineData("/* st| */")]
@@ -341,6 +395,30 @@ public sealed class WorkspaceSyntacticDocumentTests
 
     [Theory]
     [InlineData(
+        "state |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "param |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "param bind |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "inject |",
+        AkburaCSharpCompletionContextKind.Type,
+        "")]
+    [InlineData(
+        "param ObservableCollec|",
+        AkburaCSharpCompletionContextKind.Type,
+        "ObservableCollec")]
+    [InlineData(
+        "inject IUserSer|",
+        AkburaCSharpCompletionContextKind.Type,
+        "IUserSer")]
+    [InlineData(
         "state int maximum = Math.M|;",
         AkburaCSharpCompletionContextKind.Expression,
         "Math.M")]
@@ -444,6 +522,8 @@ public sealed class WorkspaceSyntacticDocumentTests
 
     [Theory]
     [InlineData("state co|unt = 0;")]
+    [InlineData("param Ti|tle = \"\";")]
+    [InlineData("param Ti|tle;")]
     [InlineData("<Button Text=\"DateTime.No|\"/>")]
     [InlineData("<Button Content=${Binding Path=Us|}/>")]
     [InlineData("<But|")]
@@ -805,6 +885,16 @@ public sealed class WorkspaceSyntacticDocumentTests
 
     [Theory]
     [InlineData(
+        ".|",
+        AkcssCompletionContextKind.SelectorSnippet,
+        ".",
+        "")]
+    [InlineData(
+        ".cl|",
+        AkcssCompletionContextKind.SelectorSnippet,
+        ".cl",
+        "")]
+    [InlineData(
         "@u|",
         AkcssCompletionContextKind.TopLevel,
         "@u",
@@ -885,8 +975,80 @@ public sealed class WorkspaceSyntacticDocumentTests
         Assert.Equal(
             expectedPrefix,
             document.Text.ToString(context.ApplicableSpan));
+
+        const string inlinePrefix = "@akcss {\n";
+        var inlineSourceWithCaret =
+            inlinePrefix +
+            sourceWithCaret +
+            "\n}\n\n<Border/>";
+        var inlinePosition = inlineSourceWithCaret.IndexOf('|');
+        var inlineSource = inlineSourceWithCaret.Remove(
+            inlinePosition,
+            1);
+        var inlineDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(inlineSource),
+            "Component.akbura");
+        var inlineContext = inlineDocument
+            .GetAkcssCompletionContext(inlinePosition);
+
+        Assert.Equal(expectedKind, inlineContext.Kind);
+        Assert.Equal(expectedPrefix, inlineContext.Prefix);
+        Assert.Equal(expectedQualifier, inlineContext.Qualifier);
+        Assert.Equal(
+            expectedPrefix,
+            inlineDocument.Text.ToString(
+                inlineContext.ApplicableSpan));
     }
 
+    [Fact]
+    public void UsingEditService_InsertsInlineImportBeforeAkcssModules()
+    {
+        const string source =
+            "@akcss {\r\n" +
+            "    @using Imported.akcss;\r\n" +
+            "\r\n" +
+            "    Control.card { }\r\n" +
+            "}\r\n" +
+            "\r\n" +
+            "<Border/>\r\n";
+        var position = source.IndexOf(
+            "Control",
+            StringComparison.Ordinal);
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Component.akbura");
+
+        Assert.True(
+            AkburaUsingEditService.TryCreateNamespaceImportChange(
+                text,
+                document.SyntaxTree,
+                "Avalonia.Media",
+                position,
+                out var change));
+
+        var changedText = text
+            .WithChanges(change)
+            .ToString();
+        var inlineBlockIndex = changedText.IndexOf(
+            "@akcss {",
+            StringComparison.Ordinal);
+        var namespaceImportIndex = changedText.IndexOf(
+            "    @using Avalonia.Media;",
+            StringComparison.Ordinal);
+        var moduleImportIndex = changedText.IndexOf(
+            "    @using Imported.akcss;",
+            StringComparison.Ordinal);
+        Assert.True(
+            inlineBlockIndex >= 0 &&
+            namespaceImportIndex > inlineBlockIndex &&
+            moduleImportIndex > namespaceImportIndex,
+            changedText);
+        Assert.DoesNotContain(
+            "\r\nusing Avalonia.Media;",
+            changedText,
+            StringComparison.Ordinal);
+    }
     [Fact]
     public void SyntacticDocument_DoesNotOfferAkcssCompletionInsideComment()
     {
@@ -900,5 +1062,22 @@ public sealed class WorkspaceSyntacticDocumentTests
 
         Assert.True(
             document.GetAkcssCompletionContext(position).IsDefault);
+
+        const string inlinePrefix = "@akcss {\n";
+        var inlineSourceWithCaret =
+            inlinePrefix +
+            sourceWithCaret +
+            "\n}\n\n<Border/>";
+        var inlinePosition = inlineSourceWithCaret.IndexOf('|');
+        var inlineSource = inlineSourceWithCaret.Remove(
+            inlinePosition,
+            1);
+        var inlineDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(inlineSource),
+            "Component.akbura");
+
+        Assert.True(
+            inlineDocument.GetAkcssCompletionContext(
+                inlinePosition).IsDefault);
     }
 }

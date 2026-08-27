@@ -70,6 +70,102 @@ internal static class AkburaMarkupEditingFacts
         return true;
     }
 
+    public static bool IsCommandParameterListStartPosition(
+        ITextSnapshot snapshot,
+        int position)
+    {
+        if (position <= 0 ||
+            position > snapshot.Length ||
+            snapshot[position - 1] != '(')
+        {
+            return false;
+        }
+
+        var openParen = position - 1;
+        var lineStart = openParen;
+        while (lineStart > 0 &&
+               snapshot[lineStart - 1] is not '\r' and not '\n')
+        {
+            lineStart--;
+        }
+
+        var index = SkipWhitespace(snapshot, lineStart, openParen);
+        if (!MatchesKeyword(snapshot, index, openParen, "command"))
+        {
+            return false;
+        }
+
+        index += "command".Length;
+        if (index >= openParen ||
+            !char.IsWhiteSpace(snapshot[index]))
+        {
+            return false;
+        }
+
+        index = SkipWhitespace(snapshot, index, openParen);
+        var typeStart = index;
+        var angleDepth = 0;
+        var bracketDepth = 0;
+        var tupleDepth = 0;
+        while (index < openParen)
+        {
+            var character = snapshot[index];
+            if (char.IsWhiteSpace(character) &&
+                angleDepth == 0 &&
+                bracketDepth == 0 &&
+                tupleDepth == 0)
+            {
+                break;
+            }
+
+            switch (character)
+            {
+                case '<':
+                    angleDepth++;
+                    break;
+                case '>' when angleDepth > 0:
+                    angleDepth--;
+                    break;
+                case '[':
+                    bracketDepth++;
+                    break;
+                case ']' when bracketDepth > 0:
+                    bracketDepth--;
+                    break;
+                case '(':
+                    tupleDepth++;
+                    break;
+                case ')' when tupleDepth > 0:
+                    tupleDepth--;
+                    break;
+            }
+
+            index++;
+        }
+
+        if (index == typeStart)
+        {
+            return false;
+        }
+
+        index = SkipWhitespace(snapshot, index, openParen);
+        var nameStart = index;
+        while (index < openParen &&
+               (char.IsLetterOrDigit(snapshot[index]) ||
+                snapshot[index] == '_'))
+        {
+            index++;
+        }
+
+        if (index == nameStart)
+        {
+            return false;
+        }
+
+        index = SkipWhitespace(snapshot, index, openParen);
+        return index == openParen;
+    }
+
     private static int SkipWhitespace(
         ITextSnapshot snapshot,
         int start,

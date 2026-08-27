@@ -431,6 +431,168 @@ public sealed class WorkspaceCodeActionTests
             context.Document.Text.WithChanges(action.Changes).ToString());
     }
 
+    [Fact]
+    public void CodeAction_UnimportedUtilityOffersAkcssImport()
+    {
+        const string styles = """
+            @utilities {
+                .space-(double value) {
+                    Width: value;
+                }
+            }
+            """;
+        const string source =
+            "using Avalonia.Controls;\n\n" +
+            "<Button space-4/>\n";
+        using var workspace = CreateWorkspace();
+        workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Styles.akcss")),
+            SourceText.From(styles));
+        var context = Open(workspace, source);
+
+        var action = Assert.Single(GetActions(
+            workspace,
+            context,
+            source,
+            "space-4"));
+
+        Assert.Equal(
+            AkburaCodeActionKind.AddAkcssImport,
+            action.Kind);
+        Assert.Equal("Styles.akcss", action.NamespaceName);
+        Assert.Equal(
+            "using Avalonia.Controls;\n" +
+            "using Styles.akcss;\n\n" +
+            "<Button space-4/>\n",
+            context.Document.Text
+                .WithChanges(action.Changes)
+                .ToString());
+    }
+
+    [Fact]
+    public void CodeAction_AppliedAkcssImportResolvesUtility()
+    {
+        const string styles = """
+            @utilities {
+                .space-(double value) {
+                    Width: value;
+                }
+            }
+            """;
+        const string source =
+            "using Avalonia.Controls;\n\n" +
+            "<Button space-4/>\n";
+        using var workspace = CreateWorkspace();
+        workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Styles.akcss")),
+            SourceText.From(styles));
+        var context = Open(workspace, source);
+        var action = Assert.Single(GetActions(
+            workspace,
+            context,
+            source,
+            "space-4"));
+        var changedText = context.Document.Text.WithChanges(
+            action.Changes);
+        var changedContext = workspace.OpenOrChangeDocumentContext(
+            context.Document.Uri,
+            changedText);
+
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetDiagnostics(
+                changedContext,
+                new TextSpan(0, changedText.Length));
+
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_TailwindUtilityNotFound);
+    }
+
+    [Fact]
+    public void CodeAction_DoesNotOfferAkcssUtilityForIncompatibleTarget()
+    {
+        const string styles = """
+            using Avalonia.Controls;
+
+            @utilities {
+                Button.button-only {
+                    Width: 10;
+                }
+            }
+            """;
+        const string source =
+            "using Avalonia.Controls;\n\n" +
+            "<Control button-only/>\n";
+        using var workspace = CreateWorkspace();
+        workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Styles.akcss")),
+            SourceText.From(styles));
+        var context = Open(workspace, source);
+
+        Assert.Empty(GetActions(
+            workspace,
+            context,
+            source,
+            "button-only"));
+    }
+    [Fact]
+    public void CodeAction_UnresolvedApplyOffersAkcssImport()
+    {
+        const string sharedStyles = """
+            .surface {
+                Opacity: 1;
+            }
+            """;
+        const string consumerStyles = """
+            @using Avalonia.Controls;
+
+            Button.card {
+                @apply surface;
+            }
+            """;
+        using var workspace = CreateWorkspace();
+        workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Shared.akcss")),
+            SourceText.From(sharedStyles));
+        var consumerUri =
+            new Uri(Path.GetFullPath("Consumer.akcss"));
+        var context = workspace.OpenOrChangeDocumentContext(
+            consumerUri,
+            SourceText.From(consumerStyles));
+        var itemStart = consumerStyles.IndexOf(
+            "surface",
+            StringComparison.Ordinal);
+
+        var action = Assert.Single(
+            workspace.LanguageServices.CodeActions.GetCodeActions(
+                context,
+                new TextSpan(itemStart, "surface".Length)));
+
+        Assert.Equal(
+            AkburaCodeActionKind.AddAkcssImport,
+            action.Kind);
+        Assert.Equal("Shared.akcss", action.NamespaceName);
+        var changedText = context.Document.Text.WithChanges(
+            action.Changes);
+        Assert.Contains(
+            "@using Shared.akcss;",
+            changedText.ToString(),
+            StringComparison.Ordinal);
+
+        var changedContext = workspace.OpenOrChangeDocumentContext(
+            consumerUri,
+            changedText);
+        var diagnostics = workspace.LanguageServices.Diagnostics
+            .GetDiagnostics(
+                changedContext,
+                new TextSpan(0, changedText.Length));
+
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_AkcssApplyItemNotFound);
+    }
     private static ImmutableArray<AkburaCodeAction> GetActions(
         AkburaWorkspace workspace,
         AkburaDocumentContext context,

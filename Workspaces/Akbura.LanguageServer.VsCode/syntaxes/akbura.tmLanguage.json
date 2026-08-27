@@ -1,0 +1,212 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Akbura",
+  "scopeName": "source.akbura",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#rawStrings"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#markup"
+    },
+    {
+      "include": "#akcss"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.akbura",
+          "begin": "//",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.akbura",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "rawStrings": {
+      "patterns": [
+        {
+          "name": "string.quoted.other.raw.akbura",
+          "begin": "(\\$*)(\"{3,})",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.interpolated.akbura"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.akbura"
+            }
+          },
+          "end": "\\2",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.akbura"
+            }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.akbura",
+          "begin": "(?:\\$@|@\\$|\\$|@)?\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.akbura"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.akbura"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.akbura"
+            },
+            {
+              "match": "\\{+|\\}+",
+              "name": "punctuation.section.embedded.akbura"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.akbura",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.akbura"
+            }
+          ]
+        }
+      ]
+    },
+    "markup": {
+      "patterns": [
+        {
+          "name": "meta.tag.akbura",
+          "begin": "(<\\/?)([A-Za-z_][A-Za-z0-9_.]*(?:\\{[^}\\r\\n]+\\})?)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.tag.begin.akbura"
+            },
+            "2": {
+              "name": "entity.name.tag.akbura"
+            }
+          },
+          "end": "(/?>)",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.tag.end.akbura"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\b(?:bind|in|out):(?=[A-Za-z_])",
+              "name": "storage.modifier.akbura"
+            },
+            {
+              "match": "\\b(?:[A-Za-z_][A-Za-z0-9_]*:)?[A-Za-z_][A-Za-z0-9_.-]*(?=\\s*=)",
+              "name": "entity.other.attribute-name.akbura"
+            },
+            {
+              "include": "#rawStrings"
+            },
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#numbers"
+            }
+          ]
+        }
+      ]
+    },
+    "akcss": {
+      "patterns": [
+        {
+          "match": "(?<![A-Za-z0-9_])\\.[A-Za-z_][A-Za-z0-9_-]*",
+          "name": "entity.other.attribute-name.class.akbura"
+        },
+        {
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?(?=\\s*:)",
+          "name": "variable.other.property.akbura"
+        },
+        {
+          "match": "\\b(?:left|top|right|bottom|horizontal|vertical)(?=\\s*:)",
+          "name": "variable.other.label.akbura"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "match": "@[A-Za-z_][A-Za-z0-9_]*",
+          "name": "keyword.control.directive.akbura"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\b(?:using|namespace|state|param|inject|command|async|await|return|if|else|for|foreach|while|new|true|false|null|void|var|int|uint|long|ulong|short|ushort|byte|sbyte|float|double|decimal|string|char|bool|object|typeof|default|this|base)\\b",
+          "name": "keyword.control.akbura"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b(?:0[xX][0-9A-Fa-f_]+|0[bB][01_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?[fFdDmMuUlL]*)\\b",
+          "name": "constant.numeric.akbura"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "=>|==|!=|<=|>=|&&|\\|\\||\\?\\?|\\+\\+|--|[+\\-*/%=&|!<>?:]",
+          "name": "keyword.operator.akbura"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": "[{}()\\[\\],.;]",
+          "name": "punctuation.separator.akbura"
+        }
+      ]
+    }
+  }
+}

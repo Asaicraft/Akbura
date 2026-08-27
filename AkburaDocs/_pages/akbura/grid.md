@@ -170,10 +170,3 @@ This Grid contains:
   * an automatically sized row;
   * a row filling the remaining space;
   * a fixed row with a height of `48`.
-
-
-Для файла хорошо подойдёт путь:
-
-```text
-AkburaDocs/_pages/akbura/grid.md
-````

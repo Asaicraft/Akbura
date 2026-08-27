@@ -118,6 +118,48 @@ public sealed class WorkspaceDefinitionTests
     }
 
     [Fact]
+    public void Definition_ProjectedStateUsesHostWhenGeneratedMemberExists()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <Button Content={count}/>
+            """;
+
+        AssertProjectedStateDefinition(source, "count");
+    }
+
+    [Fact]
+    public void Definition_ProjectedStateInsideInterpolatedStringUsesHost()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <Button Content={$"Increment count to {count+1}"}/>
+            """;
+
+        AssertProjectedStateDefinition(source, "count+1");
+    }
+
+    [Fact]
+    public void Definition_ProjectedStateInsideClickExpressionUsesHost()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            state int count = 0;
+
+            <Button Click={count++}/>
+            """;
+
+        AssertProjectedStateDefinition(source, "count++");
+    }
+
+    [Fact]
     public void Definition_ProjectedAkcssUtilityParameterUsesHostDeclaration()
     {
         const string source = """
@@ -1232,6 +1274,65 @@ public sealed class WorkspaceDefinitionTests
                         componentSource.IndexOf(
                             "border-slate-800",
                             StringComparison.Ordinal)));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static void AssertProjectedStateDefinition(
+        string source,
+        string referenceMarker)
+    {
+        const string componentTypes = """
+            public partial class Counter : Akbura.AkburaControl
+            {
+                private int count;
+            }
+            """;
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceDefinitionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var libraryReference = CreateLibraryReference(
+                directory,
+                "@utilities { }");
+            var compilation = CreateApplicationCompilation(
+                libraryReference,
+                componentTypes);
+            using var workspace = new AkburaWorkspace(
+                new ProjectContext(
+                    ProjectId.CreateNewId(),
+                    projectFilePath: string.Empty,
+                    projectDirectory: directory,
+                    rootNamespace: string.Empty,
+                    compilation,
+                    ImmutableArray<ProjectReference>.Empty));
+            var filePath = Path.Combine(directory, "Counter.akbura");
+            File.WriteAllText(filePath, source);
+            var context = workspace.OpenOrChangeDocumentContext(
+                new Uri(filePath),
+                SourceText.From(source));
+            var referencePosition = source.LastIndexOf(
+                referenceMarker,
+                StringComparison.Ordinal);
+            Assert.True(
+                referencePosition >= 0,
+                $"Reference marker '{referenceMarker}' was not found.");
+
+            var definition = workspace.LanguageServices.Definition
+                .GetDefinition(context, referencePosition);
+
+            Assert.NotNull(definition);
+            Assert.Equal(
+                Path.GetFullPath(filePath),
+                definition!.TargetFilePath);
+            Assert.Equal("count", GetTargetText(definition));
         }
         finally
         {

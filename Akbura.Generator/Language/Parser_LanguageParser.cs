@@ -356,7 +356,7 @@ partial class Parser
     private GreenAkcssStyleRuleSyntax ParseAkcssStyleRuleSyntaxCore()
     {
         var selector = ParseAkcssStyleSelectorSyntax();
-        var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+        var openBrace = EatAkcssOpenBraceToken();
         var members = ParseAkcssBodyMemberList();
         var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
 
@@ -416,7 +416,7 @@ partial class Parser
     private GreenAkcssUtilityDeclarationSyntax ParseAkcssUtilityDeclarationSyntax()
     {
         var selector = ParseAkcssUtilitySelectorSyntax();
-        var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+        var openBrace = EatAkcssOpenBraceToken();
         var members = ParseAkcssBodyMemberList();
         var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
 
@@ -464,6 +464,26 @@ partial class Parser
             type,
             paramName,
             closeParen);
+    }
+
+    private GreenSyntaxToken EatAkcssOpenBraceToken()
+    {
+        if (CurrentToken.Kind != SyntaxKind.DoubleDotToken)
+        {
+            return EatToken(SyntaxKind.OpenBraceToken);
+        }
+
+        var current = CurrentToken;
+        var missing = GreenSyntaxFactory.MissingToken(
+            SyntaxKind.OpenBraceToken);
+
+        return WithAdditionalDiagnostics(
+            missing,
+            GetExpectedTokenError(
+                SyntaxKind.OpenBraceToken,
+                current.Kind,
+                current.GetLeadingTriviaWidth(),
+                current.Width));
     }
 
     private GreenSyntaxList<GreenAkcssBodyMemberSyntax> ParseAkcssBodyMemberList()
@@ -866,7 +886,8 @@ partial class Parser
         var staticKeyword = TryEatToken(SyntaxKind.StaticKeyword);
         var unsafeKeyword = TryEatToken(SyntaxKind.UnsafeKeyword);
         var alias = TryParseUsingAliasSyntax();
-        var name = ParseRequiredCSharpTypeSyntax();
+        var name = ParseRequiredCSharpTypeSyntax(
+            stopAtTopLevelMemberAfterNewLine: true);
         var semicolon = EatToken(SyntaxKind.SemicolonToken);
 
         return GreenSyntaxFactory.UsingDirectiveSyntax(
@@ -902,17 +923,46 @@ partial class Parser
         return GreenSyntaxFactory.NamespaceDeclarationSyntax(namespaceKeyword, name, semicolon);
     }
 
-    private GreenCSharpTypeSyntax ParseRequiredCSharpTypeSyntax()
+    private GreenCSharpTypeSyntax ParseRequiredCSharpTypeSyntax(
+        bool stopAtTopLevelMemberAfterNewLine = false)
     {
         var rawText = new StringBuilder();
 
-        while (CurrentToken.Kind is not (SyntaxKind.SemicolonToken or SyntaxKind.EndOfFileToken))
+        while (CurrentToken.Kind is not (SyntaxKind.SemicolonToken or SyntaxKind.EndOfFileToken) &&
+               (!stopAtTopLevelMemberAfterNewLine ||
+                !IsAtTopLevelMemberAfterNewLine()))
         {
             rawText.Append(EatToken().ToFullString());
         }
 
         return GreenSyntaxFactory.CSharpTypeSyntax(
             GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText.ToString())));
+    }
+
+    private bool IsAtTopLevelMemberAfterNewLine()
+    {
+        if (_prevTokenTrailingTrivia is null ||
+            !new GreenSyntaxList<GreenNode>(_prevTokenTrailingTrivia)
+                .Any((int)SyntaxKind.EndOfLineTrivia))
+        {
+            return false;
+        }
+
+        return CurrentToken.Kind switch
+        {
+            SyntaxKind.StateKeyword or
+            SyntaxKind.ParamKeyword or
+            SyntaxKind.InjectKeyword or
+            SyntaxKind.CommandKeyword or
+            SyntaxKind.UsingKeyword or
+            SyntaxKind.NamespaceKeyword or
+            SyntaxKind.LessThanToken => true,
+            SyntaxKind.GlobalKeyword =>
+                PeekToken(1).Kind == SyntaxKind.UsingKeyword,
+            SyntaxKind.AtToken =>
+                PeekToken(1).Kind == SyntaxKind.AkcssKeyword,
+            _ => false
+        };
     }
 
     #endregion
@@ -956,6 +1006,21 @@ partial class Parser
 
                 var kind =
                     CurrentToken.Kind;
+
+                if (parenDepth == 0 &&
+                    bracketDepth == 0 &&
+                    braceDepth == 0 &&
+                    tokens.Count > 0 &&
+                    IsAtTopLevelMemberAfterNewLine() &&
+                    IsCompleteCSharpExpressionStatement(tokens))
+                {
+                    tokens.Add(EatToken(SyntaxKind.SemicolonToken));
+
+                    return GreenSyntaxFactory
+                        .CSharpStatementSyntax(
+                            tokens.ToList(),
+                            body: null);
+                }
 
                 if (kind ==
                         SyntaxKind.CloseBraceToken &&
@@ -1043,6 +1108,25 @@ partial class Parser
         }
     }
 
+    private static bool IsCompleteCSharpExpressionStatement(
+        GreenSyntaxListBuilder<GreenSyntaxToken> tokens)
+    {
+        var text = new StringBuilder();
+
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            text.Append(tokens[index].ToFullString());
+        }
+
+        text.Append(';');
+
+        var statement =
+            CSharpFactory.ParseStatement(text.ToString());
+
+        return statement is
+            CSharp.ExpressionStatementSyntax &&
+            !statement.ContainsDiagnostics;
+    }
 
     private static bool IsCSharpLocalFunctionHeader(
         GreenSyntaxListBuilder<GreenSyntaxToken> tokens)
@@ -2495,9 +2579,15 @@ partial class Parser
 
     private GreenCSharpParameterListSyntax ParseCSharpParameterList()
     {
+        if (CurrentToken.Kind != SyntaxKind.OpenParenToken)
+        {
+            return CreateMissingCSharpParameterList();
+        }
+
         if (_currentToken != null)
         {
             ReturnToken();
+            _tokenOffset++;
         }
 
         var mode = _mode;
@@ -2508,12 +2598,33 @@ partial class Parser
 
         _mode = mode;
 
-        AkburaDebug.Assert(parameters.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
-        AkburaDebug.Assert(((GreenSyntaxToken.CSharpRawToken)parameters).RawNode is CSharp.ParameterListSyntax, "Expected ParameterListSyntax");
+        var rawToken =
+            parameters as GreenSyntaxToken.CSharpRawToken;
 
-        return GreenSyntaxFactory.CSharpParameterListSyntax(parameters);
+        if (rawToken == null)
+        {
+            var text = parameters.ToFullString();
+            rawToken = GreenSyntaxFactory.CSharpRawToken(
+                text,
+                CSharpFactory.ParseParameterList(text));
+        }
+
+        return GreenSyntaxFactory.CSharpParameterListSyntax(
+            EnsureCSharpRawToken(
+                rawToken,
+                text => CSharpFactory.ParseParameterList(text)));
     }
 
+    private static GreenCSharpParameterListSyntax
+        CreateMissingCSharpParameterList()
+    {
+        const string text = "";
+
+        return GreenSyntaxFactory.CSharpParameterListSyntax(
+            GreenSyntaxFactory.CSharpRawToken(
+                text,
+                CSharpFactory.ParseParameterList(text)));
+    }
     #endregion
 
     #region CSharpArgumentListSyntax

@@ -67,6 +67,60 @@ public class UsingAndNamespaceSyntaxParseTests
         Assert.Equal(code, syntax.ToFullString());
     }
 
+    [Theory]
+    [InlineData("state int count = 0;", SyntaxKind.StateDeclarationSyntax)]
+    [InlineData("param int Value;", SyntaxKind.ParamDeclarationSyntax)]
+    [InlineData("inject object Service;", SyntaxKind.InjectDeclarationSyntax)]
+    [InlineData("command void Save();", SyntaxKind.CommandDeclarationSyntax)]
+    [InlineData("using System;", SyntaxKind.UsingDirectiveSyntax)]
+    [InlineData("global using System;", SyntaxKind.UsingDirectiveSyntax)]
+    [InlineData("namespace Demo;", SyntaxKind.NamespaceDeclarationSyntax)]
+    [InlineData("@akcss {}", SyntaxKind.InlineAkcssBlockSyntax)]
+    [InlineData("<Button/>", SyntaxKind.MarkupRootSyntax)]
+    public void CompilationUnit_MissingUsingSemicolon_RecoversAtTopLevelBoundary(
+        string followingMember,
+        SyntaxKind expectedKind)
+    {
+        var code =
+            "using Akbura.Styles.akcss\n" +
+            followingMember;
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseCompilationUnit();
+
+        Assert.Equal(2, syntax.Members.Count);
+        var usingDirective = Assert.IsType<GreenUsingDirectiveSyntax>(syntax.Members[0]);
+        Assert.Equal("Akbura.Styles.akcss", usingDirective.Name.ToFullString().Trim());
+        Assert.True(usingDirective.Semicolon.IsMissing);
+        Assert.Contains(
+            usingDirective.Semicolon.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic?.Code == ErrorCodes.ERR_SemicolonExpected);
+        Assert.Equal(expectedKind, syntax.Members[1]!.Kind);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
+    [Fact]
+    public void CompilationUnit_MissingUsingSemicolon_PreservesStateAndMarkup()
+    {
+        const string code =
+            "using Akbura.Styles.akcss\n" +
+            "state int count = 0;\n" +
+            "\n" +
+            "<Button Content={count}/>";
+        var parser = MakeParser(code);
+
+        var syntax = parser.ParseCompilationUnit();
+
+        Assert.Equal(3, syntax.Members.Count);
+        var usingDirective = Assert.IsType<GreenUsingDirectiveSyntax>(syntax.Members[0]);
+        Assert.True(usingDirective.Semicolon.IsMissing);
+        var state = Assert.IsType<GreenStateDeclarationSyntax>(syntax.Members[1]);
+        Assert.Equal("count", state.Name.Identifier.ValueText);
+        Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[2]);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
     [Fact]
     public void NamespaceDeclaration_ParseSuccessfully()
     {

@@ -219,6 +219,11 @@ internal readonly partial struct Blender
                 return false;
             }
 
+            if (nodeOrToken.Kind == SyntaxKind.EndOfFileToken)
+            {
+                return true;
+            }
+
             var underlyingNode =
                 nodeOrToken.RequiredUnderlyingNode;
 
@@ -249,6 +254,12 @@ internal readonly partial struct Blender
             {
                 return false;
             }
+            if (underlyingNode is GreenCSharpStatementSyntax statement &&
+                statement.Body is null &&
+                lastTerminal.Kind != SyntaxKind.SemicolonToken)
+            {
+                return true;
+            }
 
             if (lastTerminal.Kind ==
                 SyntaxKind.CSharpRawToken)
@@ -269,10 +280,16 @@ internal readonly partial struct Blender
             var insertedCharacter =
                 text[insertedPosition];
 
-            if (insertedCharacter is ' ' or '\t' &&
-                (lastTerminal.Kind == SyntaxKind.IdentifierToken ||
-                 SyntaxFacts.IsReservedKeyword(lastTerminal.Kind) ||
-                 SyntaxFacts.IsContextualKeyword(lastTerminal.Kind)))
+            if (lastTerminal.GetTrailingTriviaWidth() == 0 &&
+                CanCombineWithInsertedCharacter(
+                    lastTerminal.Kind,
+                    insertedCharacter))
+            {
+                return true;
+            }
+
+            if (lastTerminal.GetTrailingTriviaWidth() == 0 &&
+                char.IsWhiteSpace(insertedCharacter))
             {
                 return true;
             }
@@ -312,6 +329,30 @@ internal readonly partial struct Blender
 
             return SyntaxFacts.IsIdentifierPartCharacter(
                 insertedCharacter);
+        }
+
+        private static bool CanCombineWithInsertedCharacter(
+            SyntaxKind tokenKind,
+            char insertedCharacter)
+        {
+            return tokenKind switch
+            {
+                SyntaxKind.SlashToken =>
+                    insertedCharacter == '>',
+                SyntaxKind.DotToken =>
+                    insertedCharacter == '.',
+                SyntaxKind.ColonToken =>
+                    insertedCharacter == ':',
+                SyntaxKind.EqualsToken =>
+                    insertedCharacter is '>' or '=',
+                SyntaxKind.BangToken =>
+                    insertedCharacter == '=',
+                SyntaxKind.LessThanToken =>
+                    insertedCharacter is '/' or '=',
+                SyntaxKind.GreaterThanToken =>
+                    insertedCharacter == '=',
+                _ => false,
+            };
         }
 
         private static bool CanReuse(

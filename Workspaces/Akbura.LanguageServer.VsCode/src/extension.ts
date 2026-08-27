@@ -6,6 +6,8 @@ import { promisify } from 'node:util';
 
 import * as vscode from 'vscode';
 
+import { AkburaTypingController } from './editor/AkburaTypingController.js';
+
 import {
     Executable,
     LanguageClient,
@@ -50,6 +52,34 @@ export async function activate(
     );
 
     context.subscriptions.push(outputChannel);
+
+    const typingController = new AkburaTypingController(
+        () => client,
+        outputChannel
+    );
+
+    context.subscriptions.push(
+        typingController,
+        vscode.commands.registerCommand(
+            'type',
+            argumentsValue =>
+                typingController.type(
+                    argumentsValue
+                )
+        ),
+        vscode.commands.registerCommand(
+            'akbura.typing.backspace',
+            () => typingController.backspace()
+        ),
+        vscode.commands.registerCommand(
+            'akbura.typing.tab',
+            () => typingController.tab()
+        ),
+        vscode.commands.registerCommand(
+            'akbura.typing.return',
+            () => typingController.return()
+        )
+    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(

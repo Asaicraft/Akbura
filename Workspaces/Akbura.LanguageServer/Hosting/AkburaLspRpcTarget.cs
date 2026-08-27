@@ -396,6 +396,18 @@ internal sealed class AkburaLspRpcTarget
             LspMethods.OnTypeFormatting,
             parameters,
             cancellationToken);
+
+    [JsonRpcMethod(
+        LspMethods.Typing,
+        UseSingleObjectParameterDeserialization = true)]
+    public Task<AkburaTypingResponse?> TypingAsync(
+        AkburaTypingParams parameters,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync<AkburaTypingResponse>(
+            LspMethods.Typing,
+            parameters,
+            cancellationToken);
+
     private async Task<TResult?> ExecuteAsync<TResult>(
         string method,
         object? parameters,

@@ -141,6 +141,23 @@
         "title": "Akbura: Clear Explicit Solution or Project"
       }
     ],
+    "keybindings": [
+      {
+        "command": "akbura.typing.backspace",
+        "key": "backspace",
+        "when": "editorTextFocus && !editorReadonly && !inSnippetMode && (editorLangId == akbura || editorLangId == akcss)"
+      },
+      {
+        "command": "akbura.typing.tab",
+        "key": "tab",
+        "when": "editorTextFocus && !editorReadonly && !inSnippetMode && !suggestWidgetVisible && !tabMovesFocus && (editorLangId == akbura || editorLangId == akcss)"
+      },
+      {
+        "command": "akbura.typing.return",
+        "key": "enter",
+        "when": "editorTextFocus && !editorReadonly && !inSnippetMode && !suggestWidgetVisible && (editorLangId == akbura || editorLangId == akcss)"
+      }
+    ],
     "configuration": {
       "title": "Akbura",
       "properties": {
@@ -200,6 +217,34 @@
           "scope": "window",
           "description": "Wait for a managed debugger before starting the LSP transport."
         },
+        "akbura.editor.automaticPairing": {
+          "type": "string",
+          "default": "syntax",
+          "scope": "window",
+          "enum": [
+            "syntax",
+            "basic",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Use Akbura syntax-aware automatic pairing.",
+            "Use only VS Code language-configuration pairs.",
+            "Disable Akbura automatic pairing."
+          ],
+          "description": "Controls automatic pairing for Akbura and AKCSS."
+        },
+        "akbura.editor.autoClosingTags": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Automatically inserts matching markup closing tags."
+        },
+        "akbura.editor.rawStringCompletion": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Completes and grows C# raw string delimiters."
+        },
         "akbura.trace.server": {
           "type": "string",
           "default": "off",
@@ -223,6 +268,7 @@
     "verify-server": "node ./scripts/verify-server.mjs",
     "build:debug": "npm run publish-server:debug && npm run compile",
     "build:release": "npm run publish-server:release && npm run check-types && node ./esbuild.mjs --production",
+    "test:vscode": "npm run build:debug && node ./test/runTest.mjs",
     "vscode:prepublish": "npm run build:release",
     "package:vsix": "npx --yes @vscode/vsce@latest package"
   },
@@ -232,6 +278,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.100.0",
+    "@vscode/test-electron": "^3.1.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.2"
   }

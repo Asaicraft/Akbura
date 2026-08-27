@@ -16,7 +16,33 @@ Visual Studio Code support for `.akbura` and `.akcss` files.
 - references;
 - rename;
 - signature help;
-- document, range, and on-type formatting.
+- document, range, and on-type formatting;
+- syntax-aware pairs, markup closing tags, raw strings, interpolation,
+  paired Backspace, and Tab overtype.
+
+## Automatic pairing
+
+Akbura asks the language server whether a delimiter is structural before it
+creates a pair. This keeps markup, embedded C#, standalone AKCSS, and inline
+`@akcss` behavior consistent, including syntax-only workspaces that do not have
+a loaded project yet.
+
+Use `akbura.editor.automaticPairing` to select one of these modes:
+
+- `syntax` uses the syntax-aware Akbura typing service;
+- `basic` uses only the pairs from VS Code's language configuration;
+- `off` inserts delimiters without Akbura pairing.
+
+`akbura.editor.autoClosingTags` controls matching markup end tags, while
+`akbura.editor.rawStringCompletion` controls dynamic C# raw-string delimiters.
+The extension also respects `editor.autoClosingBrackets` and
+`editor.autoClosingQuotes`.
+
+The syntax-aware mode intercepts VS Code's global `type` command only for
+single ASCII delimiter characters in `.akbura` and `.akcss` editors. Ordinary
+text, selections, multiple carets, and multi-character IME input are forwarded
+to the standard editor. An extension that also replaces `type` may conflict;
+use `basic` mode when both extensions cannot cooperate.
 
 ## Requirements
 

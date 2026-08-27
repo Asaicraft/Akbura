@@ -6,6 +6,8 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
     {
         var referenceResolver = new AkcssReferenceResolver();
 
+        Typing = new AkburaTypingService();
+
         Classification = new AkburaClassificationService(referenceResolver);
 
         Diagnostics = new AkburaDiagnosticService();
@@ -36,6 +38,8 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
 
         Formatting = new AkburaFormattingService();
     }
+
+    public IAkburaTypingService Typing { get; }
 
     public IAkburaClassificationService Classification { get; }
 

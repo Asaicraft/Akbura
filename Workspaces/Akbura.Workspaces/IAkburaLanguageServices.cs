@@ -2,6 +2,8 @@ namespace Akbura.Workspaces;
 
 public interface IAkburaLanguageServices
 {
+    IAkburaTypingService Typing { get; }
+
     IAkburaClassificationService Classification { get; }
 
     IAkburaDiagnosticService Diagnostics { get; }

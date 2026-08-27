@@ -4,6 +4,7 @@ using Akbura.LanguageServer.Handlers.Documents;
 using Akbura.LanguageServer.Handlers.LanguageFeatures;
 using Akbura.LanguageServer.Handlers.Lifecycle;
 using Akbura.LanguageServer.Handlers.SemanticTokens;
+using Akbura.LanguageServer.Handlers.Typing;
 using Akbura.LanguageServer.Protocol.Serialization;
 using StreamJsonRpc;
 
@@ -78,6 +79,7 @@ internal static class AkburaLanguageServerHost
             new DocumentFormattingHandler(),
             new DocumentRangeFormattingHandler(),
             new DocumentOnTypeFormattingHandler(),
+            new AkburaTypingHandler(),
             new AkburaApplyLoadedProjectsHandler(),
         };
         var registry = new AkburaLspHandlerRegistry(handlers);

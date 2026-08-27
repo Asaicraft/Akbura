@@ -36,6 +36,7 @@ public static class LspMethods
     public const string Formatting = "textDocument/formatting";
     public const string RangeFormatting = "textDocument/rangeFormatting";
     public const string OnTypeFormatting = "textDocument/onTypeFormatting";
+    public const string Typing = "akbura/textDocument/typing";
     public const string PublishDiagnostics = "textDocument/publishDiagnostics";
     public const string DiagnosticRefresh = "workspace/diagnostic/refresh";
     public const string SemanticTokensRefresh =

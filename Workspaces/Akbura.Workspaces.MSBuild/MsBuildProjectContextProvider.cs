@@ -71,11 +71,16 @@ public sealed class MsBuildProjectContextProvider :
         ThrowIfDisposed();
         ValidatePath(projectPath, nameof(projectPath));
 
-        var project = await _workspace
-            .OpenProjectAsync(
-                Path.GetFullPath(projectPath),
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        var fullProjectPath = Path.GetFullPath(projectPath);
+        var project = FindProject(fullProjectPath);
+        if (project == null)
+        {
+            project = await _workspace
+                .OpenProjectAsync(
+                    fullProjectPath,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         return await CreateLoadedProjectAsync(
                 project,
@@ -91,11 +96,16 @@ public sealed class MsBuildProjectContextProvider :
         ThrowIfDisposed();
         ValidatePath(solutionPath, nameof(solutionPath));
 
-        var solution = await _workspace
-            .OpenSolutionAsync(
-                Path.GetFullPath(solutionPath),
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        var fullSolutionPath = Path.GetFullPath(solutionPath);
+        var solution = PathsEqual(
+                _workspace.CurrentSolution.FilePath,
+                fullSolutionPath)
+            ? _workspace.CurrentSolution
+            : await _workspace
+                .OpenSolutionAsync(
+                    fullSolutionPath,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
         var projects = solution.Projects
             .Where(static project =>
                 project.Language == LanguageNames.CSharp)
@@ -115,6 +125,34 @@ public sealed class MsBuildProjectContextProvider :
                 loadedProjects.Length);
         loaded.AddRange(loadedProjects);
         return loaded.ToImmutable();
+    }
+
+    private Project? FindProject(string projectPath)
+    {
+        foreach (var project in _workspace.CurrentSolution.Projects)
+        {
+            if (PathsEqual(project.FilePath, projectPath))
+            {
+                return project;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool PathsEqual(string? left, string right)
+    {
+        if (string.IsNullOrWhiteSpace(left))
+        {
+            return false;
+        }
+
+        return string.Equals(
+            Path.GetFullPath(left),
+            right,
+            Path.DirectorySeparatorChar == '\\'
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal);
     }
 
     public void Dispose()

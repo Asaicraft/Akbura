@@ -131,6 +131,9 @@ public sealed class WorkspaceClientCapabilities
 
     public DiagnosticWorkspaceClientCapabilities? Diagnostics { get; set; }
 
+    public SemanticTokensWorkspaceClientCapabilities?
+        SemanticTokens { get; set; }
+
     public WorkspaceEditClientCapabilities? WorkspaceEdit { get; set; }
 }
 
@@ -145,6 +148,11 @@ public sealed class DidChangeWatchedFilesClientCapabilities
 }
 
 public sealed class DiagnosticWorkspaceClientCapabilities
+{
+    public bool? RefreshSupport { get; set; }
+}
+
+public sealed class SemanticTokensWorkspaceClientCapabilities
 {
     public bool? RefreshSupport { get; set; }
 }

@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "akbura-language-server",
+  "displayName": "Akbura Language Support",
+  "description": "Language support for .akbura and .akcss files powered by Akbura Language Server.",
+  "version": "0.1.0",
+  "publisher": "asaicraft",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Asaicraft/Akbura.git"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Linters"
+  ],
+  "keywords": [
+    "akbura",
+    "akcss",
+    "avalonia",
+    "language-server",
+    "lsp"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onLanguage:akbura",
+    "onLanguage:akcss",
+    "workspaceContains:**/*.akbura",
+    "workspaceContains:**/*.akcss",
+    "onCommand:akbura.restartLanguageServer",
+    "onCommand:akbura.showLanguageServerOutput",
+    "onCommand:akbura.selectSolution",
+    "onCommand:akbura.selectProject",
+    "onCommand:akbura.clearProjectSelection"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": false
+    },
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Akbura loads MSBuild projects and may execute project evaluation logic."
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "akbura",
+        "aliases": [
+          "Akbura",
+          "akbura"
+        ],
+        "extensions": [
+          ".akbura"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "akcss",
+        "aliases": [
+          "AKCSS",
+          "akcss"
+        ],
+        "extensions": [
+          ".akcss"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "akbura",
+        "scopeName": "source.akbura",
+        "path": "./syntaxes/akbura.tmLanguage.json"
+      },
+      {
+        "language": "akcss",
+        "scopeName": "source.akcss",
+        "path": "./syntaxes/akcss.tmLanguage.json"
+      }
+    ],
+    "semanticTokenTypes": [
+      {
+        "id": "modifier",
+        "superType": "keyword",
+        "description": "An Akbura utility or selector modifier."
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "akbura",
+        "scopes": {
+          "modifier": [
+            "keyword.control.modifier.akbura"
+          ]
+        }
+      },
+      {
+        "language": "akcss",
+        "scopes": {
+          "modifier": [
+            "keyword.control.modifier.akcss"
+          ]
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "[akbura]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[akcss]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    },
+    "commands": [
+      {
+        "command": "akbura.restartLanguageServer",
+        "title": "Akbura: Restart Language Server"
+      },
+      {
+        "command": "akbura.showLanguageServerOutput",
+        "title": "Akbura: Show Language Server Output"
+      },
+      {
+        "command": "akbura.selectSolution",
+        "title": "Akbura: Select Solution"
+      },
+      {
+        "command": "akbura.selectProject",
+        "title": "Akbura: Select Project"
+      },
+      {
+        "command": "akbura.clearProjectSelection",
+        "title": "Akbura: Clear Explicit Solution or Project"
+      }
+    ],
+    "configuration": {
+      "title": "Akbura",
+      "properties": {
+        "akbura.server.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Path to `akbura-lsp.dll` or a native Akbura language server executable. An empty value uses the server packaged with the extension."
+        },
+        "akbura.server.dotnetPath": {
+          "type": "string",
+          "default": "dotnet",
+          "scope": "machine-overridable",
+          "description": "Path to the dotnet host used to start akbura-lsp.dll."
+        },
+        "akbura.server.solution": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "Explicit `.sln` or `.slnx` path. Mutually exclusive with `akbura.server.project`."
+        },
+        "akbura.server.project": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "Explicit `.csproj` path. Mutually exclusive with `akbura.server.solution`."
+        },
+        "akbura.server.logLevel": {
+          "type": "string",
+          "default": "warning",
+          "scope": "window",
+          "enum": [
+            "trace",
+            "information",
+            "warning",
+            "error",
+            "none"
+          ],
+          "enumDescriptions": [
+            "All internal server messages.",
+            "Information, warnings, and errors.",
+            "Warnings and errors.",
+            "Errors only.",
+            "Disable server logging."
+          ],
+          "description": "Akbura language server log level."
+        },
+        "akbura.server.logFile": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "Optional file receiving a copy of language server logs."
+        },
+        "akbura.server.waitForDebugger": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "description": "Wait for a managed debugger before starting the LSP transport."
+        },
+        "akbura.trace.server": {
+          "type": "string",
+          "default": "off",
+          "scope": "window",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "description": "Trace LSP messages exchanged between VS Code and Akbura."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "compile": "npm run check-types && node ./esbuild.mjs",
+    "watch": "node ./esbuild.mjs --watch",
+    "publish-server:debug": "node ./scripts/publish-server.mjs",
+    "publish-server:release": "node ./scripts/publish-server.mjs --release",
+    "verify-server": "node ./scripts/verify-server.mjs",
+    "build:debug": "npm run publish-server:debug && npm run compile",
+    "build:release": "npm run publish-server:release && npm run check-types && node ./esbuild.mjs --production",
+    "vscode:prepublish": "npm run build:release",
+    "package:vsix": "npx --yes @vscode/vsce@latest package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.100.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.2"
+  }
+}

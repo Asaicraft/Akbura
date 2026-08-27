@@ -48,6 +48,15 @@ internal sealed class CompletionHandler :
                 cancellationToken)
             .ConfigureAwait(false);
 
+        context.Services.Logger.Log(
+            AkburaServerLogLevel.Trace,
+            $"Completion: uri='{document.Uri}', " +
+            $"version={document.Version}, " +
+            $"semantic={context.SemanticDocument != null}, " +
+            $"native={native.Items.Length}, " +
+            $"projected={projected?.Items.Length ?? 0}, " +
+            $"position={position}.");
+
         var capacity = native.Items.Length +
             (projected?.Items.Length ?? 0);
         var items = new List<Protocol.CompletionItem>(capacity);

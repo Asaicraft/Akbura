@@ -279,6 +279,21 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 Math.Min(1, document.Text.Length - position));
         }
 
+        if (TryGetUnqualifiedSyntheticOrigin(
+                token,
+                projection,
+                out var syntheticOrigin))
+        {
+            var targetSpan = ClampSpan(
+                syntheticOrigin.DeclarationSpan,
+                document.Text.Length);
+            return new AkburaDefinition(
+                sourceSpan,
+                document.FilePath,
+                document.Text.Lines.GetLinePositionSpan(targetSpan),
+                document.Text);
+        }
+
         var symbol = GetBestProjectedSymbol(
             semanticModel,
             token.Parent,
@@ -324,6 +339,45 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             akburaSymbol: null,
             symbol,
             cancellationToken);
+    }
+
+    private static bool TryGetUnqualifiedSyntheticOrigin(
+        Microsoft.CodeAnalysis.SyntaxToken token,
+        AkburaCSharpProjection projection,
+        out AkburaProjectedSymbolOrigin origin)
+    {
+        if (token.Parent is not CSharp.IdentifierNameSyntax identifier ||
+            identifier.Parent is CSharp.MemberBindingExpressionSyntax ||
+            identifier.Parent is CSharp.MemberAccessExpressionSyntax access &&
+            access.Expression is not CSharp.ThisExpressionSyntax)
+        {
+            origin = null!;
+            return false;
+        }
+
+        AkburaProjectedSymbolOrigin? match = null;
+        var identifierName = identifier.Identifier.ValueText;
+        foreach (var candidate in projection.SyntheticSymbols)
+        {
+            if (!string.Equals(
+                    candidate.Name,
+                    identifierName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (match != null)
+            {
+                origin = null!;
+                return false;
+            }
+
+            match = candidate;
+        }
+
+        origin = match!;
+        return match != null;
     }
 
     private static RoslynSymbol? GetBestProjectedSymbol(

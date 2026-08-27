@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "akbura: build debug",
+      "type": "shell",
+      "command": "npm run build:debug",
+      "problemMatcher": [
+        "$tsc",
+        "$msCompile"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "akbura: build release",
+      "type": "shell",
+      "command": "npm run build:release",
+      "problemMatcher": [
+        "$tsc",
+        "$msCompile"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "akbura: package vsix",
+      "type": "shell",
+      "command": "npm run package:vsix",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "akbura: build release"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -63,6 +63,12 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
                     project.Id,
                     inputs.ToImmutableArray(),
                     cancellationToken);
+                context.Services.Logger.Log(
+                    AkburaServerLogLevel.Information,
+                    "Applied project " +
+                    $"'{loadedProject.Context.CSharpCompilation.AssemblyName}', " +
+                    $"documents={loadedProject.Documents.Length}, " +
+                    $"projectId={project.Id}.");
             }
         }
 
@@ -105,6 +111,11 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
                     ProjectText = projectText ??
                         pair.Value.ProjectText,
                 });
+            context.Services.Logger.Log(
+                AkburaServerLogLevel.Trace,
+                $"Attached open document '{pair.Key}' to " +
+                $"projectId={document.ProjectId}, " +
+                $"documentId={document.Id}.");
         }
 
         var folder = existingFolder with
@@ -163,6 +174,16 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
             await context.Services.Diagnostics
                 .PublishAllSemanticAsync(token)
                 .ConfigureAwait(false);
+
+            if (next.ClientCapabilities.SupportsSemanticTokensRefresh)
+            {
+                await context.Services.Client
+                    .RequestAsync<object?, object?>(
+                        LspMethods.SemanticTokensRefresh,
+                        parameters: null,
+                        token)
+                    .ConfigureAwait(false);
+            }
         };
 
         return Task.FromResult(

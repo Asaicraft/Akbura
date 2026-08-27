@@ -7,7 +7,8 @@ internal sealed record AkburaClientCapabilities(
     bool SupportsDocumentChanges,
     bool SupportsPullDiagnostics,
     bool SupportsDiagnosticRefresh,
-    bool SupportsDynamicFileWatching)
+    bool SupportsDynamicFileWatching,
+    bool SupportsSemanticTokensRefresh)
 {
     public static AkburaClientCapabilities Default { get; } =
         new(
@@ -17,5 +18,6 @@ internal sealed record AkburaClientCapabilities(
             SupportsDocumentChanges: true,
             SupportsPullDiagnostics: false,
             SupportsDiagnosticRefresh: false,
-            SupportsDynamicFileWatching: false);
+            SupportsDynamicFileWatching: false,
+            SupportsSemanticTokensRefresh: false);
 }

@@ -103,7 +103,8 @@ public sealed class CodeActionResolveTests
                 SupportsDocumentChanges: true,
                 SupportsPullDiagnostics: false,
                 SupportsDiagnosticRefresh: false,
-                SupportsDynamicFileWatching: false);
+                SupportsDynamicFileWatching: false,
+                SupportsSemanticTokensRefresh: false);
             var snapshot = AkburaServerSnapshot.Create(_workspace) with
             {
                 OpenDocuments = ImmutableDictionary

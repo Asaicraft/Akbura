@@ -81,7 +81,10 @@ internal sealed class InitializeHandler :
                     .RefreshSupport == true,
             SupportsDynamicFileWatching:
                 capabilities.Workspace?.DidChangeWatchedFiles?
-                    .DynamicRegistration == true);
+                    .DynamicRegistration == true,
+            SupportsSemanticTokensRefresh:
+                capabilities.Workspace?.SemanticTokens?
+                    .RefreshSupport == true);
     }
 
     private static ImmutableDictionary<Uri, AkburaWorkspaceFolderState>
@@ -224,18 +227,35 @@ internal sealed class InitializedHandler :
                 snapshot: next,
                 afterCommit: async token =>
                 {
+                    var projectLoadingTask = context.Services.Projects
+                        .StartAsync(next, token);
+
                     if (next.ClientCapabilities
                         .SupportsDynamicFileWatching)
                     {
-                        await RegisterFileWatchersAsync(
-                                context.Services,
-                                token)
-                            .ConfigureAwait(false);
+                        try
+                        {
+                            await RegisterFileWatchersAsync(
+                                    context.Services,
+                                    token)
+                                .ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                            when (token.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            context.Services.Logger.Log(
+                                AkburaServerLogLevel.Warning,
+                                "Dynamic file watcher registration failed. " +
+                                "Project loading will continue.",
+                                exception);
+                        }
                     }
 
-                    await context.Services.Projects
-                        .StartAsync(next, token)
-                        .ConfigureAwait(false);
+                    await projectLoadingTask.ConfigureAwait(false);
                 }));
     }
 

@@ -14,7 +14,31 @@ internal static class AkburaProtocolMapper
                 $"'{value}' is not a valid absolute document URI.");
         }
 
-        return uri;
+        return NormalizeWindowsFileUri(uri);
+    }
+
+    private static Uri NormalizeWindowsFileUri(Uri uri)
+    {
+        if (Path.DirectorySeparatorChar != '\\' ||
+            !uri.IsFile ||
+            !string.IsNullOrEmpty(uri.Host))
+        {
+            return uri;
+        }
+
+        var localPath = uri.LocalPath;
+        if (localPath.Length < 4 ||
+            localPath[0] is not ('/' or '\\') ||
+            !char.IsAsciiLetter(localPath[1]) ||
+            localPath[2] != ':' ||
+            localPath[3] is not ('/' or '\\'))
+        {
+            return uri;
+        }
+
+        var windowsPath = localPath[1..]
+            .Replace('/', Path.DirectorySeparatorChar);
+        return new Uri(Path.GetFullPath(windowsPath));
     }
 
     public static Diagnostic[] ToDiagnostics(

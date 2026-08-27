@@ -17,6 +17,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         _roots = new(AkburaUriComparer.Instance);
     private readonly CancellationTokenSource _shutdown = new();
     private CancellationTokenSource? _reloadCancellation;
+    private int _activeLoadCount;
     private int _disposeState;
 
     public AkburaProjectLoadCoordinator(
@@ -169,8 +170,16 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
     {
         await _loadGate.WaitAsync(cancellationToken)
             .ConfigureAwait(false);
+        Interlocked.Increment(ref _activeLoadCount);
         try
         {
+            _services.Logger.Log(
+                AkburaServerLogLevel.Information,
+                "Discovering Akbura project: " +
+                $"workspace='{request.WorkspaceFolder}', " +
+                $"explicit='{request.ExplicitPath ?? "<null>"}', " +
+                $"reason='{request.Reason}'.");
+
             string? warning;
             var path = AkburaProjectDiscovery.Discover(
                 request.WorkspaceFolder,
@@ -194,11 +203,15 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
             if (path == null)
             {
                 _services.Logger.Log(
-                    AkburaServerLogLevel.Information,
+                    AkburaServerLogLevel.Warning,
                     $"No solution or project was found for " +
                     $"'{request.WorkspaceFolder}'. Syntax-only mode remains active.");
                 return;
             }
+
+            _services.Logger.Log(
+                AkburaServerLogLevel.Information,
+                $"Discovered project input '{path}'.");
 
             var progressToken =
                 $"akbura-project-load-{Guid.NewGuid():N}";
@@ -257,6 +270,9 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
                 return;
             }
 
+            _services.Logger.Log(
+                AkburaServerLogLevel.Information,
+                $"Loaded {projects.Length} project(s) from '{path}'.");
             var diagnostics = projects
                 .SelectMany(static project => project.Diagnostics)
                 .ToImmutableArray();
@@ -279,6 +295,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         }
         finally
         {
+            Interlocked.Decrement(ref _activeLoadCount);
             _loadGate.Release();
         }
     }
@@ -347,6 +364,15 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         object? sender,
         ProjectContextChangedEventArgs eventArgs)
     {
+        if (Volatile.Read(ref _activeLoadCount) != 0)
+        {
+            _services.Logger.Log(
+                AkburaServerLogLevel.Trace,
+                $"Ignored loader change '{eventArgs.Kind}' emitted " +
+                "by the active project load.");
+            return;
+        }
+
         _ = ScheduleReloadAsync(
             eventArgs.Kind.ToString(),
             _shutdown.Token);

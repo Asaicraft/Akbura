@@ -1,0 +1,17 @@
+.vscode/**
+.github/**
+
+src/**
+scripts/**
+
+node_modules/**
+package-lock.json
+tsconfig.json
+esbuild.mjs
+
+**/*.map
+server/**/*.pdb
+server/**/*.xml
+
+*.vsix
+.gitignore

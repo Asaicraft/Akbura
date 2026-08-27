@@ -38,6 +38,8 @@ public static class LspMethods
     public const string OnTypeFormatting = "textDocument/onTypeFormatting";
     public const string PublishDiagnostics = "textDocument/publishDiagnostics";
     public const string DiagnosticRefresh = "workspace/diagnostic/refresh";
+    public const string SemanticTokensRefresh =
+        "workspace/semanticTokens/refresh";
     public const string RegisterCapability = "client/registerCapability";
     public const string ShowMessage = "window/showMessage";
     public const string LogMessage = "window/logMessage";

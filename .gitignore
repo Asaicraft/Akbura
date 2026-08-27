@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Akbura VS Code extension build output
+/Workspaces/Akbura.LanguageServer.VsCode/node_modules/
+/Workspaces/Akbura.LanguageServer.VsCode/dist/
+/Workspaces/Akbura.LanguageServer.VsCode/server/
+/Workspaces/Akbura.LanguageServer.VsCode/*.vsix

@@ -100,6 +100,11 @@ internal sealed class DefinitionHandler :
     {
         if (context.SemanticDocument == null)
         {
+            context.Services.Logger.Log(
+                AkburaServerLogLevel.Trace,
+                "Definition unavailable for " +
+                $"'{context.OpenDocument?.Uri}': " +
+                "the document has no semantic project context.");
             return new AkburaLspHandlerResult<LocationLink[]?>(null);
         }
 
@@ -116,10 +121,25 @@ internal sealed class DefinitionHandler :
             return new AkburaLspHandlerResult<LocationLink[]?>(null);
         }
 
-        var targetPath = await _materializer.MaterializeAsync(
-                definition,
-                cancellationToken)
-            .ConfigureAwait(false);
+        var openDocumentUri = context.OpenDocument.Uri;
+        string targetPath;
+        if (openDocumentUri.IsFile &&
+            string.Equals(
+                definition.TargetFilePath,
+                Path.GetFullPath(openDocumentUri.LocalPath),
+                OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal))
+        {
+            targetPath = definition.TargetFilePath;
+        }
+        else
+        {
+            targetPath = await _materializer.MaterializeAsync(
+                    definition,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
         var targetRange = new Protocol.Range
         {
             Start = new Position

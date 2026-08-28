@@ -75,10 +75,9 @@ public sealed class MsBuildProjectContextProvider :
         var project = FindProject(fullProjectPath);
         if (project == null)
         {
-            project = await _workspace
-                .OpenProjectAsync(
+            project = await OpenProjectWithoutNotificationsAsync(
                     fullProjectPath,
-                    cancellationToken: cancellationToken)
+                    cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -101,10 +100,9 @@ public sealed class MsBuildProjectContextProvider :
                 _workspace.CurrentSolution.FilePath,
                 fullSolutionPath)
             ? _workspace.CurrentSolution
-            : await _workspace
-                .OpenSolutionAsync(
+            : await OpenSolutionWithoutNotificationsAsync(
                     fullSolutionPath,
-                    cancellationToken: cancellationToken)
+                    cancellationToken)
                 .ConfigureAwait(false);
         var projects = solution.Projects
             .Where(static project =>
@@ -125,6 +123,50 @@ public sealed class MsBuildProjectContextProvider :
                 loadedProjects.Length);
         loaded.AddRange(loadedProjects);
         return loaded.ToImmutable();
+    }
+
+    private async Task<Project> OpenProjectWithoutNotificationsAsync(
+        string projectPath,
+        CancellationToken cancellationToken)
+    {
+        _workspace.WorkspaceChanged -= OnWorkspaceChanged;
+        try
+        {
+            return await _workspace
+                .OpenProjectAsync(
+                    projectPath,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            if (Volatile.Read(ref _disposeState) == 0)
+            {
+                _workspace.WorkspaceChanged += OnWorkspaceChanged;
+            }
+        }
+    }
+
+    private async Task<Solution> OpenSolutionWithoutNotificationsAsync(
+        string solutionPath,
+        CancellationToken cancellationToken)
+    {
+        _workspace.WorkspaceChanged -= OnWorkspaceChanged;
+        try
+        {
+            return await _workspace
+                .OpenSolutionAsync(
+                    solutionPath,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            if (Volatile.Read(ref _disposeState) == 0)
+            {
+                _workspace.WorkspaceChanged += OnWorkspaceChanged;
+            }
+        }
     }
 
     private Project? FindProject(string projectPath)

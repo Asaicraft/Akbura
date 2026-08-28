@@ -96,18 +96,87 @@ public class AppConfig
     public void ResolveGitBlobBaseUrls(IVirtualDirectory contentDir)
     {
         var srcDir = new DirectoryInfo(contentDir.RealPath);
-        var gitConfig = new FileInfo(Path.Combine(srcDir.Parent!.FullName, ".git", "config"));
-        if (gitConfig.Exists)
+        var repositoryRoot = FindRepositoryRoot(srcDir);
+        if (repositoryRoot is null)
+        {
+            return;
+        }
+
+        var gitConfig = FindGitConfig(repositoryRoot);
+        if (gitConfig is { Exists: true })
         {
             var txt = gitConfig.ReadAllText();
             var pos = txt.IndexOf("url = ", StringComparison.Ordinal);
             if (pos >= 0)
             {
                 var url = txt[(pos + "url = ".Length)..].LeftPart(".git").LeftPart('\n').Trim();
-                GitPagesBaseUrl = url.CombineWith($"blob/master/{srcDir.Name}");
-                GitPagesRawBaseUrl = url.Replace("github.com","raw.githubusercontent.com").CombineWith($"refs/heads/master/{srcDir.Name}");
+                var sourcePath = Path.GetRelativePath(repositoryRoot.FullName, srcDir.FullName)
+                    .Replace(Path.DirectorySeparatorChar, '/');
+                GitPagesBaseUrl = url.CombineWith($"blob/master/{sourcePath}");
+                GitPagesRawBaseUrl = url.Replace("github.com","raw.githubusercontent.com").CombineWith($"refs/heads/master/{sourcePath}");
             }
         }
+    }
+
+    private static DirectoryInfo? FindRepositoryRoot(DirectoryInfo startDirectory)
+    {
+        for (var directory = startDirectory; directory is not null; directory = directory.Parent)
+        {
+            var gitPath = Path.Combine(directory.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
+            {
+                return directory;
+            }
+        }
+
+        return null;
+    }
+
+    private static FileInfo? FindGitConfig(DirectoryInfo repositoryRoot)
+    {
+        var gitPath = Path.Combine(repositoryRoot.FullName, ".git");
+        if (Directory.Exists(gitPath))
+        {
+            return new FileInfo(Path.Combine(gitPath, "config"));
+        }
+
+        if (!File.Exists(gitPath))
+        {
+            return null;
+        }
+
+        const string gitDirectoryPrefix = "gitdir:";
+        var gitDirectoryValue = File.ReadAllText(gitPath).Trim();
+        if (!gitDirectoryValue.StartsWith(
+                gitDirectoryPrefix,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var gitDirectoryPath = gitDirectoryValue[gitDirectoryPrefix.Length..].Trim();
+        if (!Path.IsPathRooted(gitDirectoryPath))
+        {
+            gitDirectoryPath = Path.GetFullPath(Path.Combine(
+                repositoryRoot.FullName,
+                gitDirectoryPath));
+        }
+
+        var commonDirectoryFile = Path.Combine(gitDirectoryPath, "commondir");
+        if (!File.Exists(commonDirectoryFile))
+        {
+            return new FileInfo(Path.Combine(gitDirectoryPath, "config"));
+        }
+
+        var commonDirectoryPath = File.ReadAllText(commonDirectoryFile).Trim();
+        if (!Path.IsPathRooted(commonDirectoryPath))
+        {
+            commonDirectoryPath = Path.GetFullPath(Path.Combine(
+                gitDirectoryPath,
+                commonDirectoryPath));
+        }
+
+        return new FileInfo(Path.Combine(commonDirectoryPath, "config"));
     }
 }
 

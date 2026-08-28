@@ -209,10 +209,12 @@ public sealed class SemanticProjectLifecycleTests
 
             var projectDirectory = Path.Combine(
                 repositoryRoot.FullName,
+                "src",
                 "Akbura.Previewer",
                 "Akbura.Previewer");
             WorkspaceUri = new Uri(Path.Combine(
                 repositoryRoot.FullName,
+                "src",
                 "Akbura.Previewer"));
             ComponentUri = new Uri(Path.Combine(
                 projectDirectory,

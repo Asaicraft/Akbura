@@ -3,13 +3,13 @@ name: Akbura Vs Code Extension
 on:
   pull_request:
     paths:
-      - "Workspaces/Akbura.LanguageServer.VsCode/**"
-      - "Workspaces/Akbura.LanguageServer/**"
-      - "Workspaces/Akbura.LanguageServer.Protocol/**"
-      - "Workspaces/Akbura.LanguageServer.UnitTests/**"
-      - "Workspaces/Akbura.LanguageServer.IntegrationTests/**"
-      - "Workspaces/Akbura.Workspaces/**"
-      - "Workspaces/Akbura.Workspaces.MSBuild/**"
+      - "src/Workspaces/Akbura.LanguageServer.VsCode/**"
+      - "src/Workspaces/Akbura.LanguageServer/**"
+      - "src/Workspaces/Akbura.LanguageServer.Protocol/**"
+      - "src/Workspaces/Akbura.LanguageServer.UnitTests/**"
+      - "src/Workspaces/Akbura.LanguageServer.IntegrationTests/**"
+      - "src/Workspaces/Akbura.Workspaces/**"
+      - "src/Workspaces/Akbura.Workspaces.MSBuild/**"
       - ".github/workflows/akbura-vscode.yml"
 
   push:
@@ -17,13 +17,13 @@ on:
       - master
       - feature/akbura-workspaces
     paths:
-      - "Workspaces/Akbura.LanguageServer.VsCode/**"
-      - "Workspaces/Akbura.LanguageServer/**"
-      - "Workspaces/Akbura.LanguageServer.Protocol/**"
-      - "Workspaces/Akbura.LanguageServer.UnitTests/**"
-      - "Workspaces/Akbura.LanguageServer.IntegrationTests/**"
-      - "Workspaces/Akbura.Workspaces/**"
-      - "Workspaces/Akbura.Workspaces.MSBuild/**"
+      - "src/Workspaces/Akbura.LanguageServer.VsCode/**"
+      - "src/Workspaces/Akbura.LanguageServer/**"
+      - "src/Workspaces/Akbura.LanguageServer.Protocol/**"
+      - "src/Workspaces/Akbura.LanguageServer.UnitTests/**"
+      - "src/Workspaces/Akbura.LanguageServer.IntegrationTests/**"
+      - "src/Workspaces/Akbura.Workspaces/**"
+      - "src/Workspaces/Akbura.Workspaces.MSBuild/**"
       - ".github/workflows/akbura-vscode.yml"
 
 jobs:
@@ -45,41 +45,41 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: >
-            Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
+            src/Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
 
       - name: Restore LSP projects
         run: |
           dotnet restore \
-            Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+            src/Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
           dotnet restore \
-            Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+            src/Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
           dotnet restore \
-            Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj
+            src/Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj
 
       - name: Test LSP unit tests
         run: >
           dotnet test
-          Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+          src/Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
           --configuration Release
           --no-restore
 
       - name: Test LSP integration tests
         run: >
           dotnet test
-          Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+          src/Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
           --configuration Release
           --no-restore
 
       - name: Install extension dependencies
-        working-directory: Workspaces/Akbura.LanguageServer.VsCode
+        working-directory: src/Workspaces/Akbura.LanguageServer.VsCode
         run: npm ci
 
       - name: Package VSIX
-        working-directory: Workspaces/Akbura.LanguageServer.VsCode
+        working-directory: src/Workspaces/Akbura.LanguageServer.VsCode
         run: npm run package:vsix
 
       - name: Verify packaged language server
-        working-directory: Workspaces/Akbura.LanguageServer.VsCode
+        working-directory: src/Workspaces/Akbura.LanguageServer.VsCode
         run: npm run verify-server
 
       - name: Upload VSIX
@@ -87,5 +87,5 @@ jobs:
         with:
           name: akbura-vscode-extension
           path: >
-            Workspaces/Akbura.LanguageServer.VsCode/*.vsix
+            src/Workspaces/Akbura.LanguageServer.VsCode/*.vsix
           if-no-files-found: error

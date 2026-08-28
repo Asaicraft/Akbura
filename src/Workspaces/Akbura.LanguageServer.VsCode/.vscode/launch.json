@@ -9,7 +9,7 @@
       "args": [
         "--trace-deprecation",
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "${workspaceFolder}/../.."
+        "${workspaceFolder}/../../.."
       ],
       "outFiles": [
         "${workspaceFolder}/dist/**/*.js"

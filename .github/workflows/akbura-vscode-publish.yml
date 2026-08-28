@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXTENSION_DIRECTORY: Workspaces/Akbura.LanguageServer.VsCode
+  EXTENSION_DIRECTORY: src/Workspaces/Akbura.LanguageServer.VsCode
   VSCE_VERSION: "3.9.2"
   AZURE_CORE_OUTPUT: none
   AZURE_LOGIN_PRE_CLEANUP: "true"
@@ -109,7 +109,7 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: >
-            Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
+            src/Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
 
       - name: Verify release tag and metadata
         id: release
@@ -174,23 +174,23 @@ jobs:
         shell: bash
         run: |
           dotnet restore \
-            Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+            src/Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
           dotnet restore \
-            Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+            src/Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
           dotnet restore \
-            Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj
+            src/Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj
 
       - name: Test LSP unit tests
         run: >
           dotnet test
-          Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+          src/Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
           --configuration Release
           --no-restore
 
       - name: Test LSP integration tests
         run: >
           dotnet test
-          Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+          src/Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
           --configuration Release
           --no-restore
 

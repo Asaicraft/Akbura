@@ -12,11 +12,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VSIX_PROJECT_PATH: Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj
-  VSIX_OUTPUT_PATH: Workspaces/Akbura.VisualStudio.Vsix/bin/Release/net472/Akbura.VisualStudio.Vsix.vsix
-  PUBLISH_MANIFEST_PATH: Workspaces/Akbura.VisualStudio.Vsix/vs-publish.json
-  OVERVIEW_PATH: Workspaces/Akbura.VisualStudio.Vsix/overview.md
-  VERIFY_SCRIPT_PATH: Workspaces/Akbura.VisualStudio.Vsix/scripts/verify-vsix.ps1
+  VSIX_PROJECT_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj
+  VSIX_OUTPUT_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/bin/Release/net472/Akbura.VisualStudio.Vsix.vsix
+  PUBLISH_MANIFEST_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/vs-publish.json
+  OVERVIEW_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/overview.md
+  VERIFY_SCRIPT_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/scripts/verify-vsix.ps1
   VSIX_PUBLISHER_VERSION: "17.13.2126"
 
 jobs:
@@ -64,7 +64,7 @@ jobs:
           $tagVersion = $Matches[1]
 
           [xml] $sourceManifest = Get-Content -Raw -LiteralPath `
-            Workspaces/Akbura.VisualStudio.Vsix/source.extension.vsixmanifest
+            src/Workspaces/Akbura.VisualStudio.Vsix/source.extension.vsixmanifest
           $identity = $sourceManifest.PackageManifest.Metadata.Identity
           $manifestVersion = [string] $identity.Version
 
@@ -95,7 +95,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          dotnet restore Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj
+          dotnet restore src/Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj
           if ($LASTEXITCODE -ne 0) {
             throw "Workspace test restore failed with exit code $LASTEXITCODE."
           }
@@ -108,7 +108,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          dotnet test Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj `
+          dotnet test src/Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj `
             --configuration Release `
             --no-restore
           if ($LASTEXITCODE -ne 0) {

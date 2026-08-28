@@ -8,7 +8,7 @@ Maybe this will become a real generator later. For now, treat it as the source o
 
 ## 1. Add The Syntax Declaration To Syntax.nooken
 
-Start by describing the syntax in [Syntax.nooken](../Akbura.Generator/Language/Syntax/Syntax.nooken).
+Start by describing the syntax in [Syntax.nooken](../src/Akbura.Generator/Language/Syntax/Syntax.nooken).
 
 The file is organized into several sections:
 
@@ -123,7 +123,7 @@ The maximum syntax kind storage size is currently 16 bits, because `SyntaxKind` 
 
 ## 2. Update SyntaxKind
 
-Update [SyntaxKind.g.cs](../Akbura.Generator/Language/Syntax/Generated/SyntaxKind.g.cs).
+Update [SyntaxKind.g.cs](../src/Akbura.Generator/Language/Syntax/Generated/SyntaxKind.g.cs).
 
 Despite the `.g.cs` suffix, this file is currently maintained by hand. Add your concrete token or syntax node kind to the correct range.
 
@@ -158,7 +158,7 @@ For a new concrete syntax node:
 
 ## 3. Update SyntaxFacts
 
-Update [SyntaxFacts.g.cs](../Akbura.Generator/Language/Syntax/Generated/SyntaxFacts.g.cs).
+Update [SyntaxFacts.g.cs](../src/Akbura.Generator/Language/Syntax/Generated/SyntaxFacts.g.cs).
 
 If you added a token with well-known text, update:
 
@@ -199,9 +199,9 @@ There is an old notebook workflow that was used to generate the first wave of `.
 
 The important files are:
 
-- [Syntax.nooken](../Akbura.Generator/Language/Syntax/Syntax.nooken);
-- [SystemNodeGenerationPrompt.md](../Akbura.Generator/Language/Syntax/Generated/SystemNodeGenerationPrompt.md);
-- generated syntax node files in [Akbura.Generator/Language/Syntax/Generated](../Akbura.Generator/Language/Syntax/Generated).
+- [Syntax.nooken](../src/Akbura.Generator/Language/Syntax/Syntax.nooken);
+- [SystemNodeGenerationPrompt.md](../src/Akbura.Generator/Language/Syntax/Generated/SystemNodeGenerationPrompt.md);
+- generated syntax node files in [src/Akbura.Generator/Language/Syntax/Generated](../src/Akbura.Generator/Language/Syntax/Generated).
 
 The workflow is:
 
@@ -245,7 +245,7 @@ client = OpenAI()
 NOTEBOOK_DIR = Path.cwd()
 
 NOOKEN_GRAMMAR = Path(
-    "../Akbura.Generator/Language/Syntax/Syntax.nooken"
+    "../src/Akbura.Generator/Language/Syntax/Syntax.nooken"
 ).read_text(encoding="utf-8")
 
 NODE_SYSTEM_PROMPT = (
@@ -370,15 +370,15 @@ The declaration remains a top-level member in `AkburaDocumentSyntax.Members`; fo
 
 After the syntax shape exists, update the parser so it actually produces the new node.
 
-The parser lives in the `Akbura.Generator/Language` folder, not under `Language/Syntax`.
+The parser lives in the `src/Akbura.Generator/Language` folder, not under `Language/Syntax`.
 
 The main files to inspect first are:
 
-- [Parser.cs](../Akbura.Generator/Language/Parser.cs) for token buffering, `EatToken`, `TryEatToken`, missing tokens, and parser lifetime;
-- [Parser_LanguageParser.cs](../Akbura.Generator/Language/Parser_LanguageParser.cs) for the main grammar productions;
-- [Parser.Incremental.cs](../Akbura.Generator/Language/Parser.Incremental.cs) for incremental parsing hooks;
-- [Blender.cs](../Akbura.Generator/Language/Blender.cs) and `Blender.*.cs` for old-tree reuse;
-- [ComponentSyntaxTree.cs](../Akbura.Generator/Language/ComponentSyntaxTree.cs) and [AkcssSyntaxTree.cs](../Akbura.Generator/Language/AkcssSyntaxTree.cs) for `ParseText(...)` and `WithChangedText(...)`.
+- [Parser.cs](../src/Akbura.Generator/Language/Parser.cs) for token buffering, `EatToken`, `TryEatToken`, missing tokens, and parser lifetime;
+- [Parser_LanguageParser.cs](../src/Akbura.Generator/Language/Parser_LanguageParser.cs) for the main grammar productions;
+- [Parser.Incremental.cs](../src/Akbura.Generator/Language/Parser.Incremental.cs) for incremental parsing hooks;
+- [Blender.cs](../src/Akbura.Generator/Language/Blender.cs) and `Blender.*.cs` for old-tree reuse;
+- [ComponentSyntaxTree.cs](../src/Akbura.Generator/Language/ComponentSyntaxTree.cs) and [AkcssSyntaxTree.cs](../src/Akbura.Generator/Language/AkcssSyntaxTree.cs) for `ParseText(...)` and `WithChangedText(...)`.
 
 Usually parser wiring means:
 
@@ -784,7 +784,7 @@ If in doubt, ask: "Can another piece of code refer to this by name?" If yes, it 
 
 A `Declaration` is not a symbol. It is a lightweight source declaration tree used to organize the project before full semantic binding.
 
-Declaration files live in [Akbura.Generator/Language/Declarations](../Akbura.Generator/Language/Declarations).
+Declaration files live in [src/Akbura.Generator/Language/Declarations](../src/Akbura.Generator/Language/Declarations).
 
 Important files:
 
@@ -851,7 +851,7 @@ Declarations should stay cheap. Do not do C# binding, type resolution, overload 
 
 An `ISymbol` represents a semantic entity that users or other semantic layers can refer to by name.
 
-Symbol files live in [Akbura.Generator/Language/Symbols](../Akbura.Generator/Language/Symbols).
+Symbol files live in [src/Akbura.Generator/Language/Symbols](../src/Akbura.Generator/Language/Symbols).
 
 Create a symbol when the new syntax declares something like:
 
@@ -904,7 +904,7 @@ Symbols should describe facts, not perform binding. If computing a property requ
 
 A `Binder` is a scope-aware semantic worker. It owns lookup and creates bound nodes.
 
-Binder files live in [Akbura.Generator/Language/Binder](../Akbura.Generator/Language/Binder).
+Binder files live in [src/Akbura.Generator/Language/Binder](../src/Akbura.Generator/Language/Binder).
 
 The base binder chain is a chain of responsibility:
 
@@ -979,7 +979,7 @@ var boundExpression = SemanticModel.BindingSession.BindExpression(
 
 A `BoundNode` is the internal semantic tree. It is not public API and it is not an operation.
 
-Bound node files live in [Akbura.Generator/Language/BoundTree](../Akbura.Generator/Language/BoundTree).
+Bound node files live in [src/Akbura.Generator/Language/BoundTree](../src/Akbura.Generator/Language/BoundTree).
 
 `BoundNode` stores:
 
@@ -1057,7 +1057,7 @@ Bound nodes should not answer UI-style questions like "what operation should an 
 
 An `IOperation` is the semantic operation tree materialized from a `BoundNode`.
 
-Operation files live in [Akbura.Generator/Language/Operations](../Akbura.Generator/Language/Operations).
+Operation files live in [src/Akbura.Generator/Language/Operations](../src/Akbura.Generator/Language/Operations).
 
 Create an operation when consumers should be able to inspect an executable or semantic action through `GetOperation(...)`.
 

@@ -17,7 +17,7 @@ Insert an application-specific builder at index `0` when it should be preferred 
 Create this file:
 
 ```text
-Akbura.FeatureGallery/Akbura.FeatureGallery/Diagnostics/RouteInputBuilder.cs
+src/Akbura.FeatureGallery/Akbura.FeatureGallery/Diagnostics/RouteInputBuilder.cs
 ```
 
 Add the following implementation:
@@ -141,7 +141,7 @@ Akbura.FeatureGallery.Diagnostics.RouteInputBuilder.Icon
 Add the geometry inside `Application.Resources` in:
 
 ```text
-Akbura.FeatureGallery/Akbura.FeatureGallery/App.axaml
+src/Akbura.FeatureGallery/Akbura.FeatureGallery/App.axaml
 ```
 
 Place it in the existing `ResourceDictionary`, after `ResourceDictionary.MergedDictionaries` and before the closing `</ResourceDictionary>`:

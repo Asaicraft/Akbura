@@ -6,31 +6,31 @@
     <BuildType Name="ReleaseStats" />
   </Configurations>
   <Folder Name="/Akbura.FeatureGallery/">
-    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.Android/Akbura.FeatureGallery.Android.csproj" Id="7e04b4ea-3f3d-4ccf-a861-bc2f966f5bbb">
+    <Project Path="src/Akbura.FeatureGallery/Akbura.FeatureGallery.Android/Akbura.FeatureGallery.Android.csproj" Id="7e04b4ea-3f3d-4ccf-a861-bc2f966f5bbb">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
       <Deploy />
     </Project>
-    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.Browser/Akbura.FeatureGallery.Browser.csproj" Id="bbd207de-ea63-42f3-8731-93b79988dee3">
+    <Project Path="src/Akbura.FeatureGallery/Akbura.FeatureGallery.Browser/Akbura.FeatureGallery.Browser.csproj" Id="bbd207de-ea63-42f3-8731-93b79988dee3">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.Desktop/Akbura.FeatureGallery.Desktop.csproj" Id="b08a3d26-04af-47f3-bf06-9b688c6bdc0e">
+    <Project Path="src/Akbura.FeatureGallery/Akbura.FeatureGallery.Desktop/Akbura.FeatureGallery.Desktop.csproj" Id="b08a3d26-04af-47f3-bf06-9b688c6bdc0e">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery.iOS/Akbura.FeatureGallery.iOS.csproj" Id="ff971912-4b75-4a03-aae9-a06e39da2b71">
+    <Project Path="src/Akbura.FeatureGallery/Akbura.FeatureGallery.iOS/Akbura.FeatureGallery.iOS.csproj" Id="ff971912-4b75-4a03-aae9-a06e39da2b71">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
       <Deploy />
     </Project>
-    <Project Path="Akbura.FeatureGallery/Akbura.FeatureGallery/Akbura.FeatureGallery.csproj" Id="715ad655-2825-4130-b148-45d5a392e758">
+    <Project Path="src/Akbura.FeatureGallery/Akbura.FeatureGallery/Akbura.FeatureGallery.csproj" Id="715ad655-2825-4130-b148-45d5a392e758">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
   </Folder>
   <Folder Name="/Akbura.Previewer/">
-    <Project Path="Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj">
+    <Project Path="src/Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
@@ -54,54 +54,54 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/Workspaces/">
-    <Project Path="Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj">
+    <Project Path="src/Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Workspaces/Akbura.LanguageServer.Protocol/Akbura.LanguageServer.Protocol.csproj">
+    <Project Path="src/Workspaces/Akbura.LanguageServer.Protocol/Akbura.LanguageServer.Protocol.csproj">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj">
+    <Project Path="src/Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Workspaces/Akbura.LanguageServer/Akbura.LanguageServer.csproj">
+    <Project Path="src/Workspaces/Akbura.LanguageServer/Akbura.LanguageServer.csproj">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj" Id="e0c6426f-ece8-4de0-a40c-c22d196bbc1a">
+    <Project Path="src/Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj" Id="e0c6426f-ece8-4de0-a40c-c22d196bbc1a">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
       <Deploy />
     </Project>
-    <Project Path="Workspaces/Akbura.VisualStudio/Akbura.VisualStudio.csproj" Id="18328b7e-6083-4ea1-b033-ca3f27686a2c">
+    <Project Path="src/Workspaces/Akbura.VisualStudio/Akbura.VisualStudio.csproj" Id="18328b7e-6083-4ea1-b033-ca3f27686a2c">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Workspaces/Akbura.Workspaces.MSBuild/Akbura.Workspaces.MSBuild.csproj" Id="1e620b9a-a42e-4ad1-8448-9ccdf85fc284">
+    <Project Path="src/Workspaces/Akbura.Workspaces.MSBuild/Akbura.Workspaces.MSBuild.csproj" Id="1e620b9a-a42e-4ad1-8448-9ccdf85fc284">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj" Id="8284f1e6-0ff7-489c-8fbb-cbe81cd250fc">
+    <Project Path="src/Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj" Id="8284f1e6-0ff7-489c-8fbb-cbe81cd250fc">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
-    <Project Path="Workspaces/Akbura.Workspaces/Akbura.Workspaces.csproj" Id="ec1f02fc-0d05-4701-bbc2-63fcc4823ff9">
+    <Project Path="src/Workspaces/Akbura.Workspaces/Akbura.Workspaces.csproj" Id="ec1f02fc-0d05-4701-bbc2-63fcc4823ff9">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
   </Folder>
-  <Project Path="Akbura.AotTest/Akbura.AotTest.csproj" />
-  <Project Path="Akbura.Benchmarks/Akbura.Benchmarks.csproj" />
-  <Project Path="Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />
-  <Project Path="Akbura.Diagnostics/Akbura.Diagnostics.csproj" />
-  <Project Path="Akbura.Furioso/Akbura.Furioso.csproj" Id="3ee5ad67-1b8f-4c3b-b023-626bc70e7a00" />
-  <Project Path="Akbura.Generator/Akbura.Generator.csproj" />
-  <Project Path="Akbura.Preview/Akbura.Preview.csproj" />
-  <Project Path="Akbura.UnitTests/Akbura.UnitTests.csproj" />
-  <Project Path="Akbura/Akbura.csproj" />
-  <Project Path="AkburaDocs/AkburaDocs.csproj">
+  <Project Path="src/Akbura.AotTest/Akbura.AotTest.csproj" />
+  <Project Path="src/Akbura.Benchmarks/Akbura.Benchmarks.csproj" />
+  <Project Path="src/Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />
+  <Project Path="src/Akbura.Diagnostics/Akbura.Diagnostics.csproj" />
+  <Project Path="src/Akbura.Furioso/Akbura.Furioso.csproj" Id="3ee5ad67-1b8f-4c3b-b023-626bc70e7a00" />
+  <Project Path="src/Akbura.Generator/Akbura.Generator.csproj" />
+  <Project Path="src/Akbura.Preview/Akbura.Preview.csproj" />
+  <Project Path="src/Akbura.UnitTests/Akbura.UnitTests.csproj" />
+  <Project Path="src/Akbura/Akbura.csproj" />
+  <Project Path="src/AkburaDocs/AkburaDocs.csproj">
     <BuildType Solution="DebugStats|*" Project="Debug" />
     <BuildType Solution="ReleaseStats|*" Project="Release" />
   </Project>

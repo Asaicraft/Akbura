@@ -115,7 +115,7 @@ public sealed class GalleryOptions
         "master";
 
     public string PathToGallery { get; set; } =
-        "Akbura.FeatureGallery/Akbura.FeatureGallery";
+        "src/Akbura.FeatureGallery/Akbura.FeatureGallery";
 }
 ```
 

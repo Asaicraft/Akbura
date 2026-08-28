@@ -8,8 +8,8 @@ on:
     branches:
       - master
     paths:
-      - "AkburaDocs/**"
-      - "Akbura.FeatureGallery/**"
+      - "src/AkburaDocs/**"
+      - "src/Akbura.FeatureGallery/**"
       - ".github/workflows/build.yml"
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
         run: dotnet workload install wasm-tools
 
       - name: Build
-        working-directory: ./AkburaDocs
+        working-directory: ./src/AkburaDocs
         run: dotnet build .
 
       - name: Assign default GitHub URL base path
@@ -42,11 +42,11 @@ jobs:
           repo_name=$(echo "${{ github.repository }}" | cut -d '/' -f 2)
           org_name=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
 
-          if [ ! -f "./AkburaDocs/wwwroot/CNAME" ] && [ -z "$custom_domain" ]; then
+          if [ ! -f "./src/AkburaDocs/wwwroot/CNAME" ] && [ -z "$custom_domain" ]; then
             echo "ssg_base_href=https://$org_name.github.io/$repo_name/" >> "$GITHUB_ENV"
           elif [ -n "$custom_domain" ]; then
-            echo "Persist CNAME '$custom_domain' to ./AkburaDocs/wwwroot/CNAME"
-            echo "$custom_domain" > ./AkburaDocs/wwwroot/CNAME
+            echo "Persist CNAME '$custom_domain' to ./src/AkburaDocs/wwwroot/CNAME"
+            echo "$custom_domain" > ./src/AkburaDocs/wwwroot/CNAME
             echo "custom_domain=$custom_domain" >> "$GITHUB_ENV"
           fi
 
@@ -58,11 +58,11 @@ jobs:
           chmod +x /home/runner/.local/bin/tailwindcss
 
       - name: Build Tailwind
-        working-directory: ./AkburaDocs
+        working-directory: ./src/AkburaDocs
         run: npm run build
 
       - name: Prerender
-        working-directory: ./AkburaDocs
+        working-directory: ./src/AkburaDocs
         run: |
           site_base_href="${{ env.ssg_base_href }}"
 
@@ -86,23 +86,23 @@ jobs:
       - name: Publish Feature Gallery
         run: |
           dotnet publish \
-            ./Akbura.FeatureGallery/Akbura.FeatureGallery.Browser/Akbura.FeatureGallery.Browser.csproj \
+            ./src/Akbura.FeatureGallery/Akbura.FeatureGallery.Browser/Akbura.FeatureGallery.Browser.csproj \
             --configuration Release \
             --output "${{ runner.temp }}/feature-gallery"
 
       - name: Add Feature Gallery to site
         run: |
-          mkdir -p ./AkburaDocs/dist/Gallery
-          cp -a "${{ runner.temp }}/feature-gallery/wwwroot/." ./AkburaDocs/dist/Gallery/
+          mkdir -p ./src/AkburaDocs/dist/Gallery
+          cp -a "${{ runner.temp }}/feature-gallery/wwwroot/." ./src/AkburaDocs/dist/Gallery/
 
-          test -f ./AkburaDocs/dist/404.html
-          test -f ./AkburaDocs/dist/Gallery/index.html
-          test -d ./AkburaDocs/dist/Gallery/_framework
+          test -f ./src/AkburaDocs/dist/404.html
+          test -f ./src/AkburaDocs/dist/Gallery/index.html
+          test -d ./src/AkburaDocs/dist/Gallery/_framework
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GH_PAGES_TOKEN }}
-          publish_dir: ./AkburaDocs/dist
+          publish_dir: ./src/AkburaDocs/dist
           user_name: GitHub Action
           user_email: action@github.com

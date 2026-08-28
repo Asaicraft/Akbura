@@ -363,8 +363,8 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Akbura VS Code extension build output
-/Workspaces/Akbura.LanguageServer.VsCode/node_modules/
-/Workspaces/Akbura.LanguageServer.VsCode/dist/
-/Workspaces/Akbura.LanguageServer.VsCode/server/
-/Workspaces/Akbura.LanguageServer.VsCode/.vscode-test/
-/Workspaces/Akbura.LanguageServer.VsCode/*.vsix
+/src/Workspaces/Akbura.LanguageServer.VsCode/node_modules/
+/src/Workspaces/Akbura.LanguageServer.VsCode/dist/
+/src/Workspaces/Akbura.LanguageServer.VsCode/server/
+/src/Workspaces/Akbura.LanguageServer.VsCode/.vscode-test/
+/src/Workspaces/Akbura.LanguageServer.VsCode/*.vsix

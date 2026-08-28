@@ -1,0 +1,295 @@
+name: Publish Akbura VS Code Extension
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "vscode-v*"
+
+permissions: {}
+
+concurrency:
+  group: akbura-vscode-marketplace
+  cancel-in-progress: false
+
+env:
+  EXTENSION_DIRECTORY: Workspaces/Akbura.LanguageServer.VsCode
+  VSCE_VERSION: "3.9.2"
+  AZURE_CORE_OUTPUT: none
+  AZURE_LOGIN_PRE_CLEANUP: "true"
+  AZURE_LOGIN_POST_CLEANUP: "true"
+
+jobs:
+  bootstrap:
+    name: Get Marketplace profile ID
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: vscode-marketplace
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Verify bootstrap ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
+            echo "::error::Marketplace bootstrap must be dispatched from the master branch."
+            exit 1
+          fi
+
+      - name: Sign in to Azure with GitHub OIDC
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Print Marketplace profile ID
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          profile_id="$(
+            az rest \
+              --method get \
+              --url "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1" \
+              --resource "499b84ac-1321-427f-aa17-267ca6975798" \
+              --query id \
+              --output tsv
+          )"
+
+          if [[ ! "$profile_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "::error::Marketplace Profile ID was not returned as a GUID."
+            exit 1
+          fi
+
+          echo "::notice title=Marketplace Profile ID::$profile_id"
+          {
+            echo "## Marketplace bootstrap"
+            echo
+            echo "Managed identity Marketplace Profile ID:"
+            echo
+            echo "\`$profile_id\`"
+            echo
+            echo "Add this ID to publisher **asaicraft** as a **Contributor**."
+            echo
+            echo "This workflow_dispatch run did not publish an extension."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  package:
+    name: Test and package release VSIX
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/vscode-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      vsix-name: ${{ steps.release.outputs.vsix-name }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: >
+            Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
+
+      - name: Verify release tag and metadata
+        id: release
+        working-directory: ${{ env.EXTENSION_DIRECTORY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin master:refs/remotes/origin/master
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::Release tag must point to a commit on master."
+            exit 1
+          fi
+
+          package_version="$(node -p "require('./package.json').version")"
+          lock_version="$(node -p "require('./package-lock.json').version")"
+          package_name="$(node -p "require('./package.json').name")"
+          publisher="$(node -p "require('./package.json').publisher")"
+          expected_tag="vscode-v${package_version}"
+
+          if [[ ! "$GITHUB_REF_NAME" =~ ^vscode-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag '$GITHUB_REF_NAME' must have the form 'vscode-vX.Y.Z'."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF_NAME" != "$expected_tag" ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match package version '$package_version'. Expected '$expected_tag'."
+            exit 1
+          fi
+
+          if [[ "$lock_version" != "$package_version" ]]; then
+            echo "::error::package-lock.json version '$lock_version' does not match package.json version '$package_version'."
+            exit 1
+          fi
+
+          if [[ "$package_name" != "akbura-language-server" ]]; then
+            echo "::error::Unexpected extension name '$package_name'."
+            exit 1
+          fi
+
+          if [[ "$publisher" != "asaicraft" ]]; then
+            echo "::error::Unexpected extension publisher '$publisher'."
+            exit 1
+          fi
+
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "vsix-name=akbura-language-server-${package_version}.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: Restore LSP projects
+        shell: bash
+        run: |
+          dotnet restore \
+            Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+          dotnet restore \
+            Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+          dotnet restore \
+            Akbura.Previewer/Akbura.Previewer/Akbura.Previewer.csproj
+
+      - name: Test LSP unit tests
+        run: >
+          dotnet test
+          Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Test LSP integration tests
+        run: >
+          dotnet test
+          Workspaces/Akbura.LanguageServer.IntegrationTests/Akbura.LanguageServer.IntegrationTests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Install extension dependencies
+        working-directory: ${{ env.EXTENSION_DIRECTORY }}
+        run: npm ci
+
+      - name: Package VSIX
+        working-directory: ${{ env.EXTENSION_DIRECTORY }}
+        shell: bash
+        env:
+          VSIX_NAME: ${{ steps.release.outputs.vsix-name }}
+        run: >
+          npx --yes "@vscode/vsce@${VSCE_VERSION}"
+          package
+          --out "$VSIX_NAME"
+
+      - name: Verify packaged language server
+        working-directory: ${{ env.EXTENSION_DIRECTORY }}
+        run: npm run verify-server
+
+      - name: Upload release VSIX
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-vscode-extension-${{ steps.release.outputs.version }}
+          path: >
+            ${{ env.EXTENSION_DIRECTORY }}/${{ steps.release.outputs.vsix-name }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  publish:
+    name: Publish to Visual Studio Marketplace
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/vscode-v')
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: vscode-marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-language-server
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download release VSIX
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-vscode-extension-${{ needs.package.outputs.version }}
+          path: ${{ runner.temp }}/akbura-vscode-extension
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Install VSCE
+        shell: bash
+        run: npm install --global "@vscode/vsce@${VSCE_VERSION}"
+
+      - name: Verify downloaded VSIX
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ needs.package.outputs.version }}
+          VSIX_PATH: >
+            ${{ runner.temp }}/akbura-vscode-extension/${{ needs.package.outputs.vsix-name }}
+        run: |
+          set -euo pipefail
+
+          test -f "$VSIX_PATH"
+          unzip -p "$VSIX_PATH" extension/package.json | node -e '
+            const manifest = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const expectedVersion = process.env.EXPECTED_VERSION;
+            const actual = `${manifest.publisher}.${manifest.name}@${manifest.version}`;
+            const expected = `asaicraft.akbura-language-server@${expectedVersion}`;
+
+            if (actual !== expected) {
+              console.error(`Unexpected VSIX identity: ${actual}; expected ${expected}.`);
+              process.exit(1);
+            }
+
+            console.log(`Verified VSIX identity: ${actual}`);
+          '
+          sha256sum "$VSIX_PATH"
+
+      - name: Sign in to Azure with GitHub OIDC
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Publish VSIX
+        shell: bash
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          VSIX_PATH: >
+            ${{ runner.temp }}/akbura-vscode-extension/${{ needs.package.outputs.vsix-name }}
+        run: >
+          vsce publish
+          --packagePath "$VSIX_PATH"
+          --azure-credential
+
+      - name: Write publication summary
+        shell: bash
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          {
+            echo "## Visual Studio Marketplace"
+            echo
+            echo "Published **asaicraft.akbura-language-server** version **$VERSION**."
+          } >> "$GITHUB_STEP_SUMMARY"

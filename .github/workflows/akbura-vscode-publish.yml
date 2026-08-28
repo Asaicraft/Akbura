@@ -244,8 +244,7 @@ jobs:
         shell: bash
         env:
           EXPECTED_VERSION: ${{ needs.package.outputs.version }}
-          VSIX_PATH: >
-            ${{ runner.temp }}/akbura-vscode-extension/${{ needs.package.outputs.vsix-name }}
+          VSIX_PATH: ${{ runner.temp }}/akbura-vscode-extension/${{ needs.package.outputs.vsix-name }}
         run: |
           set -euo pipefail
 
@@ -276,8 +275,7 @@ jobs:
         shell: bash
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          VSIX_PATH: >
-            ${{ runner.temp }}/akbura-vscode-extension/${{ needs.package.outputs.vsix-name }}
+          VSIX_PATH: ${{ runner.temp }}/akbura-vscode-extension/${{ needs.package.outputs.vsix-name }}
         run: >
           vsce publish
           --packagePath "$VSIX_PATH"

@@ -1,0 +1,15 @@
+{
+  "categories": [
+    "coding",
+    "programming languages"
+  ],
+  "identity": {
+    "internalName": "akbura-visual-studio-extension"
+  },
+  "overview": "overview.md",
+  "priceCategory": "free",
+  "publisher": "asaicraft",
+  "private": false,
+  "qna": true,
+  "repo": "https://github.com/Asaicraft/Akbura"
+}

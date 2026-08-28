@@ -1,0 +1,112 @@
+name: Akbura Visual Studio Extension
+
+on:
+  pull_request:
+    paths:
+      - "Akbura.Generator/**"
+      - "Workspaces/Akbura.Workspaces/**"
+      - "Workspaces/Akbura.Workspaces.UnitTests/**"
+      - "Workspaces/Akbura.VisualStudio/**"
+      - "Workspaces/Akbura.VisualStudio.Vsix/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - ".github/workflows/akbura-visualstudio.yml"
+      - ".github/workflows/akbura-visualstudio-publish.yml"
+
+  push:
+    branches:
+      - master
+    paths:
+      - "Akbura.Generator/**"
+      - "Workspaces/Akbura.Workspaces/**"
+      - "Workspaces/Akbura.Workspaces.UnitTests/**"
+      - "Workspaces/Akbura.VisualStudio/**"
+      - "Workspaces/Akbura.VisualStudio.Vsix/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - ".github/workflows/akbura-visualstudio.yml"
+      - ".github/workflows/akbura-visualstudio-publish.yml"
+
+permissions: {}
+
+env:
+  VSIX_PROJECT_PATH: Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj
+  VSIX_OUTPUT_PATH: Workspaces/Akbura.VisualStudio.Vsix/bin/Release/net472/Akbura.VisualStudio.Vsix.vsix
+  PUBLISH_MANIFEST_PATH: Workspaces/Akbura.VisualStudio.Vsix/vs-publish.json
+  VERIFY_SCRIPT_PATH: Workspaces/Akbura.VisualStudio.Vsix/scripts/verify-vsix.ps1
+
+jobs:
+  build:
+    name: Build Visual Studio VSIX
+    runs-on: windows-2022
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore Visual Studio projects
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet restore Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj
+          if ($LASTEXITCODE -ne 0) {
+            throw "Workspace test restore failed with exit code $LASTEXITCODE."
+          }
+          dotnet restore $env:VSIX_PROJECT_PATH
+          if ($LASTEXITCODE -ne 0) {
+            throw "Visual Studio restore failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Test workspace services
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet test Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj `
+            --configuration Release `
+            --no-restore
+          if ($LASTEXITCODE -ne 0) {
+            throw "Workspace tests failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Build Release VSIX
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build $env:VSIX_PROJECT_PATH `
+            --configuration Release `
+            --no-restore
+          if ($LASTEXITCODE -ne 0) {
+            throw "Visual Studio VSIX build failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Verify Visual Studio VSIX
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [xml] $sourceManifest = Get-Content -Raw -LiteralPath `
+            Workspaces/Akbura.VisualStudio.Vsix/source.extension.vsixmanifest
+          $version = [string] $sourceManifest.PackageManifest.Metadata.Identity.Version
+
+          & $env:VERIFY_SCRIPT_PATH `
+            -VsixPath $env:VSIX_OUTPUT_PATH `
+            -ExpectedVersion $version `
+            -PublishManifestPath $env:PUBLISH_MANIFEST_PATH
+
+      - name: Upload Visual Studio VSIX
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-visualstudio-extension
+          path: ${{ env.VSIX_OUTPUT_PATH }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

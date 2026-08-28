@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.1
+
+- Renamed the extension to Akbura Vs Code Extension.
+
 ## 0.1.0
 
 - Added language declarations and TextMate grammars for `.akbura` and `.akcss`.

@@ -1,9 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "akbura-language-server",
-  "displayName": "Akbura Language Support",
+  "displayName": "Akbura Vs Code Extension",
   "description": "Language support for .akbura and .akcss files powered by Akbura Language Server.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "asaicraft",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {

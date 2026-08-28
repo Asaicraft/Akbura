@@ -1,4 +1,4 @@
-name: Akbura VS Code Extension
+name: Akbura Vs Code Extension
 
 on:
   pull_request:

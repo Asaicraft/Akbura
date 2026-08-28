@@ -8,6 +8,10 @@ async function run() {
     );
 
     assert.ok(extension, 'The Akbura extension was not installed.');
+    assert.equal(
+        extension.packageJSON.displayName,
+        'Akbura Vs Code Extension'
+    );
     await extension.activate();
 
     const document = await vscode.workspace.openTextDocument({

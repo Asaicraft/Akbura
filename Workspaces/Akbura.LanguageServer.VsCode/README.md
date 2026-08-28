@@ -1,4 +1,4 @@
-# Akbura Language Support
+# Akbura Vs Code Extension
 
 Visual Studio Code support for `.akbura` and `.akcss` files.
 

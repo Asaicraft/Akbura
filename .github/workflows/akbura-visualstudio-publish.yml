@@ -1,0 +1,269 @@
+name: Publish Akbura Visual Studio Extension
+
+on:
+  push:
+    tags:
+      - "visualstudio-v*"
+
+permissions: {}
+
+concurrency:
+  group: akbura-visualstudio-marketplace
+  cancel-in-progress: false
+
+env:
+  VSIX_PROJECT_PATH: Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj
+  VSIX_OUTPUT_PATH: Workspaces/Akbura.VisualStudio.Vsix/bin/Release/net472/Akbura.VisualStudio.Vsix.vsix
+  PUBLISH_MANIFEST_PATH: Workspaces/Akbura.VisualStudio.Vsix/vs-publish.json
+  OVERVIEW_PATH: Workspaces/Akbura.VisualStudio.Vsix/overview.md
+  VERIFY_SCRIPT_PATH: Workspaces/Akbura.VisualStudio.Vsix/scripts/verify-vsix.ps1
+
+jobs:
+  package:
+    name: Test and package Visual Studio VSIX
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/visualstudio-v')
+    runs-on: windows-2022
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      vsix-name: ${{ steps.release.outputs.vsix-name }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Verify release tag and metadata
+        id: release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git fetch --no-tags origin master:refs/remotes/origin/master
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to fetch origin/master.'
+          }
+
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/master
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Release tag must point to a commit on master.'
+          }
+
+          if ($env:GITHUB_REF_NAME -notmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+)$') {
+            throw "Release tag '$env:GITHUB_REF_NAME' must have the form 'visualstudio-vX.Y.Z'."
+          }
+          $tagVersion = $Matches[1]
+
+          [xml] $sourceManifest = Get-Content -Raw -LiteralPath `
+            Workspaces/Akbura.VisualStudio.Vsix/source.extension.vsixmanifest
+          $identity = $sourceManifest.PackageManifest.Metadata.Identity
+          $manifestVersion = [string] $identity.Version
+
+          if ($manifestVersion -cne $tagVersion) {
+            throw "Tag version '$tagVersion' does not match VSIX version '$manifestVersion'."
+          }
+          if ([string] $identity.Id -cne 'Akbura.VisualStudio.Vsix.09fb6c7e-e90e-4536-ac90-4c71949913da') {
+            throw "Unexpected source VSIX ID '$($identity.Id)'."
+          }
+          if ([string] $identity.Publisher -cne 'Asaicraft') {
+            throw "Unexpected source VSIX publisher '$($identity.Publisher)'."
+          }
+          $displayName = [string] $sourceManifest.PackageManifest.Metadata.DisplayName
+          if ($displayName.Trim() -cne 'Akbura Visual Studio Extension') {
+            throw "Unexpected source VSIX display name '$displayName'."
+          }
+
+          "version=$manifestVersion" | Out-File `
+            -FilePath $env:GITHUB_OUTPUT `
+            -Encoding utf8 `
+            -Append
+          "vsix-name=akbura-visual-studio-extension-$manifestVersion.vsix" | Out-File `
+            -FilePath $env:GITHUB_OUTPUT `
+            -Encoding utf8 `
+            -Append
+
+      - name: Restore Visual Studio projects
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet restore Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj
+          if ($LASTEXITCODE -ne 0) {
+            throw "Workspace test restore failed with exit code $LASTEXITCODE."
+          }
+          dotnet restore $env:VSIX_PROJECT_PATH
+          if ($LASTEXITCODE -ne 0) {
+            throw "Visual Studio restore failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Test workspace services
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet test Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj `
+            --configuration Release `
+            --no-restore
+          if ($LASTEXITCODE -ne 0) {
+            throw "Workspace tests failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Build Release VSIX
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build $env:VSIX_PROJECT_PATH `
+            --configuration Release `
+            --no-restore
+          if ($LASTEXITCODE -ne 0) {
+            throw "Visual Studio VSIX build failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Verify Visual Studio VSIX
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:VERIFY_SCRIPT_PATH `
+            -VsixPath $env:VSIX_OUTPUT_PATH `
+            -ExpectedVersion $env:EXPECTED_VERSION `
+            -PublishManifestPath $env:PUBLISH_MANIFEST_PATH
+
+      - name: Stage Marketplace artifact
+        shell: pwsh
+        env:
+          VSIX_NAME: ${{ steps.release.outputs.vsix-name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactDirectory = Join-Path `
+            $env:RUNNER_TEMP `
+            'akbura-visualstudio-extension'
+          New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+
+          Copy-Item -LiteralPath $env:VSIX_OUTPUT_PATH `
+            -Destination (Join-Path $artifactDirectory $env:VSIX_NAME)
+          Copy-Item -LiteralPath $env:PUBLISH_MANIFEST_PATH `
+            -Destination (Join-Path $artifactDirectory 'vs-publish.json')
+          Copy-Item -LiteralPath $env:OVERVIEW_PATH `
+            -Destination (Join-Path $artifactDirectory 'overview.md')
+          Copy-Item -LiteralPath $env:VERIFY_SCRIPT_PATH `
+            -Destination (Join-Path $artifactDirectory 'verify-vsix.ps1')
+
+      - name: Upload Marketplace artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-visualstudio-extension-${{ steps.release.outputs.version }}
+          path: ${{ runner.temp }}/akbura-visualstudio-extension
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  publish:
+    name: Publish to Visual Studio Marketplace
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/visualstudio-v')
+    needs: package
+    runs-on: windows-2022
+    timeout-minutes: 15
+    environment:
+      name: visualstudio-marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-visual-studio-extension
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Download Marketplace artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-visualstudio-extension-${{ needs.package.outputs.version }}
+          path: ${{ runner.temp }}/akbura-visualstudio-extension
+
+      - name: Verify downloaded VSIX and metadata
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ needs.package.outputs.version }}
+          VSIX_PATH: ${{ runner.temp }}/akbura-visualstudio-extension/${{ needs.package.outputs.vsix-name }}
+          PUBLISH_MANIFEST_PATH: ${{ runner.temp }}/akbura-visualstudio-extension/vs-publish.json
+          VERIFY_SCRIPT_PATH: ${{ runner.temp }}/akbura-visualstudio-extension/verify-vsix.ps1
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:VERIFY_SCRIPT_PATH `
+            -VsixPath $env:VSIX_PATH `
+            -ExpectedVersion $env:EXPECTED_VERSION `
+            -PublishManifestPath $env:PUBLISH_MANIFEST_PATH
+
+      - name: Locate VsixPublisher
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path `
+            ${env:ProgramFiles(x86)} `
+            'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
+            throw "vswhere.exe was not found at '$vswhere'."
+          }
+
+          $installations = @(
+            & $vswhere `
+              -latest `
+              -products '*' `
+              -version '[17.0,18.0)' `
+              -requires Microsoft.VisualStudio.Component.VSSDK `
+              -property installationPath
+          )
+          $vsInstallDirectory = $installations |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($vsInstallDirectory)) {
+            throw 'Visual Studio 2022 with the VSSDK component was not found.'
+          }
+
+          $vsixPublisherPath = Join-Path `
+            $vsInstallDirectory.Trim() `
+            'VSSDK\VisualStudioIntegration\Tools\Bin\VsixPublisher.exe'
+          if (-not (Test-Path -LiteralPath $vsixPublisherPath -PathType Leaf)) {
+            throw "VsixPublisher.exe was not found at '$vsixPublisherPath'."
+          }
+
+          "VSIX_PUBLISHER_PATH=$vsixPublisherPath" | Out-File `
+            -FilePath $env:GITHUB_ENV `
+            -Encoding utf8 `
+            -Append
+
+      - name: Publish VSIX
+        shell: pwsh
+        env:
+          VS_MARKETPLACE_PAT: ${{ secrets.VS_MARKETPLACE_PAT }}
+          VSIX_PATH: ${{ runner.temp }}/akbura-visualstudio-extension/${{ needs.package.outputs.vsix-name }}
+          PUBLISH_MANIFEST_PATH: ${{ runner.temp }}/akbura-visualstudio-extension/vs-publish.json
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:VS_MARKETPLACE_PAT)) {
+            throw 'VS_MARKETPLACE_PAT is missing.'
+          }
+
+          & $env:VSIX_PUBLISHER_PATH publish `
+            -payload $env:VSIX_PATH `
+            -publishManifest $env:PUBLISH_MANIFEST_PATH `
+            -personalAccessToken $env:VS_MARKETPLACE_PAT
+          if ($LASTEXITCODE -ne 0) {
+            throw "VsixPublisher.exe failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Write publication summary
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          @"
+          ## Visual Studio Marketplace
+
+          Published **asaicraft.akbura-visual-studio-extension** version **$env:VERSION**.
+          "@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

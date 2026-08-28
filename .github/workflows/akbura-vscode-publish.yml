@@ -1,4 +1,4 @@
-name: Publish Akbura VS Code Extension
+name: Publish Akbura Vs Code Extension
 
 on:
   workflow_dispatch:
@@ -127,6 +127,7 @@ jobs:
           package_version="$(node -p "require('./package.json').version")"
           lock_version="$(node -p "require('./package-lock.json').version")"
           package_name="$(node -p "require('./package.json').name")"
+          display_name="$(node -p "require('./package.json').displayName")"
           publisher="$(node -p "require('./package.json').publisher")"
           expected_tag="vscode-v${package_version}"
 
@@ -147,6 +148,11 @@ jobs:
 
           if [[ "$package_name" != "akbura-language-server" ]]; then
             echo "::error::Unexpected extension name '$package_name'."
+            exit 1
+          fi
+
+          if [[ "$display_name" != "Akbura Vs Code Extension" ]]; then
+            echo "::error::Unexpected extension display name '$display_name'."
             exit 1
           fi
 
@@ -254,13 +260,19 @@ jobs:
             const expectedVersion = process.env.EXPECTED_VERSION;
             const actual = `${manifest.publisher}.${manifest.name}@${manifest.version}`;
             const expected = `asaicraft.akbura-language-server@${expectedVersion}`;
+            const expectedDisplayName = "Akbura Vs Code Extension";
 
             if (actual !== expected) {
               console.error(`Unexpected VSIX identity: ${actual}; expected ${expected}.`);
               process.exit(1);
             }
 
-            console.log(`Verified VSIX identity: ${actual}`);
+            if (manifest.displayName !== expectedDisplayName) {
+              console.error(`Unexpected VSIX display name: ${manifest.displayName}; expected ${expectedDisplayName}.`);
+              process.exit(1);
+            }
+
+            console.log(`Verified VSIX: ${actual}, ${manifest.displayName}`);
           '
           sha256sum "$VSIX_PATH"
 

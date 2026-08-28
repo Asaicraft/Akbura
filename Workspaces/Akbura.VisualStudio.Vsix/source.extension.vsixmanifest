@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="Akbura.VisualStudio.Vsix.09fb6c7e-e90e-4536-ac90-4c71949913da" Version="0.1.0" Language="en-US" Publisher="Asaicraft" />
+    <Identity Id="Akbura.VisualStudio.Vsix.09fb6c7e-e90e-4536-ac90-4c71949913da" Version="0.1.1" Language="en-US" Publisher="Asaicraft" />
     <DisplayName>Akbura Visual Studio Extension</DisplayName>
     <Description xml:space="preserve">
       Syntax highlighting and editor services for Akbura.
     </Description>
+    <Icon>Resources\Marketplace\icon-90.png</Icon>
+    <PreviewImage>Resources\Marketplace\preview-200.png</PreviewImage>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,)">

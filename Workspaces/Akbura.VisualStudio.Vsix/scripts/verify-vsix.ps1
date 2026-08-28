@@ -27,7 +27,13 @@ $requiredEntries = @(
     'Akbura.VisualStudio.Vsix.dll'
     'Akbura.VisualStudio.Vsix.pkgdef'
     'AkburaFileIcons.pkgdef'
+    'Resources/Marketplace/icon-90.png'
+    'Resources/Marketplace/preview-200.png'
 )
+$expectedImageDimensions = @{
+    'Resources/Marketplace/icon-90.png' = @(90, 90)
+    'Resources/Marketplace/preview-200.png' = @(200, 200)
+}
 
 function Assert-Exact {
     param(
@@ -76,6 +82,33 @@ try {
             throw "VSIX does not contain required entry '$requiredEntry'."
         }
     }
+
+    Add-Type -AssemblyName System.Drawing
+    foreach ($imageEntryName in $expectedImageDimensions.Keys) {
+        $imageEntry = $archive.GetEntry($imageEntryName)
+        $imageStream = $imageEntry.Open()
+        try {
+            $image = [System.Drawing.Image]::FromStream($imageStream)
+            try {
+                $expectedDimensions =
+                    $expectedImageDimensions[$imageEntryName]
+                if ($image.Width -ne $expectedDimensions[0] -or
+                    $image.Height -ne $expectedDimensions[1]) {
+                    throw (
+                        "Unexpected dimensions for '$imageEntryName': " +
+                        "$($image.Width)x$($image.Height); expected " +
+                        "$($expectedDimensions[0])x$($expectedDimensions[1])."
+                    )
+                }
+            }
+            finally {
+                $image.Dispose()
+            }
+        }
+        finally {
+            $imageStream.Dispose()
+        }
+    }
 }
 finally {
     $archive.Dispose()
@@ -108,6 +141,23 @@ if ($null -eq $displayName) {
 Assert-Exact $displayName.InnerText.Trim() $expectedDisplayName `
     'VSIX display name'
 
+$icon = $manifest.SelectSingleNode(
+    '/vs:PackageManifest/vs:Metadata/vs:Icon',
+    $namespaceManager
+)
+if ($null -eq $icon) {
+    throw 'VSIX manifest does not contain Metadata/Icon.'
+}
+Assert-Exact ($icon.InnerText.Trim().Replace('\', '/')) 'Resources/Marketplace/icon-90.png' 'VSIX icon path'
+
+$previewImage = $manifest.SelectSingleNode(
+    '/vs:PackageManifest/vs:Metadata/vs:PreviewImage',
+    $namespaceManager
+)
+if ($null -eq $previewImage) {
+    throw 'VSIX manifest does not contain Metadata/PreviewImage.'
+}
+Assert-Exact ($previewImage.InnerText.Trim().Replace('\', '/')) 'Resources/Marketplace/preview-200.png' 'VSIX preview image path'
 $targets = @($manifest.SelectNodes(
     '/vs:PackageManifest/vs:Installation/vs:InstallationTarget',
     $namespaceManager

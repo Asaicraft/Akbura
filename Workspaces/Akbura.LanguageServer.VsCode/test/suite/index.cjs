@@ -12,6 +12,7 @@ async function run() {
         extension.packageJSON.displayName,
         'Akbura Vs Code Extension'
     );
+    assert.equal(extension.packageJSON.icon, 'icon.png');
     await extension.activate();
 
     const document = await vscode.workspace.openTextDocument({

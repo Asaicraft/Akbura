@@ -19,3 +19,7 @@ Language support for `.akbura` and `.akcss` files in Visual Studio.
 
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
+
+## What's new in 0.1.1
+
+- Added Akbura artwork to the Marketplace listing and Extension Manager.

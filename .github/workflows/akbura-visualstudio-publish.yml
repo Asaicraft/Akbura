@@ -17,6 +17,7 @@ env:
   PUBLISH_MANIFEST_PATH: Workspaces/Akbura.VisualStudio.Vsix/vs-publish.json
   OVERVIEW_PATH: Workspaces/Akbura.VisualStudio.Vsix/overview.md
   VERIFY_SCRIPT_PATH: Workspaces/Akbura.VisualStudio.Vsix/scripts/verify-vsix.ps1
+  VSIX_PUBLISHER_VERSION: "17.13.2126"
 
 jobs:
   package:
@@ -199,44 +200,66 @@ jobs:
             -ExpectedVersion $env:EXPECTED_VERSION `
             -PublishManifestPath $env:PUBLISH_MANIFEST_PATH
 
-      - name: Locate VsixPublisher
+      - name: Install pinned VsixPublisher
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $vswhere = Join-Path `
-            ${env:ProgramFiles(x86)} `
-            'Microsoft Visual Studio\Installer\vswhere.exe'
-          if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
-            throw "vswhere.exe was not found at '$vswhere'."
-          }
 
-          $installations = @(
-            & $vswhere `
-              -latest `
-              -products '*' `
-              -version '[17.0,18.0)' `
-              -requires Microsoft.VisualStudio.Component.VSSDK `
-              -property installationPath
+          $nuget = (Get-Command nuget.exe -ErrorAction Stop).Source
+          $packageDirectory = Join-Path $env:RUNNER_TEMP 'vsix-publisher'
+          $nugetArguments = @(
+            'install'
+            'Microsoft.VSSDK.BuildTools'
+            '-Version'
+            $env:VSIX_PUBLISHER_VERSION
+            '-OutputDirectory'
+            $packageDirectory
+            '-Source'
+            'https://api.nuget.org/v3/index.json'
+            '-NonInteractive'
+            '-DirectDownload'
+            '-NoHttpCache'
           )
-          $vsInstallDirectory = $installations |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Select-Object -First 1
-          if ([string]::IsNullOrWhiteSpace($vsInstallDirectory)) {
-            throw 'Visual Studio 2022 with the VSSDK component was not found.'
+
+          & $nuget @nugetArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw (
+              'Unable to install Microsoft.VSSDK.BuildTools ' +
+              "$env:VSIX_PUBLISHER_VERSION."
+            )
           }
 
-          $vsixPublisherPath = Join-Path `
-            $vsInstallDirectory.Trim() `
-            'VSSDK\VisualStudioIntegration\Tools\Bin\VsixPublisher.exe'
-          if (-not (Test-Path -LiteralPath $vsixPublisherPath -PathType Leaf)) {
-            throw "VsixPublisher.exe was not found at '$vsixPublisherPath'."
+          $packageRoot = Join-Path $packageDirectory (
+            'Microsoft.VSSDK.BuildTools.' +
+            $env:VSIX_PUBLISHER_VERSION
+          )
+          $publisherPath = Join-Path $packageRoot (
+            'tools\vssdk\bin\VsixPublisher.exe'
+          )
+          if (-not (Test-Path -LiteralPath $publisherPath -PathType Leaf)) {
+            throw (
+              'VsixPublisher.exe was not found in ' +
+              "Microsoft.VSSDK.BuildTools $env:VSIX_PUBLISHER_VERSION."
+            )
           }
 
-          "VSIX_PUBLISHER_PATH=$vsixPublisherPath" | Out-File `
-            -FilePath $env:GITHUB_ENV `
-            -Encoding utf8 `
-            -Append
+          $productVersion =
+            (Get-Item -LiteralPath $publisherPath).VersionInfo.ProductVersion
+          if ([string]::IsNullOrWhiteSpace($productVersion) -or
+              -not $productVersion.StartsWith(
+                $env:VSIX_PUBLISHER_VERSION,
+                [System.StringComparison]::Ordinal
+              )) {
+            throw (
+              "Unexpected VsixPublisher product version '$productVersion'."
+            )
+          }
 
+          Write-Host (
+            "Using VsixPublisher $productVersion at '$publisherPath'."
+          )
+          "VSIX_PUBLISHER_PATH=$publisherPath" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Publish VSIX
         shell: pwsh
         env:
@@ -245,18 +268,54 @@ jobs:
           PUBLISH_MANIFEST_PATH: ${{ runner.temp }}/akbura-visualstudio-extension/vs-publish.json
         run: |
           $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+
           if ([string]::IsNullOrWhiteSpace($env:VS_MARKETPLACE_PAT)) {
             throw 'VS_MARKETPLACE_PAT is missing.'
           }
 
-          & $env:VSIX_PUBLISHER_PATH publish `
-            -payload $env:VSIX_PATH `
-            -publishManifest $env:PUBLISH_MANIFEST_PATH `
-            -personalAccessToken $env:VS_MARKETPLACE_PAT
-          if ($LASTEXITCODE -ne 0) {
-            throw "VsixPublisher.exe failed with exit code $LASTEXITCODE."
+          $publisherArguments = @(
+            'publish'
+            '-payload'
+            $env:VSIX_PATH
+            '-publishManifest'
+            $env:PUBLISH_MANIFEST_PATH
+            '-personalAccessToken'
+            $env:VS_MARKETPLACE_PAT
+          )
+          $publisherOutput = @(
+            & $env:VSIX_PUBLISHER_PATH @publisherArguments 2>&1 |
+              ForEach-Object {
+                $line = $_.ToString()
+                Write-Host $line
+                $line
+              }
+          )
+          $publisherExitCode = $LASTEXITCODE
+          $uploadPattern = (
+            "\bVsixPub0038\b\s*:\s*Uploaded\s+" +
+            "'Akbura Visual Studio Extension'\s+" +
+            "to\s+the\s+marketplace\."
+          )
+          $uploadConfirmed = @(
+            $publisherOutput |
+              Where-Object { $_ -match $uploadPattern }
+          ).Count -gt 0
+
+          if ($publisherExitCode -ne 0 -and -not $uploadConfirmed) {
+            throw (
+              'VsixPublisher.exe failed before Marketplace confirmed ' +
+              "the upload. Exit code: $publisherExitCode."
+            )
           }
 
+          if ($publisherExitCode -ne 0 -and $uploadConfirmed) {
+            Write-Warning (
+              'Marketplace confirmed the upload with VsixPub0038, but ' +
+              'VsixPublisher.exe later returned exit code ' +
+              "$publisherExitCode. Treating the publication as successful."
+            )
+          }
       - name: Write publication summary
         shell: pwsh
         env:
@@ -267,3 +326,91 @@ jobs:
 
           Published **asaicraft.akbura-visual-studio-extension** version **$env:VERSION**.
           "@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+  github-release:
+    name: Attach VSIX to GitHub Release
+    if: >
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/visualstudio-v')
+    needs:
+      - package
+      - publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download release VSIX
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-visualstudio-extension-${{ needs.package.outputs.version }}
+          path: ${{ runner.temp }}/akbura-visualstudio-github-release
+
+      - name: Prepare GitHub Release assets
+        id: assets
+        shell: bash
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          SOURCE_VSIX: ${{ runner.temp }}/akbura-visualstudio-github-release/${{ needs.package.outputs.vsix-name }}
+        run: |
+          set -euo pipefail
+
+          release_directory="$RUNNER_TEMP/github-release-assets"
+          release_name="Akbura-Visual-Studio-Extension-$VERSION.vsix"
+          release_path="$release_directory/$release_name"
+          checksum_path="$release_path.sha256"
+
+          mkdir -p "$release_directory"
+          test -f "$SOURCE_VSIX"
+          cp "$SOURCE_VSIX" "$release_path"
+
+          (
+            cd "$release_directory"
+            sha256sum "$release_name" > "$release_name.sha256"
+          )
+
+          echo "vsix=$release_path" >> "$GITHUB_OUTPUT"
+          echo "checksum=$checksum_path" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.package.outputs.version }}
+          VSIX_PATH: ${{ steps.assets.outputs.vsix }}
+          CHECKSUM_PATH: ${{ steps.assets.outputs.checksum }}
+        run: |
+          set -euo pipefail
+
+          title="Akbura Visual Studio Extension $VERSION"
+          notes="$(
+            printf '%s\n\n%s\n\n%s\n' \
+              "Akbura Visual Studio Extension $VERSION." \
+              "Install from the Visual Studio Marketplace or download the VSIX asset below for manual installation." \
+              "Marketplace extension ID: asaicraft.akbura-visual-studio-extension"
+          )"
+
+          if gh release view "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "$title" \
+              --notes "$notes" \
+              --repo "$GITHUB_REPOSITORY"
+            gh release upload "$GITHUB_REF_NAME" \
+              "$VSIX_PATH" \
+              "$CHECKSUM_PATH" \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "$VSIX_PATH" \
+              "$CHECKSUM_PATH" \
+              --verify-tag \
+              --title "$title" \
+              --notes "$notes" \
+              --repo "$GITHUB_REPOSITORY"
+          fi

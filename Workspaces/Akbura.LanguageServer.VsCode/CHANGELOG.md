@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.1.2
+
+- Added the Akbura icon to the VS Code Marketplace package.
+
 ## 0.1.1
 
 - Renamed the extension to Akbura Vs Code Extension.

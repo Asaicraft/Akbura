@@ -92,6 +92,7 @@
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
   </Folder>
+  <Project Path="src/Akbura.BlackSilence/Akbura.BlackSilence.csproj" />
   <Project Path="src/Akbura.AotTest/Akbura.AotTest.csproj" />
   <Project Path="src/Akbura.Benchmarks/Akbura.Benchmarks.csproj" />
   <Project Path="src/Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />

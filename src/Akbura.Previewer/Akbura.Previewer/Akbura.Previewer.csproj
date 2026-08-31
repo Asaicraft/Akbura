@@ -30,7 +30,7 @@
 		<ProjectReference Include="..\..\Akbura.Diagnostics\Akbura.Diagnostics.csproj" />
 		<ProjectReference Include="..\..\Akbura\Akbura.csproj" />
 		<ProjectReference Include="..\..\Akbura.Build.Tasks\Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
-		<ProjectReference Include="..\..\Akbura.Furioso\Akbura.Furioso.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
+		<ProjectReference Include="..\..\Akbura.BlackSilence\Akbura.BlackSilence.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
 	</ItemGroup>
 
 	<Import Project="..\..\Akbura\buildTransitive\Akbura.targets" />

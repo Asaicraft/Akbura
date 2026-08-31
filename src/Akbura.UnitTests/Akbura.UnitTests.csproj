@@ -34,6 +34,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj"/>
 		<ProjectReference Include="..\Akbura.Furioso\Akbura.Furioso.csproj" />
+		<ProjectReference Include="..\Akbura.BlackSilence\Akbura.BlackSilence.csproj" />
 		<ProjectReference Include="..\Akbura.Diagnostics\Akbura.Diagnostics.csproj" />
 		<ProjectReference Include="..\Akbura\Akbura.csproj"/>
 	</ItemGroup>

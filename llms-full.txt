@@ -695,13 +695,6 @@ This Grid contains:
   * a fixed row with a height of `48`.
 
 
-Для файла хорошо подойдёт путь:
-
-```text
-AkburaDocs/_pages/akbura/grid.md
-````
-
-
 # ItemsControl
 Source: Akbura/akbura/items-control
 
@@ -1520,7 +1513,7 @@ public sealed class GalleryOptions
         "master";
 
     public string PathToGallery { get; set; } =
-        "Akbura.FeatureGallery/Akbura.FeatureGallery";
+        "src/Akbura.FeatureGallery/Akbura.FeatureGallery";
 }
 ```
 

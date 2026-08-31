@@ -4629,6 +4629,126 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_CompiledElementNameBinding_UsesForwardDeclaredElementType()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <StackPanel>
+                <TextBlock Text=${CompiledBinding #input.Text} />
+                <TextBox x.Name="input" />
+            </StackPanel>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(AvaloniaBindingCSharpCode));
+        var textBlock = Assert.Single(
+            syntaxTree.GetRootSyntax()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() == "TextBlock");
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        var binding = Assert.IsType<MarkupBindingValue>(extension.Binding);
+
+        Assert.Equal(MarkupBindingKind.Compiled, binding.Kind);
+        Assert.Equal("#input.Text", binding.Path);
+        Assert.Collection(
+            binding.PathElements,
+            input =>
+            {
+                Assert.Equal(MarkupBindingPathElementKind.ElementName, input.Kind);
+                Assert.Equal("#input", input.Text);
+                Assert.Equal("Avalonia.Controls.TextBox", input.Type.Symbol?.ToDisplayString());
+            },
+            text =>
+            {
+                Assert.Equal(MarkupBindingPathElementKind.Property, text.Kind);
+                Assert.Equal("Text", text.Text);
+                Assert.Equal(
+                    SpecialType.System_String,
+                    Assert.IsAssignableFrom<ITypeSymbol>(text.Type.Symbol).SpecialType);
+            });
+        Assert.Equal(
+            SpecialType.System_String,
+            Assert.IsAssignableFrom<ITypeSymbol>(binding.ResultType.Symbol).SpecialType);
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(
+                " | ",
+                semanticModel.GetSemanticDiagnostics(textAttribute)
+                    .Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_CompiledBindingElementNameProperty_UsesForwardDeclaredElementType()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            <StackPanel>
+                <TextBlock Text=${CompiledBinding Path=Text, ElementName=input} />
+                <TextBox x.Name="input" />
+            </StackPanel>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(AvaloniaBindingCSharpCode));
+        var textBlock = Assert.Single(
+            syntaxTree.GetRootSyntax()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() == "TextBlock");
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        var binding = Assert.IsType<MarkupBindingValue>(extension.Binding);
+        var elementName = Assert.Single(
+            extension.Properties,
+            static property => property.Name == "ElementName");
+        var text = Assert.Single(binding.PathElements);
+
+        Assert.Equal(MarkupBindingKind.Compiled, binding.Kind);
+        Assert.Equal("Text", binding.Path);
+        Assert.Equal(
+            "Avalonia.Controls.TextBox",
+            binding.SourceType.Symbol?.ToDisplayString());
+        Assert.True(elementName.Property.IsDefault);
+        Assert.Equal("input", elementName.ConvertedValue);
+        Assert.Equal(
+            SpecialType.System_String,
+            Assert.IsAssignableFrom<ITypeSymbol>(elementName.Type.Symbol).SpecialType);
+        Assert.Equal(MarkupBindingPathElementKind.Property, text.Kind);
+        Assert.Equal("Text", text.Text);
+        Assert.Equal(
+            SpecialType.System_String,
+            Assert.IsAssignableFrom<ITypeSymbol>(text.Type.Symbol).SpecialType);
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(
+                " | ",
+                semanticModel.GetSemanticDiagnostics(textAttribute)
+                    .Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
     public void SemanticModel_ItemTemplateBinding_InheritsDataTypeFromItemsSource()
     {
         const string code =

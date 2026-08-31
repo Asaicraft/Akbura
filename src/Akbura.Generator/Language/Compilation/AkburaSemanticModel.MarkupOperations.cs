@@ -787,6 +787,7 @@ internal partial class AkburaSemanticModel
         using var propertiesBuilder = ImmutableArrayBuilder<MarkupExtensionPropertyValue>.Rent();
 
         string? path = null;
+        string? compiledElementName = null;
         var positionalIndex = 0;
         foreach (var argument in extensionSyntax.Arguments)
         {
@@ -828,12 +829,32 @@ internal partial class AkburaSemanticModel
                     {
                         var propertyArgument = Unsafe.As<MarkupExtensionPropertyArgumentSyntax>(argument);
                         var propertyName = propertyArgument.Name.Identifier.ValueText;
-                        var extensionProperty = FindMarkupExtensionSettableProperty(
-                            bindingType,
+                        var isPathProperty = string.Equals(
                             propertyName,
-                            out var inaccessibleProperty);
+                            "Path",
+                            StringComparison.Ordinal);
+                        var isCompiledElementNameProperty =
+                            kind == MarkupBindingKind.Compiled &&
+                            string.Equals(
+                                propertyName,
+                                "ElementName",
+                                StringComparison.Ordinal);
+                        Microsoft.CodeAnalysis.IPropertySymbol? extensionProperty;
+                        var inaccessibleProperty = false;
+                        if (isCompiledElementNameProperty)
+                        {
+                            extensionProperty = null;
+                        }
+                        else
+                        {
+                            extensionProperty = FindMarkupExtensionSettableProperty(
+                                bindingType,
+                                propertyName,
+                                out inaccessibleProperty);
+                        }
 
-                        if (extensionProperty == null)
+                        if (extensionProperty == null &&
+                            !isCompiledElementNameProperty)
                         {
                             diagnosticsBuilder.Add(CreateMarkupExtensionErrorDiagnostic(
                                 propertyArgument.Name,
@@ -843,18 +864,26 @@ internal partial class AkburaSemanticModel
                                     : $"Binding property '{propertyName}' was not found."));
                         }
 
-                        var isPathProperty = string.Equals(propertyName, "Path", StringComparison.Ordinal);
                         var boundValue = isPathProperty
                             ? BindMarkupBindingPathValue(propertyArgument.Value)
                             : BindMarkupExtensionValue(
                                 markupAttribute,
                                 propertyArgument.Value,
-                                extensionProperty?.Type,
+                                isCompiledElementNameProperty
+                                    ? Compilation.CSharpCompilation.GetSpecialType(
+                                        SpecialType.System_String)
+                                    : extensionProperty?.Type,
                                 diagnosticsBuilder);
 
                         if (isPathProperty)
                         {
                             path = boundValue.Text;
+                        }
+                        else if (isCompiledElementNameProperty)
+                        {
+                            compiledElementName =
+                                boundValue.ConvertedValue as string ??
+                                boundValue.Text;
                         }
 
                         propertiesBuilder.Add(new MarkupExtensionPropertyValue(
@@ -872,18 +901,32 @@ internal partial class AkburaSemanticModel
         }
 
         path ??= string.Empty;
+        INamedTypeSymbol? bindingSourceType = hasDataType
+            ? dataType
+            : null;
+        if (compiledElementName != null &&
+            TryGetMarkupBindingElementNameType(
+                markupAttribute,
+                compiledElementName,
+                out var elementNameType))
+        {
+            bindingSourceType = elementNameType;
+        }
+
         var pathElements = BindMarkupBindingPath(
             markupAttribute,
             path,
             kind,
-            hasDataType ? dataType : null,
+            bindingSourceType,
             diagnosticsBuilder,
             out var bindingResultType);
         var bindingValue = new MarkupBindingValue(
             kind,
             path,
             new CSharpSymbolDefinition(bindingType),
-            hasDataType ? new CSharpSymbolDefinition(dataType) : default,
+            bindingSourceType == null
+                ? default
+                : new CSharpSymbolDefinition(bindingSourceType),
             bindingResultType == null ? default : new CSharpSymbolDefinition(bindingResultType),
             pathElements);
         var value = new MarkupExtensionValue(
@@ -1196,7 +1239,20 @@ internal partial class AkburaSemanticModel
             }
 
             var text = path[start..index];
-            builder.Add(new MarkupBindingPathElement(MarkupBindingPathElementKind.ElementName, text));
+            if (TryGetMarkupBindingElementNameType(
+                    markupAttribute,
+                    path[nameStart..index],
+                    out var elementType))
+            {
+                rootType = elementType;
+            }
+
+            builder.Add(new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.ElementName,
+                text,
+                type: rootType == null
+                    ? default
+                    : new CSharpSymbolDefinition(rootType)));
             isRooted = true;
             return true;
         }
@@ -1260,6 +1316,44 @@ internal partial class AkburaSemanticModel
             return true;
         }
 
+        return false;
+    }
+
+    private bool TryGetMarkupBindingElementNameType(
+        MarkupAttributeSyntax markupAttribute,
+        string elementName,
+        out INamedTypeSymbol elementType)
+    {
+        for (var current = markupAttribute.Parent;
+             current != null;
+             current = current.Parent)
+        {
+            if (current.Kind != AkburaSyntaxKind.MarkupRootSyntax)
+            {
+                continue;
+            }
+
+            var nameScope = BindingSession.GetMarkupNameScope(
+                Unsafe.As<MarkupRootSyntax>(current));
+
+            foreach (var symbol in nameScope.GetDeclaredSymbols(this))
+            {
+                if (symbol is IMarkupNameSymbol nameSymbol &&
+                    string.Equals(
+                        nameSymbol.Name,
+                        elementName,
+                        StringComparison.Ordinal) &&
+                    nameSymbol.Type.Symbol is INamedTypeSymbol type)
+                {
+                    elementType = type;
+                    return true;
+                }
+            }
+
+            break;
+        }
+
+        elementType = null!;
         return false;
     }
 

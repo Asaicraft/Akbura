@@ -2,6 +2,7 @@ name: Build
 
 permissions:
   contents: write
+  pages: read
 
 on:
   push:
@@ -34,9 +35,9 @@ jobs:
 
       - name: Assign default GitHub URL base path
         env:
-          GH_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          custom_domain=$(gh api "/repos/${{ github.repository }}/pages" | jq -r '.cname // empty')
+          custom_domain=$(gh api "/repos/${{ github.repository }}/pages" --jq '.cname // empty')
           echo "CNAME config detected: $custom_domain"
 
           repo_name=$(echo "${{ github.repository }}" | cut -d '/' -f 2)
@@ -100,9 +101,9 @@ jobs:
           test -d ./src/AkburaDocs/dist/Gallery/_framework
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4.1.0
         with:
-          github_token: ${{ secrets.GH_PAGES_TOKEN }}
+          github_token: ${{ github.token }}
           publish_dir: ./src/AkburaDocs/dist
           user_name: GitHub Action
           user_email: action@github.com

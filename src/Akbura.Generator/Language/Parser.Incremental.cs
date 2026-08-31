@@ -1309,7 +1309,9 @@ internal sealed partial class Parser
         {
             segments.Add(ParseIncrementalMarkupNameSegmentSyntax());
 
-            while (PeekIncrementalTokenKind() == SyntaxKind.DotToken)
+            while (PeekIncrementalTokenKind() == SyntaxKind.DotToken &&
+                   IsIncrementalMarkupNameToken(
+                       PeekIncrementalTokenKind(1)))
             {
                 segments.AddSeparator(ReadRequiredIncrementalToken(SyntaxKind.DotToken));
                 segments.Add(ParseIncrementalMarkupNameSegmentSyntax());

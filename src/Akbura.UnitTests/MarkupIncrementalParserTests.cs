@@ -167,6 +167,70 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void BindingDotPathEdit_RemainsAPositionalArgument()
+    {
+        // Avalonia path: .
+        const string oldCode =
+            "<TextBlock Text=$" +
+            "{Binding Name}/>";
+        const string newCode =
+            "<TextBlock Text=$" +
+            "{Binding .}/>";
+
+        var (oldMarkup, newMarkup) =
+            ParseMarkupIncremental(
+                newCode,
+                oldCode,
+                oldCode.IndexOf(
+                    "Name",
+                    StringComparison.Ordinal),
+                oldLength: "Name".Length,
+                newLength: 1);
+        var oldAttribute =
+            Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+                oldMarkup.Element.StartTag!.Attributes[0]);
+        var newAttribute =
+            Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+                newMarkup.Element.StartTag!.Attributes[0]);
+        var oldValue =
+            Assert.IsType<
+                GreenMarkupExtensionAttributeValueSyntax>(
+                oldAttribute.Value);
+        var newValue =
+            Assert.IsType<
+                GreenMarkupExtensionAttributeValueSyntax>(
+                newAttribute.Value);
+
+        Assert.Same(
+            oldValue.Extension.Type,
+            newValue.Extension.Type);
+        Assert.Equal(
+            "Binding",
+            newValue.Extension.Type
+                .ToFullString()
+                .Trim());
+        Assert.Equal(
+            1,
+            newValue.Extension.Arguments.Count);
+
+        var argument =
+            Assert.IsType<
+                GreenMarkupExtensionPositionalArgumentSyntax>(
+                newValue.Extension.Arguments[0]);
+        var literal =
+            Assert.IsType<
+                GreenMarkupExtensionLiteralValueSyntax>(
+                argument.Value);
+
+        Assert.Equal(
+            ".",
+            literal.Value.ToFullString().Trim());
+        Assert.Equal(
+            newCode,
+            newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void TextContentEdit_ReusesSiblingMarkupContent()
     {
         const string oldCode =

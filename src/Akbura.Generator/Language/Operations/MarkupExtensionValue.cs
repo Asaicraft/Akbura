@@ -99,6 +99,7 @@ internal sealed class MarkupBindingValue
 internal enum MarkupBindingPathElementKind
 {
     Property,
+    AttachedProperty,
     Field,
     Indexer,
     ElementName,
@@ -107,6 +108,8 @@ internal enum MarkupBindingPathElementKind
     TemplatedParent,
     Not,
     TypeCast,
+    StreamTask,
+    StreamObservable,
     Unknown,
 }
 
@@ -119,7 +122,8 @@ internal readonly struct MarkupBindingPathElement
         CSharpSymbolDefinition type = default,
         ImmutableArray<string> arguments = default,
         ImmutableArray<MarkupBindingPathArgument> boundArguments = default,
-        int? level = null)
+        int? level = null,
+        bool acceptsNull = false)
     {
         Kind = kind;
         Text = text ?? throw new ArgumentNullException(nameof(text));
@@ -132,6 +136,7 @@ internal readonly struct MarkupBindingPathElement
             ? ImmutableArray<MarkupBindingPathArgument>.Empty
             : boundArguments;
         Level = level;
+        AcceptsNull = acceptsNull;
     }
 
     public MarkupBindingPathElementKind Kind { get; }
@@ -147,6 +152,8 @@ internal readonly struct MarkupBindingPathElement
     public ImmutableArray<MarkupBindingPathArgument> BoundArguments { get; }
 
     public int? Level { get; }
+
+    public bool AcceptsNull { get; }
 }
 
 internal readonly struct MarkupBindingPathArgument

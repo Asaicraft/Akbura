@@ -1085,6 +1085,7 @@ internal partial class AkburaSemanticModel
         var currentType = dataType as ITypeSymbol;
         var index = 0;
         var trimmedPath = path.Trim();
+        var acceptsNull = false;
 
         if (!TryValidateMarkupBindingPath(trimmedPath, out var pathError))
         {
@@ -1119,8 +1120,63 @@ internal partial class AkburaSemanticModel
 
         while (index < trimmedPath.Length)
         {
+            if (trimmedPath.AsSpan(index).StartsWith(
+                    "?.".AsSpan(),
+                    StringComparison.Ordinal))
+            {
+                acceptsNull = true;
+                index += 2;
+                continue;
+            }
+
             if (trimmedPath[index] == '.')
             {
+                acceptsNull = false;
+                index++;
+                continue;
+            }
+
+            if (trimmedPath[index] == '^')
+            {
+                if (TryBindMarkupBindingStream(
+                        currentType,
+                        out var streamKind,
+                        out var streamResultType))
+                {
+                    builder.Add(new MarkupBindingPathElement(
+                        streamKind,
+                        "^",
+                        type: new CSharpSymbolDefinition(
+                            streamResultType)));
+                    currentType = streamResultType;
+                    resultType = streamResultType;
+                }
+                else
+                {
+                    builder.Add(new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Unknown,
+                        "^"));
+
+                    if (kind == MarkupBindingKind.Compiled &&
+                        currentType != null)
+                    {
+                        diagnosticsBuilder.Add(
+                            CreateMarkupExtensionErrorDiagnostic(
+                                markupAttribute,
+                                "^",
+                                "Compiled binding stream operator '^' " +
+                                "requires Task<T> or IObservable<T>, but '" +
+                                currentType.ToDisplayString(
+                                    SymbolDisplayFormat
+                                        .FullyQualifiedFormat) +
+                                "' was found."));
+                    }
+
+                    currentType = null;
+                    resultType = null;
+                }
+
+                acceptsNull = false;
                 index++;
                 continue;
             }
@@ -1147,23 +1203,79 @@ internal partial class AkburaSemanticModel
                     boundIndexerArguments));
                 currentType = indexerResultType;
                 resultType = currentType ?? resultType;
+                acceptsNull = false;
                 continue;
             }
 
             if (trimmedPath[index] == '(')
             {
-                var typeCastText = ReadParenthesizedBindingText(trimmedPath, ref index);
-                if (TryBindMarkupDataType(typeCastText.Trim('(', ')'), out var castType))
+                var typeCastText =
+                    ReadParenthesizedBindingText(
+                        trimmedPath,
+                        ref index);
+
+                if (TryParseGroupedBindingTypeCast(
+                        typeCastText,
+                        out var castTypeText,
+                        out var castOperandText))
+                {
+                    currentType =
+                        BindMarkupBindingGroupedOperand(
+                            markupAttribute,
+                            castOperandText,
+                            kind,
+                            currentType,
+                            isRooted,
+                            builder,
+                            diagnosticsBuilder);
+                    resultType = currentType;
+                }
+                else if (
+                    TryBindMarkupBindingAttachedPropertyElement(
+                        markupAttribute,
+                        typeCastText,
+                        kind,
+                        currentType,
+                        acceptsNull,
+                        builder,
+                        diagnosticsBuilder,
+                        out var attachedPropertyType))
+                {
+                    currentType =
+                        attachedPropertyType;
+                    resultType =
+                        attachedPropertyType;
+                    acceptsNull = false;
+                    continue;
+                }
+                else
+                {
+                    castTypeText =
+                        typeCastText.Trim('(', ')');
+                }
+
+                if (TryBindMarkupDataType(
+                        castTypeText,
+                        out var castType))
                 {
                     currentType = castType;
                     resultType = castType;
+                }
+                else
+                {
+                    currentType = null;
+                    resultType = null;
                 }
 
                 builder.Add(new MarkupBindingPathElement(
                     MarkupBindingPathElementKind.TypeCast,
                     typeCastText,
-                    type: currentType == null ? default : new CSharpSymbolDefinition(currentType)));
+                    type: currentType == null
+                        ? default
+                        : new CSharpSymbolDefinition(
+                            currentType)));
 
+                acceptsNull = false;
                 continue;
             }
 
@@ -1174,39 +1286,18 @@ internal partial class AkburaSemanticModel
                 continue;
             }
 
-            if (TryBindMarkupBindingPathMember(
-                    currentType,
-                    memberName,
-                    out var member,
-                    out var memberType,
-                    out var elementKind,
-                    out var inaccessibleMember))
-            {
-                currentType = memberType;
-                resultType = memberType;
-                builder.Add(new MarkupBindingPathElement(
-                    elementKind,
-                    memberName,
-                    new CSharpSymbolDefinition(member),
-                    memberType == null ? default : new CSharpSymbolDefinition(memberType)));
-                continue;
-            }
-
-            builder.Add(new MarkupBindingPathElement(MarkupBindingPathElementKind.Unknown, memberName));
-            if (kind == MarkupBindingKind.Compiled &&
-                currentType != null &&
-                !isRooted)
-            {
-                diagnosticsBuilder.Add(CreateMarkupExtensionErrorDiagnostic(
+            currentType =
+                BindMarkupBindingPathMemberElement(
                     markupAttribute,
                     memberName,
-                    inaccessibleMember
-                        ? $"Compiled binding path member '{memberName}' on '{currentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}' is inaccessible."
-                        : $"Compiled binding path member '{memberName}' was not found on '{currentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}'."));
-            }
-
-            currentType = null;
-            resultType = null;
+                    kind,
+                    currentType,
+                    isRooted,
+                    acceptsNull,
+                    builder,
+                    diagnosticsBuilder);
+            resultType = currentType;
+            acceptsNull = false;
         }
 
         return builder.ToImmutable();
@@ -1262,7 +1353,7 @@ internal partial class AkburaSemanticModel
             return false;
         }
 
-        if (path[index..].StartsWith("$self", StringComparison.Ordinal))
+        if (StartsWithBindingRoot(path, index, "$self"))
         {
             index += "$self".Length;
             rootType = GetContainingMarkupComponentSymbol(markupAttribute)?.ComponentType;
@@ -1274,7 +1365,10 @@ internal partial class AkburaSemanticModel
             return true;
         }
 
-        if (path[index..].StartsWith("$templatedParent", StringComparison.Ordinal))
+        if (StartsWithBindingRoot(
+                path,
+                index,
+                "$templatedParent"))
         {
             index += "$templatedParent".Length;
             builder.Add(new MarkupBindingPathElement(MarkupBindingPathElementKind.TemplatedParent, "$templatedParent"));
@@ -1282,18 +1376,49 @@ internal partial class AkburaSemanticModel
             return true;
         }
 
-        if (path[index..].StartsWith("$parent", StringComparison.Ordinal))
+        if (StartsWithBindingRoot(path, index, "$parent"))
         {
             var start = index;
             index += "$parent".Length;
             if (index < path.Length && path[index] == '[')
             {
-                var bracketText = ReadBracketedBindingText(path, ref index);
-                var arguments = GetBindingPathArguments(bracketText, '[', ']');
-                var ancestorTypeText = arguments.IsEmpty ? string.Empty : arguments[0];
-                var level = arguments.Length > 1 && int.TryParse(arguments[1], out var parsedLevel)
-                    ? parsedLevel
-                    : (int?)null;
+                var bracketText =
+                    ReadBracketedBindingText(
+                        path,
+                        ref index);
+                var separator =
+                    bracketText.Contains(
+                        ";",
+                        StringComparison.Ordinal)
+                        ? ';'
+                        : ',';
+                var arguments =
+                    GetBindingPathArguments(
+                        bracketText,
+                        '[',
+                        ']',
+                        separator);
+                var ancestorTypeText =
+                    arguments.IsEmpty
+                        ? string.Empty
+                        : arguments[0];
+                int? level = null;
+
+                if (arguments.Length == 1 &&
+                    int.TryParse(
+                        arguments[0],
+                        out var untypedLevel))
+                {
+                    ancestorTypeText = string.Empty;
+                    level = untypedLevel;
+                }
+                else if (arguments.Length > 1 &&
+                         int.TryParse(
+                             arguments[1],
+                             out var typedLevel))
+                {
+                    level = typedLevel;
+                }
                 if (ancestorTypeText.Length > 0 &&
                     TryBindMarkupDataType(ancestorTypeText, out var ancestorType))
                 {
@@ -1355,6 +1480,378 @@ internal partial class AkburaSemanticModel
 
         elementType = null!;
         return false;
+    }
+
+    private bool TryBindMarkupBindingAttachedPropertyElement(
+        MarkupAttributeSyntax markupAttribute,
+        string attachedPropertyText,
+        MarkupBindingKind kind,
+        ITypeSymbol? currentType,
+        bool acceptsNull,
+        ImmutableArrayBuilder<MarkupBindingPathElement>
+            builder,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
+            diagnosticsBuilder,
+        out ITypeSymbol? resultType)
+    {
+        resultType = null;
+
+        if (attachedPropertyText.Length < 5 ||
+            attachedPropertyText[0] != '(' ||
+            attachedPropertyText[^1] != ')')
+        {
+            return false;
+        }
+
+        var propertyReference =
+            attachedPropertyText[1..^1].Trim();
+
+        if (!TrySplitAttachedPropertyReference(
+                propertyReference,
+                out var ownerText,
+                out var propertyName) ||
+            !TryBindAttachedPropertyOwner(
+                ownerText,
+                GetCSharpUsingDirectives(),
+                out var ownerType))
+        {
+            return false;
+        }
+
+        if (TryCreateAttachedPropertySymbol(
+                ownerType,
+                propertyName,
+                currentType,
+                SymbolLanguage.Markup,
+                GetContainingMarkupComponentSymbol(
+                    markupAttribute),
+                out var property) &&
+            property.AvaloniaPropertyDefinition.Symbol
+                is IFieldSymbol attachedProperty &&
+            property.Type.Symbol
+                is ITypeSymbol attachedValueType)
+        {
+            builder.Add(
+                new MarkupBindingPathElement(
+                    MarkupBindingPathElementKind
+                        .AttachedProperty,
+                    attachedPropertyText,
+                    new CSharpSymbolDefinition(
+                        attachedProperty),
+                    new CSharpSymbolDefinition(
+                        attachedValueType),
+                    acceptsNull: acceptsNull));
+
+            resultType = attachedValueType;
+            return true;
+        }
+
+        if (TryBindMarkupDataType(
+                propertyReference,
+                out _))
+        {
+            return false;
+        }
+
+        builder.Add(
+            new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.Unknown,
+                attachedPropertyText,
+                acceptsNull: acceptsNull));
+
+        if (kind == MarkupBindingKind.Compiled)
+        {
+            var sourceTypeText =
+                currentType?.ToDisplayString(
+                    SymbolDisplayFormat
+                        .FullyQualifiedFormat) ??
+                "<unknown>";
+
+            diagnosticsBuilder.Add(
+                CreateMarkupExtensionErrorDiagnostic(
+                    markupAttribute,
+                    attachedPropertyText,
+                    "Compiled binding attached property '" +
+                    propertyReference +
+                    "' was not found, is not an Avalonia " +
+                    "property, or cannot be applied to '" +
+                    sourceTypeText +
+                    "'."));
+        }
+
+        return true;
+    }
+
+    private ITypeSymbol? BindMarkupBindingGroupedOperand(
+        MarkupAttributeSyntax markupAttribute,
+        string operandText,
+        MarkupBindingKind kind,
+        ITypeSymbol? sourceType,
+        bool isRooted,
+        ImmutableArrayBuilder<MarkupBindingPathElement>
+            builder,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
+            diagnosticsBuilder)
+    {
+        var currentType = sourceType;
+        var index = 0;
+
+        if (operandText[index] == '(')
+        {
+            var attachedPropertyText =
+                ReadParenthesizedBindingText(
+                    operandText,
+                    ref index);
+
+            if (!TryBindMarkupBindingAttachedPropertyElement(
+                    markupAttribute,
+                    attachedPropertyText,
+                    kind,
+                    currentType,
+                    acceptsNull: false,
+                    builder,
+                    diagnosticsBuilder,
+                    out currentType))
+            {
+                builder.Add(
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Unknown,
+                        attachedPropertyText));
+                currentType = null;
+            }
+        }
+        else if (operandText[index] != '[')
+        {
+            var memberName =
+                ReadBindingMemberName(
+                    operandText,
+                    ref index);
+
+            if (memberName.Length == 0)
+            {
+                builder.Add(
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Unknown,
+                        operandText));
+                return null;
+            }
+
+            currentType =
+                BindMarkupBindingPathMemberElement(
+                    markupAttribute,
+                    memberName,
+                    kind,
+                    currentType,
+                    isRooted,
+                    acceptsNull: false,
+                    builder,
+                    diagnosticsBuilder);
+        }
+
+        if (index < operandText.Length &&
+            operandText[index] == '[')
+        {
+            var indexerText =
+                ReadBracketedBindingText(
+                    operandText,
+                    ref index);
+            var indexerArguments =
+                GetBindingPathArguments(
+                    indexerText,
+                    '[',
+                    ']');
+
+            BindMarkupBindingIndexer(
+                markupAttribute,
+                currentType,
+                indexerText,
+                indexerArguments,
+                diagnosticsBuilder,
+                out var indexer,
+                out var indexerResultType,
+                out var boundIndexerArguments);
+
+            builder.Add(
+                new MarkupBindingPathElement(
+                    MarkupBindingPathElementKind.Indexer,
+                    indexerText,
+                    indexer == null
+                        ? default
+                        : new CSharpSymbolDefinition(
+                            indexer),
+                    indexerResultType == null
+                        ? default
+                        : new CSharpSymbolDefinition(
+                            indexerResultType),
+                    indexerArguments,
+                    boundIndexerArguments));
+
+            currentType = indexerResultType;
+        }
+
+        if (index != operandText.Length)
+        {
+            var unconsumedText =
+                operandText[index..];
+
+            builder.Add(
+                new MarkupBindingPathElement(
+                    MarkupBindingPathElementKind.Unknown,
+                    unconsumedText));
+
+            if (kind == MarkupBindingKind.Compiled)
+            {
+                diagnosticsBuilder.Add(
+                    CreateMarkupExtensionErrorDiagnostic(
+                        markupAttribute,
+                        unconsumedText,
+                        "Compiled binding grouped type cast " +
+                        "contains an unsupported operand."));
+            }
+
+            return null;
+        }
+
+        return currentType;
+    }
+
+    private bool TryBindMarkupBindingStream(
+        ITypeSymbol? sourceType,
+        out MarkupBindingPathElementKind kind,
+        out ITypeSymbol resultType)
+    {
+        kind = MarkupBindingPathElementKind.Unknown;
+        resultType = null!;
+
+        if (sourceType is not INamedTypeSymbol namedType)
+        {
+            return false;
+        }
+
+        var taskDefinition =
+            Compilation.CSharpCompilation
+                .GetTypeByMetadataName(
+                    "System.Threading.Tasks.Task\u00601");
+
+        if (taskDefinition != null)
+        {
+            for (var current = namedType;
+                 current != null;
+                 current = current.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(
+                        current.OriginalDefinition,
+                        taskDefinition))
+                {
+                    kind =
+                        MarkupBindingPathElementKind.StreamTask;
+                    resultType = current.TypeArguments[0];
+                    return true;
+                }
+            }
+        }
+
+        var observableDefinition =
+            Compilation.CSharpCompilation
+                .GetTypeByMetadataName(
+                    "System.IObservable\u00601");
+
+        if (observableDefinition == null)
+        {
+            return false;
+        }
+
+        if (SymbolEqualityComparer.Default.Equals(
+                namedType.OriginalDefinition,
+                observableDefinition))
+        {
+            kind =
+                MarkupBindingPathElementKind.StreamObservable;
+            resultType = namedType.TypeArguments[0];
+            return true;
+        }
+
+        foreach (var interfaceType
+                 in namedType.AllInterfaces)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(
+                    interfaceType.OriginalDefinition,
+                    observableDefinition))
+            {
+                continue;
+            }
+
+            kind =
+                MarkupBindingPathElementKind.StreamObservable;
+            resultType = interfaceType.TypeArguments[0];
+            return true;
+        }
+
+        return false;
+    }
+
+    private ITypeSymbol? BindMarkupBindingPathMemberElement(
+        MarkupAttributeSyntax markupAttribute,
+        string memberName,
+        MarkupBindingKind kind,
+        ITypeSymbol? currentType,
+        bool isRooted,
+        bool acceptsNull,
+        ImmutableArrayBuilder<MarkupBindingPathElement> builder,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
+            diagnosticsBuilder)
+    {
+        if (TryBindMarkupBindingPathMember(
+                currentType,
+                memberName,
+                out var member,
+                out var memberType,
+                out var elementKind,
+                out var inaccessibleMember))
+        {
+            builder.Add(new MarkupBindingPathElement(
+                elementKind,
+                memberName,
+                new CSharpSymbolDefinition(member),
+                memberType == null
+                    ? default
+                    : new CSharpSymbolDefinition(memberType),
+                acceptsNull: acceptsNull));
+
+            return memberType;
+        }
+
+        builder.Add(new MarkupBindingPathElement(
+            MarkupBindingPathElementKind.Unknown,
+            memberName,
+            acceptsNull: acceptsNull));
+
+        if (kind == MarkupBindingKind.Compiled &&
+            currentType != null &&
+            !isRooted)
+        {
+            diagnosticsBuilder.Add(
+                CreateMarkupExtensionErrorDiagnostic(
+                    markupAttribute,
+                    memberName,
+                    inaccessibleMember
+                        ? "Compiled binding path member '" +
+                          memberName +
+                          "' on '" +
+                          currentType.ToDisplayString(
+                              SymbolDisplayFormat
+                                  .FullyQualifiedFormat) +
+                          "' is inaccessible."
+                        : "Compiled binding path member '" +
+                          memberName +
+                          "' was not found on '" +
+                          currentType.ToDisplayString(
+                              SymbolDisplayFormat
+                                  .FullyQualifiedFormat) +
+                          "'."));
+        }
+
+        return null;
     }
 
     private static bool TryBindMarkupBindingPathMember(
@@ -1607,7 +2104,8 @@ internal partial class AkburaSemanticModel
     private static ImmutableArray<string> GetBindingPathArguments(
         string text,
         char open,
-        char close)
+        char close,
+        char separator = ',')
     {
         if (text.Length < 2 || text[0] != open || text[^1] != close)
         {
@@ -1649,7 +2147,7 @@ internal partial class AkburaSemanticModel
                 continue;
             }
 
-            if (character != ',' || depth != 0)
+            if (character != separator || depth != 0)
             {
                 continue;
             }
@@ -1733,8 +2231,9 @@ internal partial class AkburaSemanticModel
             return false;
         }
 
-        if (path.EndsWith(".", StringComparison.Ordinal) ||
-            path.Contains("..", StringComparison.Ordinal))
+        if (path != "." &&
+            (path.EndsWith(".", StringComparison.Ordinal) ||
+             path.Contains("..", StringComparison.Ordinal)))
         {
             error = "Binding path contains an empty member segment.";
             return false;
@@ -1750,6 +2249,56 @@ internal partial class AkburaSemanticModel
         }
 
         return true;
+    }
+
+    private static bool TryParseGroupedBindingTypeCast(
+        string text,
+        out string typeText,
+        out string operandText)
+    {
+        typeText = string.Empty;
+        operandText = string.Empty;
+
+        if (text.Length < 6 ||
+            !text.StartsWith(
+                "((",
+                StringComparison.Ordinal) ||
+            text[^1] != ')')
+        {
+            return false;
+        }
+
+        var typeEnd = text.IndexOf(')', 2);
+
+        if (typeEnd < 3)
+        {
+            return false;
+        }
+
+        typeText = text[2..typeEnd].Trim();
+        operandText =
+            text[(typeEnd + 1)..^1].Trim();
+
+        return typeText.Length > 0 &&
+               operandText.Length > 0;
+    }
+
+    private static bool StartsWithBindingRoot(
+        string path,
+        int index,
+        string root)
+    {
+        if (!path.AsSpan(index).StartsWith(
+                root.AsSpan(),
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var end = index + root.Length;
+
+        return end == path.Length ||
+               !IsBindingIdentifierPart(path[end]);
     }
 
     private static string ReadBindingMemberName(string text, ref int index)

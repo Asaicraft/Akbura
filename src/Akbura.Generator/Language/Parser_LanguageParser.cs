@@ -2057,7 +2057,8 @@ partial class Parser
         {
             segments.Add(ParseMarkupNameSegmentSyntax());
 
-            while (CurrentToken.Kind == SyntaxKind.DotToken)
+            while (CurrentToken.Kind == SyntaxKind.DotToken &&
+                   IsMarkupNameToken(PeekToken(1)))
             {
                 segments.AddSeparator(EatToken(SyntaxKind.DotToken));
                 segments.Add(ParseMarkupNameSegmentSyntax());

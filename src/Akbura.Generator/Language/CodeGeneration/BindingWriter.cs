@@ -684,6 +684,27 @@ internal readonly struct BindingWritePlan
                     break;
                 }
 
+                case MarkupBindingPathElementKind.AttachedProperty:
+                {
+                    if (element.Symbol.Symbol
+                            is not IFieldSymbol
+                            {
+                                IsStatic: true,
+                            } attachedProperty ||
+                        !environment.IsAccessible(
+                            attachedProperty) ||
+                        element.Type.Symbol
+                            is not ITypeSymbol
+                                attachedValueType)
+                    {
+                        isValid = false;
+                        break;
+                    }
+
+                    currentType = attachedValueType;
+                    break;
+                }
+
                 case MarkupBindingPathElementKind.Field:
                 {
                     if (element.Symbol.Symbol
@@ -782,6 +803,18 @@ internal readonly struct BindingWritePlan
                     }
 
                     currentType = castType;
+                    break;
+
+                case MarkupBindingPathElementKind.StreamTask:
+                case MarkupBindingPathElementKind.StreamObservable:
+                    if (element.Type.Symbol
+                        is not ITypeSymbol streamResultType)
+                    {
+                        isValid = false;
+                        break;
+                    }
+
+                    currentType = streamResultType;
                     break;
 
                 case MarkupBindingPathElementKind.Not:
@@ -1441,9 +1474,36 @@ internal ref struct BindingWriter
                     Debug.Assert(property != null);
 
                     WritePropertyPathElement(
-                        property!);
+                        property!,
+                        element.AcceptsNull);
 
                     currentType = property!.Type;
+                    break;
+                }
+
+                case MarkupBindingPathElementKind.AttachedProperty:
+                {
+                    var attachedProperty =
+                        element.Symbol.Symbol
+                            as IFieldSymbol;
+                    var attachedValueType =
+                        element.Type.Symbol
+                            as ITypeSymbol;
+
+                    Debug.Assert(
+                        attachedProperty is
+                        {
+                            IsStatic: true,
+                        });
+                    Debug.Assert(
+                        attachedValueType != null);
+
+                    WriteAttachedPropertyPathElement(
+                        attachedProperty!,
+                        element.AcceptsNull);
+
+                    currentType =
+                        attachedValueType;
                     break;
                 }
 
@@ -1456,7 +1516,8 @@ internal ref struct BindingWriter
                     Debug.Assert(field != null);
 
                     WriteFieldPathElement(
-                        field!);
+                        field!,
+                        element.AcceptsNull);
 
                     currentType = field!.Type;
                     break;
@@ -1483,7 +1544,8 @@ internal ref struct BindingWriter
 
                         WriteIndexerPathElement(
                             element,
-                            indexer!);
+                            indexer!,
+                            element.AcceptsNull);
 
                         currentType = indexer!.Type;
                     }
@@ -1553,6 +1615,23 @@ internal ref struct BindingWriter
                     break;
                 }
 
+                case MarkupBindingPathElementKind.StreamTask:
+                case MarkupBindingPathElementKind.StreamObservable:
+                {
+                    var streamResultType =
+                        element.Type.Symbol
+                            as ITypeSymbol;
+
+                    Debug.Assert(streamResultType != null);
+
+                    WriteStreamPathElement(
+                        element.Kind,
+                        streamResultType!);
+
+                    currentType = streamResultType;
+                    break;
+                }
+
                 default:
                     Debug.Fail(
                         "Unsupported binding path element: " +
@@ -1566,7 +1645,8 @@ internal ref struct BindingWriter
     }
 
     private void WritePropertyPathElement(
-        IPropertySymbol property)
+        IPropertySymbol property,
+        bool acceptsNull)
     {
         if (_environment.TryGetAvaloniaProperty(
                 property,
@@ -1581,17 +1661,37 @@ internal ref struct BindingWriter
                 .Write(", ")
                 .Write(AccessorFactoryType)
                 .Write(
-                    ".CreateAvaloniaPropertyAccessor, false)");
+                    ".CreateAvaloniaPropertyAccessor, ")
+                .Write(acceptsNull ? "true)" : "false)");
 
             return;
         }
 
         WriteClrPropertyPathElement(
-            property);
+            property,
+            acceptsNull);
+    }
+
+    private void WriteAttachedPropertyPathElement(
+        IFieldSymbol attachedProperty,
+        bool acceptsNull)
+    {
+        _writer.Write(".Property(");
+
+        WriteStaticMemberReference(
+            attachedProperty);
+
+        _writer
+            .Write(", ")
+            .Write(AccessorFactoryType)
+            .Write(
+                ".CreateAvaloniaPropertyAccessor, ")
+            .Write(acceptsNull ? "true)" : "false)");
     }
 
     private void WriteClrPropertyPathElement(
-        IPropertySymbol property)
+        IPropertySymbol property,
+        bool acceptsNull)
     {
         var sourceType =
             property.ContainingType;
@@ -1648,11 +1748,13 @@ internal ref struct BindingWriter
             .Write(")), ")
             .Write(AccessorFactoryType)
             .Write(
-                ".CreateInpcPropertyAccessor, false)");
+                ".CreateInpcPropertyAccessor, ")
+            .Write(acceptsNull ? "true)" : "false)");
     }
 
     private void WriteFieldPathElement(
-        IFieldSymbol field)
+        IFieldSymbol field,
+        bool acceptsNull)
     {
         var sourceType =
             field.ContainingType;
@@ -1709,12 +1811,14 @@ internal ref struct BindingWriter
             .Write(")), ")
             .Write(AccessorFactoryType)
             .Write(
-                ".CreateInpcPropertyAccessor, false)");
+                ".CreateInpcPropertyAccessor, ")
+            .Write(acceptsNull ? "true)" : "false)");
     }
 
     private void WriteIndexerPathElement(
         in MarkupBindingPathElement element,
-        IPropertySymbol indexer)
+        IPropertySymbol indexer,
+        bool acceptsNull)
     {
         var sourceType =
             indexer.ContainingType;
@@ -1814,8 +1918,11 @@ internal ref struct BindingWriter
                     ".CreateInpcPropertyAccessor");
         }
 
-        _writer.Write(", false)");
+        _writer.Write(", ");
+        _writer.Write(
+            acceptsNull ? "true)" : "false)");
     }
+
     private void WriteArrayPathElement(
         in MarkupBindingPathElement element,
         IArrayTypeSymbol arrayType)
@@ -1926,6 +2033,20 @@ internal ref struct BindingWriter
         _writer.Write(".TypeCast<");
 
         WriteTypeName(castType);
+
+        _writer.Write(">()");
+    }
+
+    private void WriteStreamPathElement(
+        MarkupBindingPathElementKind kind,
+        ITypeSymbol resultType)
+    {
+        _writer.Write(
+            kind == MarkupBindingPathElementKind.StreamTask
+                ? ".StreamTask<"
+                : ".StreamObservable<");
+
+        WriteTypeName(resultType);
 
         _writer.Write(">()");
     }

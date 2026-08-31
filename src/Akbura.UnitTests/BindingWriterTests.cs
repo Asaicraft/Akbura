@@ -16,6 +16,7 @@ public sealed class BindingWriterTests
     [Fact]
     public void ElementName_VisibleLocalShadowsClassMember_AndClassMemberCrossesScopes()
     {
+        // Avalonia path: #header.Name
         var fixture = CreateFixture();
         var elementType = fixture.GetRequiredType("Demo.Element");
         var extension = CreateElementNameCompiledBinding(
@@ -81,6 +82,7 @@ public sealed class BindingWriterTests
     [Fact]
     public void ReflectionElementName_UsesSourceAndWritesOnlyThePathTail()
     {
+        // Avalonia path (whitespace-insensitive): #header.Name
         var fixture = CreateFixture();
         var elementType = fixture.GetRequiredType("Demo.Element");
         const string path = "  #header  .  Name";
@@ -125,6 +127,7 @@ public sealed class BindingWriterTests
     [Fact]
     public void ElementName_FromAnotherLocalScope_IsInlineAndRequiresNameScope()
     {
+        // Avalonia path: #header.Name
         var fixture = CreateFixture();
         var elementType = fixture.GetRequiredType("Demo.Element");
         var extension = CreateElementNameCompiledBinding(
@@ -185,6 +188,7 @@ public sealed class BindingWriterTests
     [Fact]
     public void ElementNameProperty_UsesDirectSourceOrInlineNameScope_AndIsNotAnInitializer()
     {
+        // Avalonia long form: {CompiledBinding Path=Name, ElementName=header}
         var fixture = CreateFixture();
         var elementType = fixture.GetRequiredType("Demo.Element");
         var nameProperty = GetProperty(
@@ -286,9 +290,12 @@ public sealed class BindingWriterTests
             "Source =",
             crossScopeBinding);
     }
+
     [Fact]
     public void Indexer_ConstantArgumentsConsumeCacheIds_DynamicArgumentsStayInline()
     {
+        // Avalonia path: Items[0]
+        // Akbura expression-index extension: Items[index]
         var fixture = CreateFixture();
         var constantExtension = CreateIndexerCompiledBinding(
             fixture,
@@ -354,6 +361,7 @@ public sealed class BindingWriterTests
     [Fact]
     public void CachedPathField_UsesNonGenericClrPropertyInfo_AndBindingReusesTheField()
     {
+        // Avalonia path: Child.Name
         var fixture = CreateFixture();
         var viewModelType = fixture.GetRequiredType("Demo.ViewModel");
         var childProperty = GetProperty(viewModelType, "Child");
@@ -410,6 +418,8 @@ public sealed class BindingWriterTests
     [Fact]
     public void ValueTypeMembers_DoNotWriteSetters_AndGeneratedPathsCompile()
     {
+        // Avalonia paths: Value and [0]
+        // Akbura CLR-field extension: Field
         var fixture = CreateFixture();
         var structType = fixture.GetRequiredType("Demo.StructModel");
         var property = GetProperty(structType, "Value");
@@ -487,6 +497,7 @@ public sealed class BindingWriterTests
     [Fact]
     public void UntypedAncestor_WritesNullForgivingLiteral_AndCompiles()
     {
+        // Avalonia path: $parent[2]
         var fixture = CreateFixture();
         var sourceType = fixture.GetRequiredType("Demo.ViewModel");
         var extension = CreateBindingExtension(
@@ -525,6 +536,7 @@ public sealed class BindingWriterTests
     [Fact]
     public void UnsignedEnumAboveInt64Max_WritesUncheckedEnumCast_AndCompiles()
     {
+        // Avalonia empty path: .
         var fixture = CreateFixture();
         var sourceType = fixture.GetRequiredType("Demo.ViewModel");
         var enumType = fixture.GetRequiredType("Demo.HugeEnum");
@@ -572,6 +584,8 @@ public sealed class BindingWriterTests
     [Fact]
     public void NestedElementNameBinding_UsesWriterElementReferencesForDirectSource()
     {
+        // Outer path: Child.Name
+        // Nested Avalonia path: #header.Name
         var fixture = CreateFixture();
         var viewModelType = fixture.GetRequiredType("Demo.ViewModel");
         var childProperty = GetProperty(viewModelType, "Child");
@@ -633,6 +647,395 @@ public sealed class BindingWriterTests
         Assert.DoesNotContain(".ElementName(", binding);
     }
 
+    [Fact]
+    public void AllModeledPathKinds_WriteExpectedBuilderCalls_AndCompileTogether()
+    {
+        // Avalonia path:
+        // !$parent[Demo.Element;2].((Demo.ViewModel)DataContext).Items[3]?.LoadAsync^.Observable^.IsTrue
+        //
+        // Alternative roots cannot occur in the same path, so this test also covers:
+        // #header.Name
+        // $self
+        // $templatedParent (Akbura shorthand)
+        // $self?.(Grid.Column)
+        // Matrix[1, 2]
+        var fixture = CreateFixture();
+        var elementType =
+            fixture.GetRequiredType("Demo.Element");
+        var viewModelType =
+            fixture.GetRequiredType("Demo.ViewModel");
+        var itemCollectionType =
+            fixture.GetRequiredType("Demo.ItemCollection");
+        var itemType =
+            fixture.GetRequiredType("Demo.Item");
+        var streamContainerType =
+            fixture.GetRequiredType(
+                "Demo.StreamContainer");
+        var leafType =
+            fixture.GetRequiredType("Demo.Leaf");
+        var hostType =
+            fixture.GetRequiredType(
+                "Demo.BindingWriterHost");
+        var gridType =
+            fixture.GetRequiredType(
+                "Avalonia.Controls.Grid");
+        var dataContextProperty =
+            GetProperty(elementType, "DataContext");
+        var itemsProperty =
+            GetProperty(viewModelType, "Items");
+        var matrixProperty =
+            GetProperty(viewModelType, "Matrix");
+        var loadAsyncProperty =
+            GetProperty(itemType, "LoadAsync");
+        var observableProperty =
+            GetProperty(
+                streamContainerType,
+                "Observable");
+        var isTrueField = Assert.Single(
+            leafType.GetMembers("IsTrue")
+                .OfType<IFieldSymbol>());
+        var columnPropertyField = Assert.Single(
+            gridType.GetMembers("ColumnProperty")
+                .OfType<IFieldSymbol>());
+        var indexer = Assert.Single(
+            itemCollectionType.GetMembers()
+                .OfType<CSharpPropertySymbol>(),
+            static property => property.IsIndexer);
+        var indexerParameter =
+            Assert.Single(indexer.Parameters);
+        var indexerArgument =
+            new MarkupBindingPathArgument(
+                "3",
+                new CSharpSymbolDefinition(
+                    indexerParameter),
+                new CSharpSymbolDefinition(
+                    indexerParameter.Type),
+                operation: default,
+                conversion: default,
+                convertedValue: 3);
+        var indexerElement =
+            new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.Indexer,
+                "[3]",
+                new CSharpSymbolDefinition(indexer),
+                new CSharpSymbolDefinition(indexer.Type),
+                arguments: default,
+                ImmutableArray.Create(indexerArgument));
+        var isTrueElement =
+            new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.Field,
+                "IsTrue",
+                new CSharpSymbolDefinition(isTrueField),
+                new CSharpSymbolDefinition(
+                    isTrueField.Type));
+        var complexPath =
+            "!$parent[Demo.Element;2]." +
+            "((Demo.ViewModel)DataContext)." +
+            "Items[3]?.LoadAsync^." +
+            "Observable^.IsTrue";
+        var complexExtension =
+            CreateBindingExtension(
+                fixture,
+                MarkupBindingKind.Compiled,
+                complexPath,
+                viewModelType,
+                ImmutableArray.Create(
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Not,
+                        "!"),
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Ancestor,
+                        "$parent[Demo.Element;2]",
+                        type: new CSharpSymbolDefinition(
+                            elementType),
+                        arguments: ImmutableArray.Create(
+                            "Demo.Element",
+                            "2"),
+                        level: 2),
+                    CreatePropertyElement(
+                        dataContextProperty),
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.TypeCast,
+                        "((Demo.ViewModel)DataContext)",
+                        type: new CSharpSymbolDefinition(
+                            viewModelType)),
+                    CreatePropertyElement(itemsProperty),
+                    indexerElement,
+                    CreatePropertyElement(
+                        loadAsyncProperty,
+                        acceptsNull: true),
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.StreamTask,
+                        "^",
+                        type: new CSharpSymbolDefinition(
+                            streamContainerType)),
+                    CreatePropertyElement(
+                        observableProperty),
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind
+                            .StreamObservable,
+                        "^",
+                        type: new CSharpSymbolDefinition(
+                            leafType)),
+                    isTrueElement));
+
+        var nextCachedPathId = 0;
+        var complexPlan = CreatePlan(
+            fixture,
+            complexExtension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            Array.Empty<BindingElementReference>(),
+            ref nextCachedPathId);
+
+        var elementNameExtension =
+            CreateElementNameCompiledBinding(
+                fixture,
+                elementType,
+                "#header.Name");
+        var elementNamePlan = CreatePlan(
+            fixture,
+            elementNameExtension,
+            scopeId: 0,
+            nameScopeExpression: "__nameScope",
+            Array.Empty<BindingElementReference>(),
+            ref nextCachedPathId);
+
+        var selfExtension =
+            CreateBindingExtension(
+                fixture,
+                MarkupBindingKind.Compiled,
+                "$self",
+                hostType,
+                ImmutableArray.Create(
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Self,
+                        "$self",
+                        type: new CSharpSymbolDefinition(
+                            hostType))));
+        var selfPlan = CreatePlan(
+            fixture,
+            selfExtension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            Array.Empty<BindingElementReference>(),
+            ref nextCachedPathId);
+
+        var templatedParentExtension =
+            CreateBindingExtension(
+                fixture,
+                MarkupBindingKind.Compiled,
+                "$templatedParent",
+                elementType,
+                ImmutableArray.Create(
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind
+                            .TemplatedParent,
+                        "$templatedParent",
+                        type: new CSharpSymbolDefinition(
+                            elementType))));
+        var templatedParentPlan = CreatePlan(
+            fixture,
+            templatedParentExtension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            Array.Empty<BindingElementReference>(),
+            ref nextCachedPathId);
+
+        var intType =
+            fixture.Compilation.GetSpecialType(
+                SpecialType.System_Int32);
+        var attachedPropertyExtension =
+            CreateBindingExtension(
+                fixture,
+                MarkupBindingKind.Compiled,
+                "$self?.(Grid.Column)",
+                gridType,
+                ImmutableArray.Create(
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Self,
+                        "$self",
+                        type: new CSharpSymbolDefinition(
+                            gridType)),
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind
+                            .AttachedProperty,
+                        "(Grid.Column)",
+                        new CSharpSymbolDefinition(
+                            columnPropertyField),
+                        new CSharpSymbolDefinition(
+                            intType),
+                        acceptsNull: true)));
+        var attachedPropertyPlan = CreatePlan(
+            fixture,
+            attachedPropertyExtension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            Array.Empty<BindingElementReference>(),
+            ref nextCachedPathId);
+
+        var arrayArguments =
+            ImmutableArray.Create(
+                new MarkupBindingPathArgument(
+                    "1",
+                    parameter: default,
+                    new CSharpSymbolDefinition(intType),
+                    operation: default,
+                    conversion: default,
+                    convertedValue: 1),
+                new MarkupBindingPathArgument(
+                    "2",
+                    parameter: default,
+                    new CSharpSymbolDefinition(intType),
+                    operation: default,
+                    conversion: default,
+                    convertedValue: 2));
+        var arrayExtension =
+            CreateBindingExtension(
+                fixture,
+                MarkupBindingKind.Compiled,
+                "Matrix[1, 2]",
+                viewModelType,
+                ImmutableArray.Create(
+                    CreatePropertyElement(matrixProperty),
+                    new MarkupBindingPathElement(
+                        MarkupBindingPathElementKind.Indexer,
+                        "[1, 2]",
+                        type: new CSharpSymbolDefinition(
+                            itemType),
+                        arguments: default,
+                        boundArguments: arrayArguments)));
+        var arrayPlan = CreatePlan(
+            fixture,
+            arrayExtension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            Array.Empty<BindingElementReference>(),
+            ref nextCachedPathId);
+
+        Assert.True(complexPlan.IsValid);
+        Assert.True(complexPlan.HasCachedPath);
+        Assert.True(elementNamePlan.IsValid);
+        Assert.False(elementNamePlan.HasCachedPath);
+        Assert.True(selfPlan.IsValid);
+        Assert.True(templatedParentPlan.IsValid);
+        Assert.True(attachedPropertyPlan.IsValid);
+        Assert.True(arrayPlan.IsValid);
+        Assert.Equal(5, nextCachedPathId);
+
+        var complexField =
+            WriteCachedPathField(
+                fixture,
+                complexPlan);
+        var selfField =
+            WriteCachedPathField(
+                fixture,
+                selfPlan);
+        var templatedParentField =
+            WriteCachedPathField(
+                fixture,
+                templatedParentPlan);
+        var attachedPropertyField =
+            WriteCachedPathField(
+                fixture,
+                attachedPropertyPlan);
+        var arrayField =
+            WriteCachedPathField(
+                fixture,
+                arrayPlan);
+        var context =
+            CreateWriteContext(
+                "__nameScope",
+                scopeId: 0);
+        var complexBinding =
+            WriteBinding(
+                fixture,
+                complexPlan,
+                context);
+        var elementNameBinding =
+            WriteBinding(
+                fixture,
+                elementNamePlan,
+                context);
+        var selfBinding =
+            WriteBinding(
+                fixture,
+                selfPlan,
+                context);
+        var templatedParentBinding =
+            WriteBinding(
+                fixture,
+                templatedParentPlan,
+                context);
+        var attachedPropertyBinding =
+            WriteBinding(
+                fixture,
+                attachedPropertyPlan,
+                context);
+        var arrayBinding =
+            WriteBinding(
+                fixture,
+                arrayPlan,
+                context);
+
+        Assert.Contains(
+            ".Not().Ancestor(" +
+            "typeof(global::Demo.Element), 2)",
+            complexField);
+        Assert.Contains(
+            ".TypeCast<global::Demo.ViewModel>()",
+            complexField);
+        Assert.Contains("\"Item[]\"", complexField);
+        Assert.Contains("\"LoadAsync\"", complexField);
+        Assert.Contains(
+            ".CreateInpcPropertyAccessor, true)",
+            complexField);
+        Assert.Contains(
+            ".StreamTask<global::Demo.StreamContainer>()",
+            complexField);
+        Assert.Contains("\"Observable\"", complexField);
+        Assert.Contains(
+            ".StreamObservable<global::Demo.Leaf>()",
+            complexField);
+        Assert.Contains("\"IsTrue\"", complexField);
+        Assert.Contains(
+            ".ElementName(__nameScope, \"header\")",
+            elementNameBinding);
+        Assert.Contains(".Self().Build();", selfField);
+        Assert.Contains(
+            ".TemplatedParent().Build();",
+            templatedParentField);
+        Assert.Contains(
+            ".Property(" +
+            "global::Avalonia.Controls.Grid.ColumnProperty, " +
+            "global::Avalonia.Markup.Xaml.MarkupExtensions." +
+            "CompiledBindings.PropertyInfoAccessorFactory." +
+            "CreateAvaloniaPropertyAccessor, true)",
+            attachedPropertyField);
+        Assert.Contains(
+            ".ArrayElement(new int[] { 1, 2 }, " +
+            "typeof(global::Demo.Item))",
+            arrayField);
+
+        AssertGeneratedCSharpCompilesTogether(
+            fixture,
+            [
+                complexField,
+                selfField,
+                templatedParentField,
+                attachedPropertyField,
+                arrayField,
+            ],
+            [
+                complexBinding,
+                elementNameBinding,
+                selfBinding,
+                templatedParentBinding,
+                attachedPropertyBinding,
+                arrayBinding,
+            ]);
+    }
+
     private static TestFixture CreateFixture()
     {
         const string csharpSource =
@@ -648,6 +1051,9 @@ public sealed class BindingWriterTests
                 public Child Child { get; set; } = new();
 
                 public ItemCollection Items { get; } = new();
+
+                public Item[,] Matrix { get; } =
+                    new Item[2, 3];
             }
 
             public sealed class Child
@@ -657,16 +1063,37 @@ public sealed class BindingWriterTests
 
             public sealed class Element
             {
+                public object? DataContext { get; set; }
+
                 public string Name { get; set; } = "";
             }
 
             public sealed class ItemCollection
             {
-                public string this[int index]
+                public Item this[int index]
                 {
-                    get => "";
+                    get => new();
                     set { }
                 }
+            }
+
+            public sealed class Item
+            {
+                public global::System.Threading.Tasks.Task<StreamContainer>
+                    LoadAsync { get; } =
+                        global::System.Threading.Tasks.Task.FromResult(
+                            new StreamContainer());
+            }
+
+            public sealed class StreamContainer
+            {
+                public global::System.IObservable<Leaf> Observable { get; } =
+                    null!;
+            }
+
+            public sealed class Leaf
+            {
+                public bool IsTrue;
             }
 
             public struct StructModel
@@ -837,6 +1264,58 @@ public sealed class BindingWriterTests
             binding);
     }
 
+    private static void AssertGeneratedCSharpCompilesTogether(
+        TestFixture fixture,
+        string[] cachedPathFields,
+        string[] bindingExpressions)
+    {
+        var generatedFields =
+            string.Concat(cachedPathFields);
+        var generatedBindings =
+            string.Join(
+                "," + Environment.NewLine,
+                bindingExpressions);
+        var generatedSource =
+            $$"""
+            #nullable enable
+
+            namespace Generated;
+
+            internal sealed class BindingWriterOutput
+            {
+            {{generatedFields}}
+                private static global::Avalonia.Data.CompiledBinding[]
+                    CreateBindings(
+                        global::Avalonia.Controls.INameScope __nameScope)
+                {
+                    return new global::Avalonia.Data.CompiledBinding[]
+                    {
+            {{generatedBindings}}
+                    };
+                }
+            }
+            """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            generatedSource,
+            CSharpParseOptions.Default.WithLanguageVersion(
+                LanguageVersion.Preview),
+            path: "BindingWriterOutput.AllPaths.g.cs");
+        var compilation =
+            fixture.Compilation.AddSyntaxTrees(
+                syntaxTree);
+        var errors = compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            errors.Length == 0,
+            string.Join(
+                Environment.NewLine,
+                errors.Select(static diagnostic =>
+                    diagnostic.ToString())));
+    }
     private static void AssertGeneratedCSharpCompiles(
         TestFixture fixture,
         string cachedPathField,
@@ -878,13 +1357,15 @@ public sealed class BindingWriterTests
                     diagnostic.ToString())));
     }
     private static MarkupBindingPathElement CreatePropertyElement(
-        CSharpPropertySymbol property)
+        CSharpPropertySymbol property,
+        bool acceptsNull = false)
     {
         return new MarkupBindingPathElement(
             MarkupBindingPathElementKind.Property,
             property.Name,
             new CSharpSymbolDefinition(property),
-            new CSharpSymbolDefinition(property.Type));
+            new CSharpSymbolDefinition(property.Type),
+            acceptsNull: acceptsNull);
     }
 
     private static CSharpPropertySymbol GetProperty(

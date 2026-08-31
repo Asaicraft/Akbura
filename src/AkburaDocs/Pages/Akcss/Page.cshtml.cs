@@ -5,5 +5,5 @@ namespace AkburaDocs.Pages.Akcss;
 public class PageModel : Microsoft.AspNetCore.Mvc.RazorPages.PageModel
 {
     [FromRoute]
-    public string Slug { get; set; }
+    public string Slug { get; set; } = string.Empty;
 }

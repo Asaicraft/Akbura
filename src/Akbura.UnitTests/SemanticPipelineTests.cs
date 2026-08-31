@@ -2080,7 +2080,7 @@ public class SemanticPipelineTests
         Assert.Equal(SpecialType.System_Int32, Assert.IsAssignableFrom<INamedTypeSymbol>(property.Type.Symbol).SpecialType);
         Assert.Equal("Int32", operation.ValueType.Name);
         Assert.False(operation.HasErrors);
-        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)).IsEmpty);
     }
 
     [Fact]
@@ -2128,7 +2128,7 @@ public class SemanticPipelineTests
         Assert.Equal("MyProperty", operation.Property?.AvaloniaPropertyDefinition.Name);
         Assert.Equal("Double", operation.ValueType.Name);
         Assert.False(operation.HasErrors);
-        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)).IsEmpty);
     }
 
     [Fact]
@@ -2251,7 +2251,7 @@ public class SemanticPipelineTests
         Assert.Equal("imported", apply.AppliedSymbols[1].ClassName);
         Assert.IsAssignableFrom<ITailwindUtilitySymbol>(apply.AppliedSymbols[2]);
         Assert.False(apply.HasErrors);
-        Assert.True(semanticModel.GetSemanticDiagnostics(apply.Syntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(apply)).IsEmpty);
     }
 
     [Fact]
@@ -2297,7 +2297,7 @@ public class SemanticPipelineTests
         Assert.Equal("min-w", appliedParameterizedUtility.Name);
         Assert.Single(appliedParameterizedUtility.Parameters);
         Assert.False(apply.HasErrors);
-        Assert.True(semanticModel.GetSemanticDiagnostics(apply.Syntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(apply)).IsEmpty);
     }
 
     [Fact]
@@ -2351,7 +2351,7 @@ public class SemanticPipelineTests
             "Avalonia.Controls.Decorator",
             appliedUtility.TargetType.Symbol?.ToDisplayString());
         Assert.False(apply.HasErrors);
-        Assert.True(semanticModel.GetSemanticDiagnostics(apply.Syntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(apply)).IsEmpty);
     }
 
     [Fact]
@@ -2372,7 +2372,7 @@ public class SemanticPipelineTests
             .Single(rule => rule.Selector.Name?.Identifier.ValueText == "target");
         var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(targetRule).Symbol);
         var apply = Assert.IsAssignableFrom<IAkcssApplyOperation>(Assert.Single(symbol.Operations));
-        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(apply.Syntax));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(AssertSyntax(apply)));
 
         Assert.True(apply.HasErrors);
         Assert.Empty(apply.AppliedSymbols);
@@ -2439,7 +2439,7 @@ public class SemanticPipelineTests
             symbol.InterceptType.Symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
         Assert.Same(symbol.InterceptType.Symbol, operation.InterceptType.Symbol);
         Assert.False(operation.HasErrors);
-        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)).IsEmpty);
     }
 
     [Fact]
@@ -2543,7 +2543,7 @@ public class SemanticPipelineTests
         var rule = GetOnlyAkcssStyleRule(syntaxTree);
         var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
         var operation = Assert.IsAssignableFrom<IAkcssInterceptOperation>(Assert.Single(symbol.Operations));
-        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)));
 
         Assert.False(symbol.IsIntercepted);
         Assert.True(operation.HasErrors);
@@ -2568,7 +2568,7 @@ public class SemanticPipelineTests
         var rule = GetOnlyAkcssStyleRule(syntaxTree);
         var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
         var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(symbol.Operations));
-        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)));
 
         Assert.Null(operation.Property);
         Assert.True(operation.HasErrors);
@@ -2676,7 +2676,7 @@ public class SemanticPipelineTests
         var member = Assert.IsType<CSharpSymbolDefinition>(operation.ConvertedValue);
         Assert.Equal("Bold", member.Name);
         Assert.False(operation.HasErrors);
-        Assert.True(semanticModel.GetSemanticDiagnostics(operation.Syntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)).IsEmpty);
     }
 
     [Fact]
@@ -2830,7 +2830,7 @@ public class SemanticPipelineTests
         var symbol = Assert.IsAssignableFrom<IAkcssSymbol>(semanticModel.GetSymbolInfo(rule).Symbol);
         var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
             Assert.Single(symbol.Operations));
-        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)));
 
         Assert.Equal("Padding", operation.Property?.Name);
         Assert.True(operation.HasErrors);
@@ -2909,7 +2909,7 @@ public class SemanticPipelineTests
         var utility = GetOnlyAkcssUtility(syntaxTree);
         var symbol = Assert.IsAssignableFrom<ITailwindUtilitySymbol>(semanticModel.GetSymbolInfo(utility).Symbol);
         var operation = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(symbol.Operations));
-        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(operation.Syntax));
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(AssertSyntax(operation)));
 
         Assert.True(operation.HasErrors);
         Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_AkcssExpressionError, diagnostic.Code);
@@ -6162,7 +6162,7 @@ public class SemanticPipelineTests
         {
             var ifOperation = Assert.IsAssignableFrom<IAkcssIfOperation>(operation);
             Assert.False(ifOperation.HasErrors);
-            Assert.True(semanticModel.GetSemanticDiagnostics(ifOperation.Syntax).IsEmpty);
+            Assert.True(semanticModel.GetSemanticDiagnostics(AssertSyntax(ifOperation)).IsEmpty);
         });
 
         Assert.Equal(2, attributes.Length);
@@ -7902,6 +7902,13 @@ public class SemanticPipelineTests
         Assert.NotNull(csharpOperation);
         Assert.Same(owner, csharpOperation!.Parent);
         Assert.Contains(csharpOperation, owner.Children);
+    }
+
+    private static AkburaSyntax AssertSyntax(Akbura.Language.Operations.IOperation operation)
+    {
+        var syntax = operation.Syntax;
+        Assert.NotNull(syntax);
+        return syntax;
     }
 
     private static IEnumerable<ICSharpOperation> EnumerateCSharpOperations(

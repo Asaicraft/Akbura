@@ -1,6 +1,6 @@
 using Akbura.Hooks;
 
-param Control Content = null;
+param Control? Content = null;
 param IList<Page> Pages;
 param bind string Url = ""; 
 param IDataTemplate NotFound;
@@ -18,7 +18,7 @@ useEffect(() =>
     content = page == null
         ? NotFound.Build(Url)
         : TemplateContent
-            .Load<Control>(page.Content)
+            .Load<Control>(page.Content)?
             .Result;
 
 }, [Url, Pages, NotFound]);

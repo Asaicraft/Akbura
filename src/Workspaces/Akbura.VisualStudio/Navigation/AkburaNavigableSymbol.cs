@@ -80,8 +80,8 @@ internal sealed class AkburaNavigableSymbol :
             return;
         }
 
-        _ = ThreadHelper.JoinableTaskFactory
-            .RunAsync(NavigateAsync);
+        ThreadHelper.JoinableTaskFactory
+            .Run(NavigateAsync);
     }
 
     private async Task NavigateAsync()

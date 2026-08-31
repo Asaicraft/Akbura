@@ -493,8 +493,10 @@ internal sealed partial class CSharpProbeBinder
         var declarator = CSharpSyntaxFactory.VariableDeclarator(
                 CSharpSyntaxFactory.Identifier(name))
             .WithInitializer(CSharpSyntaxFactory.EqualsValueClause(
-                CSharpSyntaxFactory.LiteralExpression(
-                    CSharpSyntaxKind.DefaultLiteralExpression)));
+                CSharpSyntaxFactory.PostfixUnaryExpression(
+                    CSharpSyntaxKind.SuppressNullableWarningExpression,
+                    CSharpSyntaxFactory.LiteralExpression(
+                        CSharpSyntaxKind.DefaultLiteralExpression))));
         if (!string.IsNullOrEmpty(annotationKind))
         {
             declarator = declarator.WithAdditionalAnnotations(

@@ -4,7 +4,7 @@ using ServiceStack.IO;
 namespace AkburaDocs;
 
 public class MarkdownPages(ILogger<MarkdownPages> log, IWebHostEnvironment env, IVirtualFiles fs)
-    : MarkdownPagesBase<MarkdownFileInfo>(log, env, fs)
+    : MarkdownPagesBase<MarkdownFileInfo>(env, fs)
 {
     public override string Id => "pages";
 

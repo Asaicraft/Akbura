@@ -5,8 +5,8 @@ namespace AkburaDocs.Pages.Shared;
 public class DocsPage : PageModel
 {
     public string? Brand { get; set; }
-    public string Slug { get; set; }
-    public string Folder { get; set; }
+    public string Slug { get; set; } = string.Empty;
+    public string Folder { get; set; } = string.Empty;
     public MarkdownMenu? DefaultMenu { get; set; }
     public MarkdownFileInfo? Doc { get; set; }
     public Func<dynamic?, object>? Header { get; set; }

@@ -46,20 +46,23 @@ internal sealed partial class CSharpProbeBinder : Binder
     {
         var syntaxTree = CreateSyntaxTree(compilationUnit);
         var semanticModel = CreateSemanticModel(syntaxTree);
-        var probeType = syntaxTree
+        var probeField = syntaxTree
             .GetCompilationUnitRoot()
             .DescendantNodes()
             .OfType<CSharp.FieldDeclarationSyntax>()
-            .Single()
-            .Declaration
-            .Type;
+            .Single();
+        var probeType = probeField.Declaration.Type;
 
         var typeInfo = semanticModel.GetTypeInfo(probeType);
         var symbolInfo = semanticModel.GetSymbolInfo(probeType);
         var diagnostics = GetProbeDiagnostics(semanticModel, probeType);
-        var typeSymbol = ContainsErrorType(typeInfo.Type)
+        var declaredType = semanticModel.GetDeclaredSymbol(
+            probeField.Declaration.Variables.Single()) is IFieldSymbol field
+                ? field.Type
+                : typeInfo.Type;
+        var typeSymbol = ContainsErrorType(declaredType)
             ? null
-            : typeInfo.Type;
+            : declaredType;
 
         return new CSharpBindingResult(
             typeSymbol,
@@ -351,7 +354,13 @@ internal sealed partial class CSharpProbeBinder : Binder
         var parseOptions = CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
-        return CSharpSyntaxTree.Create(compilationUnit, parseOptions);
+        var nullableCompilationUnit = compilationUnit.WithLeadingTrivia(
+            CSharpSyntaxFactory
+                .ParseLeadingTrivia("#nullable enable\r\n")
+                .AddRange(compilationUnit.GetLeadingTrivia()));
+        return CSharpSyntaxTree.Create(
+            nullableCompilationUnit,
+            parseOptions);
     }
 
     private RoslynSemanticModel CreateSemanticModel(SyntaxTree syntaxTree)

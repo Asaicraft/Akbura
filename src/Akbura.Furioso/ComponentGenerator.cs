@@ -434,7 +434,8 @@ internal static class ComponentGenerator
             int indentation,
             IParamSymbol parameter)
         {
-            var type = GetTypeName(parameter.Type.Symbol);
+            var type = GetTypeNameWithNullableAnnotation(
+                parameter.Type.Symbol);
             var name = EscapeIdentifier(parameter.Name);
             var binding = parameter.BindingKind switch
             {
@@ -699,7 +700,8 @@ internal static class ComponentGenerator
         {
             foreach (var state in _symbol.States)
             {
-                var type = GetTypeName(state.Type.Symbol);
+                var type = GetTypeNameWithNullableAnnotation(
+                    state.Type.Symbol);
                 var name = EscapeIdentifier(state.Name);
                 var suffix = SanitizeIdentifier(state.Name);
                 var stateInfoFactory = GetStateInfoFactory(state, type);
@@ -1018,7 +1020,8 @@ internal static class ComponentGenerator
         {
             foreach (var state in _symbol.States)
             {
-                var type = GetTypeName(state.Type.Symbol);
+                var type = GetTypeNameWithNullableAnnotation(
+                    state.Type.Symbol);
                 var suffix = SanitizeIdentifier(state.Name);
                 if (_semanticModel.BindingSession.BindSemanticSyntax(state.InitializerSyntax) is BoundStateInitializer
                     {
@@ -4512,7 +4515,8 @@ internal static class ComponentGenerator
                 "<" +
                 string.Join(
                     ", ",
-                    method.TypeArguments.Select(GetTypeName)) +
+                    method.TypeArguments.Select(
+                        GetTypeNameWithNullableAnnotation)) +
                 ">";
         }
 
@@ -4529,7 +4533,7 @@ internal static class ComponentGenerator
     }
 
     private static string GetTypeNameWithNullableAnnotation(
-        ITypeSymbol type)
+        Microsoft.CodeAnalysis.ISymbol? symbol)
     {
         var format =
             SymbolDisplayFormat.FullyQualifiedFormat
@@ -4538,7 +4542,8 @@ internal static class ComponentGenerator
                         .MiscellaneousOptions |
                     SymbolDisplayMiscellaneousOptions
                         .IncludeNullableReferenceTypeModifier);
-        return !ContainsErrorType(type)
+        return symbol is ITypeSymbol type &&
+            !ContainsErrorType(type)
             ? type.ToDisplayString(format)
             : "global::System.Object";
     }

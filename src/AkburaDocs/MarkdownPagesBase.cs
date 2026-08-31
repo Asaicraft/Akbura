@@ -99,7 +99,7 @@ public interface IMarkdownPages
     List<MarkdownFileBase> GetAll();
 }
 
-public abstract class MarkdownPagesBase<T>(ILogger log, IWebHostEnvironment env, IVirtualFiles fs) : IMarkdownPages
+public abstract class MarkdownPagesBase<T>(IWebHostEnvironment env, IVirtualFiles fs) : IMarkdownPages
     where T : MarkdownFileBase
 {
     public abstract string Id { get; }
@@ -174,7 +174,7 @@ public abstract class MarkdownPagesBase<T>(ILogger log, IWebHostEnvironment env,
         return doc;
     }
 
-    public virtual T? Load(string path, MarkdownPipeline? pipeline = null)
+    public virtual T Load(string path, MarkdownPipeline? pipeline = null)
     {
         var file = fs.GetFile(path)
                    ?? throw new FileNotFoundException(path.LastRightPart('/'));
@@ -257,7 +257,7 @@ public abstract class MarkdownPagesBase<T>(ILogger log, IWebHostEnvironment env,
 }
 
 public class MarkdownIncludes(ILogger<MarkdownIncludes> log, IWebHostEnvironment env, IVirtualFiles fs)
-    : MarkdownPagesBase<MarkdownFileInfo>(log, env, fs)
+    : MarkdownPagesBase<MarkdownFileInfo>(env, fs)
 {
     public override string Id => "includes";
     public List<MarkdownFileInfo> Pages { get; } = [];
@@ -1023,6 +1023,6 @@ public class MarkdownMenu
 
 public class MarkdownMenuItem
 {
-    public string Text { get; set; }
-    public string Link { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public string Link { get; set; } = string.Empty;
 }

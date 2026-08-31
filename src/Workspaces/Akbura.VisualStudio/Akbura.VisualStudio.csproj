@@ -8,6 +8,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="MessagePack" PrivateAssets="all" />
 		<PackageReference Include="Microsoft.VisualStudio.SDK" />
 		<PackageReference Include="Microsoft.VisualStudio.Text.Logic" />
 		<PackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />

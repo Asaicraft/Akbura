@@ -24,6 +24,152 @@ namespace Akbura.UnitTests;
 public sealed class AkburaCsGeneratorTests
 {
     [Fact]
+    public void SemanticModel_PreservesNullableAnnotationsForExplicitComponentTypes()
+    {
+        var syntaxTree = ComponentSyntaxTree.ParseText(
+            """
+            using Avalonia.Controls;
+
+            param object? Value;
+            param System.Collections.Generic.IReadOnlyList<string?>? Values;
+
+            state object? selected = null;
+            state System.Collections.Generic.IReadOnlyList<string?>? items = null;
+
+            <Border />
+            """,
+            "NullableComponent.akbura");
+        var csharpCompilation = CSharpCompilation.Create(
+            "AkburaNullableSemanticTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var compilation = new AkburaCompilation(
+            csharpCompilation,
+            [syntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var parameters = root.Members
+            .OfType<Akbura.Language.Syntax.ParamDeclarationSyntax>()
+            .ToDictionary(static parameter =>
+                parameter.Name.Identifier.ValueText);
+        var states = root.Members
+            .OfType<Akbura.Language.Syntax.StateDeclarationSyntax>()
+            .ToDictionary(static state =>
+                state.Name.Identifier.ValueText);
+
+        AssertNullableType(
+            Assert.IsAssignableFrom<IParamSymbol>(
+                semanticModel.GetDeclaredSymbol(parameters["Value"]))
+                .Type.Symbol);
+        AssertNestedNullableType(
+            Assert.IsAssignableFrom<IParamSymbol>(
+                semanticModel.GetDeclaredSymbol(parameters["Values"]))
+                .Type.Symbol);
+        AssertNullableType(
+            Assert.IsAssignableFrom<IStateSymbol>(
+                semanticModel.GetDeclaredSymbol(states["selected"]))
+                .Type.Symbol);
+        AssertNestedNullableType(
+            Assert.IsAssignableFrom<IStateSymbol>(
+                semanticModel.GetDeclaredSymbol(states["items"]))
+                .Type.Symbol);
+
+        static void AssertNullableType(Microsoft.CodeAnalysis.ISymbol? symbol)
+        {
+            var type = Assert.IsAssignableFrom<ITypeSymbol>(symbol);
+            Assert.Equal(NullableAnnotation.Annotated, type.NullableAnnotation);
+        }
+
+        static void AssertNestedNullableType(Microsoft.CodeAnalysis.ISymbol? symbol)
+        {
+            var type = Assert.IsAssignableFrom<INamedTypeSymbol>(symbol);
+            Assert.Equal(NullableAnnotation.Annotated, type.NullableAnnotation);
+            Assert.Equal(
+                NullableAnnotation.Annotated,
+                Assert.Single(type.TypeArguments).NullableAnnotation);
+        }
+    }
+
+    [Fact]
+    public void Generator_PreservesNullableAnnotationsForExplicitParametersAndStates()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            param object? Value;
+            param System.Collections.Generic.IReadOnlyList<string?>? Values;
+
+            state object? selected = null;
+            state System.Collections.Generic.IReadOnlyList<string?>? items = null;
+
+            <Border />
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaNullableGeneratorTests",
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    Path.Combine(
+                        Environment.CurrentDirectory,
+                        "NullableComponent.akbura"),
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generatedText = Assert.Single(
+                Assert.Single(driver.GetRunResult().Results)
+                    .GeneratedSources)
+            .SourceText
+            .ToString();
+        Assert.Contains(
+            "Parameter<NullableComponent, object?> ValueProperty",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Parameter<NullableComponent, " +
+                "global::System.Collections.Generic.IReadOnlyList<string?>?> ValuesProperty",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StateInfo<object?> s_stateInfo_selected",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "StateInfo<global::System.Collections.Generic.IReadOnlyList<string?>?> " +
+                "s_stateInfo_items",
+            generatedText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity is DiagnosticSeverity.Warning or
+                    DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void Generator_UsesInstantiableMarkupTypeWhenStaticTypeHasSameName()
     {
         const string component =
@@ -1378,8 +1524,9 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
             static diagnostic =>
-                diagnostic.Severity ==
-                DiagnosticSeverity.Error);
+                diagnostic.Severity is
+                    DiagnosticSeverity.Warning or
+                    DiagnosticSeverity.Error);
         var result = Assert.Single(
             driver.GetRunResult().Results);
         var linkSource = Assert.Single(

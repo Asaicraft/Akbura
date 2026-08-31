@@ -646,7 +646,8 @@ public sealed class RealisticSemanticProjectTests
         Assert.Contains(module.AkcssSymbols, symbol => symbol.ClassName == "primary");
         Assert.Contains(module.AkcssSymbols, symbol => symbol.ClassName == "inlinePanel");
         Assert.Contains(module.AkcssSymbols, symbol => symbol.Name == "inlineFade");
-        Assert.True(semanticModel.GetSemanticDiagnostics(module.DeclaringSyntax).IsEmpty);
+        Assert.True(semanticModel.GetSemanticDiagnostics(
+            Assert.IsAssignableFrom<AkburaSyntax>(module.DeclaringSyntax)).IsEmpty);
     }
 
     private static MarkupComponentSymbol AssertMarkupComponent(

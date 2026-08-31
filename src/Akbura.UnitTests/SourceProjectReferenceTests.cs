@@ -209,7 +209,7 @@ public sealed class SourceProjectReferenceTests
         var setter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(
             Assert.Single(style.Operations));
         Assert.Equal("Width", setter.Property!.Name);
-        return setter.Syntax.Expression.ToFullString().Trim();
+        return Assert.IsType<AkcssAssignmentSyntax>(setter.Syntax).Expression.ToFullString().Trim();
     }
 
     private static MarkupAttributeSyntax GetAttribute(

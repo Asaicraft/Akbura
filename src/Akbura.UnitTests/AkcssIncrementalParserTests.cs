@@ -322,7 +322,11 @@ public sealed class AkcssIncrementalParserTests
         Assert.NotSame(oldBlock, newBlock);
         Assert.NotSame(oldCard, newCard);
         Assert.Same(oldCard.Selector.DotToken, newCard.Selector.DotToken);
-        Assert.Same(oldCard.Selector.Name.Identifier, newCard.Selector.Name.Identifier);
+        var oldName = oldCard.Selector.Name;
+        var newName = newCard.Selector.Name;
+        Assert.NotNull(oldName);
+        Assert.NotNull(newName);
+        Assert.Same(oldName.Identifier, newName.Identifier);
         Assert.Same(oldCard.OpenBrace, newCard.OpenBrace);
         Assert.Same(oldCard.Members[0], newCard.Members[0]);
         Assert.NotSame(oldCard.Members[1], newCard.Members[1]);

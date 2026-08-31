@@ -36,13 +36,9 @@ internal sealed partial class Parser : IDisposable
     private GreenSyntaxToken? _currentToken;
     private ArrayElement<GreenSyntaxToken>[] _lexedTokens;
     private Lexer.LexerMode _mode;
-    private int _recursionDepth;
     private GreenNode? _prevTokenTrailingTrivia;
-    private int _firstToken; // The position of _lexedTokens[0] (or _blendedTokens[0]).
     private int _tokenOffset; // The index of the current token within _lexedTokens or _blendedTokens.
     private int _tokenCount;
-    private int _resetCount;
-    private int _resetStart;
 
     public Parser(Lexer lexer, CancellationToken cancellationToken)
     {
@@ -99,12 +95,11 @@ internal sealed partial class Parser : IDisposable
 
     private void AddLexedTokenSlot()
     {
-        // shift tokens to left if we are far to the right
-        // don't shift if reset points have fixed locked the starting point at the token in the window
-        if (_tokenOffset > (_lexedTokens.Length >> 1)
-            && (_resetStart == -1 || _resetStart > _firstToken))
+        // Shift consumed tokens to the left when we are far enough into the buffer.
+        // This parser has no reset points, so no consumed token needs to be retained.
+        if (_tokenOffset > (_lexedTokens.Length >> 1))
         {
-            var shiftOffset = (_resetStart == -1) ? _tokenOffset : _resetStart - _firstToken;
+            var shiftOffset = _tokenOffset;
             var shiftCount = _tokenCount - shiftOffset;
             Debug.Assert(shiftOffset > 0);
             if (shiftCount > 0)
@@ -114,7 +109,6 @@ internal sealed partial class Parser : IDisposable
 
             ShiftBlendedTokenSlots(shiftOffset, shiftCount);
 
-            _firstToken += shiftOffset;
             _tokenCount -= shiftOffset;
             _tokenOffset -= shiftOffset;
         }

@@ -683,6 +683,7 @@ public sealed class MarkupIncrementalParserTests
         var markup = Assert.IsType<GreenMarkupRootSyntax>(syntax.Members[0]);
         var attribute = markup.Element.StartTag!.Attributes[0];
 
+        Assert.NotNull(attribute);
         Assert.True(attribute.ContainsSkippedText);
         Assert.Equal(code, markup.ToFullString());
     }

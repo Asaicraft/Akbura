@@ -47,6 +47,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="MessagePack" PrivateAssets="all" ExcludeAssets="runtime" />
 		<PackageReference Include="Microsoft.VisualStudio.SDK" ExcludeAssets="runtime" />
 
 		<PackageReference Include="Microsoft.VSSDK.BuildTools">

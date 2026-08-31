@@ -5,7 +5,7 @@ using ServiceStack.IO;
 namespace AkburaDocs;
 
 public class MarkdownWhatsNew(ILogger<MarkdownWhatsNew> log, IWebHostEnvironment env, IVirtualFiles fs)
-    : MarkdownPagesBase<MarkdownFileInfo>(log, env, fs)
+    : MarkdownPagesBase<MarkdownFileInfo>(env, fs)
 {
     public override string Id => "whatsnew";
     public Dictionary<string, List<MarkdownFileInfo>> Features { get; set; } = new();

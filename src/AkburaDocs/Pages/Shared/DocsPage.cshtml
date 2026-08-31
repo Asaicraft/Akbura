@@ -1,7 +1,7 @@
 @page
 @model AkburaDocs.Pages.Shared.DocsPage
 @inject MarkdownPages Markdown
-@inject AppConfig Config
+@inject AppConfig SiteConfig
 
 @{
 	var info = Model;
@@ -145,10 +145,10 @@
 
 				<div class="not-prose">@Model.Footer?.Invoke(null)</div>
 				
-				@if (!Model.HideEditOnGitHub && Config.GitPagesBaseUrl != null)
+				@if (!Model.HideEditOnGitHub && SiteConfig.GitPagesBaseUrl != null)
 				{
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="@Config.GitPagesBaseUrl.CombineWith(doc.Path)" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="@SiteConfig.GitPagesBaseUrl.CombineWith(doc.Path)" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -250,7 +250,7 @@
 				}
 			</div>
 				
-			@if (!Model.HideDocumentMap && doc.DocumentMap?.Headings.Count > 0)
+			@if (!Model.HideDocumentMap && doc.DocumentMap is { Headings.Count: > 0 } documentMap)
 			{
 				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
 					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
@@ -259,10 +259,16 @@
 								On This Page
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
-								@foreach (var h2 in doc.DocumentMap.Headings)
+								@foreach (var h2 in documentMap.Headings)
 								{
+									var h2Link = h2.Link;
+									if (string.IsNullOrEmpty(h2Link))
+									{
+										continue;
+									}
+
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'@h2.Link'" data-id="@h2.Link.Substring(1)" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+										<span v-hash="'@h2Link'" data-id="@h2Link.Substring(1)" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											@h2.Text
 										</span>
 										@if (h2.Children?.Count > 0)

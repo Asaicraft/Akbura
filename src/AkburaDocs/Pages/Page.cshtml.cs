@@ -6,5 +6,5 @@ namespace AkburaDocs;
 public class Page : PageModel
 {
     [FromRoute]
-    public string Slug { get; set; }
+    public string Slug { get; set; } = string.Empty;
 }

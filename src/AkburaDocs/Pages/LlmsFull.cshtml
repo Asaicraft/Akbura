@@ -1,6 +1,6 @@
 @page "/llms-full.txt"
 @inject MarkdownPages Markdown
-@inject AppConfig Config
+@inject AppConfig SiteConfig
 @attribute [RenderStatic]
 @{
     Layout = "";
@@ -21,7 +21,7 @@
             }
 
 <text># @(page.Title)
-Source: @Config.PublicBaseUrl.CombineWith(item.Link)
+Source: @SiteConfig.PublicBaseUrl.CombineWith(item.Link)
 
 @(Html.Raw(content))
 

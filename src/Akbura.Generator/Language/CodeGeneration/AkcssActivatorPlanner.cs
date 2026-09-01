@@ -153,6 +153,7 @@ internal static class AkcssActivatorPlanner
         private void BuildElement(in AkcssActivatorElementInput element)
         {
             var activatorStart = _activators.Count;
+            var slotStart = _slots.Count;
             var operations = element.Symbol.AttributeOperations;
             var isControlTarget = IsControlElement(element.Symbol);
 
@@ -179,7 +180,10 @@ internal static class AkcssActivatorPlanner
                 element.Id,
                 new AkcssPlanRange(
                     activatorStart,
-                    _activators.Count - activatorStart)));
+                    _activators.Count - activatorStart),
+                new AkcssPlanRange(
+                    slotStart,
+                    _slots.Count - slotStart)));
         }
 
         private void AddAppliedClasses(IMarkupPropertySetterOperation operation)
@@ -219,30 +223,25 @@ internal static class AkcssActivatorPlanner
             int sourceOrder,
             bool isControlTarget)
         {
-            var applicationStart = _applications.Count;
             var utilities = operation.Utilities;
+            using var applications = ImmutableArrayBuilder<AkcssUtilityApplicationPlan>.Rent(utilities.Length);
 
             for (var i = 0; i < utilities.Length; i++)
             {
                 var utility = utilities[i];
                 if (TryCreateStyleReference(utility, out var reference))
                 {
-                    _applications.Add(new AkcssUtilityApplicationPlan(utility, reference));
+                    applications.Add(new AkcssUtilityApplicationPlan(utility, reference));
                 }
             }
 
-            var applicationCount = _applications.Count - applicationStart;
-            if (applicationCount == 0)
+            if (applications.Count == 0)
             {
                 return;
             }
 
-            var applicationCacheId = _applicationCaches.Count;
-            _applicationCaches.Add(new AkcssUtilityApplicationCachePlan(
-                applicationCacheId,
-                new AkcssPlanRange(applicationStart, applicationCount)));
-
-            var firstUtility = _applications.WrittenSpan[applicationStart].Utility;
+            var applicationCacheId = GetOrAddApplicationCache(applications.WrittenSpan);
+            var firstUtility = applications.WrittenSpan[0].Utility;
             var valueSourceStart = _valueSources.Count;
             AddArgumentValueSources(element, operation, firstUtility, isControlTarget);
 
@@ -264,6 +263,50 @@ internal static class AkcssActivatorPlanner
                 operation.Variant,
                 operation.BindingPriority));
             _activators.Add(AkcssActivatorPlan.CreateCandidate(candidateIndex));
+        }
+
+        private int GetOrAddApplicationCache(
+            scoped ReadOnlySpan<AkcssUtilityApplicationPlan> applications)
+        {
+            var caches = _applicationCaches.WrittenSpan;
+            var existingApplications = _applications.WrittenSpan;
+
+            for (var i = 0; i < caches.Length; i++)
+            {
+                var cache = caches[i];
+                var range = cache.Applications;
+
+                if (range.Length != applications.Length)
+                {
+                    continue;
+                }
+
+                var isMatch = true;
+                for (var j = 0; j < range.Length; j++)
+                {
+                    var existing = existingApplications[range.Start + j].Reference;
+                    var current = applications[j].Reference;
+
+                    if (!StyleReferencesEqual(existing, current))
+                    {
+                        isMatch = false;
+                        break;
+                    }
+                }
+
+                if (isMatch)
+                {
+                    return cache.Id;
+                }
+            }
+
+            var id = _applicationCaches.Count;
+            var start = _applications.Count;
+            _applications.AddRange(applications);
+            _applicationCaches.Add(new AkcssUtilityApplicationCachePlan(
+                id,
+                new AkcssPlanRange(start, applications.Length)));
+            return id;
         }
 
         private void AddArgumentValueSources(

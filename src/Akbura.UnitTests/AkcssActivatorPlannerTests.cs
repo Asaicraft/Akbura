@@ -72,12 +72,14 @@ public sealed class AkcssActivatorPlannerTests
                 Assert.Equal(10, element.ElementId);
                 Assert.Equal(0, element.Activators.Start);
                 Assert.Equal(3, element.Activators.Length);
+                AssertRange(element.MarkupExtensionSlots, 0, 0);
             },
             element =>
             {
                 Assert.Equal(20, element.ElementId);
                 Assert.Equal(3, element.Activators.Start);
                 Assert.Equal(3, element.Activators.Length);
+                AssertRange(element.MarkupExtensionSlots, 0, 0);
             });
         Assert.Equal(
             [
@@ -169,6 +171,18 @@ public sealed class AkcssActivatorPlannerTests
             AkcssUtilityValueSourceKind.Binding,
         };
 
+        Assert.Collection(
+            plan.Elements,
+            element =>
+            {
+                Assert.Equal(7, element.ElementId);
+                AssertRange(element.MarkupExtensionSlots, 0, 5);
+            },
+            element =>
+            {
+                Assert.Equal(8, element.ElementId);
+                AssertRange(element.MarkupExtensionSlots, 5, 5);
+            });
         Assert.Equal(10, plan.ValueSources.Length);
         Assert.Equal(
             expectedKinds,

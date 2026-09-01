@@ -27,15 +27,21 @@ internal readonly struct AkcssPlanRange
 
 internal readonly struct AkcssElementActivatorPlan
 {
-    public AkcssElementActivatorPlan(int elementId, AkcssPlanRange activators)
+    public AkcssElementActivatorPlan(
+        int elementId,
+        AkcssPlanRange activators,
+        AkcssPlanRange markupExtensionSlots)
     {
         ElementId = elementId;
         Activators = activators;
+        MarkupExtensionSlots = markupExtensionSlots;
     }
 
     public int ElementId { get; }
 
     public AkcssPlanRange Activators { get; }
+
+    public AkcssPlanRange MarkupExtensionSlots { get; }
 }
 
 internal enum AkcssStyleReferenceKind : byte

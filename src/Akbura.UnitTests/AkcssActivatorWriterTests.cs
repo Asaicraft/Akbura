@@ -8,6 +8,8 @@ namespace Akbura.UnitTests;
 
 public sealed class AkcssActivatorWriterTests
 {
+    private const string OwnerTypeName = "global::Demo.PlannerView";
+
     [Fact]
     public void WriteStaticMembers_CachesClassesApplicationsAndUsesStaticUtilityLambdas()
     {
@@ -204,14 +206,79 @@ public sealed class AkcssActivatorWriterTests
 
         using var codeWriter = new CodeWriter("\n");
         var environment = fixture.Environment;
-        var writer = new AkcssActivatorWriter(codeWriter, in environment);
+        var writer = new AkcssActivatorWriter(
+            codeWriter,
+            in environment,
+            OwnerTypeName);
         var context = CreateWriteContext();
         var empty = new AkcssPlanRange(0, 0);
 
+        Assert.False(
+            writer.WriteFactoryMethods(
+                fixture.Plan,
+                fixture.Plan.Elements[0],
+                context));
         writer.WriteSetStyles(fixture.Plan, empty, "", context);
         writer.WriteRefresh(empty, "");
 
         Assert.Equal(string.Empty, codeWriter.GetText().ToString());
+    }
+
+    [Fact]
+    public void WriteFactoryMethods_UsesElementSlotRangeAndReturnsWhetherItWrites()
+    {
+        var semanticFixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var fixture = CreateWriterFixture(
+            semanticFixture,
+            semanticFixture.GetRootElement(),
+            false,
+            true);
+        using var codeWriter = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var writer = new AkcssActivatorWriter(
+            codeWriter,
+            in environment,
+            OwnerTypeName);
+        var context = CreateWriteContext();
+
+        Assert.True(
+            writer.WriteFactoryMethods(
+                fixture.Plan,
+                fixture.Plan.Elements[0],
+                context));
+        var lengthAfterFirstElement = codeWriter.Length;
+        Assert.False(
+            writer.WriteFactoryMethods(
+                fixture.Plan,
+                fixture.Plan.Elements[1],
+                context));
+
+        Assert.Equal(lengthAfterFirstElement, codeWriter.Length);
+        Assert.Equal(
+            5,
+            CountOccurrences(
+                codeWriter.GetText().ToString(),
+                "private "));
+    }
+
+    [Fact]
+    public void WriteStaticMembers_UsesExplicitOwnerTypeName()
+    {
+        var semanticFixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var fixture = CreateWriterFixture(
+            semanticFixture,
+            semanticFixture.GetRootElement(),
+            requiresLocalMarkupExtensionContext: false);
+
+        var output = WriteStaticMembers(
+            fixture,
+            "global::Demo.GeneratedOwner");
+
+        Assert.Contains(
+            "RegisterAttached<global::Demo.GeneratedOwner, " +
+            "global::Avalonia.Controls.Control, object?>",
+            output,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -405,11 +472,16 @@ public sealed class AkcssActivatorWriterTests
             semanticFixture.CreateBindingEnvironment());
     }
 
-    private static string WriteStaticMembers(WriterFixture fixture)
+    private static string WriteStaticMembers(
+        WriterFixture fixture,
+        string ownerTypeName = OwnerTypeName)
     {
         using var codeWriter = new CodeWriter("\n");
         var environment = fixture.Environment;
-        var writer = new AkcssActivatorWriter(codeWriter, in environment);
+        var writer = new AkcssActivatorWriter(
+            codeWriter,
+            in environment,
+            ownerTypeName);
 
         writer.WriteStaticMembers(fixture.Plan);
 
@@ -424,14 +496,19 @@ public sealed class AkcssActivatorWriterTests
     {
         using var codeWriter = new CodeWriter("\n");
         var environment = fixture.Environment;
-        var writer = new AkcssActivatorWriter(codeWriter, in environment);
+        var writer = new AkcssActivatorWriter(
+            codeWriter,
+            in environment,
+            OwnerTypeName);
         var context = CreateWriteContext();
         var element = fixture.Plan.Elements[elementIndex];
 
-        if (writeFactories)
+        if (writeFactories &&
+            writer.WriteFactoryMethods(
+                fixture.Plan,
+                element,
+                context))
         {
-            var factoryContext = new AkcssFactoryWriteContext(element.ElementId, context);
-            writer.WriteFactoryMethods(fixture.Plan, factoryContext);
             codeWriter.WriteLine();
         }
 

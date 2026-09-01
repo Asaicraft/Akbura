@@ -1,41 +1,44 @@
 ﻿using Akbura.Language.Binder;
 using Akbura.Language.Operations;
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
-internal readonly ref struct AkcssFactoryWriteContext
-{
-    public AkcssFactoryWriteContext(
-        int elementId,
-        in MarkupExtensionWriteContext markupExtensionContext)
-    {
-        ElementId = elementId;
-        MarkupExtensionContext = markupExtensionContext;
-    }
-
-    public int ElementId { get; }
-
-    public MarkupExtensionWriteContext MarkupExtensionContext { get; }
-}
-
 internal readonly ref struct AkcssActivatorWriter
 {
     private readonly CodeWriter _writer;
     private readonly CSharpValueWriter _valueWriter;
     private readonly BindingWriterEnvironment _bindingEnvironment;
+    private readonly SourceMappingWriter _sourceMappingWriter;
+    private readonly bool _hasSourceMap;
+    private readonly string _ownerTypeName;
 
     public AkcssActivatorWriter(
         CodeWriter writer,
-        in BindingWriterEnvironment bindingEnvironment)
+        in BindingWriterEnvironment bindingEnvironment,
+        string ownerTypeName,
+        ComponentGenerationSourceMap? sourceMap = null)
     {
         Debug.Assert(writer != null);
+        Debug.Assert(!string.IsNullOrEmpty(ownerTypeName));
 
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         _valueWriter = new CSharpValueWriter(_writer);
         _bindingEnvironment = bindingEnvironment;
+
+        if (string.IsNullOrEmpty(ownerTypeName))
+        {
+            throw new ArgumentException("The owner type name cannot be empty.", nameof(ownerTypeName));
+        }
+
+        _ownerTypeName = ownerTypeName;
+        _hasSourceMap = sourceMap != null;
+        _sourceMappingWriter = sourceMap != null
+            ? new SourceMappingWriter(_writer, sourceMap)
+            : default;
     }
 
     public void WriteStaticMembers(in AkcssComponentActivatorPlan plan)
@@ -62,18 +65,26 @@ internal readonly ref struct AkcssActivatorWriter
         WriteMarkupExtensionTargetProperties(plan, hasPreviousSection);
     }
 
-    public void WriteFactoryMethods(
+    public bool WriteFactoryMethods(
         in AkcssComponentActivatorPlan plan,
-        in AkcssFactoryWriteContext context)
+        in AkcssElementActivatorPlan element,
+        in MarkupExtensionWriteContext context)
     {
-        var wroteMethod = false;
-        var slots = plan.MarkupExtensionSlots;
-
-        for (var i = 0; i < slots.Length; i++)
+        var range = element.MarkupExtensionSlots;
+        if (range.IsEmpty)
         {
-            var slot = slots[i];
+            return false;
+        }
 
-            if (!slot.NeedsFactoryMethod || slot.ElementId != context.ElementId)
+        EnsureRange(range, plan.MarkupExtensionSlots.Length, nameof(element));
+
+        var wroteMethod = false;
+
+        for (var i = 0; i < range.Length; i++)
+        {
+            var slot = plan.MarkupExtensionSlots[range.Start + i];
+
+            if (!slot.NeedsFactoryMethod)
             {
                 continue;
             }
@@ -83,9 +94,11 @@ internal readonly ref struct AkcssActivatorWriter
                 _writer.WriteLine();
             }
 
-            WriteFactoryMethod(slot, context.MarkupExtensionContext);
+            WriteFactoryMethod(slot, context);
             wroteMethod = true;
         }
+
+        return wroteMethod;
     }
 
     public void WriteSetStyles(
@@ -275,12 +288,6 @@ internal readonly ref struct AkcssActivatorWriter
     private void WriteMarkupExtensionTargetProperty(in AkcssMarkupExtensionSlotPlan slot)
     {
         var indent = _writer.CurrentIndent;
-        var ownerType = _bindingEnvironment.WithinType;
-
-        if (ownerType == null)
-        {
-            throw new InvalidOperationException("AKCSS target properties require a component type.");
-        }
 
         _writer
             .Write("private static readonly global::Avalonia.AttachedProperty<object?> ")
@@ -288,9 +295,9 @@ internal readonly ref struct AkcssActivatorWriter
             .WriteLine(" =");
         _writer.CurrentIndent = indent + 4;
         _writer
-            .Write("global::Avalonia.AvaloniaProperty.RegisterAttached<");
-        _valueWriter.WriteTypeName(ownerType);
-        _writer.Write(", global::Avalonia.Controls.Control, object?>(");
+            .Write("global::Avalonia.AvaloniaProperty.RegisterAttached<")
+            .Write(_ownerTypeName)
+            .Write(", global::Avalonia.Controls.Control, object?>(");
         _writer.WriteStringLiteral(slot.PropertyName).WriteLine(");");
         _writer.CurrentIndent = indent;
     }
@@ -303,12 +310,24 @@ internal readonly ref struct AkcssActivatorWriter
 
         _writer.Write("private ");
         WriteFactoryReturnType(slot.FactoryValueType, slot.HasPriorityMember);
-        _writer.Write(" ").Write(slot.FactoryName).WriteLine("(");
-        _writer.CurrentIndent = indent + 4;
-        _writer.WriteLine(slot.IsControlTarget
+        _writer.Write(" ").Write(slot.FactoryName).Write("(");
+
+        var parameter = slot.IsControlTarget
             ? "global::Avalonia.Controls.Control __target)"
-            : "object __target)");
-        _writer.CurrentIndent = indent;
+            : "object __target)";
+
+        if (_writer.Location.CharacterIndex + parameter.Length <= 120)
+        {
+            _writer.WriteLine(parameter);
+        }
+        else
+        {
+            _writer.WriteLine();
+            _writer.CurrentIndent = indent + 4;
+            _writer.WriteLine(parameter);
+            _writer.CurrentIndent = indent;
+        }
+
         _writer.WriteLine("{");
         _writer.CurrentIndent = indent + 4;
 
@@ -317,9 +336,11 @@ internal readonly ref struct AkcssActivatorWriter
 
         if (slot.PriorityMember == null)
         {
+            var mapping = WriteSourceMappingStart(slot.Syntax, "return ".Length);
             _writer.Write("return ");
             extensionWriter.Write(slot.Extension, extensionContext);
             _writer.WriteLine(";");
+            WriteSourceMappingEnd(mapping);
         }
         else
         {
@@ -337,9 +358,15 @@ internal readonly ref struct AkcssActivatorWriter
     {
         var indent = _writer.CurrentIndent;
 
+        var creationMapping = WriteSourceMappingStart(
+            slot.Syntax,
+            "var __extension = ".Length);
         _writer.Write("var __extension = ");
         extensionWriter.WriteCreation(slot.Extension, context);
         _writer.WriteLine(";");
+        WriteSourceMappingEnd(creationMapping);
+
+        var resultMapping = WriteSourceMappingStart(slot.Syntax, "return ".Length);
         _writer.Write("return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
         _valueWriter.WriteTypeName(slot.FactoryValueType);
         _writer.WriteLine(">(");
@@ -349,6 +376,7 @@ internal readonly ref struct AkcssActivatorWriter
         _writer.Write("__extension.");
         _valueWriter.WriteIdentifier(slot.PriorityMember!.Name);
         _writer.WriteLine(");");
+        WriteSourceMappingEnd(resultMapping);
         _writer.CurrentIndent = indent;
     }
 
@@ -737,12 +765,17 @@ internal readonly ref struct AkcssActivatorWriter
 
         var extensionContext = CreateExtensionContext(slot, context);
         var extensionWriter = new MarkupExtensionWriter(_writer, in _bindingEnvironment);
+        var valueOffset = plan.HasPriorityMember
+            ? "__target => { var __extension = ".Length
+            : "__target => ".Length;
+        var mapping = WriteSourceMappingStart(slot.Syntax, valueOffset);
 
         _writer.Write("__target => ");
 
         if (!plan.HasPriorityMember)
         {
             extensionWriter.Write(plan.Extension, extensionContext);
+            WriteSourceMappingEnd(mapping);
             return;
         }
 
@@ -760,6 +793,24 @@ internal readonly ref struct AkcssActivatorWriter
         _writer.Write(", __extension.");
         _valueWriter.WriteIdentifier(plan.PriorityMember.Name);
         _writer.Write("); }");
+        WriteSourceMappingEnd(mapping);
+    }
+
+    private SourceMappingToken WriteSourceMappingStart(
+        AkburaSyntax syntax,
+        int valueOffset = 0)
+    {
+        return _hasSourceMap
+            ? _sourceMappingWriter.WriteStart(syntax, valueOffset)
+            : default;
+    }
+
+    private void WriteSourceMappingEnd(in SourceMappingToken token)
+    {
+        if (_hasSourceMap)
+        {
+            _sourceMappingWriter.WriteEnd(token);
+        }
     }
 
     private void WriteRuntimeUtilityType(Akbura.Language.Symbols.ITailwindUtilitySymbol utility)

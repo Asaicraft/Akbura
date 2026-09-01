@@ -2,10 +2,8 @@
 using Akbura.Language.Operations;
 using CSharpSymbolDefinition = Akbura.Language.Symbols.CSharpSymbolDefinition;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Diagnostics;
-using System.Globalization;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -81,10 +79,8 @@ internal readonly ref struct MarkupExtensionWriteContext
 /// </summary>
 internal readonly ref struct MarkupExtensionWriter
 {
-    private static readonly SymbolDisplayFormat s_typeDisplayFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat;
-
     private readonly CodeWriter _writer;
+    private readonly CSharpValueWriter _valueWriter;
     private readonly BindingWriterEnvironment _environment;
 
     public MarkupExtensionWriter(
@@ -94,6 +90,7 @@ internal readonly ref struct MarkupExtensionWriter
         Debug.Assert(writer != null);
 
         _writer = writer!;
+        _valueWriter = new CSharpValueWriter(_writer);
         _environment = environment;
     }
 
@@ -137,10 +134,7 @@ internal readonly ref struct MarkupExtensionWriter
         in BindingWritePlan plan,
         in MarkupExtensionWriteContext context)
     {
-        var bindingWriter = new BindingWriter(
-            _writer,
-            in _environment,
-            context.ElementReferences);
+        var bindingWriter = new BindingWriter(_writer, in _environment, context.ElementReferences);
 
         bindingWriter.WriteBinding(plan, context);
     }
@@ -166,7 +160,7 @@ internal readonly ref struct MarkupExtensionWriter
         Debug.Assert(extensionType != null);
 
         _writer.Write("new ");
-        WriteTypeName(_writer, extensionType);
+        _valueWriter.WriteTypeName(extensionType);
         _writer.Write("(");
 
         for (var i = 0; i < extension.Arguments.Length; i++)
@@ -197,7 +191,7 @@ internal readonly ref struct MarkupExtensionWriter
 
             var property = extension.Properties[i];
 
-            WriteIdentifier(_writer, property.Name);
+            _valueWriter.WriteIdentifier(property.Name);
             _writer.Write(" = ");
             WritePropertyValue(property, context);
         }
@@ -271,7 +265,7 @@ internal readonly ref struct MarkupExtensionWriter
 
         if (constant.HasValue)
         {
-            WriteConstant(_writer, constant.Value, targetType);
+            _valueWriter.WriteConstant(constant.Value, targetType);
             return;
         }
 
@@ -282,14 +276,14 @@ internal readonly ref struct MarkupExtensionWriter
         }
 
         if (convertedValue is CSharpSymbolDefinition definition &&
-            TryWriteStaticMemberReference(_writer, definition.Symbol))
+            _valueWriter.TryWriteStaticMemberReference(definition.Symbol))
         {
             return;
         }
 
         if (convertedValue != null)
         {
-            WriteConstant(_writer, convertedValue, targetType);
+            _valueWriter.WriteConstant(convertedValue, targetType);
             return;
         }
 
@@ -300,7 +294,7 @@ internal readonly ref struct MarkupExtensionWriter
         IMethodSymbol provideValue,
         in MarkupExtensionWriteContext context)
     {
-        WriteIdentifier(_writer, provideValue.Name);
+        _valueWriter.WriteIdentifier(provideValue.Name);
         _writer.Write("(");
 
         Debug.Assert(provideValue.Parameters.Length <= 1);
@@ -349,254 +343,6 @@ internal readonly ref struct MarkupExtensionWriter
         _writer.Write(")");
     }
 
-    internal static void WriteIdentifier(CodeWriter writer, string identifier)
-    {
-        writer.WriteIdentifierEscapeIfNeeded(identifier);
-        writer.Write(identifier);
-    }
-
-    internal static void WriteTypeName(CodeWriter writer, ITypeSymbol? type)
-    {
-        if (type == null || ContainsErrorType(type))
-        {
-            writer.Write("global::System.Object");
-            return;
-        }
-
-        // SymbolDisplay currently allocates the resulting string,
-        // but avoids introducing a generator-wide dictionary whose
-        // retained memory would usually cost more than these temporary
-        // generation-time strings.
-        writer.Write(type.ToDisplayString(s_typeDisplayFormat));
-    }
-
-    internal static void WriteStaticMemberReference(CodeWriter writer, ISymbol symbol)
-    {
-        Debug.Assert(
-            symbol is IFieldSymbol { IsStatic: true } or
-            IPropertySymbol { IsStatic: true });
-
-        WriteTypeName(writer, symbol.ContainingType);
-        writer.Write(".");
-        WriteIdentifier(writer, symbol.Name);
-    }
-
-    private static bool TryWriteStaticMemberReference(
-        CodeWriter writer,
-        ISymbol? symbol)
-    {
-        if (symbol is not IFieldSymbol { IsStatic: true } and
-            not IPropertySymbol { IsStatic: true })
-        {
-            return false;
-        }
-
-        WriteStaticMemberReference(writer, symbol);
-        return true;
-    }
-
-    internal static void WriteConstant(
-        CodeWriter writer,
-        object? value,
-        ISymbol? targetType)
-    {
-        if (value == null)
-        {
-            writer.Write("null");
-            return;
-        }
-
-        if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum } unsignedEnumType &&
-            value is ulong unsignedEnumValue &&
-            unsignedEnumValue > long.MaxValue)
-        {
-            writer.Write("unchecked((");
-            WriteTypeName(writer, unsignedEnumType);
-            writer.Write(")");
-            writer.Write(unsignedEnumValue.ToString(CultureInfo.InvariantCulture));
-            writer.Write("UL)");
-            return;
-        }
-
-        if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType &&
-            TryConvertToInt64(value, out var enumValue))
-        {
-            writer.Write("(");
-            WriteTypeName(writer, enumType);
-            writer.Write(")");
-            writer.Write(enumValue.ToString(CultureInfo.InvariantCulture));
-            return;
-        }
-
-        switch (value)
-        {
-            case CSharpSymbolDefinition definition
-                when TryWriteStaticMemberReference(writer, definition.Symbol):
-                return;
-
-            case ITypeSymbol type:
-                writer.Write("typeof(");
-                WriteTypeName(writer, type);
-                writer.Write(")");
-                return;
-
-            case string text:
-                writer.WriteStringLiteral(text);
-                return;
-
-            case char character:
-                writer.Write(SymbolDisplay.FormatLiteral(character, quote: true));
-                return;
-
-            case bool boolean:
-                writer.WriteBooleanLiteral(boolean);
-                return;
-
-            case byte number:
-                writer.WriteIntegerLiteral(number);
-                return;
-
-            case sbyte number:
-                writer.WriteIntegerLiteral(number);
-                return;
-
-            case short number:
-                writer.WriteIntegerLiteral(number);
-                return;
-
-            case ushort number:
-                writer.WriteIntegerLiteral(number);
-                return;
-
-            case int number:
-                writer.WriteIntegerLiteral(number);
-                return;
-
-            case uint number:
-                writer.Write(number.ToString(CultureInfo.InvariantCulture));
-                writer.Write("u");
-                return;
-
-            case long number:
-                writer.Write(number.ToString(CultureInfo.InvariantCulture));
-                writer.Write("L");
-                return;
-
-            case ulong number:
-                writer.Write(number.ToString(CultureInfo.InvariantCulture));
-                writer.Write("UL");
-                return;
-
-            case float number:
-                WriteSingleLiteral(writer, number);
-                return;
-
-            case double number:
-                WriteDoubleLiteral(writer, number);
-                return;
-
-            case decimal number:
-                writer.Write(number.ToString(CultureInfo.InvariantCulture));
-                writer.Write("m");
-                return;
-
-            default:
-                Debug.Fail("Unsupported constant value: " + value.GetType().FullName);
-                writer.WriteStringLiteral(value.ToString() ?? string.Empty);
-                return;
-        }
-    }
-
-    private static void WriteSingleLiteral(CodeWriter writer, float value)
-    {
-        if (float.IsNaN(value))
-        {
-            writer.Write("global::System.Single.NaN");
-            return;
-        }
-
-        if (float.IsPositiveInfinity(value))
-        {
-            writer.Write("global::System.Single.PositiveInfinity");
-            return;
-        }
-
-        if (float.IsNegativeInfinity(value))
-        {
-            writer.Write("global::System.Single.NegativeInfinity");
-            return;
-        }
-
-        writer.Write(value.ToString("R", CultureInfo.InvariantCulture));
-        writer.Write("f");
-    }
-
-    private static void WriteDoubleLiteral(CodeWriter writer, double value)
-    {
-        if (double.IsNaN(value))
-        {
-            writer.Write("global::System.Double.NaN");
-            return;
-        }
-
-        if (double.IsPositiveInfinity(value))
-        {
-            writer.Write("global::System.Double.PositiveInfinity");
-            return;
-        }
-
-        if (double.IsNegativeInfinity(value))
-        {
-            writer.Write("global::System.Double.NegativeInfinity");
-            return;
-        }
-
-        writer.Write(value.ToString("R", CultureInfo.InvariantCulture));
-        writer.Write("d");
-    }
-
-    private static bool TryConvertToInt64(object value, out long result)
-    {
-        switch (value)
-        {
-            case byte number:
-                result = number;
-                return true;
-
-            case sbyte number:
-                result = number;
-                return true;
-
-            case short number:
-                result = number;
-                return true;
-
-            case ushort number:
-                result = number;
-                return true;
-
-            case int number:
-                result = number;
-                return true;
-
-            case uint number:
-                result = number;
-                return true;
-
-            case long number:
-                result = number;
-                return true;
-
-            case ulong number when number <= long.MaxValue:
-                result = (long)number;
-                return true;
-
-            default:
-                result = 0;
-                return false;
-        }
-    }
-
     private static ReadOnlyMemory<char> TrimQuotes(string text)
     {
         var value = text.AsMemory();
@@ -615,54 +361,5 @@ internal readonly ref struct MarkupExtensionWriter
         }
 
         return value;
-    }
-
-    private static bool ContainsErrorType(ITypeSymbol type)
-    {
-        if (type is IErrorTypeSymbol || type.TypeKind == TypeKind.Error)
-        {
-            return true;
-        }
-
-        switch (type)
-        {
-            case IArrayTypeSymbol array:
-                return ContainsErrorType(array.ElementType);
-
-            case IPointerTypeSymbol pointer:
-                return ContainsErrorType(pointer.PointedAtType);
-
-            case INamedTypeSymbol named:
-                for (var i = 0; i < named.TypeArguments.Length; i++)
-                {
-                    if (ContainsErrorType(named.TypeArguments[i]))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-
-            case IFunctionPointerTypeSymbol functionPointer:
-                if (ContainsErrorType(functionPointer.Signature.ReturnType))
-                {
-                    return true;
-                }
-
-                var parameters = functionPointer.Signature.Parameters;
-
-                for (var i = 0; i < parameters.Length; i++)
-                {
-                    if (ContainsErrorType(parameters[i].Type))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-
-            default:
-                return false;
-        }
     }
 }

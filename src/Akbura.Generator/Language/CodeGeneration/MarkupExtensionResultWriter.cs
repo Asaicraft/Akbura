@@ -29,9 +29,7 @@ internal readonly ref struct BindingBaseResultWriter
     {
         WriteStart(target);
 
-        var extensionWriter = new MarkupExtensionWriter(
-            _writer,
-            in _environment);
+        var extensionWriter = new MarkupExtensionWriter(_writer, in _environment);
         extensionWriter.Write(extension, context);
 
         WriteEnd();
@@ -44,9 +42,7 @@ internal readonly ref struct BindingBaseResultWriter
     {
         WriteStart(target);
 
-        var extensionWriter = new MarkupExtensionWriter(
-            _writer,
-            in _environment);
+        var extensionWriter = new MarkupExtensionWriter(_writer, in _environment);
         extensionWriter.WriteBinding(plan, context);
 
         WriteEnd();
@@ -60,9 +56,8 @@ internal readonly ref struct BindingBaseResultWriter
             .Write("((global::Avalonia.AvaloniaObject)")
             .Write(target.TargetExpression)
             .Write(").Bind(");
-        MarkupExtensionWriter.WriteStaticMemberReference(
-            _writer,
-            target.AvaloniaProperty);
+        var valueWriter = new CSharpValueWriter(_writer);
+        valueWriter.WriteStaticMemberReference(target.AvaloniaProperty);
         _writer.Write(", ");
     }
 
@@ -76,8 +71,7 @@ internal readonly ref struct BindingBaseResultWriter
     {
         if (!target.IsValid)
         {
-            throw new InvalidOperationException(
-                "The Avalonia property write target is not initialized.");
+            throw new InvalidOperationException("The Avalonia property write target is not initialized.");
         }
     }
 }
@@ -105,16 +99,12 @@ internal readonly ref struct DynamicResourceWriter
         in MarkupExtensionResultPlan plan,
         in MarkupExtensionWriteContext context)
     {
-        if (!plan.IsValid ||
-            plan.Kind != MarkupExtensionResultKind.DynamicResource)
+        if (!plan.IsValid || plan.Kind != MarkupExtensionResultKind.DynamicResource)
         {
-            throw new InvalidOperationException(
-                "DynamicResourceWriter requires a DynamicResource result plan.");
+            throw new InvalidOperationException("DynamicResourceWriter requires a DynamicResource result plan.");
         }
 
-        var resultWriter = new BindingBaseResultWriter(
-            _writer,
-            in _environment);
+        var resultWriter = new BindingBaseResultWriter(_writer, in _environment);
         resultWriter.WriteMarkupExtension(target, plan.Extension, context);
     }
 }
@@ -144,9 +134,7 @@ internal readonly ref struct RuntimeMarkupExtensionResultWriter
     {
         WriteStart(target);
 
-        var extensionWriter = new MarkupExtensionWriter(
-            _writer,
-            in _environment);
+        var extensionWriter = new MarkupExtensionWriter(_writer, in _environment);
         extensionWriter.Write(extension, context);
 
         WriteEnd();
@@ -161,9 +149,8 @@ internal readonly ref struct RuntimeMarkupExtensionResultWriter
             .Write("(global::Avalonia.AvaloniaObject)")
             .Write(target.TargetExpression)
             .Write(", ");
-        MarkupExtensionWriter.WriteStaticMemberReference(
-            _writer,
-            target.AvaloniaProperty);
+        var valueWriter = new CSharpValueWriter(_writer);
+        valueWriter.WriteStaticMemberReference(target.AvaloniaProperty);
         _writer.Write(", ");
     }
 
@@ -177,8 +164,7 @@ internal readonly ref struct RuntimeMarkupExtensionResultWriter
     {
         if (!target.IsValid)
         {
-            throw new InvalidOperationException(
-                "The Avalonia property write target is not initialized.");
+            throw new InvalidOperationException("The Avalonia property write target is not initialized.");
         }
     }
 }
@@ -206,16 +192,12 @@ internal readonly ref struct StaticResourceWriter
         in MarkupExtensionResultPlan plan,
         in MarkupExtensionWriteContext context)
     {
-        if (!plan.IsValid ||
-            plan.Kind != MarkupExtensionResultKind.StaticResource)
+        if (!plan.IsValid || plan.Kind != MarkupExtensionResultKind.StaticResource)
         {
-            throw new InvalidOperationException(
-                "StaticResourceWriter requires a StaticResource result plan.");
+            throw new InvalidOperationException("StaticResourceWriter requires a StaticResource result plan.");
         }
 
-        var resultWriter = new RuntimeMarkupExtensionResultWriter(
-            _writer,
-            in _environment);
+        var resultWriter = new RuntimeMarkupExtensionResultWriter(_writer, in _environment);
         resultWriter.Write(target, plan.Extension, context);
     }
 }

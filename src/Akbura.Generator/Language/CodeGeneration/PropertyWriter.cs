@@ -72,8 +72,7 @@ internal readonly struct PropertyWritePlan
             PropertyAccessKind.ClrProperty => CreateClrProperty(property),
             PropertyAccessKind.AvaloniaProperty => CreateAvaloniaProperty(property),
             PropertyAccessKind.AttachedAccessor => CreateAttachedAccessor(property),
-            PropertyAccessKind.Parameter or PropertyAccessKind.Command =>
-                CreateDirectMember(property),
+            PropertyAccessKind.Parameter or PropertyAccessKind.Command => CreateDirectMember(property),
             _ => default,
         };
     }
@@ -127,8 +126,7 @@ internal readonly struct PropertyWritePlan
             return default;
         }
 
-        var receiverType = property.AttachedTargetType.Symbol as ITypeSymbol ??
-            attachedSetter.Parameters[0].Type;
+        var receiverType = property.AttachedTargetType.Symbol as ITypeSymbol ?? attachedSetter.Parameters[0].Type;
 
         return new PropertyWritePlan(
             PropertyWriteKind.AttachedAccessor,
@@ -157,10 +155,7 @@ internal readonly struct PropertyWritePlan
 
     private static RoslynSymbol? GetStaticMember(RoslynSymbol? symbol)
     {
-        return symbol is IFieldSymbol { IsStatic: true } or
-            RoslynPropertySymbol { IsStatic: true }
-                ? symbol
-                : null;
+        return symbol is IFieldSymbol { IsStatic: true } or RoslynPropertySymbol { IsStatic: true } ? symbol : null;
     }
 }
 
@@ -170,12 +165,14 @@ internal readonly struct PropertyWritePlan
 internal readonly ref struct PropertyWriter
 {
     private readonly CodeWriter _writer;
+    private readonly CSharpValueWriter _valueWriter;
 
     public PropertyWriter(CodeWriter writer)
     {
         Debug.Assert(writer != null);
 
         _writer = writer!;
+        _valueWriter = new CSharpValueWriter(_writer);
     }
 
     public PropertyWriteEnd WriteStart(
@@ -229,9 +226,9 @@ internal readonly ref struct PropertyWriter
         Debug.Assert(plan.ReceiverType != null);
 
         _writer.Write("((");
-        MarkupExtensionWriter.WriteTypeName(_writer, plan.ReceiverType);
+        _valueWriter.WriteTypeName(plan.ReceiverType);
         _writer.Write(")").Write(targetExpression).Write(").");
-        MarkupExtensionWriter.WriteIdentifier(_writer, plan.ClrProperty!.Name);
+        _valueWriter.WriteIdentifier(plan.ClrProperty!.Name);
         _writer.Write(" = ");
 
         return PropertyWriteEnd.Assignment;
@@ -247,9 +244,7 @@ internal readonly ref struct PropertyWriter
             .Write("((global::Avalonia.AvaloniaObject)")
             .Write(targetExpression)
             .Write(").SetValue(");
-        MarkupExtensionWriter.WriteStaticMemberReference(
-            _writer,
-            plan.AvaloniaProperty!);
+        _valueWriter.WriteStaticMemberReference(plan.AvaloniaProperty!);
         _writer.Write(", ");
 
         return PropertyWriteEnd.Invocation;
@@ -265,13 +260,11 @@ internal readonly ref struct PropertyWriter
 
         var attachedSetter = plan.AttachedSetter!;
 
-        MarkupExtensionWriter.WriteTypeName(
-            _writer,
-            attachedSetter.ContainingType);
+        _valueWriter.WriteTypeName(attachedSetter.ContainingType);
         _writer.Write(".");
-        MarkupExtensionWriter.WriteIdentifier(_writer, attachedSetter.Name);
+        _valueWriter.WriteIdentifier(attachedSetter.Name);
         _writer.Write("((");
-        MarkupExtensionWriter.WriteTypeName(_writer, plan.ReceiverType);
+        _valueWriter.WriteTypeName(plan.ReceiverType);
         _writer.Write(")").Write(targetExpression).Write(", ");
 
         return PropertyWriteEnd.Invocation;
@@ -284,7 +277,7 @@ internal readonly ref struct PropertyWriter
         Debug.Assert(!string.IsNullOrEmpty(plan.MemberName));
 
         _writer.Write(targetExpression).Write(".");
-        MarkupExtensionWriter.WriteIdentifier(_writer, plan.MemberName!);
+        _valueWriter.WriteIdentifier(plan.MemberName!);
         _writer.Write(" = ");
 
         return PropertyWriteEnd.Assignment;

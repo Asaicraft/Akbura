@@ -59,6 +59,8 @@ internal readonly struct BindingWriterEnvironment
     private readonly INamedTypeSymbol? _avaloniaObjectType;
     private readonly INamedTypeSymbol? _avaloniaPropertyType;
 
+    internal INamedTypeSymbol? WithinType => _withinType;
+
     private BindingWriterEnvironment(
         CSharpCompilation compilation,
         INamedTypeSymbol? withinType,

@@ -10,8 +10,8 @@ using System.Globalization;
 namespace Akbura.Language.CodeGeneration;
 
 /// <summary>
-/// Expressions required when a markup extension requests
-/// an IServiceProvider or when a binding path uses ElementName.
+/// Expressions required when a markup extension requests an IServiceProvider
+/// or when a binding path uses ElementName.
 /// </summary>
 internal readonly ref struct MarkupExtensionWriteContext
 {
@@ -55,7 +55,8 @@ internal readonly ref struct MarkupExtensionWriteContext
 
     public ReadOnlySpan<BindingElementReference> ElementReferences { get; }
 
-    internal MarkupExtensionWriteContext WithElementReferences(ReadOnlySpan<BindingElementReference> elementReferences)
+    internal MarkupExtensionWriteContext WithElementReferences(
+        ReadOnlySpan<BindingElementReference> elementReferences)
     {
         if (elementReferences.IsEmpty)
         {
@@ -76,11 +77,12 @@ internal readonly ref struct MarkupExtensionWriteContext
 }
 
 /// <summary>
-/// Allocation-free writer facade for markup-extension code generation.
+/// Writes markup-extension expressions directly to CodeWriter.
 /// </summary>
 internal readonly ref struct MarkupExtensionWriter
 {
-    private static readonly SymbolDisplayFormat s_typeDisplayFormat = SymbolDisplayFormat.FullyQualifiedFormat;
+    private static readonly SymbolDisplayFormat s_typeDisplayFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat;
 
     private readonly CodeWriter _writer;
     private readonly BindingWriterEnvironment _environment;
@@ -90,6 +92,7 @@ internal readonly ref struct MarkupExtensionWriter
         in BindingWriterEnvironment environment)
     {
         Debug.Assert(writer != null);
+
         _writer = writer!;
         _environment = environment;
     }
@@ -104,42 +107,27 @@ internal readonly ref struct MarkupExtensionWriter
     {
         if (extension.Binding != null)
         {
-            var inlinePlan =
-                BindingWritePlan.CreateInline(
-                    in _environment,
-                    extension,
-                    context.ScopeId,
-                    context.NameScopeExpression,
-                    context.ElementReferences);
+            var inlinePlan = BindingWritePlan.CreateInline(
+                in _environment,
+                extension,
+                context.ScopeId,
+                context.NameScopeExpression,
+                context.ElementReferences);
 
-            WriteBinding(
-                inlinePlan,
-                context);
-
+            WriteBinding(inlinePlan, context);
             return;
         }
 
-
         if (extension.ProvideValueMethod.Symbol is not IMethodSymbol provideValue)
         {
-            WriteCreation(
-                extension,
-                context);
-
+            WriteCreation(extension, context);
             return;
         }
 
         _writer.Write("(");
-
-        WriteCreation(
-            extension,
-            context);
-
+        WriteCreation(extension, context);
         _writer.Write(").");
-
-        WriteProvideValueInvocationCore(
-            provideValue,
-            context);
+        WriteProvideValueInvocationCore(provideValue, context);
     }
 
     /// <summary>
@@ -149,15 +137,12 @@ internal readonly ref struct MarkupExtensionWriter
         in BindingWritePlan plan,
         in MarkupExtensionWriteContext context)
     {
-        var bindingWriter =
-            new BindingWriter(
-                _writer,
-                in _environment,
-                context.ElementReferences);
+        var bindingWriter = new BindingWriter(
+            _writer,
+            in _environment,
+            context.ElementReferences);
 
-        bindingWriter.WriteBinding(
-            plan,
-            context);
+        bindingWriter.WriteBinding(plan, context);
     }
 
     /// <summary>
@@ -165,11 +150,7 @@ internal readonly ref struct MarkupExtensionWriter
     /// </summary>
     public void WriteCachedBindingPath(in BindingWritePlan plan)
     {
-        var bindingWriter =
-            new BindingWriter(
-                _writer,
-                in _environment);
-
+        var bindingWriter = new BindingWriter(_writer, in _environment);
         bindingWriter.WriteCachedPathField(plan);
     }
 
@@ -180,32 +161,22 @@ internal readonly ref struct MarkupExtensionWriter
         MarkupExtensionValue extension,
         in MarkupExtensionWriteContext context)
     {
-        var extensionType =
-            extension.ExtensionType.Symbol
-                as ITypeSymbol;
+        var extensionType = extension.ExtensionType.Symbol as ITypeSymbol;
 
         Debug.Assert(extensionType != null);
 
         _writer.Write("new ");
-
-        WriteTypeName(
-            _writer,
-            extensionType);
-
+        WriteTypeName(_writer, extensionType);
         _writer.Write("(");
 
-        for (var i = 0;
-             i < extension.Arguments.Length;
-             i++)
+        for (var i = 0; i < extension.Arguments.Length; i++)
         {
             if (i > 0)
             {
                 _writer.Write(", ");
             }
 
-            WriteArgumentValue(
-                extension.Arguments[i],
-                context);
+            WriteArgumentValue(extension.Arguments[i], context);
         }
 
         _writer.Write(")");
@@ -217,22 +188,17 @@ internal readonly ref struct MarkupExtensionWriter
 
         _writer.Write(" { ");
 
-        for (var i = 0;
-             i < extension.Properties.Length;
-             i++)
+        for (var i = 0; i < extension.Properties.Length; i++)
         {
             if (i > 0)
             {
                 _writer.Write(", ");
             }
 
-            var property =
-                extension.Properties[i];
+            var property = extension.Properties[i];
 
             WriteIdentifier(_writer, property.Name);
-
             _writer.Write(" = ");
-
             WritePropertyValue(property, context);
         }
 
@@ -247,25 +213,18 @@ internal readonly ref struct MarkupExtensionWriter
         string instanceExpression,
         in MarkupExtensionWriteContext context)
     {
-        Debug.Assert(
-            !string.IsNullOrEmpty(
-                instanceExpression));
+        Debug.Assert(!string.IsNullOrEmpty(instanceExpression));
 
         _writer.Write(instanceExpression);
-
 
         if (extension.ProvideValueMethod.Symbol is not IMethodSymbol provideValue)
         {
             Debug.Fail("The markup extension has no ProvideValue method.");
-
             return;
         }
 
         _writer.Write(".");
-
-        WriteProvideValueInvocationCore(
-            provideValue,
-            context);
+        WriteProvideValueInvocationCore(provideValue, context);
     }
 
     internal void WritePropertyValue(
@@ -305,47 +264,32 @@ internal readonly ref struct MarkupExtensionWriter
         if (nestedValue != null)
         {
             Write(nestedValue, context);
-
             return;
         }
 
-        var constant =
-            operation.ConstantValue;
+        var constant = operation.ConstantValue;
 
         if (constant.HasValue)
         {
-            WriteConstant(
-                _writer,
-                constant.Value,
-                targetType);
-
+            WriteConstant(_writer, constant.Value, targetType);
             return;
         }
 
-        if (!operation.IsDefault &&
-            operation.Syntax != null)
+        if (!operation.IsDefault && operation.Syntax != null)
         {
             _writer.Write(operation.Syntax.ToString());
-
             return;
         }
 
-        if (convertedValue
-            is CSharpSymbolDefinition definition &&
-            TryWriteStaticMemberReference(
-                _writer,
-                definition.Symbol))
+        if (convertedValue is CSharpSymbolDefinition definition &&
+            TryWriteStaticMemberReference(_writer, definition.Symbol))
         {
             return;
         }
 
         if (convertedValue != null)
         {
-            WriteConstant(
-                _writer,
-                convertedValue,
-                targetType);
-
+            WriteConstant(_writer, convertedValue, targetType);
             return;
         }
 
@@ -356,10 +300,7 @@ internal readonly ref struct MarkupExtensionWriter
         IMethodSymbol provideValue,
         in MarkupExtensionWriteContext context)
     {
-        WriteIdentifier(
-            _writer,
-            provideValue.Name);
-
+        WriteIdentifier(_writer, provideValue.Name);
         _writer.Write("(");
 
         Debug.Assert(provideValue.Parameters.Length <= 1);
@@ -375,28 +316,19 @@ internal readonly ref struct MarkupExtensionWriter
     private void WriteMarkupServiceProvider(
         in MarkupExtensionWriteContext context)
     {
-        if (string.IsNullOrEmpty(
-                context.TargetObjectExpression) ||
-            string.IsNullOrEmpty(
-                context.TargetPropertyExpression) ||
-            string.IsNullOrEmpty(
-                context.IntermediateRootExpression) ||
-            string.IsNullOrEmpty(
-                context.BaseUriExpression) ||
-            string.IsNullOrEmpty(
-                context.DirectParentsStackExpression))
+        if (string.IsNullOrEmpty(context.TargetObjectExpression) ||
+            string.IsNullOrEmpty(context.TargetPropertyExpression) ||
+            string.IsNullOrEmpty(context.IntermediateRootExpression) ||
+            string.IsNullOrEmpty(context.BaseUriExpression) ||
+            string.IsNullOrEmpty(context.DirectParentsStackExpression))
         {
-            Debug.Fail(
-                "The markup extension service-provider context is incomplete.");
-
+            Debug.Fail("The markup extension service-provider context is incomplete.");
             _writer.Write("default!");
             return;
         }
 
         _writer
-            .Write(
-                "CreateMarkupServiceProvider(" +
-                "targetObject: ")
+            .Write("CreateMarkupServiceProvider(targetObject: ")
             .Write(context.TargetObjectExpression)
             .Write(", targetProperty: ")
             .Write(context.TargetPropertyExpression)
@@ -407,8 +339,7 @@ internal readonly ref struct MarkupExtensionWriter
             .Write(", directParentsStack: ")
             .Write(context.DirectParentsStackExpression);
 
-        if (!string.IsNullOrEmpty(
-                context.FallbackServiceProviderExpression))
+        if (!string.IsNullOrEmpty(context.FallbackServiceProviderExpression))
         {
             _writer
                 .Write(", fallbackServiceProvider: ")
@@ -418,23 +349,17 @@ internal readonly ref struct MarkupExtensionWriter
         _writer.Write(")");
     }
 
-    internal static void WriteIdentifier(
-        CodeWriter writer,
-        string identifier)
+    internal static void WriteIdentifier(CodeWriter writer, string identifier)
     {
         writer.WriteIdentifierEscapeIfNeeded(identifier);
-
         writer.Write(identifier);
     }
 
-    internal static void WriteTypeName(
-        CodeWriter writer,
-        ITypeSymbol? type)
+    internal static void WriteTypeName(CodeWriter writer, ITypeSymbol? type)
     {
         if (type == null || ContainsErrorType(type))
         {
             writer.Write("global::System.Object");
-
             return;
         }
 
@@ -445,52 +370,28 @@ internal readonly ref struct MarkupExtensionWriter
         writer.Write(type.ToDisplayString(s_typeDisplayFormat));
     }
 
-    internal static void WriteStaticMemberReference(
-        CodeWriter writer,
-        ISymbol symbol)
+    internal static void WriteStaticMemberReference(CodeWriter writer, ISymbol symbol)
     {
         Debug.Assert(
-            symbol is IFieldSymbol
-            {
-                IsStatic: true,
-            } or
-            IPropertySymbol
-            {
-                IsStatic: true,
-            });
+            symbol is IFieldSymbol { IsStatic: true } or
+            IPropertySymbol { IsStatic: true });
 
-        WriteTypeName(
-            writer,
-            symbol.ContainingType);
-
+        WriteTypeName(writer, symbol.ContainingType);
         writer.Write(".");
-
-        WriteIdentifier(
-            writer,
-            symbol.Name);
+        WriteIdentifier(writer, symbol.Name);
     }
 
     private static bool TryWriteStaticMemberReference(
         CodeWriter writer,
         ISymbol? symbol)
     {
-        if (symbol is not
-            IFieldSymbol
-            {
-                IsStatic: true,
-            } and not
-            IPropertySymbol
-            {
-                IsStatic: true,
-            })
+        if (symbol is not IFieldSymbol { IsStatic: true } and
+            not IPropertySymbol { IsStatic: true })
         {
             return false;
         }
 
-        WriteStaticMemberReference(
-            writer,
-            symbol);
-
+        WriteStaticMemberReference(writer, symbol);
         return true;
     }
 
@@ -505,58 +406,32 @@ internal readonly ref struct MarkupExtensionWriter
             return;
         }
 
-        if (targetType is
-            INamedTypeSymbol
-            {
-                TypeKind: TypeKind.Enum,
-            } unsignedEnumType &&
+        if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum } unsignedEnumType &&
             value is ulong unsignedEnumValue &&
             unsignedEnumValue > long.MaxValue)
         {
             writer.Write("unchecked((");
-
-            WriteTypeName(
-                writer,
-                unsignedEnumType);
-
+            WriteTypeName(writer, unsignedEnumType);
             writer.Write(")");
-
-            writer.Write(
-                unsignedEnumValue.ToString(CultureInfo.InvariantCulture));
-
+            writer.Write(unsignedEnumValue.ToString(CultureInfo.InvariantCulture));
             writer.Write("UL)");
             return;
         }
 
-        if (targetType is
-            INamedTypeSymbol
-            {
-                TypeKind: TypeKind.Enum,
-            } enumType &&
-            TryConvertToInt64(
-                value,
-                out var enumValue))
+        if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType &&
+            TryConvertToInt64(value, out var enumValue))
         {
             writer.Write("(");
-
-            WriteTypeName(
-                writer,
-                enumType);
-
+            WriteTypeName(writer, enumType);
             writer.Write(")");
-
-            writer.Write(
-                enumValue.ToString(CultureInfo.InvariantCulture));
-
+            writer.Write(enumValue.ToString(CultureInfo.InvariantCulture));
             return;
         }
 
         switch (value)
         {
             case CSharpSymbolDefinition definition
-                when TryWriteStaticMemberReference(
-                    writer,
-                    definition.Symbol):
+                when TryWriteStaticMemberReference(writer, definition.Symbol):
                 return;
 
             case ITypeSymbol type:
@@ -570,10 +445,7 @@ internal readonly ref struct MarkupExtensionWriter
                 return;
 
             case char character:
-                writer.Write(
-                    SymbolDisplay.FormatLiteral(
-                        character,
-                        quote: true));
+                writer.Write(SymbolDisplay.FormatLiteral(character, quote: true));
                 return;
 
             case bool boolean:
@@ -601,133 +473,89 @@ internal readonly ref struct MarkupExtensionWriter
                 return;
 
             case uint number:
-                writer.Write(
-                    number.ToString(
-                        CultureInfo.InvariantCulture));
-
+                writer.Write(number.ToString(CultureInfo.InvariantCulture));
                 writer.Write("u");
                 return;
 
             case long number:
-                writer.Write(
-                    number.ToString(
-                        CultureInfo.InvariantCulture));
-
+                writer.Write(number.ToString(CultureInfo.InvariantCulture));
                 writer.Write("L");
                 return;
 
             case ulong number:
-                writer.Write(
-                    number.ToString(
-                        CultureInfo.InvariantCulture));
-
+                writer.Write(number.ToString(CultureInfo.InvariantCulture));
                 writer.Write("UL");
                 return;
 
             case float number:
-                WriteSingleLiteral(
-                    writer,
-                    number);
-
+                WriteSingleLiteral(writer, number);
                 return;
 
             case double number:
-                WriteDoubleLiteral(
-                    writer,
-                    number);
-
+                WriteDoubleLiteral(writer, number);
                 return;
 
             case decimal number:
-                writer.Write(
-                    number.ToString(
-                        CultureInfo.InvariantCulture));
-
+                writer.Write(number.ToString(CultureInfo.InvariantCulture));
                 writer.Write("m");
                 return;
 
             default:
-                Debug.Fail(
-                    "Unsupported constant value: " +
-                    value.GetType().FullName);
-
-                writer.WriteStringLiteral(
-                    value.ToString() ??
-                    string.Empty);
-
+                Debug.Fail("Unsupported constant value: " + value.GetType().FullName);
+                writer.WriteStringLiteral(value.ToString() ?? string.Empty);
                 return;
         }
     }
 
-    private static void WriteSingleLiteral(
-        CodeWriter writer,
-        float value)
+    private static void WriteSingleLiteral(CodeWriter writer, float value)
     {
         if (float.IsNaN(value))
         {
             writer.Write("global::System.Single.NaN");
-
             return;
         }
 
         if (float.IsPositiveInfinity(value))
         {
             writer.Write("global::System.Single.PositiveInfinity");
-
             return;
         }
 
         if (float.IsNegativeInfinity(value))
         {
             writer.Write("global::System.Single.NegativeInfinity");
-
             return;
         }
 
-        writer.Write(
-            value.ToString(
-                "R",
-                CultureInfo.InvariantCulture));
-
+        writer.Write(value.ToString("R", CultureInfo.InvariantCulture));
         writer.Write("f");
     }
 
-    private static void WriteDoubleLiteral(
-        CodeWriter writer,
-        double value)
+    private static void WriteDoubleLiteral(CodeWriter writer, double value)
     {
         if (double.IsNaN(value))
         {
             writer.Write("global::System.Double.NaN");
-
             return;
         }
 
         if (double.IsPositiveInfinity(value))
         {
             writer.Write("global::System.Double.PositiveInfinity");
-
             return;
         }
 
         if (double.IsNegativeInfinity(value))
         {
             writer.Write("global::System.Double.NegativeInfinity");
-
             return;
         }
 
-        writer.Write(
-            value.ToString(
-                "R",
-                CultureInfo.InvariantCulture));
-
+        writer.Write(value.ToString("R", CultureInfo.InvariantCulture));
         writer.Write("d");
     }
 
-    private static bool TryConvertToInt64(
-        object value,
-        out long result)
+    private static bool TryConvertToInt64(object value, out long result)
     {
         switch (value)
         {
@@ -759,8 +587,7 @@ internal readonly ref struct MarkupExtensionWriter
                 result = number;
                 return true;
 
-            case ulong number
-                when number <= long.MaxValue:
+            case ulong number when number <= long.MaxValue:
                 result = (long)number;
                 return true;
 
@@ -792,8 +619,7 @@ internal readonly ref struct MarkupExtensionWriter
 
     private static bool ContainsErrorType(ITypeSymbol type)
     {
-        if (type is IErrorTypeSymbol ||
-            type.TypeKind == TypeKind.Error)
+        if (type is IErrorTypeSymbol || type.TypeKind == TypeKind.Error)
         {
             return true;
         }
@@ -801,12 +627,10 @@ internal readonly ref struct MarkupExtensionWriter
         switch (type)
         {
             case IArrayTypeSymbol array:
-                return ContainsErrorType(
-                    array.ElementType);
+                return ContainsErrorType(array.ElementType);
 
             case IPointerTypeSymbol pointer:
-                return ContainsErrorType(
-                    pointer.PointedAtType);
+                return ContainsErrorType(pointer.PointedAtType);
 
             case INamedTypeSymbol named:
                 for (var i = 0; i < named.TypeArguments.Length; i++)

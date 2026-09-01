@@ -336,11 +336,10 @@ internal readonly ref struct AkcssActivatorWriter
 
         if (slot.PriorityMember == null)
         {
-            var mapping = WriteSourceMappingStart(slot.Syntax, "return ".Length);
+            using var mapping = WriteSourceMappingStart(slot.Syntax, "return ".Length);
             _writer.Write("return ");
             extensionWriter.Write(slot.Extension, extensionContext);
             _writer.WriteLine(";");
-            WriteSourceMappingEnd(mapping);
         }
         else
         {
@@ -358,25 +357,26 @@ internal readonly ref struct AkcssActivatorWriter
     {
         var indent = _writer.CurrentIndent;
 
-        var creationMapping = WriteSourceMappingStart(
-            slot.Syntax,
-            "var __extension = ".Length);
-        _writer.Write("var __extension = ");
-        extensionWriter.WriteCreation(slot.Extension, context);
-        _writer.WriteLine(";");
-        WriteSourceMappingEnd(creationMapping);
+        {
+            using var creationMapping = WriteSourceMappingStart(slot.Syntax, "var __extension = ".Length);
+            _writer.Write("var __extension = ");
+            extensionWriter.WriteCreation(slot.Extension, context);
+            _writer.WriteLine(";");
+        }
 
-        var resultMapping = WriteSourceMappingStart(slot.Syntax, "return ".Length);
-        _writer.Write("return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
-        _valueWriter.WriteTypeName(slot.FactoryValueType);
-        _writer.WriteLine(">(");
-        _writer.CurrentIndent = indent + 4;
-        extensionWriter.WriteProvideValueInvocation(slot.Extension, "__extension", context);
-        _writer.WriteLine(",");
-        _writer.Write("__extension.");
-        _valueWriter.WriteIdentifier(slot.PriorityMember!.Name);
-        _writer.WriteLine(");");
-        WriteSourceMappingEnd(resultMapping);
+        {
+            using var resultMapping = WriteSourceMappingStart(slot.Syntax, "return ".Length);
+            _writer.Write("return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
+            _valueWriter.WriteTypeName(slot.FactoryValueType);
+            _writer.WriteLine(">(");
+            _writer.CurrentIndent = indent + 4;
+            extensionWriter.WriteProvideValueInvocation(slot.Extension, "__extension", context);
+            _writer.WriteLine(",");
+            _writer.Write("__extension.");
+            _valueWriter.WriteIdentifier(slot.PriorityMember!.Name);
+            _writer.WriteLine(");");
+        }
+
         _writer.CurrentIndent = indent;
     }
 
@@ -768,32 +768,31 @@ internal readonly ref struct AkcssActivatorWriter
         var valueOffset = plan.HasPriorityMember
             ? "__target => { var __extension = ".Length
             : "__target => ".Length;
-        var mapping = WriteSourceMappingStart(slot.Syntax, valueOffset);
-
-        _writer.Write("__target => ");
-
-        if (!plan.HasPriorityMember)
         {
-            extensionWriter.Write(plan.Extension, extensionContext);
-            WriteSourceMappingEnd(mapping);
-            return;
-        }
+            using var mapping = WriteSourceMappingStart(slot.Syntax, valueOffset);
+            _writer.Write("__target => ");
 
-        if (plan.PriorityMember == null)
-        {
-            throw new InvalidOperationException("A priority-aware AKCSS value source has no priority member.");
-        }
+            if (!plan.HasPriorityMember)
+            {
+                extensionWriter.Write(plan.Extension, extensionContext);
+                return;
+            }
 
-        _writer.Write("{ var __extension = ");
-        extensionWriter.WriteCreation(plan.Extension, extensionContext);
-        _writer.Write("; return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
-        _valueWriter.WriteTypeName(slot.FactoryValueType);
-        _writer.Write(">(");
-        extensionWriter.WriteProvideValueInvocation(plan.Extension, "__extension", extensionContext);
-        _writer.Write(", __extension.");
-        _valueWriter.WriteIdentifier(plan.PriorityMember.Name);
-        _writer.Write("); }");
-        WriteSourceMappingEnd(mapping);
+            if (plan.PriorityMember == null)
+            {
+                throw new InvalidOperationException("A priority-aware AKCSS value source has no priority member.");
+            }
+
+            _writer.Write("{ var __extension = ");
+            extensionWriter.WriteCreation(plan.Extension, extensionContext);
+            _writer.Write("; return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
+            _valueWriter.WriteTypeName(slot.FactoryValueType);
+            _writer.Write(">(");
+            extensionWriter.WriteProvideValueInvocation(plan.Extension, "__extension", extensionContext);
+            _writer.Write(", __extension.");
+            _valueWriter.WriteIdentifier(plan.PriorityMember.Name);
+            _writer.Write("); }");
+        }
     }
 
     private SourceMappingToken WriteSourceMappingStart(
@@ -803,14 +802,6 @@ internal readonly ref struct AkcssActivatorWriter
         return _hasSourceMap
             ? _sourceMappingWriter.WriteStart(syntax, valueOffset)
             : default;
-    }
-
-    private void WriteSourceMappingEnd(in SourceMappingToken token)
-    {
-        if (_hasSourceMap)
-        {
-            _sourceMappingWriter.WriteEnd(token);
-        }
     }
 
     private void WriteRuntimeUtilityType(Akbura.Language.Symbols.ITailwindUtilitySymbol utility)

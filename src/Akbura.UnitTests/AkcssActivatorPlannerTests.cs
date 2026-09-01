@@ -58,10 +58,12 @@ public sealed class AkcssActivatorPlannerTests
                 new AkcssActivatorElementInput(
                     10,
                     firstElementSymbol,
+                    fixture.GetElementType(elements[0]),
                     requiresLocalMarkupExtensionContext: false),
                 new AkcssActivatorElementInput(
                     20,
                     fixture.GetElementSymbol(elements[1]),
+                    fixture.GetElementType(elements[1]),
                     requiresLocalMarkupExtensionContext: false)),
             moduleTypeNames);
 
@@ -152,10 +154,12 @@ public sealed class AkcssActivatorPlannerTests
                 new AkcssActivatorElementInput(
                     7,
                     symbol,
+                    fixture.GetElementType(element),
                     requiresLocalMarkupExtensionContext: false),
                 new AkcssActivatorElementInput(
                     8,
                     symbol,
+                    fixture.GetElementType(element),
                     requiresLocalMarkupExtensionContext: true)),
             new Dictionary<AkburaSyntax, string>
             {
@@ -282,6 +286,7 @@ public sealed class AkcssActivatorPlannerTests
                 new AkcssActivatorElementInput(
                     0,
                     symbol,
+                    fixture.GetElementType(element),
                     requiresLocalMarkupExtensionContext: false)),
             new Dictionary<AkburaSyntax, string>
             {
@@ -484,6 +489,12 @@ public sealed class AkcssActivatorPlannerTests
         {
             return Assert.IsAssignableFrom<IMarkupComponentSymbol>(
                 SemanticModel.GetSymbolInfo(element).Symbol);
+        }
+
+        public ITypeSymbol GetElementType(MarkupElementSyntax element)
+        {
+            Assert.True(SemanticModel.TryGetMarkupElementReferenceType(element, out var type));
+            return Assert.IsAssignableFrom<ITypeSymbol>(type.Symbol);
         }
 
         public BindingWriterEnvironment CreateBindingEnvironment()

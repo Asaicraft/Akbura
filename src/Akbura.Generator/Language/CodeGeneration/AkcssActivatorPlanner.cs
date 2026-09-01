@@ -21,6 +21,7 @@ internal readonly struct AkcssActivatorElementInput
     public AkcssActivatorElementInput(
         int id,
         IMarkupComponentSymbol symbol,
+        ITypeSymbol type,
         bool requiresLocalMarkupExtensionContext)
     {
         if (id < 0)
@@ -30,12 +31,15 @@ internal readonly struct AkcssActivatorElementInput
 
         Id = id;
         Symbol = symbol ?? throw new ArgumentNullException(nameof(symbol));
+        Type = type ?? throw new ArgumentNullException(nameof(type));
         RequiresLocalMarkupExtensionContext = requiresLocalMarkupExtensionContext;
     }
 
     public int Id { get; }
 
     public IMarkupComponentSymbol Symbol { get; }
+
+    public ITypeSymbol Type { get; }
 
     public bool RequiresLocalMarkupExtensionContext { get; }
 }
@@ -155,7 +159,7 @@ internal static class AkcssActivatorPlanner
             var activatorStart = _activators.Count;
             var slotStart = _slots.Count;
             var operations = element.Symbol.AttributeOperations;
-            var isControlTarget = IsControlElement(element.Symbol);
+            var isControlTarget = IsControlElement(element.Type);
 
             for (var sourceOrder = 0; sourceOrder < operations.Length; sourceOrder++)
             {
@@ -490,12 +494,10 @@ internal static class AkcssActivatorPlanner
             return AkcssUtilityValueSourceKind.Direct;
         }
 
-        private bool IsControlElement(IMarkupComponentSymbol symbol)
+        private bool IsControlElement(ITypeSymbol type)
         {
-            var componentType = symbol.ComponentType ?? symbol.AkburaComponent?.ComponentType;
-            return componentType != null &&
-                _controlType != null &&
-                _compilation.ClassifyConversion(componentType, _controlType).IsImplicit;
+            return _controlType != null &&
+                AkburaSemanticModel.IsAssignableTo(type, _controlType);
         }
 
         private bool IsBindingBaseType(ITypeSymbol type)

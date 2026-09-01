@@ -15,16 +15,16 @@ namespace Akbura.Language.CodeGeneration;
 internal sealed class ComponentWriter
 {
     private readonly CodeWriter _writer;
+    private readonly ComponentPlan _plan;
     private readonly BindingWriterEnvironment _bindingEnvironment;
+    private readonly MarkupExtensionResultEnvironment _resultEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
-    private readonly AkcssComponentActivatorPlan _akcssPlan;
 
     public ComponentWriter(
         CodeWriter writer,
         IAkburaComponentSymbol component,
         AkburaSemanticModel semanticModel,
-        ReadOnlySpan<AkcssActivatorElementInput> elements,
         IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames)
     {
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
@@ -51,37 +51,30 @@ internal sealed class ComponentWriter
                 nameof(component));
         }
 
-        for (var i = 0; i < elements.Length; i++)
-        {
-            if (elements[i].Id != i)
-            {
-                throw new ArgumentException(
-                    "Component element identifiers must be dense and ordered.",
-                    nameof(elements));
-            }
-        }
-
         _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
+        _resultEnvironment = MarkupExtensionResultEnvironment.Create(semanticModel);
+        Debug.Assert(_resultEnvironment.IsValid);
         _sourceMap = new ComponentGenerationSourceMap(syntaxTree);
         _ownerTypeName = GetGeneratedOwnerTypeName(component);
-        _akcssPlan = AkcssActivatorPlanner.Create(
+        _plan = ComponentPlanner.Create(
+            component,
             semanticModel,
-            elements,
-            akcssModuleTypeNames);
+            akcssModuleTypeNames,
+            in _resultEnvironment);
     }
 
-    public ref readonly AkcssComponentActivatorPlan AkcssPlan
+    public ref readonly ComponentPlan Plan
     {
-        get => ref _akcssPlan;
+        get => ref _plan;
     }
 
-    public ImmutableArray<AkcssElementActivatorPlan> Elements => _akcssPlan.Elements;
+    public ImmutableArray<ComponentElementPlan> Elements => _plan.Elements;
 
-    public bool HasAkcss => !_akcssPlan.IsEmpty;
+    public bool HasAkcss => !_plan.Akcss.IsEmpty;
 
     public bool WriteStaticMembers()
     {
-        if (_akcssPlan.IsEmpty)
+        if (_plan.Akcss.IsEmpty)
         {
             return false;
         }
@@ -94,7 +87,7 @@ internal sealed class ComponentWriter
                 in _bindingEnvironment,
                 _ownerTypeName,
                 _sourceMap);
-            writer.WriteStaticMembers(_akcssPlan);
+            writer.WriteStaticMembers(_plan.Akcss);
             return true;
         }
         finally
@@ -107,8 +100,8 @@ internal sealed class ComponentWriter
         int elementId,
         in MarkupExtensionWriteContext context)
     {
-        var element = GetElement(elementId);
-        if (element.MarkupExtensionSlots.IsEmpty)
+        ref readonly var element = ref GetElement(elementId);
+        if (element.Akcss.MarkupExtensionSlots.IsEmpty)
         {
             return false;
         }
@@ -121,7 +114,7 @@ internal sealed class ComponentWriter
                 in _bindingEnvironment,
                 _ownerTypeName,
                 _sourceMap);
-            return writer.WriteFactoryMethods(_akcssPlan, element, context);
+            return writer.WriteFactoryMethods(_plan.Akcss, element.Akcss, context);
         }
         finally
         {
@@ -134,8 +127,8 @@ internal sealed class ComponentWriter
         string targetExpression,
         in MarkupExtensionWriteContext context)
     {
-        var element = GetElement(elementId);
-        if (element.Activators.IsEmpty)
+        ref readonly var element = ref GetElement(elementId);
+        if (element.Akcss.Activators.IsEmpty)
         {
             return false;
         }
@@ -149,8 +142,8 @@ internal sealed class ComponentWriter
                 _ownerTypeName,
                 _sourceMap);
             writer.WriteSetStyles(
-                _akcssPlan,
-                element.Activators,
+                _plan.Akcss,
+                element.Akcss.Activators,
                 targetExpression,
                 context);
             return true;
@@ -165,8 +158,8 @@ internal sealed class ComponentWriter
         int elementId,
         string targetExpression)
     {
-        var element = GetElement(elementId);
-        if (element.Activators.IsEmpty)
+        ref readonly var element = ref GetElement(elementId);
+        if (element.Akcss.Activators.IsEmpty)
         {
             return false;
         }
@@ -179,7 +172,7 @@ internal sealed class ComponentWriter
                 in _bindingEnvironment,
                 _ownerTypeName,
                 _sourceMap);
-            writer.WriteRefresh(element.Activators, targetExpression);
+            writer.WriteRefresh(element.Akcss.Activators, targetExpression);
             return true;
         }
         finally
@@ -188,16 +181,16 @@ internal sealed class ComponentWriter
         }
     }
 
-    private AkcssElementActivatorPlan GetElement(int elementId)
+    private ref readonly ComponentElementPlan GetElement(int elementId)
     {
-        if ((uint)elementId >= (uint)_akcssPlan.Elements.Length)
+        if ((uint)elementId >= (uint)_plan.Elements.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(elementId));
         }
 
-        var element = _akcssPlan.Elements[elementId];
-        Debug.Assert(element.ElementId == elementId);
-        return element;
+        ref readonly var element = ref _plan.Elements.ItemRef(elementId);
+        Debug.Assert(element.Id == elementId);
+        return ref element;
     }
 
     private static string GetGeneratedOwnerTypeName(IAkburaComponentSymbol component)

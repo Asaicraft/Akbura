@@ -11,28 +11,31 @@ public sealed class ComponentWriterTests
     [Fact]
     public void Constructor_BuildsOnePlanWithContiguousElementRanges()
     {
-        var fixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture, false, false);
-        ref readonly var plan = ref writer.AkcssPlan;
+        var writer = CreateWriter(codeWriter, fixture);
+        ref readonly var plan = ref writer.Plan;
+        var regular = GetStyledElement(plan, requiresLocalContext: false);
+        var local = GetStyledElement(plan, requiresLocalContext: true);
 
         Assert.True(writer.HasAkcss);
-        Assert.Equal(2, writer.Elements.Length);
-        AssertRange(writer.Elements[0].Activators, start: 0, length: 5);
-        AssertRange(writer.Elements[0].MarkupExtensionSlots, start: 0, length: 5);
-        AssertRange(writer.Elements[1].Activators, start: 5, length: 5);
-        AssertRange(writer.Elements[1].MarkupExtensionSlots, start: 5, length: 5);
-        Assert.Equal(10, plan.Activators.Length);
-        Assert.Equal(10, plan.MarkupExtensionSlots.Length);
+        Assert.Equal(plan.Elements, writer.Elements);
+        AssertRange(regular.Akcss.Activators, start: 0, length: 5);
+        AssertRange(regular.Akcss.MarkupExtensionSlots, start: 0, length: 5);
+        AssertRange(local.Akcss.Activators, start: 5, length: 5);
+        AssertRange(local.Akcss.MarkupExtensionSlots, start: 5, length: 5);
+        Assert.Equal(10, plan.Akcss.Activators.Length);
+        Assert.Equal(10, plan.Akcss.MarkupExtensionSlots.Length);
 
         var context = CreateWriteContext();
-        Assert.True(writer.WriteFactoryMethods(0, context));
-        Assert.True(writer.WriteFactoryMethods(1, context));
+        Assert.True(writer.WriteFactoryMethods(regular.Id, context));
+        Assert.False(writer.WriteFactoryMethods(local.Id, context));
 
         var output = codeWriter.GetText().ToString();
-        Assert.Equal(10, CountOccurrences(output, "private "));
+        Assert.Equal(5, CountOccurrences(output, "private "));
         Assert.Contains("__CreateAkcssValue0", output, StringComparison.Ordinal);
-        Assert.Contains("__CreateAkcssValue9", output, StringComparison.Ordinal);
+        Assert.Contains("__CreateAkcssValue4", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("__CreateAkcssValue5", output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -49,14 +52,15 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 8,
         };
-        var writer = CreateWriter(codeWriter, fixture, false);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var elementId = Assert.Single(writer.Elements).Id;
 
         Assert.False(writer.HasAkcss);
         Assert.False(writer.WriteStaticMembers());
-        Assert.False(writer.WriteFactoryMethods(0, context));
-        Assert.False(writer.WriteSetStyles(0, "__target", context));
-        Assert.False(writer.WriteRefresh(0, "__target"));
+        Assert.False(writer.WriteFactoryMethods(elementId, context));
+        Assert.False(writer.WriteSetStyles(elementId, "__target", context));
+        Assert.False(writer.WriteRefresh(elementId, "__target"));
         Assert.Equal(8, codeWriter.CurrentIndent);
         Assert.Equal(0, codeWriter.Length);
         Assert.Equal(string.Empty, codeWriter.GetText().ToString());
@@ -65,21 +69,22 @@ public sealed class ComponentWriterTests
     [Fact]
     public void RegularElement_WritesMethodGroupsWithCompactSignaturesAndPreservesIndent()
     {
-        var fixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter()
         {
             CurrentIndent = 8,
         };
-        var writer = CreateWriter(codeWriter, fixture, false);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var elementId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
 
         codeWriter.WriteLine("// containing type");
-        Assert.True(writer.WriteFactoryMethods(0, context));
+        Assert.True(writer.WriteFactoryMethods(elementId, context));
         Assert.Equal(8, codeWriter.CurrentIndent);
         codeWriter.WriteLine();
-        Assert.True(writer.WriteSetStyles(0, "__target", context));
+        Assert.True(writer.WriteSetStyles(elementId, "__target", context));
         Assert.Equal(8, codeWriter.CurrentIndent);
-        Assert.True(writer.WriteRefresh(0, "__target"));
+        Assert.True(writer.WriteRefresh(elementId, "__target"));
         Assert.Equal(8, codeWriter.CurrentIndent);
 
         var output = codeWriter.GetText().ToString();
@@ -99,17 +104,18 @@ public sealed class ComponentWriterTests
     [Fact]
     public void LocalElement_WritesInlineMarkupExtensionsWithoutFactoryMethods()
     {
-        var fixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter()
         {
             CurrentIndent = 4,
         };
-        var writer = CreateWriter(codeWriter, fixture, true);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var elementId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
 
-        Assert.False(writer.WriteFactoryMethods(0, context));
+        Assert.False(writer.WriteFactoryMethods(elementId, context));
         Assert.Equal(0, codeWriter.Length);
-        Assert.True(writer.WriteSetStyles(0, "__target", context));
+        Assert.True(writer.WriteSetStyles(elementId, "__target", context));
         Assert.Equal(4, codeWriter.CurrentIndent);
 
         var output = codeWriter.GetText().ToString();
@@ -122,15 +128,17 @@ public sealed class ComponentWriterTests
     [Fact]
     public void FactoryAndInlineMarkupExtensions_WriteSourceMappings()
     {
-        var fixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture, false, true);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var regularId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
+        var localId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
 
-        Assert.True(writer.WriteFactoryMethods(0, context));
+        Assert.True(writer.WriteFactoryMethods(regularId, context));
         var factoryOutput = codeWriter.GetText().ToString();
         var inlineStart = codeWriter.Length;
-        Assert.True(writer.WriteSetStyles(1, "__target", context));
+        Assert.True(writer.WriteSetStyles(localId, "__target", context));
         var output = codeWriter.GetText().ToString();
         var inlineOutput = output.Substring(inlineStart);
 
@@ -143,10 +151,12 @@ public sealed class ComponentWriterTests
     [Fact]
     public void FactoryAndInlineSourceMappings_ParseInsideArgumentLists()
     {
-        var fixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture, false, true);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var regularId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
+        var localId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
 
         codeWriter.WriteLine("#nullable enable");
         codeWriter.WriteLine();
@@ -155,12 +165,12 @@ public sealed class ComponentWriterTests
         codeWriter.WriteLine("public partial class PlannerView");
         codeWriter.WriteLine("{");
         codeWriter.CurrentIndent = 4;
-        Assert.True(writer.WriteFactoryMethods(0, context));
+        Assert.True(writer.WriteFactoryMethods(regularId, context));
         codeWriter.WriteLine();
         codeWriter.WriteLine("private void Apply(global::Avalonia.Controls.Control __target)");
         codeWriter.WriteLine("{");
         codeWriter.CurrentIndent = 8;
-        Assert.True(writer.WriteSetStyles(1, "__target", context));
+        Assert.True(writer.WriteSetStyles(localId, "__target", context));
         codeWriter.CurrentIndent = 4;
         codeWriter.WriteLine("}");
         codeWriter.CurrentIndent = 0;
@@ -189,16 +199,18 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 4,
         };
-        var writer = CreateWriter(codeWriter, fixture, false, false);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var elements = GetStyledElements(writer.Plan, requiresLocalContext: false);
 
-        Assert.Single(writer.AkcssPlan.ClassCaches);
-        Assert.Equal(2, writer.AkcssPlan.ApplicationCaches.Length);
-        Assert.Equal(4, writer.AkcssPlan.Candidates.Length);
+        Assert.Equal(2, elements.Length);
+        Assert.Single(writer.Plan.Akcss.ClassCaches);
+        Assert.Equal(2, writer.Plan.Akcss.ApplicationCaches.Length);
+        Assert.Equal(4, writer.Plan.Akcss.Candidates.Length);
         Assert.True(writer.WriteStaticMembers());
         codeWriter.WriteLine();
-        Assert.True(writer.WriteSetStyles(0, "__first", context));
-        Assert.True(writer.WriteSetStyles(1, "__second", context));
+        Assert.True(writer.WriteSetStyles(elements[0].Id, "__first", context));
+        Assert.True(writer.WriteSetStyles(elements[1].Id, "__second", context));
 
         var output = codeWriter.GetText().ToString();
         Assert.Equal(
@@ -227,14 +239,16 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreatePriorityFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture, false, true);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var regularId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
+        var localId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
         const string creation = "new global::Demo.Extensions.priorityExtension(";
 
-        Assert.True(writer.WriteFactoryMethods(0, context));
+        Assert.True(writer.WriteFactoryMethods(regularId, context));
         var methodOutput = codeWriter.GetText().ToString();
         var inlineStart = codeWriter.Length;
-        Assert.True(writer.WriteSetStyles(1, "__target", context));
+        Assert.True(writer.WriteSetStyles(localId, "__target", context));
         var inlineOutput = codeWriter.GetText().ToString().Substring(inlineStart);
 
         Assert.Equal(1, CountOccurrences(methodOutput, creation));
@@ -250,8 +264,9 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreateBasicFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture, false);
+        var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
+        var elementId = GetStyledElements(writer.Plan, requiresLocalContext: false)[0].Id;
 
         codeWriter.WriteLine("#nullable enable");
         codeWriter.WriteLine();
@@ -265,8 +280,8 @@ public sealed class ComponentWriterTests
         codeWriter.WriteLine("private static void Apply(global::Avalonia.Controls.Control __target)");
         codeWriter.WriteLine("{");
         codeWriter.CurrentIndent = 8;
-        Assert.True(writer.WriteSetStyles(0, "__target", context));
-        Assert.True(writer.WriteRefresh(0, "__target"));
+        Assert.True(writer.WriteSetStyles(elementId, "__target", context));
+        Assert.True(writer.WriteRefresh(elementId, "__target"));
         codeWriter.CurrentIndent = 4;
         codeWriter.WriteLine("}");
         codeWriter.CurrentIndent = 0;
@@ -340,10 +355,62 @@ public sealed class ComponentWriterTests
                 }
             }
 
-            <Border class="card" reset width-4 />
+            <StackPanel>
+                <Border class="card" reset width-4 />
+                <Border class="card" reset width-4 />
+            </StackPanel>
             """;
 
         return AkcssActivatorPlannerTests.CreateFixture(component);
+    }
+
+    private static AkcssActivatorPlannerTests.PlannerFixture CreateRichComponentFixture()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Markup.Xaml.Templates;
+            using Demo.Extensions;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.direct-(double value) { Width: value; }
+                    Control.late-(object value) { DataContext: value; }
+                    Control.observable-(double value) { Width: value; }
+                    Control.object-observable-(double value) { Width: value; }
+                    Control.binding-(double value) { Width: value; }
+                }
+            }
+
+            state double spacing = 4;
+
+            <StackPanel>
+                <Border
+                    direct-${DirectPadding {spacing + 1}}
+                    late-${ObjectPadding}
+                    observable-${ObservablePadding}
+                    object-observable-${ObjectObservablePadding}
+                    binding-${BindingPadding} />
+                <ItemsControl>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border
+                                direct-${DirectPadding {spacing + 1}}
+                                late-${ObjectPadding}
+                                observable-${ObservablePadding}
+                                object-observable-${ObjectObservablePadding}
+                                binding-${BindingPadding} />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            """;
+
+        return AkcssActivatorPlannerTests.CreateFixture(
+            component,
+            AkcssActivatorPlannerTests.ExtensionSource);
     }
 
     private static AkcssActivatorPlannerTests.PlannerFixture CreatePriorityFixture()
@@ -351,6 +418,7 @@ public sealed class ComponentWriterTests
         const string component =
             """
             using Avalonia.Controls;
+            using Avalonia.Markup.Xaml.Templates;
             using Demo.Extensions;
 
             @akcss {
@@ -362,7 +430,16 @@ public sealed class ComponentWriterTests
                 }
             }
 
-            <Border ${priority Priority=Template}:margin-3 />
+            <StackPanel>
+                <Border ${priority Priority=Template}:margin-3 />
+                <ItemsControl>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border ${priority Priority=Template}:margin-3 />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
             """;
         const string csharp =
             """
@@ -386,18 +463,8 @@ public sealed class ComponentWriterTests
 
     private static ComponentWriter CreateWriter(
         CodeWriter codeWriter,
-        AkcssActivatorPlannerTests.PlannerFixture fixture,
-        params bool[] localContexts)
+        AkcssActivatorPlannerTests.PlannerFixture fixture)
     {
-        var element = fixture.GetRootElement();
-        var elementSymbol = fixture.GetElementSymbol(element);
-        var inputs = new AkcssActivatorElementInput[localContexts.Length];
-
-        for (var i = 0; i < localContexts.Length; i++)
-        {
-            inputs[i] = new AkcssActivatorElementInput(i, elementSymbol, localContexts[i]);
-        }
-
         var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
             fixture.SemanticModel.GetSymbolInfo(fixture.ComponentTree.GetRoot()).Symbol);
         var moduleTypeNames = new Dictionary<AkburaSyntax, string>();
@@ -411,8 +478,30 @@ public sealed class ComponentWriterTests
             codeWriter,
             component,
             fixture.SemanticModel,
-            inputs,
             moduleTypeNames);
+    }
+
+    private static ComponentElementPlan GetStyledElement(
+        in ComponentPlan plan,
+        bool requiresLocalContext)
+    {
+        return Assert.Single(GetStyledElements(plan, requiresLocalContext));
+    }
+
+    private static ComponentElementPlan[] GetStyledElements(
+        in ComponentPlan plan,
+        bool requiresLocalContext)
+    {
+        return plan.Elements
+            .Where(element =>
+                !element.Akcss.Activators.IsEmpty &&
+                HasLocalMarkupContext(element) == requiresLocalContext)
+            .ToArray();
+    }
+
+    private static bool HasLocalMarkupContext(in ComponentElementPlan element)
+    {
+        return (element.Flags & ComponentElementFlags.RequiresLocalMarkupContext) != 0;
     }
 
     private static MarkupExtensionWriteContext CreateWriteContext()
@@ -440,9 +529,9 @@ public sealed class ComponentWriterTests
         Assert.Contains("\"" + sourcePath + "\"", output, StringComparison.Ordinal);
         Assert.Contains("#line default", output, StringComparison.Ordinal);
         Assert.Contains("#line hidden", output, StringComparison.Ordinal);
-        Assert.Equal(
-            CountOccurrences(output, "#line default"),
-            CountOccurrences(output, "#line hidden"));
+        var mappingCount = CountOccurrences(output, "#line (");
+        Assert.Equal(mappingCount, CountOccurrences(output, "#line default"));
+        Assert.Equal(mappingCount, CountOccurrences(output, "#line hidden"));
     }
 
     private static int CountOccurrences(string text, string value)

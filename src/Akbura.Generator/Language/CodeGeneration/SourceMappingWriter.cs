@@ -53,12 +53,6 @@ internal readonly ref struct SourceMappingWriter
         return new SourceMappingToken(_writer);
     }
 
-    public void WriteEnd(in SourceMappingToken token)
-    {
-        Debug.Assert(!token.IsMapped || token.IsFor(_writer));
-        token.WriteEnd();
-    }
-
     internal static void EnsureDirectiveLine(CodeWriter writer)
     {
         if (writer.LastChar is char lastCharacter && lastCharacter != '\n')
@@ -83,20 +77,10 @@ internal ref struct SourceMappingToken
     {
         var writer = _writer;
         _writer = null;
-        WriteEnd(writer);
+        WriteEndDirectives(writer);
     }
 
-    internal readonly bool IsFor(CodeWriter writer)
-    {
-        return ReferenceEquals(_writer, writer);
-    }
-
-    internal readonly void WriteEnd()
-    {
-        WriteEnd(_writer);
-    }
-
-    private static void WriteEnd(CodeWriter? writer)
+    private static void WriteEndDirectives(CodeWriter? writer)
     {
         if (writer == null)
         {

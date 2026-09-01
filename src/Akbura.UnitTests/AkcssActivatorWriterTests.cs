@@ -455,6 +455,7 @@ public sealed class AkcssActivatorWriterTests
             inputs.Add(new AkcssActivatorElementInput(
                 i,
                 symbol,
+                semanticFixture.GetElementType(element),
                 requiresLocalMarkupExtensionContext[i]));
         }
 

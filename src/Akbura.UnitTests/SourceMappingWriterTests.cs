@@ -43,7 +43,7 @@ public sealed class SourceMappingWriterTests
     }
 
     [Fact]
-    public void WriteEnd_PutsDirectivesOnTheirOwnLines()
+    public void Dispose_PutsDirectivesOnTheirOwnLines()
     {
         var syntaxTree = ComponentSyntaxTree.ParseText(
             "<Button />",
@@ -57,10 +57,36 @@ public sealed class SourceMappingWriterTests
 
         var token = sourceMappingWriter.WriteStart(syntaxTree.GetRoot());
         writer.Write("mapped();");
-        sourceMappingWriter.WriteEnd(token);
+        token.Dispose();
 
         Assert.Equal(
             "return \r\n" +
+            "#line (1,1)-(1,11) 0 \"Main.akbura\"\r\n" +
+            "mapped();\r\n" +
+            "#line default\r\n" +
+            "#line hidden\r\n",
+            writer.GetText().ToString());
+    }
+
+    [Fact]
+    public void Dispose_WhenCalledRepeatedly_WritesEndDirectivesOnce()
+    {
+        var syntaxTree = ComponentSyntaxTree.ParseText(
+            "<Button />",
+            "Main.akbura");
+        using var writer = new CodeWriter();
+        var sourceMappingWriter = new SourceMappingWriter(
+            writer,
+            new ComponentGenerationSourceMap(syntaxTree));
+
+        var token = sourceMappingWriter.WriteStart(syntaxTree.GetRoot());
+        writer.Write("mapped();");
+
+        token.Dispose();
+        token.Dispose();
+
+        Assert.False(token.IsMapped);
+        Assert.Equal(
             "#line (1,1)-(1,11) 0 \"Main.akbura\"\r\n" +
             "mapped();\r\n" +
             "#line default\r\n" +
@@ -82,7 +108,8 @@ public sealed class SourceMappingWriterTests
 
         var token = sourceMappingWriter.WriteStart(syntaxTree.GetRoot());
         writer.Write("mapped();");
-        sourceMappingWriter.WriteEnd(token);
+        token.Dispose();
+        token.Dispose();
 
         Assert.False(token.IsMapped);
         Assert.Equal("mapped();", writer.GetText().ToString());

@@ -12,6 +12,170 @@ namespace Akbura.UnitTests;
 
 public sealed class BindingWriterTests
 {
+    [Fact]
+    public void WriteCreation_WritesConstructorAndInitializerWithoutProvideValue()
+    {
+        var fixture = CreateFixture();
+        var extension = CreateOrdinaryMarkupExtension(
+            fixture,
+            "Demo.ServiceProviderExtension",
+            [CreateMarkupExtensionArgument(
+                    fixture,
+                    "7",
+                    SpecialType.System_Int32,
+                    convertedValue: 7)],
+            [CreateMarkupExtensionProperty(
+                    fixture,
+                    "Text",
+                    "hello",
+                    SpecialType.System_String,
+                    convertedValue: "hello")]);
+
+        var output = WriteMarkupExtensionCreation(
+            fixture,
+            extension,
+            CreateWriteContext(
+                nameScopeExpression: null,
+                scopeId: 0));
+
+        Assert.Equal(
+            "new global::Demo.ServiceProviderExtension(7) { Text = \"hello\" }",
+            output);
+        Assert.DoesNotContain(".ProvideValue(", output);
+    }
+
+    [Fact]
+    public void WriteProvideValueInvocation_WritesFullContextIncludingFallback()
+    {
+        var fixture = CreateFixture();
+        var extension = CreateOrdinaryMarkupExtension(
+            fixture,
+            "Demo.ServiceProviderExtension",
+            [CreateMarkupExtensionArgument(
+                    fixture,
+                    "7",
+                    SpecialType.System_Int32,
+                    convertedValue: 7)]);
+
+        var output = WriteMarkupExtensionProvideValueInvocation(
+            fixture,
+            extension,
+            "__extension",
+            CreateWriteContext(
+                nameScopeExpression: null,
+                scopeId: 0,
+                fallbackServiceProviderExpression: "__fallback"));
+
+        Assert.Equal(
+            "__extension.ProvideValue(" +
+            "CreateMarkupServiceProvider(" +
+            "targetObject: __target, " +
+            "targetProperty: __property, " +
+            "intermediateRootObject: __root, " +
+            "baseUri: __baseUri, " +
+            "directParentsStack: __parents, " +
+            "fallbackServiceProvider: __fallback))",
+            output);
+    }
+
+    [Fact]
+    public void Write_OrdinaryExtension_InvokesProvideValueOnlyWhenAvailable()
+    {
+        var fixture = CreateFixture();
+        var arguments = ImmutableArray.Create(
+            CreateMarkupExtensionArgument(
+                fixture,
+                "7",
+                SpecialType.System_Int32,
+                convertedValue: 7));
+        var withProvideValue = CreateOrdinaryMarkupExtension(
+            fixture,
+            "Demo.ServiceProviderExtension",
+            arguments);
+        var withoutProvideValue = CreateOrdinaryMarkupExtension(
+            fixture,
+            "Demo.CreationOnlyExtension",
+            arguments);
+        var context = CreateWriteContext(
+            nameScopeExpression: null,
+            scopeId: 0);
+
+        var evaluated = WriteMarkupExtension(
+            fixture,
+            withProvideValue,
+            context);
+        var creation = WriteMarkupExtension(
+            fixture,
+            withoutProvideValue,
+            context);
+
+        Assert.Contains(
+            "new global::Demo.ServiceProviderExtension(7)",
+            evaluated);
+        Assert.Contains(".ProvideValue(", evaluated);
+        Assert.Contains(
+            "CreateMarkupServiceProvider(",
+            evaluated);
+        Assert.Equal(
+            "new global::Demo.CreationOnlyExtension(7)",
+            creation);
+    }
+
+    [Fact]
+    public void Write_NestedCompiledBinding_WritesInlinePathAndForwardsElementReferences()
+    {
+        // Nested Avalonia path: #header.Name
+        var fixture = CreateFixture();
+        var elementType = fixture.GetRequiredType("Demo.Element");
+        var nestedBinding = CreateElementNameCompiledBinding(
+            fixture,
+            elementType,
+            "#header.Name");
+        var outerExtension = CreateOrdinaryMarkupExtension(
+            fixture,
+            "Demo.CreationOnlyExtension",
+            [
+                CreateMarkupExtensionArgument(
+                    fixture,
+                    "7",
+                    SpecialType.System_Int32,
+                    convertedValue: 7),
+            ],
+            [
+                CreateMarkupExtensionProperty(
+                    fixture,
+                    "Nested",
+                    nestedBinding.RawText,
+                    SpecialType.System_Object,
+                    convertedValue: null,
+                    nestedValue: nestedBinding),
+            ]);
+        var elements = new[]
+        {
+            new BindingElementReference(
+                "header",
+                "__header",
+                scopeId: 7,
+                isClassMember: false),
+        };
+        var context = CreateWriteContext(
+            nameScopeExpression: null,
+            scopeId: 7,
+            elementReferences: elements);
+
+        var output = WriteMarkupExtension(
+            fixture,
+            outerExtension,
+            context);
+
+        Assert.Contains(
+            "new global::Avalonia.Data.CompiledBinding(" +
+            "new global::Avalonia.Data.CompiledBindingPathBuilder()",
+            output);
+        Assert.Contains("Source = __header", output);
+        Assert.DoesNotContain("s_bindingPath", output);
+        Assert.DoesNotContain(".ElementName(", output);
+    }
 
     [Fact]
     public void ElementName_VisibleLocalShadowsClassMember_AndClassMemberCrossesScopes()
@@ -66,7 +230,7 @@ public sealed class BindingWriterTests
         Assert.Equal(1, otherScopePlan.CachedPathId);
         Assert.Equal(2, nextCachedPathId);
 
-        var cachedPath = WriteCachedPathField(fixture, localPlan);
+        var cachedPath = WriteCachedBindingPath(fixture, localPlan);
         var binding = WriteBinding(
             fixture,
             localPlan,
@@ -164,7 +328,7 @@ public sealed class BindingWriterTests
         Assert.Equal(0, inlinePlan.PathElementStart);
         Assert.False(inlinePlan.HasCachedPath);
         Assert.Equal(-1, inlinePlan.CachedPathId);
-        Assert.Equal(string.Empty, WriteCachedPathField(fixture, inlinePlan));
+        Assert.Equal(string.Empty, WriteCachedBindingPath(fixture, inlinePlan));
 
         var binding = WriteBinding(
             fixture,
@@ -210,9 +374,8 @@ public sealed class BindingWriterTests
             MarkupBindingKind.Compiled,
             "Name",
             elementType,
-            ImmutableArray.Create(
-                CreatePropertyElement(nameProperty)),
-            ImmutableArray.Create(elementNameProperty));
+            [CreatePropertyElement(nameProperty)],
+            [elementNameProperty]);
         var elements = new[]
         {
             new BindingElementReference(
@@ -312,21 +475,21 @@ public sealed class BindingWriterTests
             constantExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
         var dynamicPlan = CreatePlan(
             fixture,
             dynamicExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
         var secondConstantPlan = CreatePlan(
             fixture,
             constantExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
         Assert.True(firstConstantPlan.IsValid);
@@ -336,7 +499,7 @@ public sealed class BindingWriterTests
         Assert.True(dynamicPlan.IsValid);
         Assert.False(dynamicPlan.HasCachedPath);
         Assert.Equal(-1, dynamicPlan.CachedPathId);
-        Assert.Equal(string.Empty, WriteCachedPathField(fixture, dynamicPlan));
+        Assert.Equal(string.Empty, WriteCachedBindingPath(fixture, dynamicPlan));
 
         Assert.True(secondConstantPlan.IsValid);
         Assert.True(secondConstantPlan.HasCachedPath);
@@ -373,19 +536,20 @@ public sealed class BindingWriterTests
             MarkupBindingKind.Compiled,
             "Child.Name",
             viewModelType,
-            ImmutableArray.Create(
+            [
                 CreatePropertyElement(childProperty),
-                CreatePropertyElement(nameProperty)));
+                CreatePropertyElement(nameProperty),
+            ]);
         var nextCachedPathId = 0;
         var plan = CreatePlan(
             fixture,
             extension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
-        var field = WriteCachedPathField(fixture, plan);
+        var field = WriteCachedBindingPath(fixture, plan);
         var binding = WriteBinding(
             fixture,
             plan,
@@ -456,7 +620,7 @@ public sealed class BindingWriterTests
                     new CSharpSymbolDefinition(indexer),
                     new CSharpSymbolDefinition(indexer.Type),
                     arguments: default,
-                    ImmutableArray.Create(indexerArgument))),
+                    [indexerArgument])),
         };
         var nextCachedPathId = 0;
 
@@ -467,15 +631,15 @@ public sealed class BindingWriterTests
                 MarkupBindingKind.Compiled,
                 text,
                 structType,
-                ImmutableArray.Create(element));
+                [element]);
             var plan = CreatePlan(
                 fixture,
                 extension,
                 scopeId: 0,
                 nameScopeExpression: null,
-                Array.Empty<BindingElementReference>(),
+                [],
                 ref nextCachedPathId);
-            var cachedPath = WriteCachedPathField(fixture, plan);
+            var cachedPath = WriteCachedBindingPath(fixture, plan);
             var binding = WriteBinding(
                 fixture,
                 plan,
@@ -505,20 +669,21 @@ public sealed class BindingWriterTests
             MarkupBindingKind.Compiled,
             "$parent[2]",
             sourceType,
-            ImmutableArray.Create(
+            [
                 new MarkupBindingPathElement(
                     MarkupBindingPathElementKind.Ancestor,
                     "$parent[2]",
-                    level: 2)));
+                    level: 2),
+            ]);
         var nextCachedPathId = 0;
         var plan = CreatePlan(
             fixture,
             extension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
-        var cachedPath = WriteCachedPathField(fixture, plan);
+        var cachedPath = WriteCachedBindingPath(fixture, plan);
         var binding = WriteBinding(
             fixture,
             plan,
@@ -554,17 +719,17 @@ public sealed class BindingWriterTests
             MarkupBindingKind.Compiled,
             string.Empty,
             sourceType,
-            ImmutableArray<MarkupBindingPathElement>.Empty,
-            ImmutableArray.Create(converterParameter));
+            [],
+            [converterParameter]);
         var nextCachedPathId = 0;
         var plan = CreatePlan(
             fixture,
             extension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
-        var cachedPath = WriteCachedPathField(fixture, plan);
+        var cachedPath = WriteCachedBindingPath(fixture, plan);
         var binding = WriteBinding(
             fixture,
             plan,
@@ -612,10 +777,11 @@ public sealed class BindingWriterTests
             MarkupBindingKind.Compiled,
             "Child.Name",
             viewModelType,
-            ImmutableArray.Create(
+            [
                 CreatePropertyElement(childProperty),
-                CreatePropertyElement(nameProperty)),
-            ImmutableArray.Create(converterParameter));
+                CreatePropertyElement(nameProperty),
+            ],
+            [converterParameter]);
         var elements = new[]
         {
             new BindingElementReference(
@@ -638,8 +804,8 @@ public sealed class BindingWriterTests
             plan,
             CreateWriteContext(
                 nameScopeExpression: null,
-                scopeId: 11),
-            elements);
+                scopeId: 11,
+                elementReferences: elements));
 
         Assert.True(plan.IsValid);
         Assert.Contains("Source = __header", binding);
@@ -720,7 +886,7 @@ public sealed class BindingWriterTests
                 new CSharpSymbolDefinition(indexer),
                 new CSharpSymbolDefinition(indexer.Type),
                 arguments: default,
-                ImmutableArray.Create(indexerArgument));
+                [indexerArgument]);
         var isTrueElement =
             new MarkupBindingPathElement(
                 MarkupBindingPathElementKind.Field,
@@ -748,9 +914,7 @@ public sealed class BindingWriterTests
                         "$parent[Demo.Element;2]",
                         type: new CSharpSymbolDefinition(
                             elementType),
-                        arguments: ImmutableArray.Create(
-                            "Demo.Element",
-                            "2"),
+                        arguments: ["Demo.Element", "2"],
                         level: 2),
                     CreatePropertyElement(
                         dataContextProperty),
@@ -785,7 +949,7 @@ public sealed class BindingWriterTests
             complexExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
         var elementNameExtension =
@@ -798,7 +962,7 @@ public sealed class BindingWriterTests
             elementNameExtension,
             scopeId: 0,
             nameScopeExpression: "__nameScope",
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
         var selfExtension =
@@ -807,18 +971,19 @@ public sealed class BindingWriterTests
                 MarkupBindingKind.Compiled,
                 "$self",
                 hostType,
-                ImmutableArray.Create(
+                [
                     new MarkupBindingPathElement(
                         MarkupBindingPathElementKind.Self,
                         "$self",
                         type: new CSharpSymbolDefinition(
-                            hostType))));
+                            hostType)),
+                ]);
         var selfPlan = CreatePlan(
             fixture,
             selfExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
         var templatedParentExtension =
@@ -827,19 +992,20 @@ public sealed class BindingWriterTests
                 MarkupBindingKind.Compiled,
                 "$templatedParent",
                 elementType,
-                ImmutableArray.Create(
+                [
                     new MarkupBindingPathElement(
                         MarkupBindingPathElementKind
                             .TemplatedParent,
                         "$templatedParent",
                         type: new CSharpSymbolDefinition(
-                            elementType))));
+                            elementType)),
+                ]);
         var templatedParentPlan = CreatePlan(
             fixture,
             templatedParentExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
         var intType =
@@ -851,7 +1017,7 @@ public sealed class BindingWriterTests
                 MarkupBindingKind.Compiled,
                 "$self?.(Grid.Column)",
                 gridType,
-                ImmutableArray.Create(
+                [
                     new MarkupBindingPathElement(
                         MarkupBindingPathElementKind.Self,
                         "$self",
@@ -865,13 +1031,14 @@ public sealed class BindingWriterTests
                             columnPropertyField),
                         new CSharpSymbolDefinition(
                             intType),
-                        acceptsNull: true)));
+                        acceptsNull: true),
+                ]);
         var attachedPropertyPlan = CreatePlan(
             fixture,
             attachedPropertyExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
         var arrayArguments =
@@ -896,7 +1063,7 @@ public sealed class BindingWriterTests
                 MarkupBindingKind.Compiled,
                 "Matrix[1, 2]",
                 viewModelType,
-                ImmutableArray.Create(
+                [
                     CreatePropertyElement(matrixProperty),
                     new MarkupBindingPathElement(
                         MarkupBindingPathElementKind.Indexer,
@@ -904,13 +1071,14 @@ public sealed class BindingWriterTests
                         type: new CSharpSymbolDefinition(
                             itemType),
                         arguments: default,
-                        boundArguments: arrayArguments)));
+                        boundArguments: arrayArguments),
+                ]);
         var arrayPlan = CreatePlan(
             fixture,
             arrayExtension,
             scopeId: 0,
             nameScopeExpression: null,
-            Array.Empty<BindingElementReference>(),
+            [],
             ref nextCachedPathId);
 
         Assert.True(complexPlan.IsValid);
@@ -924,23 +1092,23 @@ public sealed class BindingWriterTests
         Assert.Equal(5, nextCachedPathId);
 
         var complexField =
-            WriteCachedPathField(
+            WriteCachedBindingPath(
                 fixture,
                 complexPlan);
         var selfField =
-            WriteCachedPathField(
+            WriteCachedBindingPath(
                 fixture,
                 selfPlan);
         var templatedParentField =
-            WriteCachedPathField(
+            WriteCachedBindingPath(
                 fixture,
                 templatedParentPlan);
         var attachedPropertyField =
-            WriteCachedPathField(
+            WriteCachedBindingPath(
                 fixture,
                 attachedPropertyPlan);
         var arrayField =
-            WriteCachedPathField(
+            WriteCachedBindingPath(
                 fixture,
                 arrayPlan);
         var context =
@@ -1096,6 +1264,32 @@ public sealed class BindingWriterTests
                 public bool IsTrue;
             }
 
+            public sealed class ServiceProviderExtension
+            {
+                public ServiceProviderExtension(int value)
+                {
+                }
+
+                public string Text { get; set; } = "";
+
+                public object? Nested { get; set; }
+
+                public object? ProvideValue(
+                    global::System.IServiceProvider serviceProvider)
+                {
+                    return Nested;
+                }
+            }
+
+            public sealed class CreationOnlyExtension
+            {
+                public CreationOnlyExtension(int value)
+                {
+                }
+
+                public object? Nested { get; set; }
+            }
+
             public struct StructModel
             {
                 public string Value { get; set; }
@@ -1135,8 +1329,7 @@ public sealed class BindingWriterTests
             [componentTree],
             rootNamespace: "Demo");
         var semanticModel = compilation.GetSemanticModel(componentTree);
-        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
-            semanticModel.GetSymbolInfo(componentTree.GetRoot()).Symbol);
+        var component = Assert.IsType<IAkburaComponentSymbol>(semanticModel.GetSymbolInfo(componentTree.GetRoot()).Symbol, exactMatch: false);
         var environment = BindingWriterEnvironment.Create(
             semanticModel,
             component);
@@ -1173,12 +1366,13 @@ public sealed class BindingWriterTests
             kind,
             path,
             elementType,
-            ImmutableArray.Create(
+            [
                 new MarkupBindingPathElement(
                     MarkupBindingPathElementKind.ElementName,
                     "#header",
                     type: new CSharpSymbolDefinition(elementType)),
-                CreatePropertyElement(nameProperty)));
+                CreatePropertyElement(nameProperty),
+            ]);
     }
 
     private static MarkupExtensionValue CreateIndexerCompiledBinding(
@@ -1212,16 +1406,17 @@ public sealed class BindingWriterTests
             new CSharpSymbolDefinition(indexer),
             new CSharpSymbolDefinition(indexer.Type),
             arguments: default,
-            ImmutableArray.Create(argument));
+            [argument]);
 
         return CreateBindingExtension(
             fixture,
             MarkupBindingKind.Compiled,
             $"Items[{argumentText}]",
             viewModelType,
-            ImmutableArray.Create(
+            [
                 CreatePropertyElement(itemsProperty),
-                indexerElement));
+                indexerElement,
+            ]);
     }
 
     private static MarkupExtensionValue CreateBindingExtension(
@@ -1257,11 +1452,94 @@ public sealed class BindingWriterTests
             constructor: default,
             provideValueMethod: default,
             new CSharpSymbolDefinition(bindingType),
-            arguments: ImmutableArray<MarkupExtensionArgumentValue>.Empty,
+            arguments: [],
             properties: properties.IsDefault
-                ? ImmutableArray<MarkupExtensionPropertyValue>.Empty
+                ? []
                 : properties,
             binding);
+    }
+
+    private static MarkupExtensionValue CreateOrdinaryMarkupExtension(
+        TestFixture fixture,
+        string metadataName,
+        ImmutableArray<MarkupExtensionArgumentValue> arguments = default,
+        ImmutableArray<MarkupExtensionPropertyValue> properties = default)
+    {
+        var extensionType = fixture.GetRequiredType(metadataName);
+        var constructor = Assert.Single(
+            extensionType.InstanceConstructors,
+            static constructor =>
+                constructor.DeclaredAccessibility ==
+                Accessibility.Public);
+        var provideValueMethod = extensionType
+            .GetMembers("ProvideValue")
+            .OfType<IMethodSymbol>()
+            .SingleOrDefault();
+        var resultType = provideValueMethod?.ReturnType ??
+            extensionType;
+        const string extensionSuffix = "Extension";
+        var name = extensionType.Name.EndsWith(
+                extensionSuffix,
+                StringComparison.Ordinal)
+            ? extensionType.Name[..^extensionSuffix.Length]
+            : extensionType.Name;
+
+        return new MarkupExtensionValue(
+            rawText: name,
+            name,
+            new CSharpSymbolDefinition(extensionType),
+            new CSharpSymbolDefinition(constructor),
+            provideValueMethod == null
+                ? default
+                : new CSharpSymbolDefinition(
+                    provideValueMethod),
+            new CSharpSymbolDefinition(resultType),
+            arguments,
+            properties);
+    }
+
+    private static MarkupExtensionArgumentValue
+        CreateMarkupExtensionArgument(
+            TestFixture fixture,
+            string text,
+            SpecialType specialType,
+            object? convertedValue,
+            MarkupExtensionValue? nestedValue = null)
+    {
+        var type = fixture.Compilation.GetSpecialType(
+            specialType);
+
+        return new MarkupExtensionArgumentValue(
+            text,
+            parameter: default,
+            new CSharpSymbolDefinition(type),
+            operation: default,
+            conversion: default,
+            convertedValue,
+            nestedValue);
+    }
+
+    private static MarkupExtensionPropertyValue
+        CreateMarkupExtensionProperty(
+            TestFixture fixture,
+            string name,
+            string value,
+            SpecialType specialType,
+            object? convertedValue,
+            MarkupExtensionValue? nestedValue = null)
+    {
+        var type = fixture.Compilation.GetSpecialType(
+            specialType);
+
+        return new MarkupExtensionPropertyValue(
+            name,
+            value,
+            property: default,
+            new CSharpSymbolDefinition(type),
+            operation: default,
+            conversion: default,
+            convertedValue,
+            nestedValue);
     }
 
     private static void AssertGeneratedCSharpCompilesTogether(
@@ -1396,17 +1674,17 @@ public sealed class BindingWriterTests
             ref nextCachedPathId);
     }
 
-    private static string WriteCachedPathField(
+    private static string WriteCachedBindingPath(
         TestFixture fixture,
         in BindingWritePlan plan)
     {
         using var codeWriter = new CodeWriter("\n");
         var environment = fixture.Environment;
-        var bindingWriter = new BindingWriter(
+        var extensionWriter = new MarkupExtensionWriter(
             codeWriter,
             in environment);
 
-        bindingWriter.WriteCachedPathField(
+        extensionWriter.WriteCachedBindingPath(
             in plan);
 
         return codeWriter.GetText().ToString();
@@ -1415,18 +1693,73 @@ public sealed class BindingWriterTests
     private static string WriteBinding(
         TestFixture fixture,
         in BindingWritePlan plan,
-        in MarkupExtensionWriteContext context,
-        BindingElementReference[]? elements = null)
+        in MarkupExtensionWriteContext context)
     {
         using var codeWriter = new CodeWriter("\n");
         var environment = fixture.Environment;
-        var bindingWriter = new BindingWriter(
+        var extensionWriter = new MarkupExtensionWriter(
             codeWriter,
-            in environment,
-            elements ?? Array.Empty<BindingElementReference>());
+            in environment);
 
-        bindingWriter.WriteBinding(
+        extensionWriter.WriteBinding(
             in plan,
+            in context);
+
+        return codeWriter.GetText().ToString();
+    }
+
+    private static string WriteMarkupExtension(
+        TestFixture fixture,
+        MarkupExtensionValue extension,
+        in MarkupExtensionWriteContext context)
+    {
+        using var codeWriter = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var extensionWriter = new MarkupExtensionWriter(
+            codeWriter,
+            in environment);
+
+        extensionWriter.Write(
+            extension,
+            in context);
+
+        return codeWriter.GetText().ToString();
+    }
+
+    private static string WriteMarkupExtensionCreation(
+        TestFixture fixture,
+        MarkupExtensionValue extension,
+        in MarkupExtensionWriteContext context)
+    {
+        using var codeWriter = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var extensionWriter = new MarkupExtensionWriter(
+            codeWriter,
+            in environment);
+
+        extensionWriter.WriteCreation(
+            extension,
+            in context);
+
+        return codeWriter.GetText().ToString();
+    }
+
+    private static string
+        WriteMarkupExtensionProvideValueInvocation(
+            TestFixture fixture,
+            MarkupExtensionValue extension,
+            string instanceExpression,
+            in MarkupExtensionWriteContext context)
+    {
+        using var codeWriter = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var extensionWriter = new MarkupExtensionWriter(
+            codeWriter,
+            in environment);
+
+        extensionWriter.WriteProvideValueInvocation(
+            extension,
+            instanceExpression,
             in context);
 
         return codeWriter.GetText().ToString();
@@ -1434,7 +1767,9 @@ public sealed class BindingWriterTests
 
     private static MarkupExtensionWriteContext CreateWriteContext(
         string? nameScopeExpression,
-        int scopeId)
+        int scopeId,
+        string? fallbackServiceProviderExpression = null,
+        BindingElementReference[]? elementReferences = null)
     {
         return new MarkupExtensionWriteContext(
             targetObjectExpression: "__target",
@@ -1442,9 +1777,11 @@ public sealed class BindingWriterTests
             intermediateRootExpression: "__root",
             baseUriExpression: "__baseUri",
             directParentsStackExpression: "__parents",
-            fallbackServiceProviderExpression: null,
+            fallbackServiceProviderExpression,
             nameScopeExpression,
-            scopeId);
+            scopeId,
+            elementReferences ??
+                []);
     }
 
     private sealed class TestFixture(
@@ -1460,8 +1797,9 @@ public sealed class BindingWriterTests
         public INamedTypeSymbol GetRequiredType(
             string metadataName)
         {
-            return Assert.IsAssignableFrom<INamedTypeSymbol>(
-                Compilation.GetTypeByMetadataName(metadataName));
+            return Assert.IsType<INamedTypeSymbol>(
+                Compilation.GetTypeByMetadataName(metadataName),
+                exactMatch: false);
         }
     }
 }

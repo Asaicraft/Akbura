@@ -9,6 +9,12 @@ namespace Akbura.UnitTests;
 public sealed class ComponentPlannerTests
 {
     [Fact]
+    public void DefaultPlan_IsEmpty()
+    {
+        Assert.True(default(ComponentPlan).IsEmpty);
+    }
+
+    [Fact]
     public void Create_AssignsDensePreorderIdsAndStoresDirectChildIds()
     {
         const string component =
@@ -31,7 +37,7 @@ public sealed class ComponentPlannerTests
         Assert.Equal([1, 4], GetIds(plan.ChildElementIds, plan.Elements[0].Children));
         Assert.Equal([2], GetIds(plan.ChildElementIds, plan.Elements[1].Children));
         Assert.Equal([3], GetIds(plan.ChildElementIds, plan.Elements[2].Children));
-        Assert.True(plan.Elements[0].Flags.HasFlag(ComponentElementFlags.IsRoot));
+        Assert.True(plan.Elements[0].IsRoot);
         Assert.Equal([-1, 0, 1, 2, 0], plan.Elements.Select(static element => element.ParentId));
     }
 
@@ -78,7 +84,7 @@ public sealed class ComponentPlannerTests
         Assert.All(plan.Elements, static element =>
         {
             Assert.Equal(-1, element.ParentId);
-            Assert.True(element.Flags.HasFlag(ComponentElementFlags.IsRoot));
+            Assert.True(element.IsRoot);
         });
     }
 
@@ -100,12 +106,37 @@ public sealed class ComponentPlannerTests
 
         Assert.Equal("header", header.Identifier);
         Assert.Equal("yield", keyword.Identifier);
-        Assert.True(header.Flags.HasFlag(ComponentElementFlags.HasName));
-        Assert.True(keyword.Flags.HasFlag(ComponentElementFlags.HasName));
+        Assert.True(header.HasName);
+        Assert.True(keyword.HasName);
         Assert.Collection(
             plan.ElementReferences,
             reference => AssertReference(reference, "header", "header"),
             reference => AssertReference(reference, "yield", "@yield"));
+    }
+
+    [Fact]
+    public void Create_NamedTemplateElementCreatesLocalReference()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <ItemsControl>
+                <ItemsControl.ItemTemplate>
+                    <Border x.Name="yield" />
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        var plan = CreatePlan(AkcssActivatorPlannerTests.CreateFixture(component));
+        var element = GetElement(plan, "Border");
+        var reference = Assert.Single(plan.ElementReferences);
+
+        Assert.True(element.IsLocal);
+        Assert.True(element.HasName);
+        Assert.Equal(element.ScopeId, reference.ScopeId);
+        Assert.Equal("yield", reference.Name);
+        Assert.Equal("@yield", reference.Expression);
+        Assert.False(reference.IsClassMember);
     }
 
     [Fact]
@@ -167,8 +198,9 @@ public sealed class ComponentPlannerTests
         Assert.True(template.IsTemplateElement);
         Assert.True(content.IsDeferred);
         Assert.Equal(ComponentElementScopeKind.DeferredContent, content.ScopeKind);
-        Assert.True(content.Flags.HasFlag(ComponentElementFlags.RequiresLocalMarkupContext));
-        Assert.Equal(deferred.ScopeId, content.ScopeOwnerId);
+        Assert.True(content.IsLocal);
+        Assert.True(content.RequiresLocalMarkupContext);
+        Assert.Equal(deferred.ScopeId, content.ScopeId);
         Assert.Equal([content.Id], GetIds(plan.ChildElementIds, deferred.Roots));
         Assert.Empty(plan.Templates);
     }
@@ -212,7 +244,7 @@ public sealed class ComponentPlannerTests
         Assert.Equal([deferredChild.Id], GetIds(plan.ChildElementIds, deferred.Roots));
         Assert.False(ordinaryPropertyChild.IsDeferred);
         Assert.Equal(ComponentElementScopeKind.Component, ordinaryPropertyChild.ScopeKind);
-        Assert.Equal(0, ordinaryPropertyChild.ScopeOwnerId);
+        Assert.Equal(0, ordinaryPropertyChild.ScopeId);
     }
 
     [Fact]
@@ -244,9 +276,11 @@ public sealed class ComponentPlannerTests
         Assert.NotEqual(templates[0].ScopeId, templates[1].ScopeId);
         Assert.Equal(ComponentElementScopeKind.DataTemplate, border.ScopeKind);
         Assert.Equal(ComponentElementScopeKind.DataTemplate, textBlock.ScopeKind);
-        Assert.NotEqual(border.ScopeOwnerId, textBlock.ScopeOwnerId);
+        Assert.False(border.IsTemplateElement);
+        Assert.False(textBlock.IsTemplateElement);
+        Assert.NotEqual(border.ScopeId, textBlock.ScopeId);
         Assert.All([border, textBlock], static element =>
-            Assert.True(element.Flags.HasFlag(ComponentElementFlags.RequiresLocalMarkupContext)));
+            Assert.True(element.IsLocal && element.RequiresLocalMarkupContext));
         Assert.Contains(templates, template =>
             GetIds(plan.ChildElementIds, template.Roots).SequenceEqual([border.Id]));
         Assert.Contains(templates, template =>
@@ -277,7 +311,7 @@ public sealed class ComponentPlannerTests
         Assert.True(itemsControl.IsDeferred);
         Assert.False(textBlock.IsDeferred);
         Assert.Equal(ComponentElementScopeKind.DataTemplate, textBlock.ScopeKind);
-        Assert.Equal(template.ScopeId, textBlock.ScopeOwnerId);
+        Assert.Equal(template.ScopeId, textBlock.ScopeId);
         Assert.Equal([textBlock.Id], GetIds(plan.ChildElementIds, template.Roots));
     }
 
@@ -312,8 +346,8 @@ public sealed class ComponentPlannerTests
         var innerTemplate = dataTemplates[1];
         Assert.True(innerTemplate.IsTemplateElement);
         Assert.True(innerTemplate.IsDeferred);
-        Assert.Equal(deferred[0].ScopeId, innerTemplate.ScopeOwnerId);
-        Assert.Equal(deferred[1].ScopeId, border.ScopeOwnerId);
+        Assert.Equal(deferred[0].ScopeId, innerTemplate.ScopeId);
+        Assert.Equal(deferred[1].ScopeId, border.ScopeId);
         Assert.Empty(plan.Templates);
     }
 
@@ -343,10 +377,10 @@ public sealed class ComponentPlannerTests
         var border = GetElement(plan, "Border");
 
         Assert.Equal(ComponentElementScopeKind.DataTemplate, dataTemplate.ScopeKind);
-        Assert.Equal(outerTemplate.ScopeId, dataTemplate.ScopeOwnerId);
+        Assert.Equal(outerTemplate.ScopeId, dataTemplate.ScopeId);
         Assert.False(dataTemplate.IsDeferred);
         Assert.Equal(ComponentElementScopeKind.DeferredContent, border.ScopeKind);
-        Assert.NotEqual(outerTemplate.ScopeId, border.ScopeOwnerId);
+        Assert.NotEqual(outerTemplate.ScopeId, border.ScopeId);
     }
 
     [Fact]
@@ -489,7 +523,15 @@ public sealed class ComponentPlannerTests
             moduleTypeNames.Add(fixture.ExternalAkcssTree.GetRoot(), "global::Demo.ExternalComponentPlannerStyles");
         }
 
-        return ComponentPlanner.Create(component, fixture.SemanticModel, moduleTypeNames);
+        var plan = ComponentPlanner.Create(component, fixture.SemanticModel, moduleTypeNames);
+        Assert.All(plan.Elements, static element =>
+        {
+            Assert.Equal(element.ParentId < 0, element.IsRoot);
+            Assert.Equal(element.ScopeId > 0, element.IsLocal);
+            Assert.Equal(element.ScopeKind != ComponentElementScopeKind.Component, element.IsLocal);
+            Assert.Equal(element.IsLocal, element.RequiresLocalMarkupContext);
+        });
+        return plan;
     }
 
     private static ComponentElementPlan GetElement(ComponentPlan plan, string tagName)

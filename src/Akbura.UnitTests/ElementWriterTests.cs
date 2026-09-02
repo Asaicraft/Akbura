@@ -23,16 +23,30 @@ public sealed class ElementWriterTests
     }
 
     [Fact]
+    public void WriteField_ForLocal_WritesNothing()
+    {
+        var fixture = CreateFixture();
+        var element = fixture.CreateElement("__element0", isLocal: true);
+
+        Assert.Equal(
+            string.Empty,
+            Write(
+                fixture,
+                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteField(plan),
+                element));
+    }
+
+    [Fact]
     public void WriteCreation_ForLocal_WritesVarDeclaration()
     {
         var fixture = CreateFixture();
-        var element = fixture.CreateElement("__element0");
+        var element = fixture.CreateElement("__element0", isLocal: true);
 
         Assert.Equal(
             "var __element0 = new global::Demo.Widget();\r\n",
             Write(
                 fixture,
-                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan, true),
+                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan),
                 element));
     }
 
@@ -46,7 +60,7 @@ public sealed class ElementWriterTests
             "Header = new global::Demo.Widget();\r\n",
             Write(
                 fixture,
-                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan, false),
+                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan),
                 element));
     }
 
@@ -54,13 +68,13 @@ public sealed class ElementWriterTests
     public void WriteCreation_EscapesKeywordIdentifier()
     {
         var fixture = CreateFixture();
-        var element = fixture.CreateElement("class");
+        var element = fixture.CreateElement("class", isLocal: true);
 
         Assert.Equal(
             "var @class = new global::Demo.Widget();\r\n",
             Write(
                 fixture,
-                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan, true),
+                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan),
                 element));
     }
 
@@ -68,13 +82,13 @@ public sealed class ElementWriterTests
     public void WriteCreation_WritesFullyQualifiedGenericType()
     {
         var fixture = CreateFixture();
-        var element = fixture.CreateElement("items", fixture.GenericWidgetType);
+        var element = fixture.CreateElement("items", fixture.GenericWidgetType, isLocal: true);
 
         Assert.Equal(
             "var items = new global::Demo.Widget<string>();\r\n",
             Write(
                 fixture,
-                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan, true),
+                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan),
                 element));
     }
 
@@ -85,7 +99,7 @@ public sealed class ElementWriterTests
         var element = fixture.CreateElement("class", supportsInitialize: true);
 
         Assert.Equal(
-            "@class.BeginInit();\r\n",
+            "((global::System.ComponentModel.ISupportInitialize)@class).BeginInit();\r\n",
             Write(
                 fixture,
                 static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteBeginInit(plan),
@@ -99,7 +113,7 @@ public sealed class ElementWriterTests
         var element = fixture.CreateElement("class", supportsInitialize: true);
 
         Assert.Equal(
-            "@class.EndInit();\r\n",
+            "((global::System.ComponentModel.ISupportInitialize)@class).EndInit();\r\n",
             Write(
                 fixture,
                 static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteEndInit(plan),
@@ -110,7 +124,7 @@ public sealed class ElementWriterTests
     public void InitializationMethods_WhenUnsupported_WriteNothing()
     {
         var fixture = CreateFixture();
-        var element = fixture.CreateElement("__element0");
+        var element = fixture.CreateElement("__element0", isLocal: true);
 
         Assert.Equal(
             string.Empty,
@@ -128,7 +142,7 @@ public sealed class ElementWriterTests
     public void WriteCreation_WithSourcePath_WritesSourceMapping()
     {
         var fixture = CreateFixture("Views/Widget.akbura");
-        var element = fixture.CreateElement("__element0");
+        var element = fixture.CreateElement("__element0", isLocal: true);
 
         Assert.Equal(
             "#line (1,1)-(1,11) 0 \"Views/Widget.akbura\"\r\n" +
@@ -137,8 +151,53 @@ public sealed class ElementWriterTests
             "#line hidden\r\n",
             Write(
                 fixture,
-                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan, true),
+                static (ElementWriter writer, in ComponentElementPlan plan) => writer.WriteCreation(plan),
                 element));
+    }
+
+    [Fact]
+    public void GeneratedElementFragment_WithExplicitInitializationImplementation_Compiles()
+    {
+        var fixture = CreateFixture();
+        var field = fixture.CreateElement("_widget", supportsInitialize: true);
+        var local = fixture.CreateElement("local", supportsInitialize: true, isLocal: true);
+        using var codeWriter = new CodeWriter();
+        var writer = new ElementWriter(codeWriter, new ComponentGenerationSourceMap(fixture.SyntaxTree));
+
+        codeWriter.WriteLine("namespace Demo.Generated;");
+        codeWriter.WriteLine();
+        codeWriter.WriteLine("public sealed class GeneratedComponent");
+        codeWriter.WriteLine("{");
+        codeWriter.CurrentIndent = 4;
+        writer.WriteField(field);
+        codeWriter.WriteLine();
+        codeWriter.WriteLine("public void Build()");
+        codeWriter.WriteLine("{");
+        codeWriter.CurrentIndent = 8;
+        writer.WriteCreation(field);
+        writer.WriteBeginInit(field);
+        writer.WriteCreation(local);
+        writer.WriteBeginInit(local);
+        writer.WriteEndInit(local);
+        writer.WriteEndInit(field);
+        codeWriter.CurrentIndent = 4;
+        codeWriter.WriteLine("}");
+        codeWriter.CurrentIndent = 0;
+        codeWriter.WriteLine("}");
+
+        var generatedSource = codeWriter.GetText().ToString();
+        var generatedTree = CSharpSyntaxTree.ParseText(
+            generatedSource,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
+        var diagnostics = fixture.Compilation.AddSyntaxTrees(generatedTree).GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity is
+                DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            diagnostics.Length == 0,
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic => diagnostic.ToString())) +
+            Environment.NewLine + generatedSource);
     }
 
     private static string Write(TestFixture fixture, WriteAction action, in ComponentElementPlan element)
@@ -153,10 +212,19 @@ public sealed class ElementWriterTests
     {
         const string source =
             """
+            using System.ComponentModel;
+
             namespace Demo;
 
-            public sealed class Widget
+            public sealed class Widget : ISupportInitialize
             {
+                void ISupportInitialize.BeginInit()
+                {
+                }
+
+                void ISupportInitialize.EndInit()
+                {
+                }
             }
 
             public sealed class Widget<T>
@@ -175,12 +243,13 @@ public sealed class ElementWriterTests
         var syntaxTree = ComponentSyntaxTree.ParseText("<Widget />", path);
         var syntax = Assert.Single(syntaxTree.GetRoot().Members.OfType<MarkupRootSyntax>()).Element;
 
-        return new TestFixture(syntaxTree, syntax, widgetType, genericWidgetType);
+        return new TestFixture(compilation, syntaxTree, syntax, widgetType, genericWidgetType);
     }
 
     private delegate void WriteAction(ElementWriter writer, in ComponentElementPlan element);
 
     private readonly record struct TestFixture(
+        CSharpCompilation Compilation,
         ComponentSyntaxTree SyntaxTree,
         MarkupElementSyntax Syntax,
         ITypeSymbol WidgetType,
@@ -189,11 +258,17 @@ public sealed class ElementWriterTests
         public ComponentElementPlan CreateElement(
             string identifier,
             ITypeSymbol? type = null,
-            bool supportsInitialize = false)
+            bool supportsInitialize = false,
+            bool isLocal = false)
         {
             var flags = supportsInitialize
                 ? ComponentElementFlags.SupportsInitialize
                 : ComponentElementFlags.None;
+            if (isLocal)
+            {
+                flags |= ComponentElementFlags.IsLocal |
+                    ComponentElementFlags.RequiresLocalMarkupContext;
+            }
 
             return new ComponentElementPlan(
                 id: 0,
@@ -201,8 +276,8 @@ public sealed class ElementWriterTests
                 type ?? WidgetType,
                 identifier,
                 parentId: -1,
-                scopeOwnerId: 0,
-                ComponentElementScopeKind.Component,
+                scopeId: isLocal ? 1 : 0,
+                isLocal ? ComponentElementScopeKind.DataTemplate : ComponentElementScopeKind.Component,
                 flags,
                 children: default,
                 propertyWrites: default,

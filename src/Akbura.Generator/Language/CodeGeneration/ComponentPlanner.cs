@@ -151,7 +151,7 @@ internal static class ComponentPlanner
                     element.Type,
                     element.Identifier,
                     element.ParentId,
-                    element.ScopeOwnerId,
+                    element.ScopeId,
                     element.ScopeKind,
                     element.Flags,
                     element.Children,
@@ -466,14 +466,14 @@ internal static class ComponentPlanner
         {
             var child = _elements[childId];
             if (boundary.IsDeferred &&
-                child.ScopeOwnerId == boundary.ScopeId &&
+                child.ScopeId == boundary.ScopeId &&
                 child.ScopeKind == ComponentElementScopeKind.DeferredContent)
             {
                 deferredRoots.Add(childId);
             }
 
             if (boundary.IsTemplate &&
-                child.ScopeOwnerId == boundary.ScopeId &&
+                child.ScopeId == boundary.ScopeId &&
                 child.ScopeKind == ComponentElementScopeKind.DataTemplate)
             {
                 templateRoots.Add(childId);
@@ -565,7 +565,7 @@ internal static class ComponentPlanner
                 flags |= ComponentElementFlags.IsDeferred;
             }
 
-            if (scope.Kind == ComponentElementScopeKind.DataTemplate || IsDataTemplateType(type))
+            if (IsDataTemplateType(type))
             {
                 flags |= ComponentElementFlags.IsTemplateElement;
             }
@@ -587,7 +587,8 @@ internal static class ComponentPlanner
 
             if (scope.IsLocal)
             {
-                flags |= ComponentElementFlags.RequiresLocalMarkupContext;
+                flags |= ComponentElementFlags.IsLocal |
+                    ComponentElementFlags.RequiresLocalMarkupContext;
             }
 
             return flags;
@@ -658,7 +659,6 @@ internal static class ComponentPlanner
         {
             return identifier.IdentifierRequiresEscaping() ? "@" + identifier : identifier;
         }
-
     }
 
     private readonly struct PendingElementPlan
@@ -670,7 +670,7 @@ internal static class ComponentPlanner
             ITypeSymbol type,
             string identifier,
             int parentId,
-            int scopeOwnerId,
+            int scopeId,
             ComponentElementScopeKind scopeKind,
             ComponentElementFlags flags,
             ComponentPlanRange children,
@@ -683,7 +683,7 @@ internal static class ComponentPlanner
             Type = type;
             Identifier = identifier;
             ParentId = parentId;
-            ScopeOwnerId = scopeOwnerId;
+            ScopeId = scopeId;
             ScopeKind = scopeKind;
             Flags = flags;
             Children = children;
@@ -697,7 +697,7 @@ internal static class ComponentPlanner
         public ITypeSymbol Type { get; }
         public string Identifier { get; }
         public int ParentId { get; }
-        public int ScopeOwnerId { get; }
+        public int ScopeId { get; }
         public ComponentElementScopeKind ScopeKind { get; }
         public ComponentElementFlags Flags { get; }
         public ComponentPlanRange Children { get; }

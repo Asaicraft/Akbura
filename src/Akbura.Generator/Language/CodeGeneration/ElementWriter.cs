@@ -20,6 +20,11 @@ internal readonly ref struct ElementWriter
 
     public void WriteField(in ComponentElementPlan element)
     {
+        if (element.IsLocal)
+        {
+            return;
+        }
+
         _writer.Write("private ");
         _valueWriter.WriteTypeName(element.Type);
         _writer.Write(" ");
@@ -27,11 +32,11 @@ internal readonly ref struct ElementWriter
         _writer.WriteLine(" = null!;");
     }
 
-    public void WriteCreation(in ComponentElementPlan element, bool isLocal)
+    public void WriteCreation(in ComponentElementPlan element)
     {
         using var mapping = _sourceMappingWriter.WriteStart(element.Syntax);
 
-        if (isLocal)
+        if (element.IsLocal)
         {
             _writer.Write("var ");
         }
@@ -49,8 +54,9 @@ internal readonly ref struct ElementWriter
             return;
         }
 
+        _writer.Write("((global::System.ComponentModel.ISupportInitialize)");
         _valueWriter.WriteIdentifier(element.Identifier);
-        _writer.WriteLine(".BeginInit();");
+        _writer.WriteLine(").BeginInit();");
     }
 
     public void WriteEndInit(in ComponentElementPlan element)
@@ -60,7 +66,8 @@ internal readonly ref struct ElementWriter
             return;
         }
 
+        _writer.Write("((global::System.ComponentModel.ISupportInitialize)");
         _valueWriter.WriteIdentifier(element.Identifier);
-        _writer.WriteLine(".EndInit();");
+        _writer.WriteLine(").EndInit();");
     }
 }

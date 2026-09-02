@@ -67,6 +67,143 @@ public sealed class ComponentWriterTests
     }
 
     [Fact]
+    public void WriteElementFields_WritesOnlyComponentElementsAndPreservesIndent()
+    {
+        var fixture = CreateRichComponentFixture();
+        using var codeWriter = new CodeWriter
+        {
+            CurrentIndent = 4,
+        };
+        var writer = CreateWriter(codeWriter, fixture);
+        var componentElements = writer.Plan.Elements.Where(static element => !element.IsLocal).ToArray();
+        var localElements = writer.Plan.Elements.Where(static element => element.IsLocal).ToArray();
+
+        Assert.NotEmpty(componentElements);
+        Assert.NotEmpty(localElements);
+        Assert.True(writer.WriteElementFields());
+        Assert.Equal(4, codeWriter.CurrentIndent);
+
+        var output = codeWriter.GetText().ToString();
+        Assert.Equal(componentElements.Length, CountOccurrences(output, "private "));
+        Assert.All(componentElements, element =>
+            Assert.Contains(" " + element.Identifier + " = null!;", output, StringComparison.Ordinal));
+        Assert.All(localElements, element =>
+            Assert.DoesNotContain(" " + element.Identifier + " = null!;", output, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WriteElementCreation_UsesPlannedLifetimeAndWritesSourceMappings()
+    {
+        var fixture = CreateRichComponentFixture();
+        using var codeWriter = new CodeWriter
+        {
+            CurrentIndent = 4,
+        };
+        var writer = CreateWriter(codeWriter, fixture);
+        var field = Assert.Single(
+            writer.Plan.Elements,
+            static element => !element.IsLocal && element.Syntax.StartTag?.Name.ToFullString().Trim() == "Border");
+        var local = Assert.Single(
+            writer.Plan.Elements,
+            static element => element.IsLocal && element.Syntax.StartTag?.Name.ToFullString().Trim() == "Border");
+
+        writer.WriteElementCreation(field.Id);
+        writer.WriteElementCreation(local.Id);
+
+        Assert.Equal(4, codeWriter.CurrentIndent);
+        var output = codeWriter.GetText().ToString();
+        Assert.Contains(
+            field.Identifier + " = new global::Avalonia.Controls.Border();",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "var " + local.Identifier + " = new global::Avalonia.Controls.Border();",
+            output,
+            StringComparison.Ordinal);
+        AssertSourceMappings(output, "PlannerView.akbura");
+        Assert.Equal(2, CountOccurrences(output, "#line ("));
+    }
+
+    [Fact]
+    public void ElementMethods_GenerateCompilableExplicitInitializationCalls()
+    {
+        var fixture = CreateInitializationFixture();
+        using var codeWriter = new CodeWriter();
+        var writer = CreateWriter(codeWriter, fixture);
+
+        codeWriter.WriteLine("#nullable enable");
+        codeWriter.WriteLine();
+        codeWriter.WriteLine("namespace Demo;");
+        codeWriter.WriteLine();
+        codeWriter.WriteLine("public partial class PlannerView");
+        codeWriter.WriteLine("{");
+        codeWriter.CurrentIndent = 4;
+        Assert.True(writer.WriteElementFields());
+        codeWriter.WriteLine();
+        codeWriter.WriteLine("public void Build()");
+        codeWriter.WriteLine("{");
+        codeWriter.CurrentIndent = 8;
+
+        for (var i = 0; i < writer.Plan.Elements.Length; i++)
+        {
+            writer.WriteElementCreation(i);
+            writer.WriteBeginInit(i);
+        }
+
+        for (var i = writer.Plan.Elements.Length - 1; i >= 0; i--)
+        {
+            writer.WriteEndInit(i);
+        }
+
+        codeWriter.CurrentIndent = 4;
+        codeWriter.WriteLine("}");
+        codeWriter.CurrentIndent = 0;
+        codeWriter.WriteLine("}");
+
+        var generatedSource = codeWriter.GetText().ToString();
+        var initializedElementCount = writer.Plan.Elements.Count(static element => element.SupportsInitialize);
+        Assert.NotEqual(0, initializedElementCount);
+        Assert.Equal(
+            initializedElementCount * 2,
+            CountOccurrences(generatedSource, "ISupportInitialize"));
+        Assert.Contains(").BeginInit();", generatedSource, StringComparison.Ordinal);
+        Assert.Contains(").EndInit();", generatedSource, StringComparison.Ordinal);
+        AssertSourceMappings(generatedSource, "PlannerView.akbura");
+
+        var generatedTree = CSharpSyntaxTree.ParseText(
+            generatedSource,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
+            path: "ComponentWriterElements.g.cs");
+        var diagnostics = fixture.CSharpCompilation.AddSyntaxTrees(generatedTree).GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity is
+                DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            diagnostics.Length == 0,
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic => diagnostic.ToString())) +
+            Environment.NewLine + generatedSource);
+    }
+
+    [Fact]
+    public void ElementMethods_RejectInvalidElementIds()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <Border />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        using var codeWriter = new CodeWriter();
+        var writer = CreateWriter(codeWriter, fixture);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteElementCreation(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteBeginInit(writer.Plan.Elements.Length));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteEndInit(writer.Plan.Elements.Length));
+    }
+
+    [Fact]
     public void RegularElement_WritesMethodGroupsWithCompactSignaturesAndPreservesIndent()
     {
         var fixture = CreateRichComponentFixture();
@@ -364,6 +501,38 @@ public sealed class ComponentWriterTests
         return AkcssActivatorPlannerTests.CreateFixture(component);
     }
 
+    private static AkcssActivatorPlannerTests.PlannerFixture CreateInitializationFixture()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <ExplicitInitializableControl />
+            <Border />
+            """;
+        const string csharp =
+            """
+            using Avalonia.Controls;
+            using System.ComponentModel;
+
+            namespace Demo;
+
+            public sealed class ExplicitInitializableControl : Control, ISupportInitialize
+            {
+                void ISupportInitialize.BeginInit()
+                {
+                }
+
+                void ISupportInitialize.EndInit()
+                {
+                }
+            }
+            """;
+
+        return AkcssActivatorPlannerTests.CreateFixture(component, csharp);
+    }
+
     private static AkcssActivatorPlannerTests.PlannerFixture CreateRichComponentFixture()
     {
         const string component =
@@ -495,13 +664,8 @@ public sealed class ComponentWriterTests
         return plan.Elements
             .Where(element =>
                 !element.Akcss.Activators.IsEmpty &&
-                HasLocalMarkupContext(element) == requiresLocalContext)
+                element.RequiresLocalMarkupContext == requiresLocalContext)
             .ToArray();
-    }
-
-    private static bool HasLocalMarkupContext(in ComponentElementPlan element)
-    {
-        return (element.Flags & ComponentElementFlags.RequiresLocalMarkupContext) != 0;
     }
 
     private static MarkupExtensionWriteContext CreateWriteContext()

@@ -34,6 +34,7 @@ internal enum ComponentElementFlags : ushort
     SupportsInitialize = 1 << 4,
     HasName = 1 << 5,
     RequiresLocalMarkupContext = 1 << 6,
+    IsLocal = 1 << 7,
 }
 
 internal enum ComponentElementScopeKind : byte
@@ -51,7 +52,7 @@ internal readonly struct ComponentElementPlan
         ITypeSymbol type,
         string identifier,
         int parentId,
-        int scopeOwnerId,
+        int scopeId,
         ComponentElementScopeKind scopeKind,
         ComponentElementFlags flags,
         ComponentPlanRange children,
@@ -64,7 +65,7 @@ internal readonly struct ComponentElementPlan
         Type = type ?? throw new ArgumentNullException(nameof(type));
         Identifier = identifier ?? throw new ArgumentNullException(nameof(identifier));
         ParentId = parentId;
-        ScopeOwnerId = scopeOwnerId;
+        ScopeId = scopeId;
         ScopeKind = scopeKind;
         Flags = flags;
         Children = children;
@@ -83,7 +84,7 @@ internal readonly struct ComponentElementPlan
 
     public int ParentId { get; }
 
-    public int ScopeOwnerId { get; }
+    public int ScopeId { get; }
 
     public ComponentElementScopeKind ScopeKind { get; }
 
@@ -97,11 +98,20 @@ internal readonly struct ComponentElementPlan
 
     public AkcssElementActivatorPlan Akcss { get; }
 
+    public bool IsRoot => (Flags & ComponentElementFlags.IsRoot) != 0;
+
+    public bool IsLocal => (Flags & ComponentElementFlags.IsLocal) != 0;
+
+    public bool HasName => (Flags & ComponentElementFlags.HasName) != 0;
+
     public bool IsDeferred => (Flags & ComponentElementFlags.IsDeferred) != 0;
 
     public bool IsTemplateElement => (Flags & ComponentElementFlags.IsTemplateElement) != 0;
 
     public bool SupportsInitialize => (Flags & ComponentElementFlags.SupportsInitialize) != 0;
+
+    public bool RequiresLocalMarkupContext =>
+        (Flags & ComponentElementFlags.RequiresLocalMarkupContext) != 0;
 }
 
 internal enum ComponentPropertyValueKind : byte
@@ -287,4 +297,6 @@ internal readonly struct ComponentPlan
     public ImmutableArray<BindingElementReference> ElementReferences { get; }
 
     public AkcssComponentActivatorPlan Akcss { get; }
+
+    public bool IsEmpty => Elements.IsDefaultOrEmpty;
 }

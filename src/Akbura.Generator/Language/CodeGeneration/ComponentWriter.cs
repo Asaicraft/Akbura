@@ -72,6 +72,47 @@ internal sealed class ComponentWriter
 
     public bool HasAkcss => !_plan.Akcss.IsEmpty;
 
+    public bool WriteElementFields()
+    {
+        var writer = new ElementWriter(_writer, _sourceMap);
+        var wroteAny = false;
+
+        for (var i = 0; i < _plan.Elements.Length; i++)
+        {
+            ref readonly var element = ref _plan.Elements.ItemRef(i);
+            if (element.IsLocal)
+            {
+                continue;
+            }
+
+            writer.WriteField(element);
+            wroteAny = true;
+        }
+
+        return wroteAny;
+    }
+
+    public void WriteElementCreation(int elementId)
+    {
+        ref readonly var element = ref GetElement(elementId);
+        var writer = new ElementWriter(_writer, _sourceMap);
+        writer.WriteCreation(element);
+    }
+
+    public void WriteBeginInit(int elementId)
+    {
+        ref readonly var element = ref GetElement(elementId);
+        var writer = new ElementWriter(_writer, _sourceMap);
+        writer.WriteBeginInit(element);
+    }
+
+    public void WriteEndInit(int elementId)
+    {
+        ref readonly var element = ref GetElement(elementId);
+        var writer = new ElementWriter(_writer, _sourceMap);
+        writer.WriteEndInit(element);
+    }
+
     public bool WriteStaticMembers()
     {
         if (_plan.Akcss.IsEmpty)

@@ -84,7 +84,7 @@ public sealed class ComponentWriterTests
         var element = Assert.Single(writer.Elements);
         var context = CreateWriteContext();
 
-        Assert.True(writer.WriteFirstUpdatePropertyActions(element.Id, context));
+        Assert.True(writer.WriteFirstUpdateActions(element.Id, context));
         Assert.Equal(6, codeWriter.CurrentIndent);
         var firstUpdate = codeWriter.GetText().ToString();
 
@@ -120,7 +120,7 @@ public sealed class ComponentWriterTests
         var writer = CreateWriter(codeWriter, fixture);
         var element = Assert.Single(writer.Elements);
 
-        Assert.True(writer.WriteFirstUpdatePropertyActions(element.Id, CreateWriteContext()));
+        Assert.True(writer.WriteFirstUpdateActions(element.Id, CreateWriteContext()));
         Assert.False(writer.WriteUpdateProperties(element.Id, CreateWriteContext()));
 
         var output = codeWriter.GetText().ToString();
@@ -151,7 +151,7 @@ public sealed class ComponentWriterTests
         var element = Assert.Single(writer.Elements);
         var context = CreateWriteContext();
 
-        Assert.True(writer.WriteFirstUpdatePropertyActions(element.Id, context));
+        Assert.True(writer.WriteFirstUpdateActions(element.Id, context));
         Assert.Equal(6, codeWriter.CurrentIndent);
         var firstUpdate = codeWriter.GetText().ToString();
 
@@ -205,7 +205,7 @@ public sealed class ComponentWriterTests
             static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "Child");
         var context = CreateWriteContext();
 
-        Assert.True(writer.WriteFirstUpdatePropertyActions(child.Id, context));
+        Assert.True(writer.WriteFirstUpdateActions(child.Id, context));
         var firstUpdate = codeWriter.GetText().ToString();
         var observedProperty = firstUpdate.IndexOf(
             "global::Demo.Child.ValueProperty.AvaloniaProperty",
@@ -240,7 +240,7 @@ public sealed class ComponentWriterTests
             writer.Elements,
             static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "TextBox");
 
-        Assert.True(writer.WriteFirstUpdatePropertyActions(textBox.Id, CreateWriteContext()));
+        Assert.True(writer.WriteFirstUpdateActions(textBox.Id, CreateWriteContext()));
         var registration = codeWriter.GetText().ToString();
 
         Assert.Contains(".PropertyChanged += (_, __change0) =>", registration, StringComparison.Ordinal);
@@ -291,7 +291,7 @@ public sealed class ComponentWriterTests
         Assert.DoesNotContain("s_akcss", staticMembers, StringComparison.Ordinal);
 
         var bindingStart = codeWriter.Length;
-        Assert.True(writer.WriteFirstUpdatePropertyActions(textBlock.Id, context));
+        Assert.True(writer.WriteFirstUpdateActions(textBlock.Id, context));
         Assert.False(writer.WriteUpdateProperties(textBlock.Id, context));
         Assert.Equal(4, codeWriter.CurrentIndent);
         var bindingWrite = codeWriter.GetText().ToString().Substring(bindingStart);

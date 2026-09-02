@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
+using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 
 namespace Akbura.Language.CodeGeneration;
@@ -83,6 +84,8 @@ internal static class ComponentPlanner
         private readonly ArrayBuilder<ComponentDeferredContentPlan> _deferredContents;
         private readonly ArrayBuilder<ComponentTemplatePlan> _templates;
         private readonly ArrayBuilder<PendingPropertyWritePlan> _pendingPropertyWrites;
+        private readonly ArrayBuilder<PendingFirstUpdateActionPlan> _pendingFirstUpdateActions;
+        private readonly ArrayBuilder<PendingContentPlan> _pendingContents;
         private ImmutableArrayBuilder<int> _rootElementIds;
         private ImmutableArrayBuilder<int> _childElementIds;
         private ImmutableArrayBuilder<ComponentPropertyWritePlan> _propertyWrites;
@@ -90,7 +93,13 @@ internal static class ComponentPlanner
         private ImmutableArrayBuilder<MarkupExtensionResultPlan> _markupExtensions;
         private ImmutableArrayBuilder<BindingWritePlan> _bindings;
         private ImmutableArrayBuilder<ComponentPropertySubscriptionPlan> _propertySubscriptions;
+        private ImmutableArrayBuilder<ComponentNameAssignmentPlan> _nameAssignments;
+        private ImmutableArrayBuilder<ComponentRoutedEventPlan> _routedEvents;
+        private ImmutableArrayBuilder<ComponentCommandBindingPlan> _commandBindings;
         private ImmutableArrayBuilder<ComponentFirstUpdateActionPlan> _firstUpdateActions;
+        private ImmutableArrayBuilder<ComponentPropertyContentPlan> _propertyContents;
+        private ImmutableArrayBuilder<ComponentCollectionContentPlan> _collectionContents;
+        private ImmutableArrayBuilder<ComponentContentItemPlan> _contentItems;
         private ImmutableArrayBuilder<BindingElementReference> _elementReferences;
         private int _nextScopeId;
         private int _nextCachedBindingPathId;
@@ -114,6 +123,8 @@ internal static class ComponentPlanner
             _deferredContents = ArrayBuilder<ComponentDeferredContentPlan>.GetInstance();
             _templates = ArrayBuilder<ComponentTemplatePlan>.GetInstance();
             _pendingPropertyWrites = ArrayBuilder<PendingPropertyWritePlan>.GetInstance();
+            _pendingFirstUpdateActions = ArrayBuilder<PendingFirstUpdateActionPlan>.GetInstance();
+            _pendingContents = ArrayBuilder<PendingContentPlan>.GetInstance();
             _rootElementIds = ImmutableArrayBuilder<int>.Rent();
             _childElementIds = ImmutableArrayBuilder<int>.Rent();
             _propertyWrites = ImmutableArrayBuilder<ComponentPropertyWritePlan>.Rent();
@@ -121,7 +132,13 @@ internal static class ComponentPlanner
             _markupExtensions = ImmutableArrayBuilder<MarkupExtensionResultPlan>.Rent();
             _bindings = ImmutableArrayBuilder<BindingWritePlan>.Rent();
             _propertySubscriptions = ImmutableArrayBuilder<ComponentPropertySubscriptionPlan>.Rent();
+            _nameAssignments = ImmutableArrayBuilder<ComponentNameAssignmentPlan>.Rent();
+            _routedEvents = ImmutableArrayBuilder<ComponentRoutedEventPlan>.Rent();
+            _commandBindings = ImmutableArrayBuilder<ComponentCommandBindingPlan>.Rent();
             _firstUpdateActions = ImmutableArrayBuilder<ComponentFirstUpdateActionPlan>.Rent();
+            _propertyContents = ImmutableArrayBuilder<ComponentPropertyContentPlan>.Rent();
+            _collectionContents = ImmutableArrayBuilder<ComponentCollectionContentPlan>.Rent();
+            _contentItems = ImmutableArrayBuilder<ComponentContentItemPlan>.Rent();
             _elementReferences = ImmutableArrayBuilder<BindingElementReference>.Rent();
             _nextScopeId = 1;
             _nextCachedBindingPathId = 0;
@@ -137,7 +154,8 @@ internal static class ComponentPlanner
                 }
             }
 
-            LowerPropertyWrites();
+            LowerFirstUpdateActions();
+            LowerContent();
 
             using var akcssInputs = ImmutableArrayBuilder<AkcssActivatorElementInput>.Rent(_elements.Count);
             for (var i = 0; i < _elements.Count; i++)
@@ -177,6 +195,7 @@ internal static class ComponentPlanner
                     element.PropertySubscriptions,
                     element.FirstUpdateActions,
                     element.PropertyElements,
+                    element.Content,
                     elementAkcss));
             }
 
@@ -189,8 +208,14 @@ internal static class ComponentPlanner
                 _markupExtensions.ToImmutable(),
                 _bindings.ToImmutable(),
                 _propertySubscriptions.ToImmutable(),
+                _nameAssignments.ToImmutable(),
+                _routedEvents.ToImmutable(),
+                _commandBindings.ToImmutable(),
                 _firstUpdateActions.ToImmutable(),
                 _propertyElements.ToImmutable(),
+                _propertyContents.ToImmutable(),
+                _collectionContents.ToImmutable(),
+                _contentItems.ToImmutable(),
                 _deferredContents.ToImmutable(),
                 _templates.ToImmutable(),
                 _elementReferences.ToImmutable(),
@@ -204,6 +229,8 @@ internal static class ComponentPlanner
             _deferredContents.Free();
             _templates.Free();
             _pendingPropertyWrites.Free();
+            _pendingFirstUpdateActions.Free();
+            _pendingContents.Free();
             _rootElementIds.Dispose();
             _childElementIds.Dispose();
             _propertyWrites.Dispose();
@@ -211,7 +238,13 @@ internal static class ComponentPlanner
             _markupExtensions.Dispose();
             _bindings.Dispose();
             _propertySubscriptions.Dispose();
+            _nameAssignments.Dispose();
+            _routedEvents.Dispose();
+            _commandBindings.Dispose();
             _firstUpdateActions.Dispose();
+            _propertyContents.Dispose();
+            _collectionContents.Dispose();
+            _contentItems.Dispose();
             _elementReferences.Dispose();
         }
 
@@ -242,11 +275,11 @@ internal static class ComponentPlanner
 
             _elements.Add(default);
 
-            var pendingPropertyWriteStart = _pendingPropertyWrites.Count;
-            AddPendingPropertyWrites(elementId, scope.ScopeId, type, symbol);
-            var pendingPropertyWrites = new ComponentPlanRange(
-                pendingPropertyWriteStart,
-                _pendingPropertyWrites.Count - pendingPropertyWriteStart);
+            var pendingFirstUpdateActionStart = _pendingFirstUpdateActions.Count;
+            AddPendingFirstUpdateActions(elementId, scope.ScopeId, type, symbol);
+            var pendingFirstUpdateActions = new ComponentPlanRange(
+                pendingFirstUpdateActionStart,
+                _pendingFirstUpdateActions.Count - pendingFirstUpdateActionStart);
 
             if (nameOperation?.NameSymbol is { } nameSymbol)
             {
@@ -295,20 +328,38 @@ internal static class ComponentPlanner
                     context));
             }
 
-            CompleteBoundary(implicitBoundary, deferredRoots.WrittenSpan, templateRoots.WrittenSpan);
+            var boundaryValue = CompleteBoundary(
+                implicitBoundary,
+                deferredRoots.WrittenSpan,
+                templateRoots.WrittenSpan);
 
             var children = AddElementIds(directChildren.WrittenSpan);
+            if (contentOperation != null)
+            {
+                _pendingContents.Add(new PendingContentPlan(
+                    elementId,
+                    contentOperation,
+                    children,
+                    propertyElementId: -1,
+                    boundaryValue));
+            }
+
             var propertyElementStart = _propertyElements.Count;
             for (var i = 0; i < directPropertyElements.Count; i++)
             {
                 var propertyElement = directPropertyElements.WrittenSpan[i];
+                var propertyElementId = _propertyElements.Count;
                 _propertyElements.Add(new ComponentPropertyElementPlan(
-                    _propertyElements.Count,
+                    propertyElementId,
                     propertyElement.OwnerElementId,
                     propertyElement.Syntax,
-                    propertyElement.Property,
+                    content: default));
+                _pendingContents.Add(new PendingContentPlan(
+                    propertyElement.OwnerElementId,
                     propertyElement.Operation,
-                    propertyElement.Children));
+                    propertyElement.Children,
+                    propertyElementId,
+                    propertyElement.BoundaryValue));
             }
 
             var flags = GetElementFlags(
@@ -327,7 +378,7 @@ internal static class ComponentPlanner
                 scope.Kind,
                 flags,
                 children,
-                pendingPropertyWrites,
+                pendingFirstUpdateActions,
                 new ComponentPlanRange(propertyElementStart, _propertyElements.Count - propertyElementStart));
             return true;
         }
@@ -362,13 +413,17 @@ internal static class ComponentPlanner
                 TrackBoundaryRoot(boundary, childId, deferredRoots, templateRoots);
             }
 
-            CompleteBoundary(boundary, deferredRoots.WrittenSpan, templateRoots.WrittenSpan);
+            var boundaryValue = CompleteBoundary(
+                boundary,
+                deferredRoots.WrittenSpan,
+                templateRoots.WrittenSpan);
             return new PendingPropertyElementPlan(
                 ownerElementId,
                 syntax,
                 property,
                 operation,
-                AddElementIds(children.WrittenSpan));
+                AddElementIds(children.WrittenSpan),
+                boundaryValue);
         }
 
         private ContentBoundary CreateImplicitBoundary(
@@ -414,37 +469,50 @@ internal static class ComponentPlanner
                 isTemplate);
         }
 
-        private void CompleteBoundary(
+        private ComponentContentValueReference CompleteBoundary(
             in ContentBoundary boundary,
             scoped ReadOnlySpan<int> deferredRoots,
             scoped ReadOnlySpan<int> templateRoots)
         {
-            if (!boundary.IsValid)
+            if (!boundary.IsValid || boundary.Operation.HasErrors)
             {
-                return;
+                return default;
             }
 
             if (boundary.IsDeferred)
             {
+                if (deferredRoots.IsEmpty && boundary.Operation.Content.IsDefaultOrEmpty)
+                {
+                    return default;
+                }
+
+                var id = _deferredContents.Count;
                 _deferredContents.Add(new ComponentDeferredContentPlan(
-                    _deferredContents.Count,
+                    id,
                     boundary.ScopeId,
                     boundary.OwnerElementId,
                     boundary.Syntax,
-                    boundary.Property,
-                    boundary.Operation,
                     AddElementIds(deferredRoots)));
+                return new ComponentContentValueReference(
+                    ComponentContentValueKind.DeferredContent,
+                    id);
             }
 
             if (boundary.IsTemplate && !templateRoots.IsEmpty)
             {
+                var id = _templates.Count;
                 _templates.Add(new ComponentTemplatePlan(
-                    _templates.Count,
+                    id,
                     boundary.ScopeId,
                     boundary.OwnerElementId,
                     boundary.Syntax,
                     AddElementIds(templateRoots)));
+                return new ComponentContentValueReference(
+                    ComponentContentValueKind.Template,
+                    id);
             }
+
+            return default;
         }
 
         private TraversalContext ResolveChildContext(
@@ -520,7 +588,7 @@ internal static class ComponentPlanner
             return new ComponentPlanRange(start, elementIds.Length);
         }
 
-        private void AddPendingPropertyWrites(
+        private void AddPendingFirstUpdateActions(
             int elementId,
             int scopeId,
             ITypeSymbol targetType,
@@ -529,25 +597,40 @@ internal static class ComponentPlanner
             var operations = symbol.AttributeOperations;
             for (var i = 0; i < operations.Length; i++)
             {
-                if (operations[i] is not IMarkupPropertySetterOperation
-                    {
-                        HasErrors: false,
-                        Property: { } property,
-                    } operation)
+                var operation = operations[i];
+                if (operation.HasErrors)
                 {
                     continue;
                 }
 
-                _pendingPropertyWrites.Add(new PendingPropertyWritePlan(
-                    elementId,
-                    scopeId,
-                    i,
-                    PropertyWritePlan.Create(property, targetType),
-                    operation));
+                switch (operation)
+                {
+                    case IMarkupPropertySetterOperation { Property: { } property } propertyOperation:
+                    {
+                        var index = _pendingPropertyWrites.Count;
+                        _pendingPropertyWrites.Add(new PendingPropertyWritePlan(
+                            elementId,
+                            scopeId,
+                            i,
+                            PropertyWritePlan.Create(property, targetType),
+                            propertyOperation));
+                        _pendingFirstUpdateActions.Add(PendingFirstUpdateActionPlan.CreateProperty(index));
+                        break;
+                    }
+                    case IMarkupNameAssignmentOperation { NameSymbol: not null } name:
+                        _pendingFirstUpdateActions.Add(PendingFirstUpdateActionPlan.CreateNameAssignment(name));
+                        break;
+                    case IMarkupRoutedEventBindingOperation routedEvent:
+                        _pendingFirstUpdateActions.Add(PendingFirstUpdateActionPlan.CreateRoutedEvent(routedEvent));
+                        break;
+                    case IMarkupCommandBindingOperation command:
+                        _pendingFirstUpdateActions.Add(PendingFirstUpdateActionPlan.CreateCommandBinding(command));
+                        break;
+                }
             }
         }
 
-        private void LowerPropertyWrites()
+        private void LowerFirstUpdateActions()
         {
             for (var i = 0; i < _elements.Count; i++)
             {
@@ -555,11 +638,11 @@ internal static class ComponentPlanner
                 var writeStart = _propertyWrites.Count;
                 var subscriptionStart = _propertySubscriptions.Count;
                 var actionStart = _firstUpdateActions.Count;
-                var pending = element.PendingPropertyWrites;
+                var pending = element.PendingFirstUpdateActions;
 
                 for (var j = 0; j < pending.Length; j++)
                 {
-                    LowerPropertyWrite(_pendingPropertyWrites[pending.Start + j]);
+                    LowerFirstUpdateAction(_pendingFirstUpdateActions[pending.Start + j], element.Type);
                 }
 
                 _elements[i] = element.WithPropertyPlans(
@@ -569,6 +652,87 @@ internal static class ComponentPlanner
                         _propertySubscriptions.Count - subscriptionStart),
                     new ComponentPlanRange(actionStart, _firstUpdateActions.Count - actionStart));
             }
+        }
+
+        private void LowerFirstUpdateAction(
+            in PendingFirstUpdateActionPlan pending,
+            ITypeSymbol targetType)
+        {
+            switch (pending.Kind)
+            {
+                case ComponentFirstUpdateActionKind.PropertyWrite:
+                    LowerPropertyWrite(_pendingPropertyWrites[pending.PropertyWriteIndex]);
+                    return;
+                case ComponentFirstUpdateActionKind.NameAssignment:
+                    LowerNameAssignment((IMarkupNameAssignmentOperation)pending.Operation!);
+                    return;
+                case ComponentFirstUpdateActionKind.RoutedEvent:
+                    LowerRoutedEvent((IMarkupRoutedEventBindingOperation)pending.Operation!);
+                    return;
+                case ComponentFirstUpdateActionKind.CommandBinding:
+                    LowerCommandBinding((IMarkupCommandBindingOperation)pending.Operation!, targetType);
+                    return;
+                default:
+                    Debug.Fail("An invalid pending first-update action reached lowering.");
+                    return;
+            }
+        }
+
+        private void LowerNameAssignment(IMarkupNameAssignmentOperation operation)
+        {
+            if (!operation.IsAssignedDuringFirstUpdate || operation.NameSymbol is not { } name)
+            {
+                return;
+            }
+
+            var index = _nameAssignments.Count;
+            _nameAssignments.Add(new ComponentNameAssignmentPlan(name.IdentifierText, operation.Syntax));
+            _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateNameAssignment(index));
+        }
+
+        private void LowerRoutedEvent(IMarkupRoutedEventBindingOperation operation)
+        {
+            var handlerExpression = GetEventHandlerExpression(operation);
+            ComponentRoutedEventPlan plan;
+
+            if (operation.Event.ClrEventDefinition.Symbol is IEventSymbol { IsStatic: false } clrEvent)
+            {
+                plan = ComponentRoutedEventPlan.CreateClrEvent(clrEvent, handlerExpression, operation.Syntax);
+            }
+            else if (operation.Event.RoutedEventDefinition.Symbol is { } routedEvent &&
+                routedEvent is IFieldSymbol { IsStatic: true } or RoslynPropertySymbol { IsStatic: true })
+            {
+                plan = ComponentRoutedEventPlan.CreateAvaloniaRoutedEvent(
+                    routedEvent,
+                    handlerExpression,
+                    operation.Syntax);
+            }
+            else
+            {
+                return;
+            }
+
+            var index = _routedEvents.Count;
+            _routedEvents.Add(plan);
+            _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateRoutedEvent(index));
+        }
+
+        private void LowerCommandBinding(
+            IMarkupCommandBindingOperation operation,
+            ITypeSymbol targetType)
+        {
+            var plan = new ComponentCommandBindingPlan(
+                PropertyWritePlan.Create(operation.Property, targetType),
+                operation.Command.Name,
+                operation.Syntax);
+            if (!plan.IsValid)
+            {
+                return;
+            }
+
+            var index = _commandBindings.Count;
+            _commandBindings.Add(plan);
+            _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateCommandBinding(index));
         }
 
         private void LowerPropertyWrite(in PendingPropertyWritePlan pending)
@@ -608,6 +772,377 @@ internal static class ComponentPlanner
             {
                 _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateWrite(writeIndex));
             }
+        }
+
+        private void LowerContent()
+        {
+            for (var i = 0; i < _pendingContents.Count; i++)
+            {
+                var pending = _pendingContents[i];
+                var content = LowerContent(pending);
+
+                if (pending.PropertyElementId >= 0)
+                {
+                    var propertyElement = _propertyElements[pending.PropertyElementId];
+                    _propertyElements[pending.PropertyElementId] = new ComponentPropertyElementPlan(
+                        propertyElement.Id,
+                        propertyElement.OwnerElementId,
+                        propertyElement.Syntax,
+                        content);
+                }
+                else
+                {
+                    _elements[pending.OwnerElementId] =
+                        _elements[pending.OwnerElementId].WithContent(content);
+                }
+            }
+        }
+
+        private ComponentContentTargetReference LowerContent(in PendingContentPlan pending)
+        {
+            var operation = pending.Operation;
+            if (operation.HasErrors || operation.Property == null)
+            {
+                return default;
+            }
+
+            if (pending.BoundaryValue.IsValid)
+            {
+                return LowerPropertyContent(pending, pending.BoundaryValue);
+            }
+
+            return operation.ContentModel.IsCollection
+                ? LowerCollectionContent(pending)
+                : LowerPropertyContent(pending, boundaryValue: default);
+        }
+
+        private ComponentContentTargetReference LowerPropertyContent(
+            in PendingContentPlan pending,
+            ComponentContentValueReference boundaryValue)
+        {
+            var operation = pending.Operation;
+            var destination = PropertyWritePlan.Create(
+                operation.Property!,
+                _elements[pending.OwnerElementId].Type);
+            if (!destination.IsValid)
+            {
+                return default;
+            }
+
+            var firstUpdateValue = boundaryValue;
+            var updateValue = default(ComponentContentValueReference);
+            var content = operation.Content;
+
+            if (!firstUpdateValue.IsValid &&
+                content.Length == 1 &&
+                content[0].Kind == MarkupChildKind.Element &&
+                pending.ChildElements.Length == 1)
+            {
+                firstUpdateValue = new ComponentContentValueReference(
+                    ComponentContentValueKind.Element,
+                    _childElementIds.WrittenSpan[pending.ChildElements.Start]);
+            }
+            else if (!firstUpdateValue.IsValid && HasExpressionContent(content))
+            {
+                updateValue = AddWholeContentValue(
+                    operation,
+                    ComponentContentValueKind.CSharpExpression);
+            }
+            else if (!firstUpdateValue.IsValid && HasTextContent(content))
+            {
+                firstUpdateValue = AddWholeContentValue(
+                    operation,
+                    ComponentContentValueKind.Constant);
+            }
+
+            if (!firstUpdateValue.IsValid && !updateValue.IsValid)
+            {
+                return default;
+            }
+
+            var index = _propertyContents.Count;
+            _propertyContents.Add(new ComponentPropertyContentPlan(
+                index,
+                pending.OwnerElementId,
+                destination,
+                firstUpdateValue,
+                updateValue,
+                operation.Syntax));
+            return new ComponentContentTargetReference(
+                ComponentContentTargetKind.Property,
+                index);
+        }
+
+        private ComponentContentTargetReference LowerCollectionContent(
+            in PendingContentPlan pending)
+        {
+            var operation = pending.Operation;
+            var destination = CreateCollectionWritePlan(operation);
+            if (!destination.IsValid)
+            {
+                return default;
+            }
+
+            var itemStart = _contentItems.Count;
+            var elementOffset = 0;
+            var content = operation.Content;
+
+            for (var i = 0; i < content.Length; i++)
+            {
+                var child = content[i];
+                ComponentContentValueReference value;
+
+                switch (child.Kind)
+                {
+                    case MarkupChildKind.Element:
+                        if (elementOffset >= pending.ChildElements.Length)
+                        {
+                            Debug.Fail("Content element IDs are not aligned with semantic content.");
+                            continue;
+                        }
+
+                        value = new ComponentContentValueReference(
+                            ComponentContentValueKind.Element,
+                            _childElementIds.WrittenSpan[
+                                pending.ChildElements.Start + elementOffset]);
+                        elementOffset++;
+                        break;
+
+                    case MarkupChildKind.Text:
+                        value = AddTextContentValue(child, operation.ContentModel);
+                        break;
+
+                    case MarkupChildKind.Expression:
+                        value = AddExpressionContentValue(child, operation.ContentModel);
+                        break;
+
+                    default:
+                        continue;
+                }
+
+                if (value.IsValid)
+                {
+                    _contentItems.Add(new ComponentContentItemPlan(value, child.Syntax));
+                }
+            }
+
+            Debug.Assert(elementOffset == pending.ChildElements.Length);
+
+            var itemCount = _contentItems.Count - itemStart;
+            if (itemCount == 0)
+            {
+                return default;
+            }
+
+            var index = _collectionContents.Count;
+            _collectionContents.Add(new ComponentCollectionContentPlan(
+                index,
+                pending.OwnerElementId,
+                destination,
+                new ComponentPlanRange(itemStart, itemCount),
+                operation.Syntax));
+            return new ComponentContentTargetReference(
+                ComponentContentTargetKind.Collection,
+                index);
+        }
+
+        private ComponentContentValueReference AddWholeContentValue(
+            IMarkupContentOperation operation,
+            ComponentContentValueKind kind)
+        {
+            var targetType = operation.ContentModel.AllowedChildType.Symbol as ITypeSymbol ??
+                operation.Property?.Type.Symbol as ITypeSymbol;
+            var valueOperation = operation.ValueOperation;
+            var literalValue = operation.LiteralValue;
+
+            if (valueOperation.IsDefault)
+            {
+                var content = operation.Content;
+                var whitespaceMode = content.IsDefaultOrEmpty
+                    ? MarkupWhitespaceMode.Default
+                    : content[0].WhitespaceMode;
+                if (!AkburaSemanticModel.TryCreateMarkupContentValueExpression(
+                        operation.Syntax,
+                        whitespaceMode,
+                        out var expression,
+                        out literalValue,
+                        out _,
+                        out _,
+                        out var diagnosticSyntax))
+                {
+                    return default;
+                }
+
+                var binding = _semanticModel.BindMarkupAttributeExpression(
+                    diagnosticSyntax,
+                    expression,
+                    targetType);
+                if (binding.OperationDefinition.IsDefault || HasErrors(binding.Diagnostics))
+                {
+                    return default;
+                }
+
+                valueOperation = binding.OperationDefinition;
+            }
+
+            var index = _csharpValues.Count;
+            _csharpValues.Add(new ComponentCSharpValuePlan(
+                valueOperation,
+                convertedValue: null,
+                literalValue,
+                targetType));
+            return new ComponentContentValueReference(kind, index);
+        }
+
+        private ComponentContentValueReference AddTextContentValue(
+            in MarkupChildContent child,
+            in MarkupContentModel contentModel)
+        {
+            var index = _csharpValues.Count;
+            _csharpValues.Add(new ComponentCSharpValuePlan(
+                operation: default,
+                convertedValue: null,
+                child.Text,
+                contentModel.AllowedChildType.Symbol as ITypeSymbol));
+            return new ComponentContentValueReference(
+                ComponentContentValueKind.Constant,
+                index);
+        }
+
+        private ComponentContentValueReference AddExpressionContentValue(
+            in MarkupChildContent child,
+            in MarkupContentModel contentModel)
+        {
+            if (child.Syntax is not MarkupInlineExpressionSyntax inlineExpression)
+            {
+                return default;
+            }
+
+            var expression = AkburaSemanticModel.ParseInlineExpression(
+                inlineExpression.Expression);
+            if (expression == null)
+            {
+                return default;
+            }
+
+            var targetType = contentModel.AllowedChildType.Symbol as ITypeSymbol;
+            var binding = _semanticModel.BindMarkupAttributeExpression(
+                inlineExpression,
+                expression,
+                targetType);
+            if (binding.OperationDefinition.IsDefault || HasErrors(binding.Diagnostics))
+            {
+                return default;
+            }
+
+            var index = _csharpValues.Count;
+            _csharpValues.Add(new ComponentCSharpValuePlan(
+                binding.OperationDefinition,
+                convertedValue: null,
+                literalValue: null,
+                targetType));
+            return new ComponentContentValueReference(
+                ComponentContentValueKind.CSharpExpression,
+                index);
+        }
+
+        private static CollectionWritePlan CreateCollectionWritePlan(
+            IMarkupContentOperation operation)
+        {
+            var property = operation.Property;
+            Debug.Assert(property != null);
+
+            if (property?.Parameter is { } parameter)
+            {
+                if (parameter.BindingKind != ParamBindingKind.Default ||
+                    parameter.Type.Symbol is not ITypeSymbol parameterType)
+                {
+                    return default;
+                }
+
+                return CollectionWritePlan.CreateComponentParameter(
+                    parameterType,
+                    "__AkburaAddCollection_" + SanitizeIdentifier(parameter.Name));
+            }
+
+            if (property == null)
+            {
+                return default;
+            }
+
+            var read = PropertyReadPlan.Create(property);
+            var collectionType = GetCollectionType(property, operation.ContentModel);
+            return !read.IsValid || collectionType == null
+                ? default
+                : CollectionWritePlan.CreateProperty(read, collectionType);
+        }
+
+        private static ITypeSymbol? GetCollectionType(
+            AkburaPropertySymbol property,
+            in MarkupContentModel contentModel)
+        {
+            return (property.ClrPropertyDefinition.Symbol as RoslynPropertySymbol)?.Type ??
+                (property.ReadDefinition.Symbol as RoslynPropertySymbol)?.Type ??
+                (contentModel.ContentProperty.Symbol as RoslynPropertySymbol)?.Type ??
+                property.Type.Symbol as ITypeSymbol;
+        }
+
+        private static bool HasExpressionContent(ImmutableArray<MarkupChildContent> content)
+        {
+            for (var i = 0; i < content.Length; i++)
+            {
+                if (content[i].Kind == MarkupChildKind.Expression)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasTextContent(ImmutableArray<MarkupChildContent> content)
+        {
+            for (var i = 0; i < content.Length; i++)
+            {
+                if (content[i].Kind == MarkupChildKind.Text)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasErrors(ImmutableArray<Diagnostic> diagnostics)
+        {
+            for (var i = 0; i < diagnostics.Length; i++)
+            {
+                if (diagnostics[i].Severity == DiagnosticSeverity.Error)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string SanitizeIdentifier(string value)
+        {
+            if (value.Length == 0)
+            {
+                return "value";
+            }
+
+            var characters = value.ToCharArray();
+            for (var i = 0; i < characters.Length; i++)
+            {
+                if (!char.IsLetterOrDigit(characters[i]) && characters[i] != '_')
+                {
+                    characters[i] = '_';
+                }
+            }
+
+            return new string(characters);
         }
 
         private ComponentPropertyValueReference LowerPropertyValue(in PendingPropertyWritePlan pending)
@@ -869,6 +1404,73 @@ internal static class ComponentPlanner
                 operation.ValueKind is MarkupAttributeValueKind.Literal or MarkupAttributeValueKind.MarkupExtension;
         }
 
+        private static string GetEventHandlerExpression(IMarkupRoutedEventBindingOperation operation)
+        {
+            var parameterCount = GetEventHandlerParameterCount(operation);
+            var expression = operation.ValueSyntax is MarkupDynamicAttributeValueSyntax dynamicValue
+                ? dynamicValue.Expression.Expression.GetRawCSharpExpression()?.ToFullString().Trim()
+                : null;
+
+            if (string.IsNullOrWhiteSpace(expression))
+            {
+                return "static " + GetEventHandlerParameterList(parameterCount) + " => { }";
+            }
+
+            if (operation.HandlerKind == MarkupCommandHandlerKind.Lambda)
+            {
+                return operation.HandlerParameterCount == 0
+                    ? AdaptParameterlessEventLambda(expression!, parameterCount)
+                    : expression!;
+            }
+
+            if (operation.HandlerKind == MarkupCommandHandlerKind.DirectReference)
+            {
+                return expression!;
+            }
+
+            var asyncPrefix = operation.IsAsync ? "async " : string.Empty;
+            return asyncPrefix + GetEventHandlerParameterList(parameterCount) +
+                " => { " + expression + "; }";
+        }
+
+        private static int GetEventHandlerParameterCount(IMarkupRoutedEventBindingOperation operation)
+        {
+            return operation.HandlerType.Symbol is INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod }
+                ? invokeMethod.Parameters.Length
+                : 2;
+        }
+
+        private static string GetEventHandlerParameterList(int parameterCount)
+        {
+            return "(" + string.Join(
+                ", ",
+                Enumerable.Range(0, parameterCount)
+                    .Select(static index =>
+                        "__eventArgument" + index.ToString(CultureInfo.InvariantCulture))) + ")";
+        }
+
+        private static string AdaptParameterlessEventLambda(string expression, int parameterCount)
+        {
+            if (parameterCount == 0)
+            {
+                return expression;
+            }
+
+            var parsedExpression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(expression);
+            var parameterList = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseParameterList(
+                GetEventHandlerParameterList(parameterCount));
+
+            return parsedExpression switch
+            {
+                CSharp.ParenthesizedLambdaExpressionSyntax lambda when lambda.ParameterList.Parameters.Count == 0 =>
+                    lambda.WithParameterList(parameterList).ToFullString().Trim(),
+                CSharp.AnonymousMethodExpressionSyntax anonymousMethod when anonymousMethod.ParameterList is
+                { Parameters.Count: 0 } =>
+                    anonymousMethod.WithParameterList(parameterList).ToFullString().Trim(),
+                _ => expression,
+            };
+        }
+
         private static string EscapeIdentifier(string identifier)
         {
             return identifier.IdentifierRequiresEscaping() ? "@" + identifier : identifier;
@@ -888,11 +1490,12 @@ internal static class ComponentPlanner
             ComponentElementScopeKind scopeKind,
             ComponentElementFlags flags,
             ComponentPlanRange children,
-            ComponentPlanRange pendingPropertyWrites,
+            ComponentPlanRange pendingFirstUpdateActions,
             ComponentPlanRange propertyElements,
             ComponentPlanRange propertyWrites = default,
             ComponentPlanRange propertySubscriptions = default,
-            ComponentPlanRange firstUpdateActions = default)
+            ComponentPlanRange firstUpdateActions = default,
+            ComponentContentTargetReference content = default)
         {
             Id = id;
             Syntax = syntax;
@@ -904,11 +1507,12 @@ internal static class ComponentPlanner
             ScopeKind = scopeKind;
             Flags = flags;
             Children = children;
-            PendingPropertyWrites = pendingPropertyWrites;
+            PendingFirstUpdateActions = pendingFirstUpdateActions;
             PropertyWrites = propertyWrites;
             PropertySubscriptions = propertySubscriptions;
             FirstUpdateActions = firstUpdateActions;
             PropertyElements = propertyElements;
+            Content = content;
         }
 
         public int Id { get; }
@@ -921,11 +1525,12 @@ internal static class ComponentPlanner
         public ComponentElementScopeKind ScopeKind { get; }
         public ComponentElementFlags Flags { get; }
         public ComponentPlanRange Children { get; }
-        public ComponentPlanRange PendingPropertyWrites { get; }
+        public ComponentPlanRange PendingFirstUpdateActions { get; }
         public ComponentPlanRange PropertyWrites { get; }
         public ComponentPlanRange PropertySubscriptions { get; }
         public ComponentPlanRange FirstUpdateActions { get; }
         public ComponentPlanRange PropertyElements { get; }
+        public ComponentContentTargetReference Content { get; }
         public bool RequiresLocalMarkupContext =>
             (Flags & ComponentElementFlags.RequiresLocalMarkupContext) != 0;
 
@@ -945,11 +1550,82 @@ internal static class ComponentPlanner
                 ScopeKind,
                 Flags,
                 Children,
-                PendingPropertyWrites,
+                PendingFirstUpdateActions,
                 PropertyElements,
                 propertyWrites,
                 propertySubscriptions,
-                firstUpdateActions);
+                firstUpdateActions,
+                Content);
+        }
+
+        public PendingElementPlan WithContent(ComponentContentTargetReference content)
+        {
+            return new PendingElementPlan(
+                Id,
+                Syntax,
+                Symbol,
+                Type,
+                Identifier,
+                ParentId,
+                ScopeId,
+                ScopeKind,
+                Flags,
+                Children,
+                PendingFirstUpdateActions,
+                PropertyElements,
+                PropertyWrites,
+                PropertySubscriptions,
+                FirstUpdateActions,
+                content);
+        }
+    }
+
+    private readonly struct PendingFirstUpdateActionPlan
+    {
+        private PendingFirstUpdateActionPlan(
+            ComponentFirstUpdateActionKind kind,
+            int propertyWriteIndex,
+            IMarkupAttributeOperation? operation)
+        {
+            Kind = kind;
+            PropertyWriteIndex = propertyWriteIndex;
+            Operation = operation;
+        }
+
+        public ComponentFirstUpdateActionKind Kind { get; }
+        public int PropertyWriteIndex { get; }
+        public IMarkupAttributeOperation? Operation { get; }
+
+        public static PendingFirstUpdateActionPlan CreateProperty(int propertyWriteIndex)
+        {
+            return new PendingFirstUpdateActionPlan(
+                ComponentFirstUpdateActionKind.PropertyWrite,
+                propertyWriteIndex,
+                operation: null);
+        }
+
+        public static PendingFirstUpdateActionPlan CreateNameAssignment(IMarkupNameAssignmentOperation operation)
+        {
+            return new PendingFirstUpdateActionPlan(
+                ComponentFirstUpdateActionKind.NameAssignment,
+                propertyWriteIndex: -1,
+                operation);
+        }
+
+        public static PendingFirstUpdateActionPlan CreateRoutedEvent(IMarkupRoutedEventBindingOperation operation)
+        {
+            return new PendingFirstUpdateActionPlan(
+                ComponentFirstUpdateActionKind.RoutedEvent,
+                propertyWriteIndex: -1,
+                operation);
+        }
+
+        public static PendingFirstUpdateActionPlan CreateCommandBinding(IMarkupCommandBindingOperation operation)
+        {
+            return new PendingFirstUpdateActionPlan(
+                ComponentFirstUpdateActionKind.CommandBinding,
+                propertyWriteIndex: -1,
+                operation);
         }
     }
 
@@ -983,13 +1659,15 @@ internal static class ComponentPlanner
             MarkupElementSyntax syntax,
             AkburaPropertySymbol property,
             IMarkupContentOperation operation,
-            ComponentPlanRange children)
+            ComponentPlanRange children,
+            ComponentContentValueReference boundaryValue)
         {
             OwnerElementId = ownerElementId;
             Syntax = syntax;
             Property = property;
             Operation = operation;
             Children = children;
+            BoundaryValue = boundaryValue;
         }
 
         public int OwnerElementId { get; }
@@ -997,6 +1675,30 @@ internal static class ComponentPlanner
         public AkburaPropertySymbol Property { get; }
         public IMarkupContentOperation Operation { get; }
         public ComponentPlanRange Children { get; }
+        public ComponentContentValueReference BoundaryValue { get; }
+    }
+
+    private readonly struct PendingContentPlan
+    {
+        public PendingContentPlan(
+            int ownerElementId,
+            IMarkupContentOperation operation,
+            ComponentPlanRange childElements,
+            int propertyElementId,
+            ComponentContentValueReference boundaryValue)
+        {
+            OwnerElementId = ownerElementId;
+            Operation = operation;
+            ChildElements = childElements;
+            PropertyElementId = propertyElementId;
+            BoundaryValue = boundaryValue;
+        }
+
+        public int OwnerElementId { get; }
+        public IMarkupContentOperation Operation { get; }
+        public ComponentPlanRange ChildElements { get; }
+        public int PropertyElementId { get; }
+        public ComponentContentValueReference BoundaryValue { get; }
     }
 
     private readonly struct ContentBoundary

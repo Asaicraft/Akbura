@@ -9,6 +9,7 @@ internal readonly ref struct ComponentPropertyWriter
     private readonly CodeWriter _writer;
     private readonly BindingWriterEnvironment _environment;
     private readonly SourceMappingWriter _mappings;
+    private readonly ComponentValueWriter _valueWriter;
 
     public ComponentPropertyWriter(
         CodeWriter writer,
@@ -21,6 +22,7 @@ internal readonly ref struct ComponentPropertyWriter
         _writer = writer!;
         _environment = environment;
         _mappings = new SourceMappingWriter(writer!, sourceMap!);
+        _valueWriter = new ComponentValueWriter(writer!);
     }
 
     public void Write(
@@ -44,8 +46,10 @@ internal readonly ref struct ComponentPropertyWriter
         {
             case ComponentPropertyValueKind.Constant:
             case ComponentPropertyValueKind.CSharpExpression:
-            case ComponentPropertyValueKind.ElementReference:
                 WriteCSharpValue(component, plan, targetExpression);
+                break;
+            case ComponentPropertyValueKind.ElementReference:
+                WriteElementReference(component, plan, targetExpression);
                 break;
             case ComponentPropertyValueKind.MarkupExtensionValue:
             case ComponentPropertyValueKind.MarkupBinding:
@@ -120,155 +124,31 @@ internal readonly ref struct ComponentPropertyWriter
         ref readonly var value = ref GetCSharpValue(component, plan.PayloadIndex);
         var propertyWriter = new PropertyWriter(_writer);
         var end = propertyWriter.WriteStart(plan.Destination, target);
-        var valueWriter = new CSharpValueWriter(_writer);
 
-        if (plan.ValueKind == ComponentPropertyValueKind.Constant && value.ConvertedValue != null)
+        if (plan.ValueKind == ComponentPropertyValueKind.Constant)
         {
-            WriteConvertedValue(value.ConvertedValue, value.TargetType, valueWriter);
-        }
-        else if (plan.ValueKind == ComponentPropertyValueKind.CSharpExpression &&
-            !value.Operation.IsDefault &&
-            value.Operation.Syntax != null)
-        {
-            _writer.Write(value.Operation.Syntax.ToString());
-        }
-        else if (value.Operation.ConstantValue.HasValue)
-        {
-            valueWriter.WriteConstant(value.Operation.ConstantValue.Value, value.TargetType);
-        }
-        else if (!value.Operation.IsDefault && value.Operation.Syntax != null)
-        {
-            _writer.Write(value.Operation.Syntax.ToString());
-        }
-        else if (value.ConvertedValue != null)
-        {
-            valueWriter.WriteConstant(value.ConvertedValue, value.TargetType);
+            _valueWriter.WriteConstant(value);
         }
         else
         {
-            _writer.WriteStringLiteral(value.LiteralValue ?? string.Empty);
+            _valueWriter.WriteExpression(value);
         }
 
         propertyWriter.WriteEnd(end);
     }
 
-    private void WriteConvertedValue(
-        object convertedValue,
-        ITypeSymbol? targetType,
-        CSharpValueWriter valueWriter)
+    private void WriteElementReference(
+        in ComponentPlan component,
+        in ComponentPropertyWritePlan plan,
+        string target)
     {
-        switch (convertedValue)
-        {
-            case GridDefinitionListValue definitions:
-                WriteGridDefinitions(definitions, targetType, valueWriter);
-                return;
+        Debug.Assert((uint)plan.PayloadIndex < (uint)component.Elements.Length);
 
-            case MarkupLiteralValue literal:
-                WriteMarkupLiteral(literal, valueWriter);
-                return;
-
-            default:
-                valueWriter.WriteConstant(convertedValue, targetType);
-                return;
-        }
-    }
-
-    private void WriteMarkupLiteral(
-        MarkupLiteralValue literal,
-        CSharpValueWriter valueWriter)
-    {
-        switch (literal.ConverterKind)
-        {
-            case MarkupLiteralConverterKind.ParseMethod when literal.Converter.Symbol is IMethodSymbol method:
-                valueWriter.WriteTypeName(method.ContainingType);
-                _writer.Write(".");
-                valueWriter.WriteIdentifier(method.Name);
-                _writer.Write("(").WriteStringLiteral(literal.Text).Write(")");
-                return;
-
-            case MarkupLiteralConverterKind.StringConstructor:
-                _writer.Write("new ");
-                valueWriter.WriteTypeName(literal.TargetType.Symbol);
-                _writer.Write("(").WriteStringLiteral(literal.Text).Write(")");
-                return;
-
-            case MarkupLiteralConverterKind.TypeConverter
-                when literal.Converter.Symbol is INamedTypeSymbol converterType:
-                _writer.Write("(");
-                valueWriter.WriteTypeName(literal.TargetType.Symbol);
-                _writer.Write(")new ");
-                valueWriter.WriteTypeName(converterType);
-                _writer.Write("().ConvertFromInvariantString(").WriteStringLiteral(literal.Text).Write(")!");
-                return;
-
-            default:
-                _writer.Write("(");
-                valueWriter.WriteTypeName(literal.TargetType.Symbol);
-                _writer.Write(")").WriteStringLiteral(literal.Text);
-                return;
-        }
-    }
-
-    private void WriteGridDefinitions(
-        in GridDefinitionListValue value,
-        ITypeSymbol? targetType,
-        CSharpValueWriter valueWriter)
-    {
-        var isRows = targetType?.Name == "RowDefinitions";
-        var collectionType = isRows
-            ? "global::Avalonia.Controls.RowDefinitions"
-            : "global::Avalonia.Controls.ColumnDefinitions";
-        var itemType = isRows
-            ? "global::Avalonia.Controls.RowDefinition"
-            : "global::Avalonia.Controls.ColumnDefinition";
-        var lengthProperty = isRows ? "Height" : "Width";
-        var minProperty = isRows ? "MinHeight" : "MinWidth";
-        var maxProperty = isRows ? "MaxHeight" : "MaxWidth";
-
-        _writer.Write("new ").Write(collectionType).Write(" { ");
-        for (var i = 0; i < value.Definitions.Length; i++)
-        {
-            if (i > 0)
-            {
-                _writer.Write(", ");
-            }
-
-            var definition = value.Definitions[i];
-            _writer.Write("new ").Write(itemType).Write(" { ").Write(lengthProperty).Write(" = ");
-            WriteGridLength(definition.Length, valueWriter);
-
-            if (definition.Min is { } min)
-            {
-                _writer.Write(", ").Write(minProperty).Write(" = ");
-                valueWriter.WriteConstant(min, targetType: null);
-            }
-
-            if (definition.Max is { } max)
-            {
-                _writer.Write(", ").Write(maxProperty).Write(" = ");
-                valueWriter.WriteConstant(max, targetType: null);
-            }
-
-            _writer.Write(" }");
-        }
-
-        _writer.Write(" }");
-    }
-
-    private void WriteGridLength(
-        in GridDefinitionLengthValue length,
-        CSharpValueWriter valueWriter)
-    {
-        var unit = length.UnitType switch
-        {
-            GridDefinitionUnitType.Auto => "global::Avalonia.Controls.GridUnitType.Auto",
-            GridDefinitionUnitType.Star => "global::Avalonia.Controls.GridUnitType.Star",
-            _ => "global::Avalonia.Controls.GridUnitType.Pixel",
-        };
-
-        _writer.Write("new global::Avalonia.Controls.GridLength(");
-        valueWriter.WriteConstant(length.Value, targetType: null);
-        _writer.Write(", ").Write(unit).Write(")");
+        ref readonly var element = ref component.Elements.ItemRef(plan.PayloadIndex);
+        var propertyWriter = new PropertyWriter(_writer);
+        var end = propertyWriter.WriteStart(plan.Destination, target);
+        _valueWriter.WriteElementReference(element.Identifier);
+        propertyWriter.WriteEnd(end);
     }
 
     private void WriteMarkupExtension(

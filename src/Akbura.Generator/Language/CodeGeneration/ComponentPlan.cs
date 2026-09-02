@@ -4,8 +4,6 @@ using Akbura.Language.Binder;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
-using System.Globalization;
-using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -74,6 +72,7 @@ internal readonly struct ComponentElementPlan
             propertySubscriptions: default,
             firstUpdateActions: default,
             propertyElements,
+            content: default,
             akcss)
     {
     }
@@ -92,6 +91,7 @@ internal readonly struct ComponentElementPlan
         ComponentPlanRange propertySubscriptions,
         ComponentPlanRange firstUpdateActions,
         ComponentPlanRange propertyElements,
+        ComponentContentTargetReference content,
         AkcssElementActivatorPlan akcss)
     {
         Id = id;
@@ -107,6 +107,7 @@ internal readonly struct ComponentElementPlan
         PropertySubscriptions = propertySubscriptions;
         FirstUpdateActions = firstUpdateActions;
         PropertyElements = propertyElements;
+        Content = content;
         Akcss = akcss;
     }
 
@@ -135,6 +136,8 @@ internal readonly struct ComponentElementPlan
     public ComponentPlanRange FirstUpdateActions { get; }
 
     public ComponentPlanRange PropertyElements { get; }
+
+    public ComponentContentTargetReference Content { get; }
 
     public AkcssElementActivatorPlan Akcss { get; }
 
@@ -254,42 +257,6 @@ internal readonly struct ComponentPropertySubscriptionPlan
     public AkburaSyntax Syntax { get; }
 }
 
-internal enum ComponentFirstUpdateActionKind : byte
-{
-    None,
-    PropertyWrite,
-    PropertySubscription,
-}
-
-internal readonly struct ComponentFirstUpdateActionPlan
-{
-    private ComponentFirstUpdateActionPlan(
-        ComponentFirstUpdateActionKind kind,
-        int index)
-    {
-        Kind = kind;
-        Index = index;
-    }
-
-    public ComponentFirstUpdateActionKind Kind { get; }
-
-    public int Index { get; }
-
-    public static ComponentFirstUpdateActionPlan CreateWrite(int index)
-    {
-        return new ComponentFirstUpdateActionPlan(
-            ComponentFirstUpdateActionKind.PropertyWrite,
-            index);
-    }
-
-    public static ComponentFirstUpdateActionPlan CreateSubscription(int index)
-    {
-        return new ComponentFirstUpdateActionPlan(
-            ComponentFirstUpdateActionKind.PropertySubscription,
-            index);
-    }
-}
-
 internal readonly struct ComponentPropertyWritePlan
 {
     public ComponentPropertyWritePlan(
@@ -323,16 +290,12 @@ internal readonly struct ComponentPropertyElementPlan
         int id,
         int ownerElementId,
         MarkupElementSyntax syntax,
-        AkburaPropertySymbol property,
-        IMarkupContentOperation operation,
-        ComponentPlanRange children)
+        ComponentContentTargetReference content)
     {
         Id = id;
         OwnerElementId = ownerElementId;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
-        Property = property ?? throw new ArgumentNullException(nameof(property));
-        Operation = operation ?? throw new ArgumentNullException(nameof(operation));
-        Children = children;
+        Content = content;
     }
 
     public int Id { get; }
@@ -341,11 +304,7 @@ internal readonly struct ComponentPropertyElementPlan
 
     public MarkupElementSyntax Syntax { get; }
 
-    public AkburaPropertySymbol Property { get; }
-
-    public IMarkupContentOperation Operation { get; }
-
-    public ComponentPlanRange Children { get; }
+    public ComponentContentTargetReference Content { get; }
 }
 
 internal readonly struct ComponentDeferredContentPlan
@@ -355,16 +314,12 @@ internal readonly struct ComponentDeferredContentPlan
         int scopeId,
         int targetElementId,
         AkburaSyntax syntax,
-        AkburaPropertySymbol property,
-        IMarkupContentOperation operation,
         ComponentPlanRange roots)
     {
         Id = id;
         ScopeId = scopeId;
         TargetElementId = targetElementId;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
-        Property = property ?? throw new ArgumentNullException(nameof(property));
-        Operation = operation ?? throw new ArgumentNullException(nameof(operation));
         Roots = roots;
     }
 
@@ -376,13 +331,7 @@ internal readonly struct ComponentDeferredContentPlan
 
     public AkburaSyntax Syntax { get; }
 
-    public AkburaPropertySymbol Property { get; }
-
-    public IMarkupContentOperation Operation { get; }
-
     public ComponentPlanRange Roots { get; }
-
-    public string BuilderName => "__BuildDeferredContent" + Id.ToString(CultureInfo.InvariantCulture);
 }
 
 internal readonly struct ComponentTemplatePlan
@@ -423,8 +372,14 @@ internal readonly struct ComponentPlan
         ImmutableArray<MarkupExtensionResultPlan> markupExtensions,
         ImmutableArray<BindingWritePlan> bindings,
         ImmutableArray<ComponentPropertySubscriptionPlan> propertySubscriptions,
+        ImmutableArray<ComponentNameAssignmentPlan> nameAssignments,
+        ImmutableArray<ComponentRoutedEventPlan> routedEvents,
+        ImmutableArray<ComponentCommandBindingPlan> commandBindings,
         ImmutableArray<ComponentFirstUpdateActionPlan> firstUpdateActions,
         ImmutableArray<ComponentPropertyElementPlan> propertyElements,
+        ImmutableArray<ComponentPropertyContentPlan> propertyContents,
+        ImmutableArray<ComponentCollectionContentPlan> collectionContents,
+        ImmutableArray<ComponentContentItemPlan> contentItems,
         ImmutableArray<ComponentDeferredContentPlan> deferredContents,
         ImmutableArray<ComponentTemplatePlan> templates,
         ImmutableArray<BindingElementReference> elementReferences,
@@ -442,12 +397,30 @@ internal readonly struct ComponentPlan
         PropertySubscriptions = propertySubscriptions.IsDefault
             ? ImmutableArray<ComponentPropertySubscriptionPlan>.Empty
             : propertySubscriptions;
+        NameAssignments = nameAssignments.IsDefault
+            ? ImmutableArray<ComponentNameAssignmentPlan>.Empty
+            : nameAssignments;
+        RoutedEvents = routedEvents.IsDefault
+            ? ImmutableArray<ComponentRoutedEventPlan>.Empty
+            : routedEvents;
+        CommandBindings = commandBindings.IsDefault
+            ? ImmutableArray<ComponentCommandBindingPlan>.Empty
+            : commandBindings;
         FirstUpdateActions = firstUpdateActions.IsDefault
             ? ImmutableArray<ComponentFirstUpdateActionPlan>.Empty
             : firstUpdateActions;
         PropertyElements = propertyElements.IsDefault
             ? ImmutableArray<ComponentPropertyElementPlan>.Empty
             : propertyElements;
+        PropertyContents = propertyContents.IsDefault
+            ? ImmutableArray<ComponentPropertyContentPlan>.Empty
+            : propertyContents;
+        CollectionContents = collectionContents.IsDefault
+            ? ImmutableArray<ComponentCollectionContentPlan>.Empty
+            : collectionContents;
+        ContentItems = contentItems.IsDefault
+            ? ImmutableArray<ComponentContentItemPlan>.Empty
+            : contentItems;
         DeferredContents = deferredContents.IsDefault
             ? ImmutableArray<ComponentDeferredContentPlan>.Empty
             : deferredContents;
@@ -474,9 +447,21 @@ internal readonly struct ComponentPlan
 
     public ImmutableArray<ComponentPropertySubscriptionPlan> PropertySubscriptions { get; }
 
+    public ImmutableArray<ComponentNameAssignmentPlan> NameAssignments { get; }
+
+    public ImmutableArray<ComponentRoutedEventPlan> RoutedEvents { get; }
+
+    public ImmutableArray<ComponentCommandBindingPlan> CommandBindings { get; }
+
     public ImmutableArray<ComponentFirstUpdateActionPlan> FirstUpdateActions { get; }
 
     public ImmutableArray<ComponentPropertyElementPlan> PropertyElements { get; }
+
+    public ImmutableArray<ComponentPropertyContentPlan> PropertyContents { get; }
+
+    public ImmutableArray<ComponentCollectionContentPlan> CollectionContents { get; }
+
+    public ImmutableArray<ComponentContentItemPlan> ContentItems { get; }
 
     public ImmutableArray<ComponentDeferredContentPlan> DeferredContents { get; }
 

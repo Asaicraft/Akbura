@@ -64,7 +64,10 @@ public sealed class ComponentPlannerTests
         Assert.Empty(GetIds(plan.ChildElementIds, owner.Children));
         Assert.Equal(0, child.ParentId);
         Assert.Equal(0, propertyElement.OwnerElementId);
-        Assert.Equal([1], GetIds(plan.ChildElementIds, propertyElement.Children));
+        Assert.Equal(ComponentContentTargetKind.Property, propertyElement.Content.Kind);
+        var content = plan.PropertyContents[propertyElement.Content.Index];
+        Assert.Equal(ComponentContentValueKind.Element, content.FirstUpdateValue.Kind);
+        Assert.Equal(child.Id, content.FirstUpdateValue.Index);
         Assert.Equal(1, owner.PropertyElements.Length);
         Assert.DoesNotContain(plan.Elements, element => ReferenceEquals(element.Syntax, propertyElement.Syntax));
     }
@@ -522,17 +525,21 @@ public sealed class ComponentPlannerTests
         Assert.True(markupTarget.PropertySubscriptions.IsEmpty);
 
         Assert.Equal(0, bindTarget.FirstUpdateActions.Start);
-        Assert.Equal(1, bindTarget.FirstUpdateActions.Length);
-        Assert.Equal(1, outTarget.FirstUpdateActions.Start);
-        Assert.Equal(1, outTarget.FirstUpdateActions.Length);
-        Assert.Equal(2, plainTarget.FirstUpdateActions.Start);
-        Assert.True(plainTarget.FirstUpdateActions.IsEmpty);
-        Assert.Equal(2, markupTarget.FirstUpdateActions.Start);
-        Assert.Equal(1, markupTarget.FirstUpdateActions.Length);
+        Assert.Equal(2, bindTarget.FirstUpdateActions.Length);
+        Assert.Equal(2, outTarget.FirstUpdateActions.Start);
+        Assert.Equal(2, outTarget.FirstUpdateActions.Length);
+        Assert.Equal(4, plainTarget.FirstUpdateActions.Start);
+        Assert.Equal(1, plainTarget.FirstUpdateActions.Length);
+        Assert.Equal(5, markupTarget.FirstUpdateActions.Start);
+        Assert.Equal(2, markupTarget.FirstUpdateActions.Length);
         Assert.Collection(
             plan.FirstUpdateActions,
+            action => AssertAction(action, ComponentFirstUpdateActionKind.NameAssignment, 0),
             action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 0),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.NameAssignment, 1),
             action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 1),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.NameAssignment, 2),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.NameAssignment, 3),
             action => AssertAction(action, ComponentFirstUpdateActionKind.PropertyWrite, 2));
     }
 
@@ -762,21 +769,27 @@ public sealed class ComponentPlannerTests
         var valid = GetNamedElement(plan, "valid");
 
         Assert.Empty(GetSubscriptions(plan.PropertySubscriptions, invalid.PropertySubscriptions));
-        Assert.Empty(GetActions(plan.FirstUpdateActions, invalid.FirstUpdateActions));
+        var invalidAction = Assert.Single(GetActions(
+            plan.FirstUpdateActions,
+            invalid.FirstUpdateActions));
         Assert.Equal(0, invalid.PropertySubscriptions.Start);
         Assert.Equal(0, invalid.FirstUpdateActions.Start);
+        AssertAction(invalidAction, ComponentFirstUpdateActionKind.NameAssignment, 0);
 
         var subscription = Assert.Single(GetSubscriptions(
             plan.PropertySubscriptions,
             valid.PropertySubscriptions));
-        var action = Assert.Single(GetActions(plan.FirstUpdateActions, valid.FirstUpdateActions));
+        var actions = GetActions(plan.FirstUpdateActions, valid.FirstUpdateActions);
 
         Assert.Equal(0, valid.PropertySubscriptions.Start);
         Assert.Equal(1, valid.PropertySubscriptions.Length);
-        Assert.Equal(0, valid.FirstUpdateActions.Start);
-        Assert.Equal(1, valid.FirstUpdateActions.Length);
+        Assert.Equal(1, valid.FirstUpdateActions.Start);
+        Assert.Equal(2, valid.FirstUpdateActions.Length);
         Assert.Equal(PropertyObservationKind.AvaloniaProperty, subscription.Observation.Kind);
-        AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 0);
+        Assert.Collection(
+            actions,
+            action => AssertAction(action, ComponentFirstUpdateActionKind.NameAssignment, 1),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 0));
     }
 
     [Fact]

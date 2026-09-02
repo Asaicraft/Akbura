@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -71,7 +69,7 @@ internal readonly ref struct DeferredContentWriter
             var rootId = plan.ScopeRootElementIds[scope.Roots.Start];
             Debug.Assert((uint)rootId < (uint)plan.Elements.Length);
             ref readonly var root = ref plan.Elements.ItemRef(rootId);
-            var rootExpression = EscapeIdentifier(root.Identifier);
+            var rootExpression = root.Identifier;
             var context = new ComponentScopeWriteContext(
                 rootExpression,
                 "__akburaBaseUri",
@@ -87,11 +85,10 @@ internal readonly ref struct DeferredContentWriter
                 _sourceMap,
                 _ownerTypeName);
 
-            scopeWriter.WriteInitialState(plan, scope, context);
+            scopeWriter.WriteLocalInitialState(plan, scope, context);
 
             _writer.Write("return ");
-            var valueWriter = new CSharpValueWriter(_writer);
-            valueWriter.WriteIdentifier(root.Identifier);
+            _writer.Write(root.Identifier);
             _writer.WriteLine(";");
 
             _writer.CurrentIndent -= _writer.TabSize;
@@ -121,7 +118,7 @@ internal readonly ref struct DeferredContentWriter
         }
 
         ref readonly var owner = ref plan.Elements.ItemRef(content.OwnerElementId);
-        var targetExpression = EscapeIdentifier(owner.Identifier);
+        var targetExpression = owner.Identifier;
         var targetContext = parentContext.WithTarget(
             targetExpression,
             content.Destination.TargetProperty,
@@ -207,11 +204,4 @@ internal readonly ref struct DeferredContentWriter
             scope.Roots.Length == 1;
     }
 
-    private static string EscapeIdentifier(string identifier)
-    {
-        return CSharpSyntaxFacts.GetKeywordKind(identifier) != CSharpSyntaxKind.None ||
-            CSharpSyntaxFacts.GetContextualKeywordKind(identifier) != CSharpSyntaxKind.None
-                ? "@" + identifier
-                : identifier;
-    }
 }

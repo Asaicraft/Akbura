@@ -106,7 +106,7 @@ public sealed class ComponentDeferredContentIntegrationTests
 
             namespace Demo;
 
-            public sealed class DeferredHost : AvaloniaObject
+            public sealed class DeferredHost : Control
             {
                 public static readonly StyledProperty<object?> ContentProperty =
                     AvaloniaProperty.Register<DeferredHost, object?>(nameof(Content));
@@ -137,9 +137,7 @@ public sealed class ComponentDeferredContentIntegrationTests
                 {
                 }
 
-                protected override Control FirstUpdate() => new Border();
-
-                protected override Control Update() => new Border();
+                public void InitializeForTest() => base.OnInitialized();
 
                 protected override ImmutableArray<Parameter> GetParameters() => [];
 
@@ -161,12 +159,11 @@ public sealed class ComponentDeferredContentIntegrationTests
             codeWriter,
             componentSymbol,
             semanticFixture.SemanticModel,
+            "Views/PlannerView.akbura",
             new Dictionary<AkburaSyntax, string>());
         ref readonly var plan = ref componentWriter.Plan;
         ref readonly var componentScope = ref plan.Scopes.ItemRef(0);
         var deferred = Assert.Single(plan.DeferredContents);
-        var rootId = plan.ScopeRootElementIds[componentScope.Roots.Start];
-        ref readonly var root = ref plan.Elements.ItemRef(rootId);
 
         Assert.Equal(ComponentElementScopeKind.Component, componentScope.Kind);
         Assert.Equal(1, componentScope.Elements.Length);
@@ -179,44 +176,16 @@ public sealed class ComponentDeferredContentIntegrationTests
         codeWriter.WriteLine("public partial class PlannerView");
         codeWriter.WriteLine("{");
         codeWriter.CurrentIndent = 4;
-        codeWriter.WriteLine(
-            "private static readonly global::System.Uri __akburaBaseUri = " +
-            "new(\"avares://Demo/PlannerView.akbura\");");
         componentWriter.WriteElementFields();
         codeWriter.WriteLine();
-        codeWriter.WriteLine(
-            "public global::Avalonia.Controls.IDeferredContent " +
-            "CreateRuntimeDeferredContent()");
-        codeWriter.WriteLine("{");
-        codeWriter.CurrentIndent = 8;
+        if (componentWriter.WriteLifecycleFields())
+        {
+            codeWriter.WriteLine();
+        }
 
-        var bindingEnvironment = semanticFixture.CreateBindingEnvironment();
-        var sourceMap = new ComponentGenerationSourceMap(
-            Assert.IsType<ComponentSyntaxTree>(semanticFixture.ComponentTree));
-        var scopeWriter = new ComponentScopeWriter(
-            codeWriter,
-            in bindingEnvironment,
-            sourceMap,
-            "global::Demo.PlannerView");
-        var scopeContext = new ComponentScopeWriteContext(
-            intermediateRootExpression: "this",
-            baseUriExpression: "__akburaBaseUri",
-            fallbackServiceProviderExpression: null,
-            nameScopeExpression: null,
-            scopeId: componentScope.Id,
-            parentStackTraversalKind: MarkupParentStackTraversalKind.ExactScope,
-            elements: plan.Elements.AsSpan(),
-            elementReferences: plan.ElementReferences.AsSpan());
-        scopeWriter.WriteInitialState(plan, componentScope, scopeContext);
-
-        codeWriter.Write("return (global::Avalonia.Controls.IDeferredContent)");
-        var valueWriter = new CSharpValueWriter(codeWriter);
-        valueWriter.WriteIdentifier(root.Identifier);
-        codeWriter.WriteLine(".Content!;");
-        codeWriter.CurrentIndent = 4;
-        codeWriter.WriteLine("}");
-        codeWriter.WriteLine();
         Assert.True(componentWriter.WriteDeferredContentBuilders());
+        codeWriter.WriteLine();
+        componentWriter.WriteLifecycleMembers();
         codeWriter.CurrentIndent = 0;
         codeWriter.WriteLine("}");
 
@@ -252,35 +221,46 @@ public sealed class ComponentDeferredContentIntegrationTests
             generatedSource);
         var assembly = Assembly.Load(assemblyStream.ToArray());
         var ownerType = assembly.GetType("Demo.PlannerView");
+        var rootType = assembly.GetType("Demo.DeferredHost");
         var countingPanelType = assembly.GetType("Demo.CountingPanel");
 
         Assert.NotNull(ownerType);
+        Assert.NotNull(rootType);
         Assert.NotNull(countingPanelType);
 
-        return new RuntimeFixture(ownerType!, countingPanelType!);
+        return new RuntimeFixture(ownerType!, rootType!, countingPanelType!);
     }
 
     private sealed class RuntimeFixture
     {
         private readonly Type _ownerType;
         private readonly PropertyInfo _createdCountProperty;
-        private readonly MethodInfo _createDeferredContentMethod;
+        private readonly PropertyInfo _rootContentProperty;
+        private readonly MethodInfo _initializeMethod;
 
-        public RuntimeFixture(Type ownerType, Type countingPanelType)
+        public RuntimeFixture(
+            Type ownerType,
+            Type rootType,
+            Type countingPanelType)
         {
             _ownerType = ownerType;
             var createdCountProperty = countingPanelType.GetProperty(
                 "CreatedCount",
                 BindingFlags.Public | BindingFlags.Static);
-            var createDeferredContentMethod = ownerType.GetMethod(
-                "CreateRuntimeDeferredContent",
+            var rootContentProperty = rootType.GetProperty(
+                "Content",
+                BindingFlags.Public | BindingFlags.Instance);
+            var initializeMethod = ownerType.GetMethod(
+                "InitializeForTest",
                 BindingFlags.Public | BindingFlags.Instance);
 
             Assert.NotNull(createdCountProperty);
-            Assert.NotNull(createDeferredContentMethod);
+            Assert.NotNull(rootContentProperty);
+            Assert.NotNull(initializeMethod);
 
             _createdCountProperty = createdCountProperty;
-            _createDeferredContentMethod = createDeferredContentMethod;
+            _rootContentProperty = rootContentProperty;
+            _initializeMethod = initializeMethod;
         }
 
         public int CreatedTreeCount => Assert.IsType<int>(
@@ -296,8 +276,12 @@ public sealed class ComponentDeferredContentIntegrationTests
 
         public IDeferredContent CreateDeferredContent(object owner)
         {
+            _initializeMethod.Invoke(owner, parameters: null);
+            var component = Assert.IsAssignableFrom<global::Akbura.AkburaControl>(owner);
+            var root = Assert.IsAssignableFrom<Control>(component.Child);
+
             return Assert.IsAssignableFrom<IDeferredContent>(
-                _createDeferredContentMethod.Invoke(owner, parameters: null));
+                _rootContentProperty.GetValue(root));
         }
     }
 }

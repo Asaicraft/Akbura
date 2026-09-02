@@ -65,10 +65,10 @@ public sealed class ElementWriterTests
     }
 
     [Fact]
-    public void WriteCreation_EscapesKeywordIdentifier()
+    public void WriteCreation_UsesPreparedKeywordIdentifier()
     {
         var fixture = CreateFixture();
-        var element = fixture.CreateElement("class", isLocal: true);
+        var element = fixture.CreateElement("@class", isLocal: true);
 
         Assert.Equal(
             "var @class = new global::Demo.Widget();\r\n",
@@ -96,7 +96,7 @@ public sealed class ElementWriterTests
     public void WriteBeginInit_WhenSupported_WritesInvocation()
     {
         var fixture = CreateFixture();
-        var element = fixture.CreateElement("class", supportsInitialize: true);
+        var element = fixture.CreateElement("@class", supportsInitialize: true);
 
         Assert.Equal(
             "((global::System.ComponentModel.ISupportInitialize)@class).BeginInit();\r\n",
@@ -110,7 +110,7 @@ public sealed class ElementWriterTests
     public void WriteEndInit_WhenSupported_WritesInvocation()
     {
         var fixture = CreateFixture();
-        var element = fixture.CreateElement("class", supportsInitialize: true);
+        var element = fixture.CreateElement("@class", supportsInitialize: true);
 
         Assert.Equal(
             "((global::System.ComponentModel.ISupportInitialize)@class).EndInit();\r\n",

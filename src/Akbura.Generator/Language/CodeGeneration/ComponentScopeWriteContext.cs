@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -53,7 +51,7 @@ internal readonly ref struct ComponentScopeWriteContext
         Debug.Assert(Elements[elementId].ScopeId == ScopeId);
 
         ref readonly var element = ref Elements[elementId];
-        var targetExpression = EscapeIdentifier(element.Identifier);
+        var targetExpression = element.Identifier;
         return new MarkupExtensionWriteContext(
             targetExpression,
             targetProperty: default,
@@ -70,11 +68,4 @@ internal readonly ref struct ComponentScopeWriteContext
             ElementReferences);
     }
 
-    private static string EscapeIdentifier(string identifier)
-    {
-        return CSharpSyntaxFacts.GetKeywordKind(identifier) != CSharpSyntaxKind.None ||
-            CSharpSyntaxFacts.GetContextualKeywordKind(identifier) != CSharpSyntaxKind.None
-                ? "@" + identifier
-                : identifier;
-    }
 }

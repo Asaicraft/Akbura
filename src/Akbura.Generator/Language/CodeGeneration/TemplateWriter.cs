@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -51,7 +49,7 @@ internal readonly ref struct TemplateWriter
         }
 
         ref readonly var owner = ref plan.Elements.ItemRef(content.OwnerElementId);
-        var targetExpression = EscapeIdentifier(owner.Identifier);
+        var targetExpression = owner.Identifier;
         var propertyWriter = new PropertyWriter(_writer);
         var end = PropertyWriteEnd.None;
 
@@ -125,7 +123,7 @@ internal readonly ref struct TemplateWriter
         ref readonly var scope = ref plan.Scopes.ItemRef(template.ScopeId);
         var rootId = plan.ScopeRootElementIds[scope.Roots.Start];
         ref readonly var root = ref plan.Elements.ItemRef(rootId);
-        var rootExpression = EscapeIdentifier(root.Identifier);
+        var rootExpression = root.Identifier;
 
         _writer.WriteLine();
         _writer.WriteLine("{");
@@ -149,21 +147,14 @@ internal readonly ref struct TemplateWriter
             _sourceMap,
             _ownerTypeName);
 
-        scopeWriter.WriteInitialState(plan, scope, scopeContext);
+        scopeWriter.WriteLocalInitialState(plan, scope, scopeContext);
 
         _writer.Write("return ");
-        _valueWriter.WriteIdentifier(root.Identifier);
+        _writer.Write(root.Identifier);
         _writer.WriteLine(";");
 
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.Write("}");
     }
 
-    private static string EscapeIdentifier(string identifier)
-    {
-        return CSharpSyntaxFacts.GetKeywordKind(identifier) != CSharpSyntaxKind.None ||
-            CSharpSyntaxFacts.GetContextualKeywordKind(identifier) != CSharpSyntaxKind.None
-                ? "@" + identifier
-                : identifier;
-    }
 }

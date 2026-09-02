@@ -93,7 +93,7 @@ public sealed class ComponentPlannerTests
     }
 
     [Fact]
-    public void Create_UsesLogicalNamesAndEscapedIdentifiersForElementReferences()
+    public void Create_KeepsLogicalNamesAndStoresEscapedCSharpIdentifiers()
     {
         const string component =
             """
@@ -109,7 +109,7 @@ public sealed class ComponentPlannerTests
         var keyword = GetElement(plan, "Button");
 
         Assert.Equal("header", header.Identifier);
-        Assert.Equal("yield", keyword.Identifier);
+        Assert.Equal("@yield", keyword.Identifier);
         Assert.True(header.HasName);
         Assert.True(keyword.HasName);
         Assert.Collection(
@@ -496,7 +496,7 @@ public sealed class ComponentPlannerTests
         var markupWrite = Assert.Single(GetWrites(plan.PropertyWrites, markupTarget.PropertyWrites));
 
         Assert.Equal(ComponentPropertyValueKind.CSharpExpression, bindWrite.ValueKind);
-        Assert.False(bindWrite.IsFirstUpdate);
+        Assert.Equal(ComponentPropertyWritePhase.Update, bindWrite.Phase);
         Assert.Empty(GetWrites(plan.PropertyWrites, outTarget.PropertyWrites));
         Assert.Equal(ComponentPropertyValueKind.CSharpExpression, plainWrite.ValueKind);
         Assert.Equal(ComponentPropertyValueKind.MarkupBinding, markupWrite.ValueKind);
@@ -566,9 +566,9 @@ public sealed class ComponentPlannerTests
         var actions = GetActions(plan.FirstUpdateActions, element.FirstUpdateActions);
 
         Assert.Equal(3, writes.Length);
-        Assert.False(writes[0].IsFirstUpdate);
-        Assert.True(writes[1].IsFirstUpdate);
-        Assert.True(writes[2].IsFirstUpdate);
+        Assert.Equal(ComponentPropertyWritePhase.Update, writes[0].Phase);
+        Assert.Equal(ComponentPropertyWritePhase.FirstUpdate, writes[1].Phase);
+        Assert.Equal(ComponentPropertyWritePhase.FirstUpdate, writes[2].Phase);
         Assert.Equal([0, 2], subscriptions.Select(static item => item.SourceOrder).ToArray());
         Assert.Collection(
             actions,
@@ -579,7 +579,7 @@ public sealed class ComponentPlannerTests
     }
 
     [Fact]
-    public void Create_DynamicComponentParameterIsFirstUpdateAndObservable()
+    public void Create_DynamicComponentParameterWritesInBothPhasesAndIsObservable()
     {
         const string component =
             """
@@ -614,7 +614,9 @@ public sealed class ComponentPlannerTests
         Assert.True(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
             element.Type,
             write.Destination.TargetProperty.Symbol));
-        Assert.True(write.IsFirstUpdate);
+        Assert.Equal(ComponentPropertyWritePhase.Both, write.Phase);
+        Assert.True(write.WritesDuringFirstUpdate);
+        Assert.True(write.WritesDuringUpdate);
 
         Assert.Equal(PropertyObservationKind.GeneratedParameter, subscription.Observation.Kind);
         Assert.Equal("Value", subscription.Observation.Name);
@@ -860,8 +862,8 @@ public sealed class ComponentPlannerTests
         Assert.Equal(2, writes.Length);
         Assert.Equal(ComponentPropertyValueKind.Constant, writes[0].ValueKind);
         Assert.Equal(ComponentPropertyValueKind.CSharpExpression, writes[1].ValueKind);
-        Assert.True(writes[0].IsFirstUpdate);
-        Assert.False(writes[1].IsFirstUpdate);
+        Assert.Equal(ComponentPropertyWritePhase.FirstUpdate, writes[0].Phase);
+        Assert.Equal(ComponentPropertyWritePhase.Update, writes[1].Phase);
         Assert.All(writes, static write =>
         {
             Assert.True(write.Destination.IsValid);

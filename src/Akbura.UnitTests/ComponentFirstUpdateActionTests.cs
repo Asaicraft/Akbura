@@ -121,6 +121,7 @@ public sealed class ComponentFirstUpdateActionTests
             codeWriter,
             component,
             fixture.SemanticModel,
+            "PlannerView.akbura",
             new Dictionary<AkburaSyntax, string>());
     }
 

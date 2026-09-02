@@ -381,6 +381,7 @@ public sealed class TemplateWriterTests
             codeWriter,
             componentSymbol,
             semanticFixture.SemanticModel,
+            "PlannerView.akbura",
             new Dictionary<AkburaSyntax, string>());
 
         return new WriterFixture(semanticFixture, codeWriter, writer);
@@ -426,7 +427,7 @@ public sealed class TemplateWriterTests
             elements: plan.Elements.AsSpan(),
             elementReferences: plan.ElementReferences.AsSpan());
 
-        writer.WriteInitialState(plan, scope, context);
+        writer.WriteComponentInitialState(plan, scope, context);
     }
 
     private static void AssertGeneratedTemplateCompiles(

@@ -3,7 +3,6 @@ using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia.Controls;
-using Avalonia.Controls.Templates;
 using Avalonia.Headless;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,10 +11,10 @@ using System.Reflection;
 namespace Akbura.UnitTests;
 
 [Collection(AvaloniaHeadlessCollection.Name)]
-public sealed class ComponentTemplateIntegrationTests
+public sealed class ComponentLifecycleIntegrationTests
 {
     [Fact]
-    public async Task ComponentWriter_TypedTemplateRemainsLazyAndBuildsFreshTrees()
+    public async Task GeneratedLifecycle_CreatesTreeOnceAndEvaluatesDynamicStateOnlyInUpdate()
     {
         var fixture = CreateRuntimeFixture();
 
@@ -25,42 +24,34 @@ public sealed class ComponentTemplateIntegrationTests
             () =>
             {
                 var owner = fixture.CreateOwner();
-                var beforeFactory = fixture.CreatedTreeCount;
+                var root = fixture.InvokeFirstUpdate(owner);
 
-                var template = fixture.InitializeAndGetTemplate(owner);
+                Assert.Equal(1, fixture.CreatedRootCount);
+                Assert.Equal(0, fixture.GetMessageCallCount(owner));
+                Assert.Equal(0, fixture.GetRenderCallCount(owner));
+                Assert.Null(Assert.IsType<TextBlock>(Assert.Single(root.Children)).Text);
 
-                Assert.Equal(beforeFactory, fixture.CreatedTreeCount);
-                Assert.True(template.Match(fixture.CreateItem("match probe")));
-                Assert.False(template.Match(new object()));
+                var dataContext = new object();
+                Assert.IsAssignableFrom<Control>(owner).DataContext = dataContext;
+                Assert.Same(dataContext, root.DataContext);
 
-                var templateType = template.GetType();
-                Assert.True(templateType.IsGenericType);
-                Assert.Equal(
-                    typeof(FuncDataTemplate<>),
-                    templateType.GetGenericTypeDefinition());
-                Assert.Equal(
-                    fixture.ItemType,
-                    Assert.Single(templateType.GetGenericArguments()));
+                var firstUpdateRoot = fixture.InvokeUpdate(owner);
+                var textBlock = Assert.IsType<TextBlock>(Assert.Single(root.Children));
 
-                var item = fixture.CreateItem("Template item");
-                var firstRoot = Assert.IsAssignableFrom<StackPanel>(
-                    template.Build(item));
-                var secondRoot = Assert.IsAssignableFrom<StackPanel>(
-                    template.Build(item));
+                Assert.Same(root.Value, firstUpdateRoot.Value);
+                Assert.Equal(1, fixture.CreatedRootCount);
+                Assert.Equal(1, fixture.GetMessageCallCount(owner));
+                Assert.Equal(1, fixture.GetRenderCallCount(owner));
+                Assert.Equal("Initial", textBlock.Text);
 
-                Assert.Equal(beforeFactory + 2, fixture.CreatedTreeCount);
-                Assert.Equal(fixture.TemplateRootType, firstRoot.GetType());
-                Assert.Equal(fixture.TemplateRootType, secondRoot.GetType());
-                Assert.NotSame(firstRoot, secondRoot);
+                fixture.SetMessage(owner, "Changed");
+                var secondUpdateRoot = fixture.InvokeUpdate(owner);
 
-                var firstText = Assert.IsType<TextBlock>(
-                    Assert.Single(firstRoot.Children));
-                var secondText = Assert.IsType<TextBlock>(
-                    Assert.Single(secondRoot.Children));
-
-                Assert.NotSame(firstText, secondText);
-                Assert.Equal("Template item", firstText.Text);
-                Assert.Equal("Template item", secondText.Text);
+                Assert.Same(root.Value, secondUpdateRoot.Value);
+                Assert.Equal(1, fixture.CreatedRootCount);
+                Assert.Equal(2, fixture.GetMessageCallCount(owner));
+                Assert.Equal(2, fixture.GetRenderCallCount(owner));
+                Assert.Equal("Changed", textBlock.Text);
             },
             CancellationToken.None);
     }
@@ -72,13 +63,11 @@ public sealed class ComponentTemplateIntegrationTests
             using Avalonia.Controls;
             using Demo;
 
-            <ItemsControl>
-                <ItemsControl.ItemTemplate x.DataType="Item" x.ItemName="item">
-                    <CountingPanel>
-                        <TextBlock x.Name="message" Text={item.Name} />
-                    </CountingPanel>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            RenderCallCount++;
+
+            <CountingPanel>
+                <TextBlock Text={GetMessage()} />
+            </CountingPanel>
             """;
         const string csharp =
             """
@@ -90,11 +79,6 @@ public sealed class ComponentTemplateIntegrationTests
             using System.Collections.Immutable;
 
             namespace Demo;
-
-            public sealed class Item
-            {
-                public string Name { get; set; } = string.Empty;
-            }
 
             public sealed class CountingPanel : StackPanel
             {
@@ -108,12 +92,31 @@ public sealed class ComponentTemplateIntegrationTests
 
             public partial class PlannerView : AkburaControl
             {
+                private string message = "Initial";
+
                 public PlannerView()
                     : base(AkburaEngine.Empty)
                 {
                 }
 
-                public void InitializeForTest() => base.OnInitialized();
+                public int GetMessageCallCount { get; private set; }
+
+                public int RenderCallCount { get; private set; }
+
+                public Control InvokeFirstUpdate() => FirstUpdate();
+
+                public Control InvokeUpdate() => Update();
+
+                public void SetMessage(string value)
+                {
+                    message = value;
+                }
+
+                private string GetMessage()
+                {
+                    GetMessageCallCount++;
+                    return message;
+                }
 
                 protected override ImmutableArray<Parameter> GetParameters() => [];
 
@@ -137,15 +140,6 @@ public sealed class ComponentTemplateIntegrationTests
             semanticFixture.SemanticModel,
             "Views/PlannerView.akbura",
             new Dictionary<AkburaSyntax, string>());
-        ref readonly var plan = ref componentWriter.Plan;
-        ref readonly var componentScope = ref plan.Scopes.ItemRef(0);
-        var template = Assert.Single(plan.Templates);
-        var rootId = plan.ScopeRootElementIds[componentScope.Roots.Start];
-        ref readonly var root = ref plan.Elements.ItemRef(rootId);
-
-        Assert.Equal(ComponentElementScopeKind.Component, componentScope.Kind);
-        Assert.Equal(root.Id, template.OwnerElementId);
-        Assert.NotEqual(componentScope.Id, template.ScopeId);
 
         codeWriter.WriteLine("#nullable enable");
         codeWriter.WriteLine();
@@ -154,6 +148,7 @@ public sealed class ComponentTemplateIntegrationTests
         codeWriter.WriteLine("public partial class PlannerView");
         codeWriter.WriteLine("{");
         codeWriter.CurrentIndent = 4;
+
         componentWriter.WriteElementFields();
         codeWriter.WriteLine();
         if (componentWriter.WriteLifecycleFields())
@@ -162,6 +157,7 @@ public sealed class ComponentTemplateIntegrationTests
         }
 
         componentWriter.WriteLifecycleMembers();
+
         codeWriter.CurrentIndent = 0;
         codeWriter.WriteLine("}");
 
@@ -170,11 +166,11 @@ public sealed class ComponentTemplateIntegrationTests
         var generatedTree = CSharpSyntaxTree.ParseText(
             generatedSource,
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
-            path: "PlannerView.Template.Runtime.g.cs");
+            path: "PlannerView.Lifecycle.Runtime.g.cs");
         var runtimeCompilation = semanticFixture.CSharpCompilation
             .AddSyntaxTrees(generatedTree)
             .WithAssemblyName(
-                "ComponentTemplateIntegration_" +
+                "ComponentLifecycleIntegration_" +
                 Guid.NewGuid().ToString("N"));
         var diagnostics = runtimeCompilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity is
@@ -198,14 +194,11 @@ public sealed class ComponentTemplateIntegrationTests
             generatedSource);
         var assembly = Assembly.Load(assemblyStream.ToArray());
         var ownerType = assembly.GetType("Demo.PlannerView");
-        var itemType = assembly.GetType("Demo.Item");
-        var templateRootType = assembly.GetType("Demo.CountingPanel");
+        var rootType = assembly.GetType("Demo.CountingPanel");
 
         Assert.NotNull(ownerType);
-        Assert.NotNull(itemType);
-        Assert.NotNull(templateRootType);
-
-        return new RuntimeFixture(ownerType!, itemType!, templateRootType!);
+        Assert.NotNull(rootType);
+        return new RuntimeFixture(ownerType!, rootType!);
     }
 
     private static void AssertBalancedSourceMappings(string output)
@@ -235,43 +228,29 @@ public sealed class ComponentTemplateIntegrationTests
     private sealed class RuntimeFixture
     {
         private readonly Type _ownerType;
+        private readonly Type _rootType;
         private readonly PropertyInfo _createdCountProperty;
-        private readonly PropertyInfo _itemNameProperty;
-        private readonly MethodInfo _initializeMethod;
+        private readonly PropertyInfo _getMessageCallCountProperty;
+        private readonly PropertyInfo _renderCallCountProperty;
+        private readonly MethodInfo _firstUpdateMethod;
+        private readonly MethodInfo _updateMethod;
+        private readonly MethodInfo _setMessageMethod;
 
-        public RuntimeFixture(
-            Type ownerType,
-            Type itemType,
-            Type templateRootType)
+        public RuntimeFixture(Type ownerType, Type rootType)
         {
             _ownerType = ownerType;
-            ItemType = itemType;
-            TemplateRootType = templateRootType;
-
-            var createdCountProperty = templateRootType.GetProperty(
-                "CreatedCount",
-                BindingFlags.Public | BindingFlags.Static);
-            var itemNameProperty = itemType.GetProperty(
-                "Name",
-                BindingFlags.Public | BindingFlags.Instance);
-            var initializeMethod = ownerType.GetMethod(
-                "InitializeForTest",
-                BindingFlags.Public | BindingFlags.Instance);
-
-            Assert.NotNull(createdCountProperty);
-            Assert.NotNull(itemNameProperty);
-            Assert.NotNull(initializeMethod);
-
-            _createdCountProperty = createdCountProperty;
-            _itemNameProperty = itemNameProperty;
-            _initializeMethod = initializeMethod;
+            _rootType = rootType;
+            _createdCountProperty = GetProperty(rootType, "CreatedCount");
+            _getMessageCallCountProperty = GetProperty(
+                ownerType,
+                "GetMessageCallCount");
+            _renderCallCountProperty = GetProperty(ownerType, "RenderCallCount");
+            _firstUpdateMethod = GetMethod(ownerType, "InvokeFirstUpdate");
+            _updateMethod = GetMethod(ownerType, "InvokeUpdate");
+            _setMessageMethod = GetMethod(ownerType, "SetMessage");
         }
 
-        public Type ItemType { get; }
-
-        public Type TemplateRootType { get; }
-
-        public int CreatedTreeCount => Assert.IsType<int>(
+        public int CreatedRootCount => Assert.IsType<int>(
             _createdCountProperty.GetValue(obj: null));
 
         public object CreateOwner()
@@ -282,22 +261,70 @@ public sealed class ComponentTemplateIntegrationTests
             return owner;
         }
 
-        public object CreateItem(string name)
+        public CountingPanelMarker InvokeFirstUpdate(object owner)
         {
-            var item = Activator.CreateInstance(ItemType);
-
-            Assert.NotNull(item);
-            _itemNameProperty.SetValue(item, name);
-            return item;
+            return CreateRootMarker(_firstUpdateMethod.Invoke(owner, parameters: null));
         }
 
-        public IDataTemplate InitializeAndGetTemplate(object owner)
+        public CountingPanelMarker InvokeUpdate(object owner)
         {
-            _initializeMethod.Invoke(owner, parameters: null);
-            var component = Assert.IsAssignableFrom<global::Akbura.AkburaControl>(owner);
-            var root = Assert.IsType<ItemsControl>(component.Child);
-
-            return Assert.IsAssignableFrom<IDataTemplate>(root.ItemTemplate);
+            return CreateRootMarker(_updateMethod.Invoke(owner, parameters: null));
         }
+
+        public int GetMessageCallCount(object owner)
+        {
+            return Assert.IsType<int>(_getMessageCallCountProperty.GetValue(owner));
+        }
+
+        public int GetRenderCallCount(object owner)
+        {
+            return Assert.IsType<int>(_renderCallCountProperty.GetValue(owner));
+        }
+
+        public void SetMessage(object owner, string value)
+        {
+            _setMessageMethod.Invoke(owner, [value]);
+        }
+
+        private CountingPanelMarker CreateRootMarker(object? value)
+        {
+            Assert.NotNull(value);
+            Assert.Equal(_rootType, value!.GetType());
+            return new CountingPanelMarker(Assert.IsAssignableFrom<StackPanel>(value));
+        }
+
+        private static PropertyInfo GetProperty(Type type, string name)
+        {
+            return type.GetProperty(
+                       name,
+                       BindingFlags.Public |
+                       BindingFlags.Instance |
+                       BindingFlags.Static) ??
+                throw new InvalidOperationException(
+                    "Generated runtime property was not found: " + name);
+        }
+
+        private static MethodInfo GetMethod(Type type, string name)
+        {
+            return type.GetMethod(
+                       name,
+                       BindingFlags.Public | BindingFlags.Instance) ??
+                throw new InvalidOperationException(
+                    "Generated runtime method was not found: " + name);
+        }
+    }
+
+    private sealed class CountingPanelMarker
+    {
+        public CountingPanelMarker(StackPanel value)
+        {
+            Value = value;
+        }
+
+        public StackPanel Value { get; }
+
+        public Avalonia.Controls.Controls Children => Value.Children;
+
+        public object? DataContext => Value.DataContext;
     }
 }

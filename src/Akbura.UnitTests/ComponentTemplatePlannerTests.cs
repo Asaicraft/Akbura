@@ -166,7 +166,9 @@ public sealed class ComponentTemplatePlannerTests
         Assert.Equal(ComponentFirstUpdateActionKind.PropertyWrite, dataTypeAction.Kind);
         Assert.Equal("DataType", dataTypeWrite.Destination.ClrProperty?.Name);
         Assert.Equal(ComponentPropertyValueKind.Constant, dataTypeWrite.ValueKind);
-        Assert.True(dataTypeWrite.IsFirstUpdate);
+        Assert.Equal(
+            ComponentPropertyWritePhase.FirstUpdate,
+            dataTypeWrite.Phase);
         Assert.Equal(
             "global::Demo.Person",
             GetTypeName(Assert.IsAssignableFrom<ITypeSymbol>(dataTypeValue.ConvertedValue)));

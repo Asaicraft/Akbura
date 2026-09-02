@@ -4,6 +4,7 @@ using Akbura.Language.Binder;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -34,6 +35,7 @@ internal enum ComponentElementFlags : ushort
     HasName = 1 << 5,
     RequiresLocalMarkupContext = 1 << 6,
     IsLocal = 1 << 7,
+    RequiresContentPresenterRefresh = 1 << 8,
 }
 
 internal enum ComponentElementScopeKind : byte
@@ -211,6 +213,9 @@ internal readonly struct ComponentElementPlan
 
     public bool IsControl => (Flags & ComponentElementFlags.IsControl) != 0;
 
+    public bool RequiresContentPresenterRefresh =>
+        (Flags & ComponentElementFlags.RequiresContentPresenterRefresh) != 0;
+
     public bool SupportsInitialize => (Flags & ComponentElementFlags.SupportsInitialize) != 0;
 
     public bool RequiresLocalMarkupContext =>
@@ -236,6 +241,15 @@ internal enum ComponentPropertySynchronizationKind : byte
     None,
     Bind,
     Out,
+}
+
+[Flags]
+internal enum ComponentPropertyWritePhase : byte
+{
+    None = 0,
+    FirstUpdate = 1 << 0,
+    Update = 1 << 1,
+    Both = FirstUpdate | Update,
 }
 
 internal readonly struct ComponentCSharpValuePlan
@@ -324,13 +338,19 @@ internal readonly struct ComponentPropertyWritePlan
         ComponentPropertyValueKind valueKind,
         int payloadIndex,
         AkburaSyntax syntax,
-        bool isFirstUpdate)
+        ComponentPropertyWritePhase phase)
     {
+        Debug.Assert(destination.IsValid);
+        Debug.Assert(valueKind != ComponentPropertyValueKind.None);
+        Debug.Assert(payloadIndex >= 0);
+        Debug.Assert(syntax != null);
+        Debug.Assert(phase != ComponentPropertyWritePhase.None);
+
         Destination = destination;
         ValueKind = valueKind;
         PayloadIndex = payloadIndex;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
-        IsFirstUpdate = isFirstUpdate;
+        Phase = phase;
     }
 
     public PropertyWritePlan Destination { get; }
@@ -341,7 +361,13 @@ internal readonly struct ComponentPropertyWritePlan
 
     public AkburaSyntax Syntax { get; }
 
-    public bool IsFirstUpdate { get; }
+    public ComponentPropertyWritePhase Phase { get; }
+
+    public bool WritesDuringFirstUpdate =>
+        (Phase & ComponentPropertyWritePhase.FirstUpdate) != 0;
+
+    public bool WritesDuringUpdate =>
+        (Phase & ComponentPropertyWritePhase.Update) != 0;
 }
 
 internal readonly struct ComponentPropertyElementPlan
@@ -450,6 +476,8 @@ internal readonly struct ComponentPlan
         ImmutableArray<ComponentDeferredContentPlan> deferredContents,
         ImmutableArray<ComponentTemplatePlan> templates,
         ImmutableArray<BindingElementReference> elementReferences,
+        ComponentLifecyclePlan lifecycle,
+        ImmutableArray<ComponentRenderStatementPlan> renderStatements,
         AkcssComponentActivatorPlan akcss)
     {
         Elements = elements.IsDefault ? ImmutableArray<ComponentElementPlan>.Empty : elements;
@@ -500,6 +528,10 @@ internal readonly struct ComponentPlan
         ElementReferences = elementReferences.IsDefault
             ? ImmutableArray<BindingElementReference>.Empty
             : elementReferences;
+        Lifecycle = lifecycle;
+        RenderStatements = renderStatements.IsDefault
+            ? ImmutableArray<ComponentRenderStatementPlan>.Empty
+            : renderStatements;
         Akcss = akcss;
     }
 
@@ -546,6 +578,10 @@ internal readonly struct ComponentPlan
     public ImmutableArray<ComponentTemplatePlan> Templates { get; }
 
     public ImmutableArray<BindingElementReference> ElementReferences { get; }
+
+    public ComponentLifecyclePlan Lifecycle { get; }
+
+    public ImmutableArray<ComponentRenderStatementPlan> RenderStatements { get; }
 
     public AkcssComponentActivatorPlan Akcss { get; }
 

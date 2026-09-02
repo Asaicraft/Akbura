@@ -148,7 +148,6 @@ internal readonly ref struct MarkupParentStackWriter
     {
         _writer.Write("new global::System.Object[] { ");
 
-        var valueWriter = new CSharpValueWriter(_writer);
         var hasValue = plan.ScopeId == 0 ||
             plan.TraversalKind == MarkupParentStackTraversalKind.FullHierarchy;
 
@@ -164,7 +163,7 @@ internal readonly ref struct MarkupParentStackWriter
                 _writer.Write(", ");
             }
 
-            valueWriter.WriteIdentifier(plan.Elements[hierarchy[i]].Identifier);
+            _writer.Write(plan.Elements[hierarchy[i]].Identifier);
             hasValue = true;
         }
 

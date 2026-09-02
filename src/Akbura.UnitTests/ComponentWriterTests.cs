@@ -67,6 +67,35 @@ public sealed class ComponentWriterTests
     }
 
     [Fact]
+    public void LifecycleFields_NormalizeCallerProvidedResourcePath()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            <Border Width=${DirectPadding 4} />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(
+            component,
+            AkcssActivatorPlannerTests.ExtensionSource);
+        using var codeWriter = new CodeWriter("\r\n");
+        var writer = CreateWriter(
+            codeWriter,
+            fixture,
+            "/Views\\Nested\\PlannerView.akbura");
+
+        Assert.True(writer.WriteLifecycleFields());
+
+        var output = codeWriter.GetText().ToString();
+        Assert.Contains(
+            "\"/Views/Nested/PlannerView.akbura\"",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("\\Nested\\", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PropertyMethods_SplitFirstAndRegularUpdatesAndPreserveMappingsAndIndent()
     {
         const string component =
@@ -181,7 +210,7 @@ public sealed class ComponentWriterTests
     }
 
     [Fact]
-    public void ComponentParameterBinding_WritesSubscriptionBeforeFirstValueOnly()
+    public void ComponentParameterBinding_WritesSubscriptionOnceAndValueInBothPhases()
     {
         const string component =
             """
@@ -216,7 +245,16 @@ public sealed class ComponentWriterTests
 
         Assert.True(observedProperty >= 0, firstUpdate);
         Assert.True(forwardWrite > observedProperty, firstUpdate);
-        Assert.False(writer.WriteUpdateProperties(child.Id, context));
+
+        var updateStart = codeWriter.Length;
+        Assert.True(writer.WriteUpdateProperties(child.Id, context));
+        var update = codeWriter.GetText().ToString()[updateStart..];
+
+        Assert.Contains("__element1.Value = value;", update, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "global::Demo.Child.ValueProperty.AvaloniaProperty",
+            update,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -888,7 +926,8 @@ public sealed class ComponentWriterTests
 
     private static ComponentWriter CreateWriter(
         CodeWriter codeWriter,
-        AkcssActivatorPlannerTests.PlannerFixture fixture)
+        AkcssActivatorPlannerTests.PlannerFixture fixture,
+        string resourcePath = "PlannerView.akbura")
     {
         var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
             fixture.SemanticModel.GetSymbolInfo(fixture.ComponentTree.GetRoot()).Symbol);
@@ -903,6 +942,7 @@ public sealed class ComponentWriterTests
             codeWriter,
             component,
             fixture.SemanticModel,
+            resourcePath,
             moduleTypeNames);
     }
 

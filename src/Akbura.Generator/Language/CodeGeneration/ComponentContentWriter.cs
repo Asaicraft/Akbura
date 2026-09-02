@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -40,7 +38,7 @@ internal readonly ref struct ComponentContentWriter
 
         Debug.Assert((uint)plan.OwnerElementId < (uint)component.Elements.Length);
         ref readonly var owner = ref component.Elements.ItemRef(plan.OwnerElementId);
-        var targetExpression = EscapeIdentifier(owner.Identifier);
+        var targetExpression = owner.Identifier;
 
         using var mapping = _mappings.WriteStart(plan.Syntax);
         var propertyWriter = new PropertyWriter(_writer);
@@ -61,7 +59,7 @@ internal readonly ref struct ComponentContentWriter
     {
         Debug.Assert((uint)plan.OwnerElementId < (uint)component.Elements.Length);
         ref readonly var owner = ref component.Elements.ItemRef(plan.OwnerElementId);
-        var targetExpression = EscapeIdentifier(owner.Identifier);
+        var targetExpression = owner.Identifier;
         var collectionWriter = new CollectionWriter(_writer);
         var wroteAny = false;
 
@@ -101,8 +99,7 @@ internal readonly ref struct ComponentContentWriter
         {
             case ComponentContentValueKind.Element:
                 Debug.Assert((uint)value.Index < (uint)component.Elements.Length);
-                _valueWriter.WriteElementReference(
-                    component.Elements.ItemRef(value.Index).Identifier);
+                _writer.Write(component.Elements.ItemRef(value.Index).Identifier);
                 return true;
 
             case ComponentContentValueKind.Constant:
@@ -120,11 +117,4 @@ internal readonly ref struct ComponentContentWriter
         }
     }
 
-    private static string EscapeIdentifier(string identifier)
-    {
-        return CSharpSyntaxFacts.GetKeywordKind(identifier) != CSharpSyntaxKind.None ||
-            CSharpSyntaxFacts.GetContextualKeywordKind(identifier) != CSharpSyntaxKind.None
-                ? "@" + identifier
-                : identifier;
-    }
 }

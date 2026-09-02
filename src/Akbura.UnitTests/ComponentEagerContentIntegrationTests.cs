@@ -203,6 +203,7 @@ public sealed class ComponentEagerContentIntegrationTests
             codeWriter,
             component,
             fixture.SemanticModel,
+            "PlannerView.akbura",
             new Dictionary<AkburaSyntax, string>());
     }
 

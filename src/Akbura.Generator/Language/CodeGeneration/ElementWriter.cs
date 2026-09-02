@@ -28,7 +28,7 @@ internal readonly ref struct ElementWriter
         _writer.Write("private ");
         _valueWriter.WriteTypeName(element.Type);
         _writer.Write(" ");
-        _valueWriter.WriteIdentifier(element.Identifier);
+        _writer.Write(element.Identifier);
         _writer.WriteLine(" = null!;");
     }
 
@@ -41,7 +41,7 @@ internal readonly ref struct ElementWriter
             _writer.Write("var ");
         }
 
-        _valueWriter.WriteIdentifier(element.Identifier);
+        _writer.Write(element.Identifier);
         _writer.Write(" = new ");
         _valueWriter.WriteTypeName(element.Type);
         _writer.WriteLine("();");
@@ -55,7 +55,7 @@ internal readonly ref struct ElementWriter
         }
 
         _writer.Write("((global::System.ComponentModel.ISupportInitialize)");
-        _valueWriter.WriteIdentifier(element.Identifier);
+        _writer.Write(element.Identifier);
         _writer.WriteLine(").BeginInit();");
     }
 
@@ -67,7 +67,7 @@ internal readonly ref struct ElementWriter
         }
 
         _writer.Write("((global::System.ComponentModel.ISupportInitialize)");
-        _valueWriter.WriteIdentifier(element.Identifier);
+        _writer.Write(element.Identifier);
         _writer.WriteLine(").EndInit();");
     }
 }

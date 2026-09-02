@@ -19,11 +19,13 @@ internal sealed class ComponentWriter
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
+    private readonly string _resourcePath;
 
     public ComponentWriter(
         CodeWriter writer,
         IAkburaComponentSymbol component,
         AkburaSemanticModel semanticModel,
+        string resourcePath,
         IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames)
     {
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
@@ -43,6 +45,13 @@ internal sealed class ComponentWriter
             throw new ArgumentNullException(nameof(akcssModuleTypeNames));
         }
 
+        if (string.IsNullOrWhiteSpace(resourcePath))
+        {
+            throw new ArgumentException(
+                "The component resource path cannot be empty.",
+                nameof(resourcePath));
+        }
+
         if (component.SyntaxTree is not ComponentSyntaxTree syntaxTree)
         {
             throw new ArgumentException(
@@ -55,6 +64,14 @@ internal sealed class ComponentWriter
         Debug.Assert(resultEnvironment.IsValid);
         _sourceMap = new ComponentGenerationSourceMap(syntaxTree);
         _ownerTypeName = GetGeneratedOwnerTypeName(component);
+        _resourcePath = NormalizeResourcePath(resourcePath);
+        if (_resourcePath.Length == 0)
+        {
+            throw new ArgumentException(
+                "The component resource path must contain a file name.",
+                nameof(resourcePath));
+        }
+
         _plan = ComponentPlanner.Create(
             component,
             semanticModel,
@@ -70,6 +87,36 @@ internal sealed class ComponentWriter
     public ImmutableArray<ComponentElementPlan> Elements => _plan.Elements;
 
     public bool HasAkcss => !_plan.Akcss.IsEmpty;
+
+    public bool WriteLifecycleFields()
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = CreateLifecycleWriter();
+            return writer.WriteSupportFields(_plan);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    public void WriteLifecycleMembers()
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = CreateLifecycleWriter();
+            writer.WriteMembers(_plan);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
 
     public bool WriteElementFields()
     {
@@ -445,6 +492,21 @@ internal sealed class ComponentWriter
             in _bindingEnvironment,
             _sourceMap,
             _ownerTypeName);
+    }
+
+    private ComponentLifecycleWriter CreateLifecycleWriter()
+    {
+        return new ComponentLifecycleWriter(
+            _writer,
+            in _bindingEnvironment,
+            _sourceMap,
+            _ownerTypeName,
+            _resourcePath);
+    }
+
+    private static string NormalizeResourcePath(string resourcePath)
+    {
+        return resourcePath.Replace('\\', '/').TrimStart('/');
     }
 
     private static string GetGeneratedOwnerTypeName(IAkburaComponentSymbol component)

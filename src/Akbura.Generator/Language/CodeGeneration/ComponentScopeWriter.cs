@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
-using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -32,11 +30,69 @@ internal readonly ref struct ComponentScopeWriter
         _ownerTypeName = ownerTypeName;
     }
 
-    public void WriteInitialState(
+    public void WriteComponentInitialState(
         in ComponentPlan plan,
         in ComponentScopePlan scope,
         in ComponentScopeWriteContext context)
     {
+        Debug.Assert(scope.Kind == ComponentElementScopeKind.Component);
+        Debug.Assert(scope.Id == context.ScopeId);
+        Debug.Assert((uint)scope.Id < (uint)plan.Scopes.Length);
+
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            WriteElementCreation(plan, scope);
+            WriteBeginInit(plan, scope);
+            WriteInitialRenderStatements(plan);
+
+            for (var i = 0; i < scope.Elements.Length; i++)
+            {
+                var elementId = GetScopeElementId(plan, scope, i);
+                ref readonly var element = ref plan.Elements.ItemRef(elementId);
+                var targetExpression = element.Identifier;
+                var elementContext = context.ForElement(elementId);
+
+                WriteFirstUpdateActions(plan, elementId, elementContext);
+                WriteElementContent(plan, element, isFirstUpdate: true, elementContext);
+                WritePropertyElements(plan, element, isFirstUpdate: true, elementContext);
+                WriteSetStyles(plan, elementId, targetExpression, elementContext);
+            }
+
+            WriteEndInit(plan, scope);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    private void WriteInitialRenderStatements(in ComponentPlan plan)
+    {
+        if (plan.RenderStatements.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var writer = new ComponentRenderStatementWriter(_writer, _sourceMap);
+
+        for (var i = 0; i < plan.RenderStatements.Length; i++)
+        {
+            ref readonly var statement = ref plan.RenderStatements.ItemRef(i);
+            if (statement.WritesDuringFirstUpdate)
+            {
+                writer.Write(statement);
+            }
+        }
+    }
+
+    public void WriteLocalInitialState(
+        in ComponentPlan plan,
+        in ComponentScopePlan scope,
+        in ComponentScopeWriteContext context)
+    {
+        Debug.Assert(scope.Kind != ComponentElementScopeKind.Component);
         Debug.Assert(scope.Id == context.ScopeId);
         Debug.Assert((uint)scope.Id < (uint)plan.Scopes.Length);
 
@@ -51,11 +107,11 @@ internal readonly ref struct ComponentScopeWriter
             {
                 var elementId = GetScopeElementId(plan, scope, i);
                 ref readonly var element = ref plan.Elements.ItemRef(elementId);
-                var targetExpression = EscapeIdentifier(element.Identifier);
+                var targetExpression = element.Identifier;
                 var elementContext = context.ForElement(elementId);
 
                 WriteFirstUpdateActions(plan, elementId, elementContext);
-                WriteUpdateProperties(plan, elementId, elementContext);
+                WriteInitialDynamicProperties(plan, elementId, elementContext);
                 WriteElementContent(plan, element, isFirstUpdate: true, elementContext);
                 WriteElementContent(plan, element, isFirstUpdate: false, elementContext);
                 WritePropertyElements(plan, element, isFirstUpdate: true, elementContext);
@@ -64,6 +120,38 @@ internal readonly ref struct ComponentScopeWriter
             }
 
             WriteEndInit(plan, scope);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    public void WriteUpdateState(
+        in ComponentPlan plan,
+        in ComponentScopePlan scope,
+        in ComponentScopeWriteContext context)
+    {
+        Debug.Assert(scope.Kind == ComponentElementScopeKind.Component);
+        Debug.Assert(scope.Id == context.ScopeId);
+        Debug.Assert((uint)scope.Id < (uint)plan.Scopes.Length);
+
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            for (var i = 0; i < scope.Elements.Length; i++)
+            {
+                var elementId = GetScopeElementId(plan, scope, i);
+                ref readonly var element = ref plan.Elements.ItemRef(elementId);
+                var targetExpression = element.Identifier;
+                var elementContext = context.ForElement(elementId);
+
+                WriteRuntimeUpdateProperties(plan, elementId, elementContext);
+                WriteElementContent(plan, element, isFirstUpdate: false, elementContext);
+                WritePropertyElements(plan, element, isFirstUpdate: false, elementContext);
+                WriteRefresh(element, targetExpression);
+            }
         }
         finally
         {
@@ -82,7 +170,7 @@ internal readonly ref struct ComponentScopeWriter
             return false;
         }
 
-        var targetExpression = EscapeIdentifier(element.Identifier);
+        var targetExpression = element.Identifier;
         var propertyContext = context.WithTarget(
             targetExpression,
             context.TargetProperty,
@@ -156,13 +244,46 @@ internal readonly ref struct ComponentScopeWriter
         int elementId,
         in MarkupExtensionWriteContext context)
     {
+        return WriteRuntimeUpdateProperties(plan, elementId, context);
+    }
+
+    private bool WriteInitialDynamicProperties(
+        in ComponentPlan plan,
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        return WriteProperties(
+            plan,
+            elementId,
+            context,
+            ComponentPropertyWriteFilter.UpdateOnly);
+    }
+
+    private bool WriteRuntimeUpdateProperties(
+        in ComponentPlan plan,
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        return WriteProperties(
+            plan,
+            elementId,
+            context,
+            ComponentPropertyWriteFilter.RuntimeUpdate);
+    }
+
+    private bool WriteProperties(
+        in ComponentPlan plan,
+        int elementId,
+        in MarkupExtensionWriteContext context,
+        ComponentPropertyWriteFilter filter)
+    {
         ref readonly var element = ref GetElement(plan, elementId);
         if (element.PropertyWrites.IsEmpty)
         {
             return false;
         }
 
-        var targetExpression = EscapeIdentifier(element.Identifier);
+        var targetExpression = element.Identifier;
         var propertyContext = context.WithTarget(
             targetExpression,
             context.TargetProperty,
@@ -178,7 +299,10 @@ internal readonly ref struct ComponentScopeWriter
         {
             ref readonly var property = ref plan.PropertyWrites.ItemRef(
                 element.PropertyWrites.Start + i);
-            if (property.IsFirstUpdate)
+            var shouldWrite = filter == ComponentPropertyWriteFilter.UpdateOnly
+                ? property.Phase == ComponentPropertyWritePhase.Update
+                : property.WritesDuringUpdate;
+            if (!shouldWrite)
             {
                 continue;
             }
@@ -250,6 +374,26 @@ internal readonly ref struct ComponentScopeWriter
             element.Akcss.Activators,
             targetExpression,
             context);
+        return true;
+    }
+
+    private bool WriteRefresh(
+        in ComponentElementPlan element,
+        string targetExpression)
+    {
+        if (element.Akcss.Activators.IsEmpty)
+        {
+            return false;
+        }
+
+        var writer = new AkcssActivatorWriter(
+            _writer,
+            in _bindingEnvironment,
+            _ownerTypeName,
+            _sourceMap);
+        writer.WriteRefresh(
+            element.Akcss.Activators,
+            targetExpression);
         return true;
     }
 
@@ -451,11 +595,9 @@ internal readonly ref struct ComponentScopeWriter
         return ref element;
     }
 
-    private static string EscapeIdentifier(string identifier)
+    private enum ComponentPropertyWriteFilter : byte
     {
-        return CSharpSyntaxFacts.GetKeywordKind(identifier) != CSharpSyntaxKind.None ||
-            CSharpSyntaxFacts.GetContextualKeywordKind(identifier) != CSharpSyntaxKind.None
-                ? "@" + identifier
-                : identifier;
+        UpdateOnly,
+        RuntimeUpdate,
     }
 }

@@ -282,7 +282,7 @@ internal readonly ref struct PropertySubscriptionWriter
     private void WriteElementReference(
         in ComponentElementPlan element)
     {
-        _valueWriter.WriteIdentifier(element.Identifier);
+        _writer.Write(element.Identifier);
     }
 
     private void WriteHandlerName(int id)

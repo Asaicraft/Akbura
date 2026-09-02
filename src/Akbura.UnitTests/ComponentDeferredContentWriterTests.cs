@@ -442,6 +442,7 @@ public sealed class ComponentDeferredContentWriterTests
             codeWriter,
             componentSymbol,
             semanticFixture.SemanticModel,
+            "PlannerView.akbura",
             new Dictionary<AkburaSyntax, string>());
 
         return new WriterFixture(semanticFixture, codeWriter, writer);

@@ -147,7 +147,7 @@ internal readonly ref struct ComponentPropertyWriter
         ref readonly var element = ref component.Elements.ItemRef(plan.PayloadIndex);
         var propertyWriter = new PropertyWriter(_writer);
         var end = propertyWriter.WriteStart(plan.Destination, target);
-        _valueWriter.WriteElementReference(element.Identifier);
+        _writer.Write(element.Identifier);
         propertyWriter.WriteEnd(end);
     }
 

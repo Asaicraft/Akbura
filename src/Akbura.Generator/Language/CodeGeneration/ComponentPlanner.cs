@@ -79,6 +79,8 @@ internal static class ComponentPlanner
         private readonly BindingWriterEnvironment _bindingEnvironment;
         private readonly MarkupExtensionResultEnvironment _resultEnvironment;
         private readonly INamedTypeSymbol? _controlType;
+        private readonly INamedTypeSymbol? _contentPresenterType;
+        private readonly IFieldSymbol? _dataContextProperty;
         private readonly INamedTypeSymbol? _initializeType;
         private readonly ArrayBuilder<PendingElementPlan> _elements;
         private readonly ArrayBuilder<PendingScopePlan> _pendingScopes;
@@ -106,6 +108,7 @@ internal static class ComponentPlanner
         private ImmutableArrayBuilder<ComponentCollectionContentPlan> _collectionContents;
         private ImmutableArrayBuilder<ComponentContentItemPlan> _contentItems;
         private ImmutableArrayBuilder<BindingElementReference> _elementReferences;
+        private ImmutableArrayBuilder<ComponentRenderStatementPlan> _renderStatements;
         private int _nextCachedBindingPathId;
 
         public Planner(
@@ -121,6 +124,11 @@ internal static class ComponentPlanner
             _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
             _resultEnvironment = resultEnvironment;
             _controlType = _compilation.GetTypeByMetadataName("Avalonia.Controls.Control");
+            _contentPresenterType = _compilation.GetTypeByMetadataName(
+                "Avalonia.Controls.Presenters.ContentPresenter");
+            _dataContextProperty = GetStaticField(
+                _compilation.GetTypeByMetadataName("Avalonia.StyledElement"),
+                "DataContextProperty");
             _initializeType = _compilation.GetTypeByMetadataName("System.ComponentModel.ISupportInitialize");
             _elements = ArrayBuilder<PendingElementPlan>.GetInstance();
             _pendingScopes = ArrayBuilder<PendingScopePlan>.GetInstance();
@@ -153,6 +161,7 @@ internal static class ComponentPlanner
             _collectionContents = ImmutableArrayBuilder<ComponentCollectionContentPlan>.Rent();
             _contentItems = ImmutableArrayBuilder<ComponentContentItemPlan>.Rent();
             _elementReferences = ImmutableArrayBuilder<BindingElementReference>.Rent();
+            _renderStatements = ImmutableArrayBuilder<ComponentRenderStatementPlan>.Rent();
             _nextCachedBindingPathId = 0;
         }
 
@@ -168,6 +177,7 @@ internal static class ComponentPlanner
 
             LowerFirstUpdateActions();
             LowerContent();
+            LowerRenderStatements();
             BuildScopeIndex();
 
             using var akcssInputs = ImmutableArrayBuilder<AkcssActivatorElementInput>.Rent(_elements.Count);
@@ -186,6 +196,7 @@ internal static class ComponentPlanner
                 akcssInputs.WrittenSpan,
                 _akcssModuleTypeNames);
             Debug.Assert(akcss.Elements.Length == _elements.Count);
+            var lifecycle = CreateLifecyclePlan(akcss);
 
             using var elements = ImmutableArrayBuilder<ComponentElementPlan>.Rent(_elements.Count);
             for (var i = 0; i < _elements.Count; i++)
@@ -235,6 +246,8 @@ internal static class ComponentPlanner
                 _deferredContents.ToImmutable(),
                 _templates.ToImmutable(),
                 _elementReferences.ToImmutable(),
+                lifecycle,
+                _renderStatements.ToImmutable(),
                 akcss);
         }
 
@@ -266,6 +279,267 @@ internal static class ComponentPlanner
             _collectionContents.Dispose();
             _contentItems.Dispose();
             _elementReferences.Dispose();
+            _renderStatements.Dispose();
+        }
+
+        private ComponentLifecyclePlan CreateLifecyclePlan(
+            in AkcssComponentActivatorPlan akcss)
+        {
+            var rootElementId = -1;
+            var flags = ComponentLifecycleFlags.None;
+
+            if (_rootElementIds.Count == 1)
+            {
+                var candidateId = _rootElementIds.WrittenSpan[0];
+
+                if ((uint)candidateId < (uint)_elements.Count)
+                {
+                    var candidate = _elements[candidateId];
+                    if (candidate.ScopeId == 0 &&
+                        (candidate.Flags & ComponentElementFlags.IsControl) != 0)
+                    {
+                        rootElementId = candidateId;
+
+                        if (HasExplicitDataContextSetter(candidate))
+                        {
+                            flags |= ComponentLifecycleFlags.HasExplicitRootDataContext;
+                        }
+                    }
+                }
+            }
+
+            if (rootElementId < 0)
+            {
+                flags |= ComponentLifecycleFlags.UsesFallbackRoot;
+            }
+
+            if (RequiresBaseUri(akcss))
+            {
+                flags |= ComponentLifecycleFlags.RequiresBaseUri;
+            }
+
+            for (var i = 0; i < _elements.Count; i++)
+            {
+                var element = _elements[i];
+                if (element.ScopeId == 0 &&
+                    (element.Flags & ComponentElementFlags.RequiresContentPresenterRefresh) != 0)
+                {
+                    flags |= ComponentLifecycleFlags.HasComponentContentPresenters;
+                    break;
+                }
+            }
+
+            return new ComponentLifecyclePlan(rootElementId, flags);
+        }
+
+        private bool HasExplicitDataContextSetter(
+            in PendingElementPlan element)
+        {
+            var attributes = element.Symbol.AttributeOperations;
+
+            for (var i = 0; i < attributes.Length; i++)
+            {
+                if (attributes[i] is IMarkupPropertySetterOperation operation &&
+                    !operation.HasErrors &&
+                    IsDataContextProperty(operation.Property))
+                {
+                    return true;
+                }
+            }
+
+            var propertyElements = element.PropertyElements;
+            for (var i = 0; i < propertyElements.Length; i++)
+            {
+                var propertyElement = _propertyElements[
+                    propertyElements.Start + i];
+                if (_semanticModel.GetOperation(propertyElement.Syntax) is
+                    IMarkupContentOperation operation &&
+                    !operation.HasErrors &&
+                    IsDataContextProperty(operation.Property))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsDataContextProperty(AkburaPropertySymbol? property)
+        {
+            return _dataContextProperty != null &&
+                SymbolEqualityComparer.Default.Equals(
+                    property?.AvaloniaPropertyDefinition.Symbol,
+                    _dataContextProperty);
+        }
+
+        private static IFieldSymbol? GetStaticField(
+            INamedTypeSymbol? type,
+            string name)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            var members = type.GetMembers(name);
+            for (var i = 0; i < members.Length; i++)
+            {
+                if (members[i] is IFieldSymbol { IsStatic: true } field)
+                {
+                    return field;
+                }
+            }
+
+            return null;
+        }
+
+        private bool RequiresBaseUri(in AkcssComponentActivatorPlan akcss)
+        {
+            if (_deferredContents.Count != 0)
+            {
+                return true;
+            }
+
+            var extensions = _markupExtensions.WrittenSpan;
+            for (var i = 0; i < extensions.Length; i++)
+            {
+                if (RequiresMarkupServiceProvider(extensions[i].Extension))
+                {
+                    return true;
+                }
+            }
+
+            var bindings = _bindings.WrittenSpan;
+            for (var i = 0; i < bindings.Length; i++)
+            {
+                if (NestedValuesRequireMarkupServiceProvider(bindings[i].Extension))
+                {
+                    return true;
+                }
+            }
+
+            var slots = akcss.MarkupExtensionSlots;
+            for (var i = 0; i < slots.Length; i++)
+            {
+                if (RequiresMarkupServiceProvider(slots[i].Extension))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool RequiresMarkupServiceProvider(
+            MarkupExtensionValue extension)
+        {
+            if (extension.Binding == null &&
+                extension.ProvideValueMethod.Symbol is
+                    IMethodSymbol { Parameters.Length: 1 })
+            {
+                return true;
+            }
+
+            return NestedValuesRequireMarkupServiceProvider(extension);
+        }
+
+        private static bool NestedValuesRequireMarkupServiceProvider(
+            MarkupExtensionValue extension)
+        {
+            var arguments = extension.Arguments;
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                if (arguments[i].NestedValue is { } nested &&
+                    RequiresMarkupServiceProvider(nested))
+                {
+                    return true;
+                }
+            }
+
+            var properties = extension.Properties;
+            for (var i = 0; i < properties.Length; i++)
+            {
+                if (properties[i].NestedValue is { } nested &&
+                    RequiresMarkupServiceProvider(nested))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void LowerRenderStatements()
+        {
+            var members = _component.DeclarationSyntax.Members;
+
+            for (var i = 0; i < members.Count; i++)
+            {
+                if (members[i] is not CSharpStatementSyntax syntax)
+                {
+                    continue;
+                }
+
+                var statement = syntax.GetRawCSharpStatement();
+                if (statement == null ||
+                    statement is CSharp.LocalFunctionStatementSyntax)
+                {
+                    continue;
+                }
+
+                if (syntax.Body != null)
+                {
+                    statement = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseStatement(
+                        syntax.ToFullString());
+                }
+
+                if (statement.ContainsDiagnostics)
+                {
+                    continue;
+                }
+
+                if (_semanticModel.GetOperation(syntax) is IUseHookOperation hook)
+                {
+                    if (!hook.HasErrors)
+                    {
+                        _renderStatements.Add(new ComponentRenderStatementPlan(
+                            ComponentRenderStatementKind.UseHookInvocation,
+                            hook.EffectiveInvocation,
+                            syntax,
+                            ComponentRenderStatementPhase.Update));
+                    }
+
+                    continue;
+                }
+
+                if (HasSemanticErrors(syntax))
+                {
+                    continue;
+                }
+
+                _renderStatements.Add(new ComponentRenderStatementPlan(
+                    ComponentRenderStatementKind.Statement,
+                    statement,
+                    syntax,
+                    statement is CSharp.LocalDeclarationStatementSyntax
+                        ? ComponentRenderStatementPhase.Both
+                        : ComponentRenderStatementPhase.Update));
+            }
+        }
+
+        private bool HasSemanticErrors(AkburaSyntax syntax)
+        {
+            var diagnostics = _semanticModel.GetSemanticDiagnostics(syntax);
+
+            for (var i = 0; i < diagnostics.Length; i++)
+            {
+                if (diagnostics[i].Severity == AkburaDiagnosticSeverity.Error)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool TryBuildElement(
@@ -290,7 +564,7 @@ internal static class ComponentPlanner
             var nameOperation = FindNameOperation(symbol);
             elementId = _elements.Count;
             var identifier = nameOperation?.NameSymbol is { } name
-                ? name.IdentifierText
+                ? EscapeIdentifier(name.IdentifierText)
                 : "__element" + elementId.ToString(CultureInfo.InvariantCulture);
 
             _elements.Add(default);
@@ -306,7 +580,7 @@ internal static class ComponentPlanner
             {
                 _elementReferences.Add(new BindingElementReference(
                     nameSymbol.Name,
-                    EscapeIdentifier(identifier),
+                    identifier,
                     scope.ScopeId,
                     isClassMember: !scope.IsLocal));
             }
@@ -968,7 +1242,7 @@ internal static class ComponentPlanner
                 ComponentPropertyValueKind.Constant,
                 valueIndex,
                 pending.Syntax,
-                isFirstUpdate: true));
+                ComponentPropertyWritePhase.FirstUpdate));
             _firstUpdateActions.Add(
                 ComponentFirstUpdateActionPlan.CreateWrite(writeIndex));
         }
@@ -1055,15 +1329,15 @@ internal static class ComponentPlanner
             }
 
             var writeIndex = _propertyWrites.Count;
-            var isFirstUpdate = IsFirstUpdateProperty(operation);
+            var phase = GetWritePhase(operation);
             _propertyWrites.Add(new ComponentPropertyWritePlan(
                 pending.Destination,
                 value.Kind,
                 value.Index,
                 operation.Syntax,
-                isFirstUpdate));
+                phase));
 
-            if (isFirstUpdate)
+            if ((phase & ComponentPropertyWritePhase.FirstUpdate) != 0)
             {
                 _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateWrite(writeIndex));
             }
@@ -1618,6 +1892,12 @@ internal static class ComponentPlanner
                 flags |= ComponentElementFlags.IsControl;
             }
 
+            if (!scope.IsLocal &&
+                IsImplicitConversion(type, _contentPresenterType))
+            {
+                flags |= ComponentElementFlags.RequiresContentPresenterRefresh;
+            }
+
             if (IsImplicitConversion(type, _initializeType))
             {
                 flags |= ComponentElementFlags.SupportsInitialize;
@@ -1706,10 +1986,23 @@ internal static class ComponentPlanner
             return null;
         }
 
-        private static bool IsFirstUpdateProperty(IMarkupPropertySetterOperation operation)
+        private static ComponentPropertyWritePhase GetWritePhase(
+            IMarkupPropertySetterOperation operation)
         {
-            return operation.Property?.Parameter != null ||
-                operation.ValueKind is MarkupAttributeValueKind.Literal or MarkupAttributeValueKind.MarkupExtension;
+            var isParameter = operation.Property?.Parameter != null;
+            var isInitialValue = operation.ValueKind is
+                MarkupAttributeValueKind.Literal or
+                MarkupAttributeValueKind.MarkupExtension;
+
+            if (isParameter &&
+                operation.ValueKind == MarkupAttributeValueKind.DynamicExpression)
+            {
+                return ComponentPropertyWritePhase.Both;
+            }
+
+            return isInitialValue
+                ? ComponentPropertyWritePhase.FirstUpdate
+                : ComponentPropertyWritePhase.Update;
         }
 
         private static string GetEventHandlerExpression(IMarkupRoutedEventBindingOperation operation)

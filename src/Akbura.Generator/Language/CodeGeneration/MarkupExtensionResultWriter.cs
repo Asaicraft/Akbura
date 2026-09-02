@@ -56,8 +56,8 @@ internal readonly ref struct BindingBaseResultWriter
             .Write("((global::Avalonia.AvaloniaObject)")
             .Write(target.TargetExpression)
             .Write(").Bind(");
-        var valueWriter = new CSharpValueWriter(_writer);
-        valueWriter.WriteStaticMemberReference(target.AvaloniaProperty);
+        var propertyWriter = new MarkupTargetPropertyWriter(_writer);
+        propertyWriter.Write(target.TargetProperty);
         _writer.Write(", ");
     }
 
@@ -149,8 +149,8 @@ internal readonly ref struct RuntimeMarkupExtensionResultWriter
             .Write("(global::Avalonia.AvaloniaObject)")
             .Write(target.TargetExpression)
             .Write(", ");
-        var valueWriter = new CSharpValueWriter(_writer);
-        valueWriter.WriteStaticMemberReference(target.AvaloniaProperty);
+        var propertyWriter = new MarkupTargetPropertyWriter(_writer);
+        propertyWriter.Write(target.TargetProperty);
         _writer.Write(", ");
     }
 

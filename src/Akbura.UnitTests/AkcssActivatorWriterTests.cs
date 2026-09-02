@@ -525,9 +525,10 @@ public sealed class AkcssActivatorWriterTests
 
     private static MarkupExtensionWriteContext CreateWriteContext()
     {
+        var targetProperty = MarkupTargetPropertyPlan.CreateExpression("__property");
         return new MarkupExtensionWriteContext(
             targetObjectExpression: "__target",
-            targetPropertyExpression: "__property",
+            targetProperty: targetProperty,
             intermediateRootExpression: "__root",
             baseUriExpression: "__baseUri",
             directParentsStackExpression: "__parents",

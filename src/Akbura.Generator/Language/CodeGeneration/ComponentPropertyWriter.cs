@@ -1,6 +1,5 @@
 ﻿using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
-using System;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -30,15 +29,16 @@ internal readonly ref struct ComponentPropertyWriter
         string targetExpression,
         in MarkupExtensionWriteContext context)
     {
+        Debug.Assert(plan.Destination.IsValid);
+        Debug.Assert(!string.IsNullOrEmpty(targetExpression));
+
         if (!plan.Destination.IsValid || string.IsNullOrEmpty(targetExpression))
         {
-            throw new InvalidOperationException("The component property write is not initialized.");
+            Debug.Fail("An invalid component property write reached code generation.");
+            return;
         }
 
         using var mapping = _mappings.WriteStart(plan.Syntax);
-        var targetContext = context.WithTarget(
-            targetExpression,
-            GetTargetPropertyExpression(plan.Destination));
 
         switch (plan.ValueKind)
         {
@@ -48,28 +48,62 @@ internal readonly ref struct ComponentPropertyWriter
                 WriteCSharpValue(component, plan, targetExpression);
                 break;
             case ComponentPropertyValueKind.MarkupExtensionValue:
-                WriteMarkupExtension(component, plan, targetExpression, targetContext);
-                break;
             case ComponentPropertyValueKind.MarkupBinding:
-                WriteBinding(component, plan, targetExpression, targetContext);
-                break;
             case ComponentPropertyValueKind.DynamicResource:
-                WriteDynamicResource(component, plan, targetExpression, targetContext);
-                break;
             case ComponentPropertyValueKind.StaticResource:
-                WriteStaticResource(component, plan, targetExpression, targetContext);
-                break;
             case ComponentPropertyValueKind.BindingBaseResult:
-                WriteBindingBase(component, plan, targetExpression, targetContext);
-                break;
             case ComponentPropertyValueKind.RuntimeMarkupExtensionResult:
-                WriteRuntimeResult(component, plan, targetExpression, targetContext);
+                WriteMarkupValue(component, plan, targetExpression, context);
                 break;
             default:
-                throw new InvalidOperationException("The component property value is not initialized.");
+                Debug.Fail("An invalid component property value reached code generation.");
+                return;
         }
 
         _writer.WriteLine();
+    }
+
+    private void WriteMarkupValue(
+        in ComponentPlan component,
+        in ComponentPropertyWritePlan plan,
+        string targetExpression,
+        in MarkupExtensionWriteContext context)
+    {
+        var targetProperty = plan.Destination.TargetProperty;
+        Debug.Assert(plan.ValueKind == ComponentPropertyValueKind.MarkupExtensionValue || targetProperty.IsValid);
+
+        if (plan.ValueKind != ComponentPropertyValueKind.MarkupExtensionValue && !targetProperty.IsValid)
+        {
+            Debug.Fail("A markup property write requires a target-property plan.");
+            return;
+        }
+
+        var targetContext = context.WithTarget(targetExpression, targetProperty);
+
+        switch (plan.ValueKind)
+        {
+            case ComponentPropertyValueKind.MarkupExtensionValue:
+                WriteMarkupExtension(component, plan, targetExpression, targetContext);
+                return;
+            case ComponentPropertyValueKind.MarkupBinding:
+                WriteBinding(component, plan, targetExpression, targetContext);
+                return;
+            case ComponentPropertyValueKind.DynamicResource:
+                WriteDynamicResource(component, plan, targetExpression, targetContext);
+                return;
+            case ComponentPropertyValueKind.StaticResource:
+                WriteStaticResource(component, plan, targetExpression, targetContext);
+                return;
+            case ComponentPropertyValueKind.BindingBaseResult:
+                WriteBindingBase(component, plan, targetExpression, targetContext);
+                return;
+            case ComponentPropertyValueKind.RuntimeMarkupExtensionResult:
+                WriteRuntimeResult(component, plan, targetExpression, targetContext);
+                return;
+            default:
+                Debug.Fail("A non-markup value reached markup code generation.");
+                return;
+        }
     }
 
     public void WriteCachedBindingPath(in BindingWritePlan plan)
@@ -315,10 +349,7 @@ internal readonly ref struct ComponentPropertyWriter
         in ComponentPlan component,
         int index)
     {
-        if ((uint)index >= (uint)component.CSharpValues.Length)
-        {
-            throw new InvalidOperationException("The C# value index is outside the component plan.");
-        }
+        Debug.Assert((uint)index < (uint)component.CSharpValues.Length);
 
         return ref component.CSharpValues.ItemRef(index);
     }
@@ -327,10 +358,7 @@ internal readonly ref struct ComponentPropertyWriter
         in ComponentPlan component,
         int index)
     {
-        if ((uint)index >= (uint)component.MarkupExtensions.Length)
-        {
-            throw new InvalidOperationException("The markup-extension index is outside the component plan.");
-        }
+        Debug.Assert((uint)index < (uint)component.MarkupExtensions.Length);
 
         return ref component.MarkupExtensions.ItemRef(index);
     }
@@ -339,10 +367,7 @@ internal readonly ref struct ComponentPropertyWriter
         in ComponentPlan component,
         int index)
     {
-        if ((uint)index >= (uint)component.Bindings.Length)
-        {
-            throw new InvalidOperationException("The binding index is outside the component plan.");
-        }
+        Debug.Assert((uint)index < (uint)component.Bindings.Length);
 
         return ref component.Bindings.ItemRef(index);
     }
@@ -351,49 +376,8 @@ internal readonly ref struct ComponentPropertyWriter
         in PropertyWritePlan destination,
         string target)
     {
-        if (destination.Kind != PropertyWriteKind.AvaloniaProperty || destination.AvaloniaProperty == null)
-        {
-            throw new InvalidOperationException("The result requires an Avalonia property destination.");
-        }
+        Debug.Assert(destination.HasAvaloniaPropertyTarget);
 
-        return new AvaloniaPropertyWriteTarget(target, destination.AvaloniaProperty);
-    }
-
-    private static string GetTargetPropertyExpression(in PropertyWritePlan destination)
-    {
-        if (destination.AvaloniaProperty != null)
-        {
-            return GetStaticMemberExpression(destination.AvaloniaProperty);
-        }
-
-        if (destination.ClrProperty is { } property)
-        {
-            return "typeof(" + GetTypeExpression(property.ContainingType) + ").GetProperty(\"" +
-                property.Name + "\")!";
-        }
-
-        if (destination.AttachedSetter is { } setter)
-        {
-            return "typeof(" + GetTypeExpression(setter.ContainingType) + ").GetMethod(\"" +
-                setter.Name + "\")!";
-        }
-
-        return "null!";
-    }
-
-    private static string GetStaticMemberExpression(ISymbol symbol)
-    {
-        using var writer = new CodeWriter();
-        var valueWriter = new CSharpValueWriter(writer);
-        valueWriter.WriteStaticMemberReference(symbol);
-        return writer.GetText().ToString();
-    }
-
-    private static string GetTypeExpression(ITypeSymbol type)
-    {
-        using var writer = new CodeWriter();
-        var valueWriter = new CSharpValueWriter(writer);
-        valueWriter.WriteTypeName(type);
-        return writer.GetText().ToString();
+        return new AvaloniaPropertyWriteTarget(target, destination.TargetProperty);
     }
 }

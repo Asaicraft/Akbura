@@ -179,23 +179,25 @@ internal readonly struct AvaloniaPropertyWriteTarget
 {
     public AvaloniaPropertyWriteTarget(
         string targetExpression,
-        ISymbol avaloniaProperty)
+        MarkupTargetPropertyPlan targetProperty)
     {
-        Debug.Assert(!string.IsNullOrEmpty(targetExpression));
-        Debug.Assert(
-            avaloniaProperty is IFieldSymbol { IsStatic: true } or
-                IPropertySymbol { IsStatic: true });
-
         TargetExpression = targetExpression;
-        AvaloniaProperty = avaloniaProperty;
+        TargetProperty = targetProperty;
+    }
+
+    public AvaloniaPropertyWriteTarget(
+        string targetExpression,
+        ISymbol avaloniaProperty)
+        : this(targetExpression, MarkupTargetPropertyPlan.CreateStaticMember(avaloniaProperty))
+    {
     }
 
     public string TargetExpression { get; }
 
-    public ISymbol AvaloniaProperty { get; }
+    public MarkupTargetPropertyPlan TargetProperty { get; }
 
     public bool IsValid =>
         !string.IsNullOrEmpty(TargetExpression) &&
-        AvaloniaProperty is IFieldSymbol { IsStatic: true } or
-            IPropertySymbol { IsStatic: true };
+        TargetProperty.Kind is MarkupTargetPropertyKind.StaticMember or
+            MarkupTargetPropertyKind.GeneratedParameter;
 }

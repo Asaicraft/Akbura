@@ -13,6 +13,7 @@ internal enum PropertyWriteKind : byte
     ClrProperty,
     AvaloniaProperty,
     AttachedAccessor,
+    ComponentParameter,
     DirectMember,
 }
 
@@ -31,14 +32,14 @@ internal readonly struct PropertyWritePlan
     private PropertyWritePlan(
         PropertyWriteKind kind,
         RoslynPropertySymbol? clrProperty,
-        RoslynSymbol? avaloniaProperty,
+        MarkupTargetPropertyPlan targetProperty,
         IMethodSymbol? attachedSetter,
         ITypeSymbol? receiverType,
         string? memberName)
     {
         Kind = kind;
         ClrProperty = clrProperty;
-        AvaloniaProperty = avaloniaProperty;
+        TargetProperty = targetProperty;
         AttachedSetter = attachedSetter;
         ReceiverType = receiverType;
         MemberName = memberName;
@@ -48,7 +49,12 @@ internal readonly struct PropertyWritePlan
 
     public RoslynPropertySymbol? ClrProperty { get; }
 
-    public RoslynSymbol? AvaloniaProperty { get; }
+    public MarkupTargetPropertyPlan TargetProperty { get; }
+
+    public RoslynSymbol? AvaloniaProperty =>
+        TargetProperty.Kind == MarkupTargetPropertyKind.StaticMember
+            ? TargetProperty.Symbol
+            : null;
 
     public IMethodSymbol? AttachedSetter { get; }
 
@@ -58,7 +64,29 @@ internal readonly struct PropertyWritePlan
 
     public bool IsValid => Kind != PropertyWriteKind.None;
 
+    public bool HasAvaloniaPropertyTarget =>
+        TargetProperty.Kind is MarkupTargetPropertyKind.StaticMember or
+            MarkupTargetPropertyKind.GeneratedParameter;
+
     public static PropertyWritePlan Create(AkburaPropertySymbol property)
+    {
+        return CreateCore(property, targetType: null);
+    }
+
+    public static PropertyWritePlan Create(
+        AkburaPropertySymbol property,
+        ITypeSymbol targetType)
+    {
+        Debug.Assert(targetType != null);
+
+        return targetType == null
+            ? default
+            : CreateCore(property, targetType);
+    }
+
+    private static PropertyWritePlan CreateCore(
+        AkburaPropertySymbol property,
+        ITypeSymbol? targetType)
     {
         Debug.Assert(property != null);
 
@@ -72,6 +100,7 @@ internal readonly struct PropertyWritePlan
             PropertyAccessKind.ClrProperty => CreateClrProperty(property),
             PropertyAccessKind.AvaloniaProperty => CreateAvaloniaProperty(property),
             PropertyAccessKind.AttachedAccessor => CreateAttachedAccessor(property),
+            PropertyAccessKind.Parameter when targetType != null => CreateComponentParameter(property, targetType),
             PropertyAccessKind.Parameter or PropertyAccessKind.Command => CreateDirectMember(property),
             _ => default,
         };
@@ -90,7 +119,7 @@ internal readonly struct PropertyWritePlan
         return new PropertyWritePlan(
             PropertyWriteKind.ClrProperty,
             clrProperty,
-            avaloniaProperty: null,
+            MarkupTargetPropertyPlan.CreateClrProperty(clrProperty),
             attachedSetter: null,
             receiverType,
             memberName: null);
@@ -110,7 +139,7 @@ internal readonly struct PropertyWritePlan
         return new PropertyWritePlan(
             PropertyWriteKind.AvaloniaProperty,
             clrProperty: null,
-            avaloniaProperty,
+            MarkupTargetPropertyPlan.CreateStaticMember(avaloniaProperty),
             attachedSetter: null,
             receiverType,
             memberName: null);
@@ -131,10 +160,28 @@ internal readonly struct PropertyWritePlan
         return new PropertyWritePlan(
             PropertyWriteKind.AttachedAccessor,
             clrProperty: null,
-            avaloniaProperty: null,
+            MarkupTargetPropertyPlan.CreateAttachedSetter(attachedSetter),
             attachedSetter,
             receiverType,
             memberName: null);
+    }
+
+    private static PropertyWritePlan CreateComponentParameter(
+        AkburaPropertySymbol property,
+        ITypeSymbol targetType)
+    {
+        if (string.IsNullOrEmpty(property.Name))
+        {
+            return default;
+        }
+
+        return new PropertyWritePlan(
+            PropertyWriteKind.ComponentParameter,
+            clrProperty: null,
+            MarkupTargetPropertyPlan.CreateGeneratedParameter(targetType, property.Name),
+            attachedSetter: null,
+            targetType,
+            property.Name);
     }
 
     private static PropertyWritePlan CreateDirectMember(AkburaPropertySymbol property)
@@ -147,7 +194,7 @@ internal readonly struct PropertyWritePlan
         return new PropertyWritePlan(
             PropertyWriteKind.DirectMember,
             clrProperty: null,
-            avaloniaProperty: null,
+            targetProperty: default,
             attachedSetter: null,
             receiverType: null,
             property.Name);
@@ -192,6 +239,7 @@ internal readonly ref struct PropertyWriter
             PropertyWriteKind.ClrProperty => WriteClrProperty(plan, targetExpression),
             PropertyWriteKind.AvaloniaProperty => WriteAvaloniaProperty(plan, targetExpression),
             PropertyWriteKind.AttachedAccessor => WriteAttachedAccessor(plan, targetExpression),
+            PropertyWriteKind.ComponentParameter => WriteDirectMember(plan, targetExpression),
             PropertyWriteKind.DirectMember => WriteDirectMember(plan, targetExpression),
             _ => PropertyWriteEnd.None,
         };

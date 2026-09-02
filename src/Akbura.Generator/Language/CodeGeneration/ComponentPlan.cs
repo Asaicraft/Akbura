@@ -60,6 +60,39 @@ internal readonly struct ComponentElementPlan
         ComponentPlanRange propertyWrites,
         ComponentPlanRange propertyElements,
         AkcssElementActivatorPlan akcss)
+        : this(
+            id,
+            syntax,
+            type,
+            identifier,
+            parentId,
+            scopeId,
+            scopeKind,
+            flags,
+            children,
+            propertyWrites,
+            propertySubscriptions: default,
+            firstUpdateActions: default,
+            propertyElements,
+            akcss)
+    {
+    }
+
+    public ComponentElementPlan(
+        int id,
+        MarkupElementSyntax syntax,
+        ITypeSymbol type,
+        string identifier,
+        int parentId,
+        int scopeId,
+        ComponentElementScopeKind scopeKind,
+        ComponentElementFlags flags,
+        ComponentPlanRange children,
+        ComponentPlanRange propertyWrites,
+        ComponentPlanRange propertySubscriptions,
+        ComponentPlanRange firstUpdateActions,
+        ComponentPlanRange propertyElements,
+        AkcssElementActivatorPlan akcss)
     {
         Id = id;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
@@ -71,6 +104,8 @@ internal readonly struct ComponentElementPlan
         Flags = flags;
         Children = children;
         PropertyWrites = propertyWrites;
+        PropertySubscriptions = propertySubscriptions;
+        FirstUpdateActions = firstUpdateActions;
         PropertyElements = propertyElements;
         Akcss = akcss;
     }
@@ -94,6 +129,10 @@ internal readonly struct ComponentElementPlan
     public ComponentPlanRange Children { get; }
 
     public ComponentPlanRange PropertyWrites { get; }
+
+    public ComponentPlanRange PropertySubscriptions { get; }
+
+    public ComponentPlanRange FirstUpdateActions { get; }
 
     public ComponentPlanRange PropertyElements { get; }
 
@@ -179,32 +218,76 @@ internal readonly struct ComponentPropertyValueReference
 internal readonly struct ComponentPropertySubscriptionPlan
 {
     public ComponentPropertySubscriptionPlan(
+        int id,
         int elementId,
+        int sourceOrder,
         ComponentPropertySynchronizationKind kind,
-        PropertyReadPlan source,
+        PropertyObservationPlan observation,
         CSharpOperationDefinition targetOperation,
         ITypeSymbol valueType,
         AkburaSyntax syntax)
     {
+        Id = id;
         ElementId = elementId;
+        SourceOrder = sourceOrder;
         Kind = kind;
-        Source = source;
+        Observation = observation;
         TargetOperation = targetOperation;
         ValueType = valueType ?? throw new ArgumentNullException(nameof(valueType));
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
     }
 
+    public int Id { get; }
+
     public int ElementId { get; }
+
+    public int SourceOrder { get; }
 
     public ComponentPropertySynchronizationKind Kind { get; }
 
-    public PropertyReadPlan Source { get; }
+    public PropertyObservationPlan Observation { get; }
 
     public CSharpOperationDefinition TargetOperation { get; }
 
     public ITypeSymbol ValueType { get; }
 
     public AkburaSyntax Syntax { get; }
+}
+
+internal enum ComponentFirstUpdateActionKind : byte
+{
+    None,
+    PropertyWrite,
+    PropertySubscription,
+}
+
+internal readonly struct ComponentFirstUpdateActionPlan
+{
+    private ComponentFirstUpdateActionPlan(
+        ComponentFirstUpdateActionKind kind,
+        int index)
+    {
+        Kind = kind;
+        Index = index;
+    }
+
+    public ComponentFirstUpdateActionKind Kind { get; }
+
+    public int Index { get; }
+
+    public static ComponentFirstUpdateActionPlan CreateWrite(int index)
+    {
+        return new ComponentFirstUpdateActionPlan(
+            ComponentFirstUpdateActionKind.PropertyWrite,
+            index);
+    }
+
+    public static ComponentFirstUpdateActionPlan CreateSubscription(int index)
+    {
+        return new ComponentFirstUpdateActionPlan(
+            ComponentFirstUpdateActionKind.PropertySubscription,
+            index);
+    }
 }
 
 internal readonly struct ComponentPropertyWritePlan
@@ -340,6 +423,7 @@ internal readonly struct ComponentPlan
         ImmutableArray<MarkupExtensionResultPlan> markupExtensions,
         ImmutableArray<BindingWritePlan> bindings,
         ImmutableArray<ComponentPropertySubscriptionPlan> propertySubscriptions,
+        ImmutableArray<ComponentFirstUpdateActionPlan> firstUpdateActions,
         ImmutableArray<ComponentPropertyElementPlan> propertyElements,
         ImmutableArray<ComponentDeferredContentPlan> deferredContents,
         ImmutableArray<ComponentTemplatePlan> templates,
@@ -358,6 +442,9 @@ internal readonly struct ComponentPlan
         PropertySubscriptions = propertySubscriptions.IsDefault
             ? ImmutableArray<ComponentPropertySubscriptionPlan>.Empty
             : propertySubscriptions;
+        FirstUpdateActions = firstUpdateActions.IsDefault
+            ? ImmutableArray<ComponentFirstUpdateActionPlan>.Empty
+            : firstUpdateActions;
         PropertyElements = propertyElements.IsDefault
             ? ImmutableArray<ComponentPropertyElementPlan>.Empty
             : propertyElements;
@@ -386,6 +473,8 @@ internal readonly struct ComponentPlan
     public ImmutableArray<BindingWritePlan> Bindings { get; }
 
     public ImmutableArray<ComponentPropertySubscriptionPlan> PropertySubscriptions { get; }
+
+    public ImmutableArray<ComponentFirstUpdateActionPlan> FirstUpdateActions { get; }
 
     public ImmutableArray<ComponentPropertyElementPlan> PropertyElements { get; }
 

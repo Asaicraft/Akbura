@@ -399,9 +399,10 @@ internal readonly ref struct AkcssActivatorWriter
         in AkcssMarkupExtensionSlotPlan slot,
         in MarkupExtensionWriteContext context)
     {
+        var targetProperty = MarkupTargetPropertyPlan.CreateExpression(slot.PropertyName);
         return new MarkupExtensionWriteContext(
             targetObjectExpression: "__target",
-            targetPropertyExpression: slot.NeedsTargetProperty ? slot.PropertyName : "default!",
+            targetProperty: targetProperty,
             intermediateRootExpression: context.IntermediateRootExpression,
             baseUriExpression: context.BaseUriExpression,
             directParentsStackExpression: context.DirectParentsStackExpression,

@@ -84,7 +84,7 @@ public sealed class ComponentWriterTests
         var element = Assert.Single(writer.Elements);
         var context = CreateWriteContext();
 
-        Assert.True(writer.WriteFirstUpdateProperties(element.Id, context));
+        Assert.True(writer.WriteFirstUpdatePropertyActions(element.Id, context));
         Assert.Equal(6, codeWriter.CurrentIndent);
         var firstUpdate = codeWriter.GetText().ToString();
 
@@ -120,7 +120,7 @@ public sealed class ComponentWriterTests
         var writer = CreateWriter(codeWriter, fixture);
         var element = Assert.Single(writer.Elements);
 
-        Assert.True(writer.WriteFirstUpdateProperties(element.Id, CreateWriteContext()));
+        Assert.True(writer.WriteFirstUpdatePropertyActions(element.Id, CreateWriteContext()));
         Assert.False(writer.WriteUpdateProperties(element.Id, CreateWriteContext()));
 
         var output = codeWriter.GetText().ToString();
@@ -129,6 +129,127 @@ public sealed class ComponentWriterTests
         Assert.Contains("global::Avalonia.Controls.GridUnitType.Star", output, StringComparison.Ordinal);
         Assert.Contains("new global::Avalonia.Controls.ColumnDefinitions {", output, StringComparison.Ordinal);
         Assert.DoesNotContain("GridDefinitionListValue", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PropertySubscriptions_WriteFirstRegistrationUpdateAndNamedHandler()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            state string text = "";
+
+            <TextBox x.Name="input" bind:Text={text} />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        using var codeWriter = new CodeWriter
+        {
+            CurrentIndent = 6,
+        };
+        var writer = CreateWriter(codeWriter, fixture);
+        var element = Assert.Single(writer.Elements);
+        var context = CreateWriteContext();
+
+        Assert.True(writer.WriteFirstUpdatePropertyActions(element.Id, context));
+        Assert.Equal(6, codeWriter.CurrentIndent);
+        var firstUpdate = codeWriter.GetText().ToString();
+
+        Assert.Contains(
+            "((global::Avalonia.AvaloniaObject)input).PropertyChanged += " +
+                "__OnPropertyBindingChanged0;",
+            firstUpdate,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(".SetValue(", firstUpdate, StringComparison.Ordinal);
+
+        var updateStart = codeWriter.Length;
+        Assert.True(writer.WriteUpdateProperties(element.Id, context));
+        Assert.Equal(6, codeWriter.CurrentIndent);
+        var update = codeWriter.GetText().ToString().Substring(updateStart);
+
+        Assert.Contains(".SetValue(", update, StringComparison.Ordinal);
+        Assert.Contains("TextProperty", update, StringComparison.Ordinal);
+
+        var handlerStart = codeWriter.Length;
+        Assert.True(writer.WritePropertySubscriptionHandlers());
+        Assert.Equal(6, codeWriter.CurrentIndent);
+        var handler = codeWriter.GetText().ToString().Substring(handlerStart);
+
+        Assert.Contains("private void __OnPropertyBindingChanged0(", handler, StringComparison.Ordinal);
+        Assert.Contains("text = (string)__change0.NewValue!;", handler, StringComparison.Ordinal);
+        AssertSourceMappings(handler, "PlannerView.akbura");
+    }
+
+    [Fact]
+    public void ComponentParameterBinding_WritesSubscriptionBeforeFirstValueOnly()
+    {
+        const string component =
+            """
+            using Avalonia.Markup.Xaml.Templates;
+
+            state string value = "";
+
+            <DataTemplate>
+                <Child bind:Value={value} />
+            </DataTemplate>
+            """;
+        const string childComponent =
+            """
+            param bind string Value = "";
+            """;
+        var fixture = CreateFixtureWithChildComponent(component, childComponent);
+        using var codeWriter = new CodeWriter();
+        var writer = CreateWriter(codeWriter, fixture);
+        var child = Assert.Single(
+            writer.Elements,
+            static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "Child");
+        var context = CreateWriteContext();
+
+        Assert.True(writer.WriteFirstUpdatePropertyActions(child.Id, context));
+        var firstUpdate = codeWriter.GetText().ToString();
+        var observedProperty = firstUpdate.IndexOf(
+            "global::Demo.Child.ValueProperty.AvaloniaProperty",
+            StringComparison.Ordinal);
+        var forwardWrite = firstUpdate.IndexOf(
+            "__element1.Value = value;",
+            StringComparison.Ordinal);
+
+        Assert.True(observedProperty >= 0, firstUpdate);
+        Assert.True(forwardWrite > observedProperty, firstUpdate);
+        Assert.False(writer.WriteUpdateProperties(child.Id, context));
+    }
+
+    [Fact]
+    public void LocalPropertySubscription_WritesInlineHandlerWithoutClassHandler()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Markup.Xaml.Templates;
+
+            state string text = "";
+
+            <DataTemplate>
+                <TextBox out:Text={text} />
+            </DataTemplate>
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        using var codeWriter = new CodeWriter();
+        var writer = CreateWriter(codeWriter, fixture);
+        var textBox = Assert.Single(
+            writer.Elements,
+            static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "TextBox");
+
+        Assert.True(writer.WriteFirstUpdatePropertyActions(textBox.Id, CreateWriteContext()));
+        var registration = codeWriter.GetText().ToString();
+
+        Assert.Contains(".PropertyChanged += (_, __change0) =>", registration, StringComparison.Ordinal);
+        Assert.Contains("text = (string)__change0.NewValue!;", registration, StringComparison.Ordinal);
+        Assert.DoesNotContain("__OnPropertyBindingChanged", registration, StringComparison.Ordinal);
+
+        var handlerStart = codeWriter.Length;
+        Assert.False(writer.WritePropertySubscriptionHandlers());
+        Assert.Equal(handlerStart, codeWriter.Length);
     }
 
     [Fact]
@@ -170,7 +291,7 @@ public sealed class ComponentWriterTests
         Assert.DoesNotContain("s_akcss", staticMembers, StringComparison.Ordinal);
 
         var bindingStart = codeWriter.Length;
-        Assert.True(writer.WriteFirstUpdateProperties(textBlock.Id, context));
+        Assert.True(writer.WriteFirstUpdatePropertyActions(textBlock.Id, context));
         Assert.False(writer.WriteUpdateProperties(textBlock.Id, context));
         Assert.Equal(4, codeWriter.CurrentIndent);
         var bindingWrite = codeWriter.GetText().ToString().Substring(bindingStart);
@@ -592,6 +713,24 @@ public sealed class ComponentWriterTests
             Environment.NewLine + generatedSource);
     }
 
+    private static AkcssActivatorPlannerTests.PlannerFixture CreateFixtureWithChildComponent(
+        string component,
+        string childComponent)
+    {
+        var baseFixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var childTree = Akbura.Language.AkburaSyntaxTree.ParseText(childComponent, "Child.akbura");
+        var compilation = new Akbura.Language.AkburaCompilation(
+            baseFixture.CSharpCompilation,
+            [baseFixture.ComponentTree, childTree],
+            rootNamespace: "Demo");
+
+        return new AkcssActivatorPlannerTests.PlannerFixture(
+            baseFixture.CSharpCompilation,
+            baseFixture.ComponentTree,
+            externalAkcssTree: null,
+            compilation.GetSemanticModel(baseFixture.ComponentTree));
+    }
+
     private static AkcssActivatorPlannerTests.PlannerFixture CreateBasicFixture()
     {
         const string component =
@@ -790,7 +929,7 @@ public sealed class ComponentWriterTests
     {
         return new MarkupExtensionWriteContext(
             targetObjectExpression: "__target",
-            targetPropertyExpression: "__property",
+            targetProperty: MarkupTargetPropertyPlan.CreateExpression("__property"),
             intermediateRootExpression: "__root",
             baseUriExpression: "__baseUri",
             directParentsStackExpression: "__parents",

@@ -1,5 +1,6 @@
 ﻿using Akbura.Language.CodeGeneration;
 using Akbura.Language;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
@@ -492,6 +493,7 @@ public sealed class ComponentPlannerTests
         var markupWrite = Assert.Single(GetWrites(plan.PropertyWrites, markupTarget.PropertyWrites));
 
         Assert.Equal(ComponentPropertyValueKind.CSharpExpression, bindWrite.ValueKind);
+        Assert.False(bindWrite.IsFirstUpdate);
         Assert.Empty(GetWrites(plan.PropertyWrites, outTarget.PropertyWrites));
         Assert.Equal(ComponentPropertyValueKind.CSharpExpression, plainWrite.ValueKind);
         Assert.Equal(ComponentPropertyValueKind.MarkupBinding, markupWrite.ValueKind);
@@ -509,8 +511,299 @@ public sealed class ComponentPlannerTests
                 outTarget.Id,
                 ComponentPropertySynchronizationKind.Out,
                 "outValue"));
-        Assert.DoesNotContain(plan.PropertySubscriptions, item => item.ElementId == plainTarget.Id);
-        Assert.DoesNotContain(plan.PropertySubscriptions, item => item.ElementId == markupTarget.Id);
+
+        Assert.Equal(0, bindTarget.PropertySubscriptions.Start);
+        Assert.Equal(1, bindTarget.PropertySubscriptions.Length);
+        Assert.Equal(1, outTarget.PropertySubscriptions.Start);
+        Assert.Equal(1, outTarget.PropertySubscriptions.Length);
+        Assert.Equal(2, plainTarget.PropertySubscriptions.Start);
+        Assert.True(plainTarget.PropertySubscriptions.IsEmpty);
+        Assert.Equal(2, markupTarget.PropertySubscriptions.Start);
+        Assert.True(markupTarget.PropertySubscriptions.IsEmpty);
+
+        Assert.Equal(0, bindTarget.FirstUpdateActions.Start);
+        Assert.Equal(1, bindTarget.FirstUpdateActions.Length);
+        Assert.Equal(1, outTarget.FirstUpdateActions.Start);
+        Assert.Equal(1, outTarget.FirstUpdateActions.Length);
+        Assert.Equal(2, plainTarget.FirstUpdateActions.Start);
+        Assert.True(plainTarget.FirstUpdateActions.IsEmpty);
+        Assert.Equal(2, markupTarget.FirstUpdateActions.Start);
+        Assert.Equal(1, markupTarget.FirstUpdateActions.Length);
+        Assert.Collection(
+            plan.FirstUpdateActions,
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 0),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 1),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertyWrite, 2));
+    }
+
+    [Fact]
+    public void Create_PreservesPropertySourceOrderInFirstUpdateActions()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            state double width = 0;
+            state double opacity = 0;
+
+            <Border
+                bind:Width={width}
+                Height="1"
+                out:Opacity={opacity}
+                MinWidth="2" />
+            """;
+        var plan = CreatePlan(AkcssActivatorPlannerTests.CreateFixture(component));
+        var element = Assert.Single(plan.Elements);
+        var writes = GetWrites(plan.PropertyWrites, element.PropertyWrites);
+        var subscriptions = GetSubscriptions(plan.PropertySubscriptions, element.PropertySubscriptions);
+        var actions = GetActions(plan.FirstUpdateActions, element.FirstUpdateActions);
+
+        Assert.Equal(3, writes.Length);
+        Assert.False(writes[0].IsFirstUpdate);
+        Assert.True(writes[1].IsFirstUpdate);
+        Assert.True(writes[2].IsFirstUpdate);
+        Assert.Equal([0, 2], subscriptions.Select(static item => item.SourceOrder).ToArray());
+        Assert.Collection(
+            actions,
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 0),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertyWrite, 1),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 1),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertyWrite, 2));
+    }
+
+    [Fact]
+    public void Create_DynamicComponentParameterIsFirstUpdateAndObservable()
+    {
+        const string component =
+            """
+            state string value = "";
+
+            <Child bind:Value={value} />
+            """;
+        const string childComponent =
+            """
+            param bind string Value = "";
+            """;
+        var baseFixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var childTree = AkburaSyntaxTree.ParseText(childComponent, "Child.akbura");
+        var compilation = new AkburaCompilation(
+            baseFixture.CSharpCompilation,
+            [baseFixture.ComponentTree, childTree],
+            rootNamespace: "Demo");
+        var fixture = new AkcssActivatorPlannerTests.PlannerFixture(
+            baseFixture.CSharpCompilation,
+            baseFixture.ComponentTree,
+            externalAkcssTree: null,
+            compilation.GetSemanticModel(baseFixture.ComponentTree));
+        var plan = CreatePlan(fixture);
+        var element = Assert.Single(plan.Elements);
+        var write = Assert.Single(plan.PropertyWrites);
+        var subscription = Assert.Single(plan.PropertySubscriptions);
+        var actions = GetActions(plan.FirstUpdateActions, element.FirstUpdateActions);
+
+        Assert.Equal(PropertyWriteKind.ComponentParameter, write.Destination.Kind);
+        Assert.Equal(MarkupTargetPropertyKind.GeneratedParameter, write.Destination.TargetProperty.Kind);
+        Assert.Equal("Value", write.Destination.TargetProperty.Text);
+        Assert.True(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+            element.Type,
+            write.Destination.TargetProperty.Symbol));
+        Assert.True(write.IsFirstUpdate);
+
+        Assert.Equal(PropertyObservationKind.GeneratedParameter, subscription.Observation.Kind);
+        Assert.Equal("Value", subscription.Observation.Name);
+        Assert.True(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+            element.Type,
+            subscription.Observation.Symbol));
+        Assert.Collection(
+            actions,
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 0),
+            action => AssertAction(action, ComponentFirstUpdateActionKind.PropertyWrite, 0));
+    }
+
+    [Fact]
+    public void Create_ClrPropertyCreatesNotifyPropertyChangedObservation()
+    {
+        const string component =
+            """
+            using Demo;
+
+            state string result = "";
+
+            <NotifyControl out:Value={result} />
+            """;
+        const string csharp =
+            """
+            using System.ComponentModel;
+
+            namespace Demo;
+
+            public sealed class NotifyControl : INotifyPropertyChanged
+            {
+                public string Value { get; set; } = "";
+
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+            """;
+        var plan = CreatePlan(AkcssActivatorPlannerTests.CreateFixture(component, csharp));
+        var element = Assert.Single(plan.Elements);
+        var subscription = Assert.Single(plan.PropertySubscriptions);
+
+        Assert.Empty(plan.PropertyWrites);
+        Assert.Equal(PropertyObservationKind.NotifyPropertyChanged, subscription.Observation.Kind);
+        Assert.Equal("Value", subscription.Observation.Symbol?.Name);
+        Assert.Equal(element.Id, subscription.ElementId);
+        Assert.Equal(0, subscription.SourceOrder);
+        Assert.Equal(1, element.PropertySubscriptions.Length);
+        Assert.Equal(1, element.FirstUpdateActions.Length);
+        AssertAction(
+            Assert.Single(plan.FirstUpdateActions),
+            ComponentFirstUpdateActionKind.PropertySubscription,
+            0);
+    }
+
+    [Fact]
+    public void AttachedAvaloniaProperty_CreatesAvaloniaObservation()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            state int column = 0;
+
+            <TextBlock Grid.Column={column} />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var observation = CreatePropertyObservation(fixture);
+
+        Assert.Equal(PropertyObservationKind.AvaloniaProperty, observation.Kind);
+        Assert.Equal("ColumnProperty", observation.Symbol?.Name);
+    }
+
+    [Fact]
+    public void AttachedGetterWithoutProperty_IsNotObservable()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            state int value = 0;
+
+            <TextBlock Attached.Value={value} />
+            """;
+        const string csharp =
+            """
+            namespace Demo;
+
+            public sealed class AttachedProperty<T>
+            {
+            }
+
+            public static class Attached
+            {
+                public static readonly AttachedProperty<int> ValueProperty = null!;
+
+                public static int GetValue(Avalonia.Controls.Control target) => 0;
+
+                public static void SetValue(Avalonia.Controls.Control target, int value)
+                {
+                }
+            }
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component, csharp);
+        var observation = CreatePropertyObservation(fixture);
+
+        Assert.False(observation.IsValid);
+    }
+
+    [Fact]
+    public void DirectMemberWithoutProperty_IsNotObservable()
+    {
+        const string component =
+            """
+            state string result = "";
+
+            <Child out:Refresh={result} />
+            """;
+        const string childComponent =
+            """
+            command string Refresh();
+            """;
+        var plan = CreatePlanWithChildComponent(component, childComponent);
+        var element = Assert.Single(plan.Elements);
+
+        Assert.Empty(plan.PropertySubscriptions);
+        Assert.True(element.PropertySubscriptions.IsEmpty);
+        Assert.Empty(plan.PropertyWrites);
+        Assert.Empty(plan.FirstUpdateActions);
+    }
+
+    [Fact]
+    public void InvalidSubscriptionDoesNotBreakRanges()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            state string invalidResult = "";
+            state string validResult = "";
+
+            <StackPanel>
+                <Child x.Name="invalid" out:Refresh={invalidResult} />
+                <TextBox x.Name="valid" out:Text={validResult} />
+            </StackPanel>
+            """;
+        const string childComponent =
+            """
+            command string Refresh();
+            """;
+        var plan = CreatePlanWithChildComponent(component, childComponent);
+        var invalid = GetNamedElement(plan, "invalid");
+        var valid = GetNamedElement(plan, "valid");
+
+        Assert.Empty(GetSubscriptions(plan.PropertySubscriptions, invalid.PropertySubscriptions));
+        Assert.Empty(GetActions(plan.FirstUpdateActions, invalid.FirstUpdateActions));
+        Assert.Equal(0, invalid.PropertySubscriptions.Start);
+        Assert.Equal(0, invalid.FirstUpdateActions.Start);
+
+        var subscription = Assert.Single(GetSubscriptions(
+            plan.PropertySubscriptions,
+            valid.PropertySubscriptions));
+        var action = Assert.Single(GetActions(plan.FirstUpdateActions, valid.FirstUpdateActions));
+
+        Assert.Equal(0, valid.PropertySubscriptions.Start);
+        Assert.Equal(1, valid.PropertySubscriptions.Length);
+        Assert.Equal(0, valid.FirstUpdateActions.Start);
+        Assert.Equal(1, valid.FirstUpdateActions.Length);
+        Assert.Equal(PropertyObservationKind.AvaloniaProperty, subscription.Observation.Kind);
+        AssertAction(action, ComponentFirstUpdateActionKind.PropertySubscription, 0);
+    }
+
+    [Fact]
+    public void BindingMarkupExtensionOnClrProperty_DoesNotCreateInvalidWrite()
+    {
+        const string component =
+            """
+            using Demo;
+
+            <PlainControl Value=${Binding Name} />
+            """;
+        const string csharp =
+            """
+            namespace Demo;
+
+            public sealed class PlainControl : Avalonia.Controls.Control
+            {
+                public string Value { get; set; } = "";
+            }
+            """;
+        var plan = CreatePlan(AkcssActivatorPlannerTests.CreateFixture(component, csharp));
+        var element = Assert.Single(plan.Elements);
+
+        Assert.Empty(plan.Bindings);
+        Assert.Empty(plan.PropertyWrites);
+        Assert.True(element.PropertyWrites.IsEmpty);
+        Assert.Empty(plan.FirstUpdateActions);
     }
 
     [Fact]
@@ -619,6 +912,24 @@ public sealed class ComponentPlannerTests
         Assert.False(styled.Akcss.Activators.IsEmpty);
     }
 
+    private static ComponentPlan CreatePlanWithChildComponent(
+        string component,
+        string childComponent)
+    {
+        var baseFixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var childTree = AkburaSyntaxTree.ParseText(childComponent, "Child.akbura");
+        var compilation = new AkburaCompilation(
+            baseFixture.CSharpCompilation,
+            [baseFixture.ComponentTree, childTree],
+            rootNamespace: "Demo");
+        var fixture = new AkcssActivatorPlannerTests.PlannerFixture(
+            baseFixture.CSharpCompilation,
+            baseFixture.ComponentTree,
+            externalAkcssTree: null,
+            compilation.GetSemanticModel(baseFixture.ComponentTree));
+
+        return CreatePlan(fixture);
+    }
     private static ComponentPlan CreatePlan(AkcssActivatorPlannerTests.PlannerFixture fixture)
     {
         var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
@@ -675,6 +986,37 @@ public sealed class ComponentPlannerTests
         return writes.AsSpan(range.Start, range.Length).ToArray();
     }
 
+    private static ComponentPropertySubscriptionPlan[] GetSubscriptions(
+        ImmutableArray<ComponentPropertySubscriptionPlan> subscriptions,
+        ComponentPlanRange range)
+    {
+        return subscriptions.AsSpan(range.Start, range.Length).ToArray();
+    }
+
+    private static PropertyObservationPlan CreatePropertyObservation(
+        AkcssActivatorPlannerTests.PlannerFixture fixture)
+    {
+        var syntax = Assert.Single(
+            fixture.ComponentTree.GetRoot().DescendantNodes().OfType<MarkupElementSyntax>());
+        var element = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            fixture.SemanticModel.GetSymbolInfo(syntax).Symbol);
+        var operation = Assert.Single(
+            element.AttributeOperations.OfType<IMarkupPropertySetterOperation>());
+        var property = Assert.IsAssignableFrom<Akbura.Language.Symbols.IPropertySymbol>(
+            operation.Property);
+        var ownerType = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.ITypeSymbol>(
+            element.ComponentType);
+
+        return PropertyObservationPlan.Create(property, ownerType);
+    }
+
+    private static ComponentFirstUpdateActionPlan[] GetActions(
+        ImmutableArray<ComponentFirstUpdateActionPlan> actions,
+        ComponentPlanRange range)
+    {
+        return actions.AsSpan(range.Start, range.Length).ToArray();
+    }
+
     private static void AssertReference(
         BindingElementReference reference,
         string name,
@@ -694,8 +1036,17 @@ public sealed class ComponentPlannerTests
     {
         Assert.Equal(elementId, subscription.ElementId);
         Assert.Equal(kind, subscription.Kind);
-        Assert.Equal(PropertyReadKind.AvaloniaProperty, subscription.Source.Kind);
+        Assert.Equal(PropertyObservationKind.AvaloniaProperty, subscription.Observation.Kind);
         Assert.Equal(targetExpression, subscription.TargetOperation.ToDisplayString());
         Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_String, subscription.ValueType.SpecialType);
+    }
+
+    private static void AssertAction(
+        ComponentFirstUpdateActionPlan action,
+        ComponentFirstUpdateActionKind kind,
+        int index)
+    {
+        Assert.Equal(kind, action.Kind);
+        Assert.Equal(index, action.Index);
     }
 }

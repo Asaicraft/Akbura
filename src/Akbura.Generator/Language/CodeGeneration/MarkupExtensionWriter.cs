@@ -15,7 +15,7 @@ internal readonly ref struct MarkupExtensionWriteContext
 {
     public MarkupExtensionWriteContext(
         string targetObjectExpression,
-        string targetPropertyExpression,
+        MarkupTargetPropertyPlan targetProperty,
         string intermediateRootExpression,
         string baseUriExpression,
         string directParentsStackExpression,
@@ -25,7 +25,7 @@ internal readonly ref struct MarkupExtensionWriteContext
         ReadOnlySpan<BindingElementReference> elementReferences = default)
     {
         TargetObjectExpression = targetObjectExpression;
-        TargetPropertyExpression = targetPropertyExpression;
+        TargetProperty = targetProperty;
         IntermediateRootExpression = intermediateRootExpression;
         BaseUriExpression = baseUriExpression;
         DirectParentsStackExpression = directParentsStackExpression;
@@ -37,7 +37,7 @@ internal readonly ref struct MarkupExtensionWriteContext
 
     public string TargetObjectExpression { get; }
 
-    public string TargetPropertyExpression { get; }
+    public MarkupTargetPropertyPlan TargetProperty { get; }
 
     public string IntermediateRootExpression { get; }
 
@@ -55,24 +55,24 @@ internal readonly ref struct MarkupExtensionWriteContext
 
     internal MarkupExtensionWriteContext WithTarget(
         string targetObjectExpression,
-        string targetPropertyExpression)
+        MarkupTargetPropertyPlan targetProperty)
     {
         return WithTarget(
             targetObjectExpression,
-            targetPropertyExpression,
+            targetProperty,
             ScopeId,
             ElementReferences);
     }
 
     internal MarkupExtensionWriteContext WithTarget(
         string targetObjectExpression,
-        string targetPropertyExpression,
+        MarkupTargetPropertyPlan targetProperty,
         int scopeId,
         ReadOnlySpan<BindingElementReference> elementReferences)
     {
         return new MarkupExtensionWriteContext(
             targetObjectExpression,
-            targetPropertyExpression,
+            targetProperty,
             IntermediateRootExpression,
             BaseUriExpression,
             DirectParentsStackExpression,
@@ -92,7 +92,7 @@ internal readonly ref struct MarkupExtensionWriteContext
 
         return new MarkupExtensionWriteContext(
             TargetObjectExpression,
-            TargetPropertyExpression,
+            TargetProperty,
             IntermediateRootExpression,
             BaseUriExpression,
             DirectParentsStackExpression,
@@ -340,7 +340,6 @@ internal readonly ref struct MarkupExtensionWriter
         in MarkupExtensionWriteContext context)
     {
         if (string.IsNullOrEmpty(context.TargetObjectExpression) ||
-            string.IsNullOrEmpty(context.TargetPropertyExpression) ||
             string.IsNullOrEmpty(context.IntermediateRootExpression) ||
             string.IsNullOrEmpty(context.BaseUriExpression) ||
             string.IsNullOrEmpty(context.DirectParentsStackExpression))
@@ -353,9 +352,10 @@ internal readonly ref struct MarkupExtensionWriter
         _writer
             .Write("CreateMarkupServiceProvider(targetObject: ")
             .Write(context.TargetObjectExpression)
-            .Write(", targetProperty: ")
-            .Write(context.TargetPropertyExpression)
-            .Write(", intermediateRootObject: ")
+            .Write(", targetProperty: ");
+        var targetPropertyWriter = new MarkupTargetPropertyWriter(_writer);
+        targetPropertyWriter.Write(context.TargetProperty);
+        _writer.Write(", intermediateRootObject: ")
             .Write(context.IntermediateRootExpression)
             .Write(", baseUri: ")
             .Write(context.BaseUriExpression)

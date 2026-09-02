@@ -120,6 +120,33 @@ public sealed class MarkupExtensionResultWriterTests
     }
 
     [Fact]
+    public void MarkupExtensionWrite_DefaultTargetProperty_WritesNullServiceProviderTarget()
+    {
+        var fixture = CreateFixture();
+        var extension = CreateDeclaredExtension(
+            fixture,
+            "Demo.ValueResultExtension");
+        var environment = fixture.BindingEnvironment;
+        var context = CreateWriteContext(targetProperty: default);
+        using var codeWriter = new CodeWriter("\n");
+        var writer = new MarkupExtensionWriter(
+            codeWriter,
+            in environment);
+
+        writer.Write(extension, context);
+
+        Assert.Equal(
+            "(new global::Demo.ValueResultExtension()).ProvideValue(" +
+            "CreateMarkupServiceProvider(" +
+            "targetObject: __element0, " +
+            "targetProperty: null!, " +
+            "intermediateRootObject: __root, " +
+            "baseUri: __baseUri, " +
+            "directParentsStack: __parents))",
+            codeWriter.GetText().ToString());
+    }
+
+    [Fact]
     public void DynamicResourceWrite_EvaluatesProvideValueInsideBind()
     {
         var fixture = CreateFixture();
@@ -623,9 +650,16 @@ public sealed class MarkupExtensionResultWriterTests
 
     private static MarkupExtensionWriteContext CreateWriteContext()
     {
+        var targetProperty = MarkupTargetPropertyPlan.CreateExpression(PropertyExpression);
+        return CreateWriteContext(targetProperty);
+    }
+
+    private static MarkupExtensionWriteContext CreateWriteContext(
+        MarkupTargetPropertyPlan targetProperty)
+    {
         return new MarkupExtensionWriteContext(
             targetObjectExpression: TargetExpression,
-            targetPropertyExpression: PropertyExpression,
+            targetProperty: targetProperty,
             intermediateRootExpression: "__root",
             baseUriExpression: "__baseUri",
             directParentsStackExpression: "__parents",

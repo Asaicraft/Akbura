@@ -90,6 +90,7 @@ internal static class ComponentPlanner
         private ImmutableArrayBuilder<MarkupExtensionResultPlan> _markupExtensions;
         private ImmutableArrayBuilder<BindingWritePlan> _bindings;
         private ImmutableArrayBuilder<ComponentPropertySubscriptionPlan> _propertySubscriptions;
+        private ImmutableArrayBuilder<ComponentFirstUpdateActionPlan> _firstUpdateActions;
         private ImmutableArrayBuilder<BindingElementReference> _elementReferences;
         private int _nextScopeId;
         private int _nextCachedBindingPathId;
@@ -120,6 +121,7 @@ internal static class ComponentPlanner
             _markupExtensions = ImmutableArrayBuilder<MarkupExtensionResultPlan>.Rent();
             _bindings = ImmutableArrayBuilder<BindingWritePlan>.Rent();
             _propertySubscriptions = ImmutableArrayBuilder<ComponentPropertySubscriptionPlan>.Rent();
+            _firstUpdateActions = ImmutableArrayBuilder<ComponentFirstUpdateActionPlan>.Rent();
             _elementReferences = ImmutableArrayBuilder<BindingElementReference>.Rent();
             _nextScopeId = 1;
             _nextCachedBindingPathId = 0;
@@ -172,6 +174,8 @@ internal static class ComponentPlanner
                     element.Flags,
                     element.Children,
                     element.PropertyWrites,
+                    element.PropertySubscriptions,
+                    element.FirstUpdateActions,
                     element.PropertyElements,
                     elementAkcss));
             }
@@ -185,6 +189,7 @@ internal static class ComponentPlanner
                 _markupExtensions.ToImmutable(),
                 _bindings.ToImmutable(),
                 _propertySubscriptions.ToImmutable(),
+                _firstUpdateActions.ToImmutable(),
                 _propertyElements.ToImmutable(),
                 _deferredContents.ToImmutable(),
                 _templates.ToImmutable(),
@@ -206,6 +211,7 @@ internal static class ComponentPlanner
             _markupExtensions.Dispose();
             _bindings.Dispose();
             _propertySubscriptions.Dispose();
+            _firstUpdateActions.Dispose();
             _elementReferences.Dispose();
         }
 
@@ -237,7 +243,7 @@ internal static class ComponentPlanner
             _elements.Add(default);
 
             var pendingPropertyWriteStart = _pendingPropertyWrites.Count;
-            AddPendingPropertyWrites(elementId, scope.ScopeId, symbol);
+            AddPendingPropertyWrites(elementId, scope.ScopeId, type, symbol);
             var pendingPropertyWrites = new ComponentPlanRange(
                 pendingPropertyWriteStart,
                 _pendingPropertyWrites.Count - pendingPropertyWriteStart);
@@ -517,6 +523,7 @@ internal static class ComponentPlanner
         private void AddPendingPropertyWrites(
             int elementId,
             int scopeId,
+            ITypeSymbol targetType,
             IMarkupComponentSymbol symbol)
         {
             var operations = symbol.AttributeOperations;
@@ -534,7 +541,8 @@ internal static class ComponentPlanner
                 _pendingPropertyWrites.Add(new PendingPropertyWritePlan(
                     elementId,
                     scopeId,
-                    PropertyWritePlan.Create(property),
+                    i,
+                    PropertyWritePlan.Create(property, targetType),
                     operation));
             }
         }
@@ -544,7 +552,9 @@ internal static class ComponentPlanner
             for (var i = 0; i < _elements.Count; i++)
             {
                 var element = _elements[i];
-                var start = _propertyWrites.Count;
+                var writeStart = _propertyWrites.Count;
+                var subscriptionStart = _propertySubscriptions.Count;
+                var actionStart = _firstUpdateActions.Count;
                 var pending = element.PendingPropertyWrites;
 
                 for (var j = 0; j < pending.Length; j++)
@@ -552,37 +562,51 @@ internal static class ComponentPlanner
                     LowerPropertyWrite(_pendingPropertyWrites[pending.Start + j]);
                 }
 
-                _elements[i] = element.WithPropertyWrites(
-                    new ComponentPlanRange(start, _propertyWrites.Count - start));
+                _elements[i] = element.WithPropertyPlans(
+                    new ComponentPlanRange(writeStart, _propertyWrites.Count - writeStart),
+                    new ComponentPlanRange(
+                        subscriptionStart,
+                        _propertySubscriptions.Count - subscriptionStart),
+                    new ComponentPlanRange(actionStart, _firstUpdateActions.Count - actionStart));
             }
         }
 
         private void LowerPropertyWrite(in PendingPropertyWritePlan pending)
         {
             var operation = pending.Operation;
-            if (operation.BindingKind == MarkupAttributeBindingKind.Out)
+            if (operation.BindingKind is MarkupAttributeBindingKind.Bind or MarkupAttributeBindingKind.Out)
             {
-                AddPropertySubscription(pending, ComponentPropertySynchronizationKind.Out);
-                return;
-            }
-
-            if (pending.Destination.IsValid)
-            {
-                var value = LowerPropertyValue(pending);
-                if (value.IsValid)
+                var subscriptionIndex = TryAddPropertySubscription(pending);
+                if (subscriptionIndex >= 0)
                 {
-                    _propertyWrites.Add(new ComponentPropertyWritePlan(
-                        pending.Destination,
-                        value.Kind,
-                        value.Index,
-                        operation.Syntax,
-                        IsFirstUpdateValue(operation)));
+                    _firstUpdateActions.Add(
+                        ComponentFirstUpdateActionPlan.CreateSubscription(subscriptionIndex));
                 }
             }
 
-            if (operation.BindingKind == MarkupAttributeBindingKind.Bind)
+            if (operation.BindingKind == MarkupAttributeBindingKind.Out || !pending.Destination.IsValid)
             {
-                AddPropertySubscription(pending, ComponentPropertySynchronizationKind.Bind);
+                return;
+            }
+
+            var value = LowerPropertyValue(pending);
+            if (!value.IsValid)
+            {
+                return;
+            }
+
+            var writeIndex = _propertyWrites.Count;
+            var isFirstUpdate = IsFirstUpdateProperty(operation);
+            _propertyWrites.Add(new ComponentPropertyWritePlan(
+                pending.Destination,
+                value.Kind,
+                value.Index,
+                operation.Syntax,
+                isFirstUpdate));
+
+            if (isFirstUpdate)
+            {
+                _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateWrite(writeIndex));
             }
         }
 
@@ -634,7 +658,8 @@ internal static class ComponentPlanner
                 return default;
             }
 
-            if (kind != ComponentPropertyValueKind.MarkupExtensionValue && destination.AvaloniaProperty == null)
+            if (kind != ComponentPropertyValueKind.MarkupExtensionValue &&
+                !destination.HasAvaloniaPropertyTarget)
             {
                 return default;
             }
@@ -649,7 +674,7 @@ internal static class ComponentPlanner
             int scopeId,
             in PropertyWritePlan destination)
         {
-            if (destination.AvaloniaProperty == null)
+            if (!destination.HasAvaloniaPropertyTarget)
             {
                 return default;
             }
@@ -671,9 +696,7 @@ internal static class ComponentPlanner
             return new ComponentPropertyValueReference(ComponentPropertyValueKind.MarkupBinding, index);
         }
 
-        private void AddPropertySubscription(
-            in PendingPropertyWritePlan pending,
-            ComponentPropertySynchronizationKind kind)
+        private int TryAddPropertySubscription(in PendingPropertyWritePlan pending)
         {
             var operation = pending.Operation;
             if (operation.ValueSyntax is not MarkupDynamicAttributeValueSyntax ||
@@ -681,22 +704,39 @@ internal static class ComponentPlanner
                 operation.Property is not { } property ||
                 property.Type.Symbol is not ITypeSymbol valueType)
             {
-                return;
+                return -1;
             }
 
-            var source = PropertyReadPlan.Create(property);
-            if (!source.IsValid)
+            var observation = CreateObservation(pending);
+            if (!observation.IsValid)
             {
-                return;
+                return -1;
             }
 
+            var index = _propertySubscriptions.Count;
+            var kind = operation.BindingKind == MarkupAttributeBindingKind.Bind
+                ? ComponentPropertySynchronizationKind.Bind
+                : ComponentPropertySynchronizationKind.Out;
             _propertySubscriptions.Add(new ComponentPropertySubscriptionPlan(
+                index,
                 pending.ElementId,
+                pending.SourceOrder,
                 kind,
-                source,
+                observation,
                 operation.ValueOperation,
                 valueType,
                 operation.Syntax));
+            return index;
+        }
+
+        private PropertyObservationPlan CreateObservation(in PendingPropertyWritePlan pending)
+        {
+            var property = pending.Operation.Property;
+            Debug.Assert(property != null);
+
+            return property == null
+                ? default
+                : PropertyObservationPlan.Create(property, _elements[pending.ElementId].Type);
         }
 
         private static ComponentPropertyValueKind GetComponentValueKind(MarkupExtensionResultKind kind)
@@ -712,13 +752,13 @@ internal static class ComponentPlanner
             };
         }
 
-        private static string GetNameScopeCapability(int scopeId)
+        private static string? GetNameScopeCapability(int scopeId)
         {
             Debug.Assert(scopeId >= 0);
 
             // BindingWritePlan only tests whether a name scope will be available.
             // The concrete expression is supplied by MarkupExtensionWriteContext.
-            return "__nameScope";
+            return scopeId == 0 ? null : "__nameScope";
         }
 
         private ComponentElementFlags GetElementFlags(
@@ -823,7 +863,7 @@ internal static class ComponentPlanner
             return null;
         }
 
-        private static bool IsFirstUpdateValue(IMarkupPropertySetterOperation operation)
+        private static bool IsFirstUpdateProperty(IMarkupPropertySetterOperation operation)
         {
             return operation.Property?.Parameter != null ||
                 operation.ValueKind is MarkupAttributeValueKind.Literal or MarkupAttributeValueKind.MarkupExtension;
@@ -850,7 +890,9 @@ internal static class ComponentPlanner
             ComponentPlanRange children,
             ComponentPlanRange pendingPropertyWrites,
             ComponentPlanRange propertyElements,
-            ComponentPlanRange propertyWrites = default)
+            ComponentPlanRange propertyWrites = default,
+            ComponentPlanRange propertySubscriptions = default,
+            ComponentPlanRange firstUpdateActions = default)
         {
             Id = id;
             Syntax = syntax;
@@ -864,6 +906,8 @@ internal static class ComponentPlanner
             Children = children;
             PendingPropertyWrites = pendingPropertyWrites;
             PropertyWrites = propertyWrites;
+            PropertySubscriptions = propertySubscriptions;
+            FirstUpdateActions = firstUpdateActions;
             PropertyElements = propertyElements;
         }
 
@@ -879,11 +923,16 @@ internal static class ComponentPlanner
         public ComponentPlanRange Children { get; }
         public ComponentPlanRange PendingPropertyWrites { get; }
         public ComponentPlanRange PropertyWrites { get; }
+        public ComponentPlanRange PropertySubscriptions { get; }
+        public ComponentPlanRange FirstUpdateActions { get; }
         public ComponentPlanRange PropertyElements { get; }
         public bool RequiresLocalMarkupContext =>
             (Flags & ComponentElementFlags.RequiresLocalMarkupContext) != 0;
 
-        public PendingElementPlan WithPropertyWrites(ComponentPlanRange propertyWrites)
+        public PendingElementPlan WithPropertyPlans(
+            ComponentPlanRange propertyWrites,
+            ComponentPlanRange propertySubscriptions,
+            ComponentPlanRange firstUpdateActions)
         {
             return new PendingElementPlan(
                 Id,
@@ -898,7 +947,9 @@ internal static class ComponentPlanner
                 Children,
                 PendingPropertyWrites,
                 PropertyElements,
-                propertyWrites);
+                propertyWrites,
+                propertySubscriptions,
+                firstUpdateActions);
         }
     }
 
@@ -907,17 +958,20 @@ internal static class ComponentPlanner
         public PendingPropertyWritePlan(
             int elementId,
             int scopeId,
+            int sourceOrder,
             PropertyWritePlan destination,
             IMarkupPropertySetterOperation operation)
         {
             ElementId = elementId;
             ScopeId = scopeId;
+            SourceOrder = sourceOrder;
             Destination = destination;
             Operation = operation;
         }
 
         public int ElementId { get; }
         public int ScopeId { get; }
+        public int SourceOrder { get; }
         public PropertyWritePlan Destination { get; }
         public IMarkupPropertySetterOperation Operation { get; }
     }

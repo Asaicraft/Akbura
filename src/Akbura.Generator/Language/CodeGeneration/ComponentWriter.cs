@@ -113,11 +113,65 @@ internal sealed class ComponentWriter
         writer.WriteEndInit(element);
     }
 
-    public bool WriteFirstUpdateProperties(
+    public bool WriteFirstUpdatePropertyActions(
         int elementId,
         in MarkupExtensionWriteContext context)
     {
-        return WriteProperties(elementId, isFirstUpdate: true, context);
+        ref readonly var element = ref GetElement(elementId);
+        if (element.FirstUpdateActions.IsEmpty)
+        {
+            return false;
+        }
+
+        var indent = _writer.CurrentIndent;
+        try
+        {
+            var targetExpression = EscapeIdentifier(element.Identifier);
+            var targetProperty = context.TargetProperty;
+            var propertyContext = context.WithTarget(
+                targetExpression,
+                targetProperty,
+                element.ScopeId,
+                _plan.ElementReferences.AsSpan());
+            var propertyWriter = new ComponentPropertyWriter(
+                _writer,
+                in _bindingEnvironment,
+                _sourceMap);
+            var subscriptionWriter = new PropertySubscriptionWriter(_writer, _sourceMap);
+
+            for (var i = 0; i < element.FirstUpdateActions.Length; i++)
+            {
+                ref readonly var action = ref _plan.FirstUpdateActions.ItemRef(
+                    element.FirstUpdateActions.Start + i);
+
+                switch (action.Kind)
+                {
+                    case ComponentFirstUpdateActionKind.PropertyWrite:
+                    {
+                        Debug.Assert((uint)action.Index < (uint)_plan.PropertyWrites.Length);
+                        ref readonly var property = ref _plan.PropertyWrites.ItemRef(action.Index);
+                        propertyWriter.Write(_plan, property, targetExpression, propertyContext);
+                        break;
+                    }
+                    case ComponentFirstUpdateActionKind.PropertySubscription:
+                    {
+                        Debug.Assert((uint)action.Index < (uint)_plan.PropertySubscriptions.Length);
+                        ref readonly var subscription = ref _plan.PropertySubscriptions.ItemRef(action.Index);
+                        subscriptionWriter.WriteRegistration(element, subscription);
+                        break;
+                    }
+                    default:
+                        Debug.Fail("An invalid first-update action reached code generation.");
+                        break;
+                }
+            }
+
+            return true;
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
     }
 
     public bool WriteUpdateProperties(
@@ -125,6 +179,46 @@ internal sealed class ComponentWriter
         in MarkupExtensionWriteContext context)
     {
         return WriteProperties(elementId, isFirstUpdate: false, context);
+    }
+
+    public bool WritePropertySubscriptionHandlers()
+    {
+        if (_plan.PropertySubscriptions.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        var indent = _writer.CurrentIndent;
+        try
+        {
+            var writer = new PropertySubscriptionWriter(_writer, _sourceMap);
+            var wroteAny = false;
+
+            for (var i = 0; i < _plan.PropertySubscriptions.Length; i++)
+            {
+                ref readonly var subscription = ref _plan.PropertySubscriptions.ItemRef(i);
+                ref readonly var element = ref GetElement(subscription.ElementId);
+
+                if (element.IsLocal)
+                {
+                    continue;
+                }
+
+                if (wroteAny)
+                {
+                    _writer.WriteLine();
+                }
+
+                writer.WriteHandler(subscription);
+                wroteAny = true;
+            }
+
+            return wroteAny;
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
     }
 
     public bool WriteStaticMembers()
@@ -282,9 +376,10 @@ internal sealed class ComponentWriter
         try
         {
             var targetExpression = EscapeIdentifier(element.Identifier);
+            var targetProperty = context.TargetProperty;
             var propertyContext = context.WithTarget(
                 targetExpression,
-                context.TargetPropertyExpression,
+                targetProperty,
                 element.ScopeId,
                 _plan.ElementReferences.AsSpan());
             var writer = new ComponentPropertyWriter(

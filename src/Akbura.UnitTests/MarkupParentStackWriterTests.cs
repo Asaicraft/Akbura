@@ -38,7 +38,8 @@ public sealed class MarkupParentStackWriterTests
         var plan = new MarkupParentStackPlan(
             fixture.Plan.Elements.AsSpan(),
             target.Id,
-            target.ScopeId);
+            target.ScopeId,
+            MarkupParentStackTraversalKind.ExactScope);
         var writer = new MarkupParentStackWriter(codeWriter);
 
         Assert.True(writer.Write(plan));
@@ -69,7 +70,8 @@ public sealed class MarkupParentStackWriterTests
         var plan = new MarkupParentStackPlan(
             fixture.Plan.Elements.AsSpan(),
             target.Id,
-            target.ScopeId);
+            target.ScopeId,
+            MarkupParentStackTraversalKind.ExactScope);
         var writer = new MarkupParentStackWriter(codeWriter);
 
         Assert.True(writer.Write(plan));
@@ -79,7 +81,40 @@ public sealed class MarkupParentStackWriterTests
     }
 
     [Fact]
-    public void ComponentHierarchy_DeeperThanStackCapacityPreservesOrder()
+    public void ComponentHierarchy_FullHierarchyCrossesScopeBoundary()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Markup.Xaml.Templates;
+
+            <DataTemplate>
+                <StackPanel>
+                    <Border>
+                        <TextBlock />
+                    </Border>
+                </StackPanel>
+            </DataTemplate>
+            """;
+        var fixture = CreatePlan(component);
+        var target = fixture.Plan.Elements[3];
+        using var codeWriter = new CodeWriter("\n");
+        var plan = new MarkupParentStackPlan(
+            fixture.Plan.Elements.AsSpan(),
+            target.Id,
+            target.ScopeId,
+            MarkupParentStackTraversalKind.FullHierarchy);
+        var writer = new MarkupParentStackWriter(codeWriter);
+
+        Assert.True(writer.Write(plan));
+        Assert.Equal(
+            "new global::System.Object[] { this, __element0, __element1, " +
+            "__element2, __element3 }",
+            codeWriter.GetText().ToString());
+    }
+
+    [Fact]
+    public void ComponentHierarchy_DeeperThanStackCapacityPreservesOrderForBothTraversals()
     {
         const string component =
             """
@@ -123,22 +158,32 @@ public sealed class MarkupParentStackWriterTests
             """;
         var fixture = CreatePlan(component);
         var target = fixture.Plan.Elements[^1];
-        using var codeWriter = new CodeWriter("\n");
-        var plan = new MarkupParentStackPlan(
+        using var exactScopeCodeWriter = new CodeWriter("\n");
+        var exactScopePlan = new MarkupParentStackPlan(
             fixture.Plan.Elements.AsSpan(),
             target.Id,
-            target.ScopeId);
-        var writer = new MarkupParentStackWriter(codeWriter);
+            target.ScopeId,
+            MarkupParentStackTraversalKind.ExactScope);
+        var exactScopeWriter = new MarkupParentStackWriter(exactScopeCodeWriter);
+        using var fullHierarchyCodeWriter = new CodeWriter("\n");
+        var fullHierarchyPlan = new MarkupParentStackPlan(
+            fixture.Plan.Elements.AsSpan(),
+            target.Id,
+            target.ScopeId,
+            MarkupParentStackTraversalKind.FullHierarchy);
+        var fullHierarchyWriter = new MarkupParentStackWriter(fullHierarchyCodeWriter);
 
         Assert.Equal(18, fixture.Plan.Elements.Length);
-        Assert.True(writer.Write(plan));
-        Assert.Equal(
+        Assert.True(exactScopeWriter.Write(exactScopePlan));
+        Assert.True(fullHierarchyWriter.Write(fullHierarchyPlan));
+        var expected =
             "new global::System.Object[] { this, " +
             "__element0, __element1, __element2, __element3, __element4, " +
             "__element5, __element6, __element7, __element8, __element9, " +
             "__element10, __element11, __element12, __element13, __element14, " +
-            "__element15, __element16, __element17 }",
-            codeWriter.GetText().ToString());
+            "__element15, __element16, __element17 }";
+        Assert.Equal(expected, exactScopeCodeWriter.GetText().ToString());
+        Assert.Equal(expected, fullHierarchyCodeWriter.GetText().ToString());
     }
 
     [Fact]
@@ -160,7 +205,8 @@ public sealed class MarkupParentStackWriterTests
         var plan = new MarkupParentStackPlan(
             fixture.Plan.Elements.AsSpan(),
             target.Id,
-            target.ScopeId);
+            target.ScopeId,
+            MarkupParentStackTraversalKind.ExactScope);
         var writer = new MarkupParentStackWriter(codeWriter);
 
         Assert.True(writer.Write(plan));

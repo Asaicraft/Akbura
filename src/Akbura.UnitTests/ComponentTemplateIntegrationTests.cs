@@ -12,10 +12,10 @@ using System.Reflection;
 namespace Akbura.UnitTests;
 
 [Collection(AvaloniaHeadlessCollection.Name)]
-public sealed class ComponentDeferredContentIntegrationTests
+public sealed class ComponentTemplateIntegrationTests
 {
     [Fact]
-    public async Task ComponentWriter_DeferredContentRemainsLazyUntilBuild()
+    public async Task ComponentWriter_TypedTemplateRemainsLazyAndBuildsFreshTrees()
     {
         var fixture = CreateRuntimeFixture();
 
@@ -27,56 +27,40 @@ public sealed class ComponentDeferredContentIntegrationTests
                 var owner = fixture.CreateOwner();
                 var beforeFactory = fixture.CreatedTreeCount;
 
-                var content = fixture.CreateDeferredContent(owner);
+                var template = fixture.CreateTemplate(owner);
 
                 Assert.Equal(beforeFactory, fixture.CreatedTreeCount);
+                Assert.True(template.Match(fixture.CreateItem("match probe")));
+                Assert.False(template.Match(new object()));
 
-                var result = Assert.IsType<TemplateResult<Control>>(
-                    content.Build(serviceProvider: null));
-                var root = Assert.IsAssignableFrom<StackPanel>(result.Result);
+                var templateType = template.GetType();
+                Assert.True(templateType.IsGenericType);
+                Assert.Equal(
+                    typeof(FuncDataTemplate<>),
+                    templateType.GetGenericTypeDefinition());
+                Assert.Equal(
+                    fixture.ItemType,
+                    Assert.Single(templateType.GetGenericArguments()));
 
-                Assert.Equal(beforeFactory + 1, fixture.CreatedTreeCount);
-                Assert.Single(root.Children);
-            },
-            CancellationToken.None);
-    }
-
-    [Fact]
-    public async Task ComponentWriter_DeferredBuildCreatesFreshNamedTrees()
-    {
-        var fixture = CreateRuntimeFixture();
-
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
-        await session.Dispatch(
-            () =>
-            {
-                var owner = fixture.CreateOwner();
-                var content = fixture.CreateDeferredContent(owner);
-                var beforeBuild = fixture.CreatedTreeCount;
-
-                var firstResult = Assert.IsType<TemplateResult<Control>>(
-                    content.Build(serviceProvider: null));
-                var secondResult = Assert.IsType<TemplateResult<Control>>(
-                    content.Build(serviceProvider: null));
+                var item = fixture.CreateItem("Template item");
                 var firstRoot = Assert.IsAssignableFrom<StackPanel>(
-                    firstResult.Result);
+                    template.Build(item));
                 var secondRoot = Assert.IsAssignableFrom<StackPanel>(
-                    secondResult.Result);
+                    template.Build(item));
 
-                Assert.Equal(beforeBuild + 2, fixture.CreatedTreeCount);
+                Assert.Equal(beforeFactory + 2, fixture.CreatedTreeCount);
+                Assert.Equal(fixture.TemplateRootType, firstRoot.GetType());
+                Assert.Equal(fixture.TemplateRootType, secondRoot.GetType());
                 Assert.NotSame(firstRoot, secondRoot);
-                var firstNamed = Assert.IsType<TextBlock>(
-                    Assert.Single(firstRoot.Children));
-                var secondNamed = Assert.IsType<TextBlock>(
-                    Assert.Single(secondRoot.Children));
-                Assert.NotSame(firstNamed, secondNamed);
-                Assert.Equal("Deferred", firstNamed.Text);
-                Assert.Equal("Deferred", secondNamed.Text);
 
-                Assert.NotSame(firstResult.NameScope, secondResult.NameScope);
-                Assert.Same(firstNamed, firstResult.NameScope.Find("message"));
-                Assert.Same(secondNamed, secondResult.NameScope.Find("message"));
+                var firstText = Assert.IsType<TextBlock>(
+                    Assert.Single(firstRoot.Children));
+                var secondText = Assert.IsType<TextBlock>(
+                    Assert.Single(secondRoot.Children));
+
+                Assert.NotSame(firstText, secondText);
+                Assert.Equal("Template item", firstText.Text);
+                Assert.Equal("Template item", secondText.Text);
             },
             CancellationToken.None);
     }
@@ -88,11 +72,13 @@ public sealed class ComponentDeferredContentIntegrationTests
             using Avalonia.Controls;
             using Demo;
 
-            <DeferredHost>
-                <CountingPanel>
-                    <TextBlock x.Name="message" Text="Deferred" />
-                </CountingPanel>
-            </DeferredHost>
+            <ItemsControl>
+                <ItemsControl.ItemTemplate x.DataType="Item" x.ItemName="item">
+                    <CountingPanel>
+                        <TextBlock x.Name="message" Text={item.Name} />
+                    </CountingPanel>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
             """;
         const string csharp =
             """
@@ -101,23 +87,13 @@ public sealed class ComponentDeferredContentIntegrationTests
             using Akbura.Engine;
             using Avalonia;
             using Avalonia.Controls;
-            using Avalonia.Metadata;
             using System.Collections.Immutable;
 
             namespace Demo;
 
-            public sealed class DeferredHost : AvaloniaObject
+            public sealed class Item
             {
-                public static readonly StyledProperty<object?> ContentProperty =
-                    AvaloniaProperty.Register<DeferredHost, object?>(nameof(Content));
-
-                [Content]
-                [TemplateContent]
-                public object? Content
-                {
-                    get => GetValue(ContentProperty);
-                    set => SetValue(ContentProperty, value);
-                }
+                public string Name { get; set; } = string.Empty;
             }
 
             public sealed class CountingPanel : StackPanel
@@ -164,13 +140,13 @@ public sealed class ComponentDeferredContentIntegrationTests
             new Dictionary<AkburaSyntax, string>());
         ref readonly var plan = ref componentWriter.Plan;
         ref readonly var componentScope = ref plan.Scopes.ItemRef(0);
-        var deferred = Assert.Single(plan.DeferredContents);
+        var template = Assert.Single(plan.Templates);
         var rootId = plan.ScopeRootElementIds[componentScope.Roots.Start];
         ref readonly var root = ref plan.Elements.ItemRef(rootId);
 
         Assert.Equal(ComponentElementScopeKind.Component, componentScope.Kind);
-        Assert.Equal(1, componentScope.Elements.Length);
-        Assert.NotEqual(componentScope.Id, deferred.ScopeId);
+        Assert.Equal(root.Id, template.OwnerElementId);
+        Assert.NotEqual(componentScope.Id, template.ScopeId);
 
         codeWriter.WriteLine("#nullable enable");
         codeWriter.WriteLine();
@@ -185,8 +161,8 @@ public sealed class ComponentDeferredContentIntegrationTests
         componentWriter.WriteElementFields();
         codeWriter.WriteLine();
         codeWriter.WriteLine(
-            "public global::Avalonia.Controls.IDeferredContent " +
-            "CreateRuntimeDeferredContent()");
+            "public global::Avalonia.Controls.Templates.IDataTemplate " +
+            "CreateRuntimeTemplate()");
         codeWriter.WriteLine("{");
         codeWriter.CurrentIndent = 8;
 
@@ -209,26 +185,25 @@ public sealed class ComponentDeferredContentIntegrationTests
             elementReferences: plan.ElementReferences.AsSpan());
         scopeWriter.WriteInitialState(plan, componentScope, scopeContext);
 
-        codeWriter.Write("return (global::Avalonia.Controls.IDeferredContent)");
+        codeWriter.Write("return ");
         var valueWriter = new CSharpValueWriter(codeWriter);
         valueWriter.WriteIdentifier(root.Identifier);
-        codeWriter.WriteLine(".Content!;");
+        codeWriter.WriteLine(".ItemTemplate!;");
         codeWriter.CurrentIndent = 4;
         codeWriter.WriteLine("}");
-        codeWriter.WriteLine();
-        Assert.True(componentWriter.WriteDeferredContentBuilders());
         codeWriter.CurrentIndent = 0;
         codeWriter.WriteLine("}");
 
         var generatedSource = codeWriter.GetText().ToString();
+        AssertBalancedSourceMappings(generatedSource);
         var generatedTree = CSharpSyntaxTree.ParseText(
             generatedSource,
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
-            path: "PlannerView.DeferredContent.Runtime.g.cs");
+            path: "PlannerView.Template.Runtime.g.cs");
         var runtimeCompilation = semanticFixture.CSharpCompilation
             .AddSyntaxTrees(generatedTree)
             .WithAssemblyName(
-                "ComponentDeferredContentIntegration_" +
+                "ComponentTemplateIntegration_" +
                 Guid.NewGuid().ToString("N"));
         var diagnostics = runtimeCompilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity is
@@ -252,36 +227,78 @@ public sealed class ComponentDeferredContentIntegrationTests
             generatedSource);
         var assembly = Assembly.Load(assemblyStream.ToArray());
         var ownerType = assembly.GetType("Demo.PlannerView");
-        var countingPanelType = assembly.GetType("Demo.CountingPanel");
+        var itemType = assembly.GetType("Demo.Item");
+        var templateRootType = assembly.GetType("Demo.CountingPanel");
 
         Assert.NotNull(ownerType);
-        Assert.NotNull(countingPanelType);
+        Assert.NotNull(itemType);
+        Assert.NotNull(templateRootType);
 
-        return new RuntimeFixture(ownerType!, countingPanelType!);
+        return new RuntimeFixture(ownerType!, itemType!, templateRootType!);
+    }
+
+    private static void AssertBalancedSourceMappings(string output)
+    {
+        var mappingCount = CountOccurrences(output, "#line (");
+
+        Assert.NotEqual(0, mappingCount);
+        Assert.Equal(mappingCount, CountOccurrences(output, "#line default"));
+        Assert.Equal(mappingCount, CountOccurrences(output, "#line hidden"));
+        Assert.Contains("\"PlannerView.akbura\"", output, StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var start = 0;
+
+        while ((start = text.IndexOf(value, start, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            start += value.Length;
+        }
+
+        return count;
     }
 
     private sealed class RuntimeFixture
     {
         private readonly Type _ownerType;
         private readonly PropertyInfo _createdCountProperty;
-        private readonly MethodInfo _createDeferredContentMethod;
+        private readonly PropertyInfo _itemNameProperty;
+        private readonly MethodInfo _createTemplateMethod;
 
-        public RuntimeFixture(Type ownerType, Type countingPanelType)
+        public RuntimeFixture(
+            Type ownerType,
+            Type itemType,
+            Type templateRootType)
         {
             _ownerType = ownerType;
-            var createdCountProperty = countingPanelType.GetProperty(
+            ItemType = itemType;
+            TemplateRootType = templateRootType;
+
+            var createdCountProperty = templateRootType.GetProperty(
                 "CreatedCount",
                 BindingFlags.Public | BindingFlags.Static);
-            var createDeferredContentMethod = ownerType.GetMethod(
-                "CreateRuntimeDeferredContent",
+            var itemNameProperty = itemType.GetProperty(
+                "Name",
+                BindingFlags.Public | BindingFlags.Instance);
+            var createTemplateMethod = ownerType.GetMethod(
+                "CreateRuntimeTemplate",
                 BindingFlags.Public | BindingFlags.Instance);
 
             Assert.NotNull(createdCountProperty);
-            Assert.NotNull(createDeferredContentMethod);
+            Assert.NotNull(itemNameProperty);
+            Assert.NotNull(createTemplateMethod);
 
             _createdCountProperty = createdCountProperty;
-            _createDeferredContentMethod = createDeferredContentMethod;
+            _itemNameProperty = itemNameProperty;
+            _createTemplateMethod = createTemplateMethod;
         }
+
+        public Type ItemType { get; }
+
+        public Type TemplateRootType { get; }
 
         public int CreatedTreeCount => Assert.IsType<int>(
             _createdCountProperty.GetValue(obj: null));
@@ -294,10 +311,19 @@ public sealed class ComponentDeferredContentIntegrationTests
             return owner;
         }
 
-        public IDeferredContent CreateDeferredContent(object owner)
+        public object CreateItem(string name)
         {
-            return Assert.IsAssignableFrom<IDeferredContent>(
-                _createDeferredContentMethod.Invoke(owner, parameters: null));
+            var item = Activator.CreateInstance(ItemType);
+
+            Assert.NotNull(item);
+            _itemNameProperty.SetValue(item, name);
+            return item;
+        }
+
+        public IDataTemplate CreateTemplate(object owner)
+        {
+            return Assert.IsAssignableFrom<IDataTemplate>(
+                _createTemplateMethod.Invoke(owner, parameters: null));
         }
     }
 }

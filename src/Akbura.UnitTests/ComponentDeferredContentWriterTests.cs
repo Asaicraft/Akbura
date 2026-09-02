@@ -35,6 +35,7 @@ public sealed class ComponentDeferredContentWriterTests
             fallbackServiceProviderExpression: "__services",
             nameScopeExpression: "__nameScope",
             scopeId: scope.Id,
+            parentStackTraversalKind: MarkupParentStackTraversalKind.ExactScope,
             elements: plan.Elements.AsSpan(),
             elementReferences: plan.ElementReferences.AsSpan());
 
@@ -47,6 +48,9 @@ public sealed class ComponentDeferredContentWriterTests
         Assert.Equal("__nameScope", elementContext.NameScopeExpression);
         Assert.Equal(scope.Id, elementContext.ScopeId);
         Assert.Equal(MarkupParentStackKind.ComponentHierarchy, elementContext.DirectParentsStack.Kind);
+        Assert.Equal(
+            MarkupParentStackTraversalKind.ExactScope,
+            elementContext.DirectParentsStack.TraversalKind);
         Assert.Equal(elementId, elementContext.DirectParentsStack.ElementId);
         Assert.Equal(scope.Id, elementContext.DirectParentsStack.ScopeId);
     }

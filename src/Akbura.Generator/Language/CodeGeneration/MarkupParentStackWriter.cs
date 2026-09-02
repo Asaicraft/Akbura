@@ -11,6 +11,12 @@ internal enum MarkupParentStackKind : byte
     ComponentHierarchy,
 }
 
+internal enum MarkupParentStackTraversalKind : byte
+{
+    ExactScope,
+    FullHierarchy,
+}
+
 /// <summary>
 /// Describes either an existing parent-stack expression or an element hierarchy
 /// whose expression must be streamed to the generated source.
@@ -26,12 +32,14 @@ internal readonly ref struct MarkupParentStackPlan
         Elements = default;
         ElementId = -1;
         ScopeId = -1;
+        TraversalKind = MarkupParentStackTraversalKind.ExactScope;
     }
 
     public MarkupParentStackPlan(
         ReadOnlySpan<ComponentElementPlan> elements,
         int elementId,
-        int scopeId)
+        int scopeId,
+        MarkupParentStackTraversalKind traversalKind)
     {
         Debug.Assert(!elements.IsEmpty);
         Debug.Assert((uint)elementId < (uint)elements.Length);
@@ -42,6 +50,7 @@ internal readonly ref struct MarkupParentStackPlan
         Elements = elements;
         ElementId = elementId;
         ScopeId = scopeId;
+        TraversalKind = traversalKind;
     }
 
     public MarkupParentStackKind Kind { get; }
@@ -53,6 +62,8 @@ internal readonly ref struct MarkupParentStackPlan
     public int ElementId { get; }
 
     public int ScopeId { get; }
+
+    public MarkupParentStackTraversalKind TraversalKind { get; }
 }
 
 /// <summary>
@@ -138,7 +149,8 @@ internal readonly ref struct MarkupParentStackWriter
         _writer.Write("new global::System.Object[] { ");
 
         var valueWriter = new CSharpValueWriter(_writer);
-        var hasValue = plan.ScopeId == 0;
+        var hasValue = plan.ScopeId == 0 ||
+            plan.TraversalKind == MarkupParentStackTraversalKind.FullHierarchy;
 
         if (hasValue)
         {
@@ -188,7 +200,8 @@ internal readonly ref struct MarkupParentStackWriter
                 return false;
             }
 
-            if (element.ScopeId != plan.ScopeId)
+            if (plan.TraversalKind == MarkupParentStackTraversalKind.ExactScope &&
+                element.ScopeId != plan.ScopeId)
             {
                 break;
             }

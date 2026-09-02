@@ -78,6 +78,7 @@ internal readonly ref struct DeferredContentWriter
                 "__services",
                 scope.RequiresNameScope ? "__nameScope" : null,
                 scope.Id,
+                MarkupParentStackTraversalKind.ExactScope,
                 plan.Elements.AsSpan(),
                 plan.ElementReferences.AsSpan());
             var scopeWriter = new ComponentScopeWriter(

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
 using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
@@ -16,6 +17,7 @@ internal readonly ref struct ComponentScopeWriteContext
         string? fallbackServiceProviderExpression,
         string? nameScopeExpression,
         int scopeId,
+        MarkupParentStackTraversalKind parentStackTraversalKind,
         ReadOnlySpan<ComponentElementPlan> elements,
         ReadOnlySpan<BindingElementReference> elementReferences)
     {
@@ -24,6 +26,7 @@ internal readonly ref struct ComponentScopeWriteContext
         FallbackServiceProviderExpression = fallbackServiceProviderExpression;
         NameScopeExpression = nameScopeExpression;
         ScopeId = scopeId;
+        ParentStackTraversalKind = parentStackTraversalKind;
         Elements = elements;
         ElementReferences = elementReferences;
     }
@@ -38,25 +41,29 @@ internal readonly ref struct ComponentScopeWriteContext
 
     public int ScopeId { get; }
 
+    public MarkupParentStackTraversalKind ParentStackTraversalKind { get; }
+
     public ReadOnlySpan<ComponentElementPlan> Elements { get; }
 
     public ReadOnlySpan<BindingElementReference> ElementReferences { get; }
 
     public MarkupExtensionWriteContext ForElement(int elementId)
     {
-        if ((uint)elementId >= (uint)Elements.Length ||
-            Elements[elementId].ScopeId != ScopeId)
-        {
-            throw new ArgumentOutOfRangeException(nameof(elementId));
-        }
+        Debug.Assert((uint)elementId < (uint)Elements.Length);
+        Debug.Assert(Elements[elementId].ScopeId == ScopeId);
 
-        var targetExpression = EscapeIdentifier(Elements[elementId].Identifier);
+        ref readonly var element = ref Elements[elementId];
+        var targetExpression = EscapeIdentifier(element.Identifier);
         return new MarkupExtensionWriteContext(
             targetExpression,
             targetProperty: default,
             IntermediateRootExpression,
             BaseUriExpression,
-            new MarkupParentStackPlan(Elements, elementId, ScopeId),
+            new MarkupParentStackPlan(
+                Elements,
+                elementId,
+                ScopeId,
+                ParentStackTraversalKind),
             FallbackServiceProviderExpression,
             NameScopeExpression,
             ScopeId,

@@ -296,6 +296,7 @@ internal static class ComponentPlanner
             _elements.Add(default);
 
             var pendingFirstUpdateActionStart = _pendingFirstUpdateActions.Count;
+            AddPendingTemplateDataType(elementId, syntax, type);
             AddPendingFirstUpdateActions(elementId, scope.ScopeId, type, symbol);
             var pendingFirstUpdateActions = new ComponentPlanRange(
                 pendingFirstUpdateActionStart,
@@ -537,20 +538,62 @@ internal static class ComponentPlanner
                     id);
             }
 
-            if (boundary.IsTemplate && !templateRoots.IsEmpty)
+            if (boundary.IsTemplate)
             {
-                var id = _templates.Count;
-                _templates.Add(new ComponentTemplatePlan(
-                    id,
-                    boundary.ScopeId,
-                    boundary.OwnerElementId,
-                    boundary.Syntax));
-                return new ComponentContentValueReference(
-                    ComponentContentValueKind.Template,
-                    id);
+                return CompleteTemplateBoundary(boundary, templateRoots);
             }
 
             return default;
+        }
+
+        private ComponentContentValueReference CompleteTemplateBoundary(
+            in ContentBoundary boundary,
+            scoped ReadOnlySpan<int> roots)
+        {
+            Debug.Assert(boundary.IsTemplate);
+
+            if (roots.Length != 1)
+            {
+                return default;
+            }
+
+            var root = _elements[roots[0]];
+            if (root.ScopeId != boundary.ScopeId ||
+                (root.Flags & ComponentElementFlags.IsControl) == 0)
+            {
+                return default;
+            }
+
+            var dataType =
+                (ITypeSymbol)_compilation.GetSpecialType(
+                    SpecialType.System_Object);
+            var itemName = "__item";
+            var dataTypes =
+                _semanticModel.BindingSession.MarkupDataTypes;
+
+            if (dataTypes.TryGetTemplateContract(
+                    boundary.Syntax,
+                    out var resolvedDataType,
+                    out var resolvedItemName))
+            {
+                dataType = resolvedDataType;
+                if (!string.IsNullOrEmpty(resolvedItemName))
+                {
+                    itemName = resolvedItemName!;
+                }
+            }
+
+            var id = _templates.Count;
+            _templates.Add(new ComponentTemplatePlan(
+                id,
+                boundary.ScopeId,
+                boundary.OwnerElementId,
+                dataType,
+                itemName,
+                boundary.Syntax));
+            return new ComponentContentValueReference(
+                ComponentContentValueKind.Template,
+                id);
         }
 
         private int AddPendingScope(
@@ -747,6 +790,66 @@ internal static class ComponentPlanner
             return new ComponentPlanRange(start, elementIds.Length);
         }
 
+        private void AddPendingTemplateDataType(
+            int elementId,
+            MarkupElementSyntax syntax,
+            ITypeSymbol elementType)
+        {
+            if (elementType is not INamedTypeSymbol namedType)
+            {
+                return;
+            }
+
+            var templates =
+                _semanticModel.BindingSession.MarkupTemplateContent;
+            if (!templates.IsDataTemplateType(namedType) ||
+                templates.FindDataTypeProperty(namedType) is not { } property ||
+                !TryGetTemplateDataType(syntax, out var dataType))
+            {
+                return;
+            }
+
+            _pendingFirstUpdateActions.Add(
+                PendingFirstUpdateActionPlan.CreateTemplateDataType(
+                    new PendingTemplateDataTypePlan(
+                        elementId,
+                        property,
+                        dataType,
+                        syntax)));
+        }
+
+        private bool TryGetTemplateDataType(
+            MarkupElementSyntax syntax,
+            out INamedTypeSymbol dataType)
+        {
+            var dataTypes =
+                _semanticModel.BindingSession.MarkupDataTypes;
+            if (dataTypes.TryGetDataType(syntax, out dataType))
+            {
+                return true;
+            }
+
+            for (var ancestor = syntax.Parent;
+                 ancestor != null;
+                 ancestor = ancestor.Parent)
+            {
+                if (ancestor is not MarkupElementSyntax propertyElement ||
+                    _semanticModel.GetSymbolInfo(propertyElement).Symbol
+                        is not AkburaPropertySymbol property ||
+                    !IsDataTemplateProperty(property))
+                {
+                    continue;
+                }
+
+                return dataTypes.TryGetDataType(
+                    propertyElement,
+                    out dataType);
+            }
+
+            dataType = null!;
+            return false;
+        }
+
         private void AddPendingFirstUpdateActions(
             int elementId,
             int scopeId,
@@ -819,22 +922,55 @@ internal static class ComponentPlanner
         {
             switch (pending.Kind)
             {
-                case ComponentFirstUpdateActionKind.PropertyWrite:
+                case PendingFirstUpdateActionKind.PropertyWrite:
                     LowerPropertyWrite(_pendingPropertyWrites[pending.PropertyWriteIndex]);
                     return;
-                case ComponentFirstUpdateActionKind.NameAssignment:
+                case PendingFirstUpdateActionKind.TemplateDataType:
+                    LowerTemplateDataType(pending.TemplateDataType);
+                    return;
+                case PendingFirstUpdateActionKind.NameAssignment:
                     LowerNameAssignment((IMarkupNameAssignmentOperation)pending.Operation!);
                     return;
-                case ComponentFirstUpdateActionKind.RoutedEvent:
+                case PendingFirstUpdateActionKind.RoutedEvent:
                     LowerRoutedEvent((IMarkupRoutedEventBindingOperation)pending.Operation!);
                     return;
-                case ComponentFirstUpdateActionKind.CommandBinding:
+                case PendingFirstUpdateActionKind.CommandBinding:
                     LowerCommandBinding((IMarkupCommandBindingOperation)pending.Operation!, targetType);
                     return;
                 default:
                     Debug.Fail("An invalid pending first-update action reached lowering.");
                     return;
             }
+        }
+
+        private void LowerTemplateDataType(
+            in PendingTemplateDataTypePlan pending)
+        {
+            Debug.Assert(
+                (uint)pending.ElementId < (uint)_elements.Count);
+
+            var destination = PropertyWritePlan.Create(pending.Property);
+            if (!destination.IsValid)
+            {
+                return;
+            }
+
+            var valueIndex = _csharpValues.Count;
+            _csharpValues.Add(new ComponentCSharpValuePlan(
+                operation: default,
+                convertedValue: pending.DataType,
+                literalValue: null,
+                targetType: pending.Property.Type));
+
+            var writeIndex = _propertyWrites.Count;
+            _propertyWrites.Add(new ComponentPropertyWritePlan(
+                destination,
+                ComponentPropertyValueKind.Constant,
+                valueIndex,
+                pending.Syntax,
+                isFirstUpdate: true));
+            _firstUpdateActions.Add(
+                ComponentFirstUpdateActionPlan.CreateWrite(writeIndex));
         }
 
         private void LowerNameAssignment(IMarkupNameAssignmentOperation operation)
@@ -1789,52 +1925,99 @@ internal static class ComponentPlanner
         }
     }
 
+    private enum PendingFirstUpdateActionKind : byte
+    {
+        None,
+        PropertyWrite,
+        TemplateDataType,
+        NameAssignment,
+        RoutedEvent,
+        CommandBinding,
+    }
+
+    private readonly struct PendingTemplateDataTypePlan
+    {
+        public PendingTemplateDataTypePlan(
+            int elementId,
+            RoslynPropertySymbol property,
+            ITypeSymbol dataType,
+            AkburaSyntax syntax)
+        {
+            ElementId = elementId;
+            Property = property;
+            DataType = dataType;
+            Syntax = syntax;
+        }
+
+        public int ElementId { get; }
+        public RoslynPropertySymbol Property { get; }
+        public ITypeSymbol DataType { get; }
+        public AkburaSyntax Syntax { get; }
+    }
+
     private readonly struct PendingFirstUpdateActionPlan
     {
         private PendingFirstUpdateActionPlan(
-            ComponentFirstUpdateActionKind kind,
+            PendingFirstUpdateActionKind kind,
             int propertyWriteIndex,
-            IMarkupAttributeOperation? operation)
+            IMarkupAttributeOperation? operation,
+            PendingTemplateDataTypePlan templateDataType)
         {
             Kind = kind;
             PropertyWriteIndex = propertyWriteIndex;
             Operation = operation;
+            TemplateDataType = templateDataType;
         }
 
-        public ComponentFirstUpdateActionKind Kind { get; }
+        public PendingFirstUpdateActionKind Kind { get; }
         public int PropertyWriteIndex { get; }
         public IMarkupAttributeOperation? Operation { get; }
+        public PendingTemplateDataTypePlan TemplateDataType { get; }
 
         public static PendingFirstUpdateActionPlan CreateProperty(int propertyWriteIndex)
         {
             return new PendingFirstUpdateActionPlan(
-                ComponentFirstUpdateActionKind.PropertyWrite,
+                PendingFirstUpdateActionKind.PropertyWrite,
                 propertyWriteIndex,
-                operation: null);
+                operation: null,
+                templateDataType: default);
+        }
+
+        public static PendingFirstUpdateActionPlan CreateTemplateDataType(
+            in PendingTemplateDataTypePlan templateDataType)
+        {
+            return new PendingFirstUpdateActionPlan(
+                PendingFirstUpdateActionKind.TemplateDataType,
+                propertyWriteIndex: -1,
+                operation: null,
+                templateDataType);
         }
 
         public static PendingFirstUpdateActionPlan CreateNameAssignment(IMarkupNameAssignmentOperation operation)
         {
             return new PendingFirstUpdateActionPlan(
-                ComponentFirstUpdateActionKind.NameAssignment,
+                PendingFirstUpdateActionKind.NameAssignment,
                 propertyWriteIndex: -1,
-                operation);
+                operation,
+                templateDataType: default);
         }
 
         public static PendingFirstUpdateActionPlan CreateRoutedEvent(IMarkupRoutedEventBindingOperation operation)
         {
             return new PendingFirstUpdateActionPlan(
-                ComponentFirstUpdateActionKind.RoutedEvent,
+                PendingFirstUpdateActionKind.RoutedEvent,
                 propertyWriteIndex: -1,
-                operation);
+                operation,
+                templateDataType: default);
         }
 
         public static PendingFirstUpdateActionPlan CreateCommandBinding(IMarkupCommandBindingOperation operation)
         {
             return new PendingFirstUpdateActionPlan(
-                ComponentFirstUpdateActionKind.CommandBinding,
+                PendingFirstUpdateActionKind.CommandBinding,
                 propertyWriteIndex: -1,
-                operation);
+                operation,
+                templateDataType: default);
         }
     }
 

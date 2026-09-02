@@ -84,6 +84,24 @@ internal readonly struct PropertyWritePlan
             : CreateCore(property, targetType);
     }
 
+    public static PropertyWritePlan Create(RoslynPropertySymbol property)
+    {
+        Debug.Assert(property != null);
+
+        if (property is not { IsStatic: false, ContainingType: { } receiverType })
+        {
+            return default;
+        }
+
+        return new PropertyWritePlan(
+            PropertyWriteKind.ClrProperty,
+            property,
+            MarkupTargetPropertyPlan.CreateClrProperty(property),
+            attachedSetter: null,
+            receiverType,
+            memberName: null);
+    }
+
     private static PropertyWritePlan CreateCore(
         AkburaPropertySymbol property,
         ITypeSymbol? targetType)

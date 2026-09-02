@@ -53,7 +53,8 @@ public sealed class MarkupServiceProviderWriterTests
         var parentStack = new MarkupParentStackPlan(
             fixture.Plan.Elements.AsSpan(),
             target.Id,
-            target.ScopeId);
+            target.ScopeId,
+            MarkupParentStackTraversalKind.ExactScope);
         var context = new MarkupExtensionWriteContext(
             targetObjectExpression: target.Identifier,
             targetProperty: MarkupTargetPropertyPlan.CreateExpression(
@@ -98,7 +99,8 @@ public sealed class MarkupServiceProviderWriterTests
         var parentStack = new MarkupParentStackPlan(
             fixture.Plan.Elements.AsSpan(),
             target.Id,
-            target.ScopeId);
+            target.ScopeId,
+            MarkupParentStackTraversalKind.ExactScope);
         var context = new MarkupExtensionWriteContext(
             targetObjectExpression: target.Identifier,
             targetProperty: MarkupTargetPropertyPlan.CreateExpression(

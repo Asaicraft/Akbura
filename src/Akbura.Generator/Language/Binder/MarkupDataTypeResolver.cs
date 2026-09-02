@@ -1,4 +1,4 @@
-using Akbura.Language.Symbols;
+﻿using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
@@ -76,6 +76,25 @@ internal sealed class MarkupDataTypeResolver
 
         dataType = null!;
         return false;
+    }
+
+    internal bool TryGetTemplateContract(
+        MarkupElementSyntax scope,
+        out INamedTypeSymbol dataType,
+        out string? itemName)
+    {
+        itemName = null;
+        if (!TryGetDataType(scope, out dataType))
+        {
+            return false;
+        }
+
+        if (TryGetItemName(scope, out _, out var resolvedItemName))
+        {
+            itemName = resolvedItemName;
+        }
+
+        return true;
     }
 
     public bool TryCreateItemSymbol(

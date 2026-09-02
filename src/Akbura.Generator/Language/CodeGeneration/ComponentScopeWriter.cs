@@ -402,8 +402,26 @@ internal readonly ref struct ComponentScopeWriter
             }
 
             case ComponentContentValueKind.Template:
-                // TemplateWriter is the next pipeline stage.
-                return false;
+            {
+                Debug.Assert(isFirstUpdate);
+                Debug.Assert((uint)value.Index < (uint)plan.Templates.Length);
+
+                if (!isFirstUpdate || (uint)value.Index >= (uint)plan.Templates.Length)
+                {
+                    return false;
+                }
+
+                var writer = new TemplateWriter(
+                    _writer,
+                    in _bindingEnvironment,
+                    _sourceMap,
+                    _ownerTypeName);
+                return writer.WriteValue(
+                    plan,
+                    content,
+                    plan.Templates.ItemRef(value.Index),
+                    context);
+            }
 
             default:
                 return false;

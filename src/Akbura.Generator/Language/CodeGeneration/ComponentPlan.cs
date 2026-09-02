@@ -209,6 +209,8 @@ internal readonly struct ComponentElementPlan
 
     public bool IsTemplateElement => (Flags & ComponentElementFlags.IsTemplateElement) != 0;
 
+    public bool IsControl => (Flags & ComponentElementFlags.IsControl) != 0;
+
     public bool SupportsInitialize => (Flags & ComponentElementFlags.SupportsInitialize) != 0;
 
     public bool RequiresLocalMarkupContext =>
@@ -398,11 +400,15 @@ internal readonly struct ComponentTemplatePlan
         int id,
         int scopeId,
         int ownerElementId,
+        ITypeSymbol dataType,
+        string itemName,
         MarkupElementSyntax syntax)
     {
         Id = id;
         ScopeId = scopeId;
         OwnerElementId = ownerElementId;
+        DataType = dataType ?? throw new ArgumentNullException(nameof(dataType));
+        ItemName = itemName ?? throw new ArgumentNullException(nameof(itemName));
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
     }
 
@@ -411,6 +417,10 @@ internal readonly struct ComponentTemplatePlan
     public int ScopeId { get; }
 
     public int OwnerElementId { get; }
+
+    public ITypeSymbol DataType { get; }
+
+    public string ItemName { get; }
 
     public MarkupElementSyntax Syntax { get; }
 }

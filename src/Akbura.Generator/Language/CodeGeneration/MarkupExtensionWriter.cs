@@ -53,6 +53,35 @@ internal readonly ref struct MarkupExtensionWriteContext
 
     public ReadOnlySpan<BindingElementReference> ElementReferences { get; }
 
+    internal MarkupExtensionWriteContext WithTarget(
+        string targetObjectExpression,
+        string targetPropertyExpression)
+    {
+        return WithTarget(
+            targetObjectExpression,
+            targetPropertyExpression,
+            ScopeId,
+            ElementReferences);
+    }
+
+    internal MarkupExtensionWriteContext WithTarget(
+        string targetObjectExpression,
+        string targetPropertyExpression,
+        int scopeId,
+        ReadOnlySpan<BindingElementReference> elementReferences)
+    {
+        return new MarkupExtensionWriteContext(
+            targetObjectExpression,
+            targetPropertyExpression,
+            IntermediateRootExpression,
+            BaseUriExpression,
+            DirectParentsStackExpression,
+            FallbackServiceProviderExpression,
+            NameScopeExpression,
+            scopeId,
+            elementReferences);
+    }
+
     internal MarkupExtensionWriteContext WithElementReferences(
         ReadOnlySpan<BindingElementReference> elementReferences)
     {

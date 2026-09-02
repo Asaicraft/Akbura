@@ -1,5 +1,6 @@
 ﻿using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
+using Akbura.Language.Binder;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
@@ -121,11 +122,89 @@ internal enum ComponentPropertyValueKind : byte
     CSharpExpression,
     ElementReference,
     MarkupExtensionValue,
-    Binding,
+    MarkupBinding,
     DynamicResource,
     StaticResource,
     BindingBaseResult,
     RuntimeMarkupExtensionResult,
+}
+
+internal enum ComponentPropertySynchronizationKind : byte
+{
+    None,
+    Bind,
+    Out,
+}
+
+internal readonly struct ComponentCSharpValuePlan
+{
+    public ComponentCSharpValuePlan(
+        CSharpOperationDefinition operation,
+        object? convertedValue,
+        string? literalValue,
+        ITypeSymbol? targetType)
+    {
+        Operation = operation;
+        ConvertedValue = convertedValue;
+        LiteralValue = literalValue;
+        TargetType = targetType;
+    }
+
+    public CSharpOperationDefinition Operation { get; }
+
+    public object? ConvertedValue { get; }
+
+    public string? LiteralValue { get; }
+
+    public ITypeSymbol? TargetType { get; }
+}
+
+internal readonly struct ComponentPropertyValueReference
+{
+    public ComponentPropertyValueReference(
+        ComponentPropertyValueKind kind,
+        int index)
+    {
+        Kind = kind;
+        Index = index;
+    }
+
+    public ComponentPropertyValueKind Kind { get; }
+
+    public int Index { get; }
+
+    public bool IsValid => Kind != ComponentPropertyValueKind.None && Index >= 0;
+}
+
+internal readonly struct ComponentPropertySubscriptionPlan
+{
+    public ComponentPropertySubscriptionPlan(
+        int elementId,
+        ComponentPropertySynchronizationKind kind,
+        PropertyReadPlan source,
+        CSharpOperationDefinition targetOperation,
+        ITypeSymbol valueType,
+        AkburaSyntax syntax)
+    {
+        ElementId = elementId;
+        Kind = kind;
+        Source = source;
+        TargetOperation = targetOperation;
+        ValueType = valueType ?? throw new ArgumentNullException(nameof(valueType));
+        Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
+    }
+
+    public int ElementId { get; }
+
+    public ComponentPropertySynchronizationKind Kind { get; }
+
+    public PropertyReadPlan Source { get; }
+
+    public CSharpOperationDefinition TargetOperation { get; }
+
+    public ITypeSymbol ValueType { get; }
+
+    public AkburaSyntax Syntax { get; }
 }
 
 internal readonly struct ComponentPropertyWritePlan
@@ -257,6 +336,10 @@ internal readonly struct ComponentPlan
         ImmutableArray<int> rootElementIds,
         ImmutableArray<int> childElementIds,
         ImmutableArray<ComponentPropertyWritePlan> propertyWrites,
+        ImmutableArray<ComponentCSharpValuePlan> csharpValues,
+        ImmutableArray<MarkupExtensionResultPlan> markupExtensions,
+        ImmutableArray<BindingWritePlan> bindings,
+        ImmutableArray<ComponentPropertySubscriptionPlan> propertySubscriptions,
         ImmutableArray<ComponentPropertyElementPlan> propertyElements,
         ImmutableArray<ComponentDeferredContentPlan> deferredContents,
         ImmutableArray<ComponentTemplatePlan> templates,
@@ -267,6 +350,14 @@ internal readonly struct ComponentPlan
         RootElementIds = rootElementIds.IsDefault ? ImmutableArray<int>.Empty : rootElementIds;
         ChildElementIds = childElementIds.IsDefault ? ImmutableArray<int>.Empty : childElementIds;
         PropertyWrites = propertyWrites.IsDefault ? ImmutableArray<ComponentPropertyWritePlan>.Empty : propertyWrites;
+        CSharpValues = csharpValues.IsDefault ? ImmutableArray<ComponentCSharpValuePlan>.Empty : csharpValues;
+        MarkupExtensions = markupExtensions.IsDefault
+            ? ImmutableArray<MarkupExtensionResultPlan>.Empty
+            : markupExtensions;
+        Bindings = bindings.IsDefault ? ImmutableArray<BindingWritePlan>.Empty : bindings;
+        PropertySubscriptions = propertySubscriptions.IsDefault
+            ? ImmutableArray<ComponentPropertySubscriptionPlan>.Empty
+            : propertySubscriptions;
         PropertyElements = propertyElements.IsDefault
             ? ImmutableArray<ComponentPropertyElementPlan>.Empty
             : propertyElements;
@@ -287,6 +378,14 @@ internal readonly struct ComponentPlan
     public ImmutableArray<int> ChildElementIds { get; }
 
     public ImmutableArray<ComponentPropertyWritePlan> PropertyWrites { get; }
+
+    public ImmutableArray<ComponentCSharpValuePlan> CSharpValues { get; }
+
+    public ImmutableArray<MarkupExtensionResultPlan> MarkupExtensions { get; }
+
+    public ImmutableArray<BindingWritePlan> Bindings { get; }
+
+    public ImmutableArray<ComponentPropertySubscriptionPlan> PropertySubscriptions { get; }
 
     public ImmutableArray<ComponentPropertyElementPlan> PropertyElements { get; }
 

@@ -113,28 +113,73 @@ internal sealed class ComponentWriter
         writer.WriteEndInit(element);
     }
 
+    public bool WriteFirstUpdateProperties(
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        return WriteProperties(elementId, isFirstUpdate: true, context);
+    }
+
+    public bool WriteUpdateProperties(
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        return WriteProperties(elementId, isFirstUpdate: false, context);
+    }
+
     public bool WriteStaticMembers()
     {
-        if (_plan.Akcss.IsEmpty)
-        {
-            return false;
-        }
-
         var indent = _writer.CurrentIndent;
         try
         {
-            var writer = new AkcssActivatorWriter(
-                _writer,
-                in _bindingEnvironment,
-                _ownerTypeName,
-                _sourceMap);
-            writer.WriteStaticMembers(_plan.Akcss);
-            return true;
+            var wroteAny = WriteCachedBindingPaths();
+            if (!_plan.Akcss.IsEmpty)
+            {
+                if (wroteAny)
+                {
+                    _writer.WriteLine();
+                }
+
+                var writer = new AkcssActivatorWriter(
+                    _writer,
+                    in _bindingEnvironment,
+                    _ownerTypeName,
+                    _sourceMap);
+                writer.WriteStaticMembers(_plan.Akcss);
+                wroteAny = true;
+            }
+
+            return wroteAny;
         }
         finally
         {
             _writer.CurrentIndent = indent;
         }
+    }
+
+    private bool WriteCachedBindingPaths()
+    {
+        var writer = new MarkupExtensionWriter(_writer, in _bindingEnvironment);
+        var wroteAny = false;
+
+        for (var i = 0; i < _plan.Bindings.Length; i++)
+        {
+            ref readonly var binding = ref _plan.Bindings.ItemRef(i);
+            if (!binding.HasCachedPath)
+            {
+                continue;
+            }
+
+            if (wroteAny)
+            {
+                _writer.WriteLine();
+            }
+
+            writer.WriteCachedBindingPath(binding);
+            wroteAny = true;
+        }
+
+        return wroteAny;
     }
 
     public bool WriteFactoryMethods(
@@ -215,6 +260,52 @@ internal sealed class ComponentWriter
                 _sourceMap);
             writer.WriteRefresh(element.Akcss.Activators, targetExpression);
             return true;
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    private bool WriteProperties(
+        int elementId,
+        bool isFirstUpdate,
+        in MarkupExtensionWriteContext context)
+    {
+        ref readonly var element = ref GetElement(elementId);
+        if (element.PropertyWrites.IsEmpty)
+        {
+            return false;
+        }
+
+        var indent = _writer.CurrentIndent;
+        try
+        {
+            var targetExpression = EscapeIdentifier(element.Identifier);
+            var propertyContext = context.WithTarget(
+                targetExpression,
+                context.TargetPropertyExpression,
+                element.ScopeId,
+                _plan.ElementReferences.AsSpan());
+            var writer = new ComponentPropertyWriter(
+                _writer,
+                in _bindingEnvironment,
+                _sourceMap);
+            var wroteAny = false;
+
+            for (var i = 0; i < element.PropertyWrites.Length; i++)
+            {
+                ref readonly var property = ref _plan.PropertyWrites.ItemRef(element.PropertyWrites.Start + i);
+                if (property.IsFirstUpdate != isFirstUpdate)
+                {
+                    continue;
+                }
+
+                writer.Write(_plan, property, targetExpression, propertyContext);
+                wroteAny = true;
+            }
+
+            return wroteAny;
         }
         finally
         {

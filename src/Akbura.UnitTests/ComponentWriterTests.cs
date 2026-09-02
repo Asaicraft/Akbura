@@ -67,6 +67,123 @@ public sealed class ComponentWriterTests
     }
 
     [Fact]
+    public void PropertyMethods_SplitFirstAndRegularUpdatesAndPreserveMappingsAndIndent()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <Border Width="42" Height={21d} />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        using var codeWriter = new CodeWriter
+        {
+            CurrentIndent = 6,
+        };
+        var writer = CreateWriter(codeWriter, fixture);
+        var element = Assert.Single(writer.Elements);
+        var context = CreateWriteContext();
+
+        Assert.True(writer.WriteFirstUpdateProperties(element.Id, context));
+        Assert.Equal(6, codeWriter.CurrentIndent);
+        var firstUpdate = codeWriter.GetText().ToString();
+
+        Assert.Contains("WidthProperty", firstUpdate, StringComparison.Ordinal);
+        Assert.Contains(".WidthProperty, 42d);", firstUpdate, StringComparison.Ordinal);
+        Assert.DoesNotContain("HeightProperty", firstUpdate, StringComparison.Ordinal);
+        AssertSourceMappings(firstUpdate, "PlannerView.akbura");
+        Assert.Equal(1, CountOccurrences(firstUpdate, "#line ("));
+
+        var updateStart = codeWriter.Length;
+        Assert.True(writer.WriteUpdateProperties(element.Id, context));
+        Assert.Equal(6, codeWriter.CurrentIndent);
+        var update = codeWriter.GetText().ToString().Substring(updateStart);
+
+        Assert.Contains("HeightProperty", update, StringComparison.Ordinal);
+        Assert.Contains(".HeightProperty, 21d);", update, StringComparison.Ordinal);
+        Assert.DoesNotContain("WidthProperty", update, StringComparison.Ordinal);
+        AssertSourceMappings(update, "PlannerView.akbura");
+        Assert.Equal(1, CountOccurrences(update, "#line ("));
+    }
+
+    [Fact]
+    public void PropertyMethods_WriteConvertedGridDefinitionLiterals()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <Grid RowDefinitions="Auto, 2*, 100" ColumnDefinitions="*, 2" />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        using var codeWriter = new CodeWriter();
+        var writer = CreateWriter(codeWriter, fixture);
+        var element = Assert.Single(writer.Elements);
+
+        Assert.True(writer.WriteFirstUpdateProperties(element.Id, CreateWriteContext()));
+        Assert.False(writer.WriteUpdateProperties(element.Id, CreateWriteContext()));
+
+        var output = codeWriter.GetText().ToString();
+        Assert.Contains("new global::Avalonia.Controls.RowDefinitions {", output, StringComparison.Ordinal);
+        Assert.Contains("global::Avalonia.Controls.GridUnitType.Auto", output, StringComparison.Ordinal);
+        Assert.Contains("global::Avalonia.Controls.GridUnitType.Star", output, StringComparison.Ordinal);
+        Assert.Contains("new global::Avalonia.Controls.ColumnDefinitions {", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("GridDefinitionListValue", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CompiledBinding_WritesCachedStaticPathWithoutAkcssAndUsesTheField()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <TextBlock Text=${CompiledBinding $self.Text} />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        using var codeWriter = new CodeWriter
+        {
+            CurrentIndent = 4,
+        };
+        var writer = CreateWriter(codeWriter, fixture);
+        var textBlock = Assert.Single(
+            writer.Elements,
+            static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "TextBlock");
+        var binding = Assert.Single(writer.Plan.Bindings);
+        var context = CreateWriteContext("__nameScope");
+
+        Assert.False(writer.HasAkcss);
+        Assert.True(binding.HasCachedPath);
+        Assert.Equal(0, binding.CachedPathId);
+        Assert.True(writer.WriteStaticMembers());
+        Assert.Equal(4, codeWriter.CurrentIndent);
+
+        var staticMembers = codeWriter.GetText().ToString();
+        Assert.Contains(
+            "private static readonly global::Avalonia.Data.CompiledBindingPath s_bindingPath0 =",
+            staticMembers,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "new global::Avalonia.Data.CompiledBindingPathBuilder()",
+            staticMembers,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("s_akcss", staticMembers, StringComparison.Ordinal);
+
+        var bindingStart = codeWriter.Length;
+        Assert.True(writer.WriteFirstUpdateProperties(textBlock.Id, context));
+        Assert.False(writer.WriteUpdateProperties(textBlock.Id, context));
+        Assert.Equal(4, codeWriter.CurrentIndent);
+        var bindingWrite = codeWriter.GetText().ToString().Substring(bindingStart);
+
+        Assert.Contains(
+            "new global::Avalonia.Data.CompiledBinding(s_bindingPath0)",
+            bindingWrite,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("CompiledBindingPathBuilder", bindingWrite, StringComparison.Ordinal);
+        AssertSourceMappings(bindingWrite, "PlannerView.akbura");
+    }
+
+    [Fact]
     public void WriteElementFields_WritesOnlyComponentElementsAndPreservesIndent()
     {
         var fixture = CreateRichComponentFixture();
@@ -668,7 +785,8 @@ public sealed class ComponentWriterTests
             .ToArray();
     }
 
-    private static MarkupExtensionWriteContext CreateWriteContext()
+    private static MarkupExtensionWriteContext CreateWriteContext(
+        string? nameScopeExpression = null)
     {
         return new MarkupExtensionWriteContext(
             targetObjectExpression: "__target",
@@ -677,7 +795,7 @@ public sealed class ComponentWriterTests
             baseUriExpression: "__baseUri",
             directParentsStackExpression: "__parents",
             fallbackServiceProviderExpression: null,
-            nameScopeExpression: null,
+            nameScopeExpression,
             scopeId: 0);
     }
 

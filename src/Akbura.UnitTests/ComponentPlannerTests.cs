@@ -427,6 +427,118 @@ public sealed class ComponentPlannerTests
     }
 
     [Fact]
+    public void Create_IndexesCSharpPayloadsWithinTypedArray()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            state double opacity = 0.5;
+
+            <Border
+                Background=${DynamicResource AccentBrush}
+                Width="42"
+                Height="21"
+                Opacity={opacity} />
+            """;
+        var plan = CreatePlan(AkcssActivatorPlannerTests.CreateFixture(component));
+        var element = Assert.Single(plan.Elements);
+        var writes = GetWrites(plan.PropertyWrites, element.PropertyWrites);
+
+        Assert.Equal(
+            [
+                ComponentPropertyValueKind.DynamicResource,
+                ComponentPropertyValueKind.Constant,
+                ComponentPropertyValueKind.Constant,
+                ComponentPropertyValueKind.CSharpExpression,
+            ],
+            writes.Select(static write => write.ValueKind).ToArray());
+        Assert.Equal([0, 0, 1, 2], writes.Select(static write => write.PayloadIndex).ToArray());
+        Assert.Equal(3, plan.CSharpValues.Length);
+        Assert.Single(plan.MarkupExtensions);
+        Assert.Equal("42", plan.CSharpValues[0].LiteralValue);
+        Assert.Equal("21", plan.CSharpValues[1].LiteralValue);
+        Assert.Equal("opacity", plan.CSharpValues[2].Operation.ToDisplayString());
+        Assert.NotEqual(1, writes[1].PayloadIndex);
+        Assert.NotEqual(2, writes[2].PayloadIndex);
+        Assert.NotEqual(3, writes[3].PayloadIndex);
+    }
+
+    [Fact]
+    public void Create_SeparatesBindOutAndMarkupBindingSemantics()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            state string bindValue = "";
+            state string outValue = "";
+            state string plainValue = "";
+
+            <StackPanel>
+                <TextBox x.Name="bindTarget" bind:Text={bindValue} />
+                <TextBox x.Name="outTarget" out:Text={outValue} />
+                <TextBlock x.Name="plainTarget" Text={plainValue} />
+                <TextBlock x.Name="markupTarget" Text=${Binding Name} />
+            </StackPanel>
+            """;
+        var plan = CreatePlan(AkcssActivatorPlannerTests.CreateFixture(component));
+        var bindTarget = GetNamedElement(plan, "bindTarget");
+        var outTarget = GetNamedElement(plan, "outTarget");
+        var plainTarget = GetNamedElement(plan, "plainTarget");
+        var markupTarget = GetNamedElement(plan, "markupTarget");
+        var bindWrite = Assert.Single(GetWrites(plan.PropertyWrites, bindTarget.PropertyWrites));
+        var plainWrite = Assert.Single(GetWrites(plan.PropertyWrites, plainTarget.PropertyWrites));
+        var markupWrite = Assert.Single(GetWrites(plan.PropertyWrites, markupTarget.PropertyWrites));
+
+        Assert.Equal(ComponentPropertyValueKind.CSharpExpression, bindWrite.ValueKind);
+        Assert.Empty(GetWrites(plan.PropertyWrites, outTarget.PropertyWrites));
+        Assert.Equal(ComponentPropertyValueKind.CSharpExpression, plainWrite.ValueKind);
+        Assert.Equal(ComponentPropertyValueKind.MarkupBinding, markupWrite.ValueKind);
+        Assert.Equal(2, plan.CSharpValues.Length);
+        Assert.Single(plan.Bindings);
+        Assert.Collection(
+            plan.PropertySubscriptions,
+            subscription => AssertSubscription(
+                subscription,
+                bindTarget.Id,
+                ComponentPropertySynchronizationKind.Bind,
+                "bindValue"),
+            subscription => AssertSubscription(
+                subscription,
+                outTarget.Id,
+                ComponentPropertySynchronizationKind.Out,
+                "outValue"));
+        Assert.DoesNotContain(plan.PropertySubscriptions, item => item.ElementId == plainTarget.Id);
+        Assert.DoesNotContain(plan.PropertySubscriptions, item => item.ElementId == markupTarget.Id);
+    }
+
+    [Fact]
+    public void Create_CompiledBindingToLaterNamedElementUsesDirectSource()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <StackPanel>
+                <TextBlock Text=${CompiledBinding #input.Text} />
+                <TextBox x.Name="input" />
+            </StackPanel>
+            """;
+        var plan = CreatePlan(AkcssActivatorPlannerTests.CreateFixture(component));
+        var textBlock = GetElement(plan, "TextBlock");
+        var write = Assert.Single(GetWrites(plan.PropertyWrites, textBlock.PropertyWrites));
+        var binding = Assert.Single(plan.Bindings);
+
+        Assert.Equal(ComponentPropertyValueKind.MarkupBinding, write.ValueKind);
+        Assert.Equal(0, write.PayloadIndex);
+        Assert.True(binding.IsValid);
+        Assert.Equal("input", binding.SourceExpression);
+        Assert.Equal(1, binding.PathElementStart);
+        Assert.Equal("#input.Text", binding.Binding.Path);
+    }
+
+    [Fact]
     public void Create_StoresPropertyWriteRangeAndValueKinds()
     {
         const string component =
@@ -470,6 +582,7 @@ public sealed class ComponentPlannerTests
         Assert.Equal(1, parent.PropertyWrites.Length);
         Assert.Equal(1, child.PropertyWrites.Start);
         Assert.Equal(1, child.PropertyWrites.Length);
+        Assert.Equal(parent.PropertyWrites.Start + parent.PropertyWrites.Length, child.PropertyWrites.Start);
         Assert.Equal(2, plan.PropertyWrites.Length);
     }
 
@@ -542,6 +655,14 @@ public sealed class ComponentPlannerTests
             StringComparison.Ordinal));
     }
 
+    private static ComponentElementPlan GetNamedElement(ComponentPlan plan, string identifier)
+    {
+        return Assert.Single(plan.Elements, element => string.Equals(
+            element.Identifier,
+            identifier,
+            StringComparison.Ordinal));
+    }
+
     private static int[] GetIds(ImmutableArray<int> ids, ComponentPlanRange range)
     {
         return ids.AsSpan(range.Start, range.Length).ToArray();
@@ -563,5 +684,18 @@ public sealed class ComponentPlannerTests
         Assert.Equal(expression, reference.Expression);
         Assert.Equal(0, reference.ScopeId);
         Assert.True(reference.IsClassMember);
+    }
+
+    private static void AssertSubscription(
+        ComponentPropertySubscriptionPlan subscription,
+        int elementId,
+        ComponentPropertySynchronizationKind kind,
+        string targetExpression)
+    {
+        Assert.Equal(elementId, subscription.ElementId);
+        Assert.Equal(kind, subscription.Kind);
+        Assert.Equal(PropertyReadKind.AvaloniaProperty, subscription.Source.Kind);
+        Assert.Equal(targetExpression, subscription.TargetOperation.ToDisplayString());
+        Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_String, subscription.ValueType.SpecialType);
     }
 }

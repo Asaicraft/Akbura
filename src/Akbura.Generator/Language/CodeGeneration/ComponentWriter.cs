@@ -116,78 +116,12 @@ internal sealed class ComponentWriter
         int elementId,
         in MarkupExtensionWriteContext context)
     {
-        ref readonly var element = ref GetElement(elementId);
-        if (element.FirstUpdateActions.IsEmpty)
-        {
-            return false;
-        }
-
         var indent = _writer.CurrentIndent;
+
         try
         {
-            var targetExpression = EscapeIdentifier(element.Identifier);
-            var targetProperty = context.TargetProperty;
-            var propertyContext = context.WithTarget(
-                targetExpression,
-                targetProperty,
-                element.ScopeId,
-                _plan.ElementReferences.AsSpan());
-            var propertyWriter = new ComponentPropertyWriter(
-                _writer,
-                in _bindingEnvironment,
-                _sourceMap);
-            var subscriptionWriter = new PropertySubscriptionWriter(_writer, _sourceMap);
-            var actionWriter = new ComponentFirstUpdateActionWriter(_writer, _sourceMap);
-
-            for (var i = 0; i < element.FirstUpdateActions.Length; i++)
-            {
-                ref readonly var action = ref _plan.FirstUpdateActions.ItemRef(
-                    element.FirstUpdateActions.Start + i);
-
-                switch (action.Kind)
-                {
-                    case ComponentFirstUpdateActionKind.NameAssignment:
-                    {
-                        Debug.Assert((uint)action.Index < (uint)_plan.NameAssignments.Length);
-                        ref readonly var name = ref _plan.NameAssignments.ItemRef(action.Index);
-                        actionWriter.WriteNameAssignment(name, targetExpression);
-                        break;
-                    }
-                    case ComponentFirstUpdateActionKind.PropertyWrite:
-                    {
-                        Debug.Assert((uint)action.Index < (uint)_plan.PropertyWrites.Length);
-                        ref readonly var property = ref _plan.PropertyWrites.ItemRef(action.Index);
-                        propertyWriter.Write(_plan, property, targetExpression, propertyContext);
-                        break;
-                    }
-                    case ComponentFirstUpdateActionKind.PropertySubscription:
-                    {
-                        Debug.Assert((uint)action.Index < (uint)_plan.PropertySubscriptions.Length);
-                        ref readonly var subscription = ref _plan.PropertySubscriptions.ItemRef(action.Index);
-                        subscriptionWriter.WriteRegistration(element, subscription);
-                        break;
-                    }
-                    case ComponentFirstUpdateActionKind.RoutedEvent:
-                    {
-                        Debug.Assert((uint)action.Index < (uint)_plan.RoutedEvents.Length);
-                        ref readonly var routedEvent = ref _plan.RoutedEvents.ItemRef(action.Index);
-                        actionWriter.WriteRoutedEvent(routedEvent, targetExpression);
-                        break;
-                    }
-                    case ComponentFirstUpdateActionKind.CommandBinding:
-                    {
-                        Debug.Assert((uint)action.Index < (uint)_plan.CommandBindings.Length);
-                        ref readonly var command = ref _plan.CommandBindings.ItemRef(action.Index);
-                        actionWriter.WriteCommandBinding(command, targetExpression);
-                        break;
-                    }
-                    default:
-                        Debug.Fail("An invalid first-update action reached code generation.");
-                        break;
-                }
-            }
-
-            return true;
+            var writer = CreateScopeWriter();
+            return writer.WriteFirstUpdateActions(_plan, elementId, context);
         }
         finally
         {
@@ -199,42 +133,12 @@ internal sealed class ComponentWriter
         int elementId,
         in MarkupExtensionWriteContext context)
     {
-        return WriteProperties(elementId, isFirstUpdate: false, context);
-    }
-
-    public bool WriteFirstUpdateContent(int elementId)
-    {
-        return WriteElementContent(elementId, isFirstUpdate: true);
-    }
-
-    public bool WriteUpdateContent(int elementId)
-    {
-        ref readonly var element = ref GetElement(elementId);
-        if (!element.Content.IsValid && element.PropertyElements.IsEmpty)
-        {
-            return false;
-        }
-
         var indent = _writer.CurrentIndent;
+
         try
         {
-            var writer = new ComponentContentWriter(_writer, _sourceMap);
-            var wroteAny = WriteContentTarget(
-                writer,
-                element.Content,
-                isFirstUpdate: false);
-
-            for (var i = 0; i < element.PropertyElements.Length; i++)
-            {
-                ref readonly var propertyElement = ref _plan.PropertyElements.ItemRef(
-                    element.PropertyElements.Start + i);
-                wroteAny |= WriteContentTarget(
-                    writer,
-                    propertyElement.Content,
-                    isFirstUpdate: false);
-            }
-
-            return wroteAny;
+            var writer = CreateScopeWriter();
+            return writer.WriteUpdateProperties(_plan, elementId, context);
         }
         finally
         {
@@ -242,28 +146,106 @@ internal sealed class ComponentWriter
         }
     }
 
-    public bool WritePropertyElements(int elementId)
+    internal bool WriteFirstUpdateContent(int elementId)
     {
-        ref readonly var element = ref GetElement(elementId);
-        if (element.PropertyElements.IsEmpty)
+        return WriteFirstUpdateContent(elementId, default);
+    }
+
+    public bool WriteFirstUpdateContent(
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = CreateScopeWriter();
+            return writer.WriteFirstUpdateContent(_plan, elementId, context);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    internal bool WriteUpdateContent(int elementId)
+    {
+        return WriteUpdateContent(elementId, default);
+    }
+
+    public bool WriteUpdateContent(
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = CreateScopeWriter();
+            return writer.WriteUpdateContent(_plan, elementId, context);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    internal bool WritePropertyElements(int elementId)
+    {
+        return WritePropertyElements(elementId, default);
+    }
+
+    public bool WritePropertyElements(
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = CreateScopeWriter();
+            return writer.WritePropertyElements(_plan, elementId, context);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    public bool WriteDeferredContentBuilders()
+    {
+        if (_plan.DeferredContents.IsDefaultOrEmpty)
         {
             return false;
         }
 
         var indent = _writer.CurrentIndent;
+
         try
         {
-            var writer = new ComponentContentWriter(_writer, _sourceMap);
+            var writer = new DeferredContentWriter(
+                _writer,
+                in _bindingEnvironment,
+                _sourceMap,
+                _ownerTypeName);
             var wroteAny = false;
 
-            for (var i = 0; i < element.PropertyElements.Length; i++)
+            for (var i = 0; i < _plan.DeferredContents.Length; i++)
             {
-                ref readonly var propertyElement = ref _plan.PropertyElements.ItemRef(
-                    element.PropertyElements.Start + i);
-                wroteAny |= WriteContentTarget(
-                    writer,
-                    propertyElement.Content,
-                    isFirstUpdate: true);
+                ref readonly var deferred = ref _plan.DeferredContents.ItemRef(i);
+                if (!DeferredContentWriter.CanWriteBuilder(_plan, deferred))
+                {
+                    continue;
+                }
+
+                if (wroteAny)
+                {
+                    _writer.WriteLine();
+                }
+
+                var wroteBuilder = writer.WriteBuilder(_plan, deferred);
+                Debug.Assert(wroteBuilder);
+                wroteAny |= wroteBuilder;
             }
 
             return wroteAny;
@@ -400,26 +382,16 @@ internal sealed class ComponentWriter
         string targetExpression,
         in MarkupExtensionWriteContext context)
     {
-        ref readonly var element = ref GetElement(elementId);
-        if (element.Akcss.Activators.IsEmpty)
-        {
-            return false;
-        }
-
         var indent = _writer.CurrentIndent;
+
         try
         {
-            var writer = new AkcssActivatorWriter(
-                _writer,
-                in _bindingEnvironment,
-                _ownerTypeName,
-                _sourceMap);
-            writer.WriteSetStyles(
-                _plan.Akcss,
-                element.Akcss.Activators,
+            var writer = CreateScopeWriter();
+            return writer.WriteSetStyles(
+                _plan,
+                elementId,
                 targetExpression,
                 context);
-            return true;
         }
         finally
         {
@@ -454,103 +426,6 @@ internal sealed class ComponentWriter
         }
     }
 
-    private bool WriteProperties(
-        int elementId,
-        bool isFirstUpdate,
-        in MarkupExtensionWriteContext context)
-    {
-        ref readonly var element = ref GetElement(elementId);
-        if (element.PropertyWrites.IsEmpty)
-        {
-            return false;
-        }
-
-        var indent = _writer.CurrentIndent;
-        try
-        {
-            var targetExpression = EscapeIdentifier(element.Identifier);
-            var targetProperty = context.TargetProperty;
-            var propertyContext = context.WithTarget(
-                targetExpression,
-                targetProperty,
-                element.ScopeId,
-                _plan.ElementReferences.AsSpan());
-            var writer = new ComponentPropertyWriter(
-                _writer,
-                in _bindingEnvironment,
-                _sourceMap);
-            var wroteAny = false;
-
-            for (var i = 0; i < element.PropertyWrites.Length; i++)
-            {
-                ref readonly var property = ref _plan.PropertyWrites.ItemRef(element.PropertyWrites.Start + i);
-                if (property.IsFirstUpdate != isFirstUpdate)
-                {
-                    continue;
-                }
-
-                writer.Write(_plan, property, targetExpression, propertyContext);
-                wroteAny = true;
-            }
-
-            return wroteAny;
-        }
-        finally
-        {
-            _writer.CurrentIndent = indent;
-        }
-    }
-
-    private bool WriteElementContent(int elementId, bool isFirstUpdate)
-    {
-        ref readonly var element = ref GetElement(elementId);
-        if (!element.Content.IsValid)
-        {
-            return false;
-        }
-
-        var indent = _writer.CurrentIndent;
-        try
-        {
-            var writer = new ComponentContentWriter(_writer, _sourceMap);
-            return WriteContentTarget(writer, element.Content, isFirstUpdate);
-        }
-        finally
-        {
-            _writer.CurrentIndent = indent;
-        }
-    }
-
-    private bool WriteContentTarget(
-        ComponentContentWriter writer,
-        in ComponentContentTargetReference target,
-        bool isFirstUpdate)
-    {
-        switch (target.Kind)
-        {
-            case ComponentContentTargetKind.Property:
-                Debug.Assert((uint)target.Index < (uint)_plan.PropertyContents.Length);
-                return writer.WriteProperty(
-                    _plan,
-                    _plan.PropertyContents.ItemRef(target.Index),
-                    isFirstUpdate);
-
-            case ComponentContentTargetKind.Collection:
-                if (!isFirstUpdate)
-                {
-                    return false;
-                }
-
-                Debug.Assert((uint)target.Index < (uint)_plan.CollectionContents.Length);
-                return writer.WriteCollection(
-                    _plan,
-                    _plan.CollectionContents.ItemRef(target.Index));
-
-            default:
-                return false;
-        }
-    }
-
     private ref readonly ComponentElementPlan GetElement(int elementId)
     {
         if ((uint)elementId >= (uint)_plan.Elements.Length)
@@ -561,6 +436,15 @@ internal sealed class ComponentWriter
         ref readonly var element = ref _plan.Elements.ItemRef(elementId);
         Debug.Assert(element.Id == elementId);
         return ref element;
+    }
+
+    private ComponentScopeWriter CreateScopeWriter()
+    {
+        return new ComponentScopeWriter(
+            _writer,
+            in _bindingEnvironment,
+            _sourceMap,
+            _ownerTypeName);
     }
 
     private static string GetGeneratedOwnerTypeName(IAkburaComponentSymbol component)

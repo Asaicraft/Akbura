@@ -1,4 +1,4 @@
-using Akbura.Language.Symbols;
+﻿using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System;
 using System.Collections.Immutable;
@@ -50,8 +50,7 @@ internal sealed class MarkupNameDeclaration
     public static MarkupNameDeclaration Create(
         MarkupElementSyntax element,
         MarkupAttachedPropertyAttributeSyntax attribute,
-        MarkupNameDeclaration? originalDeclaration,
-        bool isInsideTemplateContent)
+        MarkupNameDeclaration? originalDeclaration)
     {
         var value = AkburaSemanticModel.GetMarkupAttributeValue(attribute);
         var sourceText = value?.ToFullString().Trim() ?? string.Empty;
@@ -105,9 +104,7 @@ internal sealed class MarkupNameDeclaration
             originalDeclaration,
             originalDeclaration != null
                 ? MarkupNameDeclarationFailure.Duplicate
-                : isInsideTemplateContent
-                    ? MarkupNameDeclarationFailure.InsideTemplateContent
-                    : MarkupNameDeclarationFailure.None);
+                : MarkupNameDeclarationFailure.None);
     }
 
     public IMarkupNameSymbol? GetOrCreateSymbol(AkburaSemanticModel semanticModel)
@@ -149,10 +146,6 @@ internal sealed class MarkupNameDeclaration
                 Attribute,
                 ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate,
                 ImmutableArray.Create<object?>(IdentifierText)),
-            MarkupNameDeclarationFailure.InsideTemplateContent => new AkburaSemanticDiagnostic(
-                Attribute,
-                ErrorCodes.AKBURA_SEMANTIC_MarkupNameInsideTemplateContent,
-                ImmutableArray.Create<object?>(IdentifierText)),
             _ => null,
         };
     }
@@ -163,5 +156,4 @@ internal enum MarkupNameDeclarationFailure : byte
     None = 0,
     InvalidIdentifier,
     Duplicate,
-    InsideTemplateContent,
 }

@@ -205,7 +205,7 @@ public sealed class ComponentPlannerTests
         Assert.True(content.IsLocal);
         Assert.True(content.RequiresLocalMarkupContext);
         Assert.Equal(deferred.ScopeId, content.ScopeId);
-        Assert.Equal([content.Id], GetIds(plan.ChildElementIds, deferred.Roots));
+        Assert.Equal([content.Id], GetScopeRootIds(plan, deferred.ScopeId));
         Assert.Empty(plan.Templates);
     }
 
@@ -245,7 +245,7 @@ public sealed class ComponentPlannerTests
         var deferred = Assert.Single(plan.DeferredContents);
 
         Assert.True(deferredChild.IsDeferred);
-        Assert.Equal([deferredChild.Id], GetIds(plan.ChildElementIds, deferred.Roots));
+        Assert.Equal([deferredChild.Id], GetScopeRootIds(plan, deferred.ScopeId));
         Assert.False(ordinaryPropertyChild.IsDeferred);
         Assert.Equal(ComponentElementScopeKind.Component, ordinaryPropertyChild.ScopeKind);
         Assert.Equal(0, ordinaryPropertyChild.ScopeId);
@@ -286,9 +286,9 @@ public sealed class ComponentPlannerTests
         Assert.All([border, textBlock], static element =>
             Assert.True(element.IsLocal && element.RequiresLocalMarkupContext));
         Assert.Contains(templates, template =>
-            GetIds(plan.ChildElementIds, template.Roots).SequenceEqual([border.Id]));
+            GetScopeRootIds(plan, template.ScopeId).SequenceEqual([border.Id]));
         Assert.Contains(templates, template =>
-            GetIds(plan.ChildElementIds, template.Roots).SequenceEqual([textBlock.Id]));
+            GetScopeRootIds(plan, template.ScopeId).SequenceEqual([textBlock.Id]));
     }
 
     [Fact]
@@ -316,7 +316,7 @@ public sealed class ComponentPlannerTests
         Assert.False(textBlock.IsDeferred);
         Assert.Equal(ComponentElementScopeKind.DataTemplate, textBlock.ScopeKind);
         Assert.Equal(template.ScopeId, textBlock.ScopeId);
-        Assert.Equal([textBlock.Id], GetIds(plan.ChildElementIds, template.Roots));
+        Assert.Equal([textBlock.Id], GetScopeRootIds(plan, template.ScopeId));
     }
 
     [Fact]
@@ -990,6 +990,12 @@ public sealed class ComponentPlannerTests
     private static int[] GetIds(ImmutableArray<int> ids, ComponentPlanRange range)
     {
         return ids.AsSpan(range.Start, range.Length).ToArray();
+    }
+
+    private static int[] GetScopeRootIds(in ComponentPlan plan, int scopeId)
+    {
+        ref readonly var scope = ref plan.Scopes.ItemRef(scopeId);
+        return GetIds(plan.ScopeRootElementIds, scope.Roots);
     }
 
     private static ComponentPropertyWritePlan[] GetWrites(

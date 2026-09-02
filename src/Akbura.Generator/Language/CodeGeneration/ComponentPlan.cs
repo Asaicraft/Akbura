@@ -43,6 +43,64 @@ internal enum ComponentElementScopeKind : byte
     DataTemplate,
 }
 
+[Flags]
+internal enum ComponentScopeFlags : byte
+{
+    None = 0,
+    RequiresNameScope = 1 << 0,
+}
+
+internal readonly struct ComponentScopePlan
+{
+    public ComponentScopePlan(
+        int id,
+        int parentScopeId,
+        int ownerElementId,
+        ComponentElementScopeKind kind,
+        ComponentPlanRange elements,
+        ComponentPlanRange roots,
+        ComponentScopeFlags flags)
+    {
+        Id = id;
+        ParentScopeId = parentScopeId;
+        OwnerElementId = ownerElementId;
+        Kind = kind;
+        Elements = elements;
+        Roots = roots;
+        Flags = flags;
+    }
+
+    public int Id { get; }
+
+    /// <summary>
+    /// -1 for the component scope.
+    /// </summary>
+    public int ParentScopeId { get; }
+
+    /// <summary>
+    /// The element whose content property introduced this scope.
+    /// -1 for the component scope.
+    /// </summary>
+    public int OwnerElementId { get; }
+
+    public ComponentElementScopeKind Kind { get; }
+
+    /// <summary>
+    /// Range inside <see cref="ComponentPlan.ScopeElementIds"/>.
+    /// </summary>
+    public ComponentPlanRange Elements { get; }
+
+    /// <summary>
+    /// Range inside <see cref="ComponentPlan.ScopeRootElementIds"/>.
+    /// </summary>
+    public ComponentPlanRange Roots { get; }
+
+    public ComponentScopeFlags Flags { get; }
+
+    public bool RequiresNameScope =>
+        (Flags & ComponentScopeFlags.RequiresNameScope) != 0;
+}
+
 internal readonly struct ComponentElementPlan
 {
     public ComponentElementPlan(
@@ -313,14 +371,14 @@ internal readonly struct ComponentDeferredContentPlan
         int id,
         int scopeId,
         int targetElementId,
-        AkburaSyntax syntax,
-        ComponentPlanRange roots)
+        ITypeSymbol resultType,
+        AkburaSyntax syntax)
     {
         Id = id;
         ScopeId = scopeId;
         TargetElementId = targetElementId;
+        ResultType = resultType ?? throw new ArgumentNullException(nameof(resultType));
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
-        Roots = roots;
     }
 
     public int Id { get; }
@@ -329,9 +387,9 @@ internal readonly struct ComponentDeferredContentPlan
 
     public int TargetElementId { get; }
 
-    public AkburaSyntax Syntax { get; }
+    public ITypeSymbol ResultType { get; }
 
-    public ComponentPlanRange Roots { get; }
+    public AkburaSyntax Syntax { get; }
 }
 
 internal readonly struct ComponentTemplatePlan
@@ -340,14 +398,12 @@ internal readonly struct ComponentTemplatePlan
         int id,
         int scopeId,
         int ownerElementId,
-        MarkupElementSyntax syntax,
-        ComponentPlanRange roots)
+        MarkupElementSyntax syntax)
     {
         Id = id;
         ScopeId = scopeId;
         OwnerElementId = ownerElementId;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
-        Roots = roots;
     }
 
     public int Id { get; }
@@ -357,8 +413,6 @@ internal readonly struct ComponentTemplatePlan
     public int OwnerElementId { get; }
 
     public MarkupElementSyntax Syntax { get; }
-
-    public ComponentPlanRange Roots { get; }
 }
 
 internal readonly struct ComponentPlan
@@ -367,6 +421,9 @@ internal readonly struct ComponentPlan
         ImmutableArray<ComponentElementPlan> elements,
         ImmutableArray<int> rootElementIds,
         ImmutableArray<int> childElementIds,
+        ImmutableArray<ComponentScopePlan> scopes,
+        ImmutableArray<int> scopeElementIds,
+        ImmutableArray<int> scopeRootElementIds,
         ImmutableArray<ComponentPropertyWritePlan> propertyWrites,
         ImmutableArray<ComponentCSharpValuePlan> csharpValues,
         ImmutableArray<MarkupExtensionResultPlan> markupExtensions,
@@ -388,6 +445,11 @@ internal readonly struct ComponentPlan
         Elements = elements.IsDefault ? ImmutableArray<ComponentElementPlan>.Empty : elements;
         RootElementIds = rootElementIds.IsDefault ? ImmutableArray<int>.Empty : rootElementIds;
         ChildElementIds = childElementIds.IsDefault ? ImmutableArray<int>.Empty : childElementIds;
+        Scopes = scopes.IsDefault ? ImmutableArray<ComponentScopePlan>.Empty : scopes;
+        ScopeElementIds = scopeElementIds.IsDefault ? ImmutableArray<int>.Empty : scopeElementIds;
+        ScopeRootElementIds = scopeRootElementIds.IsDefault
+            ? ImmutableArray<int>.Empty
+            : scopeRootElementIds;
         PropertyWrites = propertyWrites.IsDefault ? ImmutableArray<ComponentPropertyWritePlan>.Empty : propertyWrites;
         CSharpValues = csharpValues.IsDefault ? ImmutableArray<ComponentCSharpValuePlan>.Empty : csharpValues;
         MarkupExtensions = markupExtensions.IsDefault
@@ -436,6 +498,12 @@ internal readonly struct ComponentPlan
     public ImmutableArray<int> RootElementIds { get; }
 
     public ImmutableArray<int> ChildElementIds { get; }
+
+    public ImmutableArray<ComponentScopePlan> Scopes { get; }
+
+    public ImmutableArray<int> ScopeElementIds { get; }
+
+    public ImmutableArray<int> ScopeRootElementIds { get; }
 
     public ImmutableArray<ComponentPropertyWritePlan> PropertyWrites { get; }
 

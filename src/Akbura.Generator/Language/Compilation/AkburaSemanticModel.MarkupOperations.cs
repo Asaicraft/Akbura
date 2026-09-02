@@ -1,4 +1,4 @@
-using Akbura.Language.Binder;
+﻿using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -1461,18 +1461,56 @@ internal partial class AkburaSemanticModel
             var nameScope = BindingSession.GetMarkupNameScope(
                 Unsafe.As<MarkupRootSyntax>(current));
 
-            foreach (var symbol in nameScope.GetDeclaredSymbols(this))
+            if (nameScope.TryGetVisibleDeclaredSymbol(
+                    this,
+                    markupAttribute,
+                    elementName,
+                    out var nameSymbol))
             {
-                if (symbol is IMarkupNameSymbol nameSymbol &&
-                    string.Equals(
-                        nameSymbol.Name,
-                        elementName,
-                        StringComparison.Ordinal) &&
-                    nameSymbol.Type.Symbol is INamedTypeSymbol type)
+                if (nameSymbol.Type.Symbol is INamedTypeSymbol type)
                 {
                     elementType = type;
                     return true;
                 }
+
+                elementType = null!;
+                return false;
+            }
+
+            break;
+        }
+
+        for (var binder = BindingSession.GetBinder(
+                 markupAttribute,
+                 BinderUsage.Expression);
+             binder != null;
+             binder = binder.Next)
+        {
+            if (binder is not ComponentBinder componentBinder)
+            {
+                continue;
+            }
+
+            foreach (var symbol in componentBinder
+                         .GetDeclaredMarkupNameSymbols())
+            {
+                if (symbol is not IMarkupNameSymbol nameSymbol ||
+                    !string.Equals(
+                        nameSymbol.Name,
+                        elementName,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (nameSymbol.Type.Symbol is INamedTypeSymbol type)
+                {
+                    elementType = type;
+                    return true;
+                }
+
+                elementType = null!;
+                return false;
             }
 
             break;

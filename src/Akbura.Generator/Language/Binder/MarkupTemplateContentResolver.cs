@@ -1,4 +1,4 @@
-using Akbura.Language.Symbols;
+﻿using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
@@ -113,6 +113,100 @@ internal sealed class MarkupTemplateContentResolver
         }
 
         return false;
+    }
+
+    internal MarkupElementSyntax? GetLocalNameScopeOwner(
+        AkburaSyntax syntax)
+    {
+        MarkupElementSyntax? element = null;
+        for (var current = syntax;
+             current != null;
+             current = current.Parent)
+        {
+            if (current is MarkupElementSyntax markupElement)
+            {
+                element = markupElement;
+                break;
+            }
+        }
+
+        return element == null
+            ? null
+            : GetLocalNameScopeOwner(element);
+    }
+
+    internal MarkupElementSyntax? GetLocalNameScopeOwner(
+        MarkupElementSyntax element)
+    {
+        var directChild = element;
+        for (var ancestor = element.Parent;
+             ancestor != null;
+             ancestor = ancestor.Parent)
+        {
+            if (ancestor is not MarkupElementSyntax ancestorElement)
+            {
+                continue;
+            }
+
+            if (DefinesLocalNameScope(
+                    ancestorElement,
+                    directChild))
+            {
+                return ancestorElement;
+            }
+
+            directChild = ancestorElement;
+        }
+
+        return null;
+    }
+
+    private bool DefinesLocalNameScope(
+        MarkupElementSyntax element,
+        MarkupElementSyntax directChild)
+    {
+        var symbol = _semanticModel.GetSymbolInfo(element).Symbol;
+        if (symbol is AkburaPropertySymbol property)
+        {
+            var clrProperty = GetClrProperty(property);
+            if (clrProperty == null)
+            {
+                return false;
+            }
+
+            if (IsDeferredContentProperty(clrProperty))
+            {
+                return true;
+            }
+
+            return IsDataTemplateProperty(clrProperty) &&
+                   !IsDataTemplateElement(directChild);
+        }
+
+        return symbol is IMarkupComponentSymbol component &&
+               _semanticModel.GetSymbolInfo(directChild).Symbol
+                   is not AkburaPropertySymbol &&
+               component.ContentModel.ContentProperty.Symbol
+                   is RoslynPropertySymbol contentProperty &&
+               IsDeferredContentProperty(contentProperty);
+    }
+
+    private bool IsDataTemplateElement(
+        MarkupElementSyntax element)
+    {
+        if (_semanticModel.TryGetMarkupElementReferenceType(
+                element,
+                out var referenceType) &&
+            referenceType.Symbol is ITypeSymbol resolvedType)
+        {
+            return IsDataTemplateType(resolvedType);
+        }
+
+        return _semanticModel.GetSymbolInfo(element).Symbol
+                   is IMarkupComponentSymbol component &&
+               (component.ComponentType ??
+                component.AkburaComponent?.ComponentType) is { } componentType &&
+               IsDataTemplateType(componentType);
     }
 
     /// <summary>

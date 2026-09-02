@@ -21,7 +21,8 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
 
     public void WriteNameAssignment(
         in ComponentNameAssignmentPlan plan,
-        string targetExpression)
+        string targetExpression,
+        string? nameScopeExpression)
     {
         Debug.Assert(!string.IsNullOrEmpty(targetExpression));
 
@@ -30,6 +31,18 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
         _writer.Write(".Name = ");
         _writer.WriteStringLiteral(plan.Name);
         _writer.WriteLine(";");
+
+        if (string.IsNullOrEmpty(nameScopeExpression))
+        {
+            return;
+        }
+
+        _writer.Write(nameScopeExpression!);
+        _writer.Write(".Register(");
+        _writer.WriteStringLiteral(plan.Name);
+        _writer.Write(", ");
+        _writer.Write(targetExpression);
+        _writer.WriteLine(");");
     }
 
     public void WriteRoutedEvent(

@@ -1,4 +1,4 @@
-using Akbura.Language.Binder;
+﻿using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -850,7 +850,7 @@ internal partial class AkburaSemanticModel
                 }
 
                 AddMarkupNameSymbolMappings(
-                    markupBinder.GetDeclaredNameSymbols(),
+                    markupBinder.GetDeclaredNameSymbols(scope),
                     akburaSymbolsByName,
                     mappedMarkupNames);
                 continue;
@@ -1127,12 +1127,21 @@ internal partial class AkburaSemanticModel
              binder != null;
              binder = binder.Next)
         {
-            if (binder is not ComponentBinder componentBinder)
+            ImmutableArray<AkburaSymbol> symbols;
+            if (binder is MarkupBinder markupBinder)
+            {
+                symbols = markupBinder.GetDeclaredNameSymbols(scope);
+            }
+            else if (binder is ComponentBinder componentBinder)
+            {
+                symbols = componentBinder.GetDeclaredMarkupNameSymbols();
+            }
+            else
             {
                 continue;
             }
 
-            foreach (var symbol in componentBinder.GetDeclaredMarkupNameSymbols())
+            foreach (var symbol in symbols)
             {
                 if (symbol is not IMarkupNameSymbol markupName ||
                     markupName.Type.Symbol is not ITypeSymbol type ||
@@ -1151,7 +1160,10 @@ internal partial class AkburaSemanticModel
                     markupName.IdentifierText);
             }
 
-            return;
+            if (binder is ComponentBinder)
+            {
+                return;
+            }
         }
     }
 

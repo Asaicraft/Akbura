@@ -1,4 +1,4 @@
-using Akbura.Language.BoundTree;
+﻿using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -95,7 +95,9 @@ internal sealed partial class MarkupBinder : Binder
 
         if (!result.IsComplete)
         {
-            var nameSymbol = FindDeclaredSymbol(GetDeclaredNameSymbols(), name);
+            var nameSymbol = FindDeclaredSymbol(
+                GetDeclaredNameSymbols(syntax),
+                name);
             if (nameSymbol != null)
             {
                 result.SetSymbol(nameSymbol);
@@ -135,7 +137,22 @@ internal sealed partial class MarkupBinder : Binder
     internal ImmutableArray<ISymbol> GetDeclaredNameSymbols()
     {
         var scope = GetNameScope();
-        return scope?.GetDeclaredSymbols(SemanticModel) ?? ImmutableArray<ISymbol>.Empty;
+        return scope != null && ScopeDesignator != null
+            ? scope.GetDeclaredSymbolsOwnedBy(
+                SemanticModel,
+                ScopeDesignator)
+            : ImmutableArray<ISymbol>.Empty;
+    }
+
+    internal ImmutableArray<ISymbol> GetDeclaredNameSymbols(
+        AkburaSyntax syntax)
+    {
+        var scope = GetNameScope();
+        return scope != null &&
+               ScopeDesignator != null &&
+               scope.Owns(ScopeDesignator, syntax)
+            ? scope.GetDeclaredSymbols(SemanticModel, syntax)
+            : ImmutableArray<ISymbol>.Empty;
     }
 
     internal bool TryGetDeclaredNameDeclaration(
@@ -154,13 +171,18 @@ internal sealed partial class MarkupBinder : Binder
 
     private MarkupNameScope? GetNameScope()
     {
-        if (ScopeDesignator?.Kind != AkburaSyntaxKind.MarkupRootSyntax)
+        for (var current = ScopeDesignator;
+             current != null;
+             current = current.Parent)
         {
-            return null;
+            if (current.Kind == AkburaSyntaxKind.MarkupRootSyntax)
+            {
+                return SemanticModel.BindingSession.GetMarkupNameScope(
+                    Unsafe.As<MarkupRootSyntax>(current));
+            }
         }
 
-        return SemanticModel.BindingSession.GetMarkupNameScope(
-            Unsafe.As<MarkupRootSyntax>(ScopeDesignator));
+        return null;
     }
 
     public override BoundNode BindOperationSyntax(AkburaSyntax syntax)

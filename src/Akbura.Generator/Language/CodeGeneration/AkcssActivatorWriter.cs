@@ -405,7 +405,7 @@ internal readonly ref struct AkcssActivatorWriter
             targetProperty: targetProperty,
             intermediateRootExpression: context.IntermediateRootExpression,
             baseUriExpression: context.BaseUriExpression,
-            directParentsStackExpression: context.DirectParentsStackExpression,
+            directParentsStack: context.DirectParentsStack,
             fallbackServiceProviderExpression: context.FallbackServiceProviderExpression,
             nameScopeExpression: context.NameScopeExpression,
             scopeId: context.ScopeId,

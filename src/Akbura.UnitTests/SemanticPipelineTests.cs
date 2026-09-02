@@ -1,4 +1,4 @@
-using Akbura.Language;
+﻿using Akbura.Language;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
@@ -27,6 +27,35 @@ public class SemanticPipelineTests
         "    [UseHook]\n" +
         "    public static State<string> useName<T>([Self] object component, T state) => null!;\n" +
         "}";
+
+    private const string MarkupNameScopeCSharpCode =
+        """
+        using Avalonia.Controls;
+        using Avalonia.Metadata;
+
+        namespace Demo;
+
+        public sealed class TemplateHost : Control
+        {
+            [TemplateContent]
+            public object? TemplateBody { get; set; }
+
+            [TemplateContent]
+            public object? Primary { get; set; }
+
+            [TemplateContent]
+            public object? Secondary { get; set; }
+        }
+
+        public sealed class DeferredHost : Control
+        {
+            public object? Header { get; set; }
+
+            [Content]
+            [TemplateContent]
+            public object? Content { get; set; }
+        }
+        """;
 
     [Fact]
     public void SyntaxTree_ParseText_PreservesRootFullWidth()
@@ -5492,7 +5521,7 @@ public class SemanticPipelineTests
     }
 
     [Fact]
-    public void SemanticModel_MarkupName_IsRejectedInsideTemplateContent()
+    public void SemanticModel_MarkupName_UsesIndependentComponentAndTemplateContentScopes()
     {
         const string code =
             """
@@ -5504,30 +5533,18 @@ public class SemanticPipelineTests
                     <TemplateHost.TemplateBody>
                         <Border>
                             <Button x.Name="shared" />
+                            <TextBlock Text={shared.Width.ToString()} />
                         </Border>
                     </TemplateHost.TemplateBody>
                 </TemplateHost>
                 <TextBlock x.Name="shared" />
+                <TextBlock Text={shared.Text} />
             </StackPanel>
             """;
-        const string csharpCode =
-            """
-            using Avalonia.Controls;
-            using Avalonia.Metadata;
-
-            namespace Demo;
-
-            public sealed class TemplateHost : ContentControl
-            {
-                [TemplateContent]
-                public object? TemplateBody { get; set; }
-            }
-            """;
-
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
         var semanticModel = CreateSemanticModel(
             syntaxTree,
-            CreateCSharpCompilation(csharpCode));
+            CreateCSharpCompilation(MarkupNameScopeCSharpCode));
         var nameAttributes = syntaxTree.GetRoot()
             .DescendantNodes()
             .OfType<MarkupAttachedPropertyAttributeSyntax>()
@@ -5536,28 +5553,648 @@ public class SemanticPipelineTests
 
         var insideTemplate = nameAttributes[0];
         var outsideTemplate = nameAttributes[1];
-        var insideInfo = semanticModel.GetSymbolInfo(insideTemplate);
+        var insideSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(insideTemplate));
         var insideOperation = Assert.IsAssignableFrom<IMarkupNameAssignmentOperation>(
             semanticModel.GetOperation(insideTemplate));
         var outsideSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
             semanticModel.GetDeclaredSymbol(outsideTemplate));
         var outsideOperation = Assert.IsAssignableFrom<IMarkupNameAssignmentOperation>(
             semanticModel.GetOperation(outsideTemplate));
+        var textAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupPlainAttributeSyntax>()
+            .ToArray();
+        Assert.Equal(2, textAttributes.Length);
+        var insideReferences = semanticModel.GetCSharpSymbolReferences(textAttributes[0]);
+        var outsideReferences = semanticModel.GetCSharpSymbolReferences(textAttributes[1]);
 
-        Assert.Null(insideInfo.Symbol);
-        Assert.Equal(AkburaCandidateReason.UnsupportedSyntax, insideInfo.CandidateReason);
-        Assert.Null(semanticModel.GetDeclaredSymbol(insideTemplate));
-        Assert.Contains(
+        Assert.Equal("shared", insideSymbol.Name);
+        Assert.Equal("Avalonia.Controls.Button", insideSymbol.Type.Symbol?.ToDisplayString());
+        Assert.DoesNotContain(
             semanticModel.GetSemanticDiagnostics(insideTemplate),
             static diagnostic =>
                 diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupNameInsideTemplateContent);
-        Assert.True(insideOperation.HasErrors);
+        Assert.False(insideOperation.HasErrors);
 
         Assert.Equal("shared", outsideSymbol.Name);
+        Assert.Equal("Avalonia.Controls.TextBlock", outsideSymbol.Type.Symbol?.ToDisplayString());
+        Assert.NotSame(insideSymbol, outsideSymbol);
         Assert.DoesNotContain(
             semanticModel.GetSemanticDiagnostics(outsideTemplate),
             static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate);
         Assert.False(outsideOperation.HasErrors);
+        Assert.Same(
+            insideSymbol,
+            Assert.Single(
+                insideReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.Same(
+            outsideSymbol,
+            Assert.Single(
+                outsideReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(textAttributes[0]),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(textAttributes[1]),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_DoesNotApplyImplicitTemplateScopeToExplicitPropertyElement()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <DeferredHost>
+                <DeferredHost.Header>
+                    <TextBlock x.Name="shared" Tag={shared} />
+                </DeferredHost.Header>
+                <TextBox x.Name="shared" Tag={shared} />
+            </DeferredHost>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(MarkupNameScopeCSharpCode));
+        var nameAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupAttachedPropertyAttributeSyntax>()
+            .ToArray();
+        var tagAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupPlainAttributeSyntax>()
+            .ToArray();
+        Assert.Equal(2, nameAttributes.Length);
+        Assert.Equal(2, tagAttributes.Length);
+
+        var componentSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[0]));
+        var deferredSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[1]));
+        var componentReferences = semanticModel.GetCSharpSymbolReferences(
+            tagAttributes[0]);
+        var deferredReferences = semanticModel.GetCSharpSymbolReferences(
+            tagAttributes[1]);
+
+        Assert.Equal(
+            "Avalonia.Controls.TextBlock",
+            componentSymbol.Type.Symbol?.ToDisplayString());
+        Assert.Equal(
+            "Avalonia.Controls.TextBox",
+            deferredSymbol.Type.Symbol?.ToDisplayString());
+        Assert.NotSame(componentSymbol, deferredSymbol);
+        Assert.Same(
+            componentSymbol,
+            Assert.Single(
+                componentReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.Same(
+            deferredSymbol,
+            Assert.Single(
+                deferredReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.DoesNotContain(
+            nameAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate);
+        Assert.DoesNotContain(
+            tagAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic =>
+                diagnostic.Code ==
+                ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_ReportsDuplicateWithinTemplateContentScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <TemplateHost>
+                <TemplateHost.TemplateBody>
+                    <StackPanel>
+                        <Button x.Name="duplicate" />
+                        <TextBlock x.Name="duplicate" />
+                    </StackPanel>
+                </TemplateHost.TemplateBody>
+            </TemplateHost>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(MarkupNameScopeCSharpCode));
+        var nameAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupAttachedPropertyAttributeSyntax>()
+            .ToArray();
+        Assert.Equal(2, nameAttributes.Length);
+
+        var firstSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[0]));
+        var duplicateInfo = semanticModel.GetSymbolInfo(nameAttributes[1]);
+        var duplicateOperation = Assert.IsAssignableFrom<IMarkupNameAssignmentOperation>(
+            semanticModel.GetOperation(nameAttributes[1]));
+
+        Assert.Equal("duplicate", firstSymbol.Name);
+        Assert.Null(duplicateInfo.Symbol);
+        Assert.Equal(AkburaCandidateReason.Ambiguous, duplicateInfo.CandidateReason);
+        Assert.Same(firstSymbol, Assert.Single(duplicateInfo.CandidateSymbols));
+        Assert.Null(semanticModel.GetDeclaredSymbol(nameAttributes[1]));
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(nameAttributes[1]),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate);
+        Assert.True(duplicateOperation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_UsesIndependentSiblingTemplateContentScopes()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <TemplateHost>
+                <TemplateHost.Primary>
+                    <StackPanel>
+                        <TextBlock Text={shared.Width.ToString()} />
+                        <Button x.Name="shared" />
+                    </StackPanel>
+                </TemplateHost.Primary>
+                <TemplateHost.Secondary>
+                    <StackPanel>
+                        <TextBlock Text={shared.Text} />
+                        <TextBox x.Name="shared" />
+                    </StackPanel>
+                </TemplateHost.Secondary>
+            </TemplateHost>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(MarkupNameScopeCSharpCode));
+        var nameAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupAttachedPropertyAttributeSyntax>()
+            .ToArray();
+        var textAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupPlainAttributeSyntax>()
+            .ToArray();
+        Assert.Equal(2, nameAttributes.Length);
+        Assert.Equal(2, textAttributes.Length);
+
+        var primarySymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[0]));
+        var secondarySymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[1]));
+        var primaryReferences = semanticModel.GetCSharpSymbolReferences(textAttributes[0]);
+        var secondaryReferences = semanticModel.GetCSharpSymbolReferences(textAttributes[1]);
+
+        Assert.Equal("Avalonia.Controls.Button", primarySymbol.Type.Symbol?.ToDisplayString());
+        Assert.Equal("Avalonia.Controls.TextBox", secondarySymbol.Type.Symbol?.ToDisplayString());
+        Assert.NotSame(primarySymbol, secondarySymbol);
+        Assert.Same(
+            primarySymbol,
+            Assert.Single(
+                primaryReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.Same(
+            secondarySymbol,
+            Assert.Single(
+                secondaryReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.DoesNotContain(
+            nameAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate);
+        Assert.DoesNotContain(
+            textAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_UsesNearestNestedTemplateContentScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <TemplateHost>
+                <TemplateHost.TemplateBody>
+                    <StackPanel>
+                        <Button x.Name="shared" />
+                        <DeferredHost>
+                            <StackPanel>
+                                <TextBox x.Name="shared" />
+                                <TextBlock Text={shared.Text} />
+                            </StackPanel>
+                        </DeferredHost>
+                        <TextBlock Text={shared.Width.ToString()} />
+                    </StackPanel>
+                </TemplateHost.TemplateBody>
+            </TemplateHost>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(MarkupNameScopeCSharpCode));
+        var nameAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupAttachedPropertyAttributeSyntax>()
+            .ToArray();
+        var textAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupPlainAttributeSyntax>()
+            .ToArray();
+        Assert.Equal(2, nameAttributes.Length);
+        Assert.Equal(2, textAttributes.Length);
+
+        var outerSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[0]));
+        var nestedSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[1]));
+        var nestedReferences = semanticModel.GetCSharpSymbolReferences(textAttributes[0]);
+        var outerReferences = semanticModel.GetCSharpSymbolReferences(textAttributes[1]);
+
+        Assert.Equal("Avalonia.Controls.Button", outerSymbol.Type.Symbol?.ToDisplayString());
+        Assert.Equal("Avalonia.Controls.TextBox", nestedSymbol.Type.Symbol?.ToDisplayString());
+        Assert.NotSame(outerSymbol, nestedSymbol);
+        Assert.Same(
+            nestedSymbol,
+            Assert.Single(
+                nestedReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.Same(
+            outerSymbol,
+            Assert.Single(
+                outerReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.DoesNotContain(
+            nameAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate);
+        Assert.DoesNotContain(
+            textAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_IsNotVisibleAcrossSiblingTemplateContentScopes()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <TemplateHost>
+                <TemplateHost.Primary>
+                    <TextBlock Text={secondary.Text} />
+                </TemplateHost.Primary>
+                <TemplateHost.Secondary>
+                    <TextBox x.Name="secondary" />
+                </TemplateHost.Secondary>
+            </TemplateHost>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(MarkupNameScopeCSharpCode));
+        var textAttribute = Assert.Single(
+            syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MarkupPlainAttributeSyntax>());
+        var references = semanticModel.GetCSharpSymbolReferences(textAttribute);
+
+        Assert.Empty(references);
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(textAttribute),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_KeepsComponentScopeVisibleInsideTemplateContent()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <StackPanel>
+                <Button x.Name="componentOnly" />
+                <TemplateHost>
+                    <TemplateHost.TemplateBody>
+                        <TextBlock Text={componentOnly.Width.ToString()} />
+                    </TemplateHost.TemplateBody>
+                </TemplateHost>
+            </StackPanel>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(MarkupNameScopeCSharpCode));
+        var nameAttribute = Assert.Single(
+            syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MarkupAttachedPropertyAttributeSyntax>());
+        var textAttribute = Assert.Single(
+            syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MarkupPlainAttributeSyntax>());
+        var componentSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttribute));
+        var references = semanticModel.GetCSharpSymbolReferences(textAttribute);
+
+        Assert.Same(
+            componentSymbol,
+            Assert.Single(
+                references,
+                static reference => reference.Name == "componentOnly").AkburaSymbol);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(textAttribute),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_KeepsDirectDataTemplateInOuterScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Markup.Xaml.Templates;
+
+            <StackPanel>
+                <ContentControl>
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate x.Name="shared">
+                            <StackPanel>
+                                <Button x.Name="shared" />
+                                <TextBlock Text={shared.Width.ToString()} />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
+                <TextBlock Tag={shared} />
+            </StackPanel>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var nameAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupAttachedPropertyAttributeSyntax>()
+            .ToArray();
+        var valueAttributes = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MarkupPlainAttributeSyntax>()
+            .ToArray();
+        Assert.Equal(2, nameAttributes.Length);
+        Assert.Equal(2, valueAttributes.Length);
+
+        var templateSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[0]));
+        var contentSymbol = Assert.IsAssignableFrom<IMarkupNameSymbol>(
+            semanticModel.GetDeclaredSymbol(nameAttributes[1]));
+        var contentReferences = semanticModel.GetCSharpSymbolReferences(valueAttributes[0]);
+        var outerReferences = semanticModel.GetCSharpSymbolReferences(valueAttributes[1]);
+
+        Assert.Equal(
+            "Avalonia.Markup.Xaml.Templates.DataTemplate",
+            templateSymbol.Type.Symbol?.ToDisplayString());
+        Assert.Equal(
+            "Avalonia.Controls.Button",
+            contentSymbol.Type.Symbol?.ToDisplayString());
+        Assert.NotSame(templateSymbol, contentSymbol);
+        Assert.Same(
+            contentSymbol,
+            Assert.Single(
+                contentReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.Same(
+            templateSymbol,
+            Assert.Single(
+                outerReferences,
+                static reference => reference.Name == "shared").AkburaSymbol);
+        Assert.DoesNotContain(
+            nameAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate);
+        Assert.DoesNotContain(
+            valueAttributes.SelectMany(attribute =>
+                semanticModel.GetSemanticDiagnostics(attribute)),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_CompiledElementNameBindingUsesLocalTemplateScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <StackPanel>
+                <Button x.Name="input" />
+                <TemplateHost>
+                    <TemplateHost.TemplateBody>
+                        <StackPanel>
+                            <TextBlock Text=${CompiledBinding #input.Text} />
+                            <TextBox x.Name="input" />
+                        </StackPanel>
+                    </TemplateHost.TemplateBody>
+                </TemplateHost>
+            </StackPanel>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                AvaloniaBindingCSharpCode,
+                MarkupNameScopeCSharpCode));
+        var textBlock = Assert.Single(
+            syntaxTree.GetRootSyntax()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() == "TextBlock");
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        var binding = Assert.IsType<MarkupBindingValue>(extension.Binding);
+        var input = binding.PathElements[0];
+
+        Assert.Equal(MarkupBindingPathElementKind.ElementName, input.Kind);
+        Assert.Equal("#input", input.Text);
+        Assert.Equal(
+            "Avalonia.Controls.TextBox",
+            input.Type.Symbol?.ToDisplayString());
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(
+                " | ",
+                semanticModel.GetSemanticDiagnostics(textAttribute)
+                    .Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_CompiledElementNameBindingFallsBackToComponentScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <StackPanel>
+                <TextBox x.Name="componentInput" />
+                <TemplateHost>
+                    <TemplateHost.TemplateBody>
+                        <TextBlock Text=${CompiledBinding #componentInput.Text} />
+                    </TemplateHost.TemplateBody>
+                </TemplateHost>
+            </StackPanel>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                AvaloniaBindingCSharpCode,
+                MarkupNameScopeCSharpCode));
+        var textBlock = Assert.Single(
+            syntaxTree.GetRootSyntax()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() == "TextBlock");
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(
+            operation.ConvertedValue);
+        var binding = Assert.IsType<MarkupBindingValue>(
+            extension.Binding);
+
+        Assert.Collection(
+            binding.PathElements,
+            input =>
+            {
+                Assert.Equal(
+                    MarkupBindingPathElementKind.ElementName,
+                    input.Kind);
+                Assert.Equal("#componentInput", input.Text);
+                Assert.Equal(
+                    "Avalonia.Controls.TextBox",
+                    input.Type.Symbol?.ToDisplayString());
+            },
+            text =>
+            {
+                Assert.Equal(
+                    MarkupBindingPathElementKind.Property,
+                    text.Kind);
+                Assert.Equal("Text", text.Text);
+                Assert.Equal(
+                    SpecialType.System_String,
+                    Assert.IsAssignableFrom<ITypeSymbol>(
+                        text.Type.Symbol).SpecialType);
+            });
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(
+                " | ",
+                semanticModel.GetSemanticDiagnostics(textAttribute)
+                    .Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
+    }
+
+    [Fact]
+    public void SemanticModel_MarkupName_CompiledElementNameBindingUsesNearestParentLocalScope()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <StackPanel>
+                <Button x.Name="input" />
+                <TemplateHost>
+                    <TemplateHost.TemplateBody>
+                        <StackPanel>
+                            <TextBox x.Name="input" />
+                            <DeferredHost>
+                                <TextBlock Text=${CompiledBinding #input.Text} />
+                            </DeferredHost>
+                        </StackPanel>
+                    </TemplateHost.TemplateBody>
+                </TemplateHost>
+            </StackPanel>
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(
+                AvaloniaBindingCSharpCode,
+                MarkupNameScopeCSharpCode));
+        var textBlock = Assert.Single(
+            syntaxTree.GetRootSyntax()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element =>
+                element.StartTag?.Name.ToFullString().Trim() == "TextBlock");
+        var textAttribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(textBlock.StartTag!.Attributes));
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(textAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(
+            operation.ConvertedValue);
+        var binding = Assert.IsType<MarkupBindingValue>(
+            extension.Binding);
+
+        Assert.Collection(
+            binding.PathElements,
+            input =>
+            {
+                Assert.Equal(
+                    MarkupBindingPathElementKind.ElementName,
+                    input.Kind);
+                Assert.Equal("#input", input.Text);
+                Assert.Equal(
+                    "Avalonia.Controls.TextBox",
+                    input.Type.Symbol?.ToDisplayString());
+            },
+            text =>
+            {
+                Assert.Equal(
+                    MarkupBindingPathElementKind.Property,
+                    text.Kind);
+                Assert.Equal("Text", text.Text);
+                Assert.Equal(
+                    SpecialType.System_String,
+                    Assert.IsAssignableFrom<ITypeSymbol>(
+                        text.Type.Symbol).SpecialType);
+            });
+        Assert.True(
+            semanticModel.GetSemanticDiagnostics(textAttribute).IsEmpty,
+            string.Join(
+                " | ",
+                semanticModel.GetSemanticDiagnostics(textAttribute)
+                    .Select(static diagnostic => diagnostic.Message)));
+        Assert.False(operation.HasErrors);
     }
 
     [Fact]

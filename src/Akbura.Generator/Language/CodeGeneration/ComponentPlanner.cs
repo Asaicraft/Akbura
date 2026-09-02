@@ -6,6 +6,7 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -80,6 +81,7 @@ internal static class ComponentPlanner
         private readonly INamedTypeSymbol? _controlType;
         private readonly INamedTypeSymbol? _initializeType;
         private readonly ArrayBuilder<PendingElementPlan> _elements;
+        private readonly ArrayBuilder<PendingScopePlan> _pendingScopes;
         private readonly ArrayBuilder<ComponentPropertyElementPlan> _propertyElements;
         private readonly ArrayBuilder<ComponentDeferredContentPlan> _deferredContents;
         private readonly ArrayBuilder<ComponentTemplatePlan> _templates;
@@ -88,6 +90,9 @@ internal static class ComponentPlanner
         private readonly ArrayBuilder<PendingContentPlan> _pendingContents;
         private ImmutableArrayBuilder<int> _rootElementIds;
         private ImmutableArrayBuilder<int> _childElementIds;
+        private ImmutableArrayBuilder<ComponentScopePlan> _scopes;
+        private ImmutableArrayBuilder<int> _scopeElementIds;
+        private ImmutableArrayBuilder<int> _scopeRootElementIds;
         private ImmutableArrayBuilder<ComponentPropertyWritePlan> _propertyWrites;
         private ImmutableArrayBuilder<ComponentCSharpValuePlan> _csharpValues;
         private ImmutableArrayBuilder<MarkupExtensionResultPlan> _markupExtensions;
@@ -101,7 +106,6 @@ internal static class ComponentPlanner
         private ImmutableArrayBuilder<ComponentCollectionContentPlan> _collectionContents;
         private ImmutableArrayBuilder<ComponentContentItemPlan> _contentItems;
         private ImmutableArrayBuilder<BindingElementReference> _elementReferences;
-        private int _nextScopeId;
         private int _nextCachedBindingPathId;
 
         public Planner(
@@ -119,6 +123,12 @@ internal static class ComponentPlanner
             _controlType = _compilation.GetTypeByMetadataName("Avalonia.Controls.Control");
             _initializeType = _compilation.GetTypeByMetadataName("System.ComponentModel.ISupportInitialize");
             _elements = ArrayBuilder<PendingElementPlan>.GetInstance();
+            _pendingScopes = ArrayBuilder<PendingScopePlan>.GetInstance();
+            _pendingScopes.Add(new PendingScopePlan(
+                id: 0,
+                parentScopeId: -1,
+                ownerElementId: -1,
+                ComponentElementScopeKind.Component));
             _propertyElements = ArrayBuilder<ComponentPropertyElementPlan>.GetInstance();
             _deferredContents = ArrayBuilder<ComponentDeferredContentPlan>.GetInstance();
             _templates = ArrayBuilder<ComponentTemplatePlan>.GetInstance();
@@ -127,6 +137,9 @@ internal static class ComponentPlanner
             _pendingContents = ArrayBuilder<PendingContentPlan>.GetInstance();
             _rootElementIds = ImmutableArrayBuilder<int>.Rent();
             _childElementIds = ImmutableArrayBuilder<int>.Rent();
+            _scopes = ImmutableArrayBuilder<ComponentScopePlan>.Rent();
+            _scopeElementIds = ImmutableArrayBuilder<int>.Rent();
+            _scopeRootElementIds = ImmutableArrayBuilder<int>.Rent();
             _propertyWrites = ImmutableArrayBuilder<ComponentPropertyWritePlan>.Rent();
             _csharpValues = ImmutableArrayBuilder<ComponentCSharpValuePlan>.Rent();
             _markupExtensions = ImmutableArrayBuilder<MarkupExtensionResultPlan>.Rent();
@@ -140,7 +153,6 @@ internal static class ComponentPlanner
             _collectionContents = ImmutableArrayBuilder<ComponentCollectionContentPlan>.Rent();
             _contentItems = ImmutableArrayBuilder<ComponentContentItemPlan>.Rent();
             _elementReferences = ImmutableArrayBuilder<BindingElementReference>.Rent();
-            _nextScopeId = 1;
             _nextCachedBindingPathId = 0;
         }
 
@@ -156,6 +168,7 @@ internal static class ComponentPlanner
 
             LowerFirstUpdateActions();
             LowerContent();
+            BuildScopeIndex();
 
             using var akcssInputs = ImmutableArrayBuilder<AkcssActivatorElementInput>.Rent(_elements.Count);
             for (var i = 0; i < _elements.Count; i++)
@@ -203,6 +216,9 @@ internal static class ComponentPlanner
                 elements.ToImmutable(),
                 _rootElementIds.ToImmutable(),
                 _childElementIds.ToImmutable(),
+                _scopes.ToImmutable(),
+                _scopeElementIds.ToImmutable(),
+                _scopeRootElementIds.ToImmutable(),
                 _propertyWrites.ToImmutable(),
                 _csharpValues.ToImmutable(),
                 _markupExtensions.ToImmutable(),
@@ -225,6 +241,7 @@ internal static class ComponentPlanner
         public void Dispose()
         {
             _elements.Free();
+            _pendingScopes.Free();
             _propertyElements.Free();
             _deferredContents.Free();
             _templates.Free();
@@ -233,6 +250,9 @@ internal static class ComponentPlanner
             _pendingContents.Free();
             _rootElementIds.Dispose();
             _childElementIds.Dispose();
+            _scopes.Dispose();
+            _scopeElementIds.Dispose();
+            _scopeRootElementIds.Dispose();
             _propertyWrites.Dispose();
             _csharpValues.Dispose();
             _markupExtensions.Dispose();
@@ -291,7 +311,11 @@ internal static class ComponentPlanner
             }
 
             var contentOperation = _semanticModel.GetOperation(syntax) as IMarkupContentOperation;
-            var implicitBoundary = CreateImplicitBoundary(elementId, syntax, contentOperation);
+            var implicitBoundary = CreateImplicitBoundary(
+                elementId,
+                syntax,
+                contentOperation,
+                scope.ScopeId);
             using var directChildren = ImmutableArrayBuilder<int>.Rent();
             using var deferredRoots = ImmutableArrayBuilder<int>.Rent();
             using var templateRoots = ImmutableArrayBuilder<int>.Rent();
@@ -390,7 +414,12 @@ internal static class ComponentPlanner
             IMarkupContentOperation operation,
             TraversalContext inheritedContext)
         {
-            var boundary = CreatePropertyBoundary(ownerElementId, syntax, property, operation);
+            var boundary = CreatePropertyBoundary(
+                ownerElementId,
+                syntax,
+                property,
+                operation,
+                inheritedContext.GetEffectiveScope().ScopeId);
             using var children = ImmutableArrayBuilder<int>.Rent();
             using var deferredRoots = ImmutableArrayBuilder<int>.Rent();
             using var templateRoots = ImmutableArrayBuilder<int>.Rent();
@@ -429,7 +458,8 @@ internal static class ComponentPlanner
         private ContentBoundary CreateImplicitBoundary(
             int ownerElementId,
             MarkupElementSyntax syntax,
-            IMarkupContentOperation? operation)
+            IMarkupContentOperation? operation,
+            int parentScopeId)
         {
             if (operation?.Property is not { } property || !IsDeferredContentProperty(property))
             {
@@ -437,7 +467,10 @@ internal static class ComponentPlanner
             }
 
             return new ContentBoundary(
-                _nextScopeId++,
+                AddPendingScope(
+                    parentScopeId,
+                    ownerElementId,
+                    ComponentElementScopeKind.DeferredContent),
                 ownerElementId,
                 syntax,
                 property,
@@ -450,7 +483,8 @@ internal static class ComponentPlanner
             int ownerElementId,
             MarkupElementSyntax syntax,
             AkburaPropertySymbol property,
-            IMarkupContentOperation operation)
+            IMarkupContentOperation operation,
+            int parentScopeId)
         {
             var isDeferred = IsDeferredContentProperty(property);
             var isTemplate = IsDataTemplateProperty(property);
@@ -460,7 +494,12 @@ internal static class ComponentPlanner
             }
 
             return new ContentBoundary(
-                _nextScopeId++,
+                AddPendingScope(
+                    parentScopeId,
+                    ownerElementId,
+                    isDeferred
+                        ? ComponentElementScopeKind.DeferredContent
+                        : ComponentElementScopeKind.DataTemplate),
                 ownerElementId,
                 syntax,
                 property,
@@ -481,7 +520,7 @@ internal static class ComponentPlanner
 
             if (boundary.IsDeferred)
             {
-                if (deferredRoots.IsEmpty && boundary.Operation.Content.IsDefaultOrEmpty)
+                if (deferredRoots.Length != 1)
                 {
                     return default;
                 }
@@ -491,8 +530,8 @@ internal static class ComponentPlanner
                     id,
                     boundary.ScopeId,
                     boundary.OwnerElementId,
-                    boundary.Syntax,
-                    AddElementIds(deferredRoots)));
+                    GetDeferredResultType(boundary.Property),
+                    boundary.Syntax));
                 return new ComponentContentValueReference(
                     ComponentContentValueKind.DeferredContent,
                     id);
@@ -505,14 +544,134 @@ internal static class ComponentPlanner
                     id,
                     boundary.ScopeId,
                     boundary.OwnerElementId,
-                    boundary.Syntax,
-                    AddElementIds(templateRoots)));
+                    boundary.Syntax));
                 return new ComponentContentValueReference(
                     ComponentContentValueKind.Template,
                     id);
             }
 
             return default;
+        }
+
+        private int AddPendingScope(
+            int parentScopeId,
+            int ownerElementId,
+            ComponentElementScopeKind kind)
+        {
+            Debug.Assert((uint)parentScopeId < (uint)_pendingScopes.Count);
+            Debug.Assert(ownerElementId >= 0);
+            Debug.Assert(kind != ComponentElementScopeKind.Component);
+
+            var id = _pendingScopes.Count;
+            _pendingScopes.Add(new PendingScopePlan(
+                id,
+                parentScopeId,
+                ownerElementId,
+                kind));
+            return id;
+        }
+
+        private void BuildScopeIndex()
+        {
+            var scopeCount = _pendingScopes.Count;
+            var elementCount = _elements.Count;
+            var counts = ArrayPool<int>.Shared.Rent(scopeCount);
+            var offsets = ArrayPool<int>.Shared.Rent(scopeCount);
+            var cursors = ArrayPool<int>.Shared.Rent(scopeCount);
+            var elementIds = ArrayPool<int>.Shared.Rent(Math.Max(elementCount, 1));
+
+            try
+            {
+                Array.Clear(counts, 0, scopeCount);
+
+                for (var i = 0; i < elementCount; i++)
+                {
+                    var scopeId = _elements[i].ScopeId;
+                    Debug.Assert((uint)scopeId < (uint)scopeCount);
+                    counts[scopeId]++;
+                }
+
+                var offset = 0;
+                for (var i = 0; i < scopeCount; i++)
+                {
+                    offsets[i] = offset;
+                    cursors[i] = offset;
+                    offset += counts[i];
+                }
+
+                for (var i = 0; i < elementCount; i++)
+                {
+                    var scopeId = _elements[i].ScopeId;
+                    elementIds[cursors[scopeId]++] = i;
+                }
+
+                _scopeElementIds.AddRange(elementIds.AsSpan(0, elementCount));
+
+                for (var i = 0; i < scopeCount; i++)
+                {
+                    _pendingScopes[i] = _pendingScopes[i].WithElements(
+                        new ComponentPlanRange(offsets[i], counts[i]));
+                }
+
+                Array.Clear(counts, 0, scopeCount);
+                var rootCount = 0;
+
+                for (var i = 0; i < elementCount; i++)
+                {
+                    var element = _elements[i];
+                    if (element.ParentId >= 0 &&
+                        _elements[element.ParentId].ScopeId == element.ScopeId)
+                    {
+                        continue;
+                    }
+
+                    counts[element.ScopeId]++;
+                    rootCount++;
+                }
+
+                offset = 0;
+                for (var i = 0; i < scopeCount; i++)
+                {
+                    offsets[i] = offset;
+                    cursors[i] = offset;
+                    offset += counts[i];
+                }
+
+                for (var i = 0; i < elementCount; i++)
+                {
+                    var element = _elements[i];
+                    if (element.ParentId >= 0 &&
+                        _elements[element.ParentId].ScopeId == element.ScopeId)
+                    {
+                        continue;
+                    }
+
+                    elementIds[cursors[element.ScopeId]++] = i;
+                }
+
+                _scopeRootElementIds.AddRange(elementIds.AsSpan(0, rootCount));
+
+                for (var i = 0; i < scopeCount; i++)
+                {
+                    var pending = _pendingScopes[i];
+                    Debug.Assert(pending.Id == i);
+                    _scopes.Add(new ComponentScopePlan(
+                        pending.Id,
+                        pending.ParentScopeId,
+                        pending.OwnerElementId,
+                        pending.Kind,
+                        pending.Elements,
+                        new ComponentPlanRange(offsets[i], counts[i]),
+                        pending.Flags));
+                }
+            }
+            finally
+            {
+                ArrayPool<int>.Shared.Return(counts);
+                ArrayPool<int>.Shared.Return(offsets);
+                ArrayPool<int>.Shared.Return(cursors);
+                ArrayPool<int>.Shared.Return(elementIds);
+            }
         }
 
         private TraversalContext ResolveChildContext(
@@ -686,7 +845,7 @@ internal static class ComponentPlanner
             }
 
             var index = _nameAssignments.Count;
-            _nameAssignments.Add(new ComponentNameAssignmentPlan(name.IdentifierText, operation.Syntax));
+            _nameAssignments.Add(new ComponentNameAssignmentPlan(name.Name, operation.Syntax));
             _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateNameAssignment(index));
         }
 
@@ -1354,6 +1513,19 @@ internal static class ComponentPlanner
                 _semanticModel.BindingSession.MarkupTemplateContent.IsDeferredContentProperty(clrProperty);
         }
 
+        private ITypeSymbol GetDeferredResultType(AkburaPropertySymbol property)
+        {
+            var clrProperty = GetClrProperty(property);
+            if (clrProperty != null)
+            {
+                return _semanticModel.BindingSession.MarkupTemplateContent
+                    .GetDeferredResultType(clrProperty);
+            }
+
+            return _controlType ??
+                _compilation.GetSpecialType(SpecialType.System_Object);
+        }
+
         private bool IsDataTemplateProperty(AkburaPropertySymbol property)
         {
             return property.Type.Symbol is ITypeSymbol propertyType && IsDataTemplateType(propertyType);
@@ -1474,6 +1646,43 @@ internal static class ComponentPlanner
         private static string EscapeIdentifier(string identifier)
         {
             return identifier.IdentifierRequiresEscaping() ? "@" + identifier : identifier;
+        }
+    }
+
+    private readonly struct PendingScopePlan
+    {
+        public PendingScopePlan(
+            int id,
+            int parentScopeId,
+            int ownerElementId,
+            ComponentElementScopeKind kind,
+            ComponentPlanRange elements = default)
+        {
+            Id = id;
+            ParentScopeId = parentScopeId;
+            OwnerElementId = ownerElementId;
+            Kind = kind;
+            Elements = elements;
+        }
+
+        public int Id { get; }
+        public int ParentScopeId { get; }
+        public int OwnerElementId { get; }
+        public ComponentElementScopeKind Kind { get; }
+        public ComponentPlanRange Elements { get; }
+        public ComponentScopeFlags Flags =>
+            Id == 0
+                ? ComponentScopeFlags.None
+                : ComponentScopeFlags.RequiresNameScope;
+
+        public PendingScopePlan WithElements(ComponentPlanRange elements)
+        {
+            return new PendingScopePlan(
+                Id,
+                ParentScopeId,
+                OwnerElementId,
+                Kind,
+                elements);
         }
     }
 

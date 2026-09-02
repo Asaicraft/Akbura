@@ -23,12 +23,35 @@ internal readonly ref struct MarkupExtensionWriteContext
         string? nameScopeExpression,
         int scopeId,
         ReadOnlySpan<BindingElementReference> elementReferences = default)
+        : this(
+            targetObjectExpression,
+            targetProperty,
+            intermediateRootExpression,
+            baseUriExpression,
+            new MarkupParentStackPlan(directParentsStackExpression),
+            fallbackServiceProviderExpression,
+            nameScopeExpression,
+            scopeId,
+            elementReferences)
+    {
+    }
+
+    public MarkupExtensionWriteContext(
+        string targetObjectExpression,
+        MarkupTargetPropertyPlan targetProperty,
+        string intermediateRootExpression,
+        string baseUriExpression,
+        MarkupParentStackPlan directParentsStack,
+        string? fallbackServiceProviderExpression,
+        string? nameScopeExpression,
+        int scopeId,
+        ReadOnlySpan<BindingElementReference> elementReferences = default)
     {
         TargetObjectExpression = targetObjectExpression;
         TargetProperty = targetProperty;
         IntermediateRootExpression = intermediateRootExpression;
         BaseUriExpression = baseUriExpression;
-        DirectParentsStackExpression = directParentsStackExpression;
+        DirectParentsStack = directParentsStack;
         FallbackServiceProviderExpression = fallbackServiceProviderExpression;
         NameScopeExpression = nameScopeExpression;
         ScopeId = scopeId;
@@ -43,7 +66,16 @@ internal readonly ref struct MarkupExtensionWriteContext
 
     public string BaseUriExpression { get; }
 
-    public string DirectParentsStackExpression { get; }
+    public MarkupParentStackPlan DirectParentsStack { get; }
+
+    /// <summary>
+    /// Preserves the expression-based context API while callers migrate to
+    /// <see cref="DirectParentsStack"/>.
+    /// </summary>
+    public string DirectParentsStackExpression =>
+        DirectParentsStack.Kind == MarkupParentStackKind.Expression
+            ? DirectParentsStack.Expression!
+            : string.Empty;
 
     public string? FallbackServiceProviderExpression { get; }
 
@@ -75,7 +107,7 @@ internal readonly ref struct MarkupExtensionWriteContext
             targetProperty,
             IntermediateRootExpression,
             BaseUriExpression,
-            DirectParentsStackExpression,
+            DirectParentsStack,
             FallbackServiceProviderExpression,
             NameScopeExpression,
             scopeId,
@@ -95,7 +127,7 @@ internal readonly ref struct MarkupExtensionWriteContext
             TargetProperty,
             IntermediateRootExpression,
             BaseUriExpression,
-            DirectParentsStackExpression,
+            DirectParentsStack,
             FallbackServiceProviderExpression,
             NameScopeExpression,
             ScopeId,
@@ -339,37 +371,12 @@ internal readonly ref struct MarkupExtensionWriter
     private void WriteMarkupServiceProvider(
         in MarkupExtensionWriteContext context)
     {
-        if (string.IsNullOrEmpty(context.TargetObjectExpression) ||
-            string.IsNullOrEmpty(context.IntermediateRootExpression) ||
-            string.IsNullOrEmpty(context.BaseUriExpression) ||
-            string.IsNullOrEmpty(context.DirectParentsStackExpression))
+        var writer = new MarkupServiceProviderWriter(_writer);
+
+        if (!writer.Write(context))
         {
-            Debug.Fail("The markup extension service-provider context is incomplete.");
             _writer.Write("default!");
-            return;
         }
-
-        _writer
-            .Write("CreateMarkupServiceProvider(targetObject: ")
-            .Write(context.TargetObjectExpression)
-            .Write(", targetProperty: ");
-        var targetPropertyWriter = new MarkupTargetPropertyWriter(_writer);
-        targetPropertyWriter.Write(context.TargetProperty);
-        _writer.Write(", intermediateRootObject: ")
-            .Write(context.IntermediateRootExpression)
-            .Write(", baseUri: ")
-            .Write(context.BaseUriExpression)
-            .Write(", directParentsStack: ")
-            .Write(context.DirectParentsStackExpression);
-
-        if (!string.IsNullOrEmpty(context.FallbackServiceProviderExpression))
-        {
-            _writer
-                .Write(", fallbackServiceProvider: ")
-                .Write(context.FallbackServiceProviderExpression!);
-        }
-
-        _writer.Write(")");
     }
 
     private static ReadOnlyMemory<char> TrimQuotes(string text)

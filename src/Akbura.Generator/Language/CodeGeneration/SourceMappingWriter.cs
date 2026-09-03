@@ -1,6 +1,7 @@
 ﻿using Akbura.Language.Syntax;
 using System;
 using System.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -26,6 +27,41 @@ internal readonly ref struct SourceMappingWriter
     {
         if (!_sourceMap.TryGetLineDirective(
                 syntax,
+                out var span,
+                out var path))
+        {
+            return default;
+        }
+
+        EnsureDirectiveLine(_writer);
+
+        var generatedOffset = _writer.CurrentIndent + Math.Max(0, valueOffset);
+        _writer
+            .Write("#line (")
+            .WriteIntegerLiteral(span.Start.Line + 1)
+            .Write(",")
+            .WriteIntegerLiteral(span.Start.Character + 1)
+            .Write(")-(")
+            .WriteIntegerLiteral(span.End.Line + 1)
+            .Write(",")
+            .WriteIntegerLiteral(span.End.Character + 1)
+            .Write(") ")
+            .WriteIntegerLiteral(generatedOffset)
+            .Write(" \"")
+            .Write(path)
+            .WriteLine("\"");
+
+        return new SourceMappingToken(_writer);
+    }
+
+    public SourceMappingToken WriteStart(
+        AkburaSyntax syntax,
+        TextSpan relativeSpan,
+        int valueOffset = 0)
+    {
+        if (!_sourceMap.TryGetLineDirective(
+                syntax,
+                relativeSpan,
                 out var span,
                 out var path))
         {

@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
@@ -18,10 +18,36 @@ internal sealed class ComponentGenerationSourceMap
         out LinePositionSpan lineSpan,
         out string path)
     {
+        return TryGetLineDirective(syntax, syntax.Span, out lineSpan, out path);
+    }
+
+    public bool TryGetLineDirective(
+        AkburaSyntax syntax,
+        TextSpan relativeSpan,
+        out LinePositionSpan lineSpan,
+        out string path)
+    {
         path = _syntaxTree.FilePath;
-        var span = syntax.Span;
         if (!ReferenceEquals(syntax.Root, _syntaxTree.GetRootSyntax()) ||
-            string.IsNullOrWhiteSpace(path) ||
+            (uint)relativeSpan.Start > (uint)syntax.FullWidth ||
+            (uint)relativeSpan.End > (uint)syntax.FullWidth ||
+            relativeSpan.Length == 0)
+        {
+            lineSpan = default;
+            path = string.Empty;
+            return false;
+        }
+
+        var span = new TextSpan(syntax.Position + relativeSpan.Start, relativeSpan.Length);
+        return TryGetLineDirective(path, span, out lineSpan);
+    }
+
+    private bool TryGetLineDirective(
+        string path,
+        TextSpan span,
+        out LinePositionSpan lineSpan)
+    {
+        if (string.IsNullOrWhiteSpace(path) ||
             path.IndexOf('"') >= 0 ||
             path.IndexOf('\r') >= 0 ||
             path.IndexOf('\n') >= 0 ||
@@ -30,7 +56,6 @@ internal sealed class ComponentGenerationSourceMap
             (uint)span.End > (uint)_syntaxTree.Text.Length)
         {
             lineSpan = default;
-            path = string.Empty;
             return false;
         }
 
@@ -41,7 +66,6 @@ internal sealed class ComponentGenerationSourceMap
             lineSpan.End.Character <= lineSpan.Start.Character)
         {
             lineSpan = default;
-            path = string.Empty;
             return false;
         }
 

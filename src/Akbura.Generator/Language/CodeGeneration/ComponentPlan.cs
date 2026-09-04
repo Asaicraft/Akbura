@@ -455,31 +455,31 @@ internal readonly struct ComponentTemplatePlan
 internal readonly struct ComponentPlan
 {
     public ComponentPlan(
-    PooledImmutableList<ComponentElementPlan> elements,
-    PooledImmutableList<int> rootElementIds,
-    PooledImmutableList<int> childElementIds,
-    PooledImmutableList<ComponentScopePlan> scopes,
-    PooledImmutableList<int> scopeElementIds,
-    PooledImmutableList<int> scopeRootElementIds,
-    ImmutableArray<ComponentPropertyWritePlan> propertyWrites,
-    ImmutableArray<ComponentCSharpValuePlan> csharpValues,
-    ImmutableArray<MarkupExtensionResultPlan> markupExtensions,
-    ImmutableArray<BindingWritePlan> bindings,
-    ImmutableArray<ComponentPropertySubscriptionPlan> propertySubscriptions,
-    PooledImmutableList<ComponentNameAssignmentPlan> nameAssignments,
-    PooledImmutableList<ComponentRoutedEventPlan> routedEvents,
-    PooledImmutableList<ComponentCommandBindingPlan> commandBindings,
-    PooledImmutableList<ComponentFirstUpdateActionPlan> firstUpdateActions,
-    ImmutableArray<ComponentPropertyElementPlan> propertyElements,
-    ImmutableArray<ComponentPropertyContentPlan> propertyContents,
-    ImmutableArray<ComponentCollectionContentPlan> collectionContents,
-    ImmutableArray<ComponentContentItemPlan> contentItems,
-    ImmutableArray<ComponentDeferredContentPlan> deferredContents,
-    ImmutableArray<ComponentTemplatePlan> templates,
-    ImmutableArray<BindingElementReference> elementReferences,
-    ComponentLifecyclePlan lifecycle,
-    ImmutableArray<ComponentRenderStatementPlan> renderStatements,
-    AkcssComponentActivatorPlan akcss)
+        PooledImmutableList<ComponentElementPlan> elements,
+        PooledImmutableList<int> rootElementIds,
+        PooledImmutableList<int> childElementIds,
+        PooledImmutableList<ComponentScopePlan> scopes,
+        PooledImmutableList<int> scopeElementIds,
+        PooledImmutableList<int> scopeRootElementIds,
+        PooledImmutableList<ComponentPropertyWritePlan> propertyWrites,
+        PooledImmutableList<ComponentCSharpValuePlan> csharpValues,
+        PooledImmutableList<MarkupExtensionResultPlan> markupExtensions,
+        PooledImmutableList<BindingWritePlan> bindings,
+        PooledImmutableList<ComponentPropertySubscriptionPlan> propertySubscriptions,
+        PooledImmutableList<ComponentNameAssignmentPlan> nameAssignments,
+        PooledImmutableList<ComponentRoutedEventPlan> routedEvents,
+        PooledImmutableList<ComponentCommandBindingPlan> commandBindings,
+        PooledImmutableList<ComponentFirstUpdateActionPlan> firstUpdateActions,
+        ImmutableArray<ComponentPropertyElementPlan> propertyElements,
+        ImmutableArray<ComponentPropertyContentPlan> propertyContents,
+        ImmutableArray<ComponentCollectionContentPlan> collectionContents,
+        ImmutableArray<ComponentContentItemPlan> contentItems,
+        ImmutableArray<ComponentDeferredContentPlan> deferredContents,
+        ImmutableArray<ComponentTemplatePlan> templates,
+        ImmutableArray<BindingElementReference> elementReferences,
+        ComponentLifecyclePlan lifecycle,
+        ImmutableArray<ComponentRenderStatementPlan> renderStatements,
+        AkcssComponentActivatorPlan akcss)
     {
         Elements = elements;
         RootElementIds = rootElementIds;
@@ -488,25 +488,11 @@ internal readonly struct ComponentPlan
         ScopeElementIds = scopeElementIds;
         ScopeRootElementIds = scopeRootElementIds;
 
-        PropertyWrites = propertyWrites.IsDefault
-            ? []
-            : propertyWrites;
-
-        CSharpValues = csharpValues.IsDefault
-            ? []
-            : csharpValues;
-
-        MarkupExtensions = markupExtensions.IsDefault
-            ? []
-            : markupExtensions;
-
-        Bindings = bindings.IsDefault
-            ? []
-            : bindings;
-
-        PropertySubscriptions = propertySubscriptions.IsDefault
-            ? []
-            : propertySubscriptions;
+        PropertyWrites = propertyWrites;
+        CSharpValues = csharpValues;
+        MarkupExtensions = markupExtensions;
+        Bindings = bindings;
+        PropertySubscriptions = propertySubscriptions;
 
         NameAssignments = nameAssignments;
         RoutedEvents = routedEvents;
@@ -562,15 +548,15 @@ internal readonly struct ComponentPlan
 
     public PooledImmutableList<int> ScopeRootElementIds { get; }
 
-    public ImmutableArray<ComponentPropertyWritePlan> PropertyWrites { get; }
+    public PooledImmutableList<ComponentPropertyWritePlan> PropertyWrites { get; }
 
-    public ImmutableArray<ComponentCSharpValuePlan> CSharpValues { get; }
+    public PooledImmutableList<ComponentCSharpValuePlan> CSharpValues { get; }
 
-    public ImmutableArray<MarkupExtensionResultPlan> MarkupExtensions { get; }
+    public PooledImmutableList<MarkupExtensionResultPlan> MarkupExtensions { get; }
 
-    public ImmutableArray<BindingWritePlan> Bindings { get; }
+    public PooledImmutableList<BindingWritePlan> Bindings { get; }
 
-    public ImmutableArray<ComponentPropertySubscriptionPlan> PropertySubscriptions { get; }
+    public PooledImmutableList<ComponentPropertySubscriptionPlan> PropertySubscriptions { get; }
 
     public PooledImmutableList<ComponentNameAssignmentPlan> NameAssignments { get; }
 
@@ -610,6 +596,12 @@ internal readonly struct ComponentPlan
         Scopes.ReturnToPool();
         ScopeElementIds.ReturnToPool();
         ScopeRootElementIds.ReturnToPool();
+
+        PropertyWrites.ReturnToPool();
+        CSharpValues.ReturnToPool();
+        MarkupExtensions.ReturnToPool();
+        Bindings.ReturnToPool();
+        PropertySubscriptions.ReturnToPool();
 
         NameAssignments.ReturnToPool();
         RoutedEvents.ReturnToPool();

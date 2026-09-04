@@ -205,6 +205,12 @@ internal static class ComponentPlanner
             var pooledScopeElementIds = default(PooledImmutableList<int>);
             var pooledScopeRootElementIds = default(PooledImmutableList<int>);
 
+            var pooledPropertyWrites = default(PooledImmutableList<ComponentPropertyWritePlan>);
+            var pooledCSharpValues = default(PooledImmutableList<ComponentCSharpValuePlan>);
+            var pooledMarkupExtensions = default(PooledImmutableList<MarkupExtensionResultPlan>);
+            var pooledBindings = default(PooledImmutableList<BindingWritePlan>);
+            var pooledPropertySubscriptions = default(PooledImmutableList<ComponentPropertySubscriptionPlan>);
+
             var pooledNameAssignments = default(PooledImmutableList<ComponentNameAssignmentPlan>);
             var pooledRoutedEvents = default(PooledImmutableList<ComponentRoutedEventPlan>);
             var pooledCommandBindings = default(PooledImmutableList<ComponentCommandBindingPlan>);
@@ -250,6 +256,12 @@ internal static class ComponentPlanner
                 pooledScopeElementIds = _scopeElementIds.ToPooledImmutableList();
                 pooledScopeRootElementIds = _scopeRootElementIds.ToPooledImmutableList();
 
+                pooledPropertyWrites = _propertyWrites.ToPooledImmutableList();
+                pooledCSharpValues = _csharpValues.ToPooledImmutableList();
+                pooledMarkupExtensions = _markupExtensions.ToPooledImmutableList();
+                pooledBindings = _bindings.ToPooledImmutableList();
+                pooledPropertySubscriptions = _propertySubscriptions.ToPooledImmutableList();
+
                 pooledNameAssignments = _nameAssignments.ToPooledImmutableList();
                 pooledRoutedEvents = _routedEvents.ToPooledImmutableList();
                 pooledCommandBindings = _commandBindings.ToPooledImmutableList();
@@ -262,11 +274,11 @@ internal static class ComponentPlanner
                     pooledScopes,
                     pooledScopeElementIds,
                     pooledScopeRootElementIds,
-                    _propertyWrites.ToImmutable(),
-                    _csharpValues.ToImmutable(),
-                    _markupExtensions.ToImmutable(),
-                    _bindings.ToImmutable(),
-                    _propertySubscriptions.ToImmutable(),
+                    pooledPropertyWrites,
+                    pooledCSharpValues,
+                    pooledMarkupExtensions,
+                    pooledBindings,
+                    pooledPropertySubscriptions,
                     pooledNameAssignments,
                     pooledRoutedEvents,
                     pooledCommandBindings,
@@ -290,6 +302,12 @@ internal static class ComponentPlanner
                 pooledScopes.ReturnToPool();
                 pooledScopeElementIds.ReturnToPool();
                 pooledScopeRootElementIds.ReturnToPool();
+
+                pooledPropertyWrites.ReturnToPool();
+                pooledCSharpValues.ReturnToPool();
+                pooledMarkupExtensions.ReturnToPool();
+                pooledBindings.ReturnToPool();
+                pooledPropertySubscriptions.ReturnToPool();
 
                 pooledNameAssignments.ReturnToPool();
                 pooledRoutedEvents.ReturnToPool();

@@ -1002,14 +1002,14 @@ public sealed class ComponentPlannerTests
     }
 
     private static ComponentPropertyWritePlan[] GetWrites(
-        ImmutableArray<ComponentPropertyWritePlan> writes,
+        PooledImmutableList<ComponentPropertyWritePlan> writes,
         ComponentPlanRange range)
     {
         return writes.AsSpan(range.Start, range.Length).ToArray();
     }
 
     private static ComponentPropertySubscriptionPlan[] GetSubscriptions(
-        ImmutableArray<ComponentPropertySubscriptionPlan> subscriptions,
+        PooledImmutableList<ComponentPropertySubscriptionPlan> subscriptions,
         ComponentPlanRange range)
     {
         return subscriptions.AsSpan(range.Start, range.Length).ToArray();

@@ -1,4 +1,4 @@
-﻿using Akbura.Language.CodeGeneration;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -25,7 +25,7 @@ public sealed class ComponentEagerContentIntegrationTests
             """;
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
         using var codeWriter = new CodeWriter("\n");
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var element = Assert.Single(writer.Plan.Elements);
 
         Assert.False(writer.WriteFirstUpdateContent(element.Id));
@@ -69,7 +69,7 @@ public sealed class ComponentEagerContentIntegrationTests
             """;
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
         using var codeWriter = new CodeWriter("\n");
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         ref readonly var plan = ref writer.Plan;
         var stackPanel = GetElement(plan, "StackPanel");
         var textBlock = GetElement(plan, "TextBlock");

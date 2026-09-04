@@ -113,6 +113,15 @@ internal ref struct ImmutableArrayBuilder<T>
         return Unsafe.As<T[], ImmutableArray<T>>(ref array);
     }
 
+#if !AKBURA_RUNTIME
+    /// <summary>
+    /// Creates a pooled immutable snapshot containing the written items.
+    /// </summary>
+    public readonly PooledImmutableList<T> ToPooledImmutableList()
+    {
+        return PooledImmutableList<T>.Create(writer!.WrittenSpan);
+    }
+#endif
     /// <summary>
     /// Creates an array containing the written items.
     /// </summary>

@@ -415,6 +415,7 @@ public sealed class ComponentLifecycleRegressionTests
 
         public void Dispose()
         {
+            Writer.Dispose();
             CodeWriter.Dispose();
         }
     }

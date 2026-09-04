@@ -3,7 +3,7 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
-using System.Collections.Immutable;
+using Akbura.Pools;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -255,49 +255,48 @@ internal readonly struct ComponentUserMemberPlan
 internal readonly struct ComponentMemberPlan
 {
     public ComponentMemberPlan(
-        ImmutableArray<ComponentParameterPlan> parameters,
-        ImmutableArray<ComponentStatePlan> states,
-        ImmutableArray<ComponentInjectServicePlan> services,
-        ImmutableArray<ComponentCommandPlan> commands,
-        ImmutableArray<ComponentCommandParameterPlan> commandParameters,
-        ImmutableArray<ComponentUserMemberPlan> userMembers)
+        PooledImmutableList<ComponentParameterPlan> parameters,
+        PooledImmutableList<ComponentStatePlan> states,
+        PooledImmutableList<ComponentInjectServicePlan> services,
+        PooledImmutableList<ComponentCommandPlan> commands,
+        PooledImmutableList<ComponentCommandParameterPlan> commandParameters,
+        PooledImmutableList<ComponentUserMemberPlan> userMembers)
     {
-        Parameters = parameters.IsDefault
-            ? []
-            : parameters;
-        States = states.IsDefault
-            ? []
-            : states;
-        Services = services.IsDefault
-            ? []
-            : services;
-        Commands = commands.IsDefault
-            ? []
-            : commands;
-        CommandParameters = commandParameters.IsDefault
-            ? []
-            : commandParameters;
-        UserMembers = userMembers.IsDefault
-            ? []
-            : userMembers;
+        Parameters = parameters;
+        States = states;
+        Services = services;
+        Commands = commands;
+        CommandParameters = commandParameters;
+        UserMembers = userMembers;
     }
 
-    public ImmutableArray<ComponentParameterPlan> Parameters { get; }
+    public PooledImmutableList<ComponentParameterPlan> Parameters { get; }
 
-    public ImmutableArray<ComponentStatePlan> States { get; }
+    public PooledImmutableList<ComponentStatePlan> States { get; }
 
-    public ImmutableArray<ComponentInjectServicePlan> Services { get; }
+    public PooledImmutableList<ComponentInjectServicePlan> Services { get; }
 
-    public ImmutableArray<ComponentCommandPlan> Commands { get; }
+    public PooledImmutableList<ComponentCommandPlan> Commands { get; }
 
-    public ImmutableArray<ComponentCommandParameterPlan> CommandParameters { get; }
+    public PooledImmutableList<ComponentCommandParameterPlan> CommandParameters { get; }
 
-    public ImmutableArray<ComponentUserMemberPlan> UserMembers { get; }
+    public PooledImmutableList<ComponentUserMemberPlan> UserMembers { get; }
 
     public bool IsEmpty =>
         Parameters.IsDefaultOrEmpty &&
         States.IsDefaultOrEmpty &&
         Services.IsDefaultOrEmpty &&
         Commands.IsDefaultOrEmpty &&
+        CommandParameters.IsDefaultOrEmpty &&
         UserMembers.IsDefaultOrEmpty;
+
+    public void ReturnToPool()
+    {
+        Parameters.ReturnToPool();
+        States.ReturnToPool();
+        Services.ReturnToPool();
+        Commands.ReturnToPool();
+        CommandParameters.ReturnToPool();
+        UserMembers.ReturnToPool();
+    }
 }

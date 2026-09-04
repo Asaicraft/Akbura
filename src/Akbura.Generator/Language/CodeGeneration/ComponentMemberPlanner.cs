@@ -81,12 +81,12 @@ internal static class ComponentMemberPlanner
             LowerUserMembers();
 
             return new ComponentMemberPlan(
-                _parameters.ToImmutable(),
-                _states.ToImmutable(),
-                _services.ToImmutable(),
-                _commands.ToImmutable(),
-                _commandParameters.ToImmutable(),
-                _userMembers.ToImmutable());
+                _parameters.ToPooledImmutableList(),
+                _states.ToPooledImmutableList(),
+                _services.ToPooledImmutableList(),
+                _commands.ToPooledImmutableList(),
+                _commandParameters.ToPooledImmutableList(),
+                _userMembers.ToPooledImmutableList());
         }
 
         public void Dispose()

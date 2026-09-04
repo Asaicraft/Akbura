@@ -1,4 +1,4 @@
-﻿using Akbura.Language.CodeGeneration;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -21,7 +21,7 @@ public sealed class ComponentFirstUpdateActionTests
             """;
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component, EventTypesSource);
         using var codeWriter = new CodeWriter("\n");
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var element = Assert.Single(writer.Plan.Elements);
         var actions = writer.Plan.FirstUpdateActions
             .AsSpan(element.FirstUpdateActions.Start, element.FirstUpdateActions.Length)
@@ -62,7 +62,7 @@ public sealed class ComponentFirstUpdateActionTests
             """;
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component, EventTypesSource);
         using var codeWriter = new CodeWriter("\n");
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var routedEvent = Assert.Single(writer.Plan.RoutedEvents);
 
         Assert.Equal(ComponentRoutedEventKind.AvaloniaRoutedEvent, routedEvent.Kind);
@@ -97,7 +97,7 @@ public sealed class ComponentFirstUpdateActionTests
             "<EventControl " + eventName + "={count++} />";
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component, EventTypesSource);
         using var codeWriter = new CodeWriter("\n");
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var routedEvent = Assert.Single(writer.Plan.RoutedEvents);
 
         Assert.Equal(ComponentRoutedEventKind.ClrEvent, routedEvent.Kind);

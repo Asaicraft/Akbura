@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -27,25 +27,24 @@ internal readonly ref struct DescriptorArrayWriter
 
     public void Write(in ComponentMemberPlan plan)
     {
-        WriteParameterArray(plan.Parameters);
+        WriteParameterArray(plan.Parameters.AsSpan());
         _writer.WriteLine();
-        WriteCommandArray(plan.Commands);
+        WriteCommandArray(plan.Commands.AsSpan());
         _writer.WriteLine();
-        WriteServiceArray(plan.Services);
+        WriteServiceArray(plan.Services.AsSpan());
         _writer.WriteLine();
-        WriteStateArray(plan.States);
+        WriteStateArray(plan.States.AsSpan());
         _writer.WriteLine();
         WriteGetters(!plan.States.IsDefaultOrEmpty);
     }
 
-    private void WriteParameterArray(
-        ImmutableArray<ComponentParameterPlan> parameters)
+    private void WriteParameterArray(ReadOnlySpan<ComponentParameterPlan> parameters)
     {
         WriteStaticArrayStart(ParameterType, "s_parameters");
 
         for (var i = 0; i < parameters.Length; i++)
         {
-            ref readonly var parameter = ref parameters.ItemRef(i);
+            ref readonly var parameter = ref parameters[i];
             _valueWriter.WriteIdentifier(parameter.Name);
             _writer.WriteLine("Property,");
         }
@@ -53,14 +52,13 @@ internal readonly ref struct DescriptorArrayWriter
         WriteArrayEnd();
     }
 
-    private void WriteCommandArray(
-        ImmutableArray<ComponentCommandPlan> commands)
+    private void WriteCommandArray(ReadOnlySpan<ComponentCommandPlan> commands)
     {
         WriteStaticArrayStart(CommandType, "s_commands");
 
         for (var i = 0; i < commands.Length; i++)
         {
-            ref readonly var command = ref commands.ItemRef(i);
+            ref readonly var command = ref commands[i];
             _valueWriter.WriteIdentifier(command.Name);
             _writer.WriteLine("Property,");
         }
@@ -68,14 +66,13 @@ internal readonly ref struct DescriptorArrayWriter
         WriteArrayEnd();
     }
 
-    private void WriteServiceArray(
-        ImmutableArray<ComponentInjectServicePlan> services)
+    private void WriteServiceArray(ReadOnlySpan<ComponentInjectServicePlan> services)
     {
         WriteStaticArrayStart(ServiceType, "s_services");
 
         for (var i = 0; i < services.Length; i++)
         {
-            ref readonly var service = ref services.ItemRef(i);
+            ref readonly var service = ref services[i];
             _valueWriter.WriteIdentifier(service.Name);
             _writer.WriteLine("Property,");
         }
@@ -83,10 +80,9 @@ internal readonly ref struct DescriptorArrayWriter
         WriteArrayEnd();
     }
 
-    private void WriteStateArray(
-        ImmutableArray<ComponentStatePlan> states)
+    private void WriteStateArray(ReadOnlySpan<ComponentStatePlan> states)
     {
-        if (states.IsDefaultOrEmpty)
+        if (states.IsEmpty)
         {
             WriteStaticArrayStart(StateType, "s_states");
             WriteArrayEnd();
@@ -111,7 +107,7 @@ internal readonly ref struct DescriptorArrayWriter
 
         for (var i = 0; i < states.Length; i++)
         {
-            ref readonly var state = ref states.ItemRef(i);
+            ref readonly var state = ref states[i];
             GeneratedMemberNameWriter.WriteStateAccessor(_writer, state.Id);
             _writer.WriteLine(",");
         }

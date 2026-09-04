@@ -124,7 +124,7 @@ public sealed class ComponentTemplateIntegrationTests
         var componentSymbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
             semanticFixture.SemanticModel.GetSymbolInfo(
                 semanticFixture.ComponentTree.GetRoot()).Symbol);
-        var componentWriter = new ComponentWriter(
+        using var componentWriter = new ComponentWriter(
             codeWriter,
             componentSymbol,
             semanticFixture.SemanticModel,

@@ -12,7 +12,7 @@ namespace Akbura.Language.CodeGeneration;
 /// <summary>
 /// Owns the generation state and immutable generation plan for one component.
 /// </summary>
-internal sealed class ComponentWriter
+internal sealed class ComponentWriter : IDisposable
 {
     private readonly CodeWriter _writer;
     private readonly ComponentPlan _plan;
@@ -21,6 +21,7 @@ internal sealed class ComponentWriter
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
     private readonly string _resourcePath;
+    private bool _disposed;
 
     public ComponentWriter(
         CodeWriter writer,
@@ -441,6 +442,17 @@ internal sealed class ComponentWriter
         }
 
         return wroteAny;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _memberPlan.ReturnToPool();
     }
 
     public bool WriteFactoryMethods(

@@ -422,7 +422,7 @@ public sealed class ComponentMemberIntegrationTests
             fixture.SemanticModel.GetSymbolInfo(
                 fixture.ComponentTree.GetRoot()).Symbol);
         using var codeWriter = new CodeWriter("\r\n");
-        var componentWriter = new ComponentWriter(
+        using var componentWriter = new ComponentWriter(
             codeWriter,
             component,
             fixture.SemanticModel,

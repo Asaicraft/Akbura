@@ -341,7 +341,7 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
             semanticModel.GetSymbolInfo(
                 baseFixture.ComponentTree.GetRoot()).Symbol);
         using var codeWriter = new CodeWriter("\r\n");
-        var componentWriter = new ComponentWriter(
+        using var componentWriter = new ComponentWriter(
             codeWriter,
             componentSymbol,
             semanticModel,

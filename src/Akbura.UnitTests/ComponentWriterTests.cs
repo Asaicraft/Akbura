@@ -1,4 +1,4 @@
-﻿using Akbura.Language.CodeGeneration;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -13,7 +13,7 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         ref readonly var plan = ref writer.Plan;
         var regular = GetStyledElement(plan, requiresLocalContext: false);
         var local = GetStyledElement(plan, requiresLocalContext: true);
@@ -52,7 +52,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 8,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var elementId = Assert.Single(writer.Elements).Id;
 
@@ -80,7 +80,7 @@ public sealed class ComponentWriterTests
             component,
             AkcssActivatorPlannerTests.ExtensionSource);
         using var codeWriter = new CodeWriter("\r\n");
-        var writer = CreateWriter(
+        using var writer = CreateWriter(
             codeWriter,
             fixture,
             "/Views\\Nested\\PlannerView.akbura");
@@ -109,7 +109,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 6,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var element = Assert.Single(writer.Elements);
         var context = CreateWriteContext();
 
@@ -146,7 +146,7 @@ public sealed class ComponentWriterTests
             """;
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var element = Assert.Single(writer.Elements);
 
         Assert.True(writer.WriteFirstUpdateActions(element.Id, CreateWriteContext()));
@@ -176,7 +176,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 6,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var element = Assert.Single(writer.Elements);
         var context = CreateWriteContext();
 
@@ -228,7 +228,7 @@ public sealed class ComponentWriterTests
             """;
         var fixture = CreateFixtureWithChildComponent(component, childComponent);
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var child = Assert.Single(
             writer.Elements,
             static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "Child");
@@ -273,7 +273,7 @@ public sealed class ComponentWriterTests
             """;
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var textBox = Assert.Single(
             writer.Elements,
             static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "TextBox");
@@ -304,7 +304,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 4,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var textBlock = Assert.Single(
             writer.Elements,
             static element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "TextBlock");
@@ -350,7 +350,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 4,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var componentElements = writer.Plan.Elements.Where(static element => !element.IsLocal).ToArray();
         var localElements = writer.Plan.Elements.Where(static element => element.IsLocal).ToArray();
 
@@ -375,7 +375,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 4,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var field = Assert.Single(
             writer.Plan.Elements,
             static element => !element.IsLocal && element.Syntax.StartTag?.Name.ToFullString().Trim() == "Border");
@@ -405,7 +405,7 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreateInitializationFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
 
         codeWriter.WriteLine("#nullable enable");
         codeWriter.WriteLine();
@@ -472,7 +472,7 @@ public sealed class ComponentWriterTests
             """;
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteElementCreation(-1));
         Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteBeginInit(writer.Plan.Elements.Length));
@@ -487,7 +487,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 8,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var elementId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
 
@@ -522,7 +522,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 4,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var elementId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
 
@@ -543,7 +543,7 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var regularId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
         var localId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
@@ -566,7 +566,7 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreateRichComponentFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var regularId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
         var localId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
@@ -612,7 +612,7 @@ public sealed class ComponentWriterTests
         {
             CurrentIndent = 4,
         };
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var elements = GetStyledElements(writer.Plan, requiresLocalContext: false);
 
@@ -652,7 +652,7 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreatePriorityFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var regularId = GetStyledElement(writer.Plan, requiresLocalContext: false).Id;
         var localId = GetStyledElement(writer.Plan, requiresLocalContext: true).Id;
@@ -677,7 +677,7 @@ public sealed class ComponentWriterTests
     {
         var fixture = CreateBasicFixture();
         using var codeWriter = new CodeWriter();
-        var writer = CreateWriter(codeWriter, fixture);
+        using var writer = CreateWriter(codeWriter, fixture);
         var context = CreateWriteContext();
         var elementId = GetStyledElements(writer.Plan, requiresLocalContext: false)[0].Id;
 

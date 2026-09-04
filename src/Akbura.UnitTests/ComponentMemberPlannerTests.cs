@@ -5,7 +5,6 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
 
@@ -389,14 +388,12 @@ public sealed class ComponentMemberPlannerTests
             default,
             default);
 
-        Assert.Equal(ImmutableArray<ComponentParameterPlan>.Empty, plan.Parameters);
-        Assert.Equal(ImmutableArray<ComponentStatePlan>.Empty, plan.States);
-        Assert.Equal(ImmutableArray<ComponentInjectServicePlan>.Empty, plan.Services);
-        Assert.Equal(ImmutableArray<ComponentCommandPlan>.Empty, plan.Commands);
-        Assert.Equal(
-            ImmutableArray<ComponentCommandParameterPlan>.Empty,
-            plan.CommandParameters);
-        Assert.Equal(ImmutableArray<ComponentUserMemberPlan>.Empty, plan.UserMembers);
+        Assert.True(plan.Parameters.IsDefaultOrEmpty);
+        Assert.True(plan.States.IsDefaultOrEmpty);
+        Assert.True(plan.Services.IsDefaultOrEmpty);
+        Assert.True(plan.Commands.IsDefaultOrEmpty);
+        Assert.True(plan.CommandParameters.IsDefaultOrEmpty);
+        Assert.True(plan.UserMembers.IsDefaultOrEmpty);
         Assert.True(plan.IsEmpty);
     }
 

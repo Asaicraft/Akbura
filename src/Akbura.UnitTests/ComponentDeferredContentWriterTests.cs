@@ -584,6 +584,7 @@ public sealed class ComponentDeferredContentWriterTests
 
         public void Dispose()
         {
+            Writer.Dispose();
             CodeWriter.Dispose();
         }
     }

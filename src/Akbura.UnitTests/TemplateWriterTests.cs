@@ -569,6 +569,7 @@ public sealed class TemplateWriterTests
     {
         public void Dispose()
         {
+            Writer.Dispose();
             CodeWriter.Dispose();
         }
     }

@@ -1020,21 +1020,19 @@ public sealed class ComponentPlannerTests
     {
         var syntax = Assert.Single(
             fixture.ComponentTree.GetRoot().DescendantNodes().OfType<MarkupElementSyntax>());
-        var element = Assert.IsAssignableFrom<IMarkupComponentSymbol>(
-            fixture.SemanticModel.GetSymbolInfo(syntax).Symbol);
+        var element = Assert.IsType<IMarkupComponentSymbol>(
+            fixture.SemanticModel.GetSymbolInfo(syntax).Symbol, exactMatch: false);
         var operation = Assert.Single(
             element.AttributeOperations.OfType<IMarkupPropertySetterOperation>());
-        var property = Assert.IsAssignableFrom<Akbura.Language.Symbols.IPropertySymbol>(
-            operation.Property);
-        var ownerType = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.ITypeSymbol>(
-            element.ComponentType);
+        var property = Assert.IsType<Akbura.Language.Symbols.IPropertySymbol>(
+            operation.Property, exactMatch: false);
+        var ownerType = Assert.IsType<Microsoft.CodeAnalysis.ITypeSymbol>(
+            element.ComponentType, exactMatch: false);
 
         return PropertyObservationPlan.Create(property, ownerType);
     }
 
-    private static ComponentFirstUpdateActionPlan[] GetActions(
-        ImmutableArray<ComponentFirstUpdateActionPlan> actions,
-        ComponentPlanRange range)
+    private static ComponentFirstUpdateActionPlan[] GetActions(PooledImmutableList<ComponentFirstUpdateActionPlan> actions, ComponentPlanRange range)
     {
         return actions.AsSpan(range.Start, range.Length).ToArray();
     }

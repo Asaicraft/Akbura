@@ -205,6 +205,11 @@ internal static class ComponentPlanner
             var pooledScopeElementIds = default(PooledImmutableList<int>);
             var pooledScopeRootElementIds = default(PooledImmutableList<int>);
 
+            var pooledNameAssignments = default(PooledImmutableList<ComponentNameAssignmentPlan>);
+            var pooledRoutedEvents = default(PooledImmutableList<ComponentRoutedEventPlan>);
+            var pooledCommandBindings = default(PooledImmutableList<ComponentCommandBindingPlan>);
+            var pooledFirstUpdateActions = default(PooledImmutableList<ComponentFirstUpdateActionPlan>);
+
             try
             {
                 Debug.Assert(akcss.Elements.Length == _elements.Count);
@@ -245,6 +250,11 @@ internal static class ComponentPlanner
                 pooledScopeElementIds = _scopeElementIds.ToPooledImmutableList();
                 pooledScopeRootElementIds = _scopeRootElementIds.ToPooledImmutableList();
 
+                pooledNameAssignments = _nameAssignments.ToPooledImmutableList();
+                pooledRoutedEvents = _routedEvents.ToPooledImmutableList();
+                pooledCommandBindings = _commandBindings.ToPooledImmutableList();
+                pooledFirstUpdateActions = _firstUpdateActions.ToPooledImmutableList();
+
                 return new ComponentPlan(
                     pooledElements,
                     pooledRootElementIds,
@@ -257,10 +267,10 @@ internal static class ComponentPlanner
                     _markupExtensions.ToImmutable(),
                     _bindings.ToImmutable(),
                     _propertySubscriptions.ToImmutable(),
-                    _nameAssignments.ToImmutable(),
-                    _routedEvents.ToImmutable(),
-                    _commandBindings.ToImmutable(),
-                    _firstUpdateActions.ToImmutable(),
+                    pooledNameAssignments,
+                    pooledRoutedEvents,
+                    pooledCommandBindings,
+                    pooledFirstUpdateActions,
                     _propertyElements.ToImmutable(),
                     _propertyContents.ToImmutable(),
                     _collectionContents.ToImmutable(),
@@ -280,6 +290,12 @@ internal static class ComponentPlanner
                 pooledScopes.ReturnToPool();
                 pooledScopeElementIds.ReturnToPool();
                 pooledScopeRootElementIds.ReturnToPool();
+
+                pooledNameAssignments.ReturnToPool();
+                pooledRoutedEvents.ReturnToPool();
+                pooledCommandBindings.ReturnToPool();
+                pooledFirstUpdateActions.ReturnToPool();
+
                 akcss.ReturnToPool();
 
                 throw;

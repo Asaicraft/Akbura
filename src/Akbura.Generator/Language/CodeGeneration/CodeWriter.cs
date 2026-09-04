@@ -231,6 +231,22 @@ internal sealed partial class CodeWriter : IDisposable
         return this;
     }
 
+    internal CodeWriter WriteCurrentIndent()
+    {
+        if (_indentSize == 0)
+        {
+            return this;
+        }
+
+        AddTextChunk(_indentString);
+
+        var indentLength = _indentString.Length;
+        _currentLineCharacterIndex += indentLength;
+        _absoluteIndex += indentLength;
+
+        return this;
+    }
+
     public CodeWriter Write(string value)
     {
         ThrowHelper.ThrowIfNull(value);

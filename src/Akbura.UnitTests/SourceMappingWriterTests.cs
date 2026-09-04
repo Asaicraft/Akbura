@@ -1,5 +1,6 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.CodeGeneration;
+using Akbura.Language.Syntax;
 
 namespace Akbura.UnitTests;
 
@@ -113,5 +114,55 @@ public sealed class SourceMappingWriterTests
 
         Assert.False(token.IsMapped);
         Assert.Equal("mapped();", writer.GetText().ToString());
+    }
+
+    [Fact]
+    public void WriteStart_ChildSyntaxUsesAbsoluteAkburaSpan()
+    {
+        var syntaxTree = ComponentSyntaxTree.ParseText(
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "<Button />",
+            "Views/Main.akbura");
+
+        var syntax = Assert.Single(
+            syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>());
+
+        using var writer = new CodeWriter();
+
+        var sourceMappingWriter = new SourceMappingWriter(
+            writer,
+            new ComponentGenerationSourceMap(syntaxTree));
+
+        {
+            using var token = sourceMappingWriter.WriteStart(syntax);
+
+            Assert.True(token.IsMapped);
+            writer.WriteLine("mapped();");
+        }
+
+        var output = writer.GetText().ToString();
+
+        Assert.Contains(
+            "#line (3,1)-(3,11)",
+            output,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "\"Views/Main.akbura\"",
+            output,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "#line default",
+            output,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "#line hidden",
+            output,
+            StringComparison.Ordinal);
     }
 }

@@ -1,7 +1,7 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -33,25 +33,7 @@ internal readonly ref struct SourceMappingWriter
             return default;
         }
 
-        EnsureDirectiveLine(_writer);
-
-        var generatedOffset = _writer.CurrentIndent + Math.Max(0, valueOffset);
-        _writer
-            .Write("#line (")
-            .WriteIntegerLiteral(span.Start.Line + 1)
-            .Write(",")
-            .WriteIntegerLiteral(span.Start.Character + 1)
-            .Write(")-(")
-            .WriteIntegerLiteral(span.End.Line + 1)
-            .Write(",")
-            .WriteIntegerLiteral(span.End.Character + 1)
-            .Write(") ")
-            .WriteIntegerLiteral(generatedOffset)
-            .Write(" \"")
-            .Write(path)
-            .WriteLine("\"");
-
-        return new SourceMappingToken(_writer);
+        return WriteStartCore(span, path, valueOffset);
     }
 
     public SourceMappingToken WriteStart(
@@ -68,9 +50,18 @@ internal readonly ref struct SourceMappingWriter
             return default;
         }
 
+        return WriteStartCore(span, path, valueOffset);
+    }
+
+    private SourceMappingToken WriteStartCore(
+        LinePositionSpan span,
+        string path,
+        int valueOffset)
+    {
         EnsureDirectiveLine(_writer);
 
         var generatedOffset = _writer.CurrentIndent + Math.Max(0, valueOffset);
+
         _writer
             .Write("#line (")
             .WriteIntegerLiteral(span.Start.Line + 1)
@@ -113,6 +104,7 @@ internal ref struct SourceMappingToken
     {
         var writer = _writer;
         _writer = null;
+
         WriteEndDirectives(writer);
     }
 

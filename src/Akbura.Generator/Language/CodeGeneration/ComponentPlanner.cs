@@ -1615,8 +1615,7 @@ internal static class ComponentPlanner
                 index);
         }
 
-        private static CollectionWritePlan CreateCollectionWritePlan(
-            IMarkupContentOperation operation)
+        private static CollectionWritePlan CreateCollectionWritePlan(IMarkupContentOperation operation)
         {
             var property = operation.Property;
             Debug.Assert(property != null);
@@ -1631,7 +1630,7 @@ internal static class ComponentPlanner
 
                 return CollectionWritePlan.CreateComponentParameter(
                     parameterType,
-                    "__AkburaAddCollection_" + SanitizeIdentifier(parameter.Name));
+                    parameter.Name);
             }
 
             if (property == null)
@@ -1641,6 +1640,7 @@ internal static class ComponentPlanner
 
             var read = PropertyReadPlan.Create(property);
             var collectionType = GetCollectionType(property, operation.ContentModel);
+
             return !read.IsValid || collectionType == null
                 ? default
                 : CollectionWritePlan.CreateProperty(read, collectionType);
@@ -1693,25 +1693,6 @@ internal static class ComponentPlanner
             }
 
             return false;
-        }
-
-        private static string SanitizeIdentifier(string value)
-        {
-            if (value.Length == 0)
-            {
-                return "value";
-            }
-
-            var characters = value.ToCharArray();
-            for (var i = 0; i < characters.Length; i++)
-            {
-                if (!char.IsLetterOrDigit(characters[i]) && characters[i] != '_')
-                {
-                    characters[i] = '_';
-                }
-            }
-
-            return new string(characters);
         }
 
         private ComponentPropertyValueReference LowerPropertyValue(in PendingPropertyWritePlan pending)

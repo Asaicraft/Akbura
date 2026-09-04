@@ -139,13 +139,6 @@ public sealed class ComponentDeferredContentIntegrationTests
 
                 public void InitializeForTest() => base.OnInitialized();
 
-                protected override ImmutableArray<Parameter> GetParameters() => [];
-
-                protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
-
-                protected override ImmutableArray<InjectService> GetServices() => [];
-
-                protected override ImmutableArray<State> GetStates() => [];
             }
             """;
         var semanticFixture = AkcssActivatorPlannerTests.CreateFixture(
@@ -186,6 +179,8 @@ public sealed class ComponentDeferredContentIntegrationTests
         Assert.True(componentWriter.WriteDeferredContentBuilders());
         codeWriter.WriteLine();
         componentWriter.WriteLifecycleMembers();
+        codeWriter.WriteLine();
+        componentWriter.WriteDescriptorMembers();
         codeWriter.CurrentIndent = 0;
         codeWriter.WriteLine("}");
 

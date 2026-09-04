@@ -56,14 +56,6 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
                 }
 
                 private string GetCurrentValue() => _currentValue;
-
-                protected override ImmutableArray<Parameter> GetParameters() => [];
-
-                protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
-
-                protected override ImmutableArray<InjectService> GetServices() => [];
-
-                protected override ImmutableArray<State> GetStates() => [];
             }
 
             public partial class Child : AkburaControl
@@ -185,14 +177,6 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
                     HookInvocationCount++;
                 }
 
-                protected override ImmutableArray<Parameter> GetParameters() => [];
-
-                protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
-
-                protected override ImmutableArray<InjectService> GetServices() => [];
-
-                protected override ImmutableArray<State> GetStates() => [];
-
                 private sealed class RuntimeHookState
                 {
                     public int ApplicationCount { get; set; }
@@ -256,14 +240,6 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
                 public Control InvokeUpdate() => Update();
 
                 private object GetExplicitDataContext() => _explicitDataContext;
-
-                protected override ImmutableArray<Parameter> GetParameters() => [];
-
-                protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
-
-                protected override ImmutableArray<InjectService> GetServices() => [];
-
-                protected override ImmutableArray<State> GetStates() => [];
             }
             """;
         var fixture = CompileRuntimeFixture(component, csharp);
@@ -321,14 +297,6 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
                 public Control InvokeFirstUpdate() => FirstUpdate();
 
                 public Control InvokeUpdate() => Update();
-
-                protected override ImmutableArray<Parameter> GetParameters() => [];
-
-                protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
-
-                protected override ImmutableArray<InjectService> GetServices() => [];
-
-                protected override ImmutableArray<State> GetStates() => [];
             }
             """;
         var fixture = CompileRuntimeFixture(component, csharp);
@@ -398,6 +366,8 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
         }
 
         componentWriter.WriteLifecycleMembers();
+        codeWriter.WriteLine();
+        componentWriter.WriteDescriptorMembers();
         codeWriter.CurrentIndent = 0;
         codeWriter.WriteLine("}");
 

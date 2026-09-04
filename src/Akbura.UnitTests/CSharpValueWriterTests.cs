@@ -30,6 +30,20 @@ public sealed class CSharpValueWriterTests
     }
 
     [Fact]
+    public void WriteTypeNameWithNullableAnnotation_PreservesNullableReferenceTypes()
+    {
+        var fixture = CreateFixture();
+        var payloadType = fixture.GetRequiredType("Demo.Payload");
+        var nullablePayload = payloadType.WithNullableAnnotation(NullableAnnotation.Annotated);
+        using var codeWriter = new CodeWriter("\n");
+        var valueWriter = new CSharpValueWriter(codeWriter);
+
+        valueWriter.WriteTypeNameWithNullableAnnotation(nullablePayload);
+
+        Assert.Equal("global::Demo.Payload?", codeWriter.GetText().ToString());
+    }
+
+    [Fact]
     public void StaticMemberReferences_WriteQualifiedEscapedNamesAndRejectOthers()
     {
         var fixture = CreateFixture();

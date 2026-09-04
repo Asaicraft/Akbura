@@ -241,7 +241,7 @@ public sealed class ComponentContentPlannerTests
     }
 
     [Fact]
-    public void Create_LowersComponentCollectionParameterToPrecomputedHelper()
+    public void Create_LowersComponentCollectionParameterToStableHelperName()
     {
         const string component =
             """
@@ -252,34 +252,40 @@ public sealed class ComponentContentPlannerTests
                 <Button />
             </CollectionHost>
             """;
+
         const string collectionHost =
             """
             using Avalonia.Controls;
             using System.Collections.Generic;
 
+            param string Header;
             param IList<Control> Content;
             """;
+
         var plan = CreatePlanWithChildComponent(
             component,
             collectionHost,
             "CollectionHost.akbura");
+
         var owner = GetElement(plan, "CollectionHost");
         var textBlock = GetElement(plan, "TextBlock");
         var button = GetElement(plan, "Button");
 
         Assert.Equal(ComponentContentTargetKind.Collection, owner.Content.Kind);
+
         var content = plan.CollectionContents[owner.Content.Index];
+
         Assert.Equal(owner.Id, content.OwnerElementId);
-        Assert.Equal(CollectionWriteKind.ComponentParameter, content.Destination.Kind);
         Assert.Equal(
-            "__AkburaAddCollection_Content",
-            content.Destination.AddMethodName);
+            CollectionWriteKind.ComponentParameter,
+            content.Destination.Kind);
+        Assert.Equal(
+            "Content",
+            content.Destination.ComponentParameterName);
         Assert.False(content.Destination.Property.IsValid);
         Assert.Equal(
             [textBlock.Id, button.Id],
-            GetItems(plan, content.Items)
-                .Select(static item => item.Value.Index)
-                .ToArray());
+            [.. GetItems(plan, content.Items).Select(static item => item.Value.Index)]);
     }
 
     [Fact]

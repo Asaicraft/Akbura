@@ -19,12 +19,12 @@ internal readonly struct CollectionWritePlan
         CollectionWriteKind kind,
         PropertyReadPlan property,
         ITypeSymbol? collectionType,
-        string? addMethodName)
+        string? componentParameterName)
     {
         Kind = kind;
         Property = property;
         CollectionType = collectionType;
-        AddMethodName = addMethodName;
+        ComponentParameterName = componentParameterName;
     }
 
     public CollectionWriteKind Kind { get; }
@@ -33,7 +33,7 @@ internal readonly struct CollectionWritePlan
 
     public ITypeSymbol? CollectionType { get; }
 
-    public string? AddMethodName { get; }
+    public string? ComponentParameterName { get; }
 
     public bool IsValid => Kind != CollectionWriteKind.None;
 
@@ -50,23 +50,24 @@ internal readonly struct CollectionWritePlan
                 CollectionWriteKind.Property,
                 property,
                 collectionType,
-                addMethodName: null);
+                componentParameterName: null);
     }
 
     public static CollectionWritePlan CreateComponentParameter(
         ITypeSymbol collectionType,
-        string addMethodName)
+        string componentParameterName)
     {
         Debug.Assert(collectionType != null);
-        Debug.Assert(!string.IsNullOrEmpty(addMethodName));
+        Debug.Assert(!string.IsNullOrEmpty(componentParameterName));
 
-        return collectionType == null || string.IsNullOrEmpty(addMethodName)
-            ? default
-            : new CollectionWritePlan(
-                CollectionWriteKind.ComponentParameter,
-                property: default,
-                collectionType,
-                addMethodName);
+        return collectionType == null ||
+            string.IsNullOrEmpty(componentParameterName)
+                ? default
+                : new CollectionWritePlan(
+                    CollectionWriteKind.ComponentParameter,
+                    property: default,
+                    collectionType,
+                    componentParameterName);
     }
 }
 
@@ -114,8 +115,13 @@ internal readonly ref struct CollectionWriter
                 return true;
 
             case CollectionWriteKind.ComponentParameter:
-                _writer.Write(targetExpression).Write(".");
-                _valueWriter.WriteIdentifier(plan.AddMethodName!);
+                Debug.Assert(!string.IsNullOrEmpty(plan.ComponentParameterName));
+
+                _writer.Write(targetExpression);
+                _writer.Write(".");
+
+                GeneratedMemberNameWriter.WriteCollectionAddMethod(_writer, plan.ComponentParameterName!);
+
                 _writer.Write("(");
                 return true;
 

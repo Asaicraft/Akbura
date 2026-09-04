@@ -66,12 +66,12 @@ public sealed class CollectionWriterTests
     }
 
     [Fact]
-    public void Write_ComponentParameter_WritesPrecomputedHelper()
+    public void Write_ComponentParameter_WritesStableHelperName()
     {
         var fixture = CreateFixture();
         var plan = CollectionWritePlan.CreateComponentParameter(
             fixture.CollectionType,
-            "__AkburaAddCollection_class");
+            "class");
 
         var output = Write(plan, "__component", "5");
 
@@ -117,17 +117,38 @@ public sealed class CollectionWriterTests
         var fixture = CreateFixture();
         var statements = new[]
         {
-            Write(CreatePropertyPlan(CreateClrProperty(fixture), fixture.CollectionType), "control", "1"),
-            Write(CreatePropertyPlan(CreateAvaloniaProperty(fixture), fixture.CollectionType), "control", "2"),
-            Write(CreatePropertyPlan(CreateAttachedProperty(fixture), fixture.CollectionType), "control", "3"),
-            Write(CreatePropertyPlan(CreateDirectProperty(fixture), fixture.CollectionType), "component", "4"),
+            Write(
+                CreatePropertyPlan(
+                    CreateClrProperty(fixture),
+                    fixture.CollectionType),
+                "control",
+                "1"),
+            Write(
+                CreatePropertyPlan(
+                    CreateAvaloniaProperty(fixture),
+                    fixture.CollectionType),
+                "control",
+                "2"),
+            Write(
+                CreatePropertyPlan(
+                    CreateAttachedProperty(fixture),
+                    fixture.CollectionType),
+                "control",
+                "3"),
+            Write(
+                CreatePropertyPlan(
+                    CreateDirectProperty(fixture),
+                    fixture.CollectionType),
+                "component",
+                "4"),
             Write(
                 CollectionWritePlan.CreateComponentParameter(
                     fixture.CollectionType,
-                    "__AkburaAddCollection_class"),
+                    "class"),
                 "component",
                 "5"),
         };
+
         var generatedStatements = string.Join("\n        ", statements);
         var generatedSource =
             $$"""
@@ -137,16 +158,20 @@ public sealed class CollectionWriterTests
 
             internal static class CollectionWriterOutput
             {
-                public static void Apply(global::Demo.Control control, global::Demo.Component component)
+                public static void Apply(
+                    global::Demo.Control control,
+                    global::Demo.Component component)
                 {
                     {{generatedStatements}}
                 }
             }
             """;
+
         var syntaxTree = CSharpSyntaxTree.ParseText(
             generatedSource,
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
             path: "CollectionWriterOutput.g.cs");
+
         var compilation = fixture.Compilation.AddSyntaxTrees(syntaxTree);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
@@ -154,64 +179,75 @@ public sealed class CollectionWriterTests
 
         Assert.True(
             errors.Length == 0,
-            string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())));
+            string.Join(
+                Environment.NewLine,
+                errors.Select(static diagnostic => diagnostic.ToString())));
     }
 
     private static TestFixture CreateFixture()
     {
         const string source =
             """
-            #nullable enable
+        #nullable enable
 
-            namespace Demo;
+        namespace Demo;
 
-            public sealed class Control : global::Avalonia.AvaloniaObject
+        public sealed class Control : global::Avalonia.AvaloniaObject
+        {
+            public static readonly global::Avalonia.StyledProperty<
+                global::System.Collections.Generic.List<int>> ItemsProperty =
+                    global::Avalonia.AvaloniaProperty.Register<
+                        Control,
+                        global::System.Collections.Generic.List<int>>(
+                            nameof(Items));
+
+            public global::System.Collections.Generic.List<int> Items { get; } = new();
+        }
+
+        public static class Attached
+        {
+            public static global::System.Collections.Generic.List<int> GetItems(
+                Control target)
             {
-                public static readonly global::Avalonia.StyledProperty<
-                    global::System.Collections.Generic.List<int>> ItemsProperty =
-                        global::Avalonia.AvaloniaProperty.Register<
-                            Control,
-                            global::System.Collections.Generic.List<int>>(
-                                nameof(Items));
-
-                public global::System.Collections.Generic.List<int> Items { get; } = new();
+                return target.Items;
             }
+        }
 
-            public static class Attached
+        public sealed class Component
+        {
+            public global::System.Collections.Generic.List<int> @class { get; } = new();
+
+            public void __AkburaAddCollection_class(int value)
             {
-                public static global::System.Collections.Generic.List<int> GetItems(Control target)
-                {
-                    return target.Items;
-                }
+                @class.Add(value);
             }
+        }
+        """;
 
-            public sealed class Component
-            {
-                public global::System.Collections.Generic.List<int> @class { get; } = new();
-
-                public void __AkburaAddCollection_class(int value)
-                {
-                    @class.Add(value);
-                }
-            }
-            """;
         var compilation = CSharpCompilation.Create(
             assemblyName: "CollectionWriterTests",
             syntaxTrees:
             [
                 CSharpSyntaxTree.ParseText(
-                    source,
-                    CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)),
+                source,
+                CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)),
             ],
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
+
         var controlType = GetRequiredType(compilation, "Demo.Control");
         var collectionType = Assert.IsAssignableFrom<ITypeSymbol>(
-            Assert.Single(controlType.GetMembers("Items").OfType<RoslynPropertySymbol>()).Type);
+            Assert.Single(
+                controlType.GetMembers("Items")
+                    .OfType<RoslynPropertySymbol>())
+            .Type);
 
-        return new TestFixture(compilation, controlType, collectionType);
+        return new TestFixture(
+            compilation,
+            controlType,
+            collectionType);
     }
 
     private static PropertySymbol CreateClrProperty(TestFixture fixture)

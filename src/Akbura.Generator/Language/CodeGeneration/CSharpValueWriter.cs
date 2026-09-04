@@ -14,6 +14,10 @@ namespace Akbura.Language.CodeGeneration;
 internal readonly ref struct CSharpValueWriter
 {
     private static readonly SymbolDisplayFormat s_typeDisplayFormat = SymbolDisplayFormat.FullyQualifiedFormat;
+    private static readonly SymbolDisplayFormat s_nullableTypeDisplayFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     private readonly CodeWriter _writer;
 
@@ -37,6 +41,23 @@ internal readonly ref struct CSharpValueWriter
 
     public void WriteTypeName(ITypeSymbol? type)
     {
+        WriteTypeName(type, s_typeDisplayFormat);
+    }
+
+    public void WriteTypeNameWithNullableAnnotation(ISymbol? symbol)
+    {
+        WriteTypeNameWithNullableAnnotation(symbol as ITypeSymbol);
+    }
+
+    public void WriteTypeNameWithNullableAnnotation(ITypeSymbol? type)
+    {
+        WriteTypeName(type, s_nullableTypeDisplayFormat);
+    }
+
+    private void WriteTypeName(
+        ITypeSymbol? type,
+        SymbolDisplayFormat format)
+    {
         if (type == null || ContainsErrorType(type))
         {
             _writer.Write("global::System.Object");
@@ -45,7 +66,7 @@ internal readonly ref struct CSharpValueWriter
 
         // Roslyn does not expose a streaming SymbolDisplay API, so this
         // currently creates one temporary string.
-        _writer.Write(type.ToDisplayString(s_typeDisplayFormat));
+        _writer.Write(type.ToDisplayString(format));
     }
 
     public void WriteStaticMemberReference(ISymbol symbol)

@@ -16,6 +16,7 @@ internal sealed class ComponentWriter
 {
     private readonly CodeWriter _writer;
     private readonly ComponentPlan _plan;
+    private readonly ComponentMemberPlan _memberPlan;
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
@@ -77,6 +78,9 @@ internal sealed class ComponentWriter
             semanticModel,
             akcssModuleTypeNames,
             in resultEnvironment);
+        _memberPlan = ComponentMemberPlanner.Create(
+            component,
+            semanticModel);
     }
 
     public ref readonly ComponentPlan Plan
@@ -84,9 +88,50 @@ internal sealed class ComponentWriter
         get => ref _plan;
     }
 
+    public ref readonly ComponentMemberPlan MemberPlan
+    {
+        get => ref _memberPlan;
+    }
+
     public ImmutableArray<ComponentElementPlan> Elements => _plan.Elements;
 
     public bool HasAkcss => !_plan.Akcss.IsEmpty;
+
+    public bool WriteComponentMembers()
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = new ComponentMemberWriter(
+                _writer,
+                _sourceMap,
+                _ownerTypeName);
+            return writer.WriteDeclarations(_memberPlan);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    public void WriteDescriptorMembers()
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = new ComponentMemberWriter(
+                _writer,
+                _sourceMap,
+                _ownerTypeName);
+            writer.WriteDescriptors(_memberPlan);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
 
     public bool WriteLifecycleFields()
     {

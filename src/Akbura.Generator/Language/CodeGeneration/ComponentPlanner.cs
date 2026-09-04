@@ -198,6 +198,13 @@ internal static class ComponentPlanner
                 akcssInputs.WrittenSpan,
                 _akcssModuleTypeNames);
 
+            var pooledElements = default(PooledImmutableList<ComponentElementPlan>);
+            var pooledRootElementIds = default(PooledImmutableList<int>);
+            var pooledChildElementIds = default(PooledImmutableList<int>);
+            var pooledScopes = default(PooledImmutableList<ComponentScopePlan>);
+            var pooledScopeElementIds = default(PooledImmutableList<int>);
+            var pooledScopeRootElementIds = default(PooledImmutableList<int>);
+
             try
             {
                 Debug.Assert(akcss.Elements.Length == _elements.Count);
@@ -231,13 +238,20 @@ internal static class ComponentPlanner
                         elementAkcss));
                 }
 
+                pooledElements = elements.ToPooledImmutableList();
+                pooledRootElementIds = _rootElementIds.ToPooledImmutableList();
+                pooledChildElementIds = _childElementIds.ToPooledImmutableList();
+                pooledScopes = _scopes.ToPooledImmutableList();
+                pooledScopeElementIds = _scopeElementIds.ToPooledImmutableList();
+                pooledScopeRootElementIds = _scopeRootElementIds.ToPooledImmutableList();
+
                 return new ComponentPlan(
-                    elements.ToImmutable(),
-                    _rootElementIds.ToImmutable(),
-                    _childElementIds.ToImmutable(),
-                    _scopes.ToImmutable(),
-                    _scopeElementIds.ToImmutable(),
-                    _scopeRootElementIds.ToImmutable(),
+                    pooledElements,
+                    pooledRootElementIds,
+                    pooledChildElementIds,
+                    pooledScopes,
+                    pooledScopeElementIds,
+                    pooledScopeRootElementIds,
                     _propertyWrites.ToImmutable(),
                     _csharpValues.ToImmutable(),
                     _markupExtensions.ToImmutable(),
@@ -260,7 +274,14 @@ internal static class ComponentPlanner
             }
             catch
             {
+                pooledElements.ReturnToPool();
+                pooledRootElementIds.ReturnToPool();
+                pooledChildElementIds.ReturnToPool();
+                pooledScopes.ReturnToPool();
+                pooledScopeElementIds.ReturnToPool();
+                pooledScopeRootElementIds.ReturnToPool();
                 akcss.ReturnToPool();
+
                 throw;
             }
         }

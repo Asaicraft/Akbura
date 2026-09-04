@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Akbura.Pools;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -454,12 +455,12 @@ internal readonly struct ComponentTemplatePlan
 internal readonly struct ComponentPlan
 {
     public ComponentPlan(
-        ImmutableArray<ComponentElementPlan> elements,
-        ImmutableArray<int> rootElementIds,
-        ImmutableArray<int> childElementIds,
-        ImmutableArray<ComponentScopePlan> scopes,
-        ImmutableArray<int> scopeElementIds,
-        ImmutableArray<int> scopeRootElementIds,
+        PooledImmutableList<ComponentElementPlan> elements,
+        PooledImmutableList<int> rootElementIds,
+        PooledImmutableList<int> childElementIds,
+        PooledImmutableList<ComponentScopePlan> scopes,
+        PooledImmutableList<int> scopeElementIds,
+        PooledImmutableList<int> scopeRootElementIds,
         ImmutableArray<ComponentPropertyWritePlan> propertyWrites,
         ImmutableArray<ComponentCSharpValuePlan> csharpValues,
         ImmutableArray<MarkupExtensionResultPlan> markupExtensions,
@@ -480,72 +481,97 @@ internal readonly struct ComponentPlan
         ImmutableArray<ComponentRenderStatementPlan> renderStatements,
         AkcssComponentActivatorPlan akcss)
     {
-        Elements = elements.IsDefault ? ImmutableArray<ComponentElementPlan>.Empty : elements;
-        RootElementIds = rootElementIds.IsDefault ? ImmutableArray<int>.Empty : rootElementIds;
-        ChildElementIds = childElementIds.IsDefault ? ImmutableArray<int>.Empty : childElementIds;
-        Scopes = scopes.IsDefault ? ImmutableArray<ComponentScopePlan>.Empty : scopes;
-        ScopeElementIds = scopeElementIds.IsDefault ? ImmutableArray<int>.Empty : scopeElementIds;
-        ScopeRootElementIds = scopeRootElementIds.IsDefault
-            ? ImmutableArray<int>.Empty
-            : scopeRootElementIds;
-        PropertyWrites = propertyWrites.IsDefault ? ImmutableArray<ComponentPropertyWritePlan>.Empty : propertyWrites;
-        CSharpValues = csharpValues.IsDefault ? ImmutableArray<ComponentCSharpValuePlan>.Empty : csharpValues;
+        Elements = elements;
+        RootElementIds = rootElementIds;
+        ChildElementIds = childElementIds;
+        Scopes = scopes;
+        ScopeElementIds = scopeElementIds;
+        ScopeRootElementIds = scopeRootElementIds;
+
+        PropertyWrites = propertyWrites.IsDefault
+            ? []
+            : propertyWrites;
+
+        CSharpValues = csharpValues.IsDefault
+            ? []
+            : csharpValues;
+
         MarkupExtensions = markupExtensions.IsDefault
-            ? ImmutableArray<MarkupExtensionResultPlan>.Empty
+            ? []
             : markupExtensions;
-        Bindings = bindings.IsDefault ? ImmutableArray<BindingWritePlan>.Empty : bindings;
+
+        Bindings = bindings.IsDefault
+            ? []
+            : bindings;
+
         PropertySubscriptions = propertySubscriptions.IsDefault
-            ? ImmutableArray<ComponentPropertySubscriptionPlan>.Empty
+            ? []
             : propertySubscriptions;
+
         NameAssignments = nameAssignments.IsDefault
-            ? ImmutableArray<ComponentNameAssignmentPlan>.Empty
+            ? []
             : nameAssignments;
+
         RoutedEvents = routedEvents.IsDefault
-            ? ImmutableArray<ComponentRoutedEventPlan>.Empty
+            ? []
             : routedEvents;
+
         CommandBindings = commandBindings.IsDefault
-            ? ImmutableArray<ComponentCommandBindingPlan>.Empty
+            ? []
             : commandBindings;
+
         FirstUpdateActions = firstUpdateActions.IsDefault
-            ? ImmutableArray<ComponentFirstUpdateActionPlan>.Empty
+            ? []
             : firstUpdateActions;
+
         PropertyElements = propertyElements.IsDefault
-            ? ImmutableArray<ComponentPropertyElementPlan>.Empty
+            ? []
             : propertyElements;
+
         PropertyContents = propertyContents.IsDefault
-            ? ImmutableArray<ComponentPropertyContentPlan>.Empty
+            ? []
             : propertyContents;
+
         CollectionContents = collectionContents.IsDefault
-            ? ImmutableArray<ComponentCollectionContentPlan>.Empty
+            ? []
             : collectionContents;
+
         ContentItems = contentItems.IsDefault
-            ? ImmutableArray<ComponentContentItemPlan>.Empty
+            ? []
             : contentItems;
+
         DeferredContents = deferredContents.IsDefault
-            ? ImmutableArray<ComponentDeferredContentPlan>.Empty
+            ? []
             : deferredContents;
-        Templates = templates.IsDefault ? ImmutableArray<ComponentTemplatePlan>.Empty : templates;
+
+        Templates = templates.IsDefault
+            ? []
+            : templates;
+
         ElementReferences = elementReferences.IsDefault
-            ? ImmutableArray<BindingElementReference>.Empty
+            ? []
             : elementReferences;
+
         Lifecycle = lifecycle;
+
         RenderStatements = renderStatements.IsDefault
-            ? ImmutableArray<ComponentRenderStatementPlan>.Empty
+            ? []
             : renderStatements;
+
         Akcss = akcss;
     }
 
-    public ImmutableArray<ComponentElementPlan> Elements { get; }
+    public PooledImmutableList<ComponentElementPlan> Elements { get; }
 
-    public ImmutableArray<int> RootElementIds { get; }
+    public PooledImmutableList<int> RootElementIds { get; }
 
-    public ImmutableArray<int> ChildElementIds { get; }
+    public PooledImmutableList<int> ChildElementIds { get; }
 
-    public ImmutableArray<ComponentScopePlan> Scopes { get; }
+    public PooledImmutableList<ComponentScopePlan> Scopes { get; }
 
-    public ImmutableArray<int> ScopeElementIds { get; }
+    public PooledImmutableList<int> ScopeElementIds { get; }
 
-    public ImmutableArray<int> ScopeRootElementIds { get; }
+    public PooledImmutableList<int> ScopeRootElementIds { get; }
 
     public ImmutableArray<ComponentPropertyWritePlan> PropertyWrites { get; }
 
@@ -585,10 +611,16 @@ internal readonly struct ComponentPlan
 
     public AkcssComponentActivatorPlan Akcss { get; }
 
-    public bool IsEmpty => Elements.IsDefaultOrEmpty;
+    public bool IsEmpty => Elements.IsEmpty;
 
     internal void ReturnToPool()
     {
+        Elements.ReturnToPool();
+        RootElementIds.ReturnToPool();
+        ChildElementIds.ReturnToPool();
+        Scopes.ReturnToPool();
+        ScopeElementIds.ReturnToPool();
+        ScopeRootElementIds.ReturnToPool();
         Akcss.ReturnToPool();
     }
 }

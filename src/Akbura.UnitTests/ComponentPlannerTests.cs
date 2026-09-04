@@ -4,6 +4,7 @@ using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
+using Akbura.Pools;
 
 namespace Akbura.UnitTests;
 
@@ -989,7 +990,7 @@ public sealed class ComponentPlannerTests
             StringComparison.Ordinal));
     }
 
-    private static int[] GetIds(ImmutableArray<int> ids, ComponentPlanRange range)
+    private static int[] GetIds(PooledImmutableList<int> ids, ComponentPlanRange range)
     {
         return ids.AsSpan(range.Start, range.Length).ToArray();
     }

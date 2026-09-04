@@ -1,5 +1,6 @@
 ﻿using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -108,7 +109,7 @@ internal sealed class ComponentWriter : IDisposable
         get => ref _memberPlan;
     }
 
-    public ImmutableArray<ComponentElementPlan> Elements => _plan.Elements;
+    public PooledImmutableList<ComponentElementPlan> Elements => _plan.Elements;
 
     public bool HasAkcss => !_plan.Akcss.IsEmpty;
 

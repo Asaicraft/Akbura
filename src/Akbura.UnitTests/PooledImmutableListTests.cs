@@ -114,4 +114,19 @@ public sealed class PooledImmutableListTests
             list.ReturnToPool();
         }
     }
+
+    [Fact]
+    public void AsSpan_ReturnsRequestedRange()
+    {
+        var list = PooledImmutableList<int>.Create([1, 2, 3, 4]);
+
+        try
+        {
+            Assert.Equal([2, 3], list.AsSpan(1, 2).ToArray());
+        }
+        finally
+        {
+            list.ReturnToPool();
+        }
+    }
 }

@@ -128,6 +128,12 @@ internal readonly struct PooledImmutableList<T> : IReadOnlyList<T>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<T> AsSpan(int start, int length)
+    {
+        return AsSpan().Slice(start, length);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref readonly T ItemRef(int index)
     {
         if ((uint)index >= (uint)_size)

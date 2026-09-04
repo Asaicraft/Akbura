@@ -455,31 +455,31 @@ internal readonly struct ComponentTemplatePlan
 internal readonly struct ComponentPlan
 {
     public ComponentPlan(
-        PooledImmutableList<ComponentElementPlan> elements,
-        PooledImmutableList<int> rootElementIds,
-        PooledImmutableList<int> childElementIds,
-        PooledImmutableList<ComponentScopePlan> scopes,
-        PooledImmutableList<int> scopeElementIds,
-        PooledImmutableList<int> scopeRootElementIds,
-        PooledImmutableList<ComponentPropertyWritePlan> propertyWrites,
-        PooledImmutableList<ComponentCSharpValuePlan> csharpValues,
-        PooledImmutableList<MarkupExtensionResultPlan> markupExtensions,
-        PooledImmutableList<BindingWritePlan> bindings,
-        PooledImmutableList<ComponentPropertySubscriptionPlan> propertySubscriptions,
-        PooledImmutableList<ComponentNameAssignmentPlan> nameAssignments,
-        PooledImmutableList<ComponentRoutedEventPlan> routedEvents,
-        PooledImmutableList<ComponentCommandBindingPlan> commandBindings,
-        PooledImmutableList<ComponentFirstUpdateActionPlan> firstUpdateActions,
-        ImmutableArray<ComponentPropertyElementPlan> propertyElements,
-        ImmutableArray<ComponentPropertyContentPlan> propertyContents,
-        ImmutableArray<ComponentCollectionContentPlan> collectionContents,
-        ImmutableArray<ComponentContentItemPlan> contentItems,
-        ImmutableArray<ComponentDeferredContentPlan> deferredContents,
-        ImmutableArray<ComponentTemplatePlan> templates,
-        ImmutableArray<BindingElementReference> elementReferences,
-        ComponentLifecyclePlan lifecycle,
-        ImmutableArray<ComponentRenderStatementPlan> renderStatements,
-        AkcssComponentActivatorPlan akcss)
+    PooledImmutableList<ComponentElementPlan> elements,
+    PooledImmutableList<int> rootElementIds,
+    PooledImmutableList<int> childElementIds,
+    PooledImmutableList<ComponentScopePlan> scopes,
+    PooledImmutableList<int> scopeElementIds,
+    PooledImmutableList<int> scopeRootElementIds,
+    PooledImmutableList<ComponentPropertyWritePlan> propertyWrites,
+    PooledImmutableList<ComponentCSharpValuePlan> csharpValues,
+    PooledImmutableList<MarkupExtensionResultPlan> markupExtensions,
+    PooledImmutableList<BindingWritePlan> bindings,
+    PooledImmutableList<ComponentPropertySubscriptionPlan> propertySubscriptions,
+    PooledImmutableList<ComponentNameAssignmentPlan> nameAssignments,
+    PooledImmutableList<ComponentRoutedEventPlan> routedEvents,
+    PooledImmutableList<ComponentCommandBindingPlan> commandBindings,
+    PooledImmutableList<ComponentFirstUpdateActionPlan> firstUpdateActions,
+    PooledImmutableList<ComponentPropertyElementPlan> propertyElements,
+    PooledImmutableList<ComponentPropertyContentPlan> propertyContents,
+    PooledImmutableList<ComponentCollectionContentPlan> collectionContents,
+    PooledImmutableList<ComponentContentItemPlan> contentItems,
+    PooledImmutableList<ComponentDeferredContentPlan> deferredContents,
+    PooledImmutableList<ComponentTemplatePlan> templates,
+    ImmutableArray<BindingElementReference> elementReferences,
+    ComponentLifecyclePlan lifecycle,
+    ImmutableArray<ComponentRenderStatementPlan> renderStatements,
+    AkcssComponentActivatorPlan akcss)
     {
         Elements = elements;
         RootElementIds = rootElementIds;
@@ -499,29 +499,12 @@ internal readonly struct ComponentPlan
         CommandBindings = commandBindings;
         FirstUpdateActions = firstUpdateActions;
 
-        PropertyElements = propertyElements.IsDefault
-            ? []
-            : propertyElements;
-
-        PropertyContents = propertyContents.IsDefault
-            ? []
-            : propertyContents;
-
-        CollectionContents = collectionContents.IsDefault
-            ? []
-            : collectionContents;
-
-        ContentItems = contentItems.IsDefault
-            ? []
-            : contentItems;
-
-        DeferredContents = deferredContents.IsDefault
-            ? []
-            : deferredContents;
-
-        Templates = templates.IsDefault
-            ? []
-            : templates;
+        PropertyElements = propertyElements;
+        PropertyContents = propertyContents;
+        CollectionContents = collectionContents;
+        ContentItems = contentItems;
+        DeferredContents = deferredContents;
+        Templates = templates;
 
         ElementReferences = elementReferences.IsDefault
             ? []
@@ -566,17 +549,17 @@ internal readonly struct ComponentPlan
 
     public PooledImmutableList<ComponentFirstUpdateActionPlan> FirstUpdateActions { get; }
 
-    public ImmutableArray<ComponentPropertyElementPlan> PropertyElements { get; }
+    public PooledImmutableList<ComponentPropertyElementPlan> PropertyElements { get; }
 
-    public ImmutableArray<ComponentPropertyContentPlan> PropertyContents { get; }
+    public PooledImmutableList<ComponentPropertyContentPlan> PropertyContents { get; }
 
-    public ImmutableArray<ComponentCollectionContentPlan> CollectionContents { get; }
+    public PooledImmutableList<ComponentCollectionContentPlan> CollectionContents { get; }
 
-    public ImmutableArray<ComponentContentItemPlan> ContentItems { get; }
+    public PooledImmutableList<ComponentContentItemPlan> ContentItems { get; }
 
-    public ImmutableArray<ComponentDeferredContentPlan> DeferredContents { get; }
+    public PooledImmutableList<ComponentDeferredContentPlan> DeferredContents { get; }
 
-    public ImmutableArray<ComponentTemplatePlan> Templates { get; }
+    public PooledImmutableList<ComponentTemplatePlan> Templates { get; }
 
     public ImmutableArray<BindingElementReference> ElementReferences { get; }
 
@@ -607,6 +590,13 @@ internal readonly struct ComponentPlan
         RoutedEvents.ReturnToPool();
         CommandBindings.ReturnToPool();
         FirstUpdateActions.ReturnToPool();
+
+        PropertyElements.ReturnToPool();
+        PropertyContents.ReturnToPool();
+        CollectionContents.ReturnToPool();
+        ContentItems.ReturnToPool();
+        DeferredContents.ReturnToPool();
+        Templates.ReturnToPool();
 
         Akcss.ReturnToPool();
     }

@@ -60,7 +60,15 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
     /// </summary>
     public ImmutableArray<T> ToImmutable()
     {
-        return ImmutableArray.CreateRange(_items);
+        return [.. _items];
+    }
+
+    /// <summary>
+    /// Creates a pooled immutable snapshot containing the current items.
+    /// </summary>
+    public PooledImmutableList<T> ToPooledImmutableList()
+    {
+        return PooledImmutableList<T>.CreateFromList(_items);
     }
 
     /// <summary>

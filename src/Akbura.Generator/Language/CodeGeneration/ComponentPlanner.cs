@@ -216,6 +216,13 @@ internal static class ComponentPlanner
             var pooledCommandBindings = default(PooledImmutableList<ComponentCommandBindingPlan>);
             var pooledFirstUpdateActions = default(PooledImmutableList<ComponentFirstUpdateActionPlan>);
 
+            var pooledPropertyElements = default(PooledImmutableList<ComponentPropertyElementPlan>);
+            var pooledPropertyContents = default(PooledImmutableList<ComponentPropertyContentPlan>);
+            var pooledCollectionContents = default(PooledImmutableList<ComponentCollectionContentPlan>);
+            var pooledContentItems = default(PooledImmutableList<ComponentContentItemPlan>);
+            var pooledDeferredContents = default(PooledImmutableList<ComponentDeferredContentPlan>);
+            var pooledTemplates = default(PooledImmutableList<ComponentTemplatePlan>);
+
             try
             {
                 Debug.Assert(akcss.Elements.Length == _elements.Count);
@@ -267,6 +274,13 @@ internal static class ComponentPlanner
                 pooledCommandBindings = _commandBindings.ToPooledImmutableList();
                 pooledFirstUpdateActions = _firstUpdateActions.ToPooledImmutableList();
 
+                pooledPropertyElements = _propertyElements.ToPooledImmutableList();
+                pooledPropertyContents = _propertyContents.ToPooledImmutableList();
+                pooledCollectionContents = _collectionContents.ToPooledImmutableList();
+                pooledContentItems = _contentItems.ToPooledImmutableList();
+                pooledDeferredContents = _deferredContents.ToPooledImmutableList();
+                pooledTemplates = _templates.ToPooledImmutableList();
+
                 return new ComponentPlan(
                     pooledElements,
                     pooledRootElementIds,
@@ -283,12 +297,12 @@ internal static class ComponentPlanner
                     pooledRoutedEvents,
                     pooledCommandBindings,
                     pooledFirstUpdateActions,
-                    _propertyElements.ToImmutable(),
-                    _propertyContents.ToImmutable(),
-                    _collectionContents.ToImmutable(),
-                    _contentItems.ToImmutable(),
-                    _deferredContents.ToImmutable(),
-                    _templates.ToImmutable(),
+                    pooledPropertyElements,
+                    pooledPropertyContents,
+                    pooledCollectionContents,
+                    pooledContentItems,
+                    pooledDeferredContents,
+                    pooledTemplates,
                     _elementReferences.ToImmutable(),
                     lifecycle,
                     _renderStatements.ToImmutable(),
@@ -313,6 +327,13 @@ internal static class ComponentPlanner
                 pooledRoutedEvents.ReturnToPool();
                 pooledCommandBindings.ReturnToPool();
                 pooledFirstUpdateActions.ReturnToPool();
+
+                pooledPropertyElements.ReturnToPool();
+                pooledPropertyContents.ReturnToPool();
+                pooledCollectionContents.ReturnToPool();
+                pooledContentItems.ReturnToPool();
+                pooledDeferredContents.ReturnToPool();
+                pooledTemplates.ReturnToPool();
 
                 akcss.ReturnToPool();
 

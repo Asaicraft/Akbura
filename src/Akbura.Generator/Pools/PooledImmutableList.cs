@@ -104,6 +104,22 @@ internal readonly struct PooledImmutableList<T> : IReadOnlyList<T>
         return new PooledImmutableList<T>(array, buffer.Length);
     }
 
+    internal static PooledImmutableList<T> CreateFromList(List<T> buffer)
+    {
+        AkburaDebug.Assert(buffer != null);
+
+        if (buffer.Count == 0)
+        {
+            return default;
+        }
+
+        var array = Rent(buffer.Count);
+
+        buffer.CopyTo(array, 0);
+
+        return new PooledImmutableList<T>(array, buffer.Count);
+    }
+
     public Enumerator GetEnumerator()
     {
         return new Enumerator(_array, _size);

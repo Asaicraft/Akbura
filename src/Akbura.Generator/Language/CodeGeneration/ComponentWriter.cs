@@ -62,11 +62,15 @@ internal sealed class ComponentWriter : IDisposable
         }
 
         _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
+
         var resultEnvironment = MarkupExtensionResultEnvironment.Create(semanticModel);
+
         Debug.Assert(resultEnvironment.IsValid);
+
         _sourceMap = new ComponentGenerationSourceMap(syntaxTree);
         _ownerTypeName = GetGeneratedOwnerTypeName(component);
         _resourcePath = NormalizeResourcePath(resourcePath);
+
         if (_resourcePath.Length == 0)
         {
             throw new ArgumentException(
@@ -74,14 +78,24 @@ internal sealed class ComponentWriter : IDisposable
                 nameof(resourcePath));
         }
 
-        _plan = ComponentPlanner.Create(
+        var plan = ComponentPlanner.Create(
             component,
             semanticModel,
             akcssModuleTypeNames,
             in resultEnvironment);
-        _memberPlan = ComponentMemberPlanner.Create(
-            component,
-            semanticModel);
+
+        try
+        {
+            var memberPlan = ComponentMemberPlanner.Create(component, semanticModel);
+
+            _plan = plan;
+            _memberPlan = memberPlan;
+        }
+        catch
+        {
+            plan.ReturnToPool();
+            throw;
+        }
     }
 
     public ref readonly ComponentPlan Plan
@@ -452,7 +466,9 @@ internal sealed class ComponentWriter : IDisposable
         }
 
         _disposed = true;
+
         _memberPlan.ReturnToPool();
+        _plan.ReturnToPool();
     }
 
     public bool WriteFactoryMethods(

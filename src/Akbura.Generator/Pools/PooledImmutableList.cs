@@ -168,14 +168,16 @@ internal readonly struct PooledImmutableList<T> : IReadOnlyList<T>
 
         public bool MoveNext()
         {
-            var next = _index + 1;
-            if (next >= _count)
+            var index = _index + 1;
+
+            if ((uint)index < (uint)_count)
             {
-                return false;
+                _index = index;
+                return true;
             }
 
-            _index = next;
-            return true;
+            _index = _count;
+            return false;
         }
 
         public void Reset()

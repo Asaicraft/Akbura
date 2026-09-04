@@ -181,9 +181,11 @@ internal static class ComponentPlanner
             BuildScopeIndex();
 
             using var akcssInputs = ImmutableArrayBuilder<AkcssActivatorElementInput>.Rent(_elements.Count);
+
             for (var i = 0; i < _elements.Count; i++)
             {
                 var element = _elements[i];
+
                 akcssInputs.Add(new AkcssActivatorElementInput(
                     element.Id,
                     element.Symbol,
@@ -195,60 +197,72 @@ internal static class ComponentPlanner
                 _semanticModel,
                 akcssInputs.WrittenSpan,
                 _akcssModuleTypeNames);
-            Debug.Assert(akcss.Elements.Length == _elements.Count);
-            var lifecycle = CreateLifecyclePlan(akcss);
 
-            using var elements = ImmutableArrayBuilder<ComponentElementPlan>.Rent(_elements.Count);
-            for (var i = 0; i < _elements.Count; i++)
+            try
             {
-                var element = _elements[i];
-                var elementAkcss = akcss.Elements[i];
-                Debug.Assert(elementAkcss.ElementId == i);
+                Debug.Assert(akcss.Elements.Length == _elements.Count);
 
-                elements.Add(new ComponentElementPlan(
-                    element.Id,
-                    element.Syntax,
-                    element.Type,
-                    element.Identifier,
-                    element.ParentId,
-                    element.ScopeId,
-                    element.ScopeKind,
-                    element.Flags,
-                    element.Children,
-                    element.PropertyWrites,
-                    element.PropertySubscriptions,
-                    element.FirstUpdateActions,
-                    element.PropertyElements,
-                    element.Content,
-                    elementAkcss));
+                var lifecycle = CreateLifecyclePlan(akcss);
+
+                using var elements = ImmutableArrayBuilder<ComponentElementPlan>.Rent(_elements.Count);
+
+                for (var i = 0; i < _elements.Count; i++)
+                {
+                    var element = _elements[i];
+                    var elementAkcss = akcss.Elements[i];
+
+                    Debug.Assert(elementAkcss.ElementId == i);
+
+                    elements.Add(new ComponentElementPlan(
+                        element.Id,
+                        element.Syntax,
+                        element.Type,
+                        element.Identifier,
+                        element.ParentId,
+                        element.ScopeId,
+                        element.ScopeKind,
+                        element.Flags,
+                        element.Children,
+                        element.PropertyWrites,
+                        element.PropertySubscriptions,
+                        element.FirstUpdateActions,
+                        element.PropertyElements,
+                        element.Content,
+                        elementAkcss));
+                }
+
+                return new ComponentPlan(
+                    elements.ToImmutable(),
+                    _rootElementIds.ToImmutable(),
+                    _childElementIds.ToImmutable(),
+                    _scopes.ToImmutable(),
+                    _scopeElementIds.ToImmutable(),
+                    _scopeRootElementIds.ToImmutable(),
+                    _propertyWrites.ToImmutable(),
+                    _csharpValues.ToImmutable(),
+                    _markupExtensions.ToImmutable(),
+                    _bindings.ToImmutable(),
+                    _propertySubscriptions.ToImmutable(),
+                    _nameAssignments.ToImmutable(),
+                    _routedEvents.ToImmutable(),
+                    _commandBindings.ToImmutable(),
+                    _firstUpdateActions.ToImmutable(),
+                    _propertyElements.ToImmutable(),
+                    _propertyContents.ToImmutable(),
+                    _collectionContents.ToImmutable(),
+                    _contentItems.ToImmutable(),
+                    _deferredContents.ToImmutable(),
+                    _templates.ToImmutable(),
+                    _elementReferences.ToImmutable(),
+                    lifecycle,
+                    _renderStatements.ToImmutable(),
+                    akcss);
             }
-
-            return new ComponentPlan(
-                elements.ToImmutable(),
-                _rootElementIds.ToImmutable(),
-                _childElementIds.ToImmutable(),
-                _scopes.ToImmutable(),
-                _scopeElementIds.ToImmutable(),
-                _scopeRootElementIds.ToImmutable(),
-                _propertyWrites.ToImmutable(),
-                _csharpValues.ToImmutable(),
-                _markupExtensions.ToImmutable(),
-                _bindings.ToImmutable(),
-                _propertySubscriptions.ToImmutable(),
-                _nameAssignments.ToImmutable(),
-                _routedEvents.ToImmutable(),
-                _commandBindings.ToImmutable(),
-                _firstUpdateActions.ToImmutable(),
-                _propertyElements.ToImmutable(),
-                _propertyContents.ToImmutable(),
-                _collectionContents.ToImmutable(),
-                _contentItems.ToImmutable(),
-                _deferredContents.ToImmutable(),
-                _templates.ToImmutable(),
-                _elementReferences.ToImmutable(),
-                lifecycle,
-                _renderStatements.ToImmutable(),
-                akcss);
+            catch
+            {
+                akcss.ReturnToPool();
+                throw;
+            }
         }
 
         public void Dispose()
@@ -282,8 +296,7 @@ internal static class ComponentPlanner
             _renderStatements.Dispose();
         }
 
-        private ComponentLifecyclePlan CreateLifecyclePlan(
-            in AkcssComponentActivatorPlan akcss)
+        private ComponentLifecyclePlan CreateLifecyclePlan(in AkcssComponentActivatorPlan akcss)
         {
             var rootElementId = -1;
             var flags = ComponentLifecycleFlags.None;

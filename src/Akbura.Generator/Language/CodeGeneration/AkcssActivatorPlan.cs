@@ -3,8 +3,7 @@ using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Immutable;
+using Akbura.Pools;
 using System.Globalization;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
@@ -339,60 +338,56 @@ internal readonly struct AkcssMarkupExtensionSlotPlan
 internal readonly struct AkcssComponentActivatorPlan
 {
     public AkcssComponentActivatorPlan(
-        ImmutableArray<AkcssElementActivatorPlan> elements,
-        ImmutableArray<AkcssActivatorPlan> activators,
-        ImmutableArray<AkcssClassCachePlan> classCaches,
-        ImmutableArray<AkcssUtilityApplicationPlan> applications,
-        ImmutableArray<AkcssUtilityApplicationCachePlan> applicationCaches,
-        ImmutableArray<AkcssUtilityCandidatePlan> candidates,
-        ImmutableArray<AkcssUtilityValueSourcePlan> valueSources,
-        ImmutableArray<AkcssMarkupExtensionSlotPlan> markupExtensionSlots,
+        PooledImmutableList<AkcssElementActivatorPlan> elements,
+        PooledImmutableList<AkcssActivatorPlan> activators,
+        PooledImmutableList<AkcssClassCachePlan> classCaches,
+        PooledImmutableList<AkcssUtilityApplicationPlan> applications,
+        PooledImmutableList<AkcssUtilityApplicationCachePlan> applicationCaches,
+        PooledImmutableList<AkcssUtilityCandidatePlan> candidates,
+        PooledImmutableList<AkcssUtilityValueSourcePlan> valueSources,
+        PooledImmutableList<AkcssMarkupExtensionSlotPlan> markupExtensionSlots,
         INamedTypeSymbol? bindingPriorityType)
     {
-        Elements = elements.IsDefault
-            ? ImmutableArray<AkcssElementActivatorPlan>.Empty
-            : elements;
-        Activators = activators.IsDefault
-            ? ImmutableArray<AkcssActivatorPlan>.Empty
-            : activators;
-        ClassCaches = classCaches.IsDefault
-            ? ImmutableArray<AkcssClassCachePlan>.Empty
-            : classCaches;
-        Applications = applications.IsDefault
-            ? ImmutableArray<AkcssUtilityApplicationPlan>.Empty
-            : applications;
-        ApplicationCaches = applicationCaches.IsDefault
-            ? ImmutableArray<AkcssUtilityApplicationCachePlan>.Empty
-            : applicationCaches;
-        Candidates = candidates.IsDefault
-            ? ImmutableArray<AkcssUtilityCandidatePlan>.Empty
-            : candidates;
-        ValueSources = valueSources.IsDefault
-            ? ImmutableArray<AkcssUtilityValueSourcePlan>.Empty
-            : valueSources;
-        MarkupExtensionSlots = markupExtensionSlots.IsDefault
-            ? ImmutableArray<AkcssMarkupExtensionSlotPlan>.Empty
-            : markupExtensionSlots;
+        Elements = elements;
+        Activators = activators;
+        ClassCaches = classCaches;
+        Applications = applications;
+        ApplicationCaches = applicationCaches;
+        Candidates = candidates;
+        ValueSources = valueSources;
+        MarkupExtensionSlots = markupExtensionSlots;
         BindingPriorityType = bindingPriorityType;
     }
 
-    public ImmutableArray<AkcssElementActivatorPlan> Elements { get; }
+    public PooledImmutableList<AkcssElementActivatorPlan> Elements { get; }
 
-    public ImmutableArray<AkcssActivatorPlan> Activators { get; }
+    public PooledImmutableList<AkcssActivatorPlan> Activators { get; }
 
-    public ImmutableArray<AkcssClassCachePlan> ClassCaches { get; }
+    public PooledImmutableList<AkcssClassCachePlan> ClassCaches { get; }
 
-    public ImmutableArray<AkcssUtilityApplicationPlan> Applications { get; }
+    public PooledImmutableList<AkcssUtilityApplicationPlan> Applications { get; }
 
-    public ImmutableArray<AkcssUtilityApplicationCachePlan> ApplicationCaches { get; }
+    public PooledImmutableList<AkcssUtilityApplicationCachePlan> ApplicationCaches { get; }
 
-    public ImmutableArray<AkcssUtilityCandidatePlan> Candidates { get; }
+    public PooledImmutableList<AkcssUtilityCandidatePlan> Candidates { get; }
 
-    public ImmutableArray<AkcssUtilityValueSourcePlan> ValueSources { get; }
+    public PooledImmutableList<AkcssUtilityValueSourcePlan> ValueSources { get; }
 
-    public ImmutableArray<AkcssMarkupExtensionSlotPlan> MarkupExtensionSlots { get; }
+    public PooledImmutableList<AkcssMarkupExtensionSlotPlan> MarkupExtensionSlots { get; }
 
     public INamedTypeSymbol? BindingPriorityType { get; }
 
-    public bool IsEmpty => Activators.IsDefaultOrEmpty;
+    public bool IsEmpty => Activators.IsEmpty;
+
+    internal void ReturnToPool()
+    {
+        Elements.ReturnToPool();
+        Activators.ReturnToPool();
+        ClassCaches.ReturnToPool();
+        Applications.ReturnToPool();
+        ApplicationCaches.ReturnToPool();
+        Candidates.ReturnToPool();
+        ValueSources.ReturnToPool();
+        MarkupExtensionSlots.ReturnToPool();
+    }
 }

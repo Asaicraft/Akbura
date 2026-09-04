@@ -586,4 +586,9 @@ internal readonly struct ComponentPlan
     public AkcssComponentActivatorPlan Akcss { get; }
 
     public bool IsEmpty => Elements.IsDefaultOrEmpty;
+
+    internal void ReturnToPool()
+    {
+        Akcss.ReturnToPool();
+    }
 }

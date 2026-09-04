@@ -131,14 +131,14 @@ internal static class AkcssActivatorPlanner
             }
 
             return new AkcssComponentActivatorPlan(
-                _elementActivators.ToImmutable(),
-                _activators.ToImmutable(),
-                _classCaches.ToImmutable(),
-                _applications.ToImmutable(),
-                _applicationCaches.ToImmutable(),
-                _candidates.ToImmutable(),
-                _valueSources.ToImmutable(),
-                _slots.ToImmutable(),
+                _elementActivators.ToPooledImmutableList(),
+                _activators.ToPooledImmutableList(),
+                _classCaches.ToPooledImmutableList(),
+                _applications.ToPooledImmutableList(),
+                _applicationCaches.ToPooledImmutableList(),
+                _candidates.ToPooledImmutableList(),
+                _valueSources.ToPooledImmutableList(),
+                _slots.ToPooledImmutableList(),
                 _bindingPriorityType);
         }
 

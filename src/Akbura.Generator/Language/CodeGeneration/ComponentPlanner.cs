@@ -180,174 +180,107 @@ internal static class ComponentPlanner
             LowerRenderStatements();
             BuildScopeIndex();
 
-            using var akcssInputs = ImmutableArrayBuilder<AkcssActivatorElementInput>.Rent(_elements.Count);
+            var owner = new ComponentPlanBufferOwner(CreateAkcssPlan());
+
+            try
+            {
+                var lifecycle = CreateLifecyclePlan(owner.Akcss);
+
+                CapturePlanBuffers(ref owner);
+
+                return owner.MoveToPlan(lifecycle);
+            }
+            finally
+            {
+                owner.Dispose();
+            }
+        }
+
+        private AkcssComponentActivatorPlan CreateAkcssPlan()
+        {
+            using var inputs = ImmutableArrayBuilder<AkcssActivatorElementInput>.Rent(_elements.Count);
 
             for (var i = 0; i < _elements.Count; i++)
             {
                 var element = _elements[i];
 
-                akcssInputs.Add(new AkcssActivatorElementInput(
+                inputs.Add(new AkcssActivatorElementInput(
                     element.Id,
                     element.Symbol,
                     element.Type,
                     element.RequiresLocalMarkupContext));
             }
 
-            var akcss = AkcssActivatorPlanner.Create(
+            return AkcssActivatorPlanner.Create(
                 _semanticModel,
-                akcssInputs.WrittenSpan,
+                inputs.WrittenSpan,
                 _akcssModuleTypeNames);
+        }
 
-            var pooledElements = default(PooledImmutableList<ComponentElementPlan>);
-            var pooledRootElementIds = default(PooledImmutableList<int>);
-            var pooledChildElementIds = default(PooledImmutableList<int>);
-            var pooledScopes = default(PooledImmutableList<ComponentScopePlan>);
-            var pooledScopeElementIds = default(PooledImmutableList<int>);
-            var pooledScopeRootElementIds = default(PooledImmutableList<int>);
+        private void CapturePlanBuffers(ref ComponentPlanBufferOwner owner)
+        {
+            owner.Elements = CreateElementPlans(owner.Akcss);
 
-            var pooledPropertyWrites = default(PooledImmutableList<ComponentPropertyWritePlan>);
-            var pooledCSharpValues = default(PooledImmutableList<ComponentCSharpValuePlan>);
-            var pooledMarkupExtensions = default(PooledImmutableList<MarkupExtensionResultPlan>);
-            var pooledBindings = default(PooledImmutableList<BindingWritePlan>);
-            var pooledPropertySubscriptions = default(PooledImmutableList<ComponentPropertySubscriptionPlan>);
+            owner.RootElementIds = _rootElementIds.ToPooledImmutableList();
+            owner.ChildElementIds = _childElementIds.ToPooledImmutableList();
+            owner.Scopes = _scopes.ToPooledImmutableList();
+            owner.ScopeElementIds = _scopeElementIds.ToPooledImmutableList();
+            owner.ScopeRootElementIds = _scopeRootElementIds.ToPooledImmutableList();
 
-            var pooledNameAssignments = default(PooledImmutableList<ComponentNameAssignmentPlan>);
-            var pooledRoutedEvents = default(PooledImmutableList<ComponentRoutedEventPlan>);
-            var pooledCommandBindings = default(PooledImmutableList<ComponentCommandBindingPlan>);
-            var pooledFirstUpdateActions = default(PooledImmutableList<ComponentFirstUpdateActionPlan>);
+            owner.PropertyWrites = _propertyWrites.ToPooledImmutableList();
+            owner.CSharpValues = _csharpValues.ToPooledImmutableList();
+            owner.MarkupExtensions = _markupExtensions.ToPooledImmutableList();
+            owner.Bindings = _bindings.ToPooledImmutableList();
+            owner.PropertySubscriptions = _propertySubscriptions.ToPooledImmutableList();
 
-            var pooledPropertyElements = default(PooledImmutableList<ComponentPropertyElementPlan>);
-            var pooledPropertyContents = default(PooledImmutableList<ComponentPropertyContentPlan>);
-            var pooledCollectionContents = default(PooledImmutableList<ComponentCollectionContentPlan>);
-            var pooledContentItems = default(PooledImmutableList<ComponentContentItemPlan>);
-            var pooledDeferredContents = default(PooledImmutableList<ComponentDeferredContentPlan>);
-            var pooledTemplates = default(PooledImmutableList<ComponentTemplatePlan>);
+            owner.NameAssignments = _nameAssignments.ToPooledImmutableList();
+            owner.RoutedEvents = _routedEvents.ToPooledImmutableList();
+            owner.CommandBindings = _commandBindings.ToPooledImmutableList();
+            owner.FirstUpdateActions = _firstUpdateActions.ToPooledImmutableList();
 
-            var pooledElementReferences = default(PooledImmutableList<BindingElementReference>);
-            var pooledRenderStatements = default(PooledImmutableList<ComponentRenderStatementPlan>);
+            owner.PropertyElements = _propertyElements.ToPooledImmutableList();
+            owner.PropertyContents = _propertyContents.ToPooledImmutableList();
+            owner.CollectionContents = _collectionContents.ToPooledImmutableList();
+            owner.ContentItems = _contentItems.ToPooledImmutableList();
+            owner.DeferredContents = _deferredContents.ToPooledImmutableList();
+            owner.Templates = _templates.ToPooledImmutableList();
 
-            try
+            owner.ElementReferences = _elementReferences.ToPooledImmutableList();
+            owner.RenderStatements = _renderStatements.ToPooledImmutableList();
+        }
+
+        private PooledImmutableList<ComponentElementPlan> CreateElementPlans(in AkcssComponentActivatorPlan akcss)
+        {
+            Debug.Assert(akcss.Elements.Length == _elements.Count);
+
+            using var elements = ImmutableArrayBuilder<ComponentElementPlan>.Rent(_elements.Count);
+
+            for (var i = 0; i < _elements.Count; i++)
             {
-                Debug.Assert(akcss.Elements.Length == _elements.Count);
+                var element = _elements[i];
+                var elementAkcss = akcss.Elements[i];
 
-                var lifecycle = CreateLifecyclePlan(akcss);
+                Debug.Assert(elementAkcss.ElementId == i);
 
-                using var elements = ImmutableArrayBuilder<ComponentElementPlan>.Rent(_elements.Count);
-
-                for (var i = 0; i < _elements.Count; i++)
-                {
-                    var element = _elements[i];
-                    var elementAkcss = akcss.Elements[i];
-
-                    Debug.Assert(elementAkcss.ElementId == i);
-
-                    elements.Add(new ComponentElementPlan(
-                        element.Id,
-                        element.Syntax,
-                        element.Type,
-                        element.Identifier,
-                        element.ParentId,
-                        element.ScopeId,
-                        element.ScopeKind,
-                        element.Flags,
-                        element.Children,
-                        element.PropertyWrites,
-                        element.PropertySubscriptions,
-                        element.FirstUpdateActions,
-                        element.PropertyElements,
-                        element.Content,
-                        elementAkcss));
-                }
-
-                pooledElements = elements.ToPooledImmutableList();
-                pooledRootElementIds = _rootElementIds.ToPooledImmutableList();
-                pooledChildElementIds = _childElementIds.ToPooledImmutableList();
-                pooledScopes = _scopes.ToPooledImmutableList();
-                pooledScopeElementIds = _scopeElementIds.ToPooledImmutableList();
-                pooledScopeRootElementIds = _scopeRootElementIds.ToPooledImmutableList();
-
-                pooledPropertyWrites = _propertyWrites.ToPooledImmutableList();
-                pooledCSharpValues = _csharpValues.ToPooledImmutableList();
-                pooledMarkupExtensions = _markupExtensions.ToPooledImmutableList();
-                pooledBindings = _bindings.ToPooledImmutableList();
-                pooledPropertySubscriptions = _propertySubscriptions.ToPooledImmutableList();
-
-                pooledNameAssignments = _nameAssignments.ToPooledImmutableList();
-                pooledRoutedEvents = _routedEvents.ToPooledImmutableList();
-                pooledCommandBindings = _commandBindings.ToPooledImmutableList();
-                pooledFirstUpdateActions = _firstUpdateActions.ToPooledImmutableList();
-
-                pooledPropertyElements = _propertyElements.ToPooledImmutableList();
-                pooledPropertyContents = _propertyContents.ToPooledImmutableList();
-                pooledCollectionContents = _collectionContents.ToPooledImmutableList();
-                pooledContentItems = _contentItems.ToPooledImmutableList();
-                pooledDeferredContents = _deferredContents.ToPooledImmutableList();
-                pooledTemplates = _templates.ToPooledImmutableList();
-
-                pooledElementReferences = _elementReferences.ToPooledImmutableList();
-                pooledRenderStatements = _renderStatements.ToPooledImmutableList();
-
-                return new ComponentPlan(
-                    pooledElements,
-                    pooledRootElementIds,
-                    pooledChildElementIds,
-                    pooledScopes,
-                    pooledScopeElementIds,
-                    pooledScopeRootElementIds,
-                    pooledPropertyWrites,
-                    pooledCSharpValues,
-                    pooledMarkupExtensions,
-                    pooledBindings,
-                    pooledPropertySubscriptions,
-                    pooledNameAssignments,
-                    pooledRoutedEvents,
-                    pooledCommandBindings,
-                    pooledFirstUpdateActions,
-                    pooledPropertyElements,
-                    pooledPropertyContents,
-                    pooledCollectionContents,
-                    pooledContentItems,
-                    pooledDeferredContents,
-                    pooledTemplates,
-                    pooledElementReferences,
-                    lifecycle,
-                    pooledRenderStatements,
-                    akcss);
+                elements.Add(new ComponentElementPlan(
+                    element.Id,
+                    element.Syntax,
+                    element.Type,
+                    element.Identifier,
+                    element.ParentId,
+                    element.ScopeId,
+                    element.ScopeKind,
+                    element.Flags,
+                    element.Children,
+                    element.PropertyWrites,
+                    element.PropertySubscriptions,
+                    element.FirstUpdateActions,
+                    element.PropertyElements,
+                    element.Content,
+                    elementAkcss));
             }
-            catch
-            {
-                pooledElements.ReturnToPool();
-                pooledRootElementIds.ReturnToPool();
-                pooledChildElementIds.ReturnToPool();
-                pooledScopes.ReturnToPool();
-                pooledScopeElementIds.ReturnToPool();
-                pooledScopeRootElementIds.ReturnToPool();
 
-                pooledPropertyWrites.ReturnToPool();
-                pooledCSharpValues.ReturnToPool();
-                pooledMarkupExtensions.ReturnToPool();
-                pooledBindings.ReturnToPool();
-                pooledPropertySubscriptions.ReturnToPool();
-
-                pooledNameAssignments.ReturnToPool();
-                pooledRoutedEvents.ReturnToPool();
-                pooledCommandBindings.ReturnToPool();
-                pooledFirstUpdateActions.ReturnToPool();
-
-                pooledPropertyElements.ReturnToPool();
-                pooledPropertyContents.ReturnToPool();
-                pooledCollectionContents.ReturnToPool();
-                pooledContentItems.ReturnToPool();
-                pooledDeferredContents.ReturnToPool();
-                pooledTemplates.ReturnToPool();
-
-                pooledElementReferences.ReturnToPool();
-                pooledRenderStatements.ReturnToPool();
-
-                akcss.ReturnToPool();
-
-                throw;
-            }
+            return elements.ToPooledImmutableList();
         }
 
         public void Dispose()

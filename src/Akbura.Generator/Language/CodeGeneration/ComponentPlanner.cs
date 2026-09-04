@@ -223,6 +223,9 @@ internal static class ComponentPlanner
             var pooledDeferredContents = default(PooledImmutableList<ComponentDeferredContentPlan>);
             var pooledTemplates = default(PooledImmutableList<ComponentTemplatePlan>);
 
+            var pooledElementReferences = default(PooledImmutableList<BindingElementReference>);
+            var pooledRenderStatements = default(PooledImmutableList<ComponentRenderStatementPlan>);
+
             try
             {
                 Debug.Assert(akcss.Elements.Length == _elements.Count);
@@ -281,6 +284,9 @@ internal static class ComponentPlanner
                 pooledDeferredContents = _deferredContents.ToPooledImmutableList();
                 pooledTemplates = _templates.ToPooledImmutableList();
 
+                pooledElementReferences = _elementReferences.ToPooledImmutableList();
+                pooledRenderStatements = _renderStatements.ToPooledImmutableList();
+
                 return new ComponentPlan(
                     pooledElements,
                     pooledRootElementIds,
@@ -303,9 +309,9 @@ internal static class ComponentPlanner
                     pooledContentItems,
                     pooledDeferredContents,
                     pooledTemplates,
-                    _elementReferences.ToImmutable(),
+                    pooledElementReferences,
                     lifecycle,
-                    _renderStatements.ToImmutable(),
+                    pooledRenderStatements,
                     akcss);
             }
             catch
@@ -334,6 +340,9 @@ internal static class ComponentPlanner
                 pooledContentItems.ReturnToPool();
                 pooledDeferredContents.ReturnToPool();
                 pooledTemplates.ReturnToPool();
+
+                pooledElementReferences.ReturnToPool();
+                pooledRenderStatements.ReturnToPool();
 
                 akcss.ReturnToPool();
 

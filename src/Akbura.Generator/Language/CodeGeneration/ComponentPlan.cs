@@ -455,31 +455,31 @@ internal readonly struct ComponentTemplatePlan
 internal readonly struct ComponentPlan
 {
     public ComponentPlan(
-    PooledImmutableList<ComponentElementPlan> elements,
-    PooledImmutableList<int> rootElementIds,
-    PooledImmutableList<int> childElementIds,
-    PooledImmutableList<ComponentScopePlan> scopes,
-    PooledImmutableList<int> scopeElementIds,
-    PooledImmutableList<int> scopeRootElementIds,
-    PooledImmutableList<ComponentPropertyWritePlan> propertyWrites,
-    PooledImmutableList<ComponentCSharpValuePlan> csharpValues,
-    PooledImmutableList<MarkupExtensionResultPlan> markupExtensions,
-    PooledImmutableList<BindingWritePlan> bindings,
-    PooledImmutableList<ComponentPropertySubscriptionPlan> propertySubscriptions,
-    PooledImmutableList<ComponentNameAssignmentPlan> nameAssignments,
-    PooledImmutableList<ComponentRoutedEventPlan> routedEvents,
-    PooledImmutableList<ComponentCommandBindingPlan> commandBindings,
-    PooledImmutableList<ComponentFirstUpdateActionPlan> firstUpdateActions,
-    PooledImmutableList<ComponentPropertyElementPlan> propertyElements,
-    PooledImmutableList<ComponentPropertyContentPlan> propertyContents,
-    PooledImmutableList<ComponentCollectionContentPlan> collectionContents,
-    PooledImmutableList<ComponentContentItemPlan> contentItems,
-    PooledImmutableList<ComponentDeferredContentPlan> deferredContents,
-    PooledImmutableList<ComponentTemplatePlan> templates,
-    ImmutableArray<BindingElementReference> elementReferences,
-    ComponentLifecyclePlan lifecycle,
-    ImmutableArray<ComponentRenderStatementPlan> renderStatements,
-    AkcssComponentActivatorPlan akcss)
+        PooledImmutableList<ComponentElementPlan> elements,
+        PooledImmutableList<int> rootElementIds,
+        PooledImmutableList<int> childElementIds,
+        PooledImmutableList<ComponentScopePlan> scopes,
+        PooledImmutableList<int> scopeElementIds,
+        PooledImmutableList<int> scopeRootElementIds,
+        PooledImmutableList<ComponentPropertyWritePlan> propertyWrites,
+        PooledImmutableList<ComponentCSharpValuePlan> csharpValues,
+        PooledImmutableList<MarkupExtensionResultPlan> markupExtensions,
+        PooledImmutableList<BindingWritePlan> bindings,
+        PooledImmutableList<ComponentPropertySubscriptionPlan> propertySubscriptions,
+        PooledImmutableList<ComponentNameAssignmentPlan> nameAssignments,
+        PooledImmutableList<ComponentRoutedEventPlan> routedEvents,
+        PooledImmutableList<ComponentCommandBindingPlan> commandBindings,
+        PooledImmutableList<ComponentFirstUpdateActionPlan> firstUpdateActions,
+        PooledImmutableList<ComponentPropertyElementPlan> propertyElements,
+        PooledImmutableList<ComponentPropertyContentPlan> propertyContents,
+        PooledImmutableList<ComponentCollectionContentPlan> collectionContents,
+        PooledImmutableList<ComponentContentItemPlan> contentItems,
+        PooledImmutableList<ComponentDeferredContentPlan> deferredContents,
+        PooledImmutableList<ComponentTemplatePlan> templates,
+        PooledImmutableList<BindingElementReference> elementReferences,
+        ComponentLifecyclePlan lifecycle,
+        PooledImmutableList<ComponentRenderStatementPlan> renderStatements,
+        AkcssComponentActivatorPlan akcss)
     {
         Elements = elements;
         RootElementIds = rootElementIds;
@@ -506,16 +506,9 @@ internal readonly struct ComponentPlan
         DeferredContents = deferredContents;
         Templates = templates;
 
-        ElementReferences = elementReferences.IsDefault
-            ? []
-            : elementReferences;
-
+        ElementReferences = elementReferences;
         Lifecycle = lifecycle;
-
-        RenderStatements = renderStatements.IsDefault
-            ? []
-            : renderStatements;
-
+        RenderStatements = renderStatements;
         Akcss = akcss;
     }
 
@@ -561,11 +554,11 @@ internal readonly struct ComponentPlan
 
     public PooledImmutableList<ComponentTemplatePlan> Templates { get; }
 
-    public ImmutableArray<BindingElementReference> ElementReferences { get; }
+    public PooledImmutableList<BindingElementReference> ElementReferences { get; }
 
     public ComponentLifecyclePlan Lifecycle { get; }
 
-    public ImmutableArray<ComponentRenderStatementPlan> RenderStatements { get; }
+    public PooledImmutableList<ComponentRenderStatementPlan> RenderStatements { get; }
 
     public AkcssComponentActivatorPlan Akcss { get; }
 
@@ -597,6 +590,9 @@ internal readonly struct ComponentPlan
         ContentItems.ReturnToPool();
         DeferredContents.ReturnToPool();
         Templates.ReturnToPool();
+
+        ElementReferences.ReturnToPool();
+        RenderStatements.ReturnToPool();
 
         Akcss.ReturnToPool();
     }

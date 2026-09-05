@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Diagnostics;
+using Microsoft.CodeAnalysis;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -13,6 +14,18 @@ internal readonly ref struct CSharpSyntaxWriter
         Debug.Assert(writer != null);
 
         _writer = writer!;
+    }
+
+    public void WriteNormalizedNode(CSharpSyntaxNode syntax)
+    {
+        Debug.Assert(syntax != null);
+
+        var normalized = syntax!.NormalizeWhitespace();
+
+        if (WriteTrimmed(normalized))
+        {
+            _writer.WriteLine();
+        }
     }
 
     public void WriteExpression(ExpressionSyntax expression)

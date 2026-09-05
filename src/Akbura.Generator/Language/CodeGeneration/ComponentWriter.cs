@@ -434,6 +434,45 @@ internal sealed class ComponentWriter : IDisposable
         }
     }
 
+    public bool WriteFactoryMethods()
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var scopeContext = CreateComponentScopeWriteContext();
+            var wroteAny = false;
+
+            for (var i = 0; i < _plan.Elements.Length; i++)
+            {
+                ref readonly var element = ref _plan.Elements.ItemRef(i);
+
+                if (element.ScopeId != 0 || !HasFactoryMethods(element))
+                {
+                    continue;
+                }
+
+                if (wroteAny)
+                {
+                    _writer.WriteLine();
+                }
+
+                var context = scopeContext.ForElement(element.Id);
+                var wroteElement = WriteFactoryMethods(element.Id, context);
+
+                Debug.Assert(wroteElement);
+
+                wroteAny |= wroteElement;
+            }
+
+            return wroteAny;
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
     private bool WriteCachedBindingPaths()
     {
         var writer = new MarkupExtensionWriter(_writer, in _bindingEnvironment);
@@ -545,6 +584,40 @@ internal sealed class ComponentWriter : IDisposable
         {
             _writer.CurrentIndent = indent;
         }
+    }
+
+    private ComponentScopeWriteContext CreateComponentScopeWriteContext()
+    {
+        return new ComponentScopeWriteContext(
+            intermediateRootExpression: "this",
+            baseUriExpression: ComponentMarkupContextWriter.BaseUriFieldName,
+            fallbackServiceProviderExpression: null,
+            nameScopeExpression: null,
+            scopeId: 0,
+            parentStackTraversalKind: MarkupParentStackTraversalKind.ExactScope,
+            elements: _plan.Elements.AsSpan(),
+            elementReferences: _plan.ElementReferences.AsSpan());
+    }
+
+    private bool HasFactoryMethods(in ComponentElementPlan element)
+    {
+        var range = element.Akcss.MarkupExtensionSlots;
+
+        for (var i = 0; i < range.Length; i++)
+        {
+            var slotIndex = range.Start + i;
+
+            Debug.Assert((uint)slotIndex < (uint)_plan.Akcss.MarkupExtensionSlots.Length);
+
+            ref readonly var slot = ref _plan.Akcss.MarkupExtensionSlots.ItemRef(slotIndex);
+
+            if (slot.NeedsFactoryMethod)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private ref readonly ComponentElementPlan GetElement(int elementId)

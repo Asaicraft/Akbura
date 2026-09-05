@@ -74,4 +74,21 @@ public sealed class CSharpSyntaxWriterTests
             codeWriter.GetText().ToString().Substring(outputStart));
         Assert.Equal(8, codeWriter.CurrentIndent);
     }
+
+    [Fact]
+    public void WriteNormalizedNode_AddsRequiredTokenWhitespace()
+    {
+        var directive = SyntaxFactory.UsingDirective(
+            SyntaxFactory.ParseName("Avalonia.Controls"));
+
+        using var codeWriter = new CodeWriter("\r\n");
+
+        var writer = new CSharpSyntaxWriter(codeWriter);
+
+        writer.WriteNormalizedNode(directive);
+
+        Assert.Equal(
+            "using Avalonia.Controls;\r\n",
+            codeWriter.GetText().ToString());
+    }
 }

@@ -12,7 +12,7 @@
 		<DefineConstants>$(DefineConstants);STATS;ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Avalonia.Headless"  />
+		<PackageReference Include="Avalonia.Headless" />
 		<PackageReference Include="Avalonia.Themes.Fluent" />
 		<PackageReference Include="coverlet.collector">
 			<PrivateAssets>all</PrivateAssets>
@@ -32,11 +32,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj"/>
+		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" />
 		<ProjectReference Include="..\Akbura.Furioso\Akbura.Furioso.csproj" />
 		<ProjectReference Include="..\Akbura.BlackSilence\Akbura.BlackSilence.csproj" />
 		<ProjectReference Include="..\Akbura.Diagnostics\Akbura.Diagnostics.csproj" />
-		<ProjectReference Include="..\Akbura\Akbura.csproj"/>
+		<ProjectReference Include="..\Akbura\Akbura.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

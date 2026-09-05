@@ -260,19 +260,15 @@ internal static class AkburaGenerationCatalogBuilder
                 Path.AltDirectorySeparatorChar);
 
         var fullSourcePath = Path.GetFullPath(filePath);
-        var projectPrefix =
-            projectPath + Path.DirectorySeparatorChar;
+        var projectPrefix = projectPath + Path.DirectorySeparatorChar;
 
-        if (!fullSourcePath.StartsWith(
-                projectPrefix,
-                StringComparison.OrdinalIgnoreCase))
+        if (!fullSourcePath.StartsWith(projectPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
         sourcePath = AkcssGeneratedModuleNames.NormalizeSourcePath(
-            fullSourcePath.Substring(
-                projectPrefix.Length));
+            fullSourcePath[projectPrefix.Length..]);
 
         return true;
     }

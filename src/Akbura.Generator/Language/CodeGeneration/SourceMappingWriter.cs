@@ -21,19 +21,16 @@ internal readonly ref struct SourceMappingWriter
         _sourceMap = sourceMap ?? throw new ArgumentNullException(nameof(sourceMap));
     }
 
-    public SourceMappingToken WriteStart(
-        AkburaSyntax syntax,
-        int valueOffset = 0)
+    public SourceMappingToken WriteStart(AkburaSyntax syntax, int valueOffset = 0)
     {
-        if (!_sourceMap.TryGetLineDirective(
-                syntax,
-                out var span,
-                out var path))
+        AkburaDebug.Assert(syntax != null);
+
+        if (!_sourceMap.TryGetLineDirective(syntax, out var span, out var path))
         {
             return default;
         }
 
-        return WriteStartCore(span, path, valueOffset);
+        return WriteStartCore(_writer, span, path, valueOffset);
     }
 
     public SourceMappingToken WriteStart(
@@ -41,43 +38,45 @@ internal readonly ref struct SourceMappingWriter
         TextSpan relativeSpan,
         int valueOffset = 0)
     {
-        if (!_sourceMap.TryGetLineDirective(
-                syntax,
-                relativeSpan,
-                out var span,
-                out var path))
+        AkburaDebug.Assert(syntax != null);
+
+        if (!_sourceMap.TryGetLineDirective(syntax, relativeSpan, out var span, out var path))
         {
             return default;
         }
 
-        return WriteStartCore(span, path, valueOffset);
+        return WriteStartCore(_writer, span, path, valueOffset);
     }
 
-    private SourceMappingToken WriteStartCore(
+    internal static SourceMappingToken WriteStartCore(
+        CodeWriter writer,
         LinePositionSpan span,
         string path,
         int valueOffset)
     {
-        EnsureDirectiveLine(_writer);
+        EnsureDirectiveLine(writer);
 
-        var generatedOffset = _writer.CurrentIndent + Math.Max(0, valueOffset);
+        var generatedOffset = writer.CurrentIndent + Math.Max(valueOffset, 0);
+        var startLine = span.Start.Line + 1;
+        var startCharacter = span.Start.Character + 1;
+        var endLine = span.End.Line + 1;
+        var endCharacter = span.End.Character + 1;
 
-        _writer
-            .Write("#line (")
-            .WriteIntegerLiteral(span.Start.Line + 1)
-            .Write(",")
-            .WriteIntegerLiteral(span.Start.Character + 1)
-            .Write(")-(")
-            .WriteIntegerLiteral(span.End.Line + 1)
-            .Write(",")
-            .WriteIntegerLiteral(span.End.Character + 1)
-            .Write(") ")
-            .WriteIntegerLiteral(generatedOffset)
-            .Write(" \"")
-            .Write(path)
-            .WriteLine("\"");
+        writer.Write("#line (");
+        writer.WriteIntegerLiteral(startLine);
+        writer.Write(",");
+        writer.WriteIntegerLiteral(startCharacter);
+        writer.Write(")-(");
+        writer.WriteIntegerLiteral(endLine);
+        writer.Write(",");
+        writer.WriteIntegerLiteral(endCharacter);
+        writer.Write(") ");
+        writer.WriteIntegerLiteral(generatedOffset);
+        writer.Write(" ");
+        writer.WriteStringLiteral(path);
+        writer.WriteLine();
 
-        return new SourceMappingToken(_writer);
+        return new SourceMappingToken(writer);
     }
 
     internal static void EnsureDirectiveLine(CodeWriter writer)

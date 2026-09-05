@@ -312,10 +312,11 @@ internal static class AkcssExpressionGenerator
         return true;
     }
 
-    public static bool TryPushApplyMetadataParameterValues(
+    public static bool TryPushApplyParameterValues(
         string item,
         ITailwindUtilitySymbol utility,
         IAkcssApplyOperation operation,
+        string targetName,
         ArrayBuilder<AkcssIdentifierValue> identifierValues,
         out int previousCount)
     {
@@ -336,8 +337,9 @@ internal static class AkcssExpressionGenerator
         }
 
         var outerValueCount = previousCount;
+
         var rewriter = AkcssAmxExpressionRewriter.GetInstance(
-            MetadataTargetName,
+            targetName,
             observeDynamicResource: false,
             GetTargetParameterName(operation.ContainingAkcssSymbol),
             identifierValues,

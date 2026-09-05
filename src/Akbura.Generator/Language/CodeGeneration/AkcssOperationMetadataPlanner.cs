@@ -296,10 +296,11 @@ internal ref struct AkcssOperationMetadataPlanner
                     ? operation.Items[i]
                     : string.Empty;
 
-                if (!AkcssExpressionGenerator.TryPushApplyMetadataParameterValues(
+                if (!AkcssExpressionGenerator.TryPushApplyParameterValues(
                         item,
                         utility,
                         operation,
+                        AkcssExpressionGenerator.MetadataTargetName,
                         _identifierValues,
                         out previousValueCount))
                 {

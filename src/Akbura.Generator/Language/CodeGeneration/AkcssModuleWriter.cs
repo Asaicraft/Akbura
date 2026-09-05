@@ -18,6 +18,7 @@ internal readonly ref struct AkcssModuleWriter
     private readonly CSharpValueWriter _valueWriter;
     private readonly AkcssDeclarationMetadataWriter _metadataWriter;
     private readonly AkcssOperationMetadataWriter _operationMetadataWriter;
+    private readonly AkcssStyleWriter _styleWriter;
 
     public AkcssModuleWriter(
         CodeWriter writer,
@@ -30,6 +31,9 @@ internal readonly ref struct AkcssModuleWriter
         _valueWriter = new CSharpValueWriter(_writer);
         _metadataWriter = new AkcssDeclarationMetadataWriter(_writer);
         _operationMetadataWriter = new AkcssOperationMetadataWriter(
+            _writer,
+            sourceMap);
+        _styleWriter = new AkcssStyleWriter(
             _writer,
             sourceMap);
     }
@@ -72,7 +76,10 @@ internal readonly ref struct AkcssModuleWriter
     {
         _metadataWriter.WriteHiddenApiAttributes();
 
-        _writer.Write("public static readonly global::System.Collections.Immutable.ImmutableArray<");
+        _writer.Write(
+            "public static readonly " +
+            "global::System.Collections.Immutable.ImmutableArray<");
+
         _writer.Write(RuntimeStyleType);
         _writer.WriteLine("> Styles =");
 
@@ -81,15 +88,22 @@ internal readonly ref struct AkcssModuleWriter
         if (plan.RuntimeStyles.IsEmpty)
         {
             _writer.CurrentIndent = indent + _writer.TabSize;
-            _writer.Write("global::System.Collections.Immutable.ImmutableArray<");
+
+            _writer.Write(
+                "global::System.Collections.Immutable.ImmutableArray<");
+
             _writer.Write(RuntimeStyleType);
             _writer.WriteLine(">.Empty;");
+
             _writer.CurrentIndent = indent;
             return;
         }
 
         _writer.CurrentIndent = indent + _writer.TabSize;
-        _writer.Write("global::System.Collections.Immutable.ImmutableArray.Create<");
+
+        _writer.Write(
+            "global::System.Collections.Immutable.ImmutableArray.Create<");
+
         _writer.Write(RuntimeStyleType);
         _writer.WriteLine(">(");
 
@@ -97,7 +111,8 @@ internal readonly ref struct AkcssModuleWriter
 
         for (var i = 0; i < plan.RuntimeStyles.Length; i++)
         {
-            ref readonly var style = ref plan.RuntimeStyles.ItemRef(i);
+            ref readonly var style =
+                ref plan.RuntimeStyles.ItemRef(i);
 
             WriteRuntimeStyleCreation(style);
 
@@ -121,10 +136,39 @@ internal readonly ref struct AkcssModuleWriter
                 _writer.WriteLine();
             }
 
-            ref readonly var symbol = ref plan.Symbols.ItemRef(i);
+            ref readonly var symbol =
+                ref plan.Symbols.ItemRef(i);
 
             WriteMetadataCarrier(symbol);
         }
+    }
+
+    public bool WriteClassStyles(in AkcssModulePlan plan)
+    {
+        var wroteAny = false;
+
+        for (var i = 0; i < plan.Symbols.Length; i++)
+        {
+            ref readonly var symbol =
+                ref plan.Symbols.ItemRef(i);
+
+            if (symbol.Kind != AkcssSymbolGenerationKind.Style ||
+                !symbol.EmitsRuntimeStyle)
+            {
+                continue;
+            }
+
+            if (wroteAny)
+            {
+                _writer.WriteLine();
+            }
+
+            wroteAny |= _styleWriter.Write(
+                plan,
+                symbol);
+        }
+
+        return wroteAny;
     }
 
     private void WriteRuntimeStyleCreation(in AkcssRuntimeStylePlan plan)
@@ -147,9 +191,12 @@ internal readonly ref struct AkcssModuleWriter
                 break;
 
             default:
-                Debug.Fail("Unexpected AKCSS runtime style kind.");
+                Debug.Fail(
+                    "Unexpected AKCSS runtime style kind.");
 
-                _writer.Write("global::Akbura.Akcss.AkcssStyle");
+                _writer.Write(
+                    "global::Akbura.Akcss.AkcssStyle");
+
                 break;
         }
 
@@ -164,11 +211,12 @@ internal readonly ref struct AkcssModuleWriter
         _operationMetadataWriter.Write(plan.Symbol);
 
         _writer.Write("public static class ");
+
         AkcssGeneratedNameWriter.WriteMetadataTypeName(
             _writer,
             plan.SymbolIndex);
-        _writer.WriteLine();
 
+        _writer.WriteLine();
         _writer.WriteLine("{");
         _writer.WriteLine("}");
     }

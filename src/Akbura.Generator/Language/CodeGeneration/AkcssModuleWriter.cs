@@ -17,14 +17,21 @@ internal readonly ref struct AkcssModuleWriter
     private readonly CodeWriter _writer;
     private readonly CSharpValueWriter _valueWriter;
     private readonly AkcssDeclarationMetadataWriter _metadataWriter;
+    private readonly AkcssOperationMetadataWriter _operationMetadataWriter;
 
-    public AkcssModuleWriter(CodeWriter writer)
+    public AkcssModuleWriter(
+        CodeWriter writer,
+        AkcssGenerationSourceMap sourceMap)
     {
-        Debug.Assert(writer != null);
+        AkburaDebug.Assert(writer != null);
+        AkburaDebug.Assert(sourceMap != null);
 
         _writer = writer!;
         _valueWriter = new CSharpValueWriter(_writer);
         _metadataWriter = new AkcssDeclarationMetadataWriter(_writer);
+        _operationMetadataWriter = new AkcssOperationMetadataWriter(
+            _writer,
+            sourceMap);
     }
 
     public void WriteAssemblyReference(in AkcssModulePlan plan)
@@ -93,7 +100,11 @@ internal readonly ref struct AkcssModuleWriter
             ref readonly var style = ref plan.RuntimeStyles.ItemRef(i);
 
             WriteRuntimeStyleCreation(style);
-            _writer.WriteLine(i + 1 == plan.RuntimeStyles.Length ? string.Empty : ",");
+
+            _writer.WriteLine(
+                i + 1 == plan.RuntimeStyles.Length
+                    ? string.Empty
+                    : ",");
         }
 
         _writer.CurrentIndent = indent + _writer.TabSize;
@@ -123,16 +134,21 @@ internal readonly ref struct AkcssModuleWriter
         switch (plan.Kind)
         {
             case AkcssRuntimeStyleKind.Generated:
-                AkcssGeneratedNameWriter.WriteStyleTypeName(_writer, plan.SymbolIndex);
+                AkcssGeneratedNameWriter.WriteStyleTypeName(
+                    _writer,
+                    plan.SymbolIndex);
+
                 break;
 
             case AkcssRuntimeStyleKind.Interceptor:
                 Debug.Assert(plan.InterceptorType != null);
+
                 _valueWriter.WriteTypeName(plan.InterceptorType);
                 break;
 
             default:
                 Debug.Fail("Unexpected AKCSS runtime style kind.");
+
                 _writer.Write("global::Akbura.Akcss.AkcssStyle");
                 break;
         }
@@ -145,9 +161,12 @@ internal readonly ref struct AkcssModuleWriter
         _metadataWriter.WriteHiddenApiAttributes();
         _metadataWriter.WriteCompilerGeneratedAttribute();
         _metadataWriter.WriteSymbolAttributes(plan);
+        _operationMetadataWriter.Write(plan.Symbol);
 
         _writer.Write("public static class ");
-        AkcssGeneratedNameWriter.WriteMetadataTypeName(_writer, plan.SymbolIndex);
+        AkcssGeneratedNameWriter.WriteMetadataTypeName(
+            _writer,
+            plan.SymbolIndex);
         _writer.WriteLine();
 
         _writer.WriteLine("{");

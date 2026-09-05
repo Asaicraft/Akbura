@@ -1,6 +1,5 @@
 ﻿using Akbura.Language.Symbols;
 using Akbura.Pools;
-using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -10,40 +9,27 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal readonly ref struct AkcssStyleWriter
 {
-    private const string RuntimeClassType =
-        "global::Akbura.Akcss.AkcssClass";
-
-    private const string StyleNameAttribute =
-        "global::Akbura.CompilerAnotations.StyleNameAttribute";
-
-    private const string InlinedStyleAttribute =
-        "global::Akbura.CompilerAnotations.InlinedStyleAttribute";
+    private const string RuntimeClassType = "global::Akbura.Akcss.AkcssClass";
+    private const string StyleNameAttribute = "global::Akbura.CompilerAnotations.StyleNameAttribute";
+    private const string InlinedStyleAttribute = "global::Akbura.CompilerAnotations.InlinedStyleAttribute";
 
     private readonly CodeWriter _writer;
-    private readonly CSharpValueWriter _valueWriter;
-    private readonly MarkupTargetPropertyWriter _targetPropertyWriter;
     private readonly AkcssGenerationSourceMap _sourceMap;
     private readonly AkcssOperationMetadataWriter _operationMetadataWriter;
+    private readonly AkcssResetWriter _resetWriter;
 
-    public AkcssStyleWriter(
-        CodeWriter writer,
-        AkcssGenerationSourceMap sourceMap)
+    public AkcssStyleWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap)
     {
         Debug.Assert(writer != null);
-        Debug.Assert(sourceMap != null);
+        AkburaDebug.Assert(sourceMap != null);
 
         _writer = writer!;
-        _valueWriter = new CSharpValueWriter(_writer);
-        _targetPropertyWriter = new MarkupTargetPropertyWriter(_writer);
         _sourceMap = sourceMap!;
-        _operationMetadataWriter = new AkcssOperationMetadataWriter(
-            _writer,
-            sourceMap);
+        _operationMetadataWriter = new AkcssOperationMetadataWriter(_writer, sourceMap);
+        _resetWriter = new AkcssResetWriter(_writer);
     }
 
-    public bool Write(
-        in AkcssModulePlan module,
-        in AkcssSymbolGenerationPlan plan)
+    public bool Write(in AkcssModulePlan module, in AkcssSymbolGenerationPlan plan)
     {
         if (plan.Kind != AkcssSymbolGenerationKind.Style ||
             !plan.EmitsRuntimeStyle ||
@@ -67,9 +53,7 @@ internal readonly ref struct AkcssStyleWriter
             WriteAttributes(module.IsInlined, plan.Symbol);
 
             _writer.Write("private sealed class ");
-            AkcssGeneratedNameWriter.WriteStyleTypeName(
-                _writer,
-                plan.SymbolIndex);
+            AkcssGeneratedNameWriter.WriteStyleTypeName(_writer, plan.SymbolIndex);
             _writer.Write(" : ");
             _writer.WriteLine(RuntimeClassType);
 
@@ -78,15 +62,12 @@ internal readonly ref struct AkcssStyleWriter
 
             WriteUpdate(plan.Symbol, ref operationWriter);
 
-            operationWriter.CollectResetProperties(
-                plan.Symbol,
-                resetProperties);
+            operationWriter.CollectResetProperties(plan.Symbol, resetProperties);
 
             if (!resetProperties.IsEmpty)
             {
                 _writer.WriteLine();
-
-                WriteReset(resetProperties);
+                _resetWriter.WriteMethod(resetProperties);
             }
 
             _writer.CurrentIndent -= _writer.TabSize;
@@ -128,57 +109,8 @@ internal readonly ref struct AkcssStyleWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
 
-        _writer.WriteLine(
-            "global::System.ArgumentNullException.ThrowIfNull(__target);");
-
+        _writer.WriteLine("global::System.ArgumentNullException.ThrowIfNull(__target);");
         operationWriter.Write(symbol, "__target");
-
-        _writer.CurrentIndent -= _writer.TabSize;
-        _writer.WriteLine("}");
-    }
-
-    private void WriteReset(ArrayBuilder<AkcssResetPropertyPlan> properties)
-    {
-        _writer.WriteLine("public override void Reset(object __target)");
-        _writer.WriteLine("{");
-        _writer.CurrentIndent += _writer.TabSize;
-
-        _writer.WriteLine(
-            "global::System.ArgumentNullException.ThrowIfNull(__target);");
-
-        _writer.WriteLine("base.Reset(__target);");
-
-        for (var i = properties.Count - 1; i >= 0; i--)
-        {
-            WriteResetProperty(properties[i]);
-        }
-
-        _writer.CurrentIndent -= _writer.TabSize;
-        _writer.WriteLine("}");
-    }
-
-    private void WriteResetProperty(in AkcssResetPropertyPlan property)
-    {
-        _writer.Write("if (__target is global::Avalonia.AvaloniaObject");
-
-        if (property.ReceiverType is
-            {
-                SpecialType: not SpecialType.System_Object,
-            } receiverType)
-        {
-            _writer.Write(" && __target is ");
-            _valueWriter.WriteTypeName(receiverType);
-        }
-
-        _writer.WriteLine(")");
-        _writer.WriteLine("{");
-        _writer.CurrentIndent += _writer.TabSize;
-
-        _writer.Write(
-            "((global::Avalonia.AvaloniaObject)__target).ClearValue(");
-
-        _targetPropertyWriter.Write(property.TargetProperty);
-        _writer.WriteLine(");");
 
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");

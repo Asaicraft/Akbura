@@ -19,4 +19,12 @@ internal static class AkcssGeneratedNameWriter
         writer.Write("Style_");
         writer.WriteIntegerLiteral(symbolIndex);
     }
+
+    public static void WriteUtilityOperationTypeName(CodeWriter writer, int operationIndex)
+    {
+        Debug.Assert(operationIndex >= 0);
+
+        writer.Write("Operation_");
+        writer.WriteIntegerLiteral(operationIndex);
+    }
 }

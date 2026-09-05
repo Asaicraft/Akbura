@@ -351,16 +351,8 @@ internal ref struct AkcssOperationMetadataPlanner
             _identifierValues.Count,
             preserveAmxResources: true);
 
-        GetOperationSource(
-            operation,
-            out var sourcePath,
-            out var sourceStart,
-            out var sourceLength);
-
-        TryGetConstantMetadata(
-            operation,
-            out var constantValue,
-            out var constantValueType);
+        GetOperationSource(operation, out var sourcePath, out var sourceStart, out var sourceLength);
+        TryGetConstantMetadata(operation, out var constantValue, out var constantValueType);
 
         return new AkcssOperationMetadataPlan
         {
@@ -371,6 +363,7 @@ internal ref struct AkcssOperationMetadataPlanner
             Origin = scope.Origin,
             TargetType = AkcssExpressionGenerator.GetAkcssTargetType(operation.ContainingAkcssSymbol),
             PropertyAccessKind = GetPropertyAccessKind(property),
+            Setter = operation,
             Property = property?.Name,
             AvaloniaProperty = GetAvaloniaPropertyName(property),
             AttachedGetter = GetAttachedGetterName(property),
@@ -386,7 +379,7 @@ internal ref struct AkcssOperationMetadataPlanner
             RequiresBrushConversion = operation.RequiresBrushConversion,
             ConstantValue = constantValue,
             ConstantValueType = constantValueType,
-            Priority = priority,
+            Priority = GetEffectiveOperationPriority(operation, priority),
             HasErrors = operation.HasErrors || property == null || !property.CanWrite,
             DeclaringSymbol = scope.DeclaringSymbol,
             ExpandedFromOrder = scope.ExpandedFromOrder,
@@ -561,6 +554,22 @@ internal ref struct AkcssOperationMetadataPlanner
         sourcePath = null;
         sourceStart = -1;
         sourceLength = 0;
+    }
+
+    private static GeneratedAkcssOperationPriority GetEffectiveOperationPriority(
+        IAkcssPropertySetterOperation operation,
+        GeneratedAkcssOperationPriority priority)
+    {
+        if (priority == GeneratedAkcssOperationPriority.StyleTrigger ||
+            operation is IMetadataAkcssOperation
+            {
+                Priority: MetadataAkcssOperationPriority.StyleTrigger,
+            })
+        {
+            return GeneratedAkcssOperationPriority.StyleTrigger;
+        }
+
+        return GeneratedAkcssOperationPriority.Style;
     }
 
     private static GeneratedAkcssPropertyAccessKind GetPropertyAccessKind(

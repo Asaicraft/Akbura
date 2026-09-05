@@ -263,6 +263,44 @@ internal static class AkcssExpressionGenerator
         }
     }
 
+    public static AkcssGeneratedValue RewriteGeneratedExpression(
+        string? expression,
+        string targetName,
+        bool observeDynamicResource)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+        {
+            return new AkcssGeneratedValue(
+                "default",
+                dynamicResource: null,
+                requiresResourceHost: false);
+        }
+
+        var syntax = CSharpSyntaxFactory.ParseExpression(expression!);
+
+        var rewriter = AkcssAmxExpressionRewriter.GetInstance(
+            targetName,
+            observeDynamicResource,
+            MetadataTargetName,
+            identifierValues: null,
+            identifierValueCount: 0,
+            preserveResourceInvocations: false);
+
+        try
+        {
+            var rewritten = rewriter.Visit(syntax)?.ToString() ?? "default";
+
+            return new AkcssGeneratedValue(
+                rewritten,
+                rewriter.DynamicResource,
+                rewriter.RequiresResourceHost);
+        }
+        finally
+        {
+            rewriter.Free();
+        }
+    }
+
     public static bool TryAppendApplyArgumentExpressions(
         string item,
         ITailwindUtilitySymbol utility,
@@ -393,12 +431,24 @@ internal static class AkcssExpressionGenerator
         ITailwindUtilitySymbol utility,
         ArrayBuilder<AkcssIdentifierValue> identifierValues)
     {
+        AddArgumentParameterValues(utility, MetadataArgumentsName, identifierValues);
+    }
+
+    public static void AddArgumentParameterValues(
+        ITailwindUtilitySymbol utility,
+        string argumentsExpression,
+        ArrayBuilder<AkcssIdentifierValue> identifierValues)
+    {
+        AkburaDebug.Assert(utility != null);
+        AkburaDebug.Assert(!string.IsNullOrEmpty(argumentsExpression));
+        AkburaDebug.Assert(identifierValues != null);
+
         var parameters = utility.Parameters;
 
         for (var i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
-            var expression = CreateMetadataArgumentExpression(parameter);
+            var expression = CreateArgumentExpression(parameter, argumentsExpression);
 
             AddIdentifierAliases(identifierValues, parameter, expression);
         }
@@ -570,8 +620,9 @@ internal static class AkcssExpressionGenerator
         }
     }
 
-    private static CSharpExpressionSyntax CreateMetadataArgumentExpression(
-        ITailwindUtilityParameterSymbol parameter)
+    private static CSharpExpressionSyntax CreateArgumentExpression(
+        ITailwindUtilityParameterSymbol parameter,
+        string argumentsExpression)
     {
         var ordinal = CSharpSyntaxFactory.LiteralExpression(
             CSharpSyntaxKind.NumericLiteralExpression,
@@ -580,14 +631,15 @@ internal static class AkcssExpressionGenerator
         var argument = CSharpSyntaxFactory.Argument(ordinal);
 
         var elementAccess = CSharpSyntaxFactory.ElementAccessExpression(
-            CSharpSyntaxFactory.IdentifierName(MetadataArgumentsName),
+            CSharpSyntaxFactory.IdentifierName(argumentsExpression),
             CSharpSyntaxFactory.BracketedArgumentList(
                 CSharpSyntaxFactory.SingletonSeparatedList(argument)));
 
         return CSharpSyntaxFactory.CastExpression(
-            CSharpSyntaxFactory.ParseTypeName(
-                GetMetadataTypeName(parameter.Type.Symbol)),
-            elementAccess);
+            CSharpSyntaxFactory.ParseTypeName(GetMetadataTypeName(parameter.Type.Symbol)),
+            CSharpSyntaxFactory.PostfixUnaryExpression(
+                CSharpSyntaxKind.SuppressNullableWarningExpression,
+                elementAccess));
     }
 
     private static bool TryCreateApplyArgumentExpression(

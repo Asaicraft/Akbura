@@ -71,6 +71,8 @@ internal struct AkcssOperationMetadataPlan
 
     public GeneratedAkcssPropertyAccessKind PropertyAccessKind { get; init; }
 
+    public IAkcssPropertySetterOperation? Setter { get; init; }
+
     public string? Property { get; init; }
 
     public string? AvaloniaProperty { get; init; }

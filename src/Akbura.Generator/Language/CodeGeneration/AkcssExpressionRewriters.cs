@@ -376,7 +376,8 @@ internal sealed class AkcssAmxExpressionRewriter : CSharpSyntaxRewriter
             RequiresResourceHost = true;
         }
 
-        var keyExpression = node.ArgumentList.Arguments[0].Expression;
+        var keySyntax = node.ArgumentList.Arguments[0].Expression;
+        var keyExpression = Visit(keySyntax) as CSharpExpressionSyntax ?? keySyntax;
 
         if (methodName == "DynamicResource" &&
             _observeDynamicResource &&

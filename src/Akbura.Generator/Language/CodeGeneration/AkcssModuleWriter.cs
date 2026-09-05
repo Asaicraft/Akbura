@@ -19,10 +19,9 @@ internal readonly ref struct AkcssModuleWriter
     private readonly AkcssDeclarationMetadataWriter _metadataWriter;
     private readonly AkcssOperationMetadataWriter _operationMetadataWriter;
     private readonly AkcssStyleWriter _styleWriter;
+    private readonly AkcssUtilityWriter _utilityWriter;
 
-    public AkcssModuleWriter(
-        CodeWriter writer,
-        AkcssGenerationSourceMap sourceMap)
+    public AkcssModuleWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap)
     {
         AkburaDebug.Assert(writer != null);
         AkburaDebug.Assert(sourceMap != null);
@@ -30,12 +29,9 @@ internal readonly ref struct AkcssModuleWriter
         _writer = writer!;
         _valueWriter = new CSharpValueWriter(_writer);
         _metadataWriter = new AkcssDeclarationMetadataWriter(_writer);
-        _operationMetadataWriter = new AkcssOperationMetadataWriter(
-            _writer,
-            sourceMap);
-        _styleWriter = new AkcssStyleWriter(
-            _writer,
-            sourceMap);
+        _operationMetadataWriter = new AkcssOperationMetadataWriter(_writer, sourceMap);
+        _styleWriter = new AkcssStyleWriter(_writer, sourceMap);
+        _utilityWriter = new AkcssUtilityWriter(_writer, sourceMap);
     }
 
     public void WriteAssemblyReference(in AkcssModulePlan plan)
@@ -166,6 +162,31 @@ internal readonly ref struct AkcssModuleWriter
             wroteAny |= _styleWriter.Write(
                 plan,
                 symbol);
+        }
+
+        return wroteAny;
+    }
+
+    public bool WriteUtilities(in AkcssModulePlan plan)
+    {
+        var wroteAny = false;
+
+        for (var i = 0; i < plan.Symbols.Length; i++)
+        {
+            ref readonly var symbol = ref plan.Symbols.ItemRef(i);
+
+            if (symbol.Kind != AkcssSymbolGenerationKind.Utility ||
+                !symbol.EmitsRuntimeStyle)
+            {
+                continue;
+            }
+
+            if (wroteAny)
+            {
+                _writer.WriteLine();
+            }
+
+            wroteAny |= _utilityWriter.Write(plan, symbol);
         }
 
         return wroteAny;

@@ -10,7 +10,7 @@ internal readonly struct AkcssIdentifierValue
     public AkcssIdentifierValue(string name, CSharpExpressionSyntax expression)
     {
         Debug.Assert(!string.IsNullOrEmpty(name));
-        Debug.Assert(expression != null);
+        AkburaDebug.Assert(expression != null);
 
         Name = name;
         Expression = expression;

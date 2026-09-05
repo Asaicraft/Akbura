@@ -131,27 +131,14 @@ internal ref struct AkcssRuntimeOperationWriter
         IAkcssPropertySetterOperation operation,
         string targetExpression)
     {
-        var property = operation.Property;
-
-        if (operation.HasErrors ||
-            property == null ||
-            !property.CanWrite)
+        if (!TryCreatePropertyWrite(
+                operation,
+                out var writePlan,
+                out var avaloniaTarget,
+                out var hasAvaloniaTarget))
         {
             return;
         }
-
-        var writePlan = PropertyWritePlan.Create(property);
-
-        if (writePlan.Kind != PropertyWriteKind.ClrProperty &&
-            writePlan.Kind != PropertyWriteKind.AvaloniaProperty &&
-            writePlan.Kind != PropertyWriteKind.AttachedAccessor)
-        {
-            return;
-        }
-
-        var hasAvaloniaTarget = TryGetAvaloniaPropertyTarget(
-            property,
-            out var avaloniaTarget);
 
         var value = AkcssExpressionGenerator.GetValueExpression(
             operation,
@@ -160,7 +147,50 @@ internal ref struct AkcssRuntimeOperationWriter
             _identifierValues,
             _identifierValues.Count);
 
-        var receiverType = AkcssExpressionGenerator.GetPropertyReceiverType(property);
+        WritePropertySetterCore(
+            operation,
+            writePlan,
+            avaloniaTarget,
+            hasAvaloniaTarget,
+            targetExpression,
+            value);
+    }
+
+    public void WriteSetter(
+        IAkcssPropertySetterOperation operation,
+        string targetExpression,
+        scoped in AkcssGeneratedValue value)
+    {
+        if (!TryCreatePropertyWrite(
+                operation,
+                out var writePlan,
+                out var avaloniaTarget,
+                out var hasAvaloniaTarget))
+        {
+            return;
+        }
+
+        WritePropertySetterCore(
+            operation,
+            writePlan,
+            avaloniaTarget,
+            hasAvaloniaTarget,
+            targetExpression,
+            value);
+    }
+
+    private void WritePropertySetterCore(
+        IAkcssPropertySetterOperation operation,
+        scoped in PropertyWritePlan writePlan,
+        scoped in MarkupTargetPropertyPlan avaloniaTarget,
+        bool hasAvaloniaTarget,
+        string targetExpression,
+        scoped in AkcssGeneratedValue value)
+    {
+        var property = operation.Property;
+        AkburaDebug.Assert(property != null);
+
+        var receiverType = AkcssExpressionGenerator.GetPropertyReceiverType(property!);
         var hasGuard = WriteTargetGuardStart(
             targetExpression,
             receiverType,
@@ -168,8 +198,7 @@ internal ref struct AkcssRuntimeOperationWriter
 
         try
         {
-            if (value.DynamicResource is { } dynamicResource &&
-                hasAvaloniaTarget)
+            if (value.DynamicResource is { } dynamicResource && hasAvaloniaTarget)
             {
                 WriteDynamicResourceBinding(
                     avaloniaTarget,
@@ -191,6 +220,38 @@ internal ref struct AkcssRuntimeOperationWriter
         {
             WriteTargetGuardEnd(hasGuard);
         }
+    }
+
+    private static bool TryCreatePropertyWrite(
+        IAkcssPropertySetterOperation operation,
+        out PropertyWritePlan writePlan,
+        out MarkupTargetPropertyPlan avaloniaTarget,
+        out bool hasAvaloniaTarget)
+    {
+        var property = operation.Property;
+
+        if (operation.HasErrors || property == null || !property.CanWrite)
+        {
+            writePlan = default;
+            avaloniaTarget = default;
+            hasAvaloniaTarget = false;
+            return false;
+        }
+
+        writePlan = PropertyWritePlan.Create(property);
+
+        if (writePlan.Kind is not (
+                PropertyWriteKind.ClrProperty or
+                PropertyWriteKind.AvaloniaProperty or
+                PropertyWriteKind.AttachedAccessor))
+        {
+            avaloniaTarget = default;
+            hasAvaloniaTarget = false;
+            return false;
+        }
+
+        hasAvaloniaTarget = TryGetAvaloniaPropertyTarget(property, out avaloniaTarget);
+        return true;
     }
 
     private void WritePropertyAssignment(

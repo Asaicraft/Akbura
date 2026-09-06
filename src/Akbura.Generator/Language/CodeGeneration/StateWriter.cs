@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -7,6 +8,7 @@ internal readonly ref struct StateWriter
     private readonly CodeWriter _writer;
     private readonly CSharpValueWriter _valueWriter;
     private readonly CSharpSyntaxWriter _syntaxWriter;
+    private readonly UseHookInvocationWriter _hookWriter;
     private readonly SourceMappingWriter _mappings;
     private readonly string _ownerTypeName;
 
@@ -22,6 +24,7 @@ internal readonly ref struct StateWriter
         _writer = writer!;
         _valueWriter = new CSharpValueWriter(writer!);
         _syntaxWriter = new CSharpSyntaxWriter(writer!);
+        _hookWriter = new UseHookInvocationWriter(writer!);
         _mappings = new SourceMappingWriter(writer!, sourceMap!);
         _ownerTypeName = ownerTypeName;
     }
@@ -170,18 +173,30 @@ internal readonly ref struct StateWriter
                 returnPrefix.Length);
 
             _writer.Write(returnPrefix);
-            _syntaxWriter.WriteExpression(plan.Initializer);
+            WriteInitializer(plan);
             _writer.WriteLine(";");
         }
         else
         {
             _writer.Write(returnPrefix);
-            _syntaxWriter.WriteExpression(plan.Initializer);
+            WriteInitializer(plan);
             _writer.WriteLine(";");
         }
 
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
+    }
+
+    private void WriteInitializer(in ComponentStatePlan plan)
+    {
+        if (plan.HookMethod is { } method)
+        {
+            _hookWriter.Write(method, (InvocationExpressionSyntax)plan.Initializer);
+        }
+        else
+        {
+            _syntaxWriter.WriteExpression(plan.Initializer);
+        }
     }
 
     private void WriteValueType(in ComponentStatePlan plan)

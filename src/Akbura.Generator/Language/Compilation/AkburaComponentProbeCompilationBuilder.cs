@@ -388,7 +388,7 @@ internal static class AkburaComponentProbeCompilationBuilder
                 StringComparison.Ordinal);
     }
 
-    private static string GetNamespaceName(
+    internal static string GetNamespaceName(
         AkburaSyntaxTree syntaxTree,
         string rootNamespace,
         string projectDirectory)

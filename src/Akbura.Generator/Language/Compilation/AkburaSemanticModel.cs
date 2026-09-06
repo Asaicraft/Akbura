@@ -37,7 +37,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private readonly IOperationFactory _operationFactory;
     private readonly DeclarationSymbolTable _declarationSymbols;
 
-    protected AkburaSemanticModel(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
+    protected AkburaSemanticModel(
+        AkburaCompilation compilation,
+        AkburaSyntaxTree syntaxTree,
+        SemanticModelState? reusableState = null)
     {
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
@@ -45,6 +48,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         _bindingSession = new BindingSession(this);
         _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
         _declarationSymbols = new DeclarationSymbolTable(this);
+
+        if (reusableState?.IsCompatibleWith(compilation, syntaxTree) == true)
+        {
+            _bindingCache.ImportReusableResults(reusableState);
+            _declarationSymbols.ImportReusableResults(reusableState);
+        }
     }
 
     protected AkburaSemanticModel(AkburaSemanticModel semanticModel)
@@ -65,6 +74,15 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     public AkburaCompilation Compilation { get; }
 
     public AkburaSyntaxTree SyntaxTree { get; }
+
+    internal SemanticModelState GetReusableState()
+    {
+        var builder = new SemanticModelState.Builder(
+            SyntaxTree, Compilation.CSharpCompilation, Compilation.RootNamespace, Compilation.ProjectDirectory);
+        _bindingCache.CopyReusableResultsTo(builder);
+        _declarationSymbols.CopyReusableResultsTo(builder);
+        return builder.ToState();
+    }
 
     public virtual AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax)
     {
@@ -3272,9 +3290,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         if (TryGetCachedSymbolInfo(markupElement, out var cachedSymbolInfo) &&
             cachedSymbolInfo.Symbol is IMarkupComponentSymbol cachedComponent &&
-            !cachedComponent.CSharpDefinition.IsDefault)
+            GetMarkupComponentReferenceType(cachedComponent) is { } componentType)
         {
-            type = cachedComponent.CSharpDefinition;
+            type = new CSharpSymbolDefinition(componentType);
             return true;
         }
 
@@ -3300,6 +3318,20 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         type = default;
         return false;
+    }
+
+    internal INamedTypeSymbol? GetMarkupComponentReferenceType(IMarkupComponentSymbol symbol)
+    {
+        var componentType = symbol.ComponentType ?? symbol.AkburaComponent?.ComponentType;
+        if (symbol.AkburaComponent is { } component && componentType?.IsGenericType != true)
+        {
+            // Markup binding has already selected the component. Resolve its full name
+            // with the generated partial base, rather than rebinding an ambiguous tag.
+            return Compilation.CSharpProbeCompilation.GetTypeByMetadataName(component.MetadataName) ??
+                componentType;
+        }
+
+        return componentType;
     }
 
     private static void AddNamespaceSegments(
@@ -4958,7 +4990,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         var symbolInfo = GetSyntaxTreeSymbolInfo(elementContent.Element);
         var componentSymbol = symbolInfo.Symbol as IMarkupComponentSymbol;
-        var childType = componentSymbol?.CSharpDefinition ?? default;
+        var componentType = componentSymbol == null ? null : GetMarkupComponentReferenceType(componentSymbol);
+        var childType = componentType == null ? default : new CSharpSymbolDefinition(componentType);
 
         childrenBuilder.Add(new MarkupChildContent(
             elementContent,
@@ -4968,16 +5001,16 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             whitespaceMode: whitespaceMode,
             isDeferred: isDeferred));
 
-        if (componentSymbol?.ComponentType == null)
+        if (componentType == null)
         {
             return;
         }
 
-        if (!IsAllowedMarkupChildType(componentSymbol.ComponentType, contentModel))
+        if (!IsAllowedMarkupChildType(componentType, contentModel))
         {
             diagnosticsBuilder.Add(CreateInvalidMarkupChildDiagnostic(
                 elementContent,
-                componentSymbol.CSharpDefinition,
+                childType,
                 contentModel));
         }
     }

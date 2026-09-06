@@ -537,7 +537,8 @@ internal static class ComponentPlanner
                             ComponentRenderStatementKind.UseHookInvocation,
                             hook.EffectiveInvocation,
                             syntax,
-                            ComponentRenderStatementPhase.Update));
+                            ComponentRenderStatementPhase.Update,
+                            hookMethod: hook.Method));
                     }
 
                     continue;
@@ -586,11 +587,7 @@ internal static class ComponentPlanner
                 return false;
             }
 
-            var type = _semanticModel.TryGetMarkupElementReferenceType(syntax, out var referenceType) &&
-                referenceType.Symbol is ITypeSymbol resolvedType
-                    ? resolvedType
-                    : symbol.ComponentType ?? symbol.AkburaComponent?.ComponentType ??
-                        _compilation.GetSpecialType(SpecialType.System_Object);
+            var type = GetElementType(syntax, symbol);
             var scope = context.GetEffectiveScope();
             var nameOperation = FindNameOperation(symbol);
             elementId = _elements.Count;
@@ -1049,21 +1046,29 @@ internal static class ComponentPlanner
             return new TraversalContext(template, deferred);
         }
 
-        private bool IsDataTemplateElement(MarkupElementSyntax syntax)
+        private ITypeSymbol GetElementType(
+            MarkupElementSyntax syntax,
+            IMarkupComponentSymbol symbol)
         {
+            if (_semanticModel.GetMarkupComponentReferenceType(symbol) is { } componentType)
+            {
+                return componentType;
+            }
+
             if (_semanticModel.TryGetMarkupElementReferenceType(syntax, out var referenceType) &&
                 referenceType.Symbol is ITypeSymbol resolvedType)
             {
-                return IsDataTemplateType(resolvedType);
+                return resolvedType;
             }
 
-            if (_semanticModel.GetSymbolInfo(syntax).Symbol is IMarkupComponentSymbol symbol &&
-                (symbol.ComponentType ?? symbol.AkburaComponent?.ComponentType) is { } componentType)
-            {
-                return IsDataTemplateType(componentType);
-            }
+            return symbol.ComponentType ?? symbol.AkburaComponent?.ComponentType ??
+                _compilation.GetSpecialType(SpecialType.System_Object);
+        }
 
-            return false;
+        private bool IsDataTemplateElement(MarkupElementSyntax syntax)
+        {
+            return _semanticModel.GetSymbolInfo(syntax).Symbol is IMarkupComponentSymbol symbol &&
+                IsDataTemplateType(GetElementType(syntax, symbol));
         }
 
         private void TrackBoundaryRoot(

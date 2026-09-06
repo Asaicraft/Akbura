@@ -1,5 +1,6 @@
 ﻿using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis;
 using System;
 using System.Diagnostics;
 
@@ -27,17 +28,20 @@ internal readonly struct ComponentRenderStatementPlan
         ComponentRenderStatementKind kind,
         CSharpSyntaxNode node,
         CSharpStatementSyntax syntax,
-        ComponentRenderStatementPhase phase = ComponentRenderStatementPhase.Update)
+        ComponentRenderStatementPhase phase = ComponentRenderStatementPhase.Update,
+        IMethodSymbol? hookMethod = null)
     {
         Debug.Assert(kind != ComponentRenderStatementKind.None);
         Debug.Assert(node != null);
         Debug.Assert(syntax != null);
         Debug.Assert(phase != ComponentRenderStatementPhase.None);
+        Debug.Assert(kind != ComponentRenderStatementKind.UseHookInvocation || hookMethod != null);
 
         Kind = kind;
         Node = node!;
         Syntax = syntax!;
         Phase = phase;
+        HookMethod = hookMethod;
     }
 
     public ComponentRenderStatementKind Kind { get; }
@@ -47,6 +51,8 @@ internal readonly struct ComponentRenderStatementPlan
     public CSharpStatementSyntax Syntax { get; }
 
     public ComponentRenderStatementPhase Phase { get; }
+
+    public IMethodSymbol? HookMethod { get; }
 
     public bool WritesDuringFirstUpdate =>
         (Phase & ComponentRenderStatementPhase.FirstUpdate) != 0;

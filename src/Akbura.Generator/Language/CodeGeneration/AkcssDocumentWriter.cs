@@ -38,6 +38,9 @@ internal static class AkcssDocumentWriter
         string rootNamespace,
         CancellationToken cancellationToken = default)
     {
+#if STATS
+        using var generationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.AkcssGeneration);
+#endif
         Debug.Assert(input.Module != null);
         Debug.Assert(input.SemanticModel != null);
         Debug.Assert(!string.IsNullOrWhiteSpace(input.SourcePath));
@@ -46,10 +49,19 @@ internal static class AkcssDocumentWriter
 
         cancellationToken.ThrowIfCancellationRequested();
 
+#if STATS
+        using var planningMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.AkcssPlanning);
+#endif
         var plan = AkcssModulePlanner.Create(input, rootNamespace, cancellationToken);
+#if STATS
+        planningMeasurement.Dispose();
+#endif
 
         try
         {
+#if STATS
+            using var emissionMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEmission);
+#endif
             using var writer = new CodeWriter();
 
             var moduleWriter = new AkcssModuleWriter(writer, sourceMap);
@@ -85,7 +97,17 @@ internal static class AkcssDocumentWriter
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            return writer.GetText();
+#if STATS
+            emissionMeasurement.Dispose();
+            using var sourceTextMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.SourceTextCreation);
+#endif
+            var sourceText = writer.GetText();
+#if STATS
+            sourceTextMeasurement.Dispose();
+            GenerationStatistics.Increment(GenerationStatisticCounter.GeneratedSourceTextCreated);
+            GenerationStatistics.Increment(GenerationStatisticCounter.AkcssGenerated);
+#endif
+            return sourceText;
         }
         finally
         {

@@ -12,11 +12,22 @@ internal static class Program
 {
     public static void Main(string[] args)
     {
-#if ENABLE_QUICK_SCAN_BENCHMARK
+        if (FeatureGalleryParityVerification.TryRun(args))
+        {
+            return;
+        }
+
+        if (FeatureGalleryColdComparison.TryRun(args))
+        {
+            return;
+        }
+
+        if (FeatureGalleryStageMeasurements.TryRun(args))
+        {
+            return;
+        }
+
         BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
-#else
-		Console.WriteLine("Quick scan benchmark is disabled. Run with /p:EnableQuickScanBenchmark=true.");
-#endif
     }
 }
 

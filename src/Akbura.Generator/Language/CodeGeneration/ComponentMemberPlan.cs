@@ -155,7 +155,8 @@ internal readonly struct ComponentStatePlan
         ComponentStateFactoryKind factoryKind,
         ComponentStateFlags flags,
         ExpressionSyntax initializer,
-        StateDeclarationSyntax syntax)
+        StateDeclarationSyntax syntax,
+        IMethodSymbol? hookMethod = null)
     {
         Id = id;
         Name = name;
@@ -165,6 +166,7 @@ internal readonly struct ComponentStatePlan
         Flags = flags;
         Initializer = initializer;
         Syntax = syntax;
+        HookMethod = hookMethod;
     }
 
     public int Id { get; }
@@ -182,6 +184,8 @@ internal readonly struct ComponentStatePlan
     public ExpressionSyntax Initializer { get; }
 
     public StateDeclarationSyntax Syntax { get; }
+
+    public IMethodSymbol? HookMethod { get; }
 
     public bool IsReadOnly => (Flags & ComponentStateFlags.IsReadOnly) != 0;
 

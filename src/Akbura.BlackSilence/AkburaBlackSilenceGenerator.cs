@@ -6,7 +6,6 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Akbura.BlackSilence;
 
@@ -17,7 +16,7 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
     private const string SourceTextsTrackingName = "BlackSilence.SourceTexts";
     private const string SourceFilesTrackingName = "BlackSilence.SourceFiles";
     private const string SyntaxTreesTrackingName = "BlackSilence.SyntaxTrees";
-    private const string GenerationCatalogTrackingName = "BlackSilence.GenerationCatalog";
+    private const string GenerationRequestsTrackingName = "BlackSilence.GenerationRequests";
     private const string GeneratedComponentsTrackingName = "BlackSilence.GeneratedComponents";
     private const string GeneratedExternalAkcssTrackingName = "BlackSilence.GeneratedExternalAkcss";
     private const string GeneratedInlineAkcssTrackingName = "BlackSilence.GeneratedInlineAkcss";
@@ -35,44 +34,69 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             .Select(static (sourceText, _) => sourceText.GetValueOrDefault())
             .WithTrackingName(SourceTextsTrackingName);
 
+        // Combining a values provider directly can retain an empty cached removal
+        // slot in Roslyn and drop a later document on the next unchanged run.
+        // Combine the collected input, then let SelectMany compare each file.
         var sourceFiles = sourceTexts
+            .Collect()
             .Combine(projectOptions)
-            .Select(static (input, _) => CreateSourceFile(input.Left, input.Right))
+            .SelectMany(static (input, cancellationToken) => CreateSourceFiles(input.Left, input.Right, cancellationToken))
             .WithTrackingName(SourceFilesTrackingName);
 
         var syntaxTrees = sourceFiles
             .Select(static (sourceFile, cancellationToken) => ParseSyntaxTree(sourceFile, cancellationToken))
             .WithTrackingName(SyntaxTreesTrackingName);
 
-        var generationCatalog = syntaxTrees
-            .Collect()
-            .Combine(context.CompilationProvider)
+        var documents = syntaxTrees
+            .Select(static (tree, cancellationToken) => DocumentSyntaxVersion.Create(tree, cancellationToken))
+            .WithComparer(DocumentSyntaxVersionComparer.Instance)
+            .WithTrackingName("BlackSilence.Documents");
+
+        var collectedDocuments = documents.Collect();
+        var csharpEnvironment = context.CompilationProvider
+            .Combine(collectedDocuments)
             .Combine(projectOptions)
-            .Select(static (input, cancellationToken) => CreateGenerationCatalog(
+            .Select(static (input, cancellationToken) => CSharpEnvironmentSnapshot.Create(
+                (CSharpCompilation)input.Left.Left,
+                input.Left.Right,
+                input.Right,
+                cancellationToken))
+            .WithComparer(CSharpEnvironmentSnapshotComparer.Instance)
+            .WithTrackingName("BlackSilence.CSharpEnvironment");
+
+        var projectState = csharpEnvironment
+            .Select(static (environment, _) => new BlackSilenceProjectState(environment.Compilation))
+            .WithTrackingName("BlackSilence.ProjectState");
+
+        var generationRequests = collectedDocuments
+            .Combine(projectState)
+            .Combine(projectOptions)
+            .Select(static (input, cancellationToken) => BlackSilenceGenerationRequestBuilder.Create(
                 input.Left.Left,
                 input.Left.Right,
                 input.Right,
                 cancellationToken))
-            .WithTrackingName(GenerationCatalogTrackingName);
+            .WithComparer(GenerationRequestComparer.Instance)
+            .WithTrackingName(GenerationRequestsTrackingName);
 
-        var generatedComponents = generationCatalog
-            .SelectMany(static (catalog, cancellationToken) => catalog != null
-                ? GenerateComponents(catalog, cancellationToken)
-                : [])
+        var generated = generationRequests
+            .Select(static (request, cancellationToken) => request == null
+                ? null
+                : BlackSilenceDocumentBatch.Generate(request, cancellationToken))
+            .WithTrackingName("BlackSilence.GeneratedBatch");
+
+        var generatedComponents = generated
+            .SelectMany(static (batch, _) => batch?.Components ?? [])
             .WithComparer(GeneratedSourceComparer.Instance)
             .WithTrackingName(GeneratedComponentsTrackingName);
 
-        var generatedExternalAkcss = generationCatalog
-            .SelectMany(static (catalog, cancellationToken) => catalog != null
-                ? GenerateExternalAkcss(catalog, cancellationToken)
-                : [])
+        var generatedExternalAkcss = generated
+            .SelectMany(static (batch, _) => batch?.ExternalAkcss ?? [])
             .WithComparer(GeneratedSourceComparer.Instance)
             .WithTrackingName(GeneratedExternalAkcssTrackingName);
 
-        var generatedInlineAkcss = generationCatalog
-            .SelectMany(static (catalog, cancellationToken) => catalog != null
-                ? GenerateInlineAkcss(catalog, cancellationToken)
-                : [])
+        var generatedInlineAkcss = generated
+            .SelectMany(static (batch, _) => batch?.InlineAkcss ?? [])
             .WithComparer(GeneratedSourceComparer.Instance)
             .WithTrackingName(GeneratedInlineAkcssTrackingName);
 
@@ -93,6 +117,9 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         AdditionalText file,
         CancellationToken cancellationToken)
     {
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.ReadSourceText);
+#endif
         var sourceText = file.GetText(cancellationToken);
 
         if (sourceText == null)
@@ -106,6 +133,21 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             : SyntaxTreeKind.Component;
 
         return new AkburaSourceText(kind, file.Path, sourceText);
+    }
+
+    private static ImmutableArray<AkburaSourceFile> CreateSourceFiles(
+        ImmutableArray<AkburaSourceText> sourceTexts,
+        GeneratorProjectOptions projectOptions,
+        CancellationToken cancellationToken)
+    {
+        var sourceFiles = new AkburaSourceFile[sourceTexts.Length];
+        for (var i = 0; i < sourceFiles.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            sourceFiles[i] = CreateSourceFile(sourceTexts[i], projectOptions);
+        }
+
+        return sourceFiles.ToImmutableArrayUnsafe();
     }
 
     private static AkburaSourceFile CreateSourceFile(
@@ -136,122 +178,6 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             sourceText.SourceText);
     }
 
-    private static AkburaGenerationCatalog? CreateGenerationCatalog(
-        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
-        Compilation compilation,
-        GeneratorProjectOptions projectOptions,
-        CancellationToken cancellationToken)
-    {
-        if (compilation is not CSharpCompilation csharpCompilation)
-        {
-            return null;
-        }
-
-        return AkburaGenerationCatalogBuilder.Create(
-            csharpCompilation,
-            syntaxTrees,
-            projectOptions.RootNamespace,
-            projectOptions.ProjectDirectory,
-            cancellationToken);
-    }
-
-    private static ImmutableArray<GeneratedSource> GenerateComponents(
-        AkburaGenerationCatalog catalog,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var inputs = catalog.Components;
-
-        if (inputs.IsEmpty)
-        {
-            return [];
-        }
-
-        var results = new GeneratedSource[inputs.Length];
-
-        Parallel.For(
-            0,
-            inputs.Length,
-            new ParallelOptions
-            {
-                CancellationToken = cancellationToken,
-                MaxDegreeOfParallelism = Math.Max(1, ProcessorCountHelper.GetProcessorCount() / 4),
-            },
-            index =>
-            {
-                var input = inputs[index];
-
-                var sourceText = ComponentDocumentWriter.Generate(
-                    input.Component,
-                    input.SemanticModel,
-                    input.SourcePath,
-                    catalog.AkcssModuleTypeNames,
-                    cancellationToken);
-
-                var hintName = ComponentDocumentWriter.GetHintName(
-                    input.Component,
-                    input.SourcePath);
-
-                results[index] = new GeneratedSource(hintName, sourceText);
-            });
-
-        return results.ToImmutableArrayUnsafe();
-    }
-
-    private static ImmutableArray<GeneratedSource> GenerateExternalAkcss(
-        AkburaGenerationCatalog catalog,
-        CancellationToken cancellationToken)
-    {
-        return GenerateAkcss(catalog.ExternalAkcssModules, catalog, cancellationToken);
-    }
-
-    private static ImmutableArray<GeneratedSource> GenerateInlineAkcss(
-        AkburaGenerationCatalog catalog,
-        CancellationToken cancellationToken)
-    {
-        return GenerateAkcss(catalog.InlineAkcssModules, catalog, cancellationToken);
-    }
-
-    private static ImmutableArray<GeneratedSource> GenerateAkcss(
-        ImmutableArray<AkcssGenerationInput> inputs,
-        AkburaGenerationCatalog catalog,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (inputs.IsEmpty)
-        {
-            return [];
-        }
-
-        var results = new GeneratedSource[inputs.Length];
-
-        Parallel.For(
-            0,
-            inputs.Length,
-            new ParallelOptions
-            {
-                CancellationToken = cancellationToken,
-                MaxDegreeOfParallelism = Math.Max(1, ProcessorCountHelper.GetProcessorCount() / 2),
-            },
-            index =>
-            {
-                var input = inputs[index];
-
-                var sourceText = AkcssDocumentWriter.Generate(
-                    input,
-                    catalog.AkcssSourceMap,
-                    catalog.RootNamespace,
-                    cancellationToken);
-
-                var hintName = AkcssDocumentWriter.GetHintName(input);
-
-                results[index] = new GeneratedSource(hintName, sourceText);
-            });
-
-        return results.ToImmutableArrayUnsafe();
-    }
 
     private static void AddGeneratedSource(SourceProductionContext context, GeneratedSource source)
     {
@@ -263,6 +189,9 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         AkburaSourceFile sourceFile,
         CancellationToken cancellationToken)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.Parse);
+#endif
         cancellationToken.ThrowIfCancellationRequested();
 
         var cached = IncrementalParseCache.TryGet(
@@ -314,6 +243,13 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         AkburaSourceFile sourceFile,
         CancellationToken cancellationToken)
     {
+#if STATS
+        if (previousSyntaxTree is ComponentSyntaxTree && sourceFile.Kind == SyntaxTreeKind.Component ||
+            previousSyntaxTree is AkcssSyntaxTree && sourceFile.Kind == SyntaxTreeKind.Akcss)
+        {
+            GenerationStatistics.Increment(GenerationStatisticCounter.IncrementalParse);
+        }
+#endif
         return previousSyntaxTree switch
         {
             ComponentSyntaxTree componentSyntaxTree when sourceFile.Kind == SyntaxTreeKind.Component =>
@@ -336,6 +272,9 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         AkburaSourceFile sourceFile,
         CancellationToken cancellationToken)
     {
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.FullParse);
+#endif
         return sourceFile.Kind switch
         {
             SyntaxTreeKind.Component => ComponentSyntaxTree.ParseText(

@@ -7,6 +7,7 @@ internal readonly ref struct ComponentRenderStatementWriter
 {
     private readonly CodeWriter _writer;
     private readonly CSharpSyntaxWriter _syntaxWriter;
+    private readonly UseHookInvocationWriter _hookWriter;
     private readonly SourceMappingWriter _mappings;
 
     public ComponentRenderStatementWriter(
@@ -18,6 +19,7 @@ internal readonly ref struct ComponentRenderStatementWriter
 
         _writer = writer!;
         _syntaxWriter = new CSharpSyntaxWriter(writer!);
+        _hookWriter = new UseHookInvocationWriter(writer!);
         _mappings = new SourceMappingWriter(writer!, sourceMap!);
     }
 
@@ -32,7 +34,8 @@ internal readonly ref struct ComponentRenderStatementWriter
                 return;
 
             case ComponentRenderStatementKind.UseHookInvocation:
-                _syntaxWriter.WriteExpression((ExpressionSyntax)plan.Node);
+                AkburaDebug.Assert(plan.HookMethod != null);
+                _hookWriter.Write(plan.HookMethod, (InvocationExpressionSyntax)plan.Node);
                 _writer.WriteLine(";");
                 return;
 

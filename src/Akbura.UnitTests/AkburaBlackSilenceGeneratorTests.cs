@@ -541,6 +541,93 @@ public sealed class AkburaBlackSilenceGeneratorTests
         Assert.Equal(1, file.ReadCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenerateSources_CompilesHooksAndTemplatesAcrossSourceComponents(bool reverseInputs)
+    {
+        const string contentSource =
+            """
+            using Avalonia.Controls;
+
+            param string Title = "Preview";
+
+            <TextBlock Text={Title} />
+            """;
+
+        const string hostSource =
+            """
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+            using Avalonia.Controls.Templates;
+
+            param IDataTemplate View;
+            state Control? preview = null;
+
+            useEffect(() =>
+            {
+                preview = View.Build(null);
+            }, [View]);
+
+            <ContentControl Content={preview} />
+            """;
+
+        const string hookSource =
+            """
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+            using Demo.Components;
+
+            param DataTemplates Target;
+            state string title = useAvaloniaProperty(Target, Demo.Components.DataTemplates.TitleProperty);
+
+            <TextBlock Text={title} />
+            """;
+
+        const string pageSource =
+            """
+            using Avalonia.Controls.Templates;
+            using Demo.Components;
+
+            <PreviewHost>
+                <PreviewHost.View>
+                    <DataTemplates Title="From template" />
+                </PreviewHost.View>
+            </PreviewHost>
+            """;
+
+        var projectDirectory = Path.Combine(Path.GetTempPath(), "BlackSilenceSourceComponentRegressionTests");
+        var files = new TestAdditionalText[]
+        {
+            new(Path.Combine(projectDirectory, "Page.akbura"), SourceText.From(pageSource)),
+            new(Path.Combine(projectDirectory, "Components", "PreviewHost.akbura"), SourceText.From(hostSource)),
+            new(Path.Combine(projectDirectory, "Components", "HookReader.akbura"), SourceText.From(hookSource)),
+            new(Path.Combine(projectDirectory, "Components", "DataTemplates.akbura"), SourceText.From(contentSource)),
+        };
+
+        if (reverseInputs)
+        {
+            Array.Reverse(files);
+        }
+
+        var compilation = CreateCompilation(string.Empty);
+        var options = new TestAnalyzerConfigOptionsProvider("Demo", projectDirectory);
+        var driver = CreateDriver(options, files);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out _);
+        AssertGeneratedCompilation(driver, outputCompilation);
+
+        var sources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
+
+        Assert.Equal(4, sources.Length);
+        Assert.Contains(sources, static source => source.SourceText.ToString().Contains(
+            "global::Akbura.Hooks.EffectHooks.useEffect(",
+            StringComparison.Ordinal));
+        Assert.Contains(sources, static source => source.SourceText.ToString().Contains(
+            "global::Akbura.Hooks.AvaloniaPropertyHooks.useAvaloniaProperty<global::Demo.Components.DataTemplates, string>(",
+            StringComparison.Ordinal));
+    }
+
     private static void AssertGeneratedCompilation(GeneratorDriver driver, Compilation compilation)
     {
         var result = Assert.Single(driver.GetRunResult().Results);

@@ -235,10 +235,12 @@ internal static class ComponentMemberPlanner
                     ? ComponentStateFlags.IsReadOnly
                     : ComponentStateFlags.None;
                 var factoryKind = ComponentStateFactoryKind.Value;
+                IMethodSymbol? hookMethod = null;
 
                 if (_semanticModel.GetOperation(state.InitializerSyntax) is IUseHookOperation hook)
                 {
                     initializer = hook.EffectiveInvocation;
+                    hookMethod = hook.Method;
                     factoryKind = ComponentStateFactoryKind.State;
                     flags |= ComponentStateFlags.UsesHook;
                 }
@@ -251,7 +253,8 @@ internal static class ComponentMemberPlanner
                     factoryKind,
                     flags,
                     initializer,
-                    state.DeclarationSyntax));
+                    state.DeclarationSyntax,
+                    hookMethod));
             }
         }
 

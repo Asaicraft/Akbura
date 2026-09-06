@@ -44,6 +44,9 @@ internal static class ComponentDocumentWriter
         IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
         CancellationToken cancellationToken = default)
     {
+#if STATS
+        using var generationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ComponentGeneration);
+#endif
         if (component == null)
         {
             throw new ArgumentNullException(nameof(component));
@@ -69,12 +72,19 @@ internal static class ComponentDocumentWriter
         cancellationToken.ThrowIfCancellationRequested();
 
         using var codeWriter = new CodeWriter();
+#if STATS
+        using var planningMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ComponentPlanning);
+#endif
         using var componentWriter = new ComponentWriter(
             codeWriter,
             component,
             semanticModel,
             sourcePath,
             akcssModuleTypeNames);
+#if STATS
+        planningMeasurement.Dispose();
+        using var emissionMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEmission);
+#endif
 
         WriteHeader(
             codeWriter,
@@ -114,7 +124,17 @@ internal static class ComponentDocumentWriter
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        return codeWriter.GetText();
+#if STATS
+        emissionMeasurement.Dispose();
+        using var sourceTextMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.SourceTextCreation);
+#endif
+        var sourceText = codeWriter.GetText();
+#if STATS
+        sourceTextMeasurement.Dispose();
+        GenerationStatistics.Increment(GenerationStatisticCounter.GeneratedSourceTextCreated);
+        GenerationStatistics.Increment(GenerationStatisticCounter.ComponentGenerated);
+#endif
+        return sourceText;
     }
 
     private static void WriteHeader(

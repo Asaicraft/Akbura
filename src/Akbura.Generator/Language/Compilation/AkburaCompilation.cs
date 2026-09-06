@@ -9,12 +9,16 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
+#if STATS
+using Akbura.Language.CodeGeneration;
+#endif
 
 namespace Akbura.Language;
 
 internal sealed partial class AkburaCompilation
 {
     private readonly ConcurrentDictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
+    private readonly ConcurrentDictionary<AkburaSyntaxTree, SemanticModelState> _reusableSemanticStates = new();
     private readonly SyntaxAndDeclarationManager _syntaxAndDeclarations;
     private readonly ReferenceManager _referenceManager;
     private ImmutableArray<UsingDirectiveSyntax> _lazyGlobalAkburaUsingDirectives;
@@ -110,6 +114,9 @@ internal sealed partial class AkburaCompilation
 
         RootNamespace = rootNamespace ?? string.Empty;
         ProjectDirectory = projectDirectory ?? string.Empty;
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.CompilationCreated);
+#endif
     }
     public CSharpCompilation CSharpCompilation { get; }
 
@@ -124,6 +131,9 @@ internal sealed partial class AkburaCompilation
                 return compilation;
             }
 
+#if STATS
+            using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeCompilation);
+#endif
             compilation =
                 AkburaComponentProbeCompilationBuilder.Build(
                     CSharpCompilation,
@@ -342,7 +352,15 @@ internal sealed partial class AkburaCompilation
         {
             return _semanticModels.GetOrAdd(
                 syntaxTree,
-                tree => new SyntaxTreeSemanticModel(this, tree));
+                tree =>
+                {
+                    _reusableSemanticStates.TryGetValue(tree, out var reusableState);
+                    var model = new SyntaxTreeSemanticModel(this, tree, reusableState);
+#if STATS
+                    GenerationStatistics.Increment(GenerationStatisticCounter.SemanticModelCreated);
+#endif
+                    return model;
+                });
         }
 
         if (_referenceManager.TryGetSemanticModel(syntaxTree, out var referencedModel))
@@ -359,13 +377,56 @@ internal sealed partial class AkburaCompilation
 
         return _semanticModels.GetOrAdd(
             syntaxTree,
-            tree => new SyntaxTreeSemanticModel(this, tree));
+            tree =>
+            {
+                _reusableSemanticStates.TryGetValue(tree, out var reusableState);
+                var model = new SyntaxTreeSemanticModel(this, tree, reusableState);
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.SemanticModelCreated);
+#endif
+                return model;
+            });
     }
 
     internal bool ContainsComponentSyntaxTree(AkburaSyntaxTree syntaxTree)
     {
         return SyntaxTrees.Contains(syntaxTree) ||
             _referenceManager.ContainsComponentSyntaxTree(syntaxTree);
+    }
+
+    /// <summary>
+    /// Capture only completed models after all generation workers have finished.
+    /// Captured states do not retain this compilation or any owner-bound caches.
+    /// </summary>
+    internal ImmutableDictionary<AkburaSyntaxTree, SemanticModelState> GetReusableSemanticStates()
+    {
+        var states = _reusableSemanticStates.ToImmutableDictionary().ToBuilder();
+        foreach (var pair in _semanticModels)
+        {
+            var state = pair.Value.GetReusableState();
+            if (state.CachedResultCount > 0)
+            {
+                states[pair.Key] = state;
+            }
+        }
+
+        return states.ToImmutable();
+    }
+
+    /// <summary>
+    /// Register a lazy result seed before workers start. The caller must verify the declaration,
+    /// global-using and dependency environment in addition to the local identity guards.
+    /// </summary>
+    internal bool TryImportSemanticState(AkburaSyntaxTree syntaxTree, SemanticModelState state)
+    {
+        if (!state.IsCompatibleWith(this, syntaxTree) || _semanticModels.ContainsKey(syntaxTree) ||
+            (!SyntaxTrees.Contains(syntaxTree) &&
+             (syntaxTree is not AkcssSyntaxTree akcssTree || !AkcssSyntaxTrees.Contains(akcssTree))))
+        {
+            return false;
+        }
+
+        return _reusableSemanticStates.TryAdd(syntaxTree, state);
     }
 
     internal bool ContainsAkcssSyntaxTree(AkcssSyntaxTree syntaxTree)

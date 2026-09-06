@@ -18,6 +18,51 @@ internal sealed class SemanticBindingCache
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _diagnosticsCache = new();
     private readonly Dictionary<AkburaSyntax, ImmutableArray<AkburaSemanticDiagnostic>> _aggregatedDiagnosticsCache = new();
 
+    internal void CopyReusableResultsTo(SemanticModelState.Builder builder)
+    {
+        _cacheLock.EnterReadLock();
+        try
+        {
+            foreach (var pair in _symbolInfoCache)
+            {
+                builder.AddSymbolInfo(pair.Key, pair.Value);
+            }
+
+            foreach (var pair in _diagnosticsCache)
+            {
+                builder.AddDiagnostics(pair.Key, pair.Value);
+            }
+
+            foreach (var pair in _aggregatedDiagnosticsCache)
+            {
+                builder.AddDiagnostics(pair.Key, pair.Value, aggregated: true);
+            }
+        }
+        finally
+        {
+            _cacheLock.ExitReadLock();
+        }
+    }
+
+    internal void ImportReusableResults(SemanticModelState state)
+    {
+        // Called only while constructing a fresh model, before publication.
+        foreach (var pair in state.SymbolInfos)
+        {
+            _symbolInfoCache.Add(pair.Key, pair.Value);
+        }
+
+        foreach (var pair in state.Diagnostics)
+        {
+            _diagnosticsCache.Add(pair.Key, pair.Value);
+        }
+
+        foreach (var pair in state.AggregatedDiagnostics)
+        {
+            _aggregatedDiagnosticsCache.Add(pair.Key, pair.Value);
+        }
+    }
+
     public AkburaSymbolInfo GetSymbolInfo(AkburaSyntax syntax, Func<AkburaSymbolInfo> bind)
     {
         _cacheLock.EnterReadLock();

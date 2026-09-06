@@ -20,6 +20,20 @@ internal sealed class DeclarationSymbolTable
         _semanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
     }
 
+    internal void CopyReusableResultsTo(SemanticModelState.Builder builder)
+    {
+        foreach (var pair in _symbolInfos)
+        {
+            builder.AddSymbolInfo(pair.Key, pair.Value, declaration: true);
+        }
+    }
+
+    internal void ImportReusableResults(SemanticModelState state)
+    {
+        // The table itself and its semantic-model owner are always new.
+        _symbolInfos = state.DeclarationSymbolInfos;
+    }
+
     public AkburaSymbolInfo GetSymbolInfo(Declaration declaration)
     {
         if (declaration is not SingleDeclaration singleDeclaration)

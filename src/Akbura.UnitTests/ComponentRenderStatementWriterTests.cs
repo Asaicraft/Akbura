@@ -173,7 +173,8 @@ public sealed class ComponentRenderStatementWriterTests
         var plan = new ComponentRenderStatementPlan(
             ComponentRenderStatementKind.UseHookInvocation,
             operation.EffectiveInvocation,
-            syntax);
+            syntax,
+            hookMethod: operation.Method);
         var writer = new ComponentRenderStatementWriter(
             codeWriter,
             new ComponentGenerationSourceMap(
@@ -184,7 +185,10 @@ public sealed class ComponentRenderStatementWriterTests
         var output = codeWriter.GetText().ToString();
         Assert.True(operation.HasSyntheticSelf);
         Assert.True(operation.HasPropertyArgumentSubstitution);
-        Assert.Contains("    useControlValue(\r\n", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "    global::Hooks.ControlHooks.useControlValue<global::Demo.PlannerView>(\r\n",
+            output,
+            StringComparison.Ordinal);
         Assert.Contains("\r\n    this,", output, StringComparison.Ordinal);
         Assert.Contains("WidthProperty);\r\n", output, StringComparison.Ordinal);
         Assert.DoesNotContain(";;", output, StringComparison.Ordinal);

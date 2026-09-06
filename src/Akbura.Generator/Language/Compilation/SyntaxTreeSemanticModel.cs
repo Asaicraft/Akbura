@@ -21,8 +21,9 @@ internal sealed class SyntaxTreeSemanticModel : AkburaSemanticModel
 
     internal SyntaxTreeSemanticModel(
         AkburaCompilation compilation,
-        AkburaSyntaxTree syntaxTree)
-        : base(compilation, syntaxTree)
+        AkburaSyntaxTree syntaxTree,
+        SemanticModelState? reusableState = null)
+        : base(compilation, syntaxTree, reusableState)
     {
         _memberSemanticModelFactory = new MemberSemanticModelFactory(this);
     }

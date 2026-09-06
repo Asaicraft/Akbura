@@ -22,6 +22,20 @@ internal static class AkburaGenerationCatalogBuilder
         string projectDirectory,
         CancellationToken cancellationToken = default)
     {
+        return Create(csharpCompilation, syntaxTrees, rootNamespace, projectDirectory, null, cancellationToken);
+    }
+
+    public static AkburaGenerationCatalog Create(
+        CSharpCompilation csharpCompilation,
+        ImmutableArray<AkburaSyntaxTree> syntaxTrees,
+        string rootNamespace,
+        string projectDirectory,
+        AkburaCompilation? reuseFrom,
+        CancellationToken cancellationToken = default)
+    {
+#if STATS
+        using var catalogMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.Catalog);
+#endif
         using var componentTrees =
             ImmutableArrayBuilder<AkburaSyntaxTree>.Rent(
                 syntaxTrees.Length);
@@ -75,12 +89,19 @@ internal static class AkburaGenerationCatalogBuilder
         var akcssSyntaxTrees = akcssTrees.ToImmutable();
         var sourceAkcssSyntaxTrees = sourceAkcssTrees.ToImmutable();
 
+#if STATS
+        using var compilationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.Compilation);
+#endif
         var compilation = new AkburaCompilation(
             csharpCompilation,
             componentSyntaxTrees,
             akcssSyntaxTrees,
             rootNamespace,
-            projectDirectory);
+            projectDirectory,
+            reuseFrom);
+#if STATS
+        compilationMeasurement.Dispose();
+#endif
 
         var sourceMap = new AkcssGenerationSourceMap(
             componentSyntaxTrees,
@@ -105,6 +126,9 @@ internal static class AkburaGenerationCatalogBuilder
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+#if STATS
+            using var semanticMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.SemanticBinding);
+#endif
             var syntaxTree = sourceComponentSyntaxTrees[i];
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
 
@@ -156,6 +180,9 @@ internal static class AkburaGenerationCatalogBuilder
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+#if STATS
+            using var semanticMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.SemanticBinding);
+#endif
             var syntaxTree = sourceAkcssSyntaxTrees[i];
             var semanticModel = compilation.GetSemanticModel(
                 syntaxTree);
@@ -201,7 +228,7 @@ internal static class AkburaGenerationCatalogBuilder
             sourceMap);
     }
 
-    private static string GetSourcePath(
+    internal static string GetSourcePath(
         ComponentSyntaxTree syntaxTree,
         string projectDirectory)
     {
@@ -217,7 +244,7 @@ internal static class AkburaGenerationCatalogBuilder
             Path.GetFileName(syntaxTree.FilePath));
     }
 
-    private static string GetSourcePath(
+    internal static string GetSourcePath(
         AkcssSyntaxTree syntaxTree,
         string projectDirectory)
     {
@@ -273,7 +300,7 @@ internal static class AkburaGenerationCatalogBuilder
         return true;
     }
 
-    private static string GetInlineAkcssModuleIdentity(
+    internal static string GetInlineAkcssModuleIdentity(
         string componentSourcePath,
         int moduleIndex)
     {

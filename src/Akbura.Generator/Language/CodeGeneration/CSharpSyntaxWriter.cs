@@ -35,6 +35,13 @@ internal readonly ref struct CSharpSyntaxWriter
         WriteTrimmed(expression!);
     }
 
+    public void WriteArgumentList(ArgumentListSyntax arguments)
+    {
+        Debug.Assert(arguments != null);
+
+        WriteTrimmed(arguments!);
+    }
+
     public void WriteStatement(StatementSyntax statement)
     {
         Debug.Assert(statement != null);

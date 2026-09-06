@@ -7,22 +7,71 @@
 		<Nullable>enable</Nullable>
 		<EnableQuickScanBenchmark Condition="'$(EnableQuickScanBenchmark)' == '' And ('$(Configuration)' == 'DebugStats' Or '$(Configuration)' == 'ReleaseStats')">true</EnableQuickScanBenchmark>
 		<EnableQuickScanBenchmark Condition="'$(EnableQuickScanBenchmark)' == ''">false</EnableQuickScanBenchmark>
+		<EnableAkburaStats Condition="'$(EnableAkburaStats)' == ''">$(EnableQuickScanBenchmark)</EnableAkburaStats>
 		<Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
 		<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+		<AkburaRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</AkburaRepositoryRoot>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(EnableQuickScanBenchmark)' == 'true'">
 		<DefineConstants>$(DefineConstants);STATS;ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="'$(EnableAkburaStats)' == 'true'">
+		<DefineConstants>$(DefineConstants);STATS</DefineConstants>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
 
+		<PackageReference Include="Microsoft.Build.Locator" Version="1.11.2" />
+		<!-- FeatureGallery uses C# 14 extension blocks. -->
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+
+		<PackageReference Include="Microsoft.Build" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.NET.StringTools" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.4" />
+	</ItemGroup>
+
+	<ItemDefinitionGroup>
+		<ProjectReference>
+			<!-- Keep shared dependencies in one MSBuild project instance and output directory. -->
+			<AdditionalProperties>EnableAkburaStats=$(EnableAkburaStats);EnableQuickScanBenchmark=$(EnableQuickScanBenchmark);AkburaEmbedSourceFiles=false</AdditionalProperties>
+		</ProjectReference>
+	</ItemDefinitionGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" />
+
+		<ProjectReference Include="..\Akbura.Furioso\Akbura.Furioso.csproj" />
+		<ProjectReference Include="..\Akbura.BlackSilence\Akbura.BlackSilence.csproj" />
+
+		<ProjectReference Include="..\Akbura.FeatureGallery\Akbura.FeatureGallery\Akbura.FeatureGallery.csproj"
+						  ReferenceOutputAssembly="false" />
+
+		<Compile Include="..\Akbura.TestUtilities\RealisticIncrementalScenario.cs"
+				 Link="RealisticIncrementalScenario.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" AdditionalProperties="EnableAkburaStats=$(EnableQuickScanBenchmark);EnableQuickScanBenchmark=$(EnableQuickScanBenchmark)" />
-		<Compile Include="..\Akbura.TestUtilities\RealisticIncrementalScenario.cs" Link="RealisticIncrementalScenario.cs" />
+		<AssemblyMetadata Include="AkburaRepositoryRoot" Value="$(AkburaRepositoryRoot)" />
 	</ItemGroup>
+
+	<Target Name="IncludeBenchmarkGeneratorRuntimeDependency" BeforeTargets="_ComputeUserRuntimeAssemblies">
+		<!-- Analyzer dependency exports suppress runtime assets, but this executable calls Generator directly. -->
+		<ItemGroup>
+			<ReferencePath Condition="'%(ReferencePath.Filename)' == 'Akbura.Generator'">
+				<IncludeRuntimeDependency>true</IncludeRuntimeDependency>
+			</ReferencePath>
+			<ReferenceDependencyPaths Condition="'%(ReferenceDependencyPaths.Filename)' == 'Akbura.Generator'">
+				<IncludeRuntimeDependency>true</IncludeRuntimeDependency>
+			</ReferenceDependencyPaths>
+		</ItemGroup>
+	</Target>
 
 </Project>

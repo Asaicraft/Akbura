@@ -180,6 +180,10 @@ public sealed class StateWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Contains("this,", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Hooks.PlannerHooks.useControlValue<global::Demo.PlannerView>(",
+            output,
+            StringComparison.Ordinal);
         Assert.Contains("WidthProperty", output, StringComparison.Ordinal);
         Assert.DoesNotContain("__CreateStateValue0", output, StringComparison.Ordinal);
         AssertSourceMappings(output);

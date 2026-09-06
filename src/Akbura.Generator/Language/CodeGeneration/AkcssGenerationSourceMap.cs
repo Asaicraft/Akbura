@@ -1,7 +1,6 @@
 ﻿using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace Akbura.Language.CodeGeneration;
@@ -11,71 +10,39 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal sealed class AkcssGenerationSourceMap
 {
-    private readonly Dictionary<AkburaSyntax, AkburaSyntaxTree> _syntaxTreesByRoot;
-    private readonly Dictionary<AkburaSyntax, IAkcssSymbol> _symbolsBySyntax = [];
+    private readonly AkburaSourceTreeMap _sourceTreeMap;
+    private readonly AkcssGenerationSymbolResolver _symbolResolver;
 
     public AkcssGenerationSourceMap(
         ImmutableArray<AkburaSyntaxTree> componentSyntaxTrees,
         ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
     {
-        _syntaxTreesByRoot = new Dictionary<AkburaSyntax, AkburaSyntaxTree>(
-            componentSyntaxTrees.Length + akcssSyntaxTrees.Length);
+        _sourceTreeMap = new AkburaSourceTreeMap(componentSyntaxTrees, akcssSyntaxTrees);
+        _symbolResolver = new AkcssGenerationSymbolResolver(_sourceTreeMap);
+    }
 
-        for (var i = 0; i < componentSyntaxTrees.Length; i++)
-        {
-            AddSyntaxTree(componentSyntaxTrees[i]);
-        }
-
-        for (var i = 0; i < akcssSyntaxTrees.Length; i++)
-        {
-            AddSyntaxTree(akcssSyntaxTrees[i]);
-        }
+    public AkcssGenerationSourceMap(
+        AkburaSourceTreeMap sourceTreeMap,
+        AkcssGenerationSymbolResolver symbolResolver)
+    {
+        _sourceTreeMap = sourceTreeMap;
+        _symbolResolver = symbolResolver;
     }
 
     public void RegisterModule(IAkcssModuleSymbol module)
     {
-        var symbols = module.AkcssSymbols;
-
-        for (var i = 0; i < symbols.Length; i++)
-        {
-            var symbol = symbols[i];
-
-            if (symbol.DeclarationSyntax is { } syntax)
-            {
-                _symbolsBySyntax[syntax] = symbol;
-            }
-        }
+        _symbolResolver.RegisterModule(module);
     }
 
     public IAkcssSymbol GetGenerationSymbol(IAkcssSymbol symbol)
     {
-        if (symbol.DeclarationSyntax is not { } declarationSyntax)
-        {
-            return symbol;
-        }
-
-        if (_symbolsBySyntax.TryGetValue(declarationSyntax, out var registered))
-        {
-            return registered;
-        }
-
-        foreach (var pair in _symbolsBySyntax)
-        {
-            if (ReferenceEquals(pair.Key.Root, declarationSyntax.Root) &&
-                pair.Key.Kind == declarationSyntax.Kind &&
-                pair.Key.FullSpan == declarationSyntax.FullSpan)
-            {
-                return pair.Value;
-            }
-        }
-
-        return symbol;
+        return _symbolResolver.GetGenerationSymbol(symbol);
     }
 
     public bool TryGetLineDirective(AkburaSyntax syntax, out LinePositionSpan lineSpan, out string path)
     {
         if (!TryGetSourceSpan(syntax, out var sourceSpan, out path) ||
-            !_syntaxTreesByRoot.TryGetValue(syntax.Root, out var syntaxTree))
+            !_sourceTreeMap.TryGetSyntaxTree(syntax, out var syntaxTree))
         {
             lineSpan = default;
             path = string.Empty;
@@ -96,7 +63,7 @@ internal sealed class AkcssGenerationSourceMap
 
     public bool TryGetSourceSpan(AkburaSyntax syntax, out TextSpan span, out string path)
     {
-        if (!_syntaxTreesByRoot.TryGetValue(syntax.Root, out var syntaxTree))
+        if (!_sourceTreeMap.TryGetSyntaxTree(syntax, out var syntaxTree))
         {
             span = default;
             path = string.Empty;
@@ -125,16 +92,6 @@ internal sealed class AkcssGenerationSourceMap
         }
 
         return true;
-    }
-
-    private void AddSyntaxTree(AkburaSyntaxTree syntaxTree)
-    {
-        var root = syntaxTree.GetRootSyntax();
-
-        if (!_syntaxTreesByRoot.ContainsKey(root))
-        {
-            _syntaxTreesByRoot.Add(root, syntaxTree);
-        }
     }
 
     private static bool IsValidLineSpan(LinePositionSpan lineSpan)

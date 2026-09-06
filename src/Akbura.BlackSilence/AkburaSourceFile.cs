@@ -3,21 +3,19 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.BlackSilence;
 
-internal sealed class AkburaSourceFile(
-    SyntaxTreeKind kind,
-    string filePath,
-    string logicalName,
-    SourceText sourceText)
-{
-    public SyntaxTreeKind Kind { get; } =
-        kind;
+/// <summary>
+/// Contains source text read directly from one additional file.
+/// </summary>
+internal readonly record struct AkburaSourceText(
+    SyntaxTreeKind Kind,
+    string FilePath,
+    SourceText SourceText);
 
-    public string FilePath { get; } =
-        filePath;
-
-    public string LogicalName { get; } =
-        logicalName;
-
-    public SourceText SourceText { get; } =
-        sourceText;
-}
+/// <summary>
+/// Contains all information required to parse one Akbura source file.
+/// </summary>
+internal readonly record struct AkburaSourceFile(
+    SyntaxTreeKind Kind,
+    string FilePath,
+    string LogicalName,
+    SourceText SourceText);

@@ -139,35 +139,16 @@ internal readonly ref struct AkcssModuleWriter
         }
     }
 
-    public bool WriteClassStyles(in AkcssModulePlan plan)
-    {
-        var wroteAny = false;
+    public bool WriteClassStyles(in AkcssModulePlan plan) =>
+        WriteRuntimeStylesCore(plan, AkcssSymbolGenerationKind.Style);
 
-        for (var i = 0; i < plan.Symbols.Length; i++)
-        {
-            ref readonly var symbol =
-                ref plan.Symbols.ItemRef(i);
+    public bool WriteUtilities(in AkcssModulePlan plan) =>
+        WriteRuntimeStylesCore(plan, AkcssSymbolGenerationKind.Utility);
 
-            if (symbol.Kind != AkcssSymbolGenerationKind.Style ||
-                !symbol.EmitsRuntimeStyle)
-            {
-                continue;
-            }
+    public bool WriteRuntimeStyles(in AkcssModulePlan plan) =>
+        WriteRuntimeStylesCore(plan, filter: null);
 
-            if (wroteAny)
-            {
-                _writer.WriteLine();
-            }
-
-            wroteAny |= _styleWriter.Write(
-                plan,
-                symbol);
-        }
-
-        return wroteAny;
-    }
-
-    public bool WriteUtilities(in AkcssModulePlan plan)
+    private bool WriteRuntimeStylesCore(in AkcssModulePlan plan, AkcssSymbolGenerationKind? filter)
     {
         var wroteAny = false;
 
@@ -175,8 +156,9 @@ internal readonly ref struct AkcssModuleWriter
         {
             ref readonly var symbol = ref plan.Symbols.ItemRef(i);
 
-            if (symbol.Kind != AkcssSymbolGenerationKind.Utility ||
-                !symbol.EmitsRuntimeStyle)
+            if (!symbol.EmitsRuntimeStyle ||
+                symbol.Kind == AkcssSymbolGenerationKind.InterceptMetadata ||
+                (filter.HasValue && symbol.Kind != filter.Value))
             {
                 continue;
             }
@@ -186,7 +168,16 @@ internal readonly ref struct AkcssModuleWriter
                 _writer.WriteLine();
             }
 
-            wroteAny |= _utilityWriter.Write(plan, symbol);
+            var wrote = symbol.Kind switch
+            {
+                AkcssSymbolGenerationKind.Style => _styleWriter.Write(plan, symbol),
+                AkcssSymbolGenerationKind.Utility => _utilityWriter.Write(plan, symbol),
+                _ => false,
+            };
+
+            Debug.Assert(wrote);
+
+            wroteAny |= wrote;
         }
 
         return wroteAny;

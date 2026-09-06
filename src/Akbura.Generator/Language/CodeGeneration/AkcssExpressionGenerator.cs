@@ -103,41 +103,23 @@ internal static class AkcssExpressionGenerator
 
         try
         {
-            string expression;
-
-            switch (operation.ConvertedValue)
+            string expression = operation.ConvertedValue switch
             {
-                case AkcssColorValue color:
-                    expression = CreateColorExpression(color);
-                    break;
+                AkcssColorValue color => CreateColorExpression(color),
+                AkcssThicknessValue thickness => CreateThicknessExpression(thickness),
+                AkcssThicknessExpressionValue thickness => CreateThicknessExpression(
+                                        thickness,
+                                        rewriter,
+                                        operation.ValueOperation.Operation?.SemanticModel),
 
-                case AkcssThicknessValue thickness:
-                    expression = CreateThicknessExpression(thickness);
-                    break;
-
-                case AkcssThicknessExpressionValue thickness:
-                    expression = CreateThicknessExpression(
-                        thickness,
-                        rewriter,
-                        operation.ValueOperation.Operation?.SemanticModel);
-
-                    break;
-
-                case CSharpSymbolDefinition definition
-                    when GetStaticMemberReference(definition.Symbol) is { } member:
-                    expression = member;
-                    break;
-
-                default:
-                    expression = RewriteExpression(
-                        operation.ValueOperation.Syntax as CSharpExpressionSyntax ??
-                        operation.Syntax?.Expression.GetRawCSharpExpression(),
-                        rewriter,
-                        operation.ValueOperation.Operation?.SemanticModel);
-
-                    break;
-            }
-
+                CSharpSymbolDefinition definition
+                                    when GetStaticMemberReference(definition.Symbol) is { } member => member,
+                _ => RewriteExpression(
+                                        operation.ValueOperation.Syntax as CSharpExpressionSyntax ??
+                                        operation.Syntax?.Expression.GetRawCSharpExpression(),
+                                        rewriter,
+                                        operation.ValueOperation.Operation?.SemanticModel),
+            };
             if (operation.RequiresBrushConversion)
             {
                 expression = WrapSolidColorBrush(expression);
@@ -504,17 +486,12 @@ internal static class AkcssExpressionGenerator
 
     public static string? GetStaticMemberReference(RoslynSymbol? symbol)
     {
-        switch (symbol)
+        return symbol switch
         {
-            case RoslynFieldSymbol { IsStatic: true } field:
-                return CreateMemberReference(field.ContainingType, field.Name);
-
-            case RoslynPropertySymbol { IsStatic: true } property:
-                return CreateMemberReference(property.ContainingType, property.Name);
-
-            default:
-                return null;
-        }
+            RoslynFieldSymbol { IsStatic: true } field => CreateMemberReference(field.ContainingType, field.Name),
+            RoslynPropertySymbol { IsStatic: true } property => CreateMemberReference(property.ContainingType, property.Name),
+            _ => null,
+        };
     }
 
     public static string GetMethodReference(RoslynMethodSymbol method)

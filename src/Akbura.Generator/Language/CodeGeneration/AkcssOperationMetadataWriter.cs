@@ -805,7 +805,7 @@ internal readonly ref struct AkcssOperationMetadataWriter
                 invocation.Arguments[0].Value,
                 targetParameterName))
         {
-            var candidateName = method.Name.Substring(3);
+            var candidateName = method.Name[3..];
 
             if (HasAvaloniaPropertyField(
                     method.ContainingType,

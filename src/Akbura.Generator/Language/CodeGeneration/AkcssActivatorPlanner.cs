@@ -725,8 +725,7 @@ internal static class AkcssActivatorPlanner
                 return false;
             }
 
-            sourcePath = AkcssGeneratedModuleNames.NormalizeSourcePath(
-                fullSourcePath.Substring(projectPrefix.Length));
+            sourcePath = AkcssGeneratedModuleNames.NormalizeSourcePath(fullSourcePath[projectPrefix.Length..]);
             return true;
         }
 

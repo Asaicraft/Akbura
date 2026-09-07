@@ -33,16 +33,12 @@
 			<LogicalName>$([System.String]::Copy('%(Identity)').Replace('\', '/'))</LogicalName>
 		</_AkburaModuleSource>
 
-		<Compile Remove="@(_AkburaModuleSource)" />
-
+		<!-- Keep source files as None items so Visual Studio can create and display them. -->
 		<AdditionalFiles Include="@(_AkburaModuleSource)"
 						 Exclude="@(AdditionalFiles)" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
-		<None Remove="**\*.akbura;**\*.akcss" />
-		<EmbeddedResource Remove="**\*.akbura;**\*.akcss" />
-
 		<EmbeddedResource Include="$(AkburaModuleManifestPath)">
 			<LogicalName>!Akbura</LogicalName>
 		</EmbeddedResource>

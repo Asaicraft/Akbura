@@ -84,18 +84,23 @@ internal static class FeatureGalleryIncrementalScenarioFactory
 
             case FeatureGalleryIncrementalScenario.SharedAkcssValueEdit:
             {
+                const string baseName = "AkburaBenchmarkSharedStyleBaseModule";
+                const string importedName = "AkburaBenchmarkSharedStyleImportedModule";
+                const string consumerName = "AkburaBenchmarkSharedStyleConsumer";
+                VerifyIsolatedFixtureNames(project, snapshot, fixtureNamespace, baseName, importedName, consumerName);
+
                 var basic = Fixture(
-                    "Base.akcss",
+                    baseName + ".akcss",
                     "@using Avalonia.Controls;\r\n" +
                     "Border.incremental-base { Width: 10; }\r\n");
                 var imported = Fixture(
-                    "Imported.akcss",
-                    "@using " + fixtureNamespace + ".Base.akcss;\r\n" +
+                    importedName + ".akcss",
+                    "@using " + fixtureNamespace + "." + baseName + ".akcss;\r\n" +
                     ".incremental-imported { @apply incremental-base; }\r\n");
                 var consumer = Fixture(
-                    "StyledView.akbura",
+                    consumerName + ".akbura",
                     "using Avalonia.Controls;\r\n" +
-                    "using " + fixtureNamespace + ".Imported.akcss;\r\n" +
+                    "using " + fixtureNamespace + "." + importedName + ".akcss;\r\n" +
                     "<Border class=\"incremental-imported\" />\r\n");
                 AddFixtures(basic, imported, consumer);
 
@@ -181,6 +186,56 @@ internal static class FeatureGalleryIncrementalScenarioFactory
         }
 
         return match;
+    }
+
+    private static void VerifyIsolatedFixtureNames(
+        FeatureGalleryBenchmarkProject project,
+        FeatureGalleryBenchmarkSnapshot snapshot,
+        string fixtureNamespace,
+        params string[] names)
+    {
+        // Dependency candidates include words in markup literals, not only actual
+        // imports. A generic module name such as Imported also matches gallery UI.
+        foreach (var file in snapshot.AdditionalTexts)
+        {
+            var text = file.GetText() ??
+                throw new InvalidOperationException("Cannot check benchmark fixture isolation: " + file.Path);
+            VerifySource(file.Path, text.ToString());
+        }
+
+        foreach (var tree in project.Compilation.SyntaxTrees)
+        {
+            VerifySource(tree.FilePath, tree.GetText().ToString());
+        }
+
+        foreach (var name in names)
+        {
+            if (project.Compilation.GetTypeByMetadataName(fixtureNamespace + "." + name) != null)
+            {
+                throw new InvalidOperationException("The isolated benchmark fixture type already exists: " + name);
+            }
+        }
+
+        void VerifySource(string filePath, string source)
+        {
+            foreach (var name in names)
+            {
+                if (filePath.Contains(name, StringComparison.OrdinalIgnoreCase) ||
+                    source.Contains(name, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException($"Benchmark fixture name '{name}' already occurs in '{filePath}'.");
+                }
+            }
+
+            // ValueText also detects escaped C# identifiers, unlike a raw-text search.
+            foreach (var token in SyntaxFactory.ParseTokens(source))
+            {
+                if (names.Contains(token.ValueText, StringComparer.Ordinal))
+                {
+                    throw new InvalidOperationException($"Benchmark fixture name '{token.ValueText}' already occurs in '{filePath}'.");
+                }
+            }
+        }
     }
 
     private static BenchmarkAdditionalText Replace(BenchmarkAdditionalText file, string before, string after)

@@ -45,4 +45,9 @@
 		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<EmbeddedResource Include="..\Akbura.FeatureGallery\Akbura.FeatureGallery\Pages\AkcssPage.akbura"
+						  LogicalName="Akbura.UnitTests.Fixtures.AkcssPage.akbura" />
+	</ItemGroup>
+
 </Project>

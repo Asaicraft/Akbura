@@ -8,6 +8,9 @@ using System.Linq;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
+#if STATS
+using Akbura.Language.CodeGeneration;
+#endif
 
 namespace Akbura.Language.Binder;
 
@@ -20,6 +23,9 @@ internal sealed partial class CSharpProbeBinder
         bool injectSelf,
         bool rewritePropertyArguments)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
         var effectiveInvocation = injectSelf
             ? AddSyntheticSelf(invocation)
             : invocation;

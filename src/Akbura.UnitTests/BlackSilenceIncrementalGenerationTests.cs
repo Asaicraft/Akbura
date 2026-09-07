@@ -62,6 +62,98 @@ public sealed class BlackSilenceIncrementalGenerationTests
         AssertParityWithFresh(project, updated, project.Options, files);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UtilityPrefixedNestedTextEdit_RoundTripsAndMatchesFreshGeneration(bool preserveTextChanges)
+    {
+        const string originalAttribute = "Text=\"AKCSS\"";
+        const string editedAttribute = "Text=\"AKCSS styles\"";
+        var project = new TestProject(publishDiagnostics: true);
+        var original = project.File("Page.akbura", Component(
+            "using Akbura.Markup;\r\nusing Demo.Shared.akcss;\r\n" +
+            "<StackPanel page\r\n            ${md}:page-desktop>\r\n" +
+            "    <TextBlock Text=\"AKCSS\"\r\n" +
+            "               page-title\r\n" +
+            "               ${md}:page-title-desktop/>\r\n" +
+            "</StackPanel>"));
+        var styles = project.File("Shared.akcss",
+            "@using Avalonia.Controls;\r\n" +
+            "@utilities {\r\n" +
+            "    StackPanel.page { Spacing: 10; }\r\n" +
+            "    StackPanel.page-desktop { Spacing: 20; }\r\n" +
+            "    TextBlock.page-title { FontSize: 24; }\r\n" +
+            "    TextBlock.page-title-desktop { FontSize: 32; }\r\n" +
+            "}");
+        var initial = Run(project, CreateDriver(project.Options, original, styles));
+        Assert.False(Assert.Single(initial.Request.Index.ComponentDescriptors).Root.ContainsDiagnostics);
+        var initialSource = initial.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+        var attributeStart = original.Text.ToString().IndexOf(originalAttribute, StringComparison.Ordinal);
+        Assert.True(attributeStart >= 0);
+
+        // Replace the full benchmark anchor while preserving both utility-prefix boundaries.
+        // AdditionalText publishers may return equivalent text without its change history.
+        var editedText = original.Text.WithChanges(
+            new TextChange(new TextSpan(attributeStart, originalAttribute.Length), editedAttribute));
+        var edited = original.WithText(preserveTextChanges ? editedText : SourceText.From(editedText.ToString()));
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, edited));
+        Assert.False(Assert.Single(updated.Request.Index.ComponentDescriptors).Root.ContainsDiagnostics);
+        var updatedSource = updated.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+
+        Assert.NotEqual(initialSource, updatedSource);
+        Assert.Contains("\"AKCSS styles\"", updatedSource, StringComparison.Ordinal);
+        AssertParityWithFresh(project, updated, project.Options, edited, styles);
+
+        var restoredText = edited.Text.WithChanges(
+            new TextChange(new TextSpan(attributeStart, editedAttribute.Length), originalAttribute));
+        var restored = edited.WithText(preserveTextChanges ? restoredText : SourceText.From(restoredText.ToString()));
+        var reverted = Run(project, updated.Driver.ReplaceAdditionalText(edited, restored));
+        Assert.False(Assert.Single(reverted.Request.Index.ComponentDescriptors).Root.ContainsDiagnostics);
+        var revertedSource = reverted.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+
+        Assert.Equal(original.Text.ToString(), restored.Text.ToString());
+        Assert.NotEqual(updatedSource, revertedSource);
+        Assert.Equal(initialSource, revertedSource);
+        AssertParityWithFresh(project, reverted, project.Options, restored, styles);
+    }
+
+    [Theory]
+    [InlineData("Height: 24;", "Height: 48;")]
+    [InlineData("double value", "float value")]
+    public void RepeatedUtilityApply_AkcssEditsRoundTripWithoutReusingOldLookupData(string before, string after)
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var page = project.File("Page.akbura", Component(
+            "using Demo.Styles.Shared.akcss;\r\n" +
+            "<StackPanel><Border class=\"first\" /><Border class=\"second\" /></StackPanel>"));
+        var other = project.File("Other.akbura", Component("<Border />"));
+        var original = project.File("Styles/Shared.akcss",
+            "@using Avalonia.Controls;\r\n" +
+            "@utilities {\r\n" +
+            "    Border.enabled { Height: 24; }\r\n" +
+            "    Border.scale-(double value) { Opacity: value; }\r\n" +
+            "}\r\n" +
+            "Border.first { @apply enabled scale-1; }\r\n" +
+            "Border.second { @apply enabled scale-1; }\r\n");
+        var initial = Run(project, CreateDriver(project.Options, page, other, original));
+        var initialSource = initial.Snapshot.Entries["akcss:Styles/Shared.akcss"].Source.SourceText.ToString();
+        AssertParityWithFresh(project, initial, project.Options, page, other, original);
+
+        var edited = original.Replace(before, after);
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, edited));
+        var updatedSource = updated.Snapshot.Entries["akcss:Styles/Shared.akcss"].Source.SourceText.ToString();
+        Assert.NotEqual(initialSource, updatedSource);
+        AssertReusedExcept(initial, updated, "component:Page.akbura", "akcss:Styles/Shared.akcss");
+        AssertParityWithFresh(project, updated, project.Options, page, other, edited);
+
+        var restored = edited.Replace(after, before);
+        var reverted = Run(project, updated.Driver.ReplaceAdditionalText(edited, restored));
+        Assert.Equal(original.Text.ToString(), restored.Text.ToString());
+        Assert.Equal(initialSource, reverted.Snapshot.Entries["akcss:Styles/Shared.akcss"].Source.SourceText.ToString());
+        AssertReusedExcept(updated, reverted, "component:Page.akbura", "akcss:Styles/Shared.akcss");
+        AssertParityWithFresh(project, reverted, project.Options, page, other, restored);
+    }
+
     [Fact]
     public void ParameterTypeEdit_ReplacesComponentAndConsumerButNotUnrelatedEntries()
     {
@@ -103,6 +195,57 @@ public sealed class BlackSilenceIncrementalGenerationTests
 
         AssertReusedExcept(initial, updated, "component:Page.akbura", "akcss:Styles/Top.akcss", "akcss:Styles/Base.akcss");
         AssertParityWithFresh(project, updated, project.Options, files);
+    }
+
+    [Fact]
+    public void IsolatedSharedStyleEdit_RoundTripsWithoutInvalidatingUnrelatedText()
+    {
+        const string fixtureNamespace = "Demo.IncrementalBenchmarks";
+        const string baseName = "AkburaBenchmarkSharedStyleBaseModule";
+        const string importedName = "AkburaBenchmarkSharedStyleImportedModule";
+        const string consumerName = "AkburaBenchmarkSharedStyleConsumer";
+        const string baseIdentity = "akcss:IncrementalBenchmarks/" + baseName + ".akcss";
+        var project = new TestProject(publishDiagnostics: true);
+        var basic = project.File("IncrementalBenchmarks/" + baseName + ".akcss",
+            "@using Avalonia.Controls;\r\nBorder.incremental-base { Width: 10; }\r\n");
+        var imported = project.File("IncrementalBenchmarks/" + importedName + ".akcss",
+            "@using " + fixtureNamespace + "." + baseName + ".akcss;\r\n" +
+            ".incremental-imported { @apply incremental-base; }\r\n");
+        var consumer = project.File("IncrementalBenchmarks/" + consumerName + ".akbura", Component(
+            "using " + fixtureNamespace + "." + importedName + ".akcss;\r\n" +
+            "<Border class=\"incremental-imported\" />\r\n"));
+        var unrelated = project.File("Page.akbura", Component("<TextBlock Text=\"Imported modules\" />"));
+        var changedIdentities = new[]
+        {
+            baseIdentity,
+            "akcss:IncrementalBenchmarks/" + importedName + ".akcss",
+            "component:IncrementalBenchmarks/" + consumerName + ".akbura",
+        };
+        var initial = Run(project, CreateDriver(project.Options, basic, imported, consumer, unrelated));
+        Assert.Equal(4, initial.Snapshot.Entries.Count);
+        foreach (var identity in changedIdentities)
+        {
+            Assert.True(initial.Snapshot.Entries.ContainsKey(identity), identity);
+        }
+
+        Assert.True(initial.Snapshot.Entries.ContainsKey("component:Page.akbura"));
+        var initialSource = initial.Snapshot.Entries[baseIdentity].Source.SourceText.ToString();
+        var edited = basic.Replace("Width: 10;", "Width: 20;");
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(basic, edited));
+        var updatedSource = updated.Snapshot.Entries[baseIdentity].Source.SourceText.ToString();
+
+        Assert.NotEqual(initialSource, updatedSource);
+        AssertReusedExcept(initial, updated, changedIdentities);
+        AssertParityWithFresh(project, updated, project.Options, edited, imported, consumer, unrelated);
+
+        var restored = edited.Replace("Width: 20;", "Width: 10;");
+        var reverted = Run(project, updated.Driver.ReplaceAdditionalText(edited, restored));
+        var revertedSource = reverted.Snapshot.Entries[baseIdentity].Source.SourceText.ToString();
+
+        Assert.NotEqual(updatedSource, revertedSource);
+        Assert.Equal(initialSource, revertedSource);
+        AssertReusedExcept(updated, reverted, changedIdentities);
+        AssertParityWithFresh(project, reverted, project.Options, restored, imported, consumer, unrelated);
     }
 
     [Fact]
@@ -450,10 +593,10 @@ public sealed class BlackSilenceIncrementalGenerationTests
 
     private sealed class TestProject
     {
-        public TestProject()
+        public TestProject(bool publishDiagnostics = false)
         {
             Directory = Path.Combine(Path.GetTempPath(), "BlackSilenceIncrementalTests", Guid.NewGuid().ToString("N"));
-            Options = new TestOptions("Demo", Directory);
+            Options = new TestOptions("Demo", Directory, publishDiagnostics);
             Compilation = CSharpCompilation.Create(
                 "BlackSilenceIncrementalTests",
                 syntaxTrees: [CSharpSyntaxTree.ParseText(string.Empty, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview))],
@@ -496,7 +639,7 @@ public sealed class BlackSilenceIncrementalGenerationTests
         }
     }
 
-    private sealed class TestOptions(string rootNamespace, string projectDirectory) : AnalyzerConfigOptionsProvider
+    private sealed class TestOptions(string rootNamespace, string projectDirectory, bool publishDiagnostics = false) : AnalyzerConfigOptionsProvider
     {
         private static readonly AnalyzerConfigOptions s_empty = new Values(new Dictionary<string, string>());
 
@@ -504,6 +647,7 @@ public sealed class BlackSilenceIncrementalGenerationTests
         {
             ["build_property.RootNamespace"] = rootNamespace,
             ["build_property.ProjectDir"] = projectDirectory,
+            ["build_property.AkburaBlackSilenceDiagnostics"] = publishDiagnostics ? "Publish" : "Shadow",
         });
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => s_empty;

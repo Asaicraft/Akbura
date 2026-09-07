@@ -1,5 +1,8 @@
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
+#if STATS
+using Akbura.Language.CodeGeneration;
+#endif
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -48,6 +51,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         _bindingSession = new BindingSession(this);
         _operationFactory = new AkburaOperationFactory(CreateCSharpOperationSymbolMapper);
         _declarationSymbols = new DeclarationSymbolTable(this);
+        _akcssLookupSymbols = new();
 
         if (reusableState?.IsCompatibleWith(compilation, syntaxTree) == true)
         {
@@ -69,6 +73,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         _bindingSession = semanticModel._bindingSession;
         _operationFactory = semanticModel._operationFactory;
         _declarationSymbols = semanticModel._declarationSymbols;
+        _akcssLookupSymbols = semanticModel._akcssLookupSymbols;
     }
 
     public AkburaCompilation Compilation { get; }
@@ -873,6 +878,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     internal ImmutableArray<ITailwindUtilityParameterSymbol> CreateTailwindUtilityParameters(
         AkcssUtilityDeclarationSyntax utilityDeclaration)
     {
+        if (utilityDeclaration.Selector.Parameters.Count == 0)
+        {
+            return ImmutableArray<ITailwindUtilityParameterSymbol>.Empty;
+        }
+
         var csharpParameters = BindTailwindUtilityCSharpParameters(utilityDeclaration);
         using var builder = ImmutableArrayBuilder<ITailwindUtilityParameterSymbol>.Rent();
 
@@ -899,6 +909,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private ImmutableArray<IParameterSymbol> BindTailwindUtilityCSharpParameters(
         AkcssUtilityDeclarationSyntax utilityDeclaration)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpUtilityParameters);
+        using var operationMeasurement = GenerationStatistics.OperationTrackingEnabled
+            ? MeasureAkcssOperation(
+                GenerationStatisticOperation.UtilityParameterBinding,
+                utilityDeclaration,
+                utilityDeclaration.Span,
+                utilityDeclaration.Selector.Name.Identifier.ValueText,
+                utilityDeclaration.Selector.Parameters.Count)
+            : null;
+#endif
         using var parametersBuilder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
         foreach (var parameter in utilityDeclaration.Selector.Parameters)
         {
@@ -1334,7 +1355,51 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private ImmutableArray<IAkcssSymbol> CreateAkcssLookupSymbols(
         Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> members)
     {
-        using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent();
+        if (members.Count == 0)
+        {
+            return ImmutableArray<IAkcssSymbol>.Empty;
+        }
+
+        var reused = _akcssLookupSymbols.TryGetValue(members, out var descriptors);
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.AkcssLookupRequest);
+        if (reused)
+        {
+            GenerationStatistics.Increment(GenerationStatisticCounter.AkcssLookupReused);
+        }
+#endif
+        if (!reused)
+        {
+            // Bind outside dictionary locks. Publish only completed descriptors;
+            // failures are not cached and competing readers cannot see partial data.
+            descriptors = _akcssLookupSymbols.GetOrAdd(members, CreateAkcssLookupDescriptors(members));
+        }
+
+        using var builder = ImmutableArrayBuilder<IAkcssSymbol>.Rent(descriptors.Length);
+        foreach (var descriptor in descriptors)
+        {
+            // Lookup symbols remain distinct from each other and from canonical
+            // symbols: their operations/intercept state can be initialized later.
+            builder.Add(descriptor.CreateSymbol());
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private ImmutableArray<AkcssLookupSymbolDescriptor> CreateAkcssLookupDescriptors(
+        Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> members)
+    {
+#if STATS
+        using var operationMeasurement = GenerationStatistics.OperationTrackingEnabled && members.Count != 0
+            ? MeasureAkcssOperation(
+                GenerationStatisticOperation.AkcssLookupSymbols,
+                members[0],
+                members.Span,
+                ReferenceEquals(members[0].Root, SyntaxTree.GetRootSyntax()) ? "owner-root AKCSS layer" : "foreign-root AKCSS layer",
+                members.Count)
+            : null;
+#endif
+        using var builder = ImmutableArrayBuilder<AkcssLookupSymbolDescriptor>.Rent();
         foreach (var member in members)
         {
             switch (member.Kind)
@@ -1343,7 +1408,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                     var styleRule = Unsafe.As<AkcssStyleRuleSyntax>(member);
                     if (TryResolveAkcssTargetType(styleRule.Selector.TargetType, out var styleTargetType))
                     {
-                        builder.Add(CreateAkcssStyleSymbol(styleRule, styleTargetType, includeOperations: false));
+                        builder.Add(new AkcssLookupSymbolDescriptor(styleRule, styleTargetType));
                     }
 
                     break;
@@ -1354,10 +1419,10 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                     {
                         if (TryResolveAkcssTargetType(utilityDeclaration.Selector.TargetType, out var utilityTargetType))
                         {
-                            builder.Add(CreateTailwindUtilitySymbolForAkcss(
+                            builder.Add(new AkcssLookupSymbolDescriptor(
                                 utilityDeclaration,
                                 utilityTargetType,
-                                includeOperations: false));
+                                CreateTailwindUtilityParameters(utilityDeclaration)));
                         }
                     }
 

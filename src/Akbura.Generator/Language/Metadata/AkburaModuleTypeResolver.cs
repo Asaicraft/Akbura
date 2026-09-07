@@ -5,6 +5,9 @@ using System;
 using System.Collections.Concurrent;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+#if STATS
+using Akbura.Language.CodeGeneration;
+#endif
 
 namespace Akbura.Language;
 
@@ -31,6 +34,9 @@ internal sealed class AkburaModuleTypeResolver
 
     private CSharpSymbolDefinition ResolveCore(string typeName)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpTypeResolution);
+#endif
         var metadataName = typeName.Trim();
         var isNullable = metadataName.EndsWith("?", StringComparison.Ordinal);
         if (isNullable)

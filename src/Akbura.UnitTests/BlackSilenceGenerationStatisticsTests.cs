@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.UnitTests;
 
+[Collection(BlackSilenceStatisticsCollection.Name)]
 public sealed class BlackSilenceGenerationStatisticsTests
 {
     [Fact]

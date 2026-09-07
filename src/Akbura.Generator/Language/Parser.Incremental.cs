@@ -2237,9 +2237,20 @@ internal sealed partial class Parser
 
     private bool IsIncrementalPlainMarkupAttributeStart()
     {
-        return IsIncrementalMarkupNameToken(PeekIncrementalTokenKind()) &&
-            (PeekIncrementalTokenKind(1) == SyntaxKind.EqualsToken ||
-             IsIncrementalMarkupAttributeValueStart(PeekIncrementalTokenKind(1)));
+        var current = PeekIncrementalToken();
+
+        if (!IsMarkupNameToken(current))
+        {
+            return false;
+        }
+
+        var next = PeekIncrementalToken(1);
+
+        // Match full parsing: a separated $/{ prefix belongs to the next utility,
+        // not to recovery of a property assignment with a missing equals token.
+        return next.Kind == SyntaxKind.EqualsToken ||
+               (IsMarkupAttributeValueStart(next) &&
+                AreAdjacent(current, next));
     }
 
     private bool IsIncrementalAttachedPropertyMarkupAttributeStart()
@@ -2309,14 +2320,6 @@ internal sealed partial class Parser
 
             _ => IsIncrementalTailwindNameToken(kind),
         };
-    }
-
-    private static bool IsIncrementalMarkupAttributeValueStart(SyntaxKind kind)
-    {
-        return kind is SyntaxKind.DollarToken or
-            SyntaxKind.OpenBraceToken or
-            SyntaxKind.DoubleQuoteToken or
-            SyntaxKind.SingleQuoteToken;
     }
 
     private static bool IsIncrementalMarkupNameToken(SyntaxKind kind)

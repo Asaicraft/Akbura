@@ -14,6 +14,9 @@ using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using RoslynSemanticModel = Microsoft.CodeAnalysis.SemanticModel;
+#if STATS
+using Akbura.Language.CodeGeneration;
+#endif
 
 namespace Akbura.Language.Binder;
 
@@ -44,6 +47,9 @@ internal sealed partial class CSharpProbeBinder : Binder
 
     public CSharpBindingResult BindFieldType(CSharp.CompilationUnitSyntax compilationUnit)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeField = syntaxTree
@@ -80,6 +86,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         bool isBindingPath,
         ITypeSymbol? targetType = null)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeExpression = syntaxTree
@@ -110,6 +119,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         ITypeSymbol? targetType = null,
         bool isBindingPath = true)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
         if (syntax == null)
         {
             throw new ArgumentNullException(nameof(syntax));
@@ -163,6 +175,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         CSharp.CompilationUnitSyntax compilationUnit,
         bool isBindingPath)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeExpression = syntaxTree
@@ -180,6 +195,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         CSharp.StatementSyntax statement,
         bool isBindingPath = false)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
         if (syntax == null)
         {
             throw new ArgumentNullException(nameof(syntax));
@@ -317,6 +335,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         CSharp.CompilationUnitSyntax compilationUnit,
         string methodName)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
         if (string.IsNullOrWhiteSpace(methodName))
         {
             throw new ArgumentException("Probe method name cannot be empty.", nameof(methodName));
@@ -365,6 +386,9 @@ internal sealed partial class CSharpProbeBinder : Binder
 
     private RoslynSemanticModel CreateSemanticModel(SyntaxTree syntaxTree)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeSemanticModel);
+#endif
         var probeCompilation = CSharpCompilation.AddSyntaxTrees(syntaxTree);
         return probeCompilation.GetSemanticModel(syntaxTree);
     }
@@ -660,6 +684,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         SyntaxNode syntax,
         bool suppressTopLevelConversionDiagnostic = false)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeDiagnostics);
+#endif
         using var builder = ImmutableArrayBuilder<Diagnostic>.Rent();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var diagnostic in semanticModel.GetDiagnostics(syntax.Span))

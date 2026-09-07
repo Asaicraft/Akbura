@@ -1,5 +1,6 @@
 #if STATS
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Threading;
 
@@ -28,6 +29,8 @@ internal enum GenerationStatisticCounter : byte
     DiagnosticDeduplicated,
     DiagnosticWorkspaceCollision,
     DiagnosticPublished,
+    AkcssLookupRequest,
+    AkcssLookupReused,
     Count,
 }
 
@@ -50,6 +53,11 @@ internal enum GenerationStatisticStage : byte
     DiagnosticBatch,
     DiagnosticSemantic,
     DiagnosticPublish,
+    CSharpProbeBinding,
+    CSharpProbeSemanticModel,
+    CSharpProbeDiagnostics,
+    CSharpTypeResolution,
+    CSharpUtilityParameters,
     Count,
 }
 
@@ -57,15 +65,15 @@ internal enum GenerationStatisticStage : byte
 /// Opt-in instrumentation. The ambient session flows with ExecutionContext into
 /// Parallel.For workers; independent and nested measurements do not share totals.
 /// </summary>
-internal static class GenerationStatistics
+internal static partial class GenerationStatistics
 {
     private static readonly AsyncLocal<GenerationStatisticsSession?> s_current = new();
 
     internal static GenerationStatisticsSession? Current => s_current.Value;
 
-    public static GenerationStatisticsSession BeginMeasurement()
+    public static GenerationStatisticsSession BeginMeasurement(Func<long>? getAllocatedBytes = null, bool trackOperations = false)
     {
-        var session = new GenerationStatisticsSession(s_current.Value);
+        var session = new GenerationStatisticsSession(s_current.Value, getAllocatedBytes, trackOperations);
         s_current.Value = session;
         return session;
     }
@@ -96,20 +104,29 @@ internal sealed class GenerationStatisticsSession : IDisposable
     private readonly GenerationStatisticsSession? _previous;
     private readonly long[] _counters = new long[(int)GenerationStatisticCounter.Count];
     private readonly long[] _elapsed = new long[(int)GenerationStatisticStage.Count];
+    private readonly long[] _allocatedBytes = new long[(int)GenerationStatisticStage.Count];
+    private readonly long[] _invocationCounts = new long[(int)GenerationStatisticStage.Count];
     private readonly long _startTimestamp = Stopwatch.GetTimestamp();
     private long _endTimestamp;
+    private long _invalidAllocationMeasurementCount;
 
-    internal GenerationStatisticsSession(GenerationStatisticsSession? previous)
+    internal GenerationStatisticsSession(GenerationStatisticsSession? previous, Func<long>? getAllocatedBytes, bool trackOperations)
     {
         _previous = previous;
+        GetAllocatedBytes = getAllocatedBytes;
+        Operations = trackOperations ? new GenerationOperationTracker() : null;
     }
 
     internal bool IsActive => Volatile.Read(ref _endTimestamp) == 0;
+    internal Func<long>? GetAllocatedBytes { get; }
+    internal GenerationOperationTracker? Operations { get; }
 
     public GenerationStatisticsSnapshot GetSnapshot()
     {
         var counters = new long[_counters.Length];
         var elapsed = new long[_elapsed.Length];
+        var allocatedBytes = new long[_allocatedBytes.Length];
+        var invocationCounts = new long[_invocationCounts.Length];
 
         for (var i = 0; i < counters.Length; i++)
         {
@@ -119,6 +136,8 @@ internal sealed class GenerationStatisticsSession : IDisposable
         for (var i = 0; i < elapsed.Length; i++)
         {
             elapsed[i] = Interlocked.Read(ref _elapsed[i]);
+            allocatedBytes[i] = Interlocked.Read(ref _allocatedBytes[i]);
+            invocationCounts[i] = Interlocked.Read(ref _invocationCounts[i]);
         }
 
         var endTimestamp = Volatile.Read(ref _endTimestamp);
@@ -127,13 +146,23 @@ internal sealed class GenerationStatisticsSession : IDisposable
             endTimestamp = Stopwatch.GetTimestamp();
         }
 
-        return new GenerationStatisticsSnapshot(counters, elapsed, endTimestamp - _startTimestamp);
+        return new GenerationStatisticsSnapshot(
+            counters,
+            elapsed,
+            allocatedBytes,
+            invocationCounts,
+            endTimestamp - _startTimestamp,
+            GetAllocatedBytes != null,
+            Interlocked.Read(ref _invalidAllocationMeasurementCount),
+            Operations != null,
+            Operations?.GetSnapshot() ?? ImmutableArray<GenerationOperationStatistics>.Empty);
     }
 
     public void Dispose()
     {
         if (Interlocked.CompareExchange(ref _endTimestamp, Stopwatch.GetTimestamp(), 0) == 0)
         {
+            Operations?.Complete();
             GenerationStatistics.Restore(this, _previous);
         }
     }
@@ -146,11 +175,20 @@ internal sealed class GenerationStatisticsSession : IDisposable
         }
     }
 
-    internal void AddElapsed(GenerationStatisticStage stage, long elapsed)
+    internal void AddMeasurement(GenerationStatisticStage stage, long elapsed, long allocatedBytes, bool invalidAllocation)
     {
         if (IsActive)
         {
             Interlocked.Add(ref _elapsed[(int)stage], elapsed);
+            Interlocked.Increment(ref _invocationCounts[(int)stage]);
+            if (invalidAllocation)
+            {
+                Interlocked.Increment(ref _invalidAllocationMeasurementCount);
+            }
+            else if (GetAllocatedBytes != null)
+            {
+                Interlocked.Add(ref _allocatedBytes[(int)stage], allocatedBytes);
+            }
         }
     }
 }
@@ -162,6 +200,8 @@ internal sealed class GenerationStageMeasurement : IDisposable
     private readonly GenerationStatisticsSession? _session;
     private readonly GenerationStatisticStage _stage;
     private readonly long _startTimestamp;
+    private readonly long _startAllocatedBytes;
+    private readonly int _startThreadId;
     private int _disposed;
 
     private GenerationStageMeasurement()
@@ -172,6 +212,12 @@ internal sealed class GenerationStageMeasurement : IDisposable
     {
         _session = session;
         _stage = stage;
+        if (session.GetAllocatedBytes is { } getAllocatedBytes)
+        {
+            _startThreadId = Thread.CurrentThread.ManagedThreadId;
+            _startAllocatedBytes = getAllocatedBytes();
+        }
+
         _startTimestamp = Stopwatch.GetTimestamp();
     }
 
@@ -179,7 +225,28 @@ internal sealed class GenerationStageMeasurement : IDisposable
     {
         if (_session != null && Interlocked.Exchange(ref _disposed, 1) == 0)
         {
-            _session.AddElapsed(_stage, Stopwatch.GetTimestamp() - _startTimestamp);
+            if (!_session.IsActive)
+            {
+                return;
+            }
+
+            var elapsed = Stopwatch.GetTimestamp() - _startTimestamp;
+            long allocatedBytes = 0;
+            var invalidAllocation = false;
+            if (_session.GetAllocatedBytes is { } getAllocatedBytes)
+            {
+                if (_startThreadId == Thread.CurrentThread.ManagedThreadId)
+                {
+                    allocatedBytes = getAllocatedBytes() - _startAllocatedBytes;
+                    invalidAllocation = allocatedBytes < 0;
+                }
+                else
+                {
+                    invalidAllocation = true;
+                }
+            }
+
+            _session.AddMeasurement(_stage, elapsed, allocatedBytes, invalidAllocation);
         }
     }
 }
@@ -191,18 +258,42 @@ internal sealed class GenerationStageMeasurement : IDisposable
 /// SemanticBindingElapsed covers semantic input and module-symbol resolution;
 /// further lazy binding remains included in planning. CSharpProbeCompilationElapsed
 /// overlaps either phase.
+/// Optional allocation totals are likewise inclusive and not additive. The provider
+/// must return a monotonic current-thread byte count and support concurrent callers.
+/// Cross-thread or decreasing allocation samples are excluded and counted as invalid;
+/// their elapsed duration and completed invocation still count. Invocation counts
+/// include the first disposal only. Finish all scopes before taking the final snapshot.
+/// Operation IDs are session-local. First invocations are reserved atomically at
+/// scope creation; repeated inclusive costs are measurements, not predicted savings.
 /// Reused counters count explicit pipeline reuse, not Roslyn's skipped callbacks.
 /// </summary>
 internal sealed class GenerationStatisticsSnapshot
 {
     private readonly long[] _counters;
     private readonly long[] _elapsed;
+    private readonly long[] _allocatedBytes;
+    private readonly long[] _invocationCounts;
 
-    internal GenerationStatisticsSnapshot(long[] counters, long[] elapsed, long elapsedTimestampTicks)
+    internal GenerationStatisticsSnapshot(
+        long[] counters,
+        long[] elapsed,
+        long[] allocatedBytes,
+        long[] invocationCounts,
+        long elapsedTimestampTicks,
+        bool hasAllocationMeasurements,
+        long invalidAllocationMeasurementCount,
+        bool operationTrackingEnabled,
+        ImmutableArray<GenerationOperationStatistics> operationMeasurements)
     {
         _counters = counters;
         _elapsed = elapsed;
+        _allocatedBytes = allocatedBytes;
+        _invocationCounts = invocationCounts;
         Elapsed = ToTimeSpan(elapsedTimestampTicks);
+        HasAllocationMeasurements = hasAllocationMeasurements;
+        InvalidAllocationMeasurementCount = invalidAllocationMeasurementCount;
+        OperationTrackingEnabled = operationTrackingEnabled;
+        OperationMeasurements = operationMeasurements;
     }
 
     public long ReadSourceTextCount => _counters[(int)GenerationStatisticCounter.ReadSourceText];
@@ -226,8 +317,14 @@ internal sealed class GenerationStatisticsSnapshot
     public long DiagnosticDeduplicatedCount => _counters[(int)GenerationStatisticCounter.DiagnosticDeduplicated];
     public long DiagnosticWorkspaceCollisionCount => _counters[(int)GenerationStatisticCounter.DiagnosticWorkspaceCollision];
     public long DiagnosticPublishedCount => _counters[(int)GenerationStatisticCounter.DiagnosticPublished];
+    public long AkcssLookupRequestCount => _counters[(int)GenerationStatisticCounter.AkcssLookupRequest];
+    public long AkcssLookupReusedCount => _counters[(int)GenerationStatisticCounter.AkcssLookupReused];
 
     public TimeSpan Elapsed { get; }
+    public bool HasAllocationMeasurements { get; }
+    public long InvalidAllocationMeasurementCount { get; }
+    public bool OperationTrackingEnabled { get; }
+    public ImmutableArray<GenerationOperationStatistics> OperationMeasurements { get; }
     public TimeSpan ParseElapsed => GetElapsed(GenerationStatisticStage.Parse);
     public TimeSpan CompilationElapsed => GetElapsed(GenerationStatisticStage.Compilation);
     public TimeSpan CatalogElapsed => GetElapsed(GenerationStatisticStage.Catalog);
@@ -246,7 +343,23 @@ internal sealed class GenerationStatisticsSnapshot
     public TimeSpan DiagnosticSemanticElapsed => GetElapsed(GenerationStatisticStage.DiagnosticSemantic);
     public TimeSpan DiagnosticPublishElapsed => GetElapsed(GenerationStatisticStage.DiagnosticPublish);
 
-    private TimeSpan GetElapsed(GenerationStatisticStage stage) => ToTimeSpan(_elapsed[(int)stage]);
+    public TimeSpan GetStageElapsed(GenerationStatisticStage stage) => ToTimeSpan(_elapsed[GetStageIndex(stage)]);
+
+    public long GetStageAllocatedBytes(GenerationStatisticStage stage) => _allocatedBytes[GetStageIndex(stage)];
+
+    public long GetStageInvocationCount(GenerationStatisticStage stage) => _invocationCounts[GetStageIndex(stage)];
+
+    private TimeSpan GetElapsed(GenerationStatisticStage stage) => GetStageElapsed(stage);
+
+    private static int GetStageIndex(GenerationStatisticStage stage)
+    {
+        if (stage >= GenerationStatisticStage.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage));
+        }
+
+        return (int)stage;
+    }
 
     private static TimeSpan ToTimeSpan(long timestampTicks)
     {

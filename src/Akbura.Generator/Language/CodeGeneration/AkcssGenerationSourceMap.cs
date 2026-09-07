@@ -10,21 +10,26 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal sealed class AkcssGenerationSourceMap
 {
+    private readonly string _projectDirectory;
     private readonly AkburaSourceTreeMap _sourceTreeMap;
     private readonly AkcssGenerationSymbolResolver _symbolResolver;
 
     public AkcssGenerationSourceMap(
         ImmutableArray<AkburaSyntaxTree> componentSyntaxTrees,
-        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees)
+        ImmutableArray<AkcssSyntaxTree> akcssSyntaxTrees,
+        string projectDirectory)
     {
+        _projectDirectory = projectDirectory;
         _sourceTreeMap = new AkburaSourceTreeMap(componentSyntaxTrees, akcssSyntaxTrees);
         _symbolResolver = new AkcssGenerationSymbolResolver(_sourceTreeMap);
     }
 
     public AkcssGenerationSourceMap(
         AkburaSourceTreeMap sourceTreeMap,
-        AkcssGenerationSymbolResolver symbolResolver)
+        AkcssGenerationSymbolResolver symbolResolver,
+        string projectDirectory)
     {
+        _projectDirectory = projectDirectory;
         _sourceTreeMap = sourceTreeMap;
         _symbolResolver = symbolResolver;
     }
@@ -41,8 +46,11 @@ internal sealed class AkcssGenerationSourceMap
 
     public bool TryGetLineDirective(AkburaSyntax syntax, out LinePositionSpan lineSpan, out string path)
     {
-        if (!TryGetSourceSpan(syntax, out var sourceSpan, out path) ||
-            !_sourceTreeMap.TryGetSyntaxTree(syntax, out var syntaxTree))
+        if (!TryGetSourceSpan(
+                syntax,
+                out var sourceSpan,
+                out path,
+                out var syntaxTree))
         {
             lineSpan = default;
             path = string.Empty;
@@ -61,9 +69,52 @@ internal sealed class AkcssGenerationSourceMap
         return true;
     }
 
-    public bool TryGetSourceSpan(AkburaSyntax syntax, out TextSpan span, out string path)
+    public bool TryGetMetadataSourceSpan(
+        AkburaSyntax syntax,
+        out TextSpan span,
+        out string path)
     {
         if (!_sourceTreeMap.TryGetSyntaxTree(syntax, out var syntaxTree))
+        {
+            span = default;
+            path = string.Empty;
+            return false;
+        }
+
+        path = syntaxTree switch
+        {
+            ComponentSyntaxTree componentTree =>
+                AkburaGenerationCatalogBuilder.GetSourcePath(
+                    componentTree,
+                    _projectDirectory),
+
+            AkcssSyntaxTree akcssTree =>
+                AkburaGenerationCatalogBuilder.GetSourcePath(
+                    akcssTree,
+                    _projectDirectory),
+
+            _ => string.Empty,
+        };
+
+        span = syntax.Span;
+
+        if (!IsValidSourceSpan(syntaxTree, span, path))
+        {
+            span = default;
+            path = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryGetSourceSpan(
+        AkburaSyntax syntax,
+        out TextSpan span,
+        out string path,
+        out AkburaSyntaxTree syntaxTree)
+    {
+        if (!_sourceTreeMap.TryGetSyntaxTree(syntax, out syntaxTree))
         {
             span = default;
             path = string.Empty;
@@ -78,13 +129,7 @@ internal sealed class AkcssGenerationSourceMap
 
         span = syntax.Span;
 
-        if (string.IsNullOrWhiteSpace(path) ||
-            path.IndexOf('"') >= 0 ||
-            path.IndexOf('\r') >= 0 ||
-            path.IndexOf('\n') >= 0 ||
-            span.Length == 0 ||
-            (uint)span.Start > (uint)syntaxTree.Text.Length ||
-            (uint)span.End > (uint)syntaxTree.Text.Length)
+        if (!IsValidSourceSpan(syntaxTree, span, path))
         {
             span = default;
             path = string.Empty;
@@ -92,6 +137,20 @@ internal sealed class AkcssGenerationSourceMap
         }
 
         return true;
+    }
+
+    private static bool IsValidSourceSpan(
+        AkburaSyntaxTree syntaxTree,
+        TextSpan span,
+        string path)
+    {
+        return !string.IsNullOrWhiteSpace(path) &&
+            path.IndexOf('"') < 0 &&
+            path.IndexOf('\r') < 0 &&
+            path.IndexOf('\n') < 0 &&
+            span.Length > 0 &&
+            (uint)span.Start <= (uint)syntaxTree.Text.Length &&
+            (uint)span.End <= (uint)syntaxTree.Text.Length;
     }
 
     private static bool IsValidLineSpan(LinePositionSpan lineSpan)

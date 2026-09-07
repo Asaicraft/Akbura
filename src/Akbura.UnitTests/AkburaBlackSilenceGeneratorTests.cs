@@ -340,6 +340,32 @@ public sealed class AkburaBlackSilenceGeneratorTests
         var inlineText = inlineGenerated.SourceText.ToString();
 
         Assert.Contains(
+            "SourcePath = \"Styles/Shared.akcss\",",
+            externalText,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain(
+            "SourcePath = \"" +
+            AkcssGeneratedModuleNames.NormalizeSourcePath(
+                externalAkcssPath) +
+            "\"",
+            externalText,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "SourcePath = \"Views/PlannerView.akbura\",",
+            inlineText,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain(
+            "SourcePath = \"" +
+            AkcssGeneratedModuleNames.NormalizeSourcePath(
+                componentPath) +
+            "\"",
+            inlineText,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
             "partial class PlannerView",
             componentText,
             StringComparison.Ordinal);

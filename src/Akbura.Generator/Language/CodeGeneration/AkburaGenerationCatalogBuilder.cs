@@ -105,7 +105,8 @@ internal static class AkburaGenerationCatalogBuilder
 
         var sourceMap = new AkcssGenerationSourceMap(
             componentSyntaxTrees,
-            akcssSyntaxTrees);
+            akcssSyntaxTrees,
+            projectDirectory);
 
         var moduleTypeNames = new Dictionary<AkburaSyntax, string>(
             sourceAkcssSyntaxTrees.Length +

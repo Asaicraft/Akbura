@@ -523,9 +523,13 @@ internal ref struct AkcssOperationMetadataPlanner
                 SourceSpan: { Length: > 0 } metadataSpan,
             })
         {
-            sourcePath = metadataPath;
-            sourceStart = metadataSpan.Start;
-            sourceLength = metadataSpan.Length;
+            sourcePath = GetSafeMetadataSourcePath(metadataPath);
+            sourceStart = sourcePath != null
+                ? metadataSpan.Start
+                : -1;
+            sourceLength = sourcePath != null
+                ? metadataSpan.Length
+                : 0;
             return;
         }
 
@@ -543,9 +547,9 @@ internal ref struct AkcssOperationMetadataPlanner
         out int sourceLength)
     {
         if (syntax != null &&
-            _sourceMap.TryGetSourceSpan(syntax, out var span, out var path))
+            _sourceMap.TryGetMetadataSourceSpan(syntax, out var span, out var path))
         {
-            sourcePath = AkcssGeneratedModuleNames.NormalizeSourcePath(path);
+            sourcePath = path;
             sourceStart = span.Start;
             sourceLength = span.Length;
             return;
@@ -554,6 +558,45 @@ internal ref struct AkcssOperationMetadataPlanner
         sourcePath = null;
         sourceStart = -1;
         sourceLength = 0;
+    }
+
+    private static string? GetSafeMetadataSourcePath(string sourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath))
+        {
+            return null;
+        }
+
+        var normalizedPath = AkcssGeneratedModuleNames.NormalizeSourcePath(sourcePath);
+
+        if (normalizedPath.IndexOf('"') >= 0 ||
+            normalizedPath.IndexOf('\r') >= 0 ||
+            normalizedPath.IndexOf('\n') >= 0)
+        {
+            return null;
+        }
+
+        if (!IsUnsafeMetadataSourcePath(normalizedPath))
+        {
+            return normalizedPath;
+        }
+
+        var fileNameStart = normalizedPath.LastIndexOf('/') + 1;
+
+        return fileNameStart < normalizedPath.Length
+            ? normalizedPath[fileNameStart..]
+            : null;
+    }
+
+    private static bool IsUnsafeMetadataSourcePath(string sourcePath)
+    {
+        return sourcePath.StartsWith("/", StringComparison.Ordinal) ||
+            sourcePath.Equals("..", StringComparison.Ordinal) ||
+            sourcePath.StartsWith("../", StringComparison.Ordinal) ||
+            sourcePath.IndexOf("/../", StringComparison.Ordinal) >= 0 ||
+            sourcePath.EndsWith("/..", StringComparison.Ordinal) ||
+            sourcePath.StartsWith("file:", StringComparison.OrdinalIgnoreCase) ||
+            sourcePath.Length >= 2 && sourcePath[1] == ':';
     }
 
     private static GeneratedAkcssOperationPriority GetEffectiveOperationPriority(

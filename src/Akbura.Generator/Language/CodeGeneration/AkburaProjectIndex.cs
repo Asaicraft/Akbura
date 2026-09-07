@@ -31,7 +31,8 @@ internal sealed class AkburaProjectIndex
         SourceTreeMap = sourceTreeMap;
         AkcssSourceMap = new AkcssGenerationSourceMap(
             sourceTreeMap,
-            new AkcssGenerationSymbolResolver(sourceTreeMap, compilation));
+            new AkcssGenerationSymbolResolver(sourceTreeMap, compilation),
+            compilation.ProjectDirectory);
     }
 
     public AkburaCompilation Compilation { get; }

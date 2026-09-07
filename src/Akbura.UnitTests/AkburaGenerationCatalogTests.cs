@@ -41,8 +41,22 @@ public sealed class AkburaGenerationCatalogTests
         Assert.True(catalog.AkcssSourceMap.TryGetLineDirective(externalSyntax, out _, out var externalPath));
         Assert.Equal(fixture.ExternalAkcssPath, externalPath);
 
+        Assert.True(
+            catalog.AkcssSourceMap.TryGetMetadataSourceSpan(
+                externalSyntax,
+                out _,
+                out var externalMetadataPath));
+        Assert.Equal("Styles/Shared.akcss", externalMetadataPath);
+
         Assert.True(catalog.AkcssSourceMap.TryGetLineDirective(inlineSyntax, out _, out var inlinePath));
         Assert.Equal(fixture.ComponentPath, inlinePath);
+
+        Assert.True(
+            catalog.AkcssSourceMap.TryGetMetadataSourceSpan(
+                inlineSyntax,
+                out _,
+                out var inlineMetadataPath));
+        Assert.Equal("Views/PlannerView.akbura", inlineMetadataPath);
     }
 
     [Fact]
@@ -278,6 +292,19 @@ public sealed class AkburaGenerationCatalogTests
 
             Assert.Contains(
                 "SourceLength = ",
+                output,
+                StringComparison.Ordinal);
+
+            Assert.Contains(
+                "SourcePath = \"Styles/Shared.akcss\",",
+                output,
+                StringComparison.Ordinal);
+
+            Assert.DoesNotContain(
+                "SourcePath = \"" +
+                AkcssGeneratedModuleNames.NormalizeSourcePath(
+                    fixture.ExternalAkcssPath) +
+                "\"",
                 output,
                 StringComparison.Ordinal);
 

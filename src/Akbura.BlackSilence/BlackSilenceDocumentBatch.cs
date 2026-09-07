@@ -7,16 +7,18 @@ using System.Threading.Tasks;
 
 namespace Akbura.BlackSilence;
 
-internal sealed class BlackSilenceDocumentBatch
+internal sealed partial class BlackSilenceDocumentBatch
 {
     private BlackSilenceDocumentBatch(
         ImmutableArray<GeneratedSource> components,
         ImmutableArray<GeneratedSource> externalAkcss,
-        ImmutableArray<GeneratedSource> inlineAkcss)
+        ImmutableArray<GeneratedSource> inlineAkcss,
+        ImmutableArray<Akbura.Diagnostics.AkburaDiagnosticRecord> diagnostics)
     {
         Components = components;
         ExternalAkcss = externalAkcss;
         InlineAkcss = inlineAkcss;
+        Diagnostics = diagnostics;
     }
 
     public ImmutableArray<GeneratedSource> Components { get; }
@@ -46,7 +48,7 @@ internal sealed class BlackSilenceDocumentBatch
             for (var i = 0; i < componentCount; i++)
             {
                 var component = request.Components[i];
-                if (component.Previous != null &&
+                if (component.Previous != null && CanImportDiagnosticSeed(request, component.Descriptor.SyntaxTree.FilePath) &&
                     previousSnapshot.SemanticStates.TryGetValue(component.Descriptor.SyntaxTree, out var state))
                 {
                     request.Index.Compilation.TryImportSemanticState(component.Descriptor.SyntaxTree, state);
@@ -56,7 +58,7 @@ internal sealed class BlackSilenceDocumentBatch
             for (var i = componentCount; i < total; i++)
             {
                 var module = GetAkcssRequest(i);
-                if (module.Previous != null &&
+                if (module.Previous != null && CanImportDiagnosticSeed(request, module.Descriptor.SyntaxTree.FilePath) &&
                     previousSnapshot.SemanticStates.TryGetValue(module.Descriptor.SyntaxTree, out var state))
                 {
                     request.Index.Compilation.TryImportSemanticState(module.Descriptor.SyntaxTree, state);
@@ -106,6 +108,11 @@ internal sealed class BlackSilenceDocumentBatch
             }
         }
 
+        // Evaluate the diagnostic-only dirty set through the same compilation.
+        // Existing source models are reused, and shared lazy binding completes
+        // before source writers enter the parallel queue.
+        var diagnosticEntries = CollectDiagnostics(request, cancellationToken);
+
         // Small edits should not pay ThreadPool scheduling costs. Cold generation
         // uses one queue for components and both kinds of AKCSS documents.
         if (dirtyIndices.Count <= 2)
@@ -142,7 +149,8 @@ internal sealed class BlackSilenceDocumentBatch
         var batch = new BlackSilenceDocumentBatch(
             GetSources(results, 0, componentCount),
             GetSources(results, componentCount, externalCount),
-            GetSources(results, componentCount + externalCount, request.InlineAkcss.Length));
+            GetSources(results, componentCount + externalCount, request.InlineAkcss.Length),
+            GetDiagnostics(request, diagnosticEntries));
         var snapshot = new BlackSilenceProjectSnapshot(
             request.Version,
             request.Options,
@@ -150,7 +158,8 @@ internal sealed class BlackSilenceDocumentBatch
             request.Documents,
             request.DeclarationEnvironment,
             entries.ToImmutable(),
-            request.Index.Compilation.GetReusableSemanticStates());
+            request.Index.Compilation.GetReusableSemanticStates(),
+            diagnosticEntries);
 
         cancellationToken.ThrowIfCancellationRequested();
         request.State.Publish(snapshot);

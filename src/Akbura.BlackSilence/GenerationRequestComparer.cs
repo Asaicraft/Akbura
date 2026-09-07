@@ -16,7 +16,8 @@ internal sealed class GenerationRequestComparer : IEqualityComparer<BlackSilence
 
         if (left == null || right == null || !ReferenceEquals(left.State, right.State) ||
             left.Options != right.Options || left.Components.Length != right.Components.Length ||
-            left.ExternalAkcss.Length != right.ExternalAkcss.Length || left.InlineAkcss.Length != right.InlineAkcss.Length)
+            left.ExternalAkcss.Length != right.ExternalAkcss.Length || left.InlineAkcss.Length != right.InlineAkcss.Length ||
+            left.ComputeDiagnostics != right.ComputeDiagnostics || left.Diagnostics.Length != right.Diagnostics.Length)
         {
             return false;
         }
@@ -43,6 +44,15 @@ internal sealed class GenerationRequestComparer : IEqualityComparer<BlackSilence
         {
             if (left.InlineAkcss[i].Identity != right.InlineAkcss[i].Identity ||
                 !left.InlineAkcss[i].Version.Equals(right.InlineAkcss[i].Version))
+            {
+                return false;
+            }
+        }
+
+        for (var i = 0; i < left.Diagnostics.Length; i++)
+        {
+            if (left.Diagnostics[i].Document.FilePath != right.Diagnostics[i].Document.FilePath ||
+                !left.Diagnostics[i].Version.Equals(right.Diagnostics[i].Version))
             {
                 return false;
             }

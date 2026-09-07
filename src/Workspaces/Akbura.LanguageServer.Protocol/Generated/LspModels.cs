@@ -429,6 +429,17 @@ public sealed class Diagnostic
     public string? Source { get; set; }
 
     public string Message { get; set; } = string.Empty;
+
+    public DiagnosticRelatedInformation[]? RelatedInformation { get; set; }
+
+    public JsonElement? Data { get; set; }
+}
+
+public sealed class DiagnosticRelatedInformation
+{
+    public Location Location { get; set; } = new();
+
+    public string Message { get; set; } = string.Empty;
 }
 
 public sealed class PublishDiagnosticsParams

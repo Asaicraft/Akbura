@@ -1,3 +1,4 @@
+using Akbura.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
@@ -66,7 +67,22 @@ public sealed class RoslynProjectContextFactory
             projectDirectory,
             GetRootNamespace(project, compilation),
             compilation,
-            project.ProjectReferences.ToImmutableArray());
+            project.ProjectReferences.ToImmutableArray(),
+            GetDiagnosticPublisher(project));
+    }
+
+    private static AkburaDiagnosticPublisher GetDiagnosticPublisher(Project project)
+    {
+        if (project.AnalyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
+                "build_property.AkburaDiagnosticPublisher",
+                out var configuredPublisher) &&
+            Enum.TryParse<AkburaDiagnosticPublisher>(configuredPublisher, true, out var publisher) &&
+            Enum.IsDefined(typeof(AkburaDiagnosticPublisher), publisher))
+        {
+            return publisher;
+        }
+
+        return AkburaDiagnosticPublisher.Auto;
     }
 
     public string GetRootNamespace(

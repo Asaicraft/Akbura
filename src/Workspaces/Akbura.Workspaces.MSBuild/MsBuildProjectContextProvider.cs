@@ -21,14 +21,20 @@ public sealed class MsBuildProjectContextProvider :
     private readonly CancellationTokenSource _disposeCancellation = new();
     private int _disposeState;
 
-    public MsBuildProjectContextProvider()
+    public MsBuildProjectContextProvider(bool workspaceDiagnosticsActive = false)
     {
         if (!MSBuildLocator.IsRegistered)
         {
             MSBuildLocator.RegisterDefaults();
         }
 
-        _workspace = MSBuildWorkspace.Create();
+        _workspace = workspaceDiagnosticsActive
+            ? MSBuildWorkspace.Create(new Dictionary<string, string>
+            {
+                ["DesignTimeBuild"] = "true",
+                ["AkburaWorkspaceDiagnosticsActive"] = "true",
+            })
+            : MSBuildWorkspace.Create();
         _workspace.WorkspaceChanged += OnWorkspaceChanged;
         _workspace.WorkspaceFailed += OnWorkspaceFailed;
     }

@@ -15,7 +15,9 @@ internal sealed class BlackSilenceGenerationRequest
         ImmutableArray<ComponentGenerationRequest> components,
         ImmutableArray<AkcssGenerationRequest> externalAkcss,
         ImmutableArray<AkcssGenerationRequest> inlineAkcss,
-        BlackSilenceProjectSnapshot? previousSnapshot)
+        BlackSilenceProjectSnapshot? previousSnapshot,
+        ImmutableArray<DocumentDiagnosticRequest> diagnostics = default,
+        bool computeDiagnostics = true)
     {
         State = state;
         Version = version;
@@ -27,6 +29,8 @@ internal sealed class BlackSilenceGenerationRequest
         ExternalAkcss = externalAkcss;
         InlineAkcss = inlineAkcss;
         PreviousSnapshot = previousSnapshot;
+        Diagnostics = diagnostics.IsDefault ? [] : diagnostics;
+        ComputeDiagnostics = computeDiagnostics;
     }
 
     public BlackSilenceProjectState State { get; }
@@ -39,4 +43,6 @@ internal sealed class BlackSilenceGenerationRequest
     public ImmutableArray<AkcssGenerationRequest> ExternalAkcss { get; }
     public ImmutableArray<AkcssGenerationRequest> InlineAkcss { get; }
     public BlackSilenceProjectSnapshot? PreviousSnapshot { get; }
+    public ImmutableArray<DocumentDiagnosticRequest> Diagnostics { get; }
+    public bool ComputeDiagnostics { get; }
 }

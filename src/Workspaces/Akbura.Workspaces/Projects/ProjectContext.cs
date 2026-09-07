@@ -1,3 +1,4 @@
+using Akbura.Diagnostics;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -18,7 +19,8 @@ public sealed record ProjectContext
         string projectDirectory,
         string rootNamespace,
         CSharpCompilation csharpCompilation,
-        ImmutableArray<ProjectReference> projectReferences)
+        ImmutableArray<ProjectReference> projectReferences,
+        AkburaDiagnosticPublisher diagnosticPublisher = AkburaDiagnosticPublisher.Auto)
     {
         RoslynProjectId = roslynProjectId ??
             throw new ArgumentNullException(nameof(roslynProjectId));
@@ -26,6 +28,7 @@ public sealed record ProjectContext
         ProjectFilePath = projectFilePath ?? string.Empty;
         ProjectDirectory = projectDirectory ?? string.Empty;
         RootNamespace = rootNamespace ?? string.Empty;
+        DiagnosticPublisher = diagnosticPublisher;
 
         CSharpCompilation = RemoveSelfMetadataReferences(
             csharpCompilation ??
@@ -43,6 +46,8 @@ public sealed record ProjectContext
     public string ProjectDirectory { get; }
 
     public string RootNamespace { get; }
+
+    public AkburaDiagnosticPublisher DiagnosticPublisher { get; }
 
     public CSharpCompilation CSharpCompilation { get; }
 

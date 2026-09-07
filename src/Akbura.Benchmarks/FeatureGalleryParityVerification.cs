@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -96,6 +97,7 @@ internal static class FeatureGalleryParityVerification
         AddDifferences("Component metadata types", furiosoTypes.Components, blackSilenceTypes.Components, differences);
         AddDifferences("AKCSS carrier metadata types", furiosoTypes.Akcss, blackSilenceTypes.Akcss, differences);
         AddDifferences("Generated hints (including infrastructure)", furioso.Sources.Keys, blackSilence.Sources.Keys, differences);
+        AddDiagnosticDifferences(furioso.CanonicalDiagnostics, blackSilence.CanonicalDiagnostics, differences);
 
         if (furiosoTypes.Components.Length == 0 || furiosoTypes.Akcss.Length == 0 ||
             blackSilenceTypes.Components.Length == 0 || blackSilenceTypes.Akcss.Length == 0)
@@ -170,11 +172,7 @@ internal static class FeatureGalleryParityVerification
             }
         }
 
-        if (!fresh.Diagnostics.SequenceEqual(incremental.Diagnostics, StringComparer.Ordinal))
-        {
-            differences.Add("Driver/generator/compiler diagnostic sequences differ (including multiplicity, mapped locations and properties).");
-            AddDifferences("Diagnostics", fresh.Diagnostics, incremental.Diagnostics, differences);
-        }
+        AddDiagnosticDifferences(fresh.CanonicalDiagnostics, incremental.CanonicalDiagnostics, differences);
 
         return new ScenarioResult(
             scenario.ToString(),
@@ -197,7 +195,7 @@ internal static class FeatureGalleryParityVerification
             generators: [generator.AsSourceGenerator()],
             additionalTexts: files,
             parseOptions: project.ParseOptions,
-            optionsProvider: snapshot.OptionsProvider);
+            optionsProvider: new DiagnosticPublishOptionsProvider(snapshot.OptionsProvider));
     }
 
     private static CapturedRun RunGenerator(GeneratorDriver driver, CSharpCompilation compilation)
@@ -227,12 +225,17 @@ internal static class FeatureGalleryParityVerification
             .Concat(DescribeDiagnostics("generator", result.Diagnostics))
             .Concat(DescribeDiagnostics("compiler", compilerDiagnostics))
             .Order(StringComparer.Ordinal).ToArray();
+        var canonicalDescriptions = DescribeDiagnostics("driver", driverDiagnostics, ignoreTransport: true)
+            .Concat(DescribeDiagnostics("generator", result.Diagnostics, ignoreTransport: true))
+            .Concat(DescribeDiagnostics("compiler", compilerDiagnostics, ignoreTransport: true))
+            .Order(StringComparer.Ordinal).ToArray();
         return new CapturedRun(
             driver,
             output,
             result,
             result.GeneratedSources.ToDictionary(static source => source.HintName, static source => source.SourceText, StringComparer.Ordinal),
-            descriptions);
+            descriptions,
+            canonicalDescriptions);
     }
 
     private static GeneratedTypes GetGeneratedTypes(CapturedRun run)
@@ -268,7 +271,10 @@ internal static class FeatureGalleryParityVerification
         return new GeneratedTypes(components.ToArray(), akcss.ToArray(), infrastructureHints.Order(StringComparer.Ordinal).ToArray());
     }
 
-    private static IEnumerable<string> DescribeDiagnostics(string stage, ImmutableArray<Diagnostic> diagnostics)
+    internal static IEnumerable<string> DescribeDiagnostics(
+        string stage,
+        ImmutableArray<Diagnostic> diagnostics,
+        bool ignoreTransport = false)
     {
         return diagnostics.Select(diagnostic => JsonSerializer.Serialize(new
         {
@@ -278,10 +284,25 @@ internal static class FeatureGalleryParityVerification
             diagnostic.WarningLevel,
             diagnostic.IsSuppressed,
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
+            Title = diagnostic.Descriptor.Title.ToString(CultureInfo.InvariantCulture),
+            diagnostic.Descriptor.Category,
+            Description = diagnostic.Descriptor.Description.ToString(CultureInfo.InvariantCulture),
+            diagnostic.Descriptor.HelpLinkUri,
+            diagnostic.Descriptor.DefaultSeverity,
+            diagnostic.Descriptor.IsEnabledByDefault,
+            CustomTags = diagnostic.Descriptor.CustomTags.ToArray(),
             Location = DescribeLocation(diagnostic.Location),
             AdditionalLocations = diagnostic.AdditionalLocations.Select(DescribeLocation).ToArray(),
-            Properties = diagnostic.Properties.OrderBy(static pair => pair.Key, StringComparer.Ordinal).ToArray(),
+            Properties = diagnostic.Properties.Where(pair => !ignoreTransport || !IsTransportProperty(pair.Key))
+                .OrderBy(static pair => pair.Key, StringComparer.Ordinal).ToArray(),
         }));
+    }
+
+    private static bool IsTransportProperty(string key)
+    {
+        // These four documented publisher fields are not semantic identity.
+        // Do not ignore arbitrary properties or a whole property-name prefix.
+        return key is "akbura.origin" or "akbura.kind" or "akbura.logical-id" or "akbura.document-version";
     }
 
     private static object DescribeLocation(Location location)
@@ -292,15 +313,45 @@ internal static class FeatureGalleryParityVerification
         {
             Kind = location.Kind.ToString(),
             FilePath = original.Path,
+            OriginalIsValid = original.IsValid,
+            OriginalHasMappedPath = original.HasMappedPath,
+            OriginalStartLine = original.StartLinePosition.Line,
+            OriginalStartCharacter = original.StartLinePosition.Character,
+            OriginalEndLine = original.EndLinePosition.Line,
+            OriginalEndCharacter = original.EndLinePosition.Character,
             location.SourceSpan.Start,
             location.SourceSpan.Length,
             MappedPath = mapped.Path,
+            MappedIsValid = mapped.IsValid,
             mapped.HasMappedPath,
             StartLine = mapped.StartLinePosition.Line,
             StartCharacter = mapped.StartLinePosition.Character,
             EndLine = mapped.EndLinePosition.Line,
             EndCharacter = mapped.EndLinePosition.Character,
         };
+    }
+
+    private static void AddDiagnosticDifferences(string[] expected, string[] actual, List<string> differences)
+    {
+        if (expected.SequenceEqual(actual, StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        differences.Add("Driver/generator/compiler diagnostics differ, including multiplicity, locations, descriptor metadata or semantic properties.");
+        var expectedCounts = expected.GroupBy(static diagnostic => diagnostic, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+        var actualCounts = actual.GroupBy(static diagnostic => diagnostic, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+        foreach (var diagnostic in expectedCounts.Keys.Union(actualCounts.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        {
+            expectedCounts.TryGetValue(diagnostic, out var expectedCount);
+            actualCounts.TryGetValue(diagnostic, out var actualCount);
+            if (expectedCount != actualCount)
+            {
+                differences.Add($"Diagnostic count expected/Furioso {expectedCount}, actual/BlackSilence {actualCount}: {diagnostic}");
+            }
+        }
     }
 
     private static void AddDifferences(string label, IEnumerable<string> expected, IEnumerable<string> actual, List<string> differences)
@@ -352,7 +403,8 @@ internal static class FeatureGalleryParityVerification
         markdown.AppendLine();
         markdown.AppendLine("Real MSBuild-loaded FeatureGallery inputs. Every checked generated compilation must have zero errors; warnings and hidden diagnostics remain part of incremental/fresh parity.");
         markdown.AppendLine("Furioso/BlackSilence compatibility compares top-level component and AKCSS carrier metadata identities, not private nested helper types or source-text formatting. Every generated hint, including infrastructure, is accounted for; hint differences fail verification and are reported.");
-        markdown.AppendLine("Each incremental/fresh comparison uses the same current AdditionalFile paths/text/options and C# compilation, with a fresh BlackSilence driver as reference. Sources are compared ordinally, not by hashes. All diagnostic channels, multiplicities, mapped locations and properties are compared. This command does not measure performance.");
+        markdown.AppendLine("Both cross-generator and incremental/fresh comparisons check every diagnostic channel, multiplicity, original/mapped location, descriptor metadata and semantic property. Only akbura.origin, akbura.kind, akbura.logical-id and akbura.document-version are excluded as transport metadata; raw properties remain in the JSON report. Descriptor message templates may differ, but their formatted invariant messages must match exactly.");
+        markdown.AppendLine("Each incremental/fresh comparison uses the same current AdditionalFile paths/text/options and C# compilation, with a fresh BlackSilence driver as reference. Sources are compared ordinally, not by hashes. Diagnostics are explicitly enabled in Publish mode. This command does not measure performance.");
         markdown.AppendLine();
         if (report.Compatibility is { } compatibility)
         {
@@ -393,7 +445,34 @@ internal static class FeatureGalleryParityVerification
 
     private static string ToCrlf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal);
 
-    private sealed record CapturedRun(GeneratorDriver Driver, Compilation Output, GeneratorRunResult Result, Dictionary<string, SourceText> Sources, string[] Diagnostics);
+    private sealed record CapturedRun(
+        GeneratorDriver Driver,
+        Compilation Output,
+        GeneratorRunResult Result,
+        Dictionary<string, SourceText> Sources,
+        string[] Diagnostics,
+        string[] CanonicalDiagnostics);
+
+    private sealed class DiagnosticPublishOptionsProvider(AnalyzerConfigOptionsProvider underlying) : AnalyzerConfigOptionsProvider
+    {
+        public override AnalyzerConfigOptions GlobalOptions { get; } = new DiagnosticPublishOptions(underlying.GlobalOptions);
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => underlying.GetOptions(tree);
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => underlying.GetOptions(textFile);
+    }
+
+    private sealed class DiagnosticPublishOptions(AnalyzerConfigOptions underlying) : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (key == "build_property.AkburaBlackSilenceDiagnostics")
+            {
+                value = "Publish";
+                return true;
+            }
+
+            return underlying.TryGetValue(key, out value!);
+        }
+    }
     private sealed record GeneratedTypes(string[] Components, string[] Akcss, string[] InfrastructureHints);
     private sealed record CompatibilityResult(
         string[] FuriosoComponents,

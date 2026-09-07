@@ -56,7 +56,8 @@ internal sealed class AkburaDiagnosticTagger :
             if (!_bufferContext.TryGetPublishedClassificationState(
                     requestedSnapshot,
                     out var state) ||
-                state.Diagnostics.IsDefaultOrEmpty)
+                state.Diagnostics.IsDefaultOrEmpty ||
+                !AkburaDiagnosticPresentation.ShouldPublish(_bufferContext, state))
             {
                 return [];
             }

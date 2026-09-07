@@ -1,3 +1,4 @@
+using Akbura.Diagnostics;
 using Akbura.Language;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,6 +9,41 @@ namespace Akbura.Workspaces.UnitTests;
 
 public sealed class ProjectContextTests
 {
+    [Theory]
+    [InlineData("Auto", AkburaDiagnosticPublisher.Auto)]
+    [InlineData("Generator", AkburaDiagnosticPublisher.Generator)]
+    [InlineData("workspace", AkburaDiagnosticPublisher.Workspace)]
+    [InlineData("Both", AkburaDiagnosticPublisher.Both)]
+    [InlineData("None", AkburaDiagnosticPublisher.None)]
+    [InlineData("unknown", AkburaDiagnosticPublisher.Auto)]
+    [InlineData("999", AkburaDiagnosticPublisher.Auto)]
+    public void FactoryReadsDiagnosticPublisherFromCompilerVisibleProperty(
+        string configuredPublisher,
+        AkburaDiagnosticPublisher expected)
+    {
+        using var workspace = new AdhocWorkspace();
+        var directory = Path.GetFullPath("DiagnosticPublisherProject");
+        var project = workspace.AddProject(ProjectInfo.Create(
+                ProjectId.CreateNewId(),
+                VersionStamp.Create(),
+                "DiagnosticPublisher",
+                "DiagnosticPublisher",
+                LanguageNames.CSharp,
+                filePath: Path.Combine(directory, "DiagnosticPublisher.csproj")))
+            .AddAnalyzerConfigDocument(
+                "Diagnostics.globalconfig",
+                SourceText.From("is_global = true\r\n" +
+                    "build_property.AkburaDiagnosticPublisher = " + configuredPublisher + "\r\n"),
+                filePath: Path.Combine(directory, "Diagnostics.globalconfig"))
+            .Project;
+
+        var context = new RoslynProjectContextFactory().Create(
+            project,
+            CSharpCompilation.Create("DiagnosticPublisher"));
+
+        Assert.Equal(expected, context.DiagnosticPublisher);
+    }
+
     [Fact]
     public void Constructor_RemovesCurrentAssemblyMetadataReference()
     {

@@ -13,7 +13,8 @@ internal sealed class BlackSilenceProjectSnapshot
         ImmutableArray<DocumentSyntaxVersion> documents,
         object declarationEnvironment,
         ImmutableDictionary<string, GeneratedDocumentEntry> entries,
-        ImmutableDictionary<AkburaSyntaxTree, SemanticModelState> semanticStates)
+        ImmutableDictionary<AkburaSyntaxTree, SemanticModelState> semanticStates,
+        ImmutableDictionary<string, DiagnosticDocumentEntry>? diagnosticEntries = null)
     {
         Version = version;
         Options = options;
@@ -22,6 +23,7 @@ internal sealed class BlackSilenceProjectSnapshot
         DeclarationEnvironment = declarationEnvironment;
         Entries = entries;
         SemanticStates = semanticStates;
+        DiagnosticEntries = diagnosticEntries ?? ImmutableDictionary<string, DiagnosticDocumentEntry>.Empty;
     }
 
     public long Version { get; }
@@ -31,4 +33,5 @@ internal sealed class BlackSilenceProjectSnapshot
     public object DeclarationEnvironment { get; }
     public ImmutableDictionary<string, GeneratedDocumentEntry> Entries { get; }
     public ImmutableDictionary<AkburaSyntaxTree, SemanticModelState> SemanticStates { get; }
+    public ImmutableDictionary<string, DiagnosticDocumentEntry> DiagnosticEntries { get; }
 }

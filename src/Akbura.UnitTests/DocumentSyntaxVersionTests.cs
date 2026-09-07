@@ -33,6 +33,39 @@ public sealed class DocumentSyntaxVersionTests
         Assert.Equal(original.DependencyNames.ToArray(), updated.DependencyNames.ToArray());
     }
 
+    [Theory]
+    [InlineData(false, "")]
+    [InlineData(false, "\r\n \t\r\n")]
+    [InlineData(true, "")]
+    [InlineData(true, "\r\n \t\r\n")]
+    public void EmptyOrWhitespaceOnlyDocument_HasReusableEmptyShape(bool akcss, string source)
+    {
+        var version = DocumentSyntaxVersion.Create(Parse(akcss, source));
+        var empty = DocumentSyntaxVersion.Create(Parse(akcss, string.Empty));
+
+        Assert.True(version.CanReuse);
+        Assert.Equal(0, version.MeaningfulLength);
+        Assert.Equal(string.Empty, version.GenerationShape);
+        Assert.Empty(version.DependencyNames);
+        Assert.True(version.HasSameGenerationShape(empty));
+        Assert.True(version.HasSameSurface(empty));
+    }
+
+    [Theory]
+    [InlineData(false, "<Border />")]
+    [InlineData(true, "Border.shared { Width: 10; }")]
+    public void CompletedCommentAfterLastToken_IsNotDiscardedAsEofWhitespace(bool akcss, string source)
+    {
+        var original = DocumentSyntaxVersion.Create(Parse(akcss, source));
+        var withComment = source + "\r\n/* retained comment */\r\n \t";
+        var updated = DocumentSyntaxVersion.Create(Parse(akcss, withComment));
+
+        Assert.True(updated.CanReuse);
+        Assert.Equal(withComment, updated.GenerationShape);
+        Assert.Equal(withComment.Length, updated.MeaningfulLength);
+        Assert.False(original.HasSameGenerationShape(updated));
+    }
+
     [Fact]
     public void LeadingBlankLine_ChangesActualSourceMappingAndGenerationShape()
     {
@@ -81,6 +114,78 @@ public sealed class DocumentSyntaxVersionTests
         Assert.Equal(source.Length, version.MeaningfulLength);
         Assert.False(version.HasSameGenerationShape(freshVersion));
         Assert.False(version.HasSameSurface(freshVersion));
+    }
+
+    [Fact]
+    public void VoidCommandReturnType_AllowsReuseWithoutExemptingOtherVoidTypes()
+    {
+        const string source = "command void Save(int value);";
+        var tree = Parse(false, source);
+        var command = Assert.Single(tree.GetRootSyntax().DescendantNodes().OfType<CommandDeclarationSyntax>());
+        Assert.Contains(command.ReturnType.ToCSharp().GetDiagnostics(), diagnostic => diagnostic.Id == "CS1547");
+        var original = DocumentSyntaxVersion.Create(tree);
+        var trailing = DocumentSyntaxVersion.Create(Parse(false, source + "\r\n \t"));
+
+        Assert.True(original.CanReuse);
+        Assert.True(trailing.CanReuse);
+        Assert.Equal(source, trailing.GenerationShape);
+        Assert.True(original.HasSameGenerationShape(trailing));
+        Assert.True(original.HasSameSurface(trailing));
+
+        var invalid = DocumentSyntaxVersion.Create(Parse(false, "param void Value;\r\n \t"));
+        Assert.False(invalid.CanReuse);
+        Assert.True(invalid.RequiresConservativeDependencies);
+        Assert.Equal("param void Value;\r\n \t", invalid.GenerationShape);
+    }
+
+    [Fact]
+    public void VoidCommandWithInvalidRawParameters_DoesNotReuseRecoverySyntax()
+    {
+        const string source = "command void Save(int value = );\r\n \t";
+        var tree = Parse(false, source);
+        var command = Assert.Single(tree.GetRootSyntax().DescendantNodes().OfType<CommandDeclarationSyntax>());
+        var parameters = command.Parameters.GetRawCSharpParameterList();
+        Assert.NotNull(parameters);
+        Assert.True(parameters.ContainsDiagnostics);
+        var version = DocumentSyntaxVersion.Create(tree);
+
+        Assert.False(version.CanReuse);
+        Assert.True(version.RequiresConservativeDependencies);
+        Assert.Equal(source, version.GenerationShape);
+        Assert.Equal(source.Length, version.MeaningfulLength);
+        Assert.False(version.HasSameGenerationShape(DocumentSyntaxVersion.Create(Parse(false, source))));
+    }
+
+    [Fact]
+    public void InvalidRawExpression_DisablesReuseAndRetainsTrailingWhitespace()
+    {
+        const string source = "state int value = 1 + ;\r\n \t";
+        var tree = Parse(false, source);
+        var expression = Assert.Single(tree.GetRootSyntax().DescendantNodes().OfType<CSharpExpressionSyntax>());
+        var rawExpression = expression.GetRawCSharpExpression();
+        Assert.NotNull(rawExpression);
+        Assert.True(rawExpression.ContainsDiagnostics);
+        var version = DocumentSyntaxVersion.Create(tree);
+
+        Assert.False(version.CanReuse);
+        Assert.True(version.RequiresConservativeDependencies);
+        Assert.Equal(source, version.GenerationShape);
+        Assert.Equal(source.Length, version.MeaningfulLength);
+    }
+
+    [Fact]
+    public void MissingCommandSemicolon_IsNotTreatedAsHarmlessEof()
+    {
+        const string source = "command void Save()\r\n \t";
+        var tree = Parse(false, source);
+        var command = Assert.Single(tree.GetRootSyntax().DescendantNodes().OfType<CommandDeclarationSyntax>());
+        Assert.True(command.Semicolon.IsMissing);
+        var version = DocumentSyntaxVersion.Create(tree);
+
+        Assert.False(version.CanReuse);
+        Assert.True(version.RequiresConservativeDependencies);
+        Assert.Equal(source, version.GenerationShape);
+        Assert.False(version.HasSameSurface(DocumentSyntaxVersion.Create(Parse(false, source))));
     }
 
     [Theory]
@@ -132,6 +237,28 @@ public sealed class DocumentSyntaxVersionTests
         Assert.Contains(new DocumentDependencyName(DocumentDependencyKind.Identifier, "Foo"), version.DependencyNames);
         Assert.Contains(new DocumentDependencyName(DocumentDependencyKind.Identifier, "Meter"), version.DependencyNames);
         Assert.Contains(new DocumentDependencyName(DocumentDependencyKind.Identifier, "Panel"), version.DependencyNames);
+    }
+
+    [Theory]
+    [InlineData(false, "param Demo.C\\u0061rd Value;", "Card")]
+    [InlineData(false, "state object value = new Demo.C\\u0061rd();", "Card")]
+    [InlineData(false, "command void Save(Demo.C\\u0061rd value);", "Card")]
+    [InlineData(false, "<TextBlock Text={Demo.C\\u0061rd.Caption} />", "Card")]
+    [InlineData(true, "Border.shared { Width: Demo.M\\u0065ter.Value; }", "Meter")]
+    public void EscapedIdentifiersInRawCSharp_AreDecodedAcrossSyntaxContexts(bool akcss, string source, string identifier)
+    {
+        var version = DocumentSyntaxVersion.Create(Parse(akcss, source));
+        var trailing = DocumentSyntaxVersion.Create(Parse(akcss, source + "\r\n \t"));
+        var dependency = new DocumentDependencyName(DocumentDependencyKind.Identifier, identifier);
+
+        // The source itself contains only the escaped spelling, so a scan of
+        // ordinary letter sequences cannot discover the referenced type name.
+        Assert.DoesNotContain(identifier, source, StringComparison.Ordinal);
+        Assert.True(version.CanReuse);
+        Assert.Contains(dependency, version.DependencyNames);
+        Assert.Single(version.DependencyNames, name => name == dependency);
+        Assert.True(version.HasSameGenerationShape(trailing));
+        Assert.Equal(version.DependencyNames.ToArray(), trailing.DependencyNames.ToArray());
     }
 
     [Fact]

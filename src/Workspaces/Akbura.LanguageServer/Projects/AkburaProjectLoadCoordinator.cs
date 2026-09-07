@@ -28,7 +28,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         _services = services ??
             throw new ArgumentNullException(nameof(services));
         _queue = queue ?? throw new ArgumentNullException(nameof(queue));
-        _loader = loader ?? new MsBuildProjectContextProvider();
+        _loader = loader ?? new MsBuildProjectContextProvider(workspaceDiagnosticsActive: true);
         _loader.Changed += OnProjectContextChanged;
     }
 

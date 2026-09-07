@@ -1,5 +1,6 @@
 using Akbura.BlackSilence;
 using Akbura.Language;
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -25,8 +26,12 @@ public sealed class AkburaBlackSilenceGeneratorTests
     [Fact]
     public void UpdatingOneAdditionalFile_ReparsesOnlyThatFile()
     {
+        // The parse cache is process-wide. Keep this project's syntax-tree
+        // cache entries isolated from concurrent test projects.
+        var projectDirectory = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests), Guid.NewGuid().ToString("N"));
         var a = new TestAdditionalText(
-            "A.akbura",
+            System.IO.Path.Combine(projectDirectory, "A.akbura"),
             SourceText.From(
                 """
                 using Avalonia.Controls;
@@ -43,10 +48,10 @@ public sealed class AkburaBlackSilenceGeneratorTests
             <Border Width={count} />
             """);
 
-        var b = new TestAdditionalText("B.akbura", oldBText);
+        var b = new TestAdditionalText(System.IO.Path.Combine(projectDirectory, "B.akbura"), oldBText);
 
         var c = new TestAdditionalText(
-            "C.akcss",
+            System.IO.Path.Combine(projectDirectory, "C.akcss"),
             SourceText.From(
                 """
                 @using Avalonia.Controls;
@@ -79,7 +84,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
             """;
 
         var compilation = CreateCompilation(csharpSource);
-        var driver = CreateDriver(s_emptyOptionsProvider, a, b, c);
+        var driver = CreateDriver(new TestAnalyzerConfigOptionsProvider(string.Empty, projectDirectory), a, b, c);
 
         driver = driver.RunGenerators(compilation);
 
@@ -145,9 +150,14 @@ public sealed class AkburaBlackSilenceGeneratorTests
         var oldBTree = Assert.IsType<ComponentSyntaxTree>(initial[b.Path].SyntaxTree);
         var newBTree = Assert.IsType<ComponentSyntaxTree>(afterAdditionalTextChange[b.Path].SyntaxTree);
 
-        Assert.Same(oldBTree.GreenRoot.Members[0], newBTree.GreenRoot.Members[0]);
-        Assert.NotSame(oldBTree.GreenRoot.Members[1], newBTree.GreenRoot.Members[1]);
-        Assert.Same(oldBTree.GreenRoot.Members[2], newBTree.GreenRoot.Members[2]);
+        Assert.Equal(oldBText.ToString(), oldBTree.GetRoot().ToFullString());
+        Assert.Equal(newBText.ToString(), newBTree.GetRoot().ToFullString());
+
+        var oldState = Assert.Single(oldBTree.GetRoot().Members.OfType<StateDeclarationSyntax>());
+        var newState = Assert.Single(newBTree.GetRoot().Members.OfType<StateDeclarationSyntax>());
+
+        Assert.Equal("0d", oldState.Initializer.ToFullString());
+        Assert.Equal("1d", newState.Initializer.ToFullString());
 
         var changedComponentReasons = GetOutputReasons(driver, GeneratedComponentsTrackingName);
 

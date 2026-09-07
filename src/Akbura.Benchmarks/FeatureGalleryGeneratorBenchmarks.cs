@@ -254,11 +254,14 @@ public sealed class FeatureGalleryGeneratorBenchmarkConfig : ManualConfig
 {
     public FeatureGalleryGeneratorBenchmarkConfig()
     {
-        var job = Job.Default
+        var job = FeatureGalleryBenchmarkBuild.Configure(Job.Default)
             .WithId("FeatureGallery")
             .WithLaunchCount(1)
-            .WithWarmupCount(3)
-            .WithIterationCount(8)
+            .WithMinWarmupCount(4)
+            .WithMaxWarmupCount(8)
+            .WithMinIterationCount(15)
+            .WithMaxIterationCount(30)
+            .WithMaxRelativeError(0.03)
             .WithInvocationCount(1)
             .WithUnrollFactor(1);
 

@@ -1,3 +1,4 @@
+using Akbura.Diagnostics;
 using Akbura.Language.Syntax;
 using Akbura.VisualStudio.Editor;
 using Akbura.Workspaces;
@@ -106,10 +107,9 @@ internal sealed class AkburaDiagnosticTableDataSource :
                 string.Empty
             : GetPublishedProjectName(bufferContext);
 
-        var entries = CreateEntries(
-            state,
-            bufferContext.FilePath,
-            projectName);
+        var entries = AkburaDiagnosticPresentation.ShouldPublish(bufferContext, state)
+            ? CreateEntries(state, bufferContext.FilePath, projectName)
+            : ImmutableArray<AkburaDiagnosticTableEntry>.Empty;
 
         lock (_gate)
         {
@@ -174,7 +174,16 @@ internal sealed class AkburaDiagnosticTableDataSource :
             builder.Add(new AkburaDiagnosticTableEntry(
                 filePath,
                 projectName,
-                diagnostic,
+                diagnostic.CanonicalDiagnostic is { } canonical
+                    ? diagnostic with
+                    {
+                        CanonicalDiagnostic = canonical with
+                        {
+                            Provenance = canonical.Provenance | DiagnosticProvenance.VisualStudio,
+                            DocumentVersion = state.RequestVersion,
+                        },
+                    }
+                    : diagnostic,
                 line.LineNumber,
                 position - line.Start,
                 state.Text.ToString(line.Span)));
@@ -345,6 +354,15 @@ internal sealed class AkburaDiagnosticTableEntriesSnapshot :
                 return true;
 
             default:
+                // These fields are an explicit adapter contract, not an instruction
+                // for Visual Studio to deduplicate another producer's rows.
+                if (entry.Diagnostic.CanonicalDiagnostic is { } canonical &&
+                    AkburaDiagnosticAdapter.GetProperties(canonical).TryGetValue(keyName, out var value))
+                {
+                    content = value;
+                    return true;
+                }
+
                 content = null;
                 return false;
         }
@@ -439,6 +457,7 @@ internal readonly struct AkburaDiagnosticTableEntry :
                    other.ProjectName,
                    StringComparison.Ordinal) &&
                Diagnostic.Equals(other.Diagnostic) &&
+               HasSameCanonicalDiagnostic(Diagnostic, other.Diagnostic) &&
                Line == other.Line &&
                Column == other.Column &&
                string.Equals(
@@ -453,6 +472,14 @@ internal readonly struct AkburaDiagnosticTableEntry :
                Equals(other);
     }
 
+    private static bool HasSameCanonicalDiagnostic(AkburaDiagnosticSpan left, AkburaDiagnosticSpan right)
+    {
+        return left.CanonicalDiagnostic is { } canonicalLeft
+            ? right.CanonicalDiagnostic is { } canonicalRight &&
+                AkburaDiagnosticCanonicalComparer.Instance.Equals(canonicalLeft, canonicalRight)
+            : !right.CanonicalDiagnostic.HasValue;
+    }
+
     public override int GetHashCode()
     {
         unchecked
@@ -461,6 +488,11 @@ internal readonly struct AkburaDiagnosticTableEntry :
                 .GetHashCode(FilePath);
             hash = (hash * 397) ^ ProjectName.GetHashCode();
             hash = (hash * 397) ^ Diagnostic.GetHashCode();
+            if (Diagnostic.CanonicalDiagnostic is { } canonical)
+            {
+                hash = (hash * 397) ^ AkburaDiagnosticCanonicalComparer.Instance.GetHashCode(canonical);
+            }
+
             hash = (hash * 397) ^ Line;
             hash = (hash * 397) ^ Column;
             hash = (hash * 397) ^ LineText.GetHashCode();

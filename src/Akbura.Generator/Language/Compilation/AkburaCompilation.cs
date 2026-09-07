@@ -339,6 +339,10 @@ internal sealed partial class AkburaCompilation
             ProjectDirectory);
     }
 
+#if STATS
+    internal bool HasCreatedSemanticModel(AkburaSyntaxTree syntaxTree) => _semanticModels.ContainsKey(syntaxTree);
+#endif
+
     public AkburaSemanticModel GetSemanticModel(AkburaSyntaxTree syntaxTree)
     {
         if (syntaxTree == null)

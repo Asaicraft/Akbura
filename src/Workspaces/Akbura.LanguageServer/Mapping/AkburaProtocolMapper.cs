@@ -1,4 +1,6 @@
+using Akbura.Diagnostics;
 using Akbura.Language.Syntax;
+using System.Text.Json;
 
 namespace Akbura.LanguageServer.Mapping;
 
@@ -44,7 +46,8 @@ internal static class AkburaProtocolMapper
     public static Diagnostic[] ToDiagnostics(
         SourceText text,
         ImmutableArray<AkburaDiagnosticSpan> diagnostics,
-        IAkburaPositionConverter positions)
+        IAkburaPositionConverter positions,
+        long? documentVersion = null)
     {
         var result = new Diagnostic[diagnostics.Length];
         for (var index = 0; index < diagnostics.Length; index++)
@@ -61,12 +64,66 @@ internal static class AkburaProtocolMapper
                     _ => 4,
                 },
                 Code = diagnostic.Code,
-                Source = "akbura",
+                Source = "Akbura",
                 Message = diagnostic.Message,
             };
+
+            if (diagnostic.CanonicalDiagnostic is { } canonical)
+            {
+                canonical = canonical with
+                {
+                    Provenance = canonical.Provenance | DiagnosticProvenance.LanguageServer,
+                    DocumentVersion = documentVersion ?? canonical.DocumentVersion,
+                };
+                result[index].Data = JsonSerializer.SerializeToElement(
+                    AkburaDiagnosticAdapter.GetProperties(canonical));
+                result[index].RelatedInformation = ToRelatedInformation(canonical);
+            }
         }
 
         return result;
+    }
+
+    private static DiagnosticRelatedInformation[]? ToRelatedInformation(
+        in AkburaDiagnosticRecord diagnostic)
+    {
+        if (diagnostic.AdditionalLocations.IsDefaultOrEmpty)
+        {
+            return null;
+        }
+
+        var result = new List<DiagnosticRelatedInformation>();
+        foreach (var location in diagnostic.AdditionalLocations)
+        {
+            if (!Uri.TryCreate(location.FilePath, UriKind.Absolute, out var uri))
+            {
+                continue;
+            }
+
+            result.Add(new DiagnosticRelatedInformation
+            {
+                Location = new Location
+                {
+                    Uri = uri.AbsoluteUri,
+                    Range = new Protocol.Range
+                    {
+                        Start = new Position
+                        {
+                            Line = location.LineSpan.Start.Line,
+                            Character = location.LineSpan.Start.Character,
+                        },
+                        End = new Position
+                        {
+                            Line = location.LineSpan.End.Line,
+                            Character = location.LineSpan.End.Character,
+                        },
+                    },
+                },
+                Message = diagnostic.Message,
+            });
+        }
+
+        return result.Count == 0 ? null : result.ToArray();
     }
 
     public static TextEdit[] ToTextEdits(

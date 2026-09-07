@@ -131,6 +131,15 @@ internal readonly struct SyntaxToken : IEquatable<SyntaxToken>
     public string Text => ToString();
 
     /// <summary>
+    /// Gets the embedded C# syntax already parsed for this token, or null when
+    /// no parsed C# syntax is stored. This method does not parse the token text.
+    /// </summary>
+    public SyntaxNode? GetRawCSharpSyntax()
+    {
+        return Node is GreenSyntaxToken.CSharpRawToken token ? token.RawNode : null;
+    }
+
+    /// <summary>
     /// Returns the string representation of this token, not including its leading and trailing trivia.
     /// </summary>
     /// <returns>The string representation of this token, not including its leading and trailing trivia.</returns>

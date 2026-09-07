@@ -1,5 +1,12 @@
 <Project>
 
+    <ItemGroup>
+        <CompilerVisibleProperty Include="AkburaBlackSilenceDiagnostics" />
+        <CompilerVisibleProperty Include="AkburaDiagnosticPublisher" />
+        <CompilerVisibleProperty Include="DesignTimeBuild" />
+        <CompilerVisibleProperty Include="AkburaWorkspaceDiagnosticsActive" />
+    </ItemGroup>
+
 	<PropertyGroup>
 		<AkburaEmbedSourceFiles Condition="'$(AkburaEmbedSourceFiles)' == ''">true</AkburaEmbedSourceFiles>
 		<AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Akbura.module.xml</AkburaModuleManifestPath>

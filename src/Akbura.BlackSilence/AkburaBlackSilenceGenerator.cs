@@ -1,5 +1,6 @@
 ﻿using Akbura.Language;
 using Akbura.Language.CodeGeneration;
+using Akbura.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
@@ -26,6 +27,11 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         var projectOptions = context.AnalyzerConfigOptionsProvider
             .Select(static (provider, _) => GeneratorProjectOptions.Create(provider.GlobalOptions))
             .WithTrackingName(ProjectOptionsTrackingName);
+
+        var diagnosticOptions = context.AnalyzerConfigOptionsProvider
+            .Select(static (provider, _) => BlackSilenceDiagnosticOptions.Create(provider.GlobalOptions))
+            .WithTrackingName("BlackSilence.DiagnosticOptions");
+        var computeDiagnostics = diagnosticOptions.Select(static (options, _) => options.ComputeDiagnostics);
 
         var sourceTexts = context.AdditionalTextsProvider
             .Where(static file => IsAkburaSourcePath(file.Path))
@@ -71,18 +77,20 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         var generationRequests = collectedDocuments
             .Combine(projectState)
             .Combine(projectOptions)
+            .Combine(computeDiagnostics)
             .Select(static (input, cancellationToken) => BlackSilenceGenerationRequestBuilder.Create(
-                input.Left.Left,
+                input.Left.Left.Left,
+                input.Left.Left.Right,
                 input.Left.Right,
-                input.Right,
-                cancellationToken))
+                cancellationToken,
+                input.Right))
             .WithComparer(GenerationRequestComparer.Instance)
             .WithTrackingName(GenerationRequestsTrackingName);
 
         var generated = generationRequests
             .Select(static (request, cancellationToken) => request == null
                 ? null
-                : BlackSilenceDocumentBatch.Generate(request, cancellationToken))
+                : BlackSilenceDocumentBatch.GenerateSafely(request, cancellationToken))
             .WithTrackingName("BlackSilence.GeneratedBatch");
 
         var generatedComponents = generated
@@ -100,6 +108,31 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             .WithComparer(GeneratedSourceComparer.Instance)
             .WithTrackingName(GeneratedInlineAkcssTrackingName);
 
+        // One batch output owns the complete current diagnostic set, including
+        // removals. Publication policy cannot invalidate source-generation inputs.
+        var diagnostics = generated
+            .Select(static (batch, _) => batch?.Diagnostics ?? [])
+            .WithComparer(DiagnosticBatchComparer.Instance)
+            .Combine(diagnosticOptions)
+            .Select(static (input, _) => SelectPublishedDiagnostics(input.Left, input.Right))
+            .WithComparer(DiagnosticBatchComparer.Instance)
+            .WithTrackingName("BlackSilence.Diagnostics");
+
+        context.RegisterSourceOutput(diagnostics, static (productionContext, batch) =>
+        {
+#if STATS
+            using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.DiagnosticPublish);
+#endif
+            foreach (var diagnostic in batch)
+            {
+                productionContext.CancellationToken.ThrowIfCancellationRequested();
+                productionContext.ReportDiagnostic(AkburaDiagnosticAdapter.ToRoslyn(diagnostic));
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.DiagnosticPublished);
+#endif
+            }
+        });
+
         context.RegisterSourceOutput(
             generatedComponents,
             static (productionContext, source) => AddGeneratedSource(productionContext, source));
@@ -111,6 +144,29 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             generatedInlineAkcss,
             static (productionContext, source) => AddGeneratedSource(productionContext, source));
+    }
+
+    private static ImmutableArray<AkburaDiagnosticRecord> SelectPublishedDiagnostics(
+        ImmutableArray<AkburaDiagnosticRecord> diagnostics,
+        BlackSilenceDiagnosticOptions options)
+    {
+        if (options.PublishDiagnostics || diagnostics.IsEmpty)
+        {
+            return diagnostics;
+        }
+
+        // Infrastructure failures must remain visible even with semantic
+        // diagnostics disabled or delegated to an editor host.
+        var failures = ImmutableArray.CreateBuilder<AkburaDiagnosticRecord>();
+        foreach (var diagnostic in diagnostics)
+        {
+            if (diagnostic.Kind == AkburaDiagnosticKind.Infrastructure)
+            {
+                failures.Add(diagnostic);
+            }
+        }
+
+        return failures.ToImmutable();
     }
 
     private static AkburaSourceText? ReadSourceText(
@@ -243,6 +299,16 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         AkburaSourceFile sourceFile,
         CancellationToken cancellationToken)
     {
+        var previousRoot = previousSyntaxTree.GetRootSyntax();
+        if (previousRoot.ContainsDiagnostics || previousRoot.ContainsSkippedText)
+        {
+            // Recovery can leave lexer context outside the edited span (for
+            // example an unfinished EOF comment followed by a repaired file
+            // with markup-extension utility attributes). Reparse this document
+            // until incremental recovery is proven equivalent to a fresh parse.
+            return ParseFull(sourceFile, cancellationToken);
+        }
+
 #if STATS
         if (previousSyntaxTree is ComponentSyntaxTree && sourceFile.Kind == SyntaxTreeKind.Component ||
             previousSyntaxTree is AkcssSyntaxTree && sourceFile.Kind == SyntaxTreeKind.Akcss)

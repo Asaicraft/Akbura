@@ -1,5 +1,4 @@
 using Akbura.Language.Syntax;
-using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
@@ -75,7 +74,7 @@ internal sealed class DocumentSyntaxVersion
             !root.ContainsDiagnostics && !root.ContainsSkippedText && !root.ContainsAnnotations;
         var meaningfulLength = 0;
 
-        ScanTokens(root.Green, 0, ref meaningfulLength, ref canReuse, builder);
+        ScanTokens(root, ref meaningfulLength, ref canReuse, builder);
         builder.Collect(root);
         canReuse &= !builder.ContainsRecoverySyntax;
 
@@ -143,18 +142,23 @@ internal sealed class DocumentSyntaxVersion
     }
 
     private static void ScanTokens(
-        GreenNode node,
-        int position,
+        AkburaSyntax root,
         ref int meaningfulLength,
         ref bool canReuse,
-        ShapeBuilder builder,
-        bool allowVoidReturnType = false)
+        ShapeBuilder builder)
     {
-        builder.CancellationToken.ThrowIfCancellationRequested();
-
-        if (node is GreenSyntaxToken token)
+        foreach (var syntax in root.DescendantNodesAndTokens())
         {
-            // The lexer represents a valid zero-width EOF with MissingTokenWithTrivia.
+            builder.CancellationToken.ThrowIfCancellationRequested();
+
+            if (!syntax.IsToken)
+            {
+                continue;
+            }
+
+            var token = syntax.AsToken();
+
+            // A valid zero-width EOF can be marked as missing.
             // Only missing meaningful tokens indicate parser recovery.
             if (token.IsMissing && token.Kind != SyntaxKind.EndOfFileToken)
             {
@@ -163,43 +167,29 @@ internal sealed class DocumentSyntaxVersion
 
             if (token.Kind != SyntaxKind.EndOfFileToken)
             {
-                meaningfulLength = Math.Max(
-                    meaningfulLength,
-                    position + token.GetLeadingTriviaWidth() + token.Width);
+                meaningfulLength = Math.Max(meaningfulLength, token.Span.End);
             }
 
-            if (token is GreenSyntaxToken.CSharpRawToken rawToken)
+            if (token.Kind != SyntaxKind.CSharpRawToken)
             {
-                if (HasBlockingRawDiagnostics(rawToken, allowVoidReturnType))
-                {
-                    canReuse = false;
-                }
-
-                builder.AddCSharpIdentifiers(rawToken.Text);
+                continue;
             }
 
-            return;
-        }
+            var allowVoidReturnType = token.Parent is CSharpTypeSyntax { Parent: CommandDeclarationSyntax command } type &&
+                ReferenceEquals(command.ReturnType, type);
 
-        for (var i = 0; i < node.SlotCount; i++)
-        {
-            if (node.GetSlot(i) is { } child)
+            if (HasBlockingRawDiagnostics(token.GetRawCSharpSyntax(), allowVoidReturnType))
             {
-                ScanTokens(
-                    child,
-                    position,
-                    ref meaningfulLength,
-                    ref canReuse,
-                    builder,
-                    allowVoidReturnType || node is GreenCommandDeclarationSyntax && i == 1);
-                position += child.FullWidth;
+                canReuse = false;
             }
+
+            builder.AddCSharpIdentifiers(token.Text);
         }
     }
 
-    private static bool HasBlockingRawDiagnostics(GreenSyntaxToken.CSharpRawToken token, bool allowVoidReturnType)
+    private static bool HasBlockingRawDiagnostics(Microsoft.CodeAnalysis.SyntaxNode? syntax, bool allowVoidReturnType)
     {
-        if (token.RawNode is not { ContainsDiagnostics: true } syntax)
+        if (syntax is not { ContainsDiagnostics: true })
         {
             return false;
         }

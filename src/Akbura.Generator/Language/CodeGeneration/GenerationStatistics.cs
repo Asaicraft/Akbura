@@ -18,6 +18,16 @@ internal enum GenerationStatisticCounter : byte
     AkcssGenerated,
     AkcssReused,
     GeneratedSourceTextCreated,
+    DiagnosticBatchCreated,
+    DiagnosticDocumentEvaluated,
+    DiagnosticDocumentReused,
+    DiagnosticSemanticModelCreated,
+    GeneratedDiagnosticCreated,
+    RoslynDiagnosticCreated,
+    DiagnosticDescriptorCreated,
+    DiagnosticDeduplicated,
+    DiagnosticWorkspaceCollision,
+    DiagnosticPublished,
     Count,
 }
 
@@ -37,6 +47,9 @@ internal enum GenerationStatisticStage : byte
     AkcssBatch,
     CSharpProbeCompilation,
     DocumentBatch,
+    DiagnosticBatch,
+    DiagnosticSemantic,
+    DiagnosticPublish,
     Count,
 }
 
@@ -203,6 +216,16 @@ internal sealed class GenerationStatisticsSnapshot
     public long AkcssGeneratedCount => _counters[(int)GenerationStatisticCounter.AkcssGenerated];
     public long AkcssReusedCount => _counters[(int)GenerationStatisticCounter.AkcssReused];
     public long GeneratedSourceTextCreatedCount => _counters[(int)GenerationStatisticCounter.GeneratedSourceTextCreated];
+    public long DiagnosticBatchCreatedCount => _counters[(int)GenerationStatisticCounter.DiagnosticBatchCreated];
+    public long DiagnosticDocumentEvaluatedCount => _counters[(int)GenerationStatisticCounter.DiagnosticDocumentEvaluated];
+    public long DiagnosticDocumentReusedCount => _counters[(int)GenerationStatisticCounter.DiagnosticDocumentReused];
+    public long DiagnosticSemanticModelCreatedCount => _counters[(int)GenerationStatisticCounter.DiagnosticSemanticModelCreated];
+    public long GeneratedDiagnosticCreatedCount => _counters[(int)GenerationStatisticCounter.GeneratedDiagnosticCreated];
+    public long RoslynDiagnosticCreatedCount => _counters[(int)GenerationStatisticCounter.RoslynDiagnosticCreated];
+    public long DiagnosticDescriptorCreatedCount => _counters[(int)GenerationStatisticCounter.DiagnosticDescriptorCreated];
+    public long DiagnosticDeduplicatedCount => _counters[(int)GenerationStatisticCounter.DiagnosticDeduplicated];
+    public long DiagnosticWorkspaceCollisionCount => _counters[(int)GenerationStatisticCounter.DiagnosticWorkspaceCollision];
+    public long DiagnosticPublishedCount => _counters[(int)GenerationStatisticCounter.DiagnosticPublished];
 
     public TimeSpan Elapsed { get; }
     public TimeSpan ParseElapsed => GetElapsed(GenerationStatisticStage.Parse);
@@ -219,6 +242,9 @@ internal sealed class GenerationStatisticsSnapshot
     public TimeSpan AkcssBatchElapsed => GetElapsed(GenerationStatisticStage.AkcssBatch);
     public TimeSpan CSharpProbeCompilationElapsed => GetElapsed(GenerationStatisticStage.CSharpProbeCompilation);
     public TimeSpan DocumentBatchElapsed => GetElapsed(GenerationStatisticStage.DocumentBatch);
+    public TimeSpan DiagnosticBatchElapsed => GetElapsed(GenerationStatisticStage.DiagnosticBatch);
+    public TimeSpan DiagnosticSemanticElapsed => GetElapsed(GenerationStatisticStage.DiagnosticSemantic);
+    public TimeSpan DiagnosticPublishElapsed => GetElapsed(GenerationStatisticStage.DiagnosticPublish);
 
     private TimeSpan GetElapsed(GenerationStatisticStage stage) => ToTimeSpan(_elapsed[(int)stage]);
 

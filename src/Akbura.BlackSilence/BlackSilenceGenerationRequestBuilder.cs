@@ -12,7 +12,8 @@ internal static class BlackSilenceGenerationRequestBuilder
         ImmutableArray<DocumentSyntaxVersion> documents,
         BlackSilenceProjectState? state,
         GeneratorProjectOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool computeDiagnostics = true)
     {
         if (state == null)
         {
@@ -68,6 +69,20 @@ internal static class BlackSilenceGenerationRequestBuilder
 
         FillAkcssRequests(index.ExternalAkcssDescriptors, external);
         FillAkcssRequests(index.InlineAkcssDescriptors, inline);
+        var diagnostics = computeDiagnostics
+            ? new DocumentDiagnosticRequest[canonicalDocuments.Length]
+            : [];
+        for (var i = 0; i < diagnostics.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var document = canonicalDocuments[i];
+            var diagnosticVersion = new DocumentDiagnosticVersion(
+                document, environment, state.CSharpCompilation, options, GetDependencyVersions(document, graph));
+            var cached = previous != null && previous.DiagnosticEntries.TryGetValue(document.FilePath, out var entry) &&
+                diagnosticVersion.Equals(entry.Version) ? entry : null;
+            diagnostics[i] = new DocumentDiagnosticRequest(document, diagnosticVersion, cached);
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
 
         return new BlackSilenceGenerationRequest(
@@ -80,7 +95,9 @@ internal static class BlackSilenceGenerationRequestBuilder
             components.ToImmutableArrayUnsafe(),
             external.ToImmutableArrayUnsafe(),
             inline.ToImmutableArrayUnsafe(),
-            previous);
+            previous,
+            diagnostics.ToImmutableArrayUnsafe(),
+            computeDiagnostics);
 
         void FillAkcssRequests(ImmutableArray<AkcssDocumentDescriptor> descriptors, AkcssGenerationRequest[] requests)
         {
@@ -104,6 +121,13 @@ internal static class BlackSilenceGenerationRequestBuilder
         object environment,
         GeneratorProjectOptions options)
     {
+        return new DocumentGenerationVersion(document, environment, options, GetDependencyVersions(document, graph));
+    }
+
+    private static ImmutableArray<DependencyGenerationVersion> GetDependencyVersions(
+        DocumentSyntaxVersion document,
+        AkburaDependencyGraph graph)
+    {
         var dependencies = graph.GetDependencies(document);
         var versions = new DependencyGenerationVersion[dependencies.Length];
         for (var i = 0; i < versions.Length; i++)
@@ -115,7 +139,7 @@ internal static class BlackSilenceGenerationRequestBuilder
                 dependency.IncludesBody);
         }
 
-        return new DocumentGenerationVersion(document, environment, options, versions.ToImmutableArrayUnsafe());
+        return versions.ToImmutableArrayUnsafe();
     }
 
     private static GeneratedDocumentEntry? FindPrevious(

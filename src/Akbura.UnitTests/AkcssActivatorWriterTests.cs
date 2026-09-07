@@ -352,6 +352,171 @@ public sealed class AkcssActivatorWriterTests
             Environment.NewLine + generatedSource);
     }
 
+    [Theory]
+    [InlineData("object?")]
+    [InlineData("global::System.IObservable<bool>?")]
+    [InlineData("global::System.IObservable<object?>?")]
+    public void GeneratedNullableMarkupExtensionFactories_PreserveReturnContractAndCompile(
+        string returnType)
+    {
+        var generatedSource = CompileNullableMarkupExtensionFactory(
+            returnType,
+            hasPriorityMember: false,
+            requiresLocalMarkupExtensionContext: false);
+
+        Assert.Contains(
+            "private " + returnType + " __CreateAkcssValue0(",
+            generatedSource,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("object?", false)]
+    [InlineData("object?", true)]
+    [InlineData("global::System.IObservable<bool>?", false)]
+    [InlineData("global::System.IObservable<bool>?", true)]
+    public void GeneratedNullablePriorityFactories_PreserveWrappedContractAndCompile(
+        string returnType,
+        bool requiresLocalMarkupExtensionContext)
+    {
+        var generatedSource = CompileNullableMarkupExtensionFactory(
+            returnType,
+            hasPriorityMember: true,
+            requiresLocalMarkupExtensionContext);
+        var invocationType = "global::Akbura.Akcss.AkcssUtilityPrefixInvocation<" + returnType + ">";
+
+        Assert.Contains("new " + invocationType + "(", generatedSource, StringComparison.Ordinal);
+
+        if (requiresLocalMarkupExtensionContext)
+        {
+            Assert.Contains("__target => { var __extension = ", generatedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain("__CreateAkcssValue", generatedSource, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains(
+                "private " + invocationType + " __CreateAkcssValue0(",
+                generatedSource,
+                StringComparison.Ordinal);
+        }
+    }
+
+    private static string CompileNullableMarkupExtensionFactory(
+        string returnType,
+        bool hasPriorityMember,
+        bool requiresLocalMarkupExtensionContext)
+    {
+        var attribute = returnType == "global::System.IObservable<object?>?"
+            ? "opacity-${NullableValue}"
+            : "${NullableValue}:opacity-0.5";
+        var component =
+            $$"""
+            using Avalonia.Controls;
+            using Demo.Extensions;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                @utilities {
+                    Control.opacity-(double value) { Opacity: value; }
+                }
+            }
+
+            <Border {{attribute}} />
+            """;
+        var priorityAttribute = hasPriorityMember
+            ? "[global::Akbura.Markup.UtilityBindingPriority(PriorityMember = nameof(Priority))]"
+            : string.Empty;
+        var priorityProperty = hasPriorityMember
+            ? "public global::Avalonia.Data.BindingPriority Priority => global::Avalonia.Data.BindingPriority.StyleTrigger;"
+            : string.Empty;
+        var extensionSource =
+            $$"""
+            #nullable enable
+
+            namespace Demo.Extensions;
+
+            {{priorityAttribute}}
+            public sealed class NullableValueExtension
+            {
+                {{priorityProperty}}
+
+                public {{returnType}} ProvideValue() => null;
+            }
+            """;
+        var semanticFixture = AkcssActivatorPlannerTests.CreateFixture(component, extensionSource);
+        Assert.Empty(
+            semanticFixture.SemanticModel.GetSemanticDiagnostics(semanticFixture.ComponentTree.GetRoot()));
+        var fixture = CreateWriterFixture(
+            semanticFixture,
+            semanticFixture.GetRootElement(),
+            requiresLocalMarkupExtensionContext);
+        Assert.Single(fixture.Plan.MarkupExtensionSlots);
+        using var codeWriter = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var writer = new AkcssActivatorWriter(codeWriter, in environment, OwnerTypeName);
+        var context = CreateWriteContext();
+
+        Assert.Equal(
+            !requiresLocalMarkupExtensionContext,
+            writer.WriteFactoryMethods(fixture.Plan, fixture.Plan.Elements[0], context));
+
+        var members = Indent(WriteStaticMembers(fixture), 4);
+        var factories = Indent(codeWriter.GetText().ToString(), 4);
+        var body = Indent(WriteElement(fixture, elementIndex: 0, writeFactories: false), 8);
+        var generatedSource =
+            $$"""
+            #nullable enable
+
+            namespace Demo;
+
+            public partial class PlannerView
+            {
+            {{members}}
+
+            {{factories}}
+
+                private void Apply(global::Avalonia.Controls.Control __target)
+                {
+            {{body}}
+                }
+            }
+
+            internal static class WriterStyles
+            {
+                public static readonly global::System.Collections.Immutable.ImmutableArray<
+                    global::Akbura.Akcss.AkcssStyle> Styles =
+                    global::System.Collections.Immutable.ImmutableArray.Create<global::Akbura.Akcss.AkcssStyle>(
+                        new TestUtility());
+
+                private sealed class TestUtility : global::Akbura.Akcss.AkcssUtility<double>
+                {
+                    public override void Update(object target, double value)
+                    {
+                        ((global::Avalonia.Controls.Control)target).Opacity = value;
+                    }
+                }
+            }
+            """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            generatedSource,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
+            path: "AkcssNullableFactoryOutput.g.cs");
+        var compilation = semanticFixture.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var diagnostics = compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity is
+                DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            diagnostics.Length == 0,
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic => diagnostic.ToString())) +
+            Environment.NewLine + generatedSource);
+        Assert.Contains(".ProvideValue()", generatedSource, StringComparison.Ordinal);
+
+        return generatedSource;
+    }
+
     private static WriterFixture CreateBasicFixture()
     {
         const string component =

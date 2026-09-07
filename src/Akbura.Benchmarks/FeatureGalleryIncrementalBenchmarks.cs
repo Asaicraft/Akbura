@@ -53,7 +53,7 @@ public sealed class FeatureGalleryIncrementalBenchmarkConfig : ManualConfig
     {
         AddJob(FeatureGalleryBenchmarkBuild.Configure(Job.Default
             .WithId("MeaningfulIncremental")
-            .WithLaunchCount(1)
+            .WithLaunchCount(3)
             .WithMinWarmupCount(4)
             .WithMaxWarmupCount(8)
             .WithMinIterationCount(15)

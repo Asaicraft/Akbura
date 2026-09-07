@@ -367,7 +367,7 @@ internal readonly ref struct AkcssActivatorWriter
         {
             using var resultMapping = WriteSourceMappingStart(slot.Syntax, "return ".Length);
             _writer.Write("return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
-            _valueWriter.WriteTypeName(slot.FactoryValueType);
+            _valueWriter.WriteTypeNameWithNullableAnnotation(slot.FactoryValueType);
             _writer.WriteLine(">(");
             _writer.CurrentIndent = indent + 4;
             extensionWriter.WriteProvideValueInvocation(slot.Extension, "__extension", context);
@@ -387,12 +387,12 @@ internal readonly ref struct AkcssActivatorWriter
         if (hasPriorityMember)
         {
             _writer.Write("global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
-            _valueWriter.WriteTypeName(resultType);
+            _valueWriter.WriteTypeNameWithNullableAnnotation(resultType);
             _writer.Write(">");
             return;
         }
 
-        _valueWriter.WriteTypeName(resultType);
+        _valueWriter.WriteTypeNameWithNullableAnnotation(resultType);
     }
 
     private static MarkupExtensionWriteContext CreateExtensionContext(
@@ -787,7 +787,7 @@ internal readonly ref struct AkcssActivatorWriter
             _writer.Write("{ var __extension = ");
             extensionWriter.WriteCreation(plan.Extension, extensionContext);
             _writer.Write("; return new global::Akbura.Akcss.AkcssUtilityPrefixInvocation<");
-            _valueWriter.WriteTypeName(slot.FactoryValueType);
+            _valueWriter.WriteTypeNameWithNullableAnnotation(slot.FactoryValueType);
             _writer.Write(">(");
             extensionWriter.WriteProvideValueInvocation(plan.Extension, "__extension", extensionContext);
             _writer.Write(", __extension.");

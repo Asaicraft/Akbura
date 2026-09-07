@@ -10,11 +10,15 @@
 		<CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
 		<IsRoslynComponent>true</IsRoslynComponent>
 		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
 		<PackageType>Analyzer</PackageType>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<RootNamespace>Akbura.BlackSilence</RootNamespace>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetBlackSilenceDependencyTargetPaths</GetTargetPathDependsOn>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackBlackSilenceCompiler</TargetsForTfmSpecificContentInPackage>
 		<Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
 	</PropertyGroup>
 
@@ -35,7 +39,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" />
+		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" PrivateAssets="all" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="README.md" Pack="true" PackagePath="\" />
+		<None Include="..\..\LICENSE.txt" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<Target Name="GetBlackSilenceDependencyTargetPaths">
@@ -47,6 +56,17 @@
 			<TargetPathWithTargetPlatformMoniker Include="@(_BlackSilenceDependencyTargetPath)">
 				<IncludeRuntimeDependency>false</IncludeRuntimeDependency>
 			</TargetPathWithTargetPlatformMoniker>
+		</ItemGroup>
+	</Target>
+
+	<Target Name="PackBlackSilenceCompiler" DependsOnTargets="ResolveProjectReferences">
+		<ItemGroup>
+			<TfmSpecificPackageFile
+				Include="$(TargetPath)"
+				PackagePath="analyzers/dotnet/cs/Akbura.BlackSilence.dll" />
+			<TfmSpecificPackageFile
+				Include="..\Akbura.Generator\bin\$(Configuration)\netstandard2.0\Akbura.Generator.dll"
+				PackagePath="analyzers/dotnet/cs/Akbura.Generator.dll" />
 		</ItemGroup>
 	</Target>
 

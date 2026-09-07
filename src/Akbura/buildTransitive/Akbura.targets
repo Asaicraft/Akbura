@@ -1,5 +1,10 @@
 <Project>
 
+	<PropertyGroup>
+		<AkburaBlackSilenceDiagnostics Condition="'$(AkburaBlackSilenceDiagnostics)' == ''">Publish</AkburaBlackSilenceDiagnostics>
+		<AkburaDiagnosticPublisher Condition="'$(AkburaDiagnosticPublisher)' == ''">Auto</AkburaDiagnosticPublisher>
+	</PropertyGroup>
+
     <ItemGroup>
         <CompilerVisibleProperty Include="AkburaBlackSilenceDiagnostics" />
         <CompilerVisibleProperty Include="AkburaDiagnosticPublisher" />

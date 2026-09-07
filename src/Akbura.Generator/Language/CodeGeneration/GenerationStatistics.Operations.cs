@@ -1,4 +1,3 @@
-#if STATS
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -303,4 +302,3 @@ internal sealed class GenerationOperationMeasurement : IDisposable
         _tracker!.AddMeasurement(_accumulator!, _firstInvocation, elapsed, allocatedBytes, invalidAllocation);
     }
 }
-#endif

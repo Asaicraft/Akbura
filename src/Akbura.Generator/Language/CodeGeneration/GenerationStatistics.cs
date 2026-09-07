@@ -1,4 +1,3 @@
-#if STATS
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -6,6 +5,9 @@ using System.Threading;
 
 namespace Akbura.Language.CodeGeneration;
 
+// Keep the instrumentation ABI available in every configuration. Roslyn can load
+// Release and ReleaseStats analyzer graphs in the same long-lived compiler process;
+// the call sites remain guarded by STATS, so production generation pays no runtime cost.
 internal enum GenerationStatisticCounter : byte
 {
     ReadSourceText,
@@ -366,4 +368,3 @@ internal sealed class GenerationStatisticsSnapshot
         return TimeSpan.FromTicks((long)(timestampTicks * ((double)TimeSpan.TicksPerSecond / Stopwatch.Frequency)));
     }
 }
-#endif

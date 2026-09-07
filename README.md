@@ -7,6 +7,8 @@
 
 Akbura is an experimental declarative UI language and compiler for .NET and Avalonia, with reactive state and typed styling through AKCSS.
 
+The `Akbura` package includes BlackSilence, the production incremental compiler. Furioso remains only as a compatibility baseline for tests and benchmarks.
+
 > [!WARNING]
 > Akbura is under active development. Syntax and APIs may change.
 

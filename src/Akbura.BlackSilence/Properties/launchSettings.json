@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Akbura.BlackSilence": {
+      "commandName": "Project"
+    },
+    "FeatureGallery": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\Akbura.FeatureGallery\\Akbura.FeatureGallery\\Akbura.FeatureGallery.csproj"
+    }
+  }
+}

@@ -54,7 +54,7 @@ internal readonly ref struct SourceMappingWriter
         string path,
         int valueOffset)
     {
-        EnsureDirectiveLine(writer);
+        writer.EnsureNewLine();
 
         var generatedOffset = writer.CurrentIndent + Math.Max(valueOffset, 0);
         var startLine = span.Start.Line + 1;
@@ -77,14 +77,6 @@ internal readonly ref struct SourceMappingWriter
         writer.WriteLine();
 
         return new SourceMappingToken(writer);
-    }
-
-    internal static void EnsureDirectiveLine(CodeWriter writer)
-    {
-        if (writer.LastChar is char lastCharacter && lastCharacter != '\n')
-        {
-            writer.WriteLine();
-        }
     }
 }
 
@@ -114,7 +106,7 @@ internal ref struct SourceMappingToken
             return;
         }
 
-        SourceMappingWriter.EnsureDirectiveLine(writer);
+        writer.EnsureNewLine();
         writer.WriteLine("#line default");
         writer.WriteLine("#line hidden");
     }

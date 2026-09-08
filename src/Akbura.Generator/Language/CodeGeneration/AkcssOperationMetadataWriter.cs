@@ -530,8 +530,7 @@ internal readonly ref struct AkcssOperationMetadataWriter
         string value,
         ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = ");
+        _writer.WriteStartAssignment(name);
         _writer.Write(enumType);
         _writer.Write(".");
         _writer.Write(value);
@@ -541,8 +540,7 @@ internal readonly ref struct AkcssOperationMetadataWriter
 
     private void WriteStringArgument(string name, string value, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = ");
+        _writer.WriteStartAssignment(name);
         _writer.WriteStringLiteral(value);
 
         WriteArgumentEnd(ref remaining);
@@ -550,8 +548,7 @@ internal readonly ref struct AkcssOperationMetadataWriter
 
     private void WriteIntegerArgument(string name, int value, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = ");
+        _writer.WriteStartAssignment(name);
         _writer.WriteIntegerLiteral(value);
 
         WriteArgumentEnd(ref remaining);
@@ -559,8 +556,7 @@ internal readonly ref struct AkcssOperationMetadataWriter
 
     private void WriteBooleanArgument(string name, bool value, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = ");
+        _writer.WriteStartAssignment(name);
         _writer.WriteBooleanLiteral(value);
 
         WriteArgumentEnd(ref remaining);
@@ -568,8 +564,8 @@ internal readonly ref struct AkcssOperationMetadataWriter
 
     private void WriteTypeArgument(string name, ITypeSymbol type, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = typeof(");
+        _writer.WriteStartAssignment(name);
+        _writer.Write("typeof(");
         _valueWriter.WriteTypeName(type);
         _writer.Write(")");
 
@@ -581,18 +577,11 @@ internal readonly ref struct AkcssOperationMetadataWriter
         ImmutableArray<string> values,
         ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = new global::System.String[] { ");
-
-        for (var i = 0; i < values.Length; i++)
-        {
-            if (i > 0)
-            {
-                _writer.Write(", ");
-            }
-
-            _writer.WriteStringLiteral(values[i]);
-        }
+        _writer.WriteStartAssignment(name);
+        _writer.Write("new global::System.String[] { ");
+        _writer.WriteCommaSeparatedList(
+            values,
+            static (writer, value) => writer.WriteStringLiteral(value));
 
         _writer.Write(" }");
 
@@ -603,35 +592,21 @@ internal readonly ref struct AkcssOperationMetadataWriter
         IAkcssApplyOperation operation,
         ref int remaining)
     {
-        _writer.Write("AppliedSymbols = new global::System.String[] { ");
+        _writer.WriteStartAssignment("AppliedSymbols");
+        _writer.Write("new global::System.String[] { ");
 
         if (operation is IMetadataAkcssApplyOperation metadataApply)
         {
-            var names = metadataApply.AppliedSymbolMetadataNames;
-
-            for (var i = 0; i < names.Length; i++)
-            {
-                if (i > 0)
-                {
-                    _writer.Write(", ");
-                }
-
-                _writer.WriteStringLiteral(names[i]);
-            }
+            _writer.WriteCommaSeparatedList(
+                metadataApply.AppliedSymbolMetadataNames,
+                static (writer, name) => writer.WriteStringLiteral(name));
         }
         else
         {
-            var symbols = operation.AppliedSymbols;
-
-            for (var i = 0; i < symbols.Length; i++)
-            {
-                if (i > 0)
-                {
-                    _writer.Write(", ");
-                }
-
-                _writer.WriteStringLiteral(symbols[i].MetadataName);
-            }
+            _writer.WriteCommaSeparatedList(
+                operation.AppliedSymbols,
+                static (writer, symbol) =>
+                    writer.WriteStringLiteral(symbol.MetadataName));
         }
 
         _writer.Write(" }");

@@ -1106,7 +1106,7 @@ internal ref struct BindingWriter
         in BindingWritePlan plan,
         in MarkupExtensionWriteContext context)
     {
-        _writer.Write("new ").Write(CompiledBindingType).Write("(");
+        _writer.WriteStartNewObject(CompiledBindingType);
 
         if (plan.HasCachedPath)
         {

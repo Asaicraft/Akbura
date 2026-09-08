@@ -17,6 +17,11 @@ internal static class CodeWriterExtensions
     private static readonly ReadOnlyMemory<char> s_false = "false".AsMemory();
     private static readonly ReadOnlyMemory<char> s_zeroes = "0000000000".AsMemory();
 
+    private static readonly ReadOnlyMemory<char> s_browsableNeverAttribute =
+        "[global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]".AsMemory();
+    private static readonly ReadOnlyMemory<char> s_browsableFalseAttribute =
+        "[global::System.ComponentModel.BrowsableAttribute(false)]".AsMemory();
+
     private static readonly ImmutableArray<ReadOnlyMemory<char>> s_integerTable =
         InitializeIntegerTable();
 
@@ -59,7 +64,7 @@ internal static class CodeWriterExtensions
 
     public static bool IsAtBeginningOfLine(this CodeWriter writer)
     {
-        return writer.LastChar is '\n';
+        return writer.LastChar is null or '\n';
     }
 
     public static void EnsureNewLine(this CodeWriter writer)
@@ -68,6 +73,14 @@ internal static class CodeWriterExtensions
         {
             writer.WriteLine();
         }
+    }
+
+    public static CodeWriter WriteHiddenApiAttributes(this CodeWriter writer)
+    {
+        writer.WriteLine(s_browsableNeverAttribute);
+        writer.WriteLine(s_browsableFalseAttribute);
+
+        return writer;
     }
 
     public static CodeWriter WriteVariableDeclaration(

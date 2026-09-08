@@ -35,16 +35,6 @@ internal readonly ref struct AkcssDeclarationMetadataWriter
         _valueWriter = new CSharpValueWriter(_writer);
     }
 
-    public void WriteHiddenApiAttributes()
-    {
-        _writer.WriteLine(
-            "[global::System.ComponentModel.EditorBrowsableAttribute(" +
-            "global::System.ComponentModel.EditorBrowsableState.Never)]");
-
-        _writer.WriteLine(
-            "[global::System.ComponentModel.BrowsableAttribute(false)]");
-    }
-
     public void WriteCompilerGeneratedAttribute()
     {
         _writer.WriteLine(
@@ -180,32 +170,29 @@ internal readonly ref struct AkcssDeclarationMetadataWriter
 
     private void WriteStringArgument(string name, string value, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = ");
+        _writer.WriteStartAssignment(name);
         _writer.WriteStringLiteral(value);
         WriteArgumentEnd(ref remaining);
     }
 
     private void WriteIntegerArgument(string name, int value, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = ");
+        _writer.WriteStartAssignment(name);
         _writer.WriteIntegerLiteral(value);
         WriteArgumentEnd(ref remaining);
     }
 
     private void WriteBooleanArgument(string name, bool value, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = ");
+        _writer.WriteStartAssignment(name);
         _writer.WriteBooleanLiteral(value);
         WriteArgumentEnd(ref remaining);
     }
 
     private void WriteTypeArgument(string name, RoslynSymbol? type, ref int remaining)
     {
-        _writer.Write(name);
-        _writer.Write(" = typeof(");
+        _writer.WriteStartAssignment(name);
+        _writer.Write("typeof(");
         _valueWriter.WriteTypeName(type);
         _writer.Write(")");
         WriteArgumentEnd(ref remaining);

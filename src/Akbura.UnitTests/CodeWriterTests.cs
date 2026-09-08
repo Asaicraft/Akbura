@@ -161,6 +161,39 @@ public sealed class CodeWriterTests
         Assert.Equal("<value>\n", writer.GetText().ToString());
     }
 
+    [Fact]
+    public void EnsureNewLine_WritesOnlyAfterContentWithoutTerminatingNewLine()
+    {
+        using var writer = new CodeWriter("\n");
+
+        Assert.True(writer.IsAtBeginningOfLine());
+        writer.EnsureNewLine();
+        Assert.Equal(string.Empty, writer.GetText().ToString());
+
+        writer.Write("content");
+        Assert.False(writer.IsAtBeginningOfLine());
+        writer.EnsureNewLine();
+        Assert.Equal("content\n", writer.GetText().ToString());
+
+        Assert.True(writer.IsAtBeginningOfLine());
+        writer.EnsureNewLine();
+        Assert.Equal("content\n", writer.GetText().ToString());
+    }
+
+    [Fact]
+    public void WriteHiddenApiAttributes_WritesEditorAndPropertyGridAttributes()
+    {
+        using var writer = new CodeWriter("\n");
+
+        writer.WriteHiddenApiAttributes();
+
+        Assert.Equal(
+            "[global::System.ComponentModel.EditorBrowsableAttribute(" +
+            "global::System.ComponentModel.EditorBrowsableState.Never)]\n" +
+            "[global::System.ComponentModel.BrowsableAttribute(false)]\n",
+            writer.GetText().ToString());
+    }
+
     public static TheoryData<int> IntegerLiterals => new()
     {
         0,

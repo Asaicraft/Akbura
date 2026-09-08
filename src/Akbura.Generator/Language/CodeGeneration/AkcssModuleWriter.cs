@@ -47,13 +47,13 @@ internal readonly ref struct AkcssModuleWriter
 
     public void WriteDeclarationAttributes(in AkcssModulePlan plan)
     {
-        _metadataWriter.WriteHiddenApiAttributes();
+        _writer.WriteHiddenApiAttributes();
         _metadataWriter.WriteModuleAttribute(plan);
     }
 
     public void WriteConstants(in AkcssModulePlan plan)
     {
-        _metadataWriter.WriteHiddenApiAttributes();
+        _writer.WriteHiddenApiAttributes();
 
         _writer.Write("public const string MetadataName = ");
         _writer.WriteStringLiteral(plan.MetadataName);
@@ -61,7 +61,7 @@ internal readonly ref struct AkcssModuleWriter
 
         _writer.WriteLine();
 
-        _metadataWriter.WriteHiddenApiAttributes();
+        _writer.WriteHiddenApiAttributes();
 
         _writer.Write("public const string SourcePath = ");
         _writer.WriteStringLiteral(plan.SourcePath);
@@ -70,7 +70,7 @@ internal readonly ref struct AkcssModuleWriter
 
     public void WriteStyleCollection(in AkcssModulePlan plan)
     {
-        _metadataWriter.WriteHiddenApiAttributes();
+        _writer.WriteHiddenApiAttributes();
 
         _writer.Write(
             "public static readonly " +
@@ -217,7 +217,7 @@ internal readonly ref struct AkcssModuleWriter
 
     private void WriteMetadataCarrier(in AkcssSymbolGenerationPlan plan)
     {
-        _metadataWriter.WriteHiddenApiAttributes();
+        _writer.WriteHiddenApiAttributes();
         _metadataWriter.WriteCompilerGeneratedAttribute();
         _metadataWriter.WriteSymbolAttributes(plan);
         _operationMetadataWriter.Write(plan.Symbol);

@@ -12,7 +12,7 @@ using Akbura.Markup;
 
             <StackPanel gap-4>
 
-                <TextBlock Text="Build Avalonia interfaces with C#"
+                <TextBlock Text="Build Avalonia interfaces with C# Hot reload"
                            page-hero-title
                            ${md}:page-hero-title-desktop/>
 

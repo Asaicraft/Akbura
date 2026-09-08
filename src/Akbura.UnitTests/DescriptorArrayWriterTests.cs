@@ -38,6 +38,12 @@ public sealed class DescriptorArrayWriterTests
 
         var output = codeWriter.GetText().ToString();
         Assert.Contains(
+            "#if DEBUG\r\n" +
+            "    private static global::System.Collections.Immutable.ImmutableArray<" +
+            "global::Akbura.ComponentTree.Parameter> s_parameters =",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
             "private static readonly global::System.Collections.Immutable.ImmutableArray<" +
             "global::Akbura.ComponentTree.Parameter> s_parameters =",
             output,
@@ -83,6 +89,8 @@ public sealed class DescriptorArrayWriterTests
         writer.Write(plan);
 
         var output = codeWriter.GetText().ToString();
+        var firstName = plan.States.ItemRef(0).GeneratedName;
+        var secondName = plan.States.ItemRef(1).GeneratedName;
         Assert.Contains(
             "private global::System.Collections.Immutable.ImmutableArray<" +
             "global::Akbura.ComponentTree.State> __states;",
@@ -99,8 +107,8 @@ public sealed class DescriptorArrayWriterTests
             "        {\r\n" +
             "            __states =\r\n" +
             "            [\r\n" +
-            "                __State0,\r\n" +
-            "                __State1,\r\n" +
+            "                __State_" + firstName + ",\r\n" +
+            "                __State_" + secondName + ",\r\n" +
             "            ];\r\n" +
             "        }",
             output,
@@ -112,7 +120,7 @@ public sealed class DescriptorArrayWriterTests
     }
 
     [Fact]
-    public void Write_WithoutStatesUsesStaticEmptyStateArray()
+    public void Write_WithoutStatesUsesLazyInstanceArray()
     {
         var plan = CreatePlan("param int Value;");
         using var codeWriter = new CodeWriter("\r\n");
@@ -122,16 +130,80 @@ public sealed class DescriptorArrayWriterTests
 
         var output = codeWriter.GetText().ToString();
         Assert.Contains(
-            "private static readonly global::System.Collections.Immutable.ImmutableArray<" +
-            "global::Akbura.ComponentTree.State> s_states =\r\n" +
-            "[\r\n" +
-            "];",
+            "private global::System.Collections.Immutable.ImmutableArray<" +
+            "global::Akbura.ComponentTree.State> __states;",
             output,
             StringComparison.Ordinal);
-        Assert.DoesNotContain("__states", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("__GetStates", output, StringComparison.Ordinal);
-        AssertGetterReturns(output, "GetStates", "s_states");
+        Assert.Contains(
+            "if (__states.IsDefault)",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "__states =\r\n" +
+            "        [\r\n" +
+            "        ];",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("s_states", output, StringComparison.Ordinal);
+        AssertGetterReturns(output, "GetStates", "__GetStates()");
         Assert.DoesNotContain("GetStates() =>\r\n    [", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WriteHotReloadAssignments_RebuildsAllDescriptorArrays()
+    {
+        const string csharp =
+            """
+            namespace Demo;
+
+            public interface IService
+            {
+            }
+            """;
+        var plan = CreatePlan(
+            """
+            using Demo;
+
+            param int Value;
+            inject IService service;
+            command void Reset();
+            """,
+            csharp);
+        using var codeWriter = new CodeWriter("\r\n")
+        {
+            CurrentIndent = 4,
+        };
+        var writer = new DescriptorArrayWriter(codeWriter);
+
+        writer.WriteHotReloadAssignments(plan);
+
+        var output = codeWriter.GetText().ToString();
+        Assert.Contains(
+            "s_parameters =\r\n" +
+            "    [\r\n" +
+            "        ValueProperty,\r\n" +
+            "    ];",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "s_commands =\r\n" +
+            "    [\r\n" +
+            "        ResetProperty,\r\n" +
+            "    ];",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "s_services =\r\n" +
+            "    [\r\n" +
+            "        serviceProperty,\r\n" +
+            "    ];",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "private static",
+            output,
+            StringComparison.Ordinal);
+        Assert.Equal(4, codeWriter.CurrentIndent);
     }
 
     private static ComponentMemberPlan CreatePlan(

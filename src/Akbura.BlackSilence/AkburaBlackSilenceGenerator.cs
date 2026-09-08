@@ -21,6 +21,7 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
     private const string GeneratedComponentsTrackingName = "BlackSilence.GeneratedComponents";
     private const string GeneratedExternalAkcssTrackingName = "BlackSilence.GeneratedExternalAkcss";
     private const string GeneratedInlineAkcssTrackingName = "BlackSilence.GeneratedInlineAkcss";
+    private const string GeneratedProjectSourcesTrackingName = "BlackSilence.GeneratedProjectSources";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -108,6 +109,11 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             .WithComparer(GeneratedSourceComparer.Instance)
             .WithTrackingName(GeneratedInlineAkcssTrackingName);
 
+        var generatedProjectSources = generated
+            .SelectMany(static (batch, _) => batch?.ProjectSources ?? [])
+            .WithComparer(GeneratedSourceComparer.Instance)
+            .WithTrackingName(GeneratedProjectSourcesTrackingName);
+
         // One batch output owns the complete current diagnostic set, including
         // removals. Publication policy cannot invalidate source-generation inputs.
         var diagnostics = generated
@@ -143,6 +149,10 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(
             generatedInlineAkcss,
+            static (productionContext, source) => AddGeneratedSource(productionContext, source));
+
+        context.RegisterSourceOutput(
+            generatedProjectSources,
             static (productionContext, source) => AddGeneratedSource(productionContext, source));
     }
 

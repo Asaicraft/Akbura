@@ -13,17 +13,20 @@ internal sealed partial class BlackSilenceDocumentBatch
         ImmutableArray<GeneratedSource> components,
         ImmutableArray<GeneratedSource> externalAkcss,
         ImmutableArray<GeneratedSource> inlineAkcss,
+        ImmutableArray<GeneratedSource> projectSources,
         ImmutableArray<Akbura.Diagnostics.AkburaDiagnosticRecord> diagnostics)
     {
         Components = components;
         ExternalAkcss = externalAkcss;
         InlineAkcss = inlineAkcss;
+        ProjectSources = projectSources;
         Diagnostics = diagnostics;
     }
 
     public ImmutableArray<GeneratedSource> Components { get; }
     public ImmutableArray<GeneratedSource> ExternalAkcss { get; }
     public ImmutableArray<GeneratedSource> InlineAkcss { get; }
+    public ImmutableArray<GeneratedSource> ProjectSources { get; }
 
     public static BlackSilenceDocumentBatch Generate(
         BlackSilenceGenerationRequest request,
@@ -146,10 +149,29 @@ internal sealed partial class BlackSilenceDocumentBatch
             }
         }
 
+        using var componentTypeNames = ImmutableArrayBuilder<string>.Rent(
+            componentCount);
+        for (var i = 0; i < componentCount; i++)
+        {
+            if (results[i] != null)
+            {
+                componentTypeNames.Add(
+                    request.Components[i].Descriptor.ComponentMetadataName);
+            }
+        }
+
+        var assemblyName =
+            request.Index.Compilation.CSharpCompilation.AssemblyName ??
+            throw new InvalidOperationException(
+                "The C# compilation assembly name is required.");
+
         var batch = new BlackSilenceDocumentBatch(
             GetSources(results, 0, componentCount),
             GetSources(results, componentCount, externalCount),
             GetSources(results, componentCount + externalCount, request.InlineAkcss.Length),
+            [HotReloadServiceWriter.Generate(
+                assemblyName,
+                componentTypeNames.ToImmutable())],
             GetDiagnostics(request, diagnosticEntries));
         var snapshot = new BlackSilenceProjectSnapshot(
             request.Version,

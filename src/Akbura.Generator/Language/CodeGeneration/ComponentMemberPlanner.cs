@@ -286,13 +286,12 @@ internal static class ComponentMemberPlanner
             for (var i = 0; i < commands.Length; i++)
             {
                 var command = commands[i];
-                var resultType = command.ResultType.Symbol as ITypeSymbol ??
-                    command.ReturnType.Symbol as ITypeSymbol;
-                if (resultType == null)
-                {
-                    resultType = _objectType;
-                }
-                else if (resultType.SpecialType == SpecialType.System_Void)
+                var declaredResultType = command.ResultType.Symbol as ITypeSymbol ??
+                    command.ReturnType.Symbol as ITypeSymbol ??
+                    _objectType;
+                var resultType = declaredResultType;
+
+                if (resultType.SpecialType == SpecialType.System_Void)
                 {
                     resultType = _objectType;
                 }
@@ -314,13 +313,24 @@ internal static class ComponentMemberPlanner
                         parameterType));
                 }
 
+                var parameterCount = _commandParameters.Count - parameterStart;
+                var parameterRange = new ComponentPlanRange(
+                    parameterStart,
+                    parameterCount);
+                var hotReloadKey = ComponentHotReloadIdentity.CreateCommandKey(
+                    command.Name,
+                    declaredResultType,
+                    _commandParameters.WrittenSpan.Slice(
+                        parameterStart,
+                        parameterCount));
+
                 _commands.Add(new ComponentCommandPlan(
                     i,
                     command.Name,
                     resultType,
-                    new ComponentPlanRange(
-                        parameterStart,
-                        _commandParameters.Count - parameterStart),
+                    declaredResultType,
+                    parameterRange,
+                    hotReloadKey,
                     command.DeclarationSyntax));
             }
         }

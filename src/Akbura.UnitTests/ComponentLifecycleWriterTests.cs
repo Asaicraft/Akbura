@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -144,6 +144,61 @@ public sealed class ComponentLifecycleWriterTests
     }
 
     [Fact]
+    public void WriteMembers_HotReloadReplaysOnlyInitialPropertyValues()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <StackPanel>
+                <TextBlock Text="Before"
+                           Width={GetWidth()} />
+                <TextBlock Text=${Binding Name} />
+                <Border Background=${DynamicResource AccentBrush} />
+            </StackPanel>
+            """;
+        const string csharp =
+            """
+            namespace Demo;
+
+            public partial class PlannerView
+            {
+                private double GetWidth() => 42;
+            }
+            """;
+        using var fixture = CreateFixture(
+            component,
+            csharp,
+            currentIndent: 4);
+        var lifecycleWriter = fixture.CreateWriter();
+        ref readonly var plan = ref fixture.Plan;
+
+        lifecycleWriter.WriteMembers(plan);
+
+        Assert.Equal(4, fixture.CodeWriter.CurrentIndent);
+        var output = fixture.CodeWriter.GetText().ToString();
+        var methods = SplitLifecycleMethods(output);
+
+        Assert.Contains("\"Before\"", methods.FirstUpdate, StringComparison.Ordinal);
+        Assert.Contains("\"Name\"", methods.FirstUpdate, StringComparison.Ordinal);
+        Assert.Contains("\"AccentBrush\"", methods.FirstUpdate, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetWidth()", methods.FirstUpdate, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("\"Before\"", methods.Update, StringComparison.Ordinal);
+        Assert.Contains("GetWidth()", methods.Update, StringComparison.Ordinal);
+
+        Assert.Contains("\"Before\"", methods.HotReload, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Name\"", methods.HotReload, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"AccentBrush\"", methods.HotReload, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetWidth()", methods.HotReload, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "new global::Avalonia.Controls.",
+            methods.HotReload,
+            StringComparison.Ordinal);
+        AssertBalancedSourceMappings(output);
+    }
+
+    [Fact]
     public void WriteMembers_InvalidRootShapeUsesSinglePersistentFallback()
     {
         const string component =
@@ -240,12 +295,19 @@ public sealed class ComponentLifecycleWriterTests
     {
         const string updateSignature =
             "protected override global::Avalonia.Controls.Control Update()";
+        const string hotReloadSignature =
+            "private void __AkburaHotReloadUpdateInitialValues()";
         var updateStart = output.IndexOf(updateSignature, StringComparison.Ordinal);
+        var hotReloadStart = output.IndexOf(
+            hotReloadSignature,
+            StringComparison.Ordinal);
 
         Assert.True(updateStart >= 0, output);
+        Assert.True(hotReloadStart > updateStart, output);
         return new LifecycleMethods(
             output[..updateStart],
-            output[updateStart..]);
+            output[updateStart..hotReloadStart],
+            output[hotReloadStart..]);
     }
 
     private static void AssertBalancedSourceMappings(string output)
@@ -274,7 +336,8 @@ public sealed class ComponentLifecycleWriterTests
 
     private readonly record struct LifecycleMethods(
         string FirstUpdate,
-        string Update);
+        string Update,
+        string HotReload);
 
     private sealed class WriterFixture : IDisposable
     {

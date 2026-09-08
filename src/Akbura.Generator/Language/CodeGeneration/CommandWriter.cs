@@ -33,21 +33,95 @@ internal readonly ref struct CommandWriter
 
         WriteDescriptor(plan);
         _writer.WriteLine();
+        WriteDescriptorFactory(plan);
+        _writer.WriteLine();
         WriteProperty(memberPlan, plan);
+    }
+
+    public void WriteHotReloadAssignment(
+        in ComponentCommandPlan plan,
+        string previousManifestExpression)
+    {
+        Debug.Assert(!string.IsNullOrEmpty(previousManifestExpression));
+
+        WriteDescriptorName(plan.Name);
+        _writer.WriteLine(" =");
+        _writer.CurrentIndent += _writer.TabSize;
+        GeneratedMemberNameWriter.WriteCommandFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine(
+            "global::Akbura.HotReload.AkburaHotReloadRuntime.FindProperty<");
+        _writer.CurrentIndent += _writer.TabSize;
+        WriteDescriptorType();
+        _writer.WriteLine(">(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write(previousManifestExpression);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(plan.HotReloadKey);
+        _writer.WriteLine("));");
+        _writer.CurrentIndent -= _writer.TabSize * 4;
     }
 
     private void WriteDescriptor(in ComponentCommandPlan plan)
     {
-        _writer.WriteLine("public static readonly");
+        _writer.WriteLine("#if DEBUG");
+        WriteDescriptorDeclaration(plan, isReadOnly: false);
+        _writer.WriteLine("#else");
+        WriteDescriptorDeclaration(plan, isReadOnly: true);
+        _writer.WriteLine("#endif");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("global::Avalonia.StyledProperty<");
-        _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("global::Akbura.IAkburaCommand>");
+        GeneratedMemberNameWriter.WriteCommandFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(null);");
         _writer.CurrentIndent -= _writer.TabSize;
+    }
+
+    private void WriteDescriptorDeclaration(
+        in ComponentCommandPlan plan,
+        bool isReadOnly)
+    {
+        _writer.Write("public static ");
+
+        if (isReadOnly)
+        {
+            _writer.Write("readonly ");
+        }
+
+        WriteDescriptorType();
+        _writer.Write(" ");
         WriteDescriptorName(plan.Name);
         _writer.WriteLine(" =");
+    }
+
+    private void WriteDescriptorFactory(in ComponentCommandPlan plan)
+    {
+        _writer.Write("private static ");
+        WriteDescriptorType();
+        _writer.Write(" ");
+        GeneratedMemberNameWriter.WriteCommandFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("global::Avalonia.AvaloniaProperty.Register<");
+        WriteDescriptorType();
+        _writer.WriteLine("? __previous)");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("#if DEBUG");
+        _writer.WriteLine("if (__previous != null)");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("return __previous;");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        _writer.WriteLine("#endif");
+        _writer.WriteLine();
+        _writer.WriteLine("return global::Avalonia.AvaloniaProperty.Register<");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write(_ownerTypeName);
         _writer.WriteLine(",");
@@ -55,7 +129,9 @@ internal readonly ref struct CommandWriter
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteStringLiteral(plan.Name);
         _writer.WriteLine(");");
-        _writer.CurrentIndent -= _writer.TabSize * 4;
+        _writer.CurrentIndent -= _writer.TabSize * 2;
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     private void WriteProperty(
@@ -127,6 +203,13 @@ internal readonly ref struct CommandWriter
         }
 
         _writer.Write(">");
+    }
+
+    private void WriteDescriptorType()
+    {
+        _writer.Write(
+            "global::Avalonia.StyledProperty<" +
+            "global::Akbura.IAkburaCommand>");
     }
 
     private void WriteDescriptorName(string name)

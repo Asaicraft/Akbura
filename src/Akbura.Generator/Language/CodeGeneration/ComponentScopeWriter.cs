@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -159,6 +159,33 @@ internal readonly ref struct ComponentScopeWriter
         }
     }
 
+    public void WriteHotReloadState(
+        in ComponentPlan plan,
+        in ComponentScopePlan scope,
+        in ComponentScopeWriteContext context)
+    {
+        Debug.Assert(scope.Kind == ComponentElementScopeKind.Component);
+        Debug.Assert(scope.Id == context.ScopeId);
+        Debug.Assert((uint)scope.Id < (uint)plan.Scopes.Length);
+
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            for (var i = 0; i < scope.Elements.Length; i++)
+            {
+                var elementId = GetScopeElementId(plan, scope, i);
+                var elementContext = context.ForElement(elementId);
+
+                WriteHotReloadProperties(plan, elementId, elementContext);
+            }
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
     public bool WriteFirstUpdateActions(
         in ComponentPlan plan,
         int elementId,
@@ -259,6 +286,18 @@ internal readonly ref struct ComponentScopeWriter
             ComponentPropertyWriteFilter.UpdateOnly);
     }
 
+    private bool WriteHotReloadProperties(
+        in ComponentPlan plan,
+        int elementId,
+        in MarkupExtensionWriteContext context)
+    {
+        return WriteProperties(
+            plan,
+            elementId,
+            context,
+            ComponentPropertyWriteFilter.HotReload);
+    }
+
     private bool WriteRuntimeUpdateProperties(
         in ComponentPlan plan,
         int elementId,
@@ -299,9 +338,17 @@ internal readonly ref struct ComponentScopeWriter
         {
             ref readonly var property = ref plan.PropertyWrites.ItemRef(
                 element.PropertyWrites.Start + i);
-            var shouldWrite = filter == ComponentPropertyWriteFilter.UpdateOnly
-                ? property.Phase == ComponentPropertyWritePhase.Update
-                : property.WritesDuringUpdate;
+            var shouldWrite = filter switch
+            {
+                ComponentPropertyWriteFilter.UpdateOnly =>
+                    property.Phase == ComponentPropertyWritePhase.Update,
+                ComponentPropertyWriteFilter.RuntimeUpdate =>
+                    property.WritesDuringUpdate,
+                ComponentPropertyWriteFilter.HotReload =>
+                    property.Phase == ComponentPropertyWritePhase.FirstUpdate &&
+                    property.ValueKind == ComponentPropertyValueKind.Constant,
+                _ => false,
+            };
             if (!shouldWrite)
             {
                 continue;
@@ -599,5 +646,6 @@ internal readonly ref struct ComponentScopeWriter
     {
         UpdateOnly,
         RuntimeUpdate,
+        HotReload,
     }
 }

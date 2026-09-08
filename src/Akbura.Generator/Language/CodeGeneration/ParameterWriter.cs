@@ -38,9 +38,38 @@ internal readonly ref struct ParameterWriter
         WriteValue(plan);
     }
 
+    public void WriteHotReloadAssignment(
+        in ComponentParameterPlan plan,
+        string previousManifestExpression)
+    {
+        Debug.Assert(!string.IsNullOrEmpty(previousManifestExpression));
+
+        WriteDescriptorName(plan.Name);
+        _writer.WriteLine(" =");
+        _writer.CurrentIndent += _writer.TabSize;
+        GeneratedMemberNameWriter.WriteParameterFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine(
+            "global::Akbura.HotReload.AkburaHotReloadRuntime.FindProperty<");
+        _writer.CurrentIndent += _writer.TabSize;
+        WriteHotReloadPropertyType(plan);
+        _writer.WriteLine(">(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write(previousManifestExpression);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(plan.HotReloadKey);
+        _writer.WriteLine("));");
+        _writer.CurrentIndent -= _writer.TabSize * 4;
+    }
+
     private void WriteValue(in ComponentParameterPlan plan)
     {
         WriteValueDescriptor(plan);
+        _writer.WriteLine();
+        WriteValueDescriptorFactory(plan);
         _writer.WriteLine();
 
         if (plan.IsContent)
@@ -59,6 +88,15 @@ internal readonly ref struct ParameterWriter
 
     private void WriteValueDescriptor(in ComponentParameterPlan plan)
     {
+        _writer.WriteLine("#if DEBUG");
+        _writer.Write("public static global::Akbura.ComponentTree.Parameter<");
+        _writer.Write(_ownerTypeName);
+        _writer.Write(", ");
+        WriteParameterType(plan);
+        _writer.Write("> ");
+        WriteDescriptorName(plan.Name);
+        _writer.WriteLine(" =");
+        _writer.WriteLine("#else");
         _writer.Write("public static readonly global::Akbura.ComponentTree.Parameter<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
@@ -66,16 +104,64 @@ internal readonly ref struct ParameterWriter
         _writer.Write("> ");
         WriteDescriptorName(plan.Name);
         _writer.WriteLine(" =");
+        _writer.WriteLine("#endif");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.Write("global::Akbura.ComponentTree.Parameter.Create<");
+        GeneratedMemberNameWriter.WriteParameterFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(null);");
+        _writer.CurrentIndent -= _writer.TabSize;
+    }
+
+    private void WriteValueDescriptorFactory(in ComponentParameterPlan plan)
+    {
+        _writer.Write("private static global::Akbura.ComponentTree.Parameter<");
+        _writer.Write(_ownerTypeName);
+        _writer.Write(", ");
+        WriteParameterType(plan);
+        _writer.Write("> ");
+        GeneratedMemberNameWriter.WriteParameterFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("global::Avalonia.StyledProperty<");
+        WriteParameterType(plan);
+        _writer.WriteLine(">? __previous)");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        WriteOptionalValueLocal(plan);
+        _writer.WriteLine("#if DEBUG");
+        WriteValueDescriptorFactoryReturn(plan, recreate: true);
+        _writer.WriteLine("#else");
+        WriteValueDescriptorFactoryReturn(plan, recreate: false);
+        _writer.WriteLine("#endif");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+    }
+
+    private void WriteValueDescriptorFactoryReturn(
+        in ComponentParameterPlan plan,
+        bool recreate)
+    {
+        _writer.Write("return global::Akbura.ComponentTree.Parameter.");
+        _writer.Write(recreate ? "RecreateForHotReload" : "Create");
+        _writer.Write("<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
         WriteParameterType(plan);
         _writer.WriteLine(">(");
         _writer.CurrentIndent += _writer.TabSize;
+
+        if (recreate)
+        {
+            _writer.WriteLine("__previous,");
+        }
+
         _writer.WriteStringLiteral(plan.Name);
         _writer.WriteLine(",");
-        WriteOptionalValue(plan);
+        _writer.WriteLine("__defaultValue,");
         WriteBinding(plan.BindingKind);
 
         if (plan.IsContent)
@@ -91,14 +177,18 @@ internal readonly ref struct ParameterWriter
             _writer.WriteLine(");");
         }
 
-        _writer.CurrentIndent -= _writer.TabSize * 2;
+        _writer.CurrentIndent -= _writer.TabSize;
     }
 
-    private void WriteOptionalValue(in ComponentParameterPlan plan)
+    private void WriteOptionalValueLocal(in ComponentParameterPlan plan)
     {
+        _writer.Write("global::Avalonia.Data.Optional<");
+        WriteParameterType(plan);
+        _writer.Write("> __defaultValue = ");
+
         if (!plan.HasDefaultValue)
         {
-            _writer.WriteLine("default,");
+            _writer.WriteLine("default;");
             return;
         }
 
@@ -120,14 +210,12 @@ internal readonly ref struct ParameterWriter
         }
         else
         {
-            // Error-tolerant fallback. The semantic diagnostic
-            // is already attached to the .akbura source.
             _writer.Write("default!");
         }
 
         _writer.WriteLine();
         _writer.CurrentIndent -= _writer.TabSize;
-        _writer.WriteLine("),");
+        _writer.WriteLine(");");
     }
 
     private void WriteBinding(ParamBindingKind bindingKind)
@@ -192,7 +280,20 @@ internal readonly ref struct ParameterWriter
     {
         WriteCollectionFields(plan);
         _writer.WriteLine();
+        WriteCollectionBackingGetter(plan);
+        _writer.WriteLine();
+
+        if (plan.IsContent)
+        {
+            WriteCollectionLogicalChildrenGetter(plan);
+            _writer.WriteLine();
+        }
+
         WriteCollectionDescriptor(plan);
+        _writer.WriteLine();
+        WriteCollectionDescriptorFactory(plan);
+        _writer.WriteLine();
+        WriteCollectionGetter(plan);
         _writer.WriteLine();
 
         if (plan.IsContent)
@@ -221,31 +322,119 @@ internal readonly ref struct ParameterWriter
 
     private void WriteCollectionFields(in ComponentParameterPlan plan)
     {
+        _writer.WriteLine("#if DEBUG");
+        _writer.Write("private ");
+        _valueWriter.WriteTypeNameWithNullableAnnotation(plan.Collection.BackingType);
+        _writer.Write("? ");
+        GeneratedMemberNameWriter.WriteCollectionField(_writer, plan.GeneratedName);
+        _writer.WriteLine(";");
+        _writer.WriteLine("#else");
         _writer.Write("private readonly ");
         _valueWriter.WriteTypeNameWithNullableAnnotation(plan.Collection.BackingType);
         _writer.Write(" ");
-        GeneratedMemberNameWriter.WriteCollectionField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionField(_writer, plan.GeneratedName);
         _writer.WriteLine(" = [];");
+        _writer.WriteLine("#endif");
 
         if (plan.IsContent && plan.Collection.ObservesChanges)
         {
             _writer.Write("private bool ");
-            GeneratedMemberNameWriter.WriteCollectionSubscribedField(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteCollectionSubscribedField(_writer, plan.GeneratedName);
             _writer.WriteLine(";");
         }
 
         if (plan.IsContent)
         {
+            _writer.WriteLine("#if DEBUG");
+            _writer.Write(
+                "private global::System.Collections.Generic.List<" +
+                "global::Avalonia.Controls.Control>? ");
+            GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(
+                _writer,
+                plan.GeneratedName);
+            _writer.WriteLine(";");
+            _writer.WriteLine("#else");
             _writer.Write(
                 "private readonly global::System.Collections.Generic.List<" +
                 "global::Avalonia.Controls.Control> ");
-            GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(
+                _writer,
+                plan.GeneratedName);
             _writer.WriteLine(" = [];");
+            _writer.WriteLine("#endif");
         }
+    }
+
+    private void WriteCollectionBackingGetter(in ComponentParameterPlan plan)
+    {
+        _writer.Write("private ");
+        _valueWriter.WriteTypeNameWithNullableAnnotation(plan.Collection.BackingType);
+        _writer.Write(" ");
+        GeneratedMemberNameWriter.WriteCollectionBackingGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("()");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("#if DEBUG");
+        _writer.Write("return ");
+        GeneratedMemberNameWriter.WriteCollectionField(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine(" ??= [];");
+        _writer.WriteLine("#else");
+        _writer.Write("return ");
+        GeneratedMemberNameWriter.WriteCollectionField(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine(";");
+        _writer.WriteLine("#endif");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+    }
+
+    private void WriteCollectionLogicalChildrenGetter(
+        in ComponentParameterPlan plan)
+    {
+        _writer.WriteLine(
+            "private global::System.Collections.Generic.List<" +
+            "global::Avalonia.Controls.Control>");
+        _writer.CurrentIndent += _writer.TabSize;
+        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("()");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("#if DEBUG");
+        _writer.Write("return ");
+        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine(" ??= [];");
+        _writer.WriteLine("#else");
+        _writer.Write("return ");
+        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine(";");
+        _writer.WriteLine("#endif");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     private void WriteCollectionDescriptor(in ComponentParameterPlan plan)
     {
+        _writer.WriteLine("#if DEBUG");
+        _writer.Write("public static global::Akbura.ComponentTree.ReadOnlyParameter<");
+        _writer.Write(_ownerTypeName);
+        _writer.Write(", ");
+        WriteCollectionPropertyType(plan);
+        _writer.Write("> ");
+        WriteDescriptorName(plan.Name);
+        _writer.WriteLine(" =");
+        _writer.WriteLine("#else");
         _writer.Write("public static readonly global::Akbura.ComponentTree.ReadOnlyParameter<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
@@ -253,19 +442,86 @@ internal readonly ref struct ParameterWriter
         _writer.Write("> ");
         WriteDescriptorName(plan.Name);
         _writer.WriteLine(" =");
+        _writer.WriteLine("#endif");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.Write("global::Akbura.ComponentTree.Parameter.CreateReadOnly<");
+        GeneratedMemberNameWriter.WriteParameterFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(null);");
+        _writer.CurrentIndent -= _writer.TabSize;
+    }
+
+    private void WriteCollectionDescriptorFactory(in ComponentParameterPlan plan)
+    {
+        _writer.Write("private static global::Akbura.ComponentTree.ReadOnlyParameter<");
+        _writer.Write(_ownerTypeName);
+        _writer.Write(", ");
+        WriteCollectionPropertyType(plan);
+        _writer.Write("> ");
+        GeneratedMemberNameWriter.WriteParameterFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("global::Avalonia.DirectProperty<");
+        _writer.Write(_ownerTypeName);
+        _writer.Write(", ");
+        WriteCollectionPropertyType(plan);
+        _writer.WriteLine(">? __previous)");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("#if DEBUG");
+        WriteCollectionDescriptorFactoryReturn(plan, recreate: true);
+        _writer.WriteLine("#else");
+        WriteCollectionDescriptorFactoryReturn(plan, recreate: false);
+        _writer.WriteLine("#endif");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+    }
+
+    private void WriteCollectionDescriptorFactoryReturn(
+        in ComponentParameterPlan plan,
+        bool recreate)
+    {
+        _writer.Write("return global::Akbura.ComponentTree.Parameter.");
+        _writer.Write(recreate
+            ? "RecreateReadOnlyForHotReload"
+            : "CreateReadOnly");
+        _writer.Write("<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
         WriteCollectionPropertyType(plan);
         _writer.WriteLine(">(");
         _writer.CurrentIndent += _writer.TabSize;
+
+        if (recreate)
+        {
+            _writer.WriteLine("__previous,");
+        }
+
         _writer.WriteStringLiteral(plan.Name);
         _writer.WriteLine(",");
-        _writer.Write("static __owner => __owner.");
-        _valueWriter.WriteIdentifier(plan.Name);
+        GeneratedMemberNameWriter.WriteCollectionGetter(
+            _writer,
+            plan.GeneratedName);
         _writer.WriteLine(");");
-        _writer.CurrentIndent -= _writer.TabSize * 2;
+        _writer.CurrentIndent -= _writer.TabSize;
+    }
+
+    private void WriteCollectionGetter(in ComponentParameterPlan plan)
+    {
+        _writer.Write("private static ");
+        WriteCollectionPropertyType(plan);
+        _writer.Write(" ");
+        GeneratedMemberNameWriter.WriteCollectionGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("(");
+        _writer.Write(_ownerTypeName);
+        _writer.Write(" __owner) => __owner.");
+        _valueWriter.WriteIdentifier(plan.Name);
+        _writer.WriteLine(";");
     }
 
     private void WriteCollectionProperty(in ComponentParameterPlan plan)
@@ -278,7 +534,10 @@ internal readonly ref struct ParameterWriter
         if (!plan.IsContent || !plan.Collection.ObservesChanges)
         {
             _writer.Write(" => ");
-            GeneratedMemberNameWriter.WriteCollectionField(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteCollectionBackingGetter(
+                _writer,
+                plan.GeneratedName);
+            _writer.Write("()");
             _writer.WriteLine(";");
             return;
         }
@@ -290,21 +549,27 @@ internal readonly ref struct ParameterWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("if (!");
-        GeneratedMemberNameWriter.WriteCollectionSubscribedField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionSubscribedField(_writer, plan.GeneratedName);
         _writer.WriteLine(")");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
-        GeneratedMemberNameWriter.WriteCollectionField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionBackingGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("()");
         _writer.Write(".CollectionChanged += ");
-        GeneratedMemberNameWriter.WriteCollectionChangedMethod(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionChangedMethod(_writer, plan.GeneratedName);
         _writer.WriteLine(";");
-        GeneratedMemberNameWriter.WriteCollectionSubscribedField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionSubscribedField(_writer, plan.GeneratedName);
         _writer.WriteLine(" = true;");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
         _writer.WriteLine();
         _writer.Write("return ");
-        GeneratedMemberNameWriter.WriteCollectionField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionBackingGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("()");
         _writer.WriteLine(";");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
@@ -332,7 +597,7 @@ internal readonly ref struct ParameterWriter
 
         if (plan.IsContent && !plan.Collection.ObservesChanges)
         {
-            GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.GeneratedName);
             _writer.WriteLine("();");
         }
 
@@ -343,7 +608,7 @@ internal readonly ref struct ParameterWriter
     private void WriteCollectionChangedHandler(in ComponentParameterPlan plan)
     {
         _writer.Write("private void ");
-        GeneratedMemberNameWriter.WriteCollectionChangedMethod(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionChangedMethod(_writer, plan.GeneratedName);
         _writer.WriteLine("(");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteLine("object? __sender,");
@@ -360,7 +625,7 @@ internal readonly ref struct ParameterWriter
         _writer.WriteLine("case global::System.Collections.Specialized.NotifyCollectionChangedAction.Remove:");
         _writer.WriteLine("case global::System.Collections.Specialized.NotifyCollectionChangedAction.Replace:");
         _writer.CurrentIndent += _writer.TabSize;
-        GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.GeneratedName);
         _writer.WriteLine("();");
         _writer.WriteLine("break;");
         _writer.CurrentIndent -= _writer.TabSize;
@@ -384,22 +649,31 @@ internal readonly ref struct ParameterWriter
     private void WriteLogicalChildrenSynchronizer(in ComponentParameterPlan plan)
     {
         _writer.Write("private void ");
-        GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.GeneratedName);
         _writer.WriteLine("()");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("foreach (var __oldContent in ");
-        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("()");
         _writer.WriteLine(")");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteLine("LogicalChildren.Remove(__oldContent);");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
-        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("()");
         _writer.WriteLine(".Clear();");
         _writer.Write("foreach (var __item in ");
-        GeneratedMemberNameWriter.WriteCollectionField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionBackingGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("()");
         _writer.WriteLine(")");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
@@ -407,13 +681,19 @@ internal readonly ref struct ParameterWriter
             "if (__item is global::Avalonia.Controls.Control __contentControl &&");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("!");
-        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("()");
         _writer.WriteLine(".Contains(__contentControl))");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteLine("LogicalChildren.Add(__contentControl);");
-        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenGetter(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write("()");
         _writer.WriteLine(".Add(__contentControl);");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
@@ -431,6 +711,23 @@ internal readonly ref struct ParameterWriter
     private void WriteCollectionPropertyType(in ComponentParameterPlan plan)
     {
         _valueWriter.WriteTypeNameWithNullableAnnotation(plan.Collection.PropertyType);
+    }
+
+    private void WriteHotReloadPropertyType(in ComponentParameterPlan plan)
+    {
+        if (plan.Kind == ComponentParameterKind.Collection)
+        {
+            _writer.Write("global::Avalonia.DirectProperty<");
+            _writer.Write(_ownerTypeName);
+            _writer.Write(", ");
+            WriteCollectionPropertyType(plan);
+            _writer.Write(">");
+            return;
+        }
+
+        _writer.Write("global::Avalonia.StyledProperty<");
+        WriteParameterType(plan);
+        _writer.Write(">");
     }
 
     private void WriteDescriptorName(string name)

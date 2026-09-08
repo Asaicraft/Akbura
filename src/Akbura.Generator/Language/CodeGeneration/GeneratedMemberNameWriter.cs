@@ -4,20 +4,24 @@ namespace Akbura.Language.CodeGeneration;
 
 internal static class GeneratedMemberNameWriter
 {
-    public static void WriteParameterField(CodeWriter writer, int id)
+    public static void WriteCollectionField(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("s_parameter");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__collection_", generatedName);
     }
 
-    public static void WriteCollectionField(CodeWriter writer, int id)
+    public static void WriteCollectionGetter(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
+        WriteStableName(writer, "__GetCollection_", generatedName);
+    }
 
-        writer.Write("__collection");
-        writer.WriteIntegerLiteral(id);
+    public static void WriteCollectionBackingGetter(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__GetCollectionBacking_", generatedName);
+    }
+
+    public static void WriteParameterFactory(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__AkburaCreateParameter_", generatedName);
     }
 
     public static void WriteCollectionAddMethod(CodeWriter writer, string parameterName)
@@ -28,91 +32,110 @@ internal static class GeneratedMemberNameWriter
         writer.Write(parameterName);
     }
 
-    public static void WriteCollectionSubscribedField(CodeWriter writer, int id)
+    public static void WriteCollectionSubscribedField(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__contentSubscribed");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__contentSubscribed_", generatedName);
     }
 
-    public static void WriteCollectionLogicalChildrenField(CodeWriter writer, int id)
+    public static void WriteCollectionLogicalChildrenField(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__contentLogicalChildren");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__contentLogicalChildren_", generatedName);
     }
 
-    public static void WriteCollectionSynchronizeMethod(CodeWriter writer, int id)
+    public static void WriteCollectionLogicalChildrenGetter(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__SynchronizeContentLogicalChildren");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__GetContentLogicalChildren_", generatedName);
     }
 
-    public static void WriteCollectionChangedMethod(CodeWriter writer, int id)
+    public static void WriteCollectionSynchronizeMethod(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__OnContentCollectionChanged");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__SynchronizeContentLogicalChildren_", generatedName);
     }
 
-    public static void WriteStateInfoField(CodeWriter writer, int id)
+    public static void WriteCollectionChangedMethod(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("s_stateInfo");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__OnContentCollectionChanged_", generatedName);
     }
 
-    public static void WriteStateField(CodeWriter writer, int id)
+    public static void WriteStateInfoField(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__state");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "s_stateInfo_", generatedName);
     }
 
-    public static void WriteStateAccessor(CodeWriter writer, int id)
+    public static void WriteStateInfoFactory(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__State");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__AkburaCreateStateInfo_", generatedName);
     }
 
-    public static void WriteStateValueFactory(CodeWriter writer, int id)
+    public static void WriteStateInfoValueFactory(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__CreateStateValue");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__AkburaCreateStateValueForOwner_", generatedName);
     }
 
-    public static void WriteStateFactory(CodeWriter writer, int id)
+    public static void WriteStateInfoStateFactory(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__CreateState");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__AkburaCreateStateForOwner_", generatedName);
     }
 
-    public static void WriteServiceField(CodeWriter writer, int id)
+    public static void WriteStateField(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
-
-        writer.Write("__service");
-        writer.WriteIntegerLiteral(id);
+        WriteStableName(writer, "__state_", generatedName);
     }
 
-    public static void WriteServiceSetter(CodeWriter writer, int id)
+    public static void WriteStateAccessor(CodeWriter writer, string generatedName)
     {
-        Debug.Assert(id >= 0);
+        WriteStableName(writer, "__State_", generatedName);
+    }
 
-        writer.Write("__SetService");
-        writer.WriteIntegerLiteral(id);
+    public static void WriteStateValueFactory(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__CreateStateValue_", generatedName);
+    }
+
+    public static void WriteStateFactory(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__CreateState_", generatedName);
+    }
+
+    public static void WriteServiceField(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__service_", generatedName);
+    }
+
+    public static void WriteServiceGetter(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__GetService_", generatedName);
+    }
+
+    public static void WriteServiceSetter(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__SetService_", generatedName);
+    }
+
+    public static void WriteServiceValueSetter(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__SetServiceValue_", generatedName);
+    }
+
+    public static void WriteServiceFactory(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__AkburaCreateService_", generatedName);
+    }
+
+    public static void WriteCommandFactory(CodeWriter writer, string generatedName)
+    {
+        WriteStableName(writer, "__AkburaCreateCommand_", generatedName);
+    }
+
+    private static void WriteStableName(
+        CodeWriter writer,
+        string prefix,
+        string generatedName)
+    {
+        Debug.Assert(writer != null);
+        Debug.Assert(!string.IsNullOrEmpty(generatedName));
+
+        writer!.Write(prefix);
+        writer.Write(generatedName!);
     }
 }

@@ -68,6 +68,14 @@ internal readonly struct ComponentParameterPlan
         DefaultValue = defaultValue;
         Collection = collection;
         Syntax = syntax;
+        HotReloadKey = ComponentHotReloadIdentity.CreateParameterKey(
+            name,
+            type,
+            kind,
+            flags);
+        GeneratedName = ComponentHotReloadIdentity.CreateGeneratedName(
+            name,
+            HotReloadKey);
     }
 
     public int Id { get; }
@@ -87,6 +95,10 @@ internal readonly struct ComponentParameterPlan
     public ComponentParameterCollectionPlan Collection { get; }
 
     public ParamDeclarationSyntax Syntax { get; }
+
+    public string HotReloadKey { get; }
+
+    public string GeneratedName { get; }
 
     public bool HasDefaultValue =>
         (Flags & ComponentParameterFlags.HasDefaultValue) != 0;
@@ -115,6 +127,12 @@ internal readonly struct ComponentInjectServicePlan
         ServiceType = serviceType;
         IsOptional = isOptional;
         Syntax = syntax;
+        HotReloadKey = ComponentHotReloadIdentity.CreateServiceKey(
+            name,
+            serviceType);
+        GeneratedName = ComponentHotReloadIdentity.CreateGeneratedName(
+            name,
+            HotReloadKey);
     }
 
     public int Id { get; }
@@ -129,6 +147,10 @@ internal readonly struct ComponentInjectServicePlan
     public bool IsOptional { get; }
 
     public InjectDeclarationSyntax Syntax { get; }
+
+    public string HotReloadKey { get; }
+
+    public string GeneratedName { get; }
 }
 
 internal enum ComponentStateFactoryKind : byte
@@ -167,6 +189,13 @@ internal readonly struct ComponentStatePlan
         Initializer = initializer;
         Syntax = syntax;
         HookMethod = hookMethod;
+        HotReloadKey = ComponentHotReloadIdentity.CreateStateKey(
+            name,
+            valueType,
+            factoryKind);
+        GeneratedName = ComponentHotReloadIdentity.CreateGeneratedName(
+            name,
+            HotReloadKey);
     }
 
     public int Id { get; }
@@ -186,6 +215,10 @@ internal readonly struct ComponentStatePlan
     public StateDeclarationSyntax Syntax { get; }
 
     public IMethodSymbol? HookMethod { get; }
+
+    public string HotReloadKey { get; }
+
+    public string GeneratedName { get; }
 
     public bool IsReadOnly => (Flags & ComponentStateFlags.IsReadOnly) != 0;
 
@@ -217,13 +250,20 @@ internal readonly struct ComponentCommandPlan
         int id,
         string name,
         ITypeSymbol resultType,
+        ITypeSymbol declaredResultType,
         ComponentPlanRange parameters,
+        string hotReloadKey,
         CommandDeclarationSyntax syntax)
     {
         Id = id;
         Name = name;
         ResultType = resultType;
+        DeclaredResultType = declaredResultType;
         Parameters = parameters;
+        HotReloadKey = hotReloadKey;
+        GeneratedName = ComponentHotReloadIdentity.CreateGeneratedName(
+            name,
+            hotReloadKey);
         Syntax = syntax;
     }
 
@@ -233,12 +273,18 @@ internal readonly struct ComponentCommandPlan
 
     public ITypeSymbol ResultType { get; }
 
+    public ITypeSymbol DeclaredResultType { get; }
+
     /// <summary>
     /// Range inside <see cref="ComponentMemberPlan.CommandParameters"/>.
     /// </summary>
     public ComponentPlanRange Parameters { get; }
 
     public CommandDeclarationSyntax Syntax { get; }
+
+    public string HotReloadKey { get; }
+
+    public string GeneratedName { get; }
 }
 
 internal readonly struct ComponentUserMemberPlan

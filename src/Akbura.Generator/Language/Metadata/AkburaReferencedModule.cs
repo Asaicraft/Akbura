@@ -20,7 +20,7 @@ internal sealed class AkburaReferencedModule
     private readonly ImmutableArray<IAkcssModuleSymbol> _akcssModules;
 
     private AkburaReferencedModule(
-        PortableExecutableReference reference,
+        MetadataReference reference,
         Lazy<EmbeddedModuleData> lazyEmbeddedData,
         ImmutableArray<IAkcssModuleSymbol> akcssModules)
     {
@@ -32,7 +32,7 @@ internal sealed class AkburaReferencedModule
             : akcssModules;
     }
 
-    public PortableExecutableReference Reference { get; }
+    public MetadataReference Reference { get; }
 
     public AkburaModuleManifest Manifest => _lazyEmbeddedData.Value.Manifest;
 
@@ -271,8 +271,7 @@ internal sealed class AkburaReferencedModule
         using var modules = ImmutableArrayBuilder<AkburaReferencedModule>.Rent();
         foreach (var reference in compilation.References)
         {
-            if (reference is PortableExecutableReference portableReference &&
-                TryLoad(compilation, portableReference, out var module))
+            if (TryLoad(compilation, reference, out var module))
             {
                 modules.Add(module);
             }
@@ -285,7 +284,7 @@ internal sealed class AkburaReferencedModule
 
     private static bool TryLoad(
         CSharpCompilation compilation,
-        PortableExecutableReference reference,
+        MetadataReference reference,
         out AkburaReferencedModule module)
     {
         module = null!;
@@ -295,19 +294,28 @@ internal sealed class AkburaReferencedModule
             : LoadAnnotatedAkcssModules(assembly);
         if (!akcssModules.IsDefaultOrEmpty)
         {
+            var assemblyName = assembly?.Name ?? string.Empty;
             module = new AkburaReferencedModule(
                 reference,
-                new Lazy<EmbeddedModuleData>(
-                    () => LoadEmbeddedDataOrEmpty(
-                        compilation,
-                        reference,
-                        assembly?.Name ?? string.Empty),
-                    LazyThreadSafetyMode.ExecutionAndPublication),
+                reference is PortableExecutableReference portableReference
+                    ? new Lazy<EmbeddedModuleData>(
+                        () => LoadEmbeddedDataOrEmpty(
+                            compilation,
+                            portableReference,
+                            assemblyName),
+                        LazyThreadSafetyMode.ExecutionAndPublication)
+                    : new Lazy<EmbeddedModuleData>(
+                        () => CreateEmptyEmbeddedData(assemblyName),
+                        LazyThreadSafetyMode.ExecutionAndPublication),
                 akcssModules);
             return true;
         }
 
-        if (!TryLoadEmbeddedData(compilation, reference, out var embeddedData))
+        if (reference is not PortableExecutableReference embeddedReference ||
+            !TryLoadEmbeddedData(
+                compilation,
+                embeddedReference,
+                out var embeddedData))
         {
             return false;
         }
@@ -351,12 +359,18 @@ internal sealed class AkburaReferencedModule
     {
         return TryLoadEmbeddedData(compilation, reference, out var data)
             ? data
-            : new EmbeddedModuleData(
-                new AkburaModuleManifest(
-                    AkburaModuleManifest.CurrentFormatVersion,
-                    assemblyName,
-                    ImmutableArray<AkburaModuleSource>.Empty),
-                ImmutableArray<AkburaReferencedSource>.Empty);
+            : CreateEmptyEmbeddedData(assemblyName);
+    }
+
+    private static EmbeddedModuleData CreateEmptyEmbeddedData(
+        string assemblyName)
+    {
+        return new EmbeddedModuleData(
+            new AkburaModuleManifest(
+                AkburaModuleManifest.CurrentFormatVersion,
+                assemblyName,
+                ImmutableArray<AkburaModuleSource>.Empty),
+            ImmutableArray<AkburaReferencedSource>.Empty);
     }
 
     private static bool TryLoadEmbeddedData(

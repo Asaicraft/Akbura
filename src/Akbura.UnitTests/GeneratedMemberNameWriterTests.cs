@@ -5,53 +5,36 @@ namespace Akbura.UnitTests;
 public sealed class GeneratedMemberNameWriterTests
 {
     [Fact]
-    public void WriteMethods_UseStablePrefixesAndNames()
+    public void StableIdentityMethods_UseIdentitySuffixInsteadOfOrdinal()
     {
+        const string identity = "Content_0123456789abcdef";
         using var writer = new CodeWriter("\r\n");
 
-        GeneratedMemberNameWriter.WriteParameterField(writer, 0);
+        GeneratedMemberNameWriter.WriteCollectionField(writer, identity);
         writer.WriteLine();
-        GeneratedMemberNameWriter.WriteCollectionField(writer, 1);
+        GeneratedMemberNameWriter.WriteCollectionBackingGetter(writer, identity);
         writer.WriteLine();
-        GeneratedMemberNameWriter.WriteCollectionAddMethod(writer, "Content");
+        GeneratedMemberNameWriter.WriteParameterFactory(writer, identity);
         writer.WriteLine();
-        GeneratedMemberNameWriter.WriteCollectionSubscribedField(writer, 3);
+        GeneratedMemberNameWriter.WriteStateInfoField(writer, identity);
         writer.WriteLine();
-        GeneratedMemberNameWriter.WriteCollectionLogicalChildrenField(writer, 4);
+        GeneratedMemberNameWriter.WriteStateFactory(writer, identity);
         writer.WriteLine();
-        GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(writer, 5);
+        GeneratedMemberNameWriter.WriteServiceField(writer, identity);
         writer.WriteLine();
-        GeneratedMemberNameWriter.WriteCollectionChangedMethod(writer, 6);
+        GeneratedMemberNameWriter.WriteServiceValueSetter(writer, identity);
         writer.WriteLine();
-        GeneratedMemberNameWriter.WriteStateInfoField(writer, 7);
-        writer.WriteLine();
-        GeneratedMemberNameWriter.WriteStateField(writer, 8);
-        writer.WriteLine();
-        GeneratedMemberNameWriter.WriteStateAccessor(writer, 9);
-        writer.WriteLine();
-        GeneratedMemberNameWriter.WriteStateValueFactory(writer, 10);
-        writer.WriteLine();
-        GeneratedMemberNameWriter.WriteStateFactory(writer, 11);
-        writer.WriteLine();
-        GeneratedMemberNameWriter.WriteServiceField(writer, 12);
-        writer.WriteLine();
-        GeneratedMemberNameWriter.WriteServiceSetter(writer, 13);
+        GeneratedMemberNameWriter.WriteCommandFactory(writer, identity);
 
         Assert.Equal(
-            "s_parameter0\r\n" +
-            "__collection1\r\n" +
-            "__AkburaAddCollection_Content\r\n" +
-            "__contentSubscribed3\r\n" +
-            "__contentLogicalChildren4\r\n" +
-            "__SynchronizeContentLogicalChildren5\r\n" +
-            "__OnContentCollectionChanged6\r\n" +
-            "s_stateInfo7\r\n" +
-            "__state8\r\n" +
-            "__State9\r\n" +
-            "__CreateStateValue10\r\n" +
-            "__CreateState11\r\n" +
-            "__service12\r\n" +
-            "__SetService13",
+            "__collection_Content_0123456789abcdef\r\n" +
+            "__GetCollectionBacking_Content_0123456789abcdef\r\n" +
+            "__AkburaCreateParameter_Content_0123456789abcdef\r\n" +
+            "s_stateInfo_Content_0123456789abcdef\r\n" +
+            "__CreateState_Content_0123456789abcdef\r\n" +
+            "__service_Content_0123456789abcdef\r\n" +
+            "__SetServiceValue_Content_0123456789abcdef\r\n" +
+            "__AkburaCreateCommand_Content_0123456789abcdef",
             writer.GetText().ToString());
     }
 }

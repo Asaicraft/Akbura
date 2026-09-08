@@ -96,14 +96,20 @@ public sealed class StateWriterTests
         writer.Write(state);
 
         var output = codeWriter.GetText().ToString();
+        var generatedName = state.GeneratedName;
         var propertyStart = output.IndexOf("private double width", StringComparison.Ordinal);
-        var factoryStart = output.IndexOf("private double __CreateStateValue0", StringComparison.Ordinal);
+        var factoryStart = output.IndexOf(
+            "private double __CreateStateValue_" + generatedName,
+            StringComparison.Ordinal);
 
         Assert.True(state.IsReadOnly);
         Assert.True(propertyStart >= 0, output);
         Assert.True(factoryStart > propertyStart, output);
         var property = output[propertyStart..factoryStart];
-        Assert.Contains("get => __State0.Value;", property, StringComparison.Ordinal);
+        Assert.Contains(
+            "get => __State_" + generatedName + ".Value;",
+            property,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("set =>", property, StringComparison.Ordinal);
     }
 
@@ -162,6 +168,7 @@ public sealed class StateWriterTests
         writer.Write(state);
 
         var output = codeWriter.GetText().ToString();
+        var generatedName = state.GeneratedName;
         Assert.True(state.UsesHook);
         Assert.Equal(ComponentStateFactoryKind.State, state.FactoryKind);
         Assert.Equal(
@@ -172,11 +179,13 @@ public sealed class StateWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            ".__CreateState0());",
+            ".__CreateState_" + generatedName + "();",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            "private global::Akbura.ComponentTree.State<double> __CreateState0()",
+            "private global::Akbura.ComponentTree.State<double> __CreateState_" +
+            generatedName +
+            "()",
             output,
             StringComparison.Ordinal);
         Assert.Contains("this,", output, StringComparison.Ordinal);
@@ -185,7 +194,10 @@ public sealed class StateWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Contains("WidthProperty", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("__CreateStateValue0", output, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "__CreateStateValue_" + generatedName,
+            output,
+            StringComparison.Ordinal);
         AssertSourceMappings(output);
         Assert.Equal(4, codeWriter.CurrentIndent);
     }

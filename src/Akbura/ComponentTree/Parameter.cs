@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Data;
+using System.ComponentModel;
 
 namespace Akbura.ComponentTree;
 
@@ -99,6 +100,67 @@ public abstract class Parameter
     }
 
     /// <summary>
+    /// Recreates a component parameter for Hot Reload while preserving a compatible
+    /// Avalonia property registration.
+    /// </summary>
+    /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
+    /// <typeparam name="TValue">The parameter value type.</typeparam>
+    /// <param name="property">
+    /// The compatible styled property from the previous generated descriptor manifest,
+    /// or <see langword="null"/> when a new property must be registered.
+    /// </param>
+    /// <param name="name">The parameter and styled property name.</param>
+    /// <param name="defaultValue">The current optional default value.</param>
+    /// <param name="parameterBinding">The current parameter binding direction.</param>
+    /// <param name="changed">
+    /// An optional callback used when a new property is registered. A reused property
+    /// retains its existing class handler.
+    /// </param>
+    /// <returns>A new parameter descriptor around the compatible property.</returns>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static Parameter<TOwner, TValue> RecreateForHotReload<TOwner, TValue>(
+        StyledProperty<TValue>? property,
+        string name,
+        Optional<TValue> defaultValue = default,
+        ParameterBinding parameterBinding = ParameterBinding.In,
+        Action<TOwner, AvaloniaPropertyChangedEventArgs>? changed = null)
+        where TOwner : AkburaControl
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (property == null)
+        {
+            return Create(
+                name,
+                defaultValue,
+                parameterBinding,
+                changed);
+        }
+
+        if (!string.Equals(property.Name, name, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"Property '{property.Name}' cannot be reused for parameter '{name}'.",
+                nameof(property));
+        }
+
+        var bindingMode = parameterBinding.ToBindingMode();
+
+        property.Unregister(typeof(TOwner));
+        property.OverrideMetadata<TOwner>(
+            new StyledPropertyMetadata<TValue>(
+                defaultValue.HasValue
+                    ? defaultValue.Value
+                    : default!,
+                defaultBindingMode: bindingMode));
+
+        // The class handler belongs to the property identity. Registering it again
+        // would invoke both the old and new callbacks after every value change.
+        return new(property, parameterBinding, defaultValue);
+    }
+
+    /// <summary>
     /// Creates a readonly component parameter backed by an Avalonia direct property.
     /// </summary>
     /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
@@ -119,6 +181,45 @@ public abstract class Parameter
             name,
             getter);
 #pragma warning restore AVP1001 // The same AvaloniaProperty should not be registered twice
+
+        return new ReadOnlyParameter<TOwner, TValue>(property);
+    }
+
+    /// <summary>
+    /// Recreates a readonly component parameter for Hot Reload while preserving a
+    /// compatible Avalonia direct property registration.
+    /// </summary>
+    /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
+    /// <typeparam name="TValue">The parameter value type.</typeparam>
+    /// <param name="property">
+    /// The compatible direct property from the previous generated descriptor manifest,
+    /// or <see langword="null"/> when a new property must be registered.
+    /// </param>
+    /// <param name="name">The parameter and direct property name.</param>
+    /// <param name="getter">Reads the per-component value when registering a new property.</param>
+    /// <returns>A new readonly parameter descriptor around the compatible property.</returns>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static ReadOnlyParameter<TOwner, TValue> RecreateReadOnlyForHotReload<TOwner, TValue>(
+        DirectProperty<TOwner, TValue>? property,
+        string name,
+        Func<TOwner, TValue> getter)
+        where TOwner : AkburaControl
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(getter);
+
+        if (property == null)
+        {
+            return CreateReadOnly(name, getter);
+        }
+
+        if (!string.Equals(property.Name, name, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"Property '{property.Name}' cannot be reused for parameter '{name}'.",
+                nameof(property));
+        }
 
         return new ReadOnlyParameter<TOwner, TValue>(property);
     }

@@ -33,62 +33,49 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.WriteLine();
         WriteServiceArray(plan.Services.AsSpan());
         _writer.WriteLine();
-        WriteStateArray(plan.States.AsSpan());
+        WriteStateCache(plan.States.AsSpan());
         _writer.WriteLine();
-        WriteGetters(!plan.States.IsDefaultOrEmpty);
+        WriteGetters();
+    }
+
+    public void WriteHotReloadAssignments(in ComponentMemberPlan plan)
+    {
+        WriteArrayAssignment(
+            "s_parameters",
+            plan.Parameters.AsSpan());
+        _writer.WriteLine();
+        WriteArrayAssignment(
+            "s_commands",
+            plan.Commands.AsSpan());
+        _writer.WriteLine();
+        WriteArrayAssignment(
+            "s_services",
+            plan.Services.AsSpan());
     }
 
     private void WriteParameterArray(ReadOnlySpan<ComponentParameterPlan> parameters)
     {
         WriteStaticArrayStart(ParameterType, "s_parameters");
-
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            ref readonly var parameter = ref parameters[i];
-            _valueWriter.WriteIdentifier(parameter.Name);
-            _writer.WriteLine("Property,");
-        }
-
+        WriteDescriptorNames(parameters);
         WriteArrayEnd();
     }
 
     private void WriteCommandArray(ReadOnlySpan<ComponentCommandPlan> commands)
     {
         WriteStaticArrayStart(CommandType, "s_commands");
-
-        for (var i = 0; i < commands.Length; i++)
-        {
-            ref readonly var command = ref commands[i];
-            _valueWriter.WriteIdentifier(command.Name);
-            _writer.WriteLine("Property,");
-        }
-
+        WriteDescriptorNames(commands);
         WriteArrayEnd();
     }
 
     private void WriteServiceArray(ReadOnlySpan<ComponentInjectServicePlan> services)
     {
         WriteStaticArrayStart(ServiceType, "s_services");
-
-        for (var i = 0; i < services.Length; i++)
-        {
-            ref readonly var service = ref services[i];
-            _valueWriter.WriteIdentifier(service.Name);
-            _writer.WriteLine("Property,");
-        }
-
+        WriteDescriptorNames(services);
         WriteArrayEnd();
     }
 
-    private void WriteStateArray(ReadOnlySpan<ComponentStatePlan> states)
+    private void WriteStateCache(ReadOnlySpan<ComponentStatePlan> states)
     {
-        if (states.IsEmpty)
-        {
-            WriteStaticArrayStart(StateType, "s_states");
-            WriteArrayEnd();
-            return;
-        }
-
         _writer.Write("private global::System.Collections.Immutable.ImmutableArray<");
         _writer.Write(StateType);
         _writer.WriteLine("> __states;");
@@ -108,7 +95,9 @@ internal readonly ref struct DescriptorArrayWriter
         for (var i = 0; i < states.Length; i++)
         {
             ref readonly var state = ref states[i];
-            GeneratedMemberNameWriter.WriteStateAccessor(_writer, state.Id);
+            GeneratedMemberNameWriter.WriteStateAccessor(
+                _writer,
+                state.GeneratedName);
             _writer.WriteLine(",");
         }
 
@@ -122,15 +111,108 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.WriteLine("}");
     }
 
-    private void WriteStaticArrayStart(string elementType, string fieldName)
+    private void WriteStaticArrayStart(
+        string elementType,
+        string fieldName)
     {
-        _writer.Write("private static readonly global::System.Collections.Immutable.ImmutableArray<");
+        _writer.WriteLine("#if DEBUG");
+        WriteStaticArrayDeclaration(
+            elementType,
+            fieldName,
+            isReadOnly: false);
+        _writer.WriteLine("#else");
+        WriteStaticArrayDeclaration(
+            elementType,
+            fieldName,
+            isReadOnly: true);
+        _writer.WriteLine("#endif");
+        _writer.WriteLine("[");
+        _writer.CurrentIndent += _writer.TabSize;
+    }
+
+    private void WriteStaticArrayDeclaration(
+        string elementType,
+        string fieldName,
+        bool isReadOnly)
+    {
+        _writer.Write("private static ");
+
+        if (isReadOnly)
+        {
+            _writer.Write("readonly ");
+        }
+
+        _writer.Write("global::System.Collections.Immutable.ImmutableArray<");
         _writer.Write(elementType);
         _writer.Write("> ");
         _writer.Write(fieldName);
         _writer.WriteLine(" =");
+    }
+
+    private void WriteArrayAssignment(
+        string fieldName,
+        ReadOnlySpan<ComponentParameterPlan> parameters)
+    {
+        _writer.Write(fieldName);
+        _writer.WriteLine(" =");
         _writer.WriteLine("[");
         _writer.CurrentIndent += _writer.TabSize;
+        WriteDescriptorNames(parameters);
+        WriteArrayEnd();
+    }
+
+    private void WriteArrayAssignment(
+        string fieldName,
+        ReadOnlySpan<ComponentCommandPlan> commands)
+    {
+        _writer.Write(fieldName);
+        _writer.WriteLine(" =");
+        _writer.WriteLine("[");
+        _writer.CurrentIndent += _writer.TabSize;
+        WriteDescriptorNames(commands);
+        WriteArrayEnd();
+    }
+
+    private void WriteArrayAssignment(
+        string fieldName,
+        ReadOnlySpan<ComponentInjectServicePlan> services)
+    {
+        _writer.Write(fieldName);
+        _writer.WriteLine(" =");
+        _writer.WriteLine("[");
+        _writer.CurrentIndent += _writer.TabSize;
+        WriteDescriptorNames(services);
+        WriteArrayEnd();
+    }
+
+    private void WriteDescriptorNames(ReadOnlySpan<ComponentParameterPlan> parameters)
+    {
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            ref readonly var parameter = ref parameters[i];
+            WriteDescriptorName(parameter.Name);
+            _writer.WriteLine(",");
+        }
+    }
+
+    private void WriteDescriptorNames(ReadOnlySpan<ComponentCommandPlan> commands)
+    {
+        for (var i = 0; i < commands.Length; i++)
+        {
+            ref readonly var command = ref commands[i];
+            WriteDescriptorName(command.Name);
+            _writer.WriteLine(",");
+        }
+    }
+
+    private void WriteDescriptorNames(ReadOnlySpan<ComponentInjectServicePlan> services)
+    {
+        for (var i = 0; i < services.Length; i++)
+        {
+            ref readonly var service = ref services[i];
+            WriteDescriptorName(service.Name);
+            _writer.WriteLine(",");
+        }
     }
 
     private void WriteArrayEnd()
@@ -139,7 +221,7 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.WriteLine("];");
     }
 
-    private void WriteGetters(bool hasStates)
+    private void WriteGetters()
     {
         WriteGetter(ParameterType, "GetParameters", "s_parameters");
         _writer.WriteLine();
@@ -147,7 +229,7 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.WriteLine();
         WriteGetter(ServiceType, "GetServices", "s_services");
         _writer.WriteLine();
-        WriteGetter(StateType, "GetStates", hasStates ? "__GetStates()" : "s_states");
+        WriteGetter(StateType, "GetStates", "__GetStates()");
     }
 
     private void WriteGetter(
@@ -164,5 +246,11 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.Write(result);
         _writer.WriteLine(";");
         _writer.CurrentIndent -= _writer.TabSize;
+    }
+
+    private void WriteDescriptorName(string name)
+    {
+        _valueWriter.WriteIdentifier(name);
+        _writer.Write("Property");
     }
 }

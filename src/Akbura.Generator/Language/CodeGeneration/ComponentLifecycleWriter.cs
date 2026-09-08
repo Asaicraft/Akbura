@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -7,6 +7,9 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal readonly ref struct ComponentLifecycleWriter
 {
+    internal const string HotReloadUpdateInitialValuesMethodName =
+        "__AkburaHotReloadUpdateInitialValues";
+
     private const string FallbackRootFieldName = "__generatedRoot";
 
     private readonly CodeWriter _writer;
@@ -75,6 +78,8 @@ internal readonly ref struct ComponentLifecycleWriter
             WriteFirstUpdate(plan);
             _writer.WriteLine();
             WriteUpdate(plan);
+            _writer.WriteLine();
+            WriteHotReloadUpdateInitialValues(plan);
         }
         finally
         {
@@ -196,6 +201,35 @@ internal readonly ref struct ComponentLifecycleWriter
 
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
+    }
+
+    private void WriteHotReloadUpdateInitialValues(in ComponentPlan plan)
+    {
+        _writer.WriteLine("#if DEBUG");
+        _writer.Write("private void ");
+        _writer.Write(HotReloadUpdateInitialValuesMethodName);
+        _writer.WriteLine("()");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+
+        if (!plan.Lifecycle.UsesFallbackRoot)
+        {
+            Debug.Assert(!plan.Scopes.IsDefaultOrEmpty);
+
+            ref readonly var scope = ref plan.Scopes.ItemRef(0);
+            var context = CreateComponentScopeContext(plan);
+            var scopeWriter = new ComponentScopeWriter(
+                _writer,
+                in _bindingEnvironment,
+                _sourceMap,
+                _ownerTypeName);
+
+            scopeWriter.WriteHotReloadState(plan, scope, context);
+        }
+
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        _writer.WriteLine("#endif");
     }
 
     private void WriteRenderStatements(in ComponentPlan plan)

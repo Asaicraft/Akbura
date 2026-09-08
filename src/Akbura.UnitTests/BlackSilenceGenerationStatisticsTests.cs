@@ -38,7 +38,7 @@ public sealed class BlackSilenceGenerationStatisticsTests
 
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
-        Assert.Equal(2, result.GeneratedSources.Length);
+        Assert.Equal(3, result.GeneratedSources.Length);
         Assert.Equal(2, cold.ReadSourceTextCount);
         Assert.Equal(2, cold.FullParseCount);
         Assert.Equal(0, cold.IncrementalParseCount);
@@ -94,7 +94,7 @@ public sealed class BlackSilenceGenerationStatisticsTests
         var statistics = measurement.GetSnapshot();
 
         Assert.Null(Assert.Single(updated.GetRunResult().Results).Exception);
-        Assert.Equal(2, Assert.Single(updated.GetRunResult().Results).GeneratedSources.Length);
+        Assert.Equal(3, Assert.Single(updated.GetRunResult().Results).GeneratedSources.Length);
         Assert.Equal(1, statistics.ReadSourceTextCount);
         Assert.Equal(0, statistics.FullParseCount);
         Assert.Equal(1, statistics.IncrementalParseCount);

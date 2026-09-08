@@ -1449,9 +1449,15 @@ internal static class ComponentPlanner
             }
             else if (!firstUpdateValue.IsValid && HasExpressionContent(content))
             {
-                updateValue = AddWholeContentValue(
+                var expressionValue = AddWholeContentValue(
                     operation,
                     ComponentContentValueKind.CSharpExpression);
+                updateValue = expressionValue;
+
+                if (destination.Kind == PropertyWriteKind.ComponentParameter)
+                {
+                    firstUpdateValue = expressionValue;
+                }
             }
             else if (!firstUpdateValue.IsValid && HasTextContent(content))
             {

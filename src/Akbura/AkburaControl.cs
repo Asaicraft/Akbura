@@ -442,6 +442,17 @@ public abstract class AkburaControl : Control, IComponentTree
         RequestUpdate();
     }
 
+    internal void ApplyHotReload()
+    {
+        var services = GetServices();
+        for (var index = 0; index < services.Length; index++)
+        {
+            services[index].Inject(this, _engine);
+        }
+
+        InvalidState();
+    }
+
     /// <summary>
     /// Registers one invocation of a render use hook in the current frame.
     /// </summary>

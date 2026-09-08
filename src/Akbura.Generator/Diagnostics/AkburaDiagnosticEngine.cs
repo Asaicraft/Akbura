@@ -146,7 +146,9 @@ internal static class AkburaDiagnosticEngine
                 var assembly = compilation.CSharpCompilation.GetAssemblyOrModuleSymbol(module.Reference)
                     as Microsoft.CodeAnalysis.IAssemblySymbol;
                 var identity = assembly?.Identity.ToString();
-                var referencePath = module.Reference.FilePath;
+                var referencePath =
+                    (module.Reference as Microsoft.CodeAnalysis.PortableExecutableReference)?.FilePath ??
+                    module.Reference.Display;
                 if (identity == null && string.IsNullOrEmpty(referencePath))
                 {
                     throw new InvalidOperationException("The embedded diagnostic source has no module identity.");

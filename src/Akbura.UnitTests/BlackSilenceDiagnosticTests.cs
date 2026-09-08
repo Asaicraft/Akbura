@@ -38,7 +38,7 @@ public sealed class BlackSilenceDiagnosticTests
     [Theory]
     [InlineData("GlobalUsings.akbura", "using System;\r\n<object />")]
     [InlineData("GlobalUsings.akcss", "@using System;\r\n.invalid { }")]
-    public void InvalidGlobalUsings_ReportsDiagnosticsEvenWithoutGeneratedSources(string path, string source)
+    public void InvalidGlobalUsings_ReportsDiagnosticsWithoutDocumentSources(string path, string source)
     {
         var project = new DiagnosticProject();
         var file = project.File(path, source);
@@ -48,7 +48,7 @@ public sealed class BlackSilenceDiagnosticTests
         var diagnostic = Assert.Single(expected.Diagnostics);
         Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing, diagnostic.Id);
         Assert.Empty(expected.GeneratedSources);
-        Assert.Empty(actual.GeneratedSources);
+        AssertOnlyHotReloadService(actual);
         AssertSourceLocations(file, expected.Diagnostics);
         AssertDiagnosticParity(expected.Diagnostics, actual.Diagnostics);
     }
@@ -334,7 +334,103 @@ public sealed class BlackSilenceDiagnosticTests
     }
 
     [Fact]
-    public void FixingGlobalUsingsDiagnostic_DoesNotRequireAnyGeneratedSource()
+    public void TextEdit_WithCompilationProjectReference_PreservesReferencedAkcssModules()
+    {
+        const string referencedStylesSource =
+            "[assembly: global::Akbura.CompilerAnotations.AkcssModuleReferenceAttribute(" +
+            "typeof(global::Library.GeneratedStyles))]\r\n" +
+            "namespace Library;\r\n" +
+            "[global::Akbura.CompilerAnotations.AkcssModuleAttribute(" +
+            "\"Styles.akcss\", MetadataName = \"Library.Styles.akcss\", FormatVersion = 4)]\r\n" +
+            "public static class GeneratedStyles\r\n" +
+            "{\r\n" +
+            "    public static readonly global::System.Collections.Immutable.ImmutableArray<\r\n" +
+            "        global::Akbura.Akcss.AkcssStyle> Styles = [];\r\n" +
+            "\r\n" +
+            "    [global::Akbura.CompilerAnotations.AkcssSymbolAttribute(" +
+            "Name = \"library-padded\", MetadataName = \"Border.library-padded\", " +
+            "Kind = global::Akbura.CompilerAnotations.AkcssSymbolKind.Utility, " +
+            "TargetType = typeof(global::Avalonia.Controls.Border), RuntimeStyleIndex = 0)]\r\n" +
+            "    public static class __AkcssMetadata_0 { }\r\n" +
+            "}\r\n";
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var references = SymbolTests.CreateAvaloniaReferences();
+        var library = CSharpCompilation.Create(
+            "ReferencedStyles",
+            [CSharpSyntaxTree.ParseText(referencedStylesSource, parseOptions)],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var image = new MemoryStream();
+        var emitResult = library.Emit(image);
+
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+
+        var project = new DiagnosticProject();
+        var styles = project.File(
+            "Page.akcss",
+            "@using Avalonia.Controls;\r\n" +
+            "@using Library.Styles.akcss;\r\n" +
+            "@utilities { Border.page-card { @apply library-padded; } }");
+        var overview = project.File(
+            "OverviewPage.akbura",
+            "using Avalonia.Controls;\r\n" +
+            "using Library.Styles.akcss;\r\n" +
+            "using Demo.Page.akcss;\r\n" +
+            "<StackPanel><TextBlock Text=\"Build Avalonia interfaces with C#\" />" +
+            "<Border page-card library-padded /></StackPanel>");
+        var peReference = MetadataReference.CreateFromImage(image.ToArray());
+        var initialCompilation = project.Compilation.AddReferences(peReference);
+        var initial = RunState(
+            project,
+            CreateDriver(project, new AkburaBlackSilenceGenerator(), styles, overview),
+            initialCompilation);
+
+        Assert.Empty(initial.Result.Diagnostics);
+        var initialOverviewSource = Assert.Single(
+            initial.Result.GeneratedSources,
+            static source => source.SourceText.ToString().Contains(
+                "partial class OverviewPage",
+                StringComparison.Ordinal));
+
+        var edited = overview.Replace(
+            "Build Avalonia interfaces with C#",
+            "Build Avalonia interfaces with C# Hot reload");
+        var compilationReference = library.ToMetadataReference();
+        var updatedCompilation = project.Compilation.AddReferences(compilationReference);
+
+        Assert.IsAssignableFrom<CompilationReference>(compilationReference);
+        Assert.NotNull(updatedCompilation.GetAssemblyOrModuleSymbol(compilationReference));
+
+        var updated = RunState(
+            project,
+            initial.Driver.ReplaceAdditionalText(overview, edited),
+            updatedCompilation);
+
+        Assert.Empty(updated.Result.Diagnostics);
+        var updatedOverviewSource = Assert.Single(
+            updated.Result.GeneratedSources,
+            static source => source.SourceText.ToString().Contains(
+                "partial class OverviewPage",
+                StringComparison.Ordinal));
+        var updatedOverviewText = updatedOverviewSource.SourceText.ToString();
+
+        Assert.NotEqual(
+            initialOverviewSource.SourceText.ToString(),
+            updatedOverviewText);
+        Assert.Contains(
+            "\"Build Avalonia interfaces with C# Hot reload\"",
+            updatedOverviewText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private void __AkburaHotReloadUpdateInitialValues()",
+            updatedOverviewText,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FixingGlobalUsingsDiagnostic_DoesNotRequireDocumentSources()
     {
         var project = new DiagnosticProject();
         var invalid = project.File("GlobalUsings.akcss", "@using System;\r\n.invalid { }");
@@ -342,11 +438,11 @@ public sealed class BlackSilenceDiagnosticTests
         var initial = RunState(project, CreateDriver(project, new AkburaBlackSilenceGenerator(), invalid));
         var initialSnapshot = GetSnapshot(initial);
         Assert.NotEmpty(initial.Result.Diagnostics);
-        Assert.Empty(initial.Result.GeneratedSources);
+        AssertOnlyHotReloadService(initial.Result);
         var updated = RunState(project, initial.Driver.ReplaceAdditionalText(invalid, valid));
 
         Assert.Empty(updated.Result.Diagnostics);
-        Assert.Empty(updated.Result.GeneratedSources);
+        AssertOnlyHotReloadService(updated.Result);
         Assert.NotSame(initialSnapshot.DiagnosticEntries[invalid.Path], GetSnapshot(updated).DiagnosticEntries[valid.Path]);
         AssertFreshParity(project, updated, valid);
     }
@@ -525,6 +621,14 @@ public sealed class BlackSilenceDiagnosticTests
         Assert.Null(result.Exception);
         Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id is "CS8784" or "CS8785");
         return new DiagnosticRun(driver, result);
+    }
+
+    private static void AssertOnlyHotReloadService(
+        GeneratorRunResult result)
+    {
+        var source = Assert.Single(result.GeneratedSources);
+
+        Assert.Equal(HotReloadServiceWriter.HintName, source.HintName);
     }
 
     private static void AssertSourceLocations(DiagnosticFile file, ImmutableArray<Diagnostic> diagnostics)

@@ -171,6 +171,46 @@ public sealed class ComponentContentPlannerTests
     }
 
     [Fact]
+    public void Create_LowersComponentParameterExpressionContentToBothPhases()
+    {
+        const string component =
+            """
+            state string code = "Initial";
+
+            <Child>
+                <Child.Code>{code}</Child.Code>
+            </Child>
+            """;
+        const string childComponent =
+            """
+            param string Code;
+            """;
+        var plan = CreatePlanWithChildComponent(
+            component,
+            childComponent,
+            "Child.akbura");
+        var content = Assert.Single(plan.PropertyContents);
+
+        Assert.Equal(
+            PropertyWriteKind.ComponentParameter,
+            content.Destination.Kind);
+        Assert.Equal(
+            ComponentContentValueKind.CSharpExpression,
+            content.FirstUpdateValue.Kind);
+        Assert.Equal(
+            ComponentContentValueKind.CSharpExpression,
+            content.UpdateValue.Kind);
+        Assert.Equal(
+            content.FirstUpdateValue.Index,
+            content.UpdateValue.Index);
+        Assert.Equal(
+            "code",
+            plan.CSharpValues[content.UpdateValue.Index]
+                .Operation
+                .ToDisplayString());
+    }
+
+    [Fact]
     public void Create_KeepsSynthesizedStringAsBoundUpdateOperation()
     {
         const string component =

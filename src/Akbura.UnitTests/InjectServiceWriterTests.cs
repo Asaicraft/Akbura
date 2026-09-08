@@ -47,13 +47,19 @@ public sealed class InjectServiceWriterTests
 
         Assert.Equal(8, codeWriter.CurrentIndent);
         var output = codeWriter.GetText().ToString();
+        var requiredName = plan.Services.ItemRef(0).GeneratedName;
+        var optionalName = plan.Services.ItemRef(1).GeneratedName;
 
         Assert.Contains(
-            "private global::Demo.IService<string>? __service0;",
+            "private global::Demo.IService<string>? __service_" +
+            requiredName +
+            ";",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            "private global::Demo.IService<string?>? __service1;",
+            "private global::Demo.IService<string?>? __service_" +
+            optionalName +
+            ";",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -67,35 +73,47 @@ public sealed class InjectServiceWriterTests
             StringComparison.Ordinal);
         Assert.Contains("@requiredProperty =", output, StringComparison.Ordinal);
         Assert.Contains(
-            "static __owner => __owner.__service0,",
+            "__GetService_" + requiredName + ",",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            "static (__owner, __value) =>",
+            "__SetServiceValue_" + requiredName + ",",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            "__owner.__SetService0(__value),",
+            "__owner.__SetService_" + requiredName + "(__value);",
             output,
             StringComparison.Ordinal);
         Assert.Contains("isOptional: false);", output, StringComparison.Ordinal);
         Assert.Contains("isOptional: true);", output, StringComparison.Ordinal);
         Assert.Contains(
-            "SetAndRaise(@requiredProperty.AvaloniaProperty, ref __service0, value);",
+            "SetAndRaise(@requiredProperty.AvaloniaProperty, ref __service_" +
+            requiredName +
+            ", value);",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
             "public global::Demo.IService<string> @required",
             output,
             StringComparison.Ordinal);
-        Assert.Contains("get => __service0!;", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "get => __service_" + requiredName + "!;",
+            output,
+            StringComparison.Ordinal);
         Assert.Contains(
             "public global::Demo.IService<string?>? optional",
             output,
             StringComparison.Ordinal);
-        Assert.Contains("get => __service1;", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("get => __service1!;", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("__service_required", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "get => __service_" + optionalName + ";",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "get => __service_" + optionalName + "!;",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("__service0", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("__service1", output, StringComparison.Ordinal);
 
         AssertGeneratedMembersCompile(output);
     }

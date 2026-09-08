@@ -1,4 +1,4 @@
-﻿using Akbura.Language.CodeGeneration;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -129,6 +129,163 @@ public sealed class ComponentDocumentWriterTests
                 component,
                 "Views/PlannerView.akbura"));
 
+        var diagnostics = fixture.CSharpCompilation
+            .AddSyntaxTrees(syntaxTree)
+            .GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity is
+                    DiagnosticSeverity.Warning or
+                    DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            diagnostics.Length == 0,
+            string.Join(
+                Environment.NewLine,
+                diagnostics.Select(static diagnostic => diagnostic.ToString())) +
+            Environment.NewLine +
+            generatedSource);
+    }
+
+    [Fact]
+    public void Generate_DebugWritesCompleteStructuralHotReloadContract()
+    {
+        const string componentSource =
+            """
+            using Avalonia.Controls;
+            using System.Collections.Generic;
+
+            param string Title = "Hello";
+            param IList<Control> Content;
+            inject IClock clock;
+            command void Save(string value);
+            state int count = 1;
+
+            <Border>
+                <TextBlock Text="Before" />
+            </Border>
+            """;
+        const string csharpSource =
+            """
+            namespace Demo;
+
+            public interface IClock
+            {
+            }
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(
+            componentSource,
+            csharpSource);
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            fixture.SemanticModel.GetSymbolInfo(
+                fixture.ComponentTree.GetRoot()).Symbol);
+        var generatedText = ComponentDocumentWriter.Generate(
+            component,
+            fixture.SemanticModel,
+            "Views/PlannerView.akbura",
+            new Dictionary<AkburaSyntax, string>(),
+            CancellationToken.None);
+        var generatedSource = generatedText.ToString();
+
+        Assert.Contains(
+            "private static string s_akburaAppliedDescriptorShape =",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private static string s_akburaAppliedStateShape =",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "s_akburaHotReloadProperties",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"param:Title:System.String:styled:normal\"",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"service:clock:Demo.IClock:direct\"",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"command:Save:System.String:System.Void\"",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.ComponentTree.Parameter.RecreateForHotReload",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.ComponentTree.Parameter." +
+            "RecreateReadOnlyForHotReload",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.ComponentTree.InjectService.RecreateForHotReload",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.HotReload.AkburaHotReloadRuntime.FindProperty<",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.HotReload.AkburaHotReloadRuntime." +
+            "BeginPropertyUpdate(",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "__component.__states = default;",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private void __AkburaHotReloadUpdateInitialValues()",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "private static void __AkburaHotReloadPrepare(",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "__component.__AkburaHotReloadUpdateInitialValues();",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.HotReload.AkburaHotReloadRuntime.Refresh<",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "__AkburaHotReloadPrepare);",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "internal static void __AkburaHotReloadApply()",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "public static global::Akbura.ComponentTree.Parameter<",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "public static readonly global::Akbura.ComponentTree.Parameter<",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "__state0",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "__service0",
+            generatedSource,
+            StringComparison.Ordinal);
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            generatedText,
+            CSharpParseOptions.Default
+                .WithLanguageVersion(LanguageVersion.Preview)
+                .WithPreprocessorSymbols("DEBUG"),
+            path: ComponentDocumentWriter.GetHintName(
+                component,
+                "Views/PlannerView.akbura"));
         var diagnostics = fixture.CSharpCompilation
             .AddSyntaxTrees(syntaxTree)
             .GetDiagnostics()

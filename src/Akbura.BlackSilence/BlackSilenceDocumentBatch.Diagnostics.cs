@@ -33,7 +33,7 @@ internal sealed partial class BlackSilenceDocumentBatch
 #endif
             // Generate publishes only after every source and diagnostic succeeds.
             // A failed attempt must not poison that snapshot or become silent.
-            return new BlackSilenceDocumentBatch([], [], [],
+            return new BlackSilenceDocumentBatch([], [], [], [],
             [
                 new AkburaDiagnosticRecord
                 {

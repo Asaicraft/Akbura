@@ -28,7 +28,10 @@ public sealed class ParameterWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Contains("\"Title\",\r\n", output, StringComparison.Ordinal);
-        Assert.Contains("default,\r\n", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "__defaultValue = default;",
+            output,
+            StringComparison.Ordinal);
         Assert.Contains(
             "get => GetValue(TitleProperty.AvaloniaProperty);",
             output,
@@ -135,7 +138,7 @@ public sealed class ParameterWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Equal(
-            2,
+            3,
             CountOccurrences(output, "__OnContentChanged"));
         Assert.Contains(
             "LogicalChildren.Remove(__oldContent);",
@@ -158,11 +161,13 @@ public sealed class ParameterWriterTests
             "param IList<Control> Content;");
 
         var output = Write(fixture, parameterIndex: 1);
+        var generatedName =
+            fixture.Plan.Parameters.ItemRef(1).GeneratedName;
 
         Assert.Contains(
             "private readonly global::System.Collections.ObjectModel." +
             "ObservableCollection<global::Avalonia.Controls.Control> " +
-            "__collection1 = [];",
+            "__collection_" + generatedName + " = [];",
             output,
             StringComparison.Ordinal);
 
@@ -174,7 +179,7 @@ public sealed class ParameterWriterTests
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "static __owner => __owner.Content);",
+            "__GetCollection_" + generatedName + ");",
             output,
             StringComparison.Ordinal);
 
@@ -188,16 +193,17 @@ public sealed class ParameterWriterTests
             1,
             CountOccurrences(
                 output,
-                "__collection1.CollectionChanged += " +
-                "__OnContentCollectionChanged1;"));
+                "__GetCollectionBacking_" + generatedName +
+                "().CollectionChanged += " +
+                "__OnContentCollectionChanged_" + generatedName + ";"));
 
         Assert.Contains(
-            "if (!__contentSubscribed1)",
+            "if (!__contentSubscribed_" + generatedName + ")",
             output,
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "__contentSubscribed1 = true;",
+            "__contentSubscribed_" + generatedName + " = true;",
             output,
             StringComparison.Ordinal);
     }
@@ -212,15 +218,19 @@ public sealed class ParameterWriterTests
             "param IList<Control> Content;");
 
         var output = Write(fixture, parameterIndex: 0);
+        var generatedName =
+            fixture.Plan.Parameters.ItemRef(0).GeneratedName;
 
         Assert.Contains(
             "private readonly global::System.Collections.Generic.List<" +
             "global::Avalonia.Controls.Control> " +
-            "__contentLogicalChildren0 = [];",
+            "__contentLogicalChildren_" + generatedName + " = [];",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            "private void __SynchronizeContentLogicalChildren0()",
+            "private void __SynchronizeContentLogicalChildren_" +
+            generatedName +
+            "()",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -236,7 +246,8 @@ public sealed class ParameterWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            "__contentLogicalChildren0.Add(__contentControl);",
+            "__GetContentLogicalChildren_" + generatedName +
+            "().Add(__contentControl);",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -256,6 +267,8 @@ public sealed class ParameterWriterTests
             "param List<Control> Content;");
 
         var output = Write(fixture, parameterIndex: 0);
+        var generatedName =
+            fixture.Plan.Parameters.ItemRef(0).GeneratedName;
 
         Assert.DoesNotContain(
             "CollectionChanged +=",
@@ -263,12 +276,12 @@ public sealed class ParameterWriterTests
             StringComparison.Ordinal);
 
         Assert.DoesNotContain(
-            "__contentSubscribed0",
+            "__contentSubscribed_" + generatedName,
             output,
             StringComparison.Ordinal);
 
         Assert.DoesNotContain(
-            "__OnContentCollectionChanged0",
+            "__OnContentCollectionChanged_" + generatedName,
             output,
             StringComparison.Ordinal);
 
@@ -277,7 +290,8 @@ public sealed class ParameterWriterTests
             "global::Avalonia.Controls.Control __value)\r\n" +
             "{\r\n" +
             "    Content.Add(__value);\r\n" +
-            "    __SynchronizeContentLogicalChildren0();\r\n" +
+            "    __SynchronizeContentLogicalChildren_" + generatedName +
+            "();\r\n" +
             "}",
             output,
             StringComparison.Ordinal);
@@ -292,10 +306,12 @@ public sealed class ParameterWriterTests
             "param IList<string?> Items;");
 
         var output = Write(fixture, parameterIndex: 0);
+        var generatedName =
+            fixture.Plan.Parameters.ItemRef(0).GeneratedName;
 
         Assert.Contains(
             "global::System.Collections.ObjectModel.ObservableCollection<string?> " +
-            "__collection0",
+            "__collection_" + generatedName,
             output,
             StringComparison.Ordinal);
 

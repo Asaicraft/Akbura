@@ -19,9 +19,261 @@ public sealed class AkburaBlackSilenceGeneratorTests
     private const string GeneratedComponentsTrackingName = "BlackSilence.GeneratedComponents";
     private const string GeneratedExternalAkcssTrackingName = "BlackSilence.GeneratedExternalAkcss";
     private const string GeneratedInlineAkcssTrackingName = "BlackSilence.GeneratedInlineAkcss";
+    private const string GeneratedProjectSourcesTrackingName = "BlackSilence.GeneratedProjectSources";
 
     private static readonly AnalyzerConfigOptionsProvider s_emptyOptionsProvider =
         new TestAnalyzerConfigOptionsProvider(string.Empty, string.Empty);
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void GenerateSources_EmitsExactlyOneProjectHotReloadService(
+        int componentCount)
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests),
+            Guid.NewGuid().ToString("N"));
+        var files = new TestAdditionalText[componentCount];
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            files[i] = new TestAdditionalText(
+                Path.Combine(projectDirectory, "View" + i + ".akbura"),
+                SourceText.From(
+                    "using Avalonia.Controls;\r\n" +
+                    "<Border />\r\n"));
+        }
+
+        var options = new TestAnalyzerConfigOptionsProvider(
+            "Demo",
+            projectDirectory);
+        var driver = CreateDriver(options, files);
+
+        driver = driver.RunGenerators(CreateCompilation(string.Empty));
+
+        var result = Assert.Single(driver.GetRunResult().Results);
+        var service = GetHotReloadService(result);
+
+        Assert.Null(result.Exception);
+        Assert.Equal(
+            componentCount,
+            result.GeneratedSources.Count(static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Component.",
+                    StringComparison.Ordinal)));
+        Assert.Equal(componentCount + 1, result.GeneratedSources.Length);
+        Assert.Equal(
+            IncrementalStepRunReason.New,
+            Assert.Single(
+                GetOutputReasons(
+                    driver,
+                    GeneratedProjectSourcesTrackingName)));
+
+        var serviceText = service.SourceText.ToString();
+        for (var i = 0; i < componentCount; i++)
+        {
+            Assert.Contains(
+                "global::Demo.View" + i + ".__AkburaHotReloadApply();",
+                serviceText,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void GenerateSources_DebugCompilationRegistersHotReloadService()
+    {
+        var driver = CreateDebugDriver(s_emptyOptionsProvider);
+        var compilation = CreateHotReloadCompilation();
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generatorDiagnostics);
+
+        var result = Assert.Single(driver.GetRunResult().Results);
+        GetHotReloadService(result);
+
+        Assert.Null(result.Exception);
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            outputCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity is DiagnosticSeverity.Warning or
+                    DiagnosticSeverity.Error);
+
+        var handlerType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            outputCompilation.GetTypeByMetadataName(
+                "Akbura.Generated." +
+                HotReloadServiceWriter.GetHandlerTypeName(
+                    compilation.AssemblyName!)));
+        var handlerAttribute = Assert.Single(
+            outputCompilation.Assembly.GetAttributes(),
+            static attribute =>
+                attribute.AttributeClass?.ToDisplayString() ==
+                "System.Reflection.Metadata.MetadataUpdateHandlerAttribute");
+        var registeredType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            Assert.Single(handlerAttribute.ConstructorArguments).Value);
+
+        Assert.True(
+            SymbolEqualityComparer.Default.Equals(
+                handlerType,
+                registeredType));
+    }
+
+    [Fact]
+    public void GenerateSources_DebugCompilationLinksComponentToHotReloadService()
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests),
+            Guid.NewGuid().ToString("N"));
+        var component = new TestAdditionalText(
+            Path.Combine(
+                projectDirectory,
+                "Components",
+                "Preview.akbura"),
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "<Border />\r\n"));
+        var options = new TestAnalyzerConfigOptionsProvider(
+            "Demo",
+            projectDirectory);
+        var driver = CreateDebugDriver(options, component);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            CreateCompilation(string.Empty),
+            out var outputCompilation,
+            out _);
+
+        AssertGeneratedCompilation(driver, outputCompilation);
+
+        var result = Assert.Single(driver.GetRunResult().Results);
+        var componentSource = Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Component.",
+                    StringComparison.Ordinal));
+        var serviceSource = GetHotReloadService(result);
+
+        Assert.Contains(
+            "internal static void __AkburaHotReloadApply()",
+            componentSource.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Demo.Components.Preview.__AkburaHotReloadApply();",
+            serviceSource.SourceText.ToString(),
+            StringComparison.Ordinal);
+
+        var componentType = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            outputCompilation.GetTypeByMetadataName(
+                "Demo.Components.Preview"));
+        var applyMethod = Assert.Single(
+            componentType.GetMembers("__AkburaHotReloadApply")
+                .OfType<IMethodSymbol>());
+
+        Assert.True(applyMethod.IsStatic);
+        Assert.Equal(Accessibility.Internal, applyMethod.DeclaredAccessibility);
+        Assert.True(applyMethod.ReturnsVoid);
+        Assert.Empty(applyMethod.Parameters);
+    }
+
+    [Fact]
+    public void GenerateSources_AddingAndRemovingComponentsUpdatesHotReloadService()
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests),
+            Guid.NewGuid().ToString("N"));
+        var options = new TestAnalyzerConfigOptionsProvider(
+            "Demo",
+            projectDirectory);
+        var first = new TestAdditionalText(
+            Path.Combine(projectDirectory, "First.akbura"),
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "<Border />\r\n"));
+        var second = new TestAdditionalText(
+            Path.Combine(projectDirectory, "Second.akbura"),
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "<Border />\r\n"));
+        var compilation = CreateCompilation(string.Empty);
+        var driver = CreateDriver(options, first);
+
+        driver = driver.RunGenerators(compilation);
+        var initialText = GetHotReloadService(
+            Assert.Single(driver.GetRunResult().Results))
+            .SourceText
+            .ToString();
+
+        Assert.Contains(
+            "global::Demo.First.__AkburaHotReloadApply();",
+            initialText,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "global::Demo.Second.__AkburaHotReloadApply();",
+            initialText,
+            StringComparison.Ordinal);
+
+        driver = driver.AddAdditionalTexts([second]);
+        driver = driver.RunGenerators(compilation);
+        var addedText = GetHotReloadService(
+            Assert.Single(driver.GetRunResult().Results))
+            .SourceText
+            .ToString();
+
+        Assert.Contains(
+            "global::Demo.First.__AkburaHotReloadApply();",
+            addedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Demo.Second.__AkburaHotReloadApply();",
+            addedText,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            IncrementalStepRunReason.Modified,
+            Assert.Single(
+                GetOutputReasons(
+                    driver,
+                    GeneratedProjectSourcesTrackingName)));
+
+        driver = driver.RemoveAdditionalTexts([first]);
+        driver = driver.RunGenerators(compilation);
+        var removedResult = Assert.Single(driver.GetRunResult().Results);
+        var removedText = GetHotReloadService(removedResult)
+            .SourceText
+            .ToString();
+
+        Assert.DoesNotContain(
+            "global::Demo.First.__AkburaHotReloadApply();",
+            removedText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Demo.Second.__AkburaHotReloadApply();",
+            removedText,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            IncrementalStepRunReason.Modified,
+            Assert.Single(
+                GetOutputReasons(
+                    driver,
+                    GeneratedProjectSourcesTrackingName)));
+
+        var fresh = CreateDriver(options, second)
+            .RunGenerators(compilation);
+        var freshText = GetHotReloadService(
+            Assert.Single(fresh.GetRunResult().Results))
+            .SourceText
+            .ToString();
+
+        Assert.Equal(freshText, removedText);
+    }
 
     [Fact]
     public void UpdatingOneAdditionalFile_ReparsesOnlyThatFile()
@@ -298,7 +550,8 @@ public sealed class AkburaBlackSilenceGeneratorTests
         var result = Assert.Single(driver.GetRunResult().Results);
 
         Assert.Null(result.Exception);
-        Assert.Equal(3, result.GeneratedSources.Length);
+        Assert.Equal(4, result.GeneratedSources.Length);
+        GetHotReloadService(result);
 
         Assert.DoesNotContain(
             generatorDiagnostics,
@@ -466,7 +719,10 @@ public sealed class AkburaBlackSilenceGeneratorTests
         Assert.Equal(1, file.ReadCount);
         Assert.Equal(IncrementalStepRunReason.Cached, Assert.Single(GetOutputReasons(driver, SourceTextsTrackingName)));
 
-        var generatedSource = Assert.Single(Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var generatedSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            static source =>
+                source.HintName != HotReloadServiceWriter.HintName);
         var generatedText = generatedSource.SourceText.ToString();
 
         Assert.Contains("namespace " + rootNamespace + ".Generated", generatedText, StringComparison.Ordinal);
@@ -523,13 +779,21 @@ public sealed class AkburaBlackSilenceGeneratorTests
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var initialCompilation, out _);
         AssertGeneratedCompilation(driver, initialCompilation);
 
-        var initialSources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
+        var initialResult = Assert.Single(driver.GetRunResult().Results);
+        var initialSources = initialResult.GeneratedSources;
 
-        Assert.Equal(componentCount * 3, initialSources.Length);
+        GetHotReloadService(initialResult);
+        Assert.Equal(componentCount * 3 + 1, initialSources.Length);
         Assert.Equal(initialSources.Length, initialSources.Select(static source => source.HintName).Distinct().Count());
         Assert.Equal(componentCount, GetOutputReasons(driver, GeneratedComponentsTrackingName).Length);
         Assert.Equal(componentCount, GetOutputReasons(driver, GeneratedExternalAkcssTrackingName).Length);
         Assert.Equal(componentCount, GetOutputReasons(driver, GeneratedInlineAkcssTrackingName).Length);
+        Assert.Equal(
+            IncrementalStepRunReason.New,
+            Assert.Single(
+                GetOutputReasons(
+                    driver,
+                    GeneratedProjectSourcesTrackingName)));
 
         var changedCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
             "internal sealed class Unrelated { }",
@@ -551,6 +815,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
         Assert.All(GetOutputReasons(driver, GeneratedComponentsTrackingName), AssertReused);
         Assert.All(GetOutputReasons(driver, GeneratedExternalAkcssTrackingName), AssertReused);
         Assert.All(GetOutputReasons(driver, GeneratedInlineAkcssTrackingName), AssertReused);
+        Assert.All(GetOutputReasons(driver, GeneratedProjectSourcesTrackingName), AssertReused);
         Assert.All(files, static file => Assert.Equal(1, file.ReadCount));
     }
 
@@ -573,7 +838,15 @@ public sealed class AkburaBlackSilenceGeneratorTests
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out _);
         AssertGeneratedCompilation(driver, outputCompilation);
 
-        Assert.Single(Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        var generatedSources = result.GeneratedSources;
+
+        Assert.Equal(2, generatedSources.Length);
+        GetHotReloadService(result);
+        Assert.Single(
+            generatedSources,
+            static source =>
+                source.HintName != HotReloadServiceWriter.HintName);
         Assert.Equal(1, file.ReadCount);
     }
 
@@ -655,7 +928,11 @@ public sealed class AkburaBlackSilenceGeneratorTests
 
         var sources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
 
-        Assert.Equal(4, sources.Length);
+        Assert.Equal(5, sources.Length);
+        Assert.Single(
+            sources,
+            static source =>
+                source.HintName == HotReloadServiceWriter.HintName);
         Assert.Contains(sources, static source => source.SourceText.ToString().Contains(
             "global::Akbura.Hooks.EffectHooks.useEffect(",
             StringComparison.Ordinal));
@@ -700,6 +977,57 @@ public sealed class AkburaBlackSilenceGeneratorTests
             driverOptions: new GeneratorDriverOptions(
                 IncrementalGeneratorOutputKind.None,
                 trackIncrementalGeneratorSteps: true));
+    }
+
+    private static GeneratorDriver CreateDebugDriver(
+        AnalyzerConfigOptionsProvider optionsProvider,
+        params AdditionalText[] additionalTexts)
+    {
+        return CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaBlackSilenceGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts: additionalTexts,
+            parseOptions: CSharpParseOptions.Default
+                .WithLanguageVersion(LanguageVersion.Preview)
+                .WithPreprocessorSymbols("DEBUG"),
+            optionsProvider: optionsProvider,
+            driverOptions: new GeneratorDriverOptions(
+                IncrementalGeneratorOutputKind.None,
+                trackIncrementalGeneratorSteps: true));
+    }
+
+    private static GeneratedSourceResult GetHotReloadService(
+        GeneratorRunResult result)
+    {
+        return Assert.Single(
+            result.GeneratedSources,
+            static source =>
+                source.HintName == HotReloadServiceWriter.HintName);
+    }
+
+    private static CSharpCompilation CreateHotReloadCompilation()
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
+            LanguageVersion.Preview);
+        var references = SymbolTests.CreateAvaloniaReferences()
+            .Where(static reference =>
+                reference.Display is not { } path ||
+                !Path.GetFileName(path).StartsWith(
+                    "Akbura",
+                    StringComparison.OrdinalIgnoreCase));
+
+        return CSharpCompilation.Create(
+            "AkburaHotReloadServiceTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(string.Empty, parseOptions),
+            ],
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
     }
 
     private static CSharpCompilation CreateCompilation(string source)

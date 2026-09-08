@@ -233,6 +233,9 @@ internal static class ComponentDocumentWriter
         writer.WriteLine();
 
         componentWriter.WriteDescriptorMembers();
+        writer.WriteLine();
+
+        componentWriter.WriteHotReloadMembers();
     }
 
     private static string GetAccessibility(ImmutableArray<INamedTypeSymbol> partialTypes)

@@ -18,6 +18,7 @@ internal sealed class ComponentWriter : IDisposable
     private readonly CodeWriter _writer;
     private readonly ComponentPlan _plan;
     private readonly ComponentMemberPlan _memberPlan;
+    private readonly ComponentHotReloadPlan _hotReloadPlan;
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
@@ -91,6 +92,7 @@ internal sealed class ComponentWriter : IDisposable
 
             _plan = plan;
             _memberPlan = memberPlan;
+            _hotReloadPlan = ComponentHotReloadPlan.Create(memberPlan);
         }
         catch
         {
@@ -107,6 +109,11 @@ internal sealed class ComponentWriter : IDisposable
     public ref readonly ComponentMemberPlan MemberPlan
     {
         get => ref _memberPlan;
+    }
+
+    public ref readonly ComponentHotReloadPlan HotReloadPlan
+    {
+        get => ref _hotReloadPlan;
     }
 
     public PooledImmutableList<ComponentElementPlan> Elements => _plan.Elements;
@@ -142,6 +149,24 @@ internal sealed class ComponentWriter : IDisposable
                 _sourceMap,
                 _ownerTypeName);
             writer.WriteDescriptors(_memberPlan);
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    public void WriteHotReloadMembers()
+    {
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = new ComponentHotReloadWriter(
+                _writer,
+                _sourceMap,
+                _ownerTypeName);
+            writer.Write(_memberPlan, _hotReloadPlan);
         }
         finally
         {

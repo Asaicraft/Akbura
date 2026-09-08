@@ -105,6 +105,117 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
     }
 
     [Fact]
+    public async Task DynamicRequiredChildParameter_FromPropertyElement_IsSetBeforeInitialization()
+    {
+        const string component =
+            """
+            var current = GetCurrentValue();
+
+            <Child>
+                <Child.Value>{current}</Child.Value>
+            </Child>
+            """;
+        const string childComponent =
+            """
+            param string Value;
+            """;
+        const string csharp =
+            """
+            using Akbura;
+            using Akbura.ComponentTree;
+            using Akbura.Engine;
+            using Avalonia;
+            using Avalonia.Controls;
+            using System.Collections.Immutable;
+
+            namespace Demo;
+
+            public partial class PlannerView : AkburaControl
+            {
+                private string _currentValue = "Initial";
+
+                public PlannerView()
+                    : base(AkburaEngine.Empty)
+                {
+                }
+
+                public Control InvokeFirstUpdate() => FirstUpdate();
+
+                public Control InvokeUpdate() => Update();
+
+                public void SetTestValue(string value)
+                {
+                    _currentValue = value;
+                }
+
+                private string GetCurrentValue() => _currentValue;
+            }
+
+            public partial class Child : AkburaControl
+            {
+                private static readonly Parameter<Child, string> s_value =
+                    Parameter.Create<Child, string>(nameof(Value));
+                private static readonly ImmutableArray<Parameter> s_parameters =
+                    [s_value];
+                private readonly Border _root = new();
+
+                public Child()
+                    : base(AkburaEngine.Empty)
+                {
+                }
+
+                public string Value
+                {
+                    get => GetValue(s_value.AvaloniaProperty);
+                    set => SetValue(s_value.AvaloniaProperty, value);
+                }
+
+                public void InitializeForTest() => base.OnInitialized();
+
+                protected override Control FirstUpdate() => _root;
+
+                protected override Control Update() => _root;
+
+                protected override ImmutableArray<Parameter> GetParameters() =>
+                    s_parameters;
+
+                protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
+
+                protected override ImmutableArray<InjectService> GetServices() => [];
+
+                protected override ImmutableArray<State> GetStates() => [];
+            }
+            """;
+        var fixture = CompileRuntimeFixture(
+            component,
+            csharp,
+            childComponent);
+
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var owner = fixture.CreateInstance("Demo.PlannerView");
+                var child = fixture.Invoke<Control>(owner, "InvokeFirstUpdate");
+
+                fixture.Invoke(child, "InitializeForTest");
+                Assert.Equal(
+                    "Initial",
+                    fixture.GetProperty<string>(child, "Value"));
+
+                fixture.Invoke(owner, "SetTestValue", "Changed");
+                var updatedChild = fixture.Invoke<Control>(owner, "InvokeUpdate");
+
+                Assert.Same(child, updatedChild);
+                Assert.Equal(
+                    "Changed",
+                    fixture.GetProperty<string>(child, "Value"));
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
     public async Task GeneratedUseHook_RunsInsideStableRuntimeFrames_WithSyntheticSelf()
     {
         const string component =

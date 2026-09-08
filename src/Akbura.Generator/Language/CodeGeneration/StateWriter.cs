@@ -33,6 +33,10 @@ internal readonly ref struct StateWriter
     {
         WriteStateInfo(plan);
         _writer.WriteLine();
+        WriteStateInfoFactory(plan);
+        _writer.WriteLine();
+        WriteStateInfoDelegate(plan);
+        _writer.WriteLine();
         WriteStateField(plan);
         _writer.WriteLine();
         WriteStateAccessor(plan);
@@ -42,14 +46,65 @@ internal readonly ref struct StateWriter
         WriteFactory(plan);
     }
 
+    public void WriteHotReloadAssignment(in ComponentStatePlan plan)
+    {
+        GeneratedMemberNameWriter.WriteStateInfoField(
+            _writer,
+            plan.GeneratedName);
+        _writer.Write(" = ");
+        GeneratedMemberNameWriter.WriteStateInfoFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("();");
+    }
+
     private void WriteStateInfo(in ComponentStatePlan plan)
     {
-        _writer.Write("private static readonly global::Akbura.ComponentTree.StateInfo<");
+        _writer.WriteLine("#if DEBUG");
+        WriteStateInfoDeclaration(plan, isReadOnly: false);
+        _writer.WriteLine("#else");
+        WriteStateInfoDeclaration(plan, isReadOnly: true);
+        _writer.WriteLine("#endif");
+        _writer.CurrentIndent += _writer.TabSize;
+        GeneratedMemberNameWriter.WriteStateInfoFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("();");
+        _writer.CurrentIndent -= _writer.TabSize;
+    }
+
+    private void WriteStateInfoDeclaration(
+        in ComponentStatePlan plan,
+        bool isReadOnly)
+    {
+        _writer.Write("private static ");
+
+        if (isReadOnly)
+        {
+            _writer.Write("readonly ");
+        }
+
+        _writer.Write("global::Akbura.ComponentTree.StateInfo<");
         WriteValueType(plan);
         _writer.Write("> ");
-        GeneratedMemberNameWriter.WriteStateInfoField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteStateInfoField(
+            _writer,
+            plan.GeneratedName);
         _writer.WriteLine(" =");
+    }
+
+    private void WriteStateInfoFactory(in ComponentStatePlan plan)
+    {
+        _writer.Write("private static global::Akbura.ComponentTree.StateInfo<");
+        WriteValueType(plan);
+        _writer.Write("> ");
+        GeneratedMemberNameWriter.WriteStateInfoFactory(
+            _writer,
+            plan.GeneratedName);
+        _writer.WriteLine("()");
+        _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("return ");
 
         if (plan.FactoryKind == ComponentStateFactoryKind.State)
         {
@@ -59,13 +114,66 @@ internal readonly ref struct StateWriter
         }
         else
         {
-            _writer.WriteLine("new(");
+            _writer.Write("new global::Akbura.ComponentTree.StateInfo<");
+            WriteValueType(plan);
+            _writer.WriteLine(">(");
         }
 
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteStringLiteral(plan.Name);
         _writer.WriteLine(",");
-        _writer.WriteLine("static __owner =>");
+
+        if (plan.FactoryKind == ComponentStateFactoryKind.State)
+        {
+            GeneratedMemberNameWriter.WriteStateInfoStateFactory(
+                _writer,
+                plan.GeneratedName);
+        }
+        else
+        {
+            GeneratedMemberNameWriter.WriteStateInfoValueFactory(
+                _writer,
+                plan.GeneratedName);
+        }
+
+        _writer.WriteLine(");");
+        _writer.CurrentIndent -= _writer.TabSize * 2;
+        _writer.WriteLine("}");
+    }
+
+    private void WriteStateInfoDelegate(in ComponentStatePlan plan)
+    {
+        _writer.Write("private static ");
+
+        if (plan.FactoryKind == ComponentStateFactoryKind.State)
+        {
+            _writer.Write("global::Akbura.ComponentTree.State<");
+            WriteValueType(plan);
+            _writer.Write(">");
+        }
+        else
+        {
+            WriteValueType(plan);
+        }
+
+        _writer.Write(" ");
+
+        if (plan.FactoryKind == ComponentStateFactoryKind.State)
+        {
+            GeneratedMemberNameWriter.WriteStateInfoStateFactory(
+                _writer,
+                plan.GeneratedName);
+        }
+        else
+        {
+            GeneratedMemberNameWriter.WriteStateInfoValueFactory(
+                _writer,
+                plan.GeneratedName);
+        }
+
+        _writer.WriteLine("(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("global::Akbura.AkburaControl __owner) =>");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("((");
         _writer.Write(_ownerTypeName);
@@ -73,15 +181,19 @@ internal readonly ref struct StateWriter
 
         if (plan.FactoryKind == ComponentStateFactoryKind.State)
         {
-            GeneratedMemberNameWriter.WriteStateFactory(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteStateFactory(
+                _writer,
+                plan.GeneratedName);
         }
         else
         {
-            GeneratedMemberNameWriter.WriteStateValueFactory(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteStateValueFactory(
+                _writer,
+                plan.GeneratedName);
         }
 
-        _writer.WriteLine("());");
-        _writer.CurrentIndent -= _writer.TabSize * 3;
+        _writer.WriteLine("();");
+        _writer.CurrentIndent -= _writer.TabSize * 2;
     }
 
     private void WriteStateField(in ComponentStatePlan plan)
@@ -89,7 +201,9 @@ internal readonly ref struct StateWriter
         _writer.Write("private global::Akbura.ComponentTree.State<");
         WriteValueType(plan);
         _writer.Write(">? ");
-        GeneratedMemberNameWriter.WriteStateField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteStateField(
+            _writer,
+            plan.GeneratedName);
         _writer.WriteLine(";");
     }
 
@@ -98,12 +212,18 @@ internal readonly ref struct StateWriter
         _writer.Write("private global::Akbura.ComponentTree.State<");
         WriteValueType(plan);
         _writer.Write("> ");
-        GeneratedMemberNameWriter.WriteStateAccessor(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteStateAccessor(
+            _writer,
+            plan.GeneratedName);
         _writer.WriteLine(" =>");
         _writer.CurrentIndent += _writer.TabSize;
-        GeneratedMemberNameWriter.WriteStateField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteStateField(
+            _writer,
+            plan.GeneratedName);
         _writer.Write(" ??= CreateState(");
-        GeneratedMemberNameWriter.WriteStateInfoField(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteStateInfoField(
+            _writer,
+            plan.GeneratedName);
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;
     }
@@ -118,13 +238,17 @@ internal readonly ref struct StateWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("get => ");
-        GeneratedMemberNameWriter.WriteStateAccessor(_writer, plan.Id);
+        GeneratedMemberNameWriter.WriteStateAccessor(
+            _writer,
+            plan.GeneratedName);
         _writer.WriteLine(".Value;");
 
         if (!plan.IsReadOnly)
         {
             _writer.Write("set => ");
-            GeneratedMemberNameWriter.WriteStateAccessor(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteStateAccessor(
+                _writer,
+                plan.GeneratedName);
             _writer.WriteLine(".Value = value;");
         }
 
@@ -151,11 +275,15 @@ internal readonly ref struct StateWriter
 
         if (plan.FactoryKind == ComponentStateFactoryKind.State)
         {
-            GeneratedMemberNameWriter.WriteStateFactory(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteStateFactory(
+                _writer,
+                plan.GeneratedName);
         }
         else
         {
-            GeneratedMemberNameWriter.WriteStateValueFactory(_writer, plan.Id);
+            GeneratedMemberNameWriter.WriteStateValueFactory(
+                _writer,
+                plan.GeneratedName);
         }
 
         _writer.WriteLine("()");

@@ -13,10 +13,12 @@ internal readonly ref struct PropertySubscriptionWriter
     private readonly CSharpValueWriter _valueWriter;
     private readonly PropertyReadWriter _readWriter;
     private readonly SourceMappingWriter _mappings;
+    private readonly bool _writeInlineHandlers;
 
     public PropertySubscriptionWriter(
         CodeWriter writer,
-        ComponentGenerationSourceMap sourceMap)
+        ComponentGenerationSourceMap sourceMap,
+        bool writeInlineHandlers = false)
     {
         Debug.Assert(writer != null);
         Debug.Assert(sourceMap != null);
@@ -25,6 +27,7 @@ internal readonly ref struct PropertySubscriptionWriter
         _valueWriter = new CSharpValueWriter(writer!);
         _readWriter = new PropertyReadWriter(writer!);
         _mappings = new SourceMappingWriter(writer!, sourceMap!);
+        _writeInlineHandlers = writeInlineHandlers;
     }
 
     public void WriteHandler(
@@ -77,6 +80,43 @@ internal readonly ref struct PropertySubscriptionWriter
 
                 default:
                     Debug.Fail("An invalid property observation reached code generation.");
+                    return;
+            }
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
+    }
+
+    public void WriteStructuralRegistration(
+        in ComponentElementPlan element,
+        in ComponentPropertySubscriptionPlan subscription)
+    {
+        Debug.Assert(element.UsesRuntimeStorage);
+
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            switch (subscription.Observation.Kind)
+            {
+                case PropertyObservationKind.AvaloniaProperty:
+                case PropertyObservationKind.GeneratedParameter:
+                    WriteStructuralAvaloniaRegistration(
+                        element,
+                        subscription);
+                    return;
+
+                case PropertyObservationKind.NotifyPropertyChanged:
+                    WriteStructuralNotifyPropertyChangedRegistration(
+                        element,
+                        subscription);
+                    return;
+
+                default:
+                    Debug.Fail(
+                        "An invalid structural property observation reached code generation.");
                     return;
             }
         }
@@ -139,7 +179,7 @@ internal readonly ref struct PropertySubscriptionWriter
         WriteElementReference(element);
         _writer.Write(").PropertyChanged += ");
 
-        if (!element.IsLocal)
+        if (!element.IsLocal && !_writeInlineHandlers)
         {
             WriteHandlerName(subscription.Id);
             _writer.WriteLine(";");
@@ -153,6 +193,48 @@ internal readonly ref struct PropertySubscriptionWriter
         WriteAvaloniaGuard(subscription.Observation, subscription.Id);
         WriteAvaloniaAssignment(subscription);
         CloseBlock(";");
+    }
+
+    private void WriteStructuralAvaloniaRegistration(
+        in ComponentElementPlan element,
+        in ComponentPropertySubscriptionPlan subscription)
+    {
+        var slot = ComponentHotReloadIdentity.CreatePropertySubscriptionSlot(
+            subscription.Observation);
+        WriteOwnedOperationCondition(
+            element.RuntimeStorageId,
+            slot,
+            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
+                subscription.Syntax));
+
+        _writer.Write(
+            ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.WriteLine(".ApplyClrEventOperation(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(element.RuntimeStorageId);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(slot);
+        _writer.WriteLine(",");
+        _writer.Write("(global::Avalonia.AvaloniaObject)");
+        WriteElementReference(element);
+        _writer.WriteLine(",");
+        _writer.WriteLine("typeof(global::Avalonia.AvaloniaObject),");
+        _writer.WriteLine("\"PropertyChanged\",");
+        _writer.Write(
+            "(global::System.EventHandler<" +
+            "global::Avalonia.AvaloniaPropertyChangedEventArgs>)((_, ");
+        WriteChangeName(subscription.Id);
+        _writer.WriteLine(") =>");
+        OpenBlock();
+        WriteAvaloniaGuard(
+            subscription.Observation,
+            subscription.Id);
+        WriteAvaloniaAssignment(subscription);
+        CloseBlock(")");
+        _writer.WriteLine(");");
+        _writer.CurrentIndent -= _writer.TabSize;
+
+        CloseBlock();
     }
 
     private void WriteNotifyPropertyChangedRegistration(
@@ -176,7 +258,7 @@ internal readonly ref struct PropertySubscriptionWriter
         WriteNotifierName(subscription.Id);
         _writer.Write(".PropertyChanged += ");
 
-        if (!element.IsLocal)
+        if (!element.IsLocal && !_writeInlineHandlers)
         {
             WriteHandlerName(subscription.Id);
             _writer.WriteLine(";");
@@ -191,6 +273,69 @@ internal readonly ref struct PropertySubscriptionWriter
         WriteNotifyPropertyChangedGuard(property, subscription.Id);
         WriteNotifyPropertyChangedAssignment(subscription, property, "__sender!");
         CloseBlock(";");
+        CloseBlock();
+    }
+
+    private void WriteStructuralNotifyPropertyChangedRegistration(
+        in ComponentElementPlan element,
+        in ComponentPropertySubscriptionPlan subscription)
+    {
+        var property = subscription.Observation.Symbol as IPropertySymbol;
+
+        if (property == null)
+        {
+            Debug.Fail(
+                "A notify-property observation must contain a CLR property.");
+            return;
+        }
+
+        _writer.Write("if (");
+        WriteElementReference(element);
+        _writer.Write(
+            " is global::System.ComponentModel.INotifyPropertyChanged ");
+        WriteNotifierName(subscription.Id);
+        _writer.WriteLine(")");
+        OpenBlock();
+
+        var slot = ComponentHotReloadIdentity.CreatePropertySubscriptionSlot(
+            subscription.Observation);
+        WriteOwnedOperationCondition(
+            element.RuntimeStorageId,
+            slot,
+            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
+                subscription.Syntax));
+
+        _writer.Write(
+            ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.WriteLine(".ApplyClrEventOperation(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(element.RuntimeStorageId);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(slot);
+        _writer.WriteLine(",");
+        WriteNotifierName(subscription.Id);
+        _writer.WriteLine(",");
+        _writer.WriteLine(
+            "typeof(global::System.ComponentModel.INotifyPropertyChanged),");
+        _writer.WriteLine("\"PropertyChanged\",");
+        _writer.Write(
+            "(global::System.ComponentModel.PropertyChangedEventHandler)" +
+            "((__sender, ");
+        WriteEventName(subscription.Id);
+        _writer.WriteLine(") =>");
+        OpenBlock();
+        WriteNotifyPropertyChangedGuard(
+            property,
+            subscription.Id);
+        WriteNotifyPropertyChangedAssignment(
+            subscription,
+            property,
+            "__sender!");
+        CloseBlock(")");
+        _writer.WriteLine(");");
+        _writer.CurrentIndent -= _writer.TabSize;
+
+        CloseBlock();
         CloseBlock();
     }
 
@@ -307,6 +452,26 @@ internal readonly ref struct PropertySubscriptionWriter
     {
         _writer.Write("__event");
         _writer.WriteIntegerLiteral(id);
+    }
+
+    private void WriteOwnedOperationCondition(
+        int ownerRuntimeId,
+        string slot,
+        string identity)
+    {
+        _writer.Write("if (");
+        _writer.Write(
+            ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.WriteLine(".ShouldApplyOwnedOperation(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(ownerRuntimeId);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(slot);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(identity);
+        _writer.WriteLine("))");
+        _writer.CurrentIndent -= _writer.TabSize;
+        OpenBlock();
     }
 
     private void OpenBlock()

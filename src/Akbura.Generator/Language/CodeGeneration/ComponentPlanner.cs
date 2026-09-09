@@ -27,7 +27,9 @@ internal static class ComponentPlanner
     public static ComponentPlan Create(
         IAkburaComponentSymbol component,
         AkburaSemanticModel semanticModel,
-        IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames)
+        IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         if (semanticModel == null)
         {
@@ -35,14 +37,21 @@ internal static class ComponentPlanner
         }
 
         var resultEnvironment = MarkupExtensionResultEnvironment.Create(semanticModel);
-        return Create(component, semanticModel, akcssModuleTypeNames, in resultEnvironment);
+        return Create(
+            component,
+            semanticModel,
+            akcssModuleTypeNames,
+            in resultEnvironment,
+            generationMode);
     }
 
     internal static ComponentPlan Create(
         IAkburaComponentSymbol component,
         AkburaSemanticModel semanticModel,
         IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
-        in MarkupExtensionResultEnvironment resultEnvironment)
+        in MarkupExtensionResultEnvironment resultEnvironment,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         if (component == null)
         {
@@ -66,7 +75,19 @@ internal static class ComponentPlanner
                 nameof(resultEnvironment));
         }
 
-        using var planner = new Planner(component, semanticModel, akcssModuleTypeNames, in resultEnvironment);
+        if (generationMode is not (
+            ComponentGenerationMode.ReleaseDirect or
+            ComponentGenerationMode.DebugStructural))
+        {
+            throw new ArgumentOutOfRangeException(nameof(generationMode));
+        }
+
+        using var planner = new Planner(
+            component,
+            semanticModel,
+            akcssModuleTypeNames,
+            in resultEnvironment,
+            generationMode);
         return planner.Create();
     }
 
@@ -78,6 +99,7 @@ internal static class ComponentPlanner
         private readonly CSharpCompilation _compilation;
         private readonly BindingWriterEnvironment _bindingEnvironment;
         private readonly MarkupExtensionResultEnvironment _resultEnvironment;
+        private readonly ComponentGenerationMode _generationMode;
         private readonly INamedTypeSymbol? _controlType;
         private readonly INamedTypeSymbol? _contentPresenterType;
         private readonly IFieldSymbol? _dataContextProperty;
@@ -110,12 +132,14 @@ internal static class ComponentPlanner
         private ImmutableArrayBuilder<BindingElementReference> _elementReferences;
         private ImmutableArrayBuilder<ComponentRenderStatementPlan> _renderStatements;
         private int _nextCachedBindingPathId;
+        private int _nextRuntimeStorageId;
 
         public Planner(
             IAkburaComponentSymbol component,
             AkburaSemanticModel semanticModel,
             IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
-            in MarkupExtensionResultEnvironment resultEnvironment)
+            in MarkupExtensionResultEnvironment resultEnvironment,
+            ComponentGenerationMode generationMode)
         {
             _component = component;
             _semanticModel = semanticModel;
@@ -123,6 +147,7 @@ internal static class ComponentPlanner
             _compilation = semanticModel.Compilation.CSharpCompilation;
             _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
             _resultEnvironment = resultEnvironment;
+            _generationMode = generationMode;
             _controlType = _compilation.GetTypeByMetadataName("Avalonia.Controls.Control");
             _contentPresenterType = _compilation.GetTypeByMetadataName(
                 "Avalonia.Controls.Presenters.ContentPresenter");
@@ -163,6 +188,7 @@ internal static class ComponentPlanner
             _elementReferences = ImmutableArrayBuilder<BindingElementReference>.Rent();
             _renderStatements = ImmutableArrayBuilder<ComponentRenderStatementPlan>.Rent();
             _nextCachedBindingPathId = 0;
+            _nextRuntimeStorageId = 0;
         }
 
         public ComponentPlan Create()
@@ -277,7 +303,9 @@ internal static class ComponentPlanner
                     element.FirstUpdateActions,
                     element.PropertyElements,
                     element.Content,
-                    elementAkcss));
+                    elementAkcss,
+                    element.ExplicitKey,
+                    element.RuntimeStorageId));
             }
 
             return elements.ToPooledImmutableList();
@@ -591,9 +619,18 @@ internal static class ComponentPlanner
             var scope = context.GetEffectiveScope();
             var nameOperation = FindNameOperation(symbol);
             elementId = _elements.Count;
-            var identifier = nameOperation?.NameSymbol is { } name
-                ? EscapeIdentifier(name.IdentifierText)
-                : "__element" + elementId.ToString(CultureInfo.InvariantCulture);
+            var explicitKey = nameOperation?.NameSymbol?.Name;
+            var usesRuntimeStorage =
+                _generationMode == ComponentGenerationMode.DebugStructural &&
+                !scope.IsLocal;
+            var runtimeStorageId = usesRuntimeStorage
+                ? _nextRuntimeStorageId++
+                : -1;
+            var identifier = usesRuntimeStorage
+                ? CreateRuntimeStorageExpression(type, runtimeStorageId)
+                : nameOperation?.NameSymbol is { } name
+                    ? EscapeIdentifier(name.IdentifierText)
+                    : "__element" + elementId.ToString(CultureInfo.InvariantCulture);
 
             _elements.Add(default);
 
@@ -706,7 +743,9 @@ internal static class ComponentPlanner
                 flags,
                 children,
                 pendingFirstUpdateActions,
-                new ComponentPlanRange(propertyElementStart, _propertyElements.Count - propertyElementStart));
+                new ComponentPlanRange(propertyElementStart, _propertyElements.Count - propertyElementStart),
+                explicitKey: explicitKey,
+                runtimeStorageId: runtimeStorageId);
             return true;
         }
 
@@ -1305,10 +1344,13 @@ internal static class ComponentPlanner
                 plan = ComponentRoutedEventPlan.CreateClrEvent(clrEvent, handlerExpression, operation.Syntax);
             }
             else if (operation.Event.RoutedEventDefinition.Symbol is { } routedEvent &&
-                routedEvent is IFieldSymbol { IsStatic: true } or RoslynPropertySymbol { IsStatic: true })
+                (routedEvent is IFieldSymbol { IsStatic: true } or
+                    RoslynPropertySymbol { IsStatic: true }) &&
+                operation.HandlerType.Symbol is ITypeSymbol handlerType)
             {
                 plan = ComponentRoutedEventPlan.CreateAvaloniaRoutedEvent(
                     routedEvent,
+                    handlerType,
                     handlerExpression,
                     operation.Syntax);
             }
@@ -1660,6 +1702,7 @@ internal static class ComponentPlanner
         private static CollectionWritePlan CreateCollectionWritePlan(IMarkupContentOperation operation)
         {
             var property = operation.Property;
+            var elementType = operation.ContentModel.AllowedChildType.Symbol as ITypeSymbol;
             Debug.Assert(property != null);
 
             if (property?.Parameter is { } parameter)
@@ -1672,7 +1715,8 @@ internal static class ComponentPlanner
 
                 return CollectionWritePlan.CreateComponentParameter(
                     parameterType,
-                    parameter.Name);
+                    parameter.Name,
+                    elementType);
             }
 
             if (property == null)
@@ -1685,7 +1729,10 @@ internal static class ComponentPlanner
 
             return !read.IsValid || collectionType == null
                 ? default
-                : CollectionWritePlan.CreateProperty(read, collectionType);
+                : CollectionWritePlan.CreateProperty(
+                    read,
+                    collectionType,
+                    elementType);
         }
 
         private static ITypeSymbol? GetCollectionType(
@@ -1806,13 +1853,20 @@ internal static class ComponentPlanner
                 return default;
             }
 
-            var binding = BindingWritePlan.Create(
-                in _bindingEnvironment,
-                extension,
-                scopeId,
-                GetNameScopeCapability(scopeId),
-                _elementReferences.WrittenSpan,
-                ref _nextCachedBindingPathId);
+            var binding = _generationMode == ComponentGenerationMode.DebugStructural
+                ? BindingWritePlan.CreateInline(
+                    in _bindingEnvironment,
+                    extension,
+                    scopeId,
+                    GetNameScopeCapability(scopeId),
+                    _elementReferences.WrittenSpan)
+                : BindingWritePlan.Create(
+                    in _bindingEnvironment,
+                    extension,
+                    scopeId,
+                    GetNameScopeCapability(scopeId),
+                    _elementReferences.WrittenSpan,
+                    ref _nextCachedBindingPathId);
             if (!binding.IsValid)
             {
                 return default;
@@ -1936,8 +1990,23 @@ internal static class ComponentPlanner
                 flags |= ComponentElementFlags.IsLocal |
                     ComponentElementFlags.RequiresLocalMarkupContext;
             }
+            else if (_generationMode == ComponentGenerationMode.DebugStructural)
+            {
+                flags |= ComponentElementFlags.UsesRuntimeStorage;
+            }
 
             return flags;
+        }
+
+        private static string CreateRuntimeStorageExpression(
+            ITypeSymbol type,
+            int localId)
+        {
+            return "__akburaRenderState.GetRequired<" +
+                type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
+                ">(" +
+                localId.ToString(CultureInfo.InvariantCulture) +
+                ")";
         }
 
         private bool IsImplicitConversion(ITypeSymbol type, ITypeSymbol? targetType)
@@ -2156,7 +2225,9 @@ internal static class ComponentPlanner
             ComponentPlanRange propertyWrites = default,
             ComponentPlanRange propertySubscriptions = default,
             ComponentPlanRange firstUpdateActions = default,
-            ComponentContentTargetReference content = default)
+            ComponentContentTargetReference content = default,
+            string? explicitKey = null,
+            int runtimeStorageId = -1)
         {
             Id = id;
             Syntax = syntax;
@@ -2174,6 +2245,8 @@ internal static class ComponentPlanner
             FirstUpdateActions = firstUpdateActions;
             PropertyElements = propertyElements;
             Content = content;
+            ExplicitKey = explicitKey;
+            RuntimeStorageId = runtimeStorageId;
         }
 
         public int Id { get; }
@@ -2181,6 +2254,8 @@ internal static class ComponentPlanner
         public IMarkupComponentSymbol Symbol { get; }
         public ITypeSymbol Type { get; }
         public string Identifier { get; }
+        public string? ExplicitKey { get; }
+        public int RuntimeStorageId { get; }
         public int ParentId { get; }
         public int ScopeId { get; }
         public ComponentElementScopeKind ScopeKind { get; }
@@ -2216,7 +2291,9 @@ internal static class ComponentPlanner
                 propertyWrites,
                 propertySubscriptions,
                 firstUpdateActions,
-                Content);
+                Content,
+                ExplicitKey,
+                RuntimeStorageId);
         }
 
         public PendingElementPlan WithContent(ComponentContentTargetReference content)
@@ -2237,7 +2314,9 @@ internal static class ComponentPlanner
                 PropertyWrites,
                 PropertySubscriptions,
                 FirstUpdateActions,
-                content);
+                content,
+                ExplicitKey,
+                RuntimeStorageId);
         }
     }
 

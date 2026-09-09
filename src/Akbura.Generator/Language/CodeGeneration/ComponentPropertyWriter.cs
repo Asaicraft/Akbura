@@ -67,6 +67,222 @@ internal readonly ref struct ComponentPropertyWriter
         _writer.WriteLine();
     }
 
+    public bool WriteStructuralConstantValue(
+        in ComponentPlan component,
+        in ComponentPropertyWritePlan plan,
+        int ownerRuntimeId,
+        string targetExpression)
+    {
+        Debug.Assert(plan.Destination.IsValid);
+        Debug.Assert(plan.ValueKind == ComponentPropertyValueKind.Constant);
+        Debug.Assert(ownerRuntimeId >= 0);
+        Debug.Assert(!string.IsNullOrEmpty(targetExpression));
+
+        if (!plan.Destination.IsValid ||
+            plan.ValueKind != ComponentPropertyValueKind.Constant ||
+            ownerRuntimeId < 0 ||
+            string.IsNullOrEmpty(targetExpression))
+        {
+            Debug.Fail(
+                "An invalid structural constant property reached code generation.");
+            return false;
+        }
+
+        var destination = plan.Destination;
+        if (destination.Kind == PropertyWriteKind.ClrProperty &&
+            destination.ClrProperty?.GetMethod == null)
+        {
+            return false;
+        }
+
+        var methodName = destination.Kind switch
+        {
+            PropertyWriteKind.ClrProperty or
+                PropertyWriteKind.ComponentParameter or
+                PropertyWriteKind.DirectMember =>
+                "ReconcileClrValue",
+            PropertyWriteKind.AvaloniaProperty =>
+                "ReconcileAvaloniaValue",
+            _ => null,
+        };
+        if (methodName == null)
+        {
+            return false;
+        }
+
+        using var mapping = _mappings.WriteStart(plan.Syntax);
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.Write(".");
+        _writer.Write(methodName);
+        _writer.WriteLine("(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(ownerRuntimeId);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(
+            ComponentHotReloadIdentity.CreatePropertySlot(destination));
+        _writer.WriteLine(",");
+        _writer.Write(targetExpression);
+        _writer.WriteLine(",");
+
+        switch (destination.Kind)
+        {
+            case PropertyWriteKind.ClrProperty:
+                Debug.Assert(destination.ClrProperty != null);
+                WriteClrDeclaringType(destination);
+                _writer.WriteLine(",");
+                _writer.WriteStringLiteral(destination.ClrProperty!.Name);
+                _writer.WriteLine(",");
+                break;
+
+            case PropertyWriteKind.ComponentParameter:
+            case PropertyWriteKind.DirectMember:
+                Debug.Assert(!string.IsNullOrEmpty(destination.MemberName));
+                WriteClrDeclaringType(destination);
+                _writer.WriteLine(",");
+                _writer.WriteStringLiteral(destination.MemberName!);
+                _writer.WriteLine(",");
+                break;
+
+            case PropertyWriteKind.AvaloniaProperty:
+                Debug.Assert(destination.AvaloniaProperty != null);
+                var valueWriter = new CSharpValueWriter(_writer);
+                valueWriter.WriteStaticMemberReference(
+                    destination.AvaloniaProperty!);
+                _writer.WriteLine(",");
+                break;
+
+            default:
+                _writer.CurrentIndent -= _writer.TabSize;
+                Debug.Fail(
+                    "An unsupported structural constant property reached code generation.");
+                return false;
+        }
+
+        _writer.WriteStringLiteral(
+            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
+                plan.Syntax));
+        _writer.WriteLine(",");
+
+        ref readonly var value = ref GetCSharpValue(
+            component,
+            plan.PayloadIndex);
+        _valueWriter.WriteConstant(value);
+        _writer.WriteLine(");");
+        _writer.CurrentIndent -= _writer.TabSize;
+        return true;
+    }
+
+    public static bool CanWriteStructuralBindingValue(
+        in ComponentPropertyWritePlan plan)
+    {
+        return plan.Destination.HasAvaloniaPropertyTarget &&
+            plan.ValueKind is
+                ComponentPropertyValueKind.MarkupBinding or
+                ComponentPropertyValueKind.DynamicResource or
+                ComponentPropertyValueKind.BindingBaseResult;
+    }
+
+    public bool WriteStructuralBindingValue(
+        in ComponentPlan component,
+        in ComponentPropertyWritePlan plan,
+        int ownerRuntimeId,
+        string targetExpression,
+        in MarkupExtensionWriteContext context)
+    {
+        Debug.Assert(ownerRuntimeId >= 0);
+        Debug.Assert(!string.IsNullOrEmpty(targetExpression));
+
+        if (!CanWriteStructuralBindingValue(plan) ||
+            ownerRuntimeId < 0 ||
+            string.IsNullOrEmpty(targetExpression))
+        {
+            return false;
+        }
+
+        var slot = ComponentHotReloadIdentity.CreatePropertySlot(
+            plan.Destination);
+        using var mapping = _mappings.WriteStart(plan.Syntax);
+
+        _writer.Write("if (");
+        _writer.Write(
+            ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.WriteLine(".ShouldApplyOwnedOperation(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(ownerRuntimeId);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(slot);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(
+            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
+                plan.Syntax));
+        _writer.WriteLine("))");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+
+        _writer.Write(
+            ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.WriteLine(".ApplyBindingOperation(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(ownerRuntimeId);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(slot);
+        _writer.WriteLine(",");
+        _writer.Write("(global::Avalonia.AvaloniaObject)");
+        _writer.Write(targetExpression);
+        _writer.WriteLine(",");
+        var targetPropertyWriter = new MarkupTargetPropertyWriter(_writer);
+        targetPropertyWriter.Write(plan.Destination.TargetProperty);
+        _writer.WriteLine(",");
+
+        var targetContext = context.WithTarget(
+            targetExpression,
+            plan.Destination.TargetProperty);
+        var extensionWriter = new MarkupExtensionWriter(
+            _writer,
+            in _environment);
+        switch (plan.ValueKind)
+        {
+            case ComponentPropertyValueKind.MarkupBinding:
+                extensionWriter.WriteBinding(
+                    GetBinding(component, plan.PayloadIndex),
+                    targetContext);
+                break;
+
+            case ComponentPropertyValueKind.DynamicResource:
+            case ComponentPropertyValueKind.BindingBaseResult:
+                extensionWriter.Write(
+                    GetMarkupExtension(component, plan.PayloadIndex).Extension,
+                    targetContext);
+                break;
+
+            default:
+                Debug.Fail(
+                    "An unsupported structural binding reached code generation.");
+                break;
+        }
+
+        _writer.WriteLine(");");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        return true;
+    }
+
+    private void WriteClrDeclaringType(in PropertyWritePlan destination)
+    {
+        if (destination.ReceiverType == null)
+        {
+            _writer.Write("null");
+            return;
+        }
+
+        _writer.Write("typeof(");
+        var valueWriter = new CSharpValueWriter(_writer);
+        valueWriter.WriteTypeName(destination.ReceiverType);
+        _writer.Write(")");
+    }
+
     private void WriteMarkupValue(
         in ComponentPlan component,
         in ComponentPropertyWritePlan plan,

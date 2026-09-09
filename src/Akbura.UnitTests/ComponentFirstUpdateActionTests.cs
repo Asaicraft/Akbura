@@ -1,3 +1,4 @@
+using Akbura.Language;
 using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -8,6 +9,86 @@ namespace Akbura.UnitTests;
 
 public sealed class ComponentFirstUpdateActionTests
 {
+    [Fact]
+    public void DebugStructural_CommandBinding_UsesReconciledPropertyOwnership()
+    {
+        const string component =
+            """
+            using Demo;
+
+            command int Execute(int value);
+
+            <Child Execute={value => value * 2} />
+            """;
+        const string childComponent =
+            """
+            namespace Demo;
+
+            command int Execute(int value);
+            """;
+        var baseFixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var childTree = AkburaSyntaxTree.ParseText(
+            childComponent,
+            "Child.akbura");
+        var compilation = new AkburaCompilation(
+            baseFixture.CSharpCompilation,
+            [baseFixture.ComponentTree, childTree],
+            rootNamespace: "Demo");
+        var componentModel = compilation.GetSemanticModel(
+            baseFixture.ComponentTree);
+        var childModel = compilation.GetSemanticModel(childTree);
+        var componentSymbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            componentModel.GetSymbolInfo(
+                baseFixture.ComponentTree.GetRoot()).Symbol);
+        var childSymbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            childModel.GetSymbolInfo(childTree.GetRoot()).Symbol);
+        var componentGenerated = ComponentDocumentWriter.Generate(
+            componentSymbol,
+            componentModel,
+            "PlannerView.akbura",
+            new Dictionary<AkburaSyntax, string>(),
+            CancellationToken.None,
+            ComponentGenerationMode.DebugStructural);
+        var childGenerated = ComponentDocumentWriter.Generate(
+            childSymbol,
+            childModel,
+            "Child.akbura",
+            new Dictionary<AkburaSyntax, string>(),
+            CancellationToken.None,
+            ComponentGenerationMode.DebugStructural);
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview)
+            .WithPreprocessorSymbols("DEBUG");
+        var generatedTrees = new[]
+        {
+            CSharpSyntaxTree.ParseText(componentGenerated, parseOptions),
+            CSharpSyntaxTree.ParseText(childGenerated, parseOptions),
+        };
+        var diagnostics = baseFixture.CSharpCompilation
+            .AddSyntaxTrees(generatedTrees)
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity is
+                DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+            .ToArray();
+        var generatedSource = componentGenerated.ToString();
+
+        Assert.True(
+            diagnostics.Length == 0,
+            string.Join(
+                Environment.NewLine,
+                diagnostics.Select(static diagnostic => diagnostic.ToString())) +
+            Environment.NewLine +
+            generatedSource);
+        Assert.Contains(
+            ".ReconcileClrValue(",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"Execute\"",
+            generatedSource,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void CreateAndWrite_PreservesSourceOrderAndEscapesClrEventAndNameIdentifiers()
     {

@@ -13,12 +13,15 @@ internal readonly ref struct ComponentScopeWriter
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
+    private readonly ComponentGenerationMode _generationMode;
 
     public ComponentScopeWriter(
         CodeWriter writer,
         in BindingWriterEnvironment bindingEnvironment,
         ComponentGenerationSourceMap sourceMap,
-        string ownerTypeName)
+        string ownerTypeName,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         Debug.Assert(writer != null);
         Debug.Assert(sourceMap != null);
@@ -28,6 +31,7 @@ internal readonly ref struct ComponentScopeWriter
         _bindingEnvironment = bindingEnvironment;
         _sourceMap = sourceMap!;
         _ownerTypeName = ownerTypeName;
+        _generationMode = generationMode;
     }
 
     public void WriteComponentInitialState(
@@ -54,10 +58,48 @@ internal readonly ref struct ComponentScopeWriter
                 var targetExpression = element.Identifier;
                 var elementContext = context.ForElement(elementId);
 
-                WriteFirstUpdateActions(plan, elementId, elementContext);
-                WriteElementContent(plan, element, isFirstUpdate: true, elementContext);
-                WritePropertyElements(plan, element, isFirstUpdate: true, elementContext);
-                WriteSetStyles(plan, elementId, targetExpression, elementContext);
+                if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                    element.UsesRuntimeStorage)
+                {
+                    WriteStructuralOneTimeActions(
+                        plan,
+                        element,
+                        elementContext);
+                    WriteInitialNonStructuralContent(
+                        plan,
+                        element,
+                        elementContext);
+                    WriteSetStyles(
+                        plan,
+                        elementId,
+                        targetExpression,
+                        elementContext);
+                    WriteStructuralRevisionActions(
+                        plan,
+                        element,
+                        elementContext);
+                    WriteStructuralConstantContent(plan, element);
+                    WriteStructuralConnections(plan, element, elementContext);
+                }
+                else
+                {
+                    WriteFirstUpdateActions(plan, elementId, elementContext);
+                    WriteElementContent(
+                        plan,
+                        element,
+                        isFirstUpdate: true,
+                        elementContext);
+                    WritePropertyElements(
+                        plan,
+                        element,
+                        isFirstUpdate: true,
+                        elementContext);
+                    WriteSetStyles(
+                        plan,
+                        elementId,
+                        targetExpression,
+                        elementContext);
+                }
             }
 
             WriteEndInit(plan, scope);
@@ -172,6 +214,12 @@ internal readonly ref struct ComponentScopeWriter
 
         try
         {
+            if (_generationMode == ComponentGenerationMode.DebugStructural)
+            {
+                WriteStructuralHotReloadState(plan, scope, context);
+                return;
+            }
+
             for (var i = 0; i < scope.Elements.Length; i++)
             {
                 var elementId = GetScopeElementId(plan, scope, i);
@@ -183,6 +231,379 @@ internal readonly ref struct ComponentScopeWriter
         finally
         {
             _writer.CurrentIndent = indent;
+        }
+    }
+
+    private void WriteStructuralHotReloadState(
+        in ComponentPlan plan,
+        in ComponentScopePlan scope,
+        in ComponentScopeWriteContext context)
+    {
+        for (var i = 0; i < scope.Elements.Length; i++)
+        {
+            var elementId = GetScopeElementId(plan, scope, i);
+            ref readonly var element = ref plan.Elements.ItemRef(elementId);
+            if (!element.UsesRuntimeStorage)
+            {
+                continue;
+            }
+
+            var elementContext = context.ForElement(elementId);
+            _writer.Write("if (");
+            _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+            _writer.Write(".IsNew(");
+            _writer.WriteIntegerLiteral(element.RuntimeStorageId);
+            _writer.WriteLine("))");
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+            WriteStructuralOneTimeActions(
+                plan,
+                element,
+                elementContext);
+            WriteInitialNonStructuralContent(plan, element, elementContext);
+            WriteSetStyles(plan, elementId, element.Identifier, elementContext);
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("}");
+            _writer.WriteLine("else");
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.Write("if (");
+            _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+            _writer.Write(".ShouldApplyInitialValues(");
+            _writer.WriteIntegerLiteral(element.RuntimeStorageId);
+            _writer.WriteLine("))");
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+            WriteInitialNonStructuralContent(plan, element, elementContext);
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("}");
+
+            WriteHotReloadStyles(
+                plan,
+                elementId,
+                element.Identifier,
+                elementContext);
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("}");
+
+            WriteStructuralRevisionActions(
+                plan,
+                element,
+                elementContext);
+            WriteStructuralConstantContent(plan, element);
+            WriteStructuralConnections(plan, element, elementContext);
+        }
+    }
+
+    private void WriteStructuralOneTimeActions(
+        in ComponentPlan plan,
+        in ComponentElementPlan element,
+        in MarkupExtensionWriteContext context)
+    {
+        var targetExpression = element.Identifier;
+        var propertyContext = context.WithTarget(
+            targetExpression,
+            context.TargetProperty,
+            element.ScopeId,
+            plan.ElementReferences.AsSpan());
+        var propertyWriter = new ComponentPropertyWriter(
+            _writer,
+            in _bindingEnvironment,
+            _sourceMap);
+        var actionWriter = new ComponentFirstUpdateActionWriter(
+            _writer,
+            _sourceMap);
+
+        for (var i = 0; i < element.FirstUpdateActions.Length; i++)
+        {
+            ref readonly var action = ref plan.FirstUpdateActions.ItemRef(
+                element.FirstUpdateActions.Start + i);
+
+            switch (action.Kind)
+            {
+                case ComponentFirstUpdateActionKind.NameAssignment:
+                {
+                    ref readonly var name = ref plan.NameAssignments.ItemRef(
+                        action.Index);
+                    actionWriter.WriteNameAssignment(
+                        name,
+                        targetExpression,
+                        nameScopeExpression: null);
+                    break;
+                }
+
+                case ComponentFirstUpdateActionKind.PropertyWrite:
+                {
+                    ref readonly var property = ref plan.PropertyWrites.ItemRef(
+                        action.Index);
+                    if (property.ValueKind == ComponentPropertyValueKind.Constant ||
+                        ComponentPropertyWriter.CanWriteStructuralBindingValue(
+                            property))
+                    {
+                        break;
+                    }
+
+                    propertyWriter.Write(
+                        plan,
+                        property,
+                        targetExpression,
+                        propertyContext);
+                    break;
+                }
+
+                case ComponentFirstUpdateActionKind.CommandBinding:
+                {
+                    ref readonly var command = ref plan.CommandBindings.ItemRef(
+                        action.Index);
+                    if (!ComponentFirstUpdateActionWriter
+                        .CanWriteStructuralCommandBinding(command))
+                    {
+                        actionWriter.WriteCommandBinding(
+                            command,
+                            targetExpression);
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    private void WriteStructuralRevisionActions(
+        in ComponentPlan plan,
+        in ComponentElementPlan element,
+        in MarkupExtensionWriteContext context)
+    {
+        var targetExpression = element.Identifier;
+        var propertyContext = context.WithTarget(
+            targetExpression,
+            context.TargetProperty,
+            element.ScopeId,
+            plan.ElementReferences.AsSpan());
+        var propertyWriter = new ComponentPropertyWriter(
+            _writer,
+            in _bindingEnvironment,
+            _sourceMap);
+        var subscriptionWriter = new PropertySubscriptionWriter(
+            _writer,
+            _sourceMap,
+            writeInlineHandlers: true);
+        var actionWriter = new ComponentFirstUpdateActionWriter(
+            _writer,
+            _sourceMap);
+
+        for (var i = 0; i < element.FirstUpdateActions.Length; i++)
+        {
+            ref readonly var action = ref plan.FirstUpdateActions.ItemRef(
+                element.FirstUpdateActions.Start + i);
+
+            switch (action.Kind)
+            {
+                case ComponentFirstUpdateActionKind.PropertyWrite:
+                {
+                    ref readonly var property = ref plan.PropertyWrites.ItemRef(
+                        action.Index);
+                    if (property.ValueKind == ComponentPropertyValueKind.Constant)
+                    {
+                        WriteStructuralPropertyOperation(
+                            plan,
+                            element,
+                            property,
+                            targetExpression,
+                            propertyContext);
+                    }
+                    else
+                    {
+                        propertyWriter.WriteStructuralBindingValue(
+                            plan,
+                            property,
+                            element.RuntimeStorageId,
+                            targetExpression,
+                            propertyContext);
+                    }
+
+                    break;
+                }
+
+                case ComponentFirstUpdateActionKind.PropertySubscription:
+                {
+                    ref readonly var subscription = ref
+                        plan.PropertySubscriptions.ItemRef(action.Index);
+                    subscriptionWriter.WriteStructuralRegistration(
+                        element,
+                        subscription);
+                    break;
+                }
+
+                case ComponentFirstUpdateActionKind.RoutedEvent:
+                {
+                    ref readonly var routedEvent = ref plan.RoutedEvents.ItemRef(
+                        action.Index);
+                    actionWriter.WriteStructuralRoutedEvent(
+                        routedEvent,
+                        element.RuntimeStorageId,
+                        targetExpression);
+                    break;
+                }
+
+                case ComponentFirstUpdateActionKind.CommandBinding:
+                {
+                    ref readonly var command = ref plan.CommandBindings.ItemRef(
+                        action.Index);
+                    actionWriter.WriteStructuralCommandBinding(
+                        command,
+                        element.RuntimeStorageId,
+                        targetExpression);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void WriteInitialNonStructuralContent(
+        in ComponentPlan plan,
+        in ComponentElementPlan element,
+        in MarkupExtensionWriteContext context)
+    {
+        WriteInitialNonStructuralContentTarget(plan, element.Content, context);
+
+        for (var i = 0; i < element.PropertyElements.Length; i++)
+        {
+            ref readonly var propertyElement = ref plan.PropertyElements.ItemRef(
+                element.PropertyElements.Start + i);
+            WriteInitialNonStructuralContentTarget(
+                plan,
+                propertyElement.Content,
+                context);
+        }
+    }
+
+    private void WriteStructuralConstantContent(
+        in ComponentPlan plan,
+        in ComponentElementPlan element)
+    {
+        WriteStructuralConstantContentTarget(plan, element.Content);
+
+        for (var i = 0; i < element.PropertyElements.Length; i++)
+        {
+            ref readonly var propertyElement = ref plan.PropertyElements.ItemRef(
+                element.PropertyElements.Start + i);
+            WriteStructuralConstantContentTarget(
+                plan,
+                propertyElement.Content);
+        }
+    }
+
+    private void WriteStructuralConstantContentTarget(
+        in ComponentPlan plan,
+        in ComponentContentTargetReference target)
+    {
+        if (target.Kind != ComponentContentTargetKind.Property)
+        {
+            return;
+        }
+
+        Debug.Assert((uint)target.Index < (uint)plan.PropertyContents.Length);
+        ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
+        if (content.FirstUpdateValue.Kind != ComponentContentValueKind.Constant)
+        {
+            return;
+        }
+
+        var writer = new ComponentContentWriter(_writer, _sourceMap);
+        writer.WriteStructuralConstantValue(plan, content);
+    }
+
+    private void WriteInitialNonStructuralContentTarget(
+        in ComponentPlan plan,
+        in ComponentContentTargetReference target,
+        in MarkupExtensionWriteContext context)
+    {
+        if (target.Kind == ComponentContentTargetKind.Collection)
+        {
+            Debug.Assert(
+                (uint)target.Index <
+                (uint)plan.CollectionContents.Length);
+            ref readonly var collection =
+                ref plan.CollectionContents.ItemRef(target.Index);
+            if (!ComponentContentWriter.CanWriteStructuralCollection(
+                    plan,
+                    collection))
+            {
+                var contentWriter = new ComponentContentWriter(
+                    _writer,
+                    _sourceMap);
+                contentWriter.WriteCollection(plan, collection);
+            }
+
+            return;
+        }
+
+        if (target.Kind != ComponentContentTargetKind.Property)
+        {
+            return;
+        }
+
+        Debug.Assert((uint)target.Index < (uint)plan.PropertyContents.Length);
+        ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
+        if (content.FirstUpdateValue.Kind == ComponentContentValueKind.Element)
+        {
+            return;
+        }
+
+        if (ComponentContentWriter.CanWriteStructuralConstantValue(
+                plan,
+                content))
+        {
+            return;
+        }
+
+        WritePropertyContent(plan, target.Index, isFirstUpdate: true, context);
+    }
+
+    private void WriteStructuralConnections(
+        in ComponentPlan plan,
+        in ComponentElementPlan element,
+        in MarkupExtensionWriteContext context)
+    {
+        WriteStructuralConnection(plan, element.Content, context);
+
+        for (var i = 0; i < element.PropertyElements.Length; i++)
+        {
+            ref readonly var propertyElement = ref plan.PropertyElements.ItemRef(
+                element.PropertyElements.Start + i);
+            WriteStructuralConnection(plan, propertyElement.Content, context);
+        }
+    }
+
+    private void WriteStructuralConnection(
+        in ComponentPlan plan,
+        in ComponentContentTargetReference target,
+        in MarkupExtensionWriteContext context)
+    {
+        switch (target.Kind)
+        {
+            case ComponentContentTargetKind.Property:
+            {
+                Debug.Assert((uint)target.Index < (uint)plan.PropertyContents.Length);
+                ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
+                if (content.FirstUpdateValue.Kind == ComponentContentValueKind.Element)
+                {
+                    WritePropertyContent(plan, target.Index, isFirstUpdate: true, context);
+                }
+
+                break;
+            }
+
+            case ComponentContentTargetKind.Collection:
+            {
+                Debug.Assert((uint)target.Index < (uint)plan.CollectionContents.Length);
+                var contentWriter = new ComponentContentWriter(_writer, _sourceMap);
+                contentWriter.WriteStructuralCollection(
+                    plan,
+                    plan.CollectionContents.ItemRef(target.Index));
+                break;
+            }
         }
     }
 
@@ -207,7 +628,11 @@ internal readonly ref struct ComponentScopeWriter
             _writer,
             in _bindingEnvironment,
             _sourceMap);
-        var subscriptionWriter = new PropertySubscriptionWriter(_writer, _sourceMap);
+        var subscriptionWriter = new PropertySubscriptionWriter(
+            _writer,
+            _sourceMap,
+            writeInlineHandlers:
+                _generationMode == ComponentGenerationMode.DebugStructural);
         var actionWriter = new ComponentFirstUpdateActionWriter(_writer, _sourceMap);
 
         for (var i = 0; i < element.FirstUpdateActions.Length; i++)
@@ -233,7 +658,26 @@ internal readonly ref struct ComponentScopeWriter
                 {
                     Debug.Assert((uint)action.Index < (uint)plan.PropertyWrites.Length);
                     ref readonly var property = ref plan.PropertyWrites.ItemRef(action.Index);
-                    propertyWriter.Write(plan, property, targetExpression, propertyContext);
+                    if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                        element.UsesRuntimeStorage &&
+                        property.ValueKind == ComponentPropertyValueKind.Constant)
+                    {
+                        WriteStructuralPropertyOperation(
+                            plan,
+                            element,
+                            property,
+                            targetExpression,
+                            propertyContext);
+                    }
+                    else
+                    {
+                        propertyWriter.Write(
+                            plan,
+                            property,
+                            targetExpression,
+                            propertyContext);
+                    }
+
                     break;
                 }
                 case ComponentFirstUpdateActionKind.PropertySubscription:
@@ -354,11 +798,78 @@ internal readonly ref struct ComponentScopeWriter
                 continue;
             }
 
-            writer.Write(plan, property, targetExpression, propertyContext);
+            if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                element.UsesRuntimeStorage &&
+                filter == ComponentPropertyWriteFilter.HotReload)
+            {
+                WriteStructuralPropertyOperation(
+                    plan,
+                    element,
+                    property,
+                    targetExpression,
+                    propertyContext);
+            }
+            else
+            {
+                writer.Write(
+                    plan,
+                    property,
+                    targetExpression,
+                    propertyContext);
+            }
+
             wroteAny = true;
         }
 
         return wroteAny;
+    }
+
+    private void WriteStructuralPropertyOperation(
+        in ComponentPlan plan,
+        in ComponentElementPlan element,
+        in ComponentPropertyWritePlan property,
+        string targetExpression,
+        in MarkupExtensionWriteContext context)
+    {
+        var writer = new ComponentPropertyWriter(
+            _writer,
+            in _bindingEnvironment,
+            _sourceMap);
+        if (writer.WriteStructuralConstantValue(
+                plan,
+                property,
+                element.RuntimeStorageId,
+                targetExpression))
+        {
+            return;
+        }
+
+        _writer.Write("if (");
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.WriteLine(".ShouldApplyOperation(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(element.RuntimeStorageId);
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(
+            ComponentHotReloadIdentity.CreatePropertySlot(
+                property.Destination));
+        _writer.WriteLine(",");
+        _writer.WriteStringLiteral(
+            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
+                property.Syntax));
+        _writer.WriteLine("))");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+
+        writer.Write(
+            plan,
+            property,
+            targetExpression,
+            context);
+
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     public bool WriteFirstUpdateContent(
@@ -415,13 +926,47 @@ internal readonly ref struct ComponentScopeWriter
             _writer,
             in _bindingEnvironment,
             _ownerTypeName,
-            _sourceMap);
-        writer.WriteSetStyles(
-            plan.Akcss,
-            element.Akcss.Activators,
+            _sourceMap,
+            _generationMode);
+        if (_generationMode == ComponentGenerationMode.DebugStructural &&
+            element.UsesRuntimeStorage)
+        {
+            writer.WriteApplyHotReloadStyles(
+                plan.Akcss,
+                element.Akcss.Activators,
+                element.RuntimeStorageId,
+                targetExpression,
+                context);
+        }
+        else
+        {
+            writer.WriteSetStyles(
+                plan.Akcss,
+                element.Akcss.Activators,
+                targetExpression,
+                context);
+        }
+
+        return true;
+    }
+
+    private bool WriteHotReloadStyles(
+        in ComponentPlan plan,
+        int elementId,
+        string targetExpression,
+        in MarkupExtensionWriteContext context)
+    {
+        ref readonly var element = ref GetElement(plan, elementId);
+        if (element.Akcss.Activators.IsEmpty)
+        {
+            return false;
+        }
+
+        return WriteSetStyles(
+            plan,
+            elementId,
             targetExpression,
             context);
-        return true;
     }
 
     private bool WriteRefresh(
@@ -437,7 +982,8 @@ internal readonly ref struct ComponentScopeWriter
             _writer,
             in _bindingEnvironment,
             _ownerTypeName,
-            _sourceMap);
+            _sourceMap,
+            _generationMode);
         writer.WriteRefresh(
             element.Akcss.Activators,
             targetExpression);
@@ -540,6 +1086,14 @@ internal readonly ref struct ComponentScopeWriter
 
                 Debug.Assert((uint)target.Index < (uint)plan.CollectionContents.Length);
                 var eagerWriter = new ComponentContentWriter(_writer, _sourceMap);
+                if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                    eagerWriter.WriteStructuralCollection(
+                        plan,
+                        plan.CollectionContents.ItemRef(target.Index)))
+                {
+                    return true;
+                }
+
                 return eagerWriter.WriteCollection(
                     plan,
                     plan.CollectionContents.ItemRef(target.Index));
@@ -567,6 +1121,22 @@ internal readonly ref struct ComponentScopeWriter
             case ComponentContentValueKind.CSharpExpression:
             {
                 var writer = new ComponentContentWriter(_writer, _sourceMap);
+                if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                    isFirstUpdate)
+                {
+                    if (value.Kind == ComponentContentValueKind.Element &&
+                        writer.WriteStructuralProperty(plan, content))
+                    {
+                        return true;
+                    }
+
+                    if (value.Kind == ComponentContentValueKind.Constant &&
+                        writer.WriteStructuralConstantValue(plan, content))
+                    {
+                        return true;
+                    }
+                }
+
                 return writer.WriteProperty(plan, content, isFirstUpdate);
             }
 
@@ -584,7 +1154,8 @@ internal readonly ref struct ComponentScopeWriter
                     _writer,
                     in _bindingEnvironment,
                     _sourceMap,
-                    _ownerTypeName);
+                    _ownerTypeName,
+                    _generationMode);
                 return writer.WriteValue(
                     plan,
                     content,
@@ -606,7 +1177,8 @@ internal readonly ref struct ComponentScopeWriter
                     _writer,
                     in _bindingEnvironment,
                     _sourceMap,
-                    _ownerTypeName);
+                    _ownerTypeName,
+                    _generationMode);
                 return writer.WriteValue(
                     plan,
                     content,

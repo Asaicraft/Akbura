@@ -1,8 +1,10 @@
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace Akbura.Language.CodeGeneration;
@@ -141,6 +143,229 @@ internal static class ComponentHotReloadIdentity
         }
 
         return hash.ToString();
+    }
+
+    public static string CreateRenderFingerprint(in ComponentPlan plan)
+    {
+        var hash = new FingerprintHash();
+
+        for (var i = 0; i < plan.Elements.Length; i++)
+        {
+            ref readonly var element = ref plan.Elements.ItemRef(i);
+            if (!element.UsesRuntimeStorage)
+            {
+                continue;
+            }
+
+            hash.Add(element.RuntimeStorageId);
+            hash.Add(GetRuntimeParentId(plan, element));
+            hash.Add(
+                ComponentStructuralHotReloadWriter.GetElementSlot(
+                    plan,
+                    element));
+            hash.Add(element.Type);
+            hash.Add(element.ExplicitKey ?? string.Empty);
+            hash.Add(CreateRenderSyntaxIdentity(element.Syntax));
+        }
+
+        return hash.ToString();
+    }
+
+    public static string CreateRenderSyntaxIdentity(MarkupElementSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        var builder = new StringBuilder();
+        AppendRenderTokens(builder, syntax.StartTag);
+
+        for (var i = 0; i < syntax.Body.Count; i++)
+        {
+            var content = syntax.Body[i];
+            if (content is MarkupElementContentSyntax)
+            {
+                continue;
+            }
+
+            AppendRenderTokens(builder, content);
+        }
+
+        return ComputeRenderSyntaxHash(builder.ToString());
+    }
+
+    public static string CreateOperationSyntaxIdentity(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        var builder = new StringBuilder();
+        AppendRenderTokens(builder, syntax);
+        return ComputeRenderSyntaxHash(builder.ToString());
+    }
+
+    public static string CreateContentSyntaxIdentity(AkburaSyntax syntax)
+    {
+        if (syntax == null)
+        {
+            throw new ArgumentNullException(nameof(syntax));
+        }
+
+        var builder = new StringBuilder();
+        if (syntax is MarkupElementSyntax element)
+        {
+            for (var i = 0; i < element.Body.Count; i++)
+            {
+                AppendRenderTokens(builder, element.Body[i]);
+            }
+        }
+        else
+        {
+            AppendRenderTokens(builder, syntax);
+        }
+
+        return ComputeRenderSyntaxHash(builder.ToString());
+    }
+
+    private static string ComputeRenderSyntaxHash(string normalizedSyntax)
+    {
+        using var algorithm = SHA256.Create();
+        var bytes = Encoding.UTF8.GetBytes(normalizedSyntax);
+        var digest = algorithm.ComputeHash(bytes);
+        var builder = new StringBuilder(digest.Length * 2);
+
+        for (var i = 0; i < digest.Length; i++)
+        {
+            builder.Append(digest[i].ToString(
+                "X2",
+                CultureInfo.InvariantCulture));
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendRenderTokens(
+        StringBuilder builder,
+        AkburaSyntax? syntax)
+    {
+        if (syntax == null)
+        {
+            return;
+        }
+
+        foreach (var token in syntax.DescendantTokens(descendIntoTrivia: false))
+        {
+            var value = token.ValueText;
+
+            builder.Append(token.RawKind);
+            builder.Append(':');
+            builder.Append(value.Length);
+            builder.Append(':');
+            builder.Append(value);
+            builder.Append(';');
+        }
+    }
+
+    public static string CreateCollectionSlot(
+        in CollectionWritePlan plan)
+    {
+        return plan.Kind switch
+        {
+            CollectionWriteKind.Property =>
+                "collection:" + CreatePropertyReadIdentity(plan.Property),
+            CollectionWriteKind.ComponentParameter =>
+                "parameter:" + (plan.ComponentParameterName ?? string.Empty),
+            _ => "content",
+        };
+    }
+
+    public static string CreatePropertySlot(
+        in PropertyWritePlan plan)
+    {
+        var identity = plan.Kind switch
+        {
+            PropertyWriteKind.ClrProperty =>
+                GetSymbolIdentity(plan.ClrProperty),
+            PropertyWriteKind.AvaloniaProperty =>
+                GetSymbolIdentity(plan.AvaloniaProperty),
+            PropertyWriteKind.AttachedAccessor =>
+                GetSymbolIdentity(plan.AttachedSetter),
+            PropertyWriteKind.ComponentParameter or
+                PropertyWriteKind.DirectMember =>
+                plan.MemberName ?? string.Empty,
+            _ => string.Empty,
+        };
+
+        return "property:" + identity;
+    }
+
+    public static string CreatePropertySubscriptionSlot(
+        in PropertyObservationPlan observation)
+    {
+        var identity = observation.Kind switch
+        {
+            PropertyObservationKind.GeneratedParameter
+                when observation.Symbol is ITypeSymbol ownerType =>
+                    GetTypeIdentity(ownerType) + "." +
+                    (observation.Name ?? string.Empty),
+            _ => GetSymbolIdentity(observation.Symbol),
+        };
+
+        return "subscription:" + identity;
+    }
+
+    public static string CreateRoutedEventSlot(
+        in ComponentRoutedEventPlan plan)
+    {
+        return "event:" + GetSymbolIdentity(plan.EventSymbol);
+    }
+
+    private static string CreatePropertyReadIdentity(
+        in PropertyReadPlan plan)
+    {
+        return plan.Kind switch
+        {
+            PropertyReadKind.ClrProperty =>
+                GetSymbolIdentity(plan.ClrProperty),
+            PropertyReadKind.AvaloniaProperty =>
+                GetSymbolIdentity(plan.AvaloniaProperty),
+            PropertyReadKind.AttachedAccessor =>
+                GetSymbolIdentity(plan.AttachedGetter),
+            PropertyReadKind.DirectMember =>
+                plan.MemberName ?? string.Empty,
+            _ => string.Empty,
+        };
+    }
+
+    private static string GetSymbolIdentity(ISymbol? symbol)
+    {
+        if (symbol == null)
+        {
+            return string.Empty;
+        }
+
+        var containingType = GetTypeIdentity(symbol.ContainingType);
+        return containingType.Length == 0
+            ? symbol.MetadataName
+            : containingType + "." + symbol.MetadataName;
+    }
+
+    private static int GetRuntimeParentId(
+        in ComponentPlan plan,
+        in ComponentElementPlan element)
+    {
+        if (element.ParentId < 0)
+        {
+            return -1;
+        }
+
+        ref readonly var parent = ref plan.Elements.ItemRef(element.ParentId);
+        return parent.UsesRuntimeStorage
+            ? parent.RuntimeStorageId
+            : -1;
     }
 
     private static string GetTypeIdentity(ITypeSymbol? type)

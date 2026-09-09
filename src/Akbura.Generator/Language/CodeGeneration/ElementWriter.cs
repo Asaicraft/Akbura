@@ -20,7 +20,7 @@ internal readonly ref struct ElementWriter
 
     public void WriteField(in ComponentElementPlan element)
     {
-        if (element.IsLocal)
+        if (element.IsLocal || element.UsesRuntimeStorage)
         {
             return;
         }
@@ -34,6 +34,11 @@ internal readonly ref struct ElementWriter
 
     public void WriteCreation(in ComponentElementPlan element)
     {
+        if (element.UsesRuntimeStorage)
+        {
+            return;
+        }
+
         using var mapping = _sourceMappingWriter.WriteStart(element.Syntax);
 
         if (element.IsLocal)
@@ -49,7 +54,7 @@ internal readonly ref struct ElementWriter
 
     public void WriteBeginInit(in ComponentElementPlan element)
     {
-        if (!element.SupportsInitialize)
+        if (element.UsesRuntimeStorage || !element.SupportsInitialize)
         {
             return;
         }
@@ -61,7 +66,7 @@ internal readonly ref struct ElementWriter
 
     public void WriteEndInit(in ComponentElementPlan element)
     {
-        if (!element.SupportsInitialize)
+        if (element.UsesRuntimeStorage || !element.SupportsInitialize)
         {
             return;
         }

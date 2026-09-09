@@ -359,7 +359,7 @@ public sealed class AkburaHotReloadRuntimeTests
     }
 
     [Fact]
-    public async Task Refresh_PreparesThenReinjectsOnlyAttachedAssignableComponents()
+    public async Task Refresh_PreparesAttachedComponentsAndDetachedComponentsCatchUpOnAttach()
     {
         using var session = HeadlessUnitTestSession.StartNew(
             typeof(AvaloniaTestAppBuilder));
@@ -397,6 +397,7 @@ public sealed class AkburaHotReloadRuntimeTests
                     var componentUpdates = component.UpdateCount;
                     var derivedUpdates = derived.UpdateCount;
                     var otherUpdates = other.UpdateCount;
+                    var detachedUpdates = detached.UpdateCount;
 
                     RefreshComponent.SetServices(
                         [RefreshComponent.ServiceDescriptor]);
@@ -423,6 +424,16 @@ public sealed class AkburaHotReloadRuntimeTests
                     Assert.True(derived.UpdateObservedService);
                     Assert.Equal(2, provider.CallCount);
 
+                    var panel = Assert.IsType<StackPanel>(window.Content);
+                    panel.Children.Add(detached);
+
+                    Assert.Equal(1, detached.PrepareCount);
+                    Assert.Same(service, detached.Service);
+                    Assert.Equal(detachedUpdates + 1, detached.UpdateCount);
+                    Assert.True(detached.UpdateObservedPrepare);
+                    Assert.True(detached.UpdateObservedService);
+                    Assert.Equal(3, provider.CallCount);
+
                     AkburaHotReloadRuntime.Refresh(
                         typeof(OtherRefreshComponent));
 
@@ -432,6 +443,482 @@ public sealed class AkburaHotReloadRuntimeTests
                 {
                     window.Close();
                     RefreshComponent.SetServices([]);
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Refresh_ContinuesAttachedComponentsAfterOneFailure()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var failing = new IsolatedRefreshComponent(
+                    AkburaEngine.Empty)
+                {
+                    FailureMessage = "First component failed.",
+                };
+                var succeeding = new IsolatedRefreshComponent(
+                    AkburaEngine.Empty);
+                var window = new Window
+                {
+                    Content = new StackPanel
+                    {
+                        Children =
+                        {
+                            failing,
+                            succeeding,
+                        },
+                    },
+                };
+
+                try
+                {
+                    window.Show();
+                    var succeedingUpdates = succeeding.UpdateCount;
+
+                    var exception = Assert.Throws<InvalidOperationException>(
+                        () => AkburaHotReloadRuntime.Refresh<
+                            IsolatedRefreshComponent>(
+                                PrepareIsolatedRefresh));
+
+                    Assert.Equal(
+                        "First component failed.",
+                        exception.Message);
+                    Assert.Equal(1, failing.PrepareCount);
+                    Assert.Equal(1, succeeding.PrepareCount);
+                    Assert.Equal(
+                        succeedingUpdates + 1,
+                        succeeding.UpdateCount);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Refresh_AggregatesFailuresAfterTryingEveryAttachedComponent()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var first = new IsolatedRefreshComponent(
+                    AkburaEngine.Empty)
+                {
+                    FailureMessage = "First component failed.",
+                };
+                var succeeding = new IsolatedRefreshComponent(
+                    AkburaEngine.Empty);
+                var last = new IsolatedRefreshComponent(
+                    AkburaEngine.Empty)
+                {
+                    FailureMessage = "Last component failed.",
+                };
+                var window = new Window
+                {
+                    Content = new StackPanel
+                    {
+                        Children =
+                        {
+                            first,
+                            succeeding,
+                            last,
+                        },
+                    },
+                };
+
+                try
+                {
+                    window.Show();
+                    var succeedingUpdates = succeeding.UpdateCount;
+
+                    var exception = Assert.Throws<AggregateException>(
+                        () => AkburaHotReloadRuntime.Refresh<
+                            IsolatedRefreshComponent>(
+                                PrepareIsolatedRefresh));
+
+                    Assert.Equal(2, exception.InnerExceptions.Count);
+                    Assert.Contains(
+                        exception.InnerExceptions,
+                        static current =>
+                            current.Message == "First component failed.");
+                    Assert.Contains(
+                        exception.InnerExceptions,
+                        static current =>
+                            current.Message == "Last component failed.");
+                    Assert.Equal(1, first.PrepareCount);
+                    Assert.Equal(1, succeeding.PrepareCount);
+                    Assert.Equal(1, last.PrepareCount);
+                    Assert.Equal(
+                        succeedingUpdates + 1,
+                        succeeding.UpdateCount);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task QueuedRefresh_IsAcknowledgedOnlyAfterSuccessfulUpdate()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component = new AcknowledgedRefreshComponent(
+                    AkburaEngine.Empty);
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                try
+                {
+                    window.Show();
+                    var updateAttempts = component.UpdateAttemptCount;
+                    var suppression =
+                        component.SuppressUpdatesForTest();
+
+                    AkburaHotReloadRuntime.Refresh<
+                        AcknowledgedRefreshComponent>(
+                            static current =>
+                                current.PrepareCount++);
+
+                    Assert.Equal(1, component.PrepareCount);
+                    Assert.Equal(
+                        updateAttempts,
+                        component.UpdateAttemptCount);
+
+                    component.ThrowOnUpdate = true;
+
+                    var exception = Assert.Throws<InvalidOperationException>(
+                        suppression.Dispose);
+
+                    Assert.Equal(
+                        "Queued Hot Reload update failed.",
+                        exception.Message);
+                    Assert.Equal(
+                        updateAttempts + 1,
+                        component.UpdateAttemptCount);
+
+                    component.ThrowOnUpdate = false;
+
+                    Assert.True(
+                        AkburaHotReloadRuntime.ApplyPendingRefreshes(
+                            component));
+                    Assert.Equal(1, component.PrepareCount);
+                    Assert.Equal(
+                        updateAttempts + 2,
+                        component.UpdateAttemptCount);
+                    Assert.False(
+                        AkburaHotReloadRuntime.ApplyPendingRefreshes(
+                            component));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ReentrantRefresh_IsNotAcknowledgedByCurrentUpdate()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component =
+                    new ReentrantAcknowledgedRefreshComponent(
+                        AkburaEngine.Empty);
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                try
+                {
+                    window.Show();
+                    component.QueueRefreshDuringUpdate = true;
+
+                    var exception = Assert.Throws<InvalidOperationException>(
+                        component.InvalidState);
+
+                    Assert.Equal(
+                        "Reentrant Hot Reload update failed.",
+                        exception.Message);
+                    Assert.Equal(1, component.HotReloadPrepareCount);
+
+                    Assert.True(
+                        AkburaHotReloadRuntime.ApplyPendingRefreshes(
+                            component));
+                    Assert.Equal(1, component.HotReloadPrepareCount);
+                    Assert.False(
+                        AkburaHotReloadRuntime.ApplyPendingRefreshes(
+                            component));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Refresh_CoalescesMissedRevisionsAndSkipsNewInstances()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var existing = new HistoricalRefreshComponent(
+                    AkburaEngine.Empty);
+
+                AkburaHotReloadRuntime.Refresh<HistoricalRefreshComponent>(
+                    static component => component.FirstPrepareCount++);
+                AkburaHotReloadRuntime.Refresh<HistoricalRefreshComponent>(
+                    static component => component.SecondPrepareCount++);
+
+                var createdAfterRevisions =
+                    new HistoricalRefreshComponent(AkburaEngine.Empty);
+                var window = new Window
+                {
+                    Content = new StackPanel
+                    {
+                        Children =
+                        {
+                            existing,
+                            createdAfterRevisions,
+                        },
+                    },
+                };
+
+                try
+                {
+                    window.Show();
+
+                    Assert.Equal(0, existing.FirstPrepareCount);
+                    Assert.Equal(1, existing.SecondPrepareCount);
+                    Assert.Equal(0, createdAfterRevisions.FirstPrepareCount);
+                    Assert.Equal(0, createdAfterRevisions.SecondPrepareCount);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DetachedCatchUp_PreparesEveryMissedRevisionBeforeLatestUpdate()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component = new BatchedCatchUpDerivedRefreshComponent(
+                    AkburaEngine.Empty);
+
+                AkburaHotReloadRuntime.Refresh<
+                    BatchedCatchUpRefreshComponent>(
+                        static current =>
+                            current.FirstPrepareCount++);
+                AkburaHotReloadRuntime.Refresh<
+                    BatchedCatchUpDerivedRefreshComponent>(
+                        static current =>
+                        {
+                            current.SecondPrepareCount++;
+                            current.ShapeReady = true;
+                        });
+
+                component.RequireShapeReady = true;
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                try
+                {
+                    window.Show();
+
+                    Assert.Equal(1, component.FirstPrepareCount);
+                    Assert.Equal(1, component.SecondPrepareCount);
+                    Assert.True(component.ShapeReady);
+                    Assert.Equal(1, component.ValidatedUpdateCount);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Refresh_ReentrantPendingCheckDoesNotApplyRevisionTwice()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component = new ReentrantRefreshComponent(
+                    AkburaEngine.Empty);
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                try
+                {
+                    window.Show();
+                    var updateCount = component.UpdateCount;
+
+                    AkburaHotReloadRuntime.Refresh<ReentrantRefreshComponent>(
+                        static current =>
+                        {
+                            current.PrepareCount++;
+                            current.ReentrantApplyResult =
+                                AkburaHotReloadRuntime.ApplyPendingRefreshes(
+                                    current);
+                        });
+
+                    Assert.Equal(1, component.PrepareCount);
+                    Assert.False(component.ReentrantApplyResult);
+                    Assert.Equal(updateCount + 1, component.UpdateCount);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ApplyPendingRefreshes_RetriesFailedRevisionBeforeQueuedNewerRevision()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component = new ThrowingRefreshComponent(
+                    AkburaEngine.Empty)
+                {
+                    ThrowOnPrepare = true,
+                };
+
+                AkburaHotReloadRuntime.Refresh<ThrowingRefreshComponent>(
+                    static current =>
+                    {
+                        current.OlderPrepareCount++;
+                        if (!current.NestedRefreshRegistered)
+                        {
+                            current.NestedRefreshRegistered = true;
+                            AkburaHotReloadRuntime.Refresh<
+                                ThrowingRefreshComponent>(
+                                    static nested =>
+                                        nested.NewerPrepareCount++);
+                        }
+
+                        if (current.ThrowOnPrepare)
+                        {
+                            throw new InvalidOperationException(
+                                "Preparation failed.");
+                        }
+                    });
+
+                var exception = Assert.Throws<InvalidOperationException>(
+                    () => AkburaHotReloadRuntime.ApplyPendingRefreshes(
+                        component));
+
+                Assert.Equal("Preparation failed.", exception.Message);
+                Assert.Equal(1, component.OlderPrepareCount);
+                Assert.Equal(0, component.NewerPrepareCount);
+
+                component.ThrowOnPrepare = false;
+
+                Assert.True(
+                    AkburaHotReloadRuntime.ApplyPendingRefreshes(component));
+                Assert.Equal(1, component.OlderPrepareCount);
+                Assert.Equal(1, component.NewerPrepareCount);
+                Assert.True(
+                    AkburaHotReloadRuntime.ApplyPendingRefreshes(component));
+                Assert.Equal(1, component.OlderPrepareCount);
+                Assert.Equal(1, component.NewerPrepareCount);
+
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                try
+                {
+                    window.Show();
+
+                    Assert.False(
+                        AkburaHotReloadRuntime.ApplyPendingRefreshes(
+                            component));
+                    Assert.Equal(1, component.OlderPrepareCount);
+                    Assert.Equal(1, component.NewerPrepareCount);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Refresh_DoesNotEnterAnExcludedTopLevel()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(
+            () =>
+            {
+                var component = new ExcludedRefreshComponent(
+                    AkburaEngine.Empty);
+                var window = new Window
+                {
+                    Content = component,
+                };
+
+                try
+                {
+                    window.Show();
+                    var updateCount = component.UpdateCount;
+                    AkburaComponentRegistry.ExcludeTopLevel(window);
+
+                    AkburaHotReloadRuntime.Refresh<ExcludedRefreshComponent>(
+                        static current => current.PrepareCount++);
+
+                    Assert.Equal(0, component.PrepareCount);
+                    Assert.Equal(updateCount, component.UpdateCount);
+                }
+                finally
+                {
+                    window.Close();
                 }
             },
             CancellationToken.None);
@@ -466,6 +953,17 @@ public sealed class AkburaHotReloadRuntimeTests
         return (AvaloniaProperty?)findRegistered.Invoke(
             AvaloniaPropertyRegistry.Instance,
             [propertyId]);
+    }
+
+    private static void PrepareIsolatedRefresh(
+        IsolatedRefreshComponent component)
+    {
+        component.PrepareCount++;
+        if (component.FailureMessage != null)
+        {
+            throw new InvalidOperationException(
+                component.FailureMessage);
+        }
     }
 
     private interface IRefreshService
@@ -677,6 +1175,173 @@ public sealed class AkburaHotReloadRuntimeTests
     private sealed class DerivedRefreshComponent : RefreshComponent
     {
         public DerivedRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+    }
+
+    private sealed class HistoricalRefreshComponent : RefreshComponent
+    {
+        public HistoricalRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+
+        public int FirstPrepareCount { get; set; }
+
+        public int SecondPrepareCount { get; set; }
+    }
+
+    private class BatchedCatchUpRefreshComponent : RefreshComponent
+    {
+        public BatchedCatchUpRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+
+        public bool RequireShapeReady { get; set; }
+
+        public bool ShapeReady { get; set; }
+
+        public int FirstPrepareCount { get; set; }
+
+        public int SecondPrepareCount { get; set; }
+
+        public int ValidatedUpdateCount { get; private set; }
+
+        protected override Control Update()
+        {
+            if (RequireShapeReady && !ShapeReady)
+            {
+                throw new InvalidOperationException(
+                    "The latest shape was not prepared.");
+            }
+
+            if (RequireShapeReady)
+            {
+                ValidatedUpdateCount++;
+            }
+
+            return base.Update();
+        }
+    }
+
+    private sealed class BatchedCatchUpDerivedRefreshComponent
+        : BatchedCatchUpRefreshComponent
+    {
+        public BatchedCatchUpDerivedRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+    }
+
+    private sealed class IsolatedRefreshComponent : RefreshComponent
+    {
+        public IsolatedRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+
+        public string? FailureMessage { get; set; }
+    }
+
+    private sealed class AcknowledgedRefreshComponent : RefreshComponent
+    {
+        public AcknowledgedRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+
+        public bool ThrowOnUpdate { get; set; }
+
+        public int UpdateAttemptCount { get; private set; }
+
+        public IDisposable SuppressUpdatesForTest()
+        {
+            return SuppressUpdates();
+        }
+
+        protected override Control Update()
+        {
+            UpdateAttemptCount++;
+            if (ThrowOnUpdate)
+            {
+                throw new InvalidOperationException(
+                    "Queued Hot Reload update failed.");
+            }
+
+            return base.Update();
+        }
+    }
+
+    private sealed class ReentrantRefreshComponent : RefreshComponent
+    {
+        public ReentrantRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+
+        public bool ReentrantApplyResult { get; set; }
+    }
+
+    private sealed class ReentrantAcknowledgedRefreshComponent
+        : RefreshComponent
+    {
+        private bool _refreshQueued;
+        private bool _throwOnNextUpdate;
+
+        public ReentrantAcknowledgedRefreshComponent(
+            AkburaEngine engine)
+            : base(engine)
+        {
+        }
+
+        public bool QueueRefreshDuringUpdate { get; set; }
+
+        public int HotReloadPrepareCount { get; private set; }
+
+        protected override Control Update()
+        {
+            if (_throwOnNextUpdate)
+            {
+                _throwOnNextUpdate = false;
+                throw new InvalidOperationException(
+                    "Reentrant Hot Reload update failed.");
+            }
+
+            if (QueueRefreshDuringUpdate && !_refreshQueued)
+            {
+                _refreshQueued = true;
+                _throwOnNextUpdate = true;
+                AkburaHotReloadRuntime.Refresh<
+                    ReentrantAcknowledgedRefreshComponent>(
+                        static current =>
+                            current.HotReloadPrepareCount++);
+            }
+
+            return base.Update();
+        }
+    }
+
+    private sealed class ThrowingRefreshComponent : RefreshComponent
+    {
+        public ThrowingRefreshComponent(AkburaEngine engine)
+            : base(engine)
+        {
+        }
+
+        public bool ThrowOnPrepare { get; set; }
+
+        public bool NestedRefreshRegistered { get; set; }
+
+        public int OlderPrepareCount { get; set; }
+
+        public int NewerPrepareCount { get; set; }
+    }
+
+    private sealed class ExcludedRefreshComponent : RefreshComponent
+    {
+        public ExcludedRefreshComponent(AkburaEngine engine)
             : base(engine)
         {
         }

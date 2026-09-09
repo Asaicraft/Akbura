@@ -13,12 +13,15 @@ internal readonly ref struct TemplateWriter
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
+    private readonly ComponentGenerationMode _generationMode;
 
     public TemplateWriter(
         CodeWriter writer,
         in BindingWriterEnvironment bindingEnvironment,
         ComponentGenerationSourceMap sourceMap,
-        string ownerTypeName)
+        string ownerTypeName,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         Debug.Assert(writer != null);
         Debug.Assert(sourceMap != null);
@@ -29,6 +32,7 @@ internal readonly ref struct TemplateWriter
         _bindingEnvironment = bindingEnvironment;
         _sourceMap = sourceMap!;
         _ownerTypeName = ownerTypeName;
+        _generationMode = generationMode;
     }
 
     public bool WriteValue(
@@ -145,7 +149,8 @@ internal readonly ref struct TemplateWriter
             _writer,
             in _bindingEnvironment,
             _sourceMap,
-            _ownerTypeName);
+            _ownerTypeName,
+            _generationMode);
 
         scopeWriter.WriteLocalInitialState(plan, scope, scopeContext);
 

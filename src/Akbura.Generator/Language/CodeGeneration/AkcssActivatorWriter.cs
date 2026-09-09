@@ -15,12 +15,15 @@ internal readonly ref struct AkcssActivatorWriter
     private readonly SourceMappingWriter _sourceMappingWriter;
     private readonly bool _hasSourceMap;
     private readonly string _ownerTypeName;
+    private readonly ComponentGenerationMode _generationMode;
 
     public AkcssActivatorWriter(
         CodeWriter writer,
         in BindingWriterEnvironment bindingEnvironment,
         string ownerTypeName,
-        ComponentGenerationSourceMap? sourceMap = null)
+        ComponentGenerationSourceMap? sourceMap = null,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         Debug.Assert(writer != null);
         Debug.Assert(!string.IsNullOrEmpty(ownerTypeName));
@@ -35,6 +38,7 @@ internal readonly ref struct AkcssActivatorWriter
         }
 
         _ownerTypeName = ownerTypeName;
+        _generationMode = generationMode;
         _hasSourceMap = sourceMap != null;
         _sourceMappingWriter = sourceMap != null
             ? new SourceMappingWriter(_writer, sourceMap)
@@ -43,6 +47,11 @@ internal readonly ref struct AkcssActivatorWriter
 
     public void WriteStaticMembers(in AkcssComponentActivatorPlan plan)
     {
+        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            return;
+        }
+
         var hasPreviousSection = false;
 
         if (!plan.ClassCaches.IsDefaultOrEmpty)
@@ -70,6 +79,11 @@ internal readonly ref struct AkcssActivatorWriter
         in AkcssElementActivatorPlan element,
         in MarkupExtensionWriteContext context)
     {
+        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            return false;
+        }
+
         var range = element.MarkupExtensionSlots;
         if (range.IsEmpty)
         {
@@ -117,13 +131,57 @@ internal readonly ref struct AkcssActivatorWriter
 
         var indent = _writer.CurrentIndent;
 
-        _writer.WriteLine("global::Akbura.AkburaControl.SetAkcssStyles(");
+        _writer.Write("global::Akbura.AkburaControl.");
+        _writer.WriteLine(
+            _generationMode == ComponentGenerationMode.DebugStructural
+                ? "ReplaceAkcssStylesForHotReload("
+                : "SetAkcssStyles(");
         _writer.CurrentIndent = indent + 4;
         _writer.Write(targetExpression).WriteLine(",");
+        WriteActivatorArray(plan, activators, context);
+        _writer.WriteLine(");");
+        _writer.CurrentIndent = indent;
+    }
+
+    public void WriteApplyHotReloadStyles(
+        in AkcssComponentActivatorPlan plan,
+        in AkcssPlanRange activators,
+        int localId,
+        string targetExpression,
+        in MarkupExtensionWriteContext context)
+    {
+        if (activators.IsEmpty)
+        {
+            return;
+        }
+
+        EnsureRange(activators, plan.Activators.Length, nameof(activators));
+        EnsureExpression(targetExpression, nameof(targetExpression));
+
+        var indent = _writer.CurrentIndent;
+
+        _writer
+            .Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
+            .WriteLine(".ApplyAkcssStylesOperation(");
+        _writer.CurrentIndent = indent + 4;
+        _writer.WriteIntegerLiteral(localId).WriteLine(",");
+        _writer.Write(targetExpression).WriteLine(",");
+        WriteActivatorArray(plan, activators, context);
+        _writer.WriteLine(");");
+        _writer.CurrentIndent = indent;
+    }
+
+    private void WriteActivatorArray(
+        in AkcssComponentActivatorPlan plan,
+        in AkcssPlanRange activators,
+        in MarkupExtensionWriteContext context)
+    {
+        var indent = _writer.CurrentIndent;
+
         _writer.WriteLine(
             "global::System.Collections.Immutable.ImmutableArray.Create<" +
             "global::Akbura.Akcss.AkcssStyleActivator>(");
-        _writer.CurrentIndent = indent + 8;
+        _writer.CurrentIndent = indent + 4;
 
         for (var i = 0; i < activators.Length; i++)
         {
@@ -131,9 +189,8 @@ internal readonly ref struct AkcssActivatorWriter
             _writer.WriteLine(i + 1 == activators.Length ? string.Empty : ",");
         }
 
-        _writer.CurrentIndent = indent + 4;
-        _writer.WriteLine("));");
         _writer.CurrentIndent = indent;
+        _writer.Write(")");
     }
 
     public void WriteRefresh(
@@ -207,12 +264,23 @@ internal readonly ref struct AkcssActivatorWriter
         WriteApplicationFieldName(cache.Id);
         _writer.WriteLine(" =");
         _writer.CurrentIndent = indent + 4;
+        WriteApplicationArray(plan, cache.Applications);
+        _writer.WriteLine(";");
+        _writer.CurrentIndent = indent;
+    }
+
+    private void WriteApplicationArray(
+        in AkcssComponentActivatorPlan plan,
+        in AkcssPlanRange range)
+    {
+        EnsureRange(range, plan.Applications.Length, nameof(range));
+
+        var indent = _writer.CurrentIndent;
+
         _writer.WriteLine(
             "global::System.Collections.Immutable.ImmutableArray.Create<" +
             "global::Akbura.Akcss.AkcssUtilityApplication>(");
-        _writer.CurrentIndent = indent + 8;
-
-        var range = cache.Applications;
+        _writer.CurrentIndent = indent + 4;
 
         for (var i = 0; i < range.Length; i++)
         {
@@ -220,8 +288,8 @@ internal readonly ref struct AkcssActivatorWriter
             _writer.WriteLine(i + 1 == range.Length ? string.Empty : ",");
         }
 
-        _writer.CurrentIndent = indent + 4;
-        _writer.WriteLine(");");
+        _writer.CurrentIndent = indent;
+        _writer.Write(")");
         _writer.CurrentIndent = indent;
     }
 
@@ -395,11 +463,12 @@ internal readonly ref struct AkcssActivatorWriter
         _valueWriter.WriteTypeNameWithNullableAnnotation(resultType);
     }
 
-    private static MarkupExtensionWriteContext CreateExtensionContext(
+    private MarkupExtensionWriteContext CreateExtensionContext(
         in AkcssMarkupExtensionSlotPlan slot,
         in MarkupExtensionWriteContext context)
     {
-        var targetProperty = MarkupTargetPropertyPlan.CreateExpression(slot.PropertyName);
+        var targetProperty = MarkupTargetPropertyPlan.CreateExpression(
+            GetTargetPropertyExpression(slot));
         return new MarkupExtensionWriteContext(
             targetObjectExpression: "__target",
             targetProperty: targetProperty,
@@ -420,7 +489,14 @@ internal readonly ref struct AkcssActivatorWriter
         switch (activator.Kind)
         {
             case AkcssActivatorKind.Class:
-                WriteClassFieldName(plan.ClassCaches[activator.Index].Id);
+                if (_generationMode == ComponentGenerationMode.DebugStructural)
+                {
+                    WriteClassActivator(plan.ClassCaches[activator.Index]);
+                }
+                else
+                {
+                    WriteClassFieldName(plan.ClassCaches[activator.Index].Id);
+                }
                 return;
 
             case AkcssActivatorKind.UtilityCandidate:
@@ -430,6 +506,14 @@ internal readonly ref struct AkcssActivatorWriter
             default:
                 throw new InvalidOperationException("Unexpected AKCSS activator kind.");
         }
+    }
+
+    private void WriteClassActivator(in AkcssClassCachePlan plan)
+    {
+        _writer.Write("new global::Akbura.Akcss.AkcssClassActivator(");
+        _writer.Write("(global::Akbura.Akcss.AkcssClass)");
+        WriteStyleReference(plan.Style);
+        _writer.Write(")");
     }
 
     private void WriteCandidate(
@@ -445,7 +529,18 @@ internal readonly ref struct AkcssActivatorWriter
         _writer.WriteStringLiteral(candidate.ConflictKey).WriteLine(",");
         _writer.Write("sourceOrder: ").WriteIntegerLiteral(candidate.SourceOrder).WriteLine(",");
         _writer.Write("applications: ");
-        WriteApplicationFieldName(candidate.ApplicationCacheId);
+
+        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            ref readonly var cache = ref GetApplicationCache(
+                plan,
+                candidate.ApplicationCacheId);
+            WriteApplicationArray(plan, cache.Applications);
+        }
+        else
+        {
+            WriteApplicationFieldName(candidate.ApplicationCacheId);
+        }
 
         if (!candidate.ValueSources.IsEmpty)
         {
@@ -670,7 +765,8 @@ internal readonly ref struct AkcssActivatorWriter
         _valueWriter.WriteTypeName(plan.ExpectedType);
         _writer.Write(">(");
         WriteMarkupExtensionFactory(componentPlan, plan, context);
-        _writer.Write(", ").Write(slot.PropertyName);
+        _writer.Write(", ");
+        WriteTargetPropertyReference(slot);
         WriteObjectConverter(plan.ExpectedType, useNullForgivingOperator: true);
         WriteRecreateOnRefresh(plan.RecreateOnRefresh);
     }
@@ -753,7 +849,8 @@ internal readonly ref struct AkcssActivatorWriter
 
         var slot = GetSlot(componentPlan, plan.MarkupExtensionSlotId);
 
-        if (plan.UseFactoryMethod)
+        if (plan.UseFactoryMethod &&
+            _generationMode != ComponentGenerationMode.DebugStructural)
         {
             if (!slot.NeedsFactoryMethod)
             {
@@ -851,7 +948,22 @@ internal readonly ref struct AkcssActivatorWriter
                 throw new InvalidOperationException("Unexpected AKCSS style-reference kind.");
         }
 
-        _writer.Write(".Styles[").WriteIntegerLiteral(reference.StyleIndex).Write("]");
+        if (_generationMode == ComponentGenerationMode.DebugStructural &&
+            reference.Kind == AkcssStyleReferenceKind.GeneratedModule)
+        {
+            _writer
+                .Write(".")
+                .Write(AkcssModuleWriter.DebugStyleAccessorName)
+                .Write("(")
+                .WriteIntegerLiteral(reference.StyleIndex)
+                .Write(")");
+            return;
+        }
+
+        _writer
+            .Write(".Styles[")
+            .WriteIntegerLiteral(reference.StyleIndex)
+            .Write("]");
     }
 
     private void WriteClassFieldName(int id)
@@ -881,6 +993,23 @@ internal readonly ref struct AkcssActivatorWriter
         throw new InvalidOperationException("The AKCSS markup-extension slot was not found.");
     }
 
+    private static ref readonly AkcssUtilityApplicationCachePlan GetApplicationCache(
+        in AkcssComponentActivatorPlan plan,
+        int cacheId)
+    {
+        var caches = plan.ApplicationCaches;
+
+        for (var i = 0; i < caches.Length; i++)
+        {
+            if (caches[i].Id == cacheId)
+            {
+                return ref caches.ItemRef(i);
+            }
+        }
+
+        throw new InvalidOperationException("The AKCSS application cache was not found.");
+    }
+
     private static void EnsureRange(
         in AkcssPlanRange range,
         int collectionLength,
@@ -900,5 +1029,24 @@ internal readonly ref struct AkcssActivatorWriter
         {
             throw new ArgumentException("A generated expression is required.", parameterName);
         }
+    }
+
+    private string GetTargetPropertyExpression(in AkcssMarkupExtensionSlotPlan slot)
+    {
+        if (_generationMode != ComponentGenerationMode.DebugStructural)
+        {
+            return slot.PropertyName;
+        }
+
+        return "global::Akbura.Akcss.AkcssUtilityValueSource.GetTargetProperty<" +
+            _ownerTypeName +
+            ">(" +
+            slot.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            ")";
+    }
+
+    private void WriteTargetPropertyReference(in AkcssMarkupExtensionSlotPlan slot)
+    {
+        _writer.Write(GetTargetPropertyExpression(slot));
     }
 }

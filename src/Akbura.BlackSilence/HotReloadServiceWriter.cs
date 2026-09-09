@@ -1,5 +1,6 @@
 using Akbura.Language.CodeGeneration;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 
@@ -11,7 +12,8 @@ internal static class HotReloadServiceWriter
 
     public static GeneratedSource Generate(
         string assemblyName,
-        ImmutableArray<string> componentTypeNames)
+        ImmutableArray<string> componentTypeNames,
+        IReadOnlyDictionary<string, ImmutableArray<string>>? akcssModuleTypeNamesByComponent = null)
     {
         var handlerTypeName = GetHandlerTypeName(assemblyName);
         var orderedTypeNames = GetOrderedTypeNames(componentTypeNames);
@@ -48,13 +50,20 @@ internal static class HotReloadServiceWriter
         WriteUpdateApplicationCore(
             writer,
             handlerTypeName,
-            orderedTypeNames);
+            orderedTypeNames,
+            akcssModuleTypeNamesByComponent);
         writer.WriteLine();
         WriteReloadAll(writer, orderedTypeNames);
+        writer.WriteLine();
+        WriteReload(writer, orderedTypeNames);
+        writer.WriteLine();
+        WriteOrderBaseTypesFirst(writer);
         writer.WriteLine();
         WriteAffects(writer);
         writer.WriteLine();
         WriteContainsType(writer);
+        writer.WriteLine();
+        WriteThrowRefreshFailures(writer);
 
         writer.CurrentIndent -= writer.TabSize;
         writer.WriteLine("}");
@@ -100,7 +109,8 @@ internal static class HotReloadServiceWriter
     private static void WriteUpdateApplicationCore(
         CodeWriter writer,
         string handlerTypeName,
-        string[] componentTypeNames)
+        string[] componentTypeNames,
+        IReadOnlyDictionary<string, ImmutableArray<string>>? akcssModuleTypeNamesByComponent)
     {
         writer.WriteLine("private static void UpdateApplicationCore(");
         writer.CurrentIndent += writer.TabSize;
@@ -120,24 +130,51 @@ internal static class HotReloadServiceWriter
         writer.WriteLine("return;");
         writer.CurrentIndent -= writer.TabSize;
         writer.WriteLine("}");
+        writer.WriteLine();
+        writer.Write("var __componentTypes = new global::System.Type[");
+        writer.WriteIntegerLiteral(componentTypeNames.Length);
+        writer.WriteLine("];");
+        writer.WriteLine("var __componentCount = 0;");
 
         for (var i = 0; i < componentTypeNames.Length; i++)
         {
+            var componentTypeName = componentTypeNames[i];
+            var moduleTypeNames = GetOrderedModuleTypeNames(
+                componentTypeName,
+                akcssModuleTypeNamesByComponent);
+
             writer.WriteLine();
             writer.WriteLine("if (Affects(");
             writer.CurrentIndent += writer.TabSize;
             writer.WriteLine("updatedTypes,");
             writer.Write("typeof(");
-            WriteTypeName(writer, componentTypeNames[i]);
-            writer.WriteLine(")))");
+            WriteTypeName(writer, componentTypeName);
+            writer.Write("))");
+
+            for (var moduleIndex = 0; moduleIndex < moduleTypeNames.Length; moduleIndex++)
+            {
+                writer.WriteLine(" ||");
+                writer.Write("Affects(updatedTypes, typeof(");
+                WriteTypeName(
+                    writer,
+                    moduleTypeNames[moduleIndex]);
+                writer.Write("))");
+            }
+
+            writer.WriteLine(")");
             writer.CurrentIndent -= writer.TabSize;
             writer.WriteLine("{");
             writer.CurrentIndent += writer.TabSize;
-            WriteApplyInvocation(writer, componentTypeNames[i]);
+            writer.Write("__componentTypes[__componentCount++] = typeof(");
+            WriteTypeName(writer, componentTypeName);
+            writer.WriteLine(");");
             writer.CurrentIndent -= writer.TabSize;
             writer.WriteLine("}");
         }
 
+        writer.WriteLine();
+        writer.WriteLine(
+            "Reload(__componentTypes, __componentCount);");
         writer.CurrentIndent -= writer.TabSize;
         writer.WriteLine("}");
     }
@@ -149,12 +186,122 @@ internal static class HotReloadServiceWriter
         writer.WriteLine("private static void ReloadAll()");
         writer.WriteLine("{");
         writer.CurrentIndent += writer.TabSize;
+        writer.Write("var __componentTypes = new global::System.Type[");
+        writer.WriteIntegerLiteral(componentTypeNames.Length);
+        writer.WriteLine("];");
 
         for (var i = 0; i < componentTypeNames.Length; i++)
         {
-            WriteApplyInvocation(writer, componentTypeNames[i]);
+            writer.Write("__componentTypes[");
+            writer.WriteIntegerLiteral(i);
+            writer.Write("] = typeof(");
+            WriteTypeName(writer, componentTypeNames[i]);
+            writer.WriteLine(");");
         }
 
+        writer.WriteLine();
+        writer.WriteLine(
+            "Reload(__componentTypes, __componentTypes.Length);");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+    }
+
+    private static void WriteReload(
+        CodeWriter writer,
+        string[] componentTypeNames)
+    {
+        writer.WriteLine("private static void Reload(");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "global::System.Type[] componentTypes,");
+        writer.WriteLine("int componentCount)");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "OrderBaseTypesFirst(componentTypes, componentCount);");
+        writer.WriteLine(
+            "global::System.Collections.Generic.List<global::System.Exception>? " +
+            "__exceptions = null;");
+        writer.WriteLine();
+        writer.WriteLine(
+            "for (var i = 0; i < componentCount; i++)");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "var __componentType = componentTypes[i];");
+
+        for (var i = 0; i < componentTypeNames.Length; i++)
+        {
+            writer.WriteLine();
+            writer.Write("if (__componentType == typeof(");
+            WriteTypeName(writer, componentTypeNames[i]);
+            writer.WriteLine("))");
+            writer.WriteLine("{");
+            writer.CurrentIndent += writer.TabSize;
+            WriteGuardedApplyInvocation(
+                writer,
+                componentTypeNames[i]);
+            writer.WriteLine("continue;");
+            writer.CurrentIndent -= writer.TabSize;
+            writer.WriteLine("}");
+        }
+
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+        writer.WriteLine();
+        writer.WriteLine("ThrowRefreshFailures(__exceptions);");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+    }
+
+    private static void WriteOrderBaseTypesFirst(
+        CodeWriter writer)
+    {
+        writer.WriteLine(
+            "private static void OrderBaseTypesFirst(");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "global::System.Type[] componentTypes,");
+        writer.WriteLine("int componentCount)");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "for (var index = 1; index < componentCount; index++)");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "var componentType = componentTypes[index];");
+        writer.WriteLine();
+        writer.WriteLine(
+            "for (var candidateIndex = 0; candidateIndex < index; candidateIndex++)");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "if (!componentType.IsAssignableFrom(componentTypes[candidateIndex]))");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine("continue;");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+        writer.WriteLine();
+        writer.WriteLine(
+            "for (var moveIndex = index; moveIndex > candidateIndex; moveIndex--)");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "componentTypes[moveIndex] = componentTypes[moveIndex - 1];");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+        writer.WriteLine();
+        writer.WriteLine(
+            "componentTypes[candidateIndex] = componentType;");
+        writer.WriteLine("break;");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
         writer.CurrentIndent -= writer.TabSize;
         writer.WriteLine("}");
     }
@@ -223,6 +370,65 @@ internal static class HotReloadServiceWriter
         writer.WriteLine("}");
     }
 
+    private static void WriteThrowRefreshFailures(CodeWriter writer)
+    {
+        writer.WriteLine("private static void ThrowRefreshFailures(");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "global::System.Collections.Generic.List<global::System.Exception>? " +
+            "exceptions)");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine("if (exceptions == null)");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine("return;");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+        writer.WriteLine();
+        writer.WriteLine("if (exceptions.Count == 1)");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "global::System.Runtime.ExceptionServices.ExceptionDispatchInfo");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(".Capture(exceptions[0])");
+        writer.WriteLine(".Throw();");
+        writer.CurrentIndent -= writer.TabSize * 2;
+        writer.WriteLine("}");
+        writer.WriteLine();
+        writer.WriteLine("throw new global::System.AggregateException(");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "\"One or more component types could not be refreshed.\",");
+        writer.WriteLine("exceptions);");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+    }
+
+    private static void WriteGuardedApplyInvocation(
+        CodeWriter writer,
+        string componentTypeName)
+    {
+        writer.WriteLine("try");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        WriteApplyInvocation(writer, componentTypeName);
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+        writer.WriteLine("catch (global::System.Exception __exception)");
+        writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine(
+            "__exceptions ??= new global::System.Collections.Generic." +
+            "List<global::System.Exception>();");
+        writer.WriteLine("__exceptions.Add(__exception);");
+        writer.CurrentIndent -= writer.TabSize;
+        writer.WriteLine("}");
+    }
+
     private static void WriteApplyInvocation(
         CodeWriter writer,
         string componentTypeName)
@@ -236,6 +442,14 @@ internal static class HotReloadServiceWriter
         string metadataName)
     {
         writer.Write("global::");
+
+        if (metadataName.StartsWith(
+                "global::",
+                StringComparison.Ordinal))
+        {
+            metadataName = metadataName.Substring(
+                "global::".Length);
+        }
 
         var start = 0;
         while (start < metadataName.Length)
@@ -291,6 +505,18 @@ internal static class HotReloadServiceWriter
         var unique = new string[uniqueCount];
         Array.Copy(names, unique, uniqueCount);
         return unique;
+    }
+
+    private static string[] GetOrderedModuleTypeNames(
+        string componentTypeName,
+        IReadOnlyDictionary<string, ImmutableArray<string>>? akcssModuleTypeNamesByComponent)
+    {
+        return akcssModuleTypeNamesByComponent != null &&
+            akcssModuleTypeNamesByComponent.TryGetValue(
+                componentTypeName,
+                out var moduleTypeNames)
+                ? GetOrderedTypeNames(moduleTypeNames)
+                : [];
     }
 
     internal static string GetHandlerTypeName(string assemblyName)

@@ -60,6 +60,34 @@ public sealed class ComponentContentWriterTests
     }
 
     [Fact]
+    public void WriteStructuralConstantValue_UsesRuntimeValueReconciliation()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <Button>Save</Button>
+            """;
+        var fixture = CreateFixture(
+            component,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var plan = Assert.Single(fixture.Plan.PropertyContents);
+
+        var output = WriteStructuralConstantValue(
+            fixture,
+            plan,
+            out var wroteAny);
+
+        Assert.True(wroteAny);
+        Assert.Contains(".ReconcileAvaloniaValue(", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Avalonia.Controls.ContentControl.ContentProperty",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains("\"Save\");", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WriteProperty_ExpressionWritesOnlyDuringUpdate()
     {
         const string component =
@@ -112,6 +140,343 @@ public sealed class ComponentContentWriterTests
             output.IndexOf("first);", StringComparison.Ordinal) <
             output.IndexOf("second);", StringComparison.Ordinal));
         Assert.Contains("\"PlannerView.akbura\"", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WriteStructuralCollection_PreservesMixedEagerItemOrder()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            state string suffix = "B";
+
+            <MixedContentHost>A<Button />{suffix}<Border />A</MixedContentHost>
+            """;
+        const string csharp =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Metadata;
+            using System.Collections.Generic;
+
+            namespace Demo;
+
+            public sealed class MixedContentHost : Control
+            {
+                [Content]
+                public List<object> Items { get; } = new();
+            }
+            """;
+        var fixture = CreateFixture(
+            component,
+            csharp,
+            ComponentGenerationMode.DebugStructural);
+        var plan = Assert.Single(fixture.Plan.CollectionContents);
+
+        var output = WriteStructuralCollection(
+            fixture,
+            plan,
+            out var wroteAny);
+
+        Assert.True(wroteAny);
+        Assert.Contains(".ReconcileCollection(", output, StringComparison.Ordinal);
+        Assert.Contains("new object[]", output, StringComparison.Ordinal);
+
+        var firstText = output.IndexOf("\"A\",", StringComparison.Ordinal);
+        var button = output.IndexOf(
+            "GetRequired<global::Avalonia.Controls.Button>",
+            StringComparison.Ordinal);
+        var expression = output.IndexOf("suffix,", StringComparison.Ordinal);
+        var border = output.IndexOf(
+            "GetRequired<global::Avalonia.Controls.Border>",
+            StringComparison.Ordinal);
+        var lastText = output.LastIndexOf("\"A\",", StringComparison.Ordinal);
+
+        Assert.True(firstText >= 0);
+        Assert.True(firstText < button);
+        Assert.True(button < expression);
+        Assert.True(expression < border);
+        Assert.True(border < lastText);
+    }
+
+    [Fact]
+    public void WriteStructuralCollection_GenericOnlyIListUsesTypedRuntimePathAndCompiles()
+    {
+        const string component =
+            "using Avalonia.Controls;\r\n" +
+            "using Demo;\r\n" +
+            "\r\n" +
+            "<GenericOnlyContentHost>\r\n" +
+            "    <TextBlock />\r\n" +
+            "    <Button />\r\n" +
+            "</GenericOnlyContentHost>\r\n";
+        const string csharp =
+            "using Avalonia.Controls;\r\n" +
+            "using Avalonia.Metadata;\r\n" +
+            "using System.Collections;\r\n" +
+            "using System.Collections.Generic;\r\n" +
+            "\r\n" +
+            "namespace Demo;\r\n" +
+            "\r\n" +
+            "public sealed class GenericOnlyContentHost : Control\r\n" +
+            "{\r\n" +
+            "    [Content]\r\n" +
+            "    public GenericOnlyList<Control> Items { get; } = new();\r\n" +
+            "}\r\n" +
+            "\r\n" +
+            "public sealed class GenericOnlyList<T> : IList<T>\r\n" +
+            "{\r\n" +
+            "    private readonly List<T> _items = new();\r\n" +
+            "    public T this[int index] { get => _items[index]; set => _items[index] = value; }\r\n" +
+            "    public int Count => _items.Count;\r\n" +
+            "    public bool IsReadOnly => false;\r\n" +
+            "    public void Add(T item) => _items.Add(item);\r\n" +
+            "    public void Clear() => _items.Clear();\r\n" +
+            "    public bool Contains(T item) => _items.Contains(item);\r\n" +
+            "    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);\r\n" +
+            "    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();\r\n" +
+            "    public int IndexOf(T item) => _items.IndexOf(item);\r\n" +
+            "    public void Insert(int index, T item) => _items.Insert(index, item);\r\n" +
+            "    public bool Remove(T item) => _items.Remove(item);\r\n" +
+            "    public void RemoveAt(int index) => _items.RemoveAt(index);\r\n" +
+            "    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();\r\n" +
+            "}\r\n";
+        var fixture = CreateFixture(
+            component,
+            csharp,
+            ComponentGenerationMode.DebugStructural);
+        var plan = Assert.Single(fixture.Plan.CollectionContents);
+        using var codeWriter = new CodeWriter("\n")
+        {
+            CurrentIndent = 8,
+        };
+        var contentWriter = new ComponentContentWriter(
+            codeWriter,
+            fixture.SourceMap);
+        var wroteAny = contentWriter.WriteStructuralCollection(
+            fixture.Plan,
+            plan);
+        var output = codeWriter.GetText().ToString();
+
+        Assert.True(wroteAny);
+        Assert.False(plan.Destination.SupportsUntypedReconciliation);
+        Assert.True(plan.Destination.SupportsTypedReconciliation);
+        Assert.Contains(
+            ".ReconcileCollection<global::Avalonia.Controls.Control>(",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "new global::Avalonia.Controls.Control[]",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("new object[]", output, StringComparison.Ordinal);
+
+        var generatedSource =
+            "#nullable enable\r\n" +
+            "namespace Demo;\r\n" +
+            "internal static class StructuralCollectionOutput\r\n" +
+            "{\r\n" +
+            "    private static readonly global::Akbura.HotReload.AkburaRenderState " +
+            "__akburaRenderState = new();\r\n" +
+            "    private static void Apply()\r\n" +
+            "    {\r\n" +
+            output +
+            "    }\r\n" +
+            "}\r\n";
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            generatedSource,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
+            path: "StructuralCollectionOutput.g.cs");
+        var errors = fixture.Compilation.AddSyntaxTrees(syntaxTree)
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            errors.Length == 0,
+            string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())) +
+            Environment.NewLine + generatedSource);
+    }
+
+    [Fact]
+    public void WriteStructuralCollection_GenericOnlyValueIListUsesTypedRuntimePathAndCompiles()
+    {
+        const string component =
+            "using Demo;\r\n" +
+            "\r\n" +
+            "<GenericOnlyValueContentHost>{1}</GenericOnlyValueContentHost>\r\n";
+        const string csharp =
+            "using Avalonia.Controls;\r\n" +
+            "using Avalonia.Metadata;\r\n" +
+            "using System.Collections;\r\n" +
+            "using System.Collections.Generic;\r\n" +
+            "\r\n" +
+            "namespace Demo;\r\n" +
+            "\r\n" +
+            "public sealed class GenericOnlyValueContentHost : Control\r\n" +
+            "{\r\n" +
+            "    [Content]\r\n" +
+            "    public GenericOnlyList<int> Items { get; } = new();\r\n" +
+            "}\r\n" +
+            "\r\n" +
+            "public sealed class GenericOnlyList<T> : IList<T>\r\n" +
+            "{\r\n" +
+            "    private readonly List<T> _items = new();\r\n" +
+            "    public T this[int index] { get => _items[index]; set => _items[index] = value; }\r\n" +
+            "    public int Count => _items.Count;\r\n" +
+            "    public bool IsReadOnly => false;\r\n" +
+            "    public void Add(T item) => _items.Add(item);\r\n" +
+            "    public void Clear() => _items.Clear();\r\n" +
+            "    public bool Contains(T item) => _items.Contains(item);\r\n" +
+            "    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);\r\n" +
+            "    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();\r\n" +
+            "    public int IndexOf(T item) => _items.IndexOf(item);\r\n" +
+            "    public void Insert(int index, T item) => _items.Insert(index, item);\r\n" +
+            "    public bool Remove(T item) => _items.Remove(item);\r\n" +
+            "    public void RemoveAt(int index) => _items.RemoveAt(index);\r\n" +
+            "    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();\r\n" +
+            "}\r\n";
+        var fixture = CreateFixture(
+            component,
+            csharp,
+            ComponentGenerationMode.DebugStructural);
+        var plan = Assert.Single(fixture.Plan.CollectionContents);
+        using var codeWriter = new CodeWriter("\n")
+        {
+            CurrentIndent = 8,
+        };
+        var contentWriter = new ComponentContentWriter(
+            codeWriter,
+            fixture.SourceMap);
+        var wroteAny = contentWriter.WriteStructuralCollection(
+            fixture.Plan,
+            plan);
+        var output = codeWriter.GetText().ToString();
+
+        Assert.True(wroteAny);
+        Assert.False(plan.Destination.SupportsUntypedReconciliation);
+        Assert.True(plan.Destination.SupportsTypedReconciliation);
+        Assert.Contains(
+            ".ReconcileCollection<int>(",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains("new int[]", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("new object[]", output, StringComparison.Ordinal);
+
+        var generatedSource =
+            "#nullable enable\r\n" +
+            "namespace Demo;\r\n" +
+            "internal static class StructuralValueCollectionOutput\r\n" +
+            "{\r\n" +
+            "    private static readonly global::Akbura.HotReload.AkburaRenderState " +
+            "__akburaRenderState = new();\r\n" +
+            "    private static void Apply()\r\n" +
+            "    {\r\n" +
+            output +
+            "    }\r\n" +
+            "}\r\n";
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            generatedSource,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
+            path: "StructuralValueCollectionOutput.g.cs");
+        var errors = fixture.Compilation.AddSyntaxTrees(syntaxTree)
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            errors.Length == 0,
+            string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())) +
+            Environment.NewLine + generatedSource);
+    }
+
+    [Fact]
+    public void WriteStructuralCollection_ComponentParameterUsesRuntimeReconciliation()
+    {
+        const string component =
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "<CollectionHost>\r\n" +
+            "    <TextBlock />\r\n" +
+            "    <Button />\r\n" +
+            "</CollectionHost>\r\n";
+        const string collectionHost =
+            "using Avalonia.Controls;\r\n" +
+            "using System.Collections.Generic;\r\n" +
+            "\r\n" +
+            "param List<Control> Content;\r\n";
+        var fixture = CreateFixtureWithChildComponent(
+            component,
+            collectionHost,
+            "CollectionHost.akbura");
+        var plan = Assert.Single(fixture.Plan.CollectionContents);
+
+        var output = WriteStructuralCollection(
+            fixture,
+            plan,
+            out var wroteAny);
+
+        Assert.True(wroteAny);
+        Assert.Equal(
+            CollectionWriteKind.ComponentParameter,
+            plan.Destination.Kind);
+        Assert.Contains(
+            ".ReconcileComponentCollection(",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "((global::System.Collections.Generic.List<" +
+            "global::Avalonia.Controls.Control>)",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "__AkburaCompleteCollectionReconciliation_",
+            output,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WriteStructuralCollection_GenericOnlyComponentParameterUsesTypedRuntimePath()
+    {
+        const string component =
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "<CollectionHost>\r\n" +
+            "    <TextBlock />\r\n" +
+            "    <Button />\r\n" +
+            "</CollectionHost>\r\n";
+        const string collectionHost =
+            "using Avalonia.Controls;\r\n" +
+            "using System.Collections.Generic;\r\n" +
+            "\r\n" +
+            "param IList<Control> Content;\r\n";
+        var fixture = CreateFixtureWithChildComponent(
+            component,
+            collectionHost,
+            "CollectionHost.akbura");
+        var plan = Assert.Single(fixture.Plan.CollectionContents);
+
+        var output = WriteStructuralCollection(
+            fixture,
+            plan,
+            out var wroteAny);
+
+        Assert.True(wroteAny);
+        Assert.Equal(
+            CollectionWriteKind.ComponentParameter,
+            plan.Destination.Kind);
+        Assert.False(plan.Destination.SupportsUntypedReconciliation);
+        Assert.True(plan.Destination.SupportsTypedReconciliation);
+        Assert.Contains(
+            ".ReconcileComponentCollection<global::Avalonia.Controls.Control>(",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "new global::Avalonia.Controls.Control[]",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("new object[]", output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -224,7 +589,9 @@ public sealed class ComponentContentWriterTests
 
     private static WriterFixture CreateFixture(
         string component,
-        string? additionalCSharp = null)
+        string? additionalCSharp = null,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         var fixture = AkcssActivatorPlannerTests.CreateFixture(component, additionalCSharp);
         var componentSymbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
@@ -232,11 +599,46 @@ public sealed class ComponentContentWriterTests
         var plan = ComponentPlanner.Create(
             componentSymbol,
             fixture.SemanticModel,
-            new Dictionary<AkburaSyntax, string>());
+            new Dictionary<AkburaSyntax, string>(),
+            generationMode);
         var sourceMap = new ComponentGenerationSourceMap(
             Assert.IsType<ComponentSyntaxTree>(fixture.ComponentTree, exactMatch: false));
 
         return new WriterFixture(plan, sourceMap, fixture.CSharpCompilation);
+    }
+
+    private static WriterFixture CreateFixtureWithChildComponent(
+        string component,
+        string childComponent,
+        string childFileName)
+    {
+        var baseFixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var childTree = AkburaSyntaxTree.ParseText(
+            childComponent,
+            childFileName);
+        var compilation = new AkburaCompilation(
+            baseFixture.CSharpCompilation,
+            [baseFixture.ComponentTree, childTree],
+            rootNamespace: "Demo");
+        var semanticModel = compilation.GetSemanticModel(
+            baseFixture.ComponentTree);
+        var componentSymbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            semanticModel.GetSymbolInfo(
+                baseFixture.ComponentTree.GetRoot()).Symbol);
+        var plan = ComponentPlanner.Create(
+            componentSymbol,
+            semanticModel,
+            new Dictionary<AkburaSyntax, string>(),
+            ComponentGenerationMode.DebugStructural);
+        var sourceMap = new ComponentGenerationSourceMap(
+            Assert.IsType<ComponentSyntaxTree>(
+                baseFixture.ComponentTree,
+                exactMatch: false));
+
+        return new WriterFixture(
+            plan,
+            sourceMap,
+            baseFixture.CSharpCompilation);
     }
 
     private static string WriteProperty(
@@ -259,6 +661,28 @@ public sealed class ComponentContentWriterTests
         using var codeWriter = new CodeWriter("\n");
         var writer = new ComponentContentWriter(codeWriter, fixture.SourceMap);
         wroteAny = writer.WriteCollection(fixture.Plan, plan);
+        return codeWriter.GetText().ToString();
+    }
+
+    private static string WriteStructuralCollection(
+        WriterFixture fixture,
+        in ComponentCollectionContentPlan plan,
+        out bool wroteAny)
+    {
+        using var codeWriter = new CodeWriter("\n");
+        var writer = new ComponentContentWriter(codeWriter, fixture.SourceMap);
+        wroteAny = writer.WriteStructuralCollection(fixture.Plan, plan);
+        return codeWriter.GetText().ToString();
+    }
+
+    private static string WriteStructuralConstantValue(
+        WriterFixture fixture,
+        in ComponentPropertyContentPlan plan,
+        out bool wroteAny)
+    {
+        using var codeWriter = new CodeWriter("\n");
+        var writer = new ComponentContentWriter(codeWriter, fixture.SourceMap);
+        wroteAny = writer.WriteStructuralConstantValue(fixture.Plan, plan);
         return codeWriter.GetText().ToString();
     }
 

@@ -259,11 +259,204 @@ public sealed class ComponentLifecycleWriterTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WriteSupportFields_DebugStructuralKeepsFallbackFieldStable()
+    {
+        using var valid = CreateFixture(
+            """
+            using Avalonia.Controls;
+
+            <Border />
+            """,
+            currentIndent: 4,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        using var fallback = CreateFixture(
+            """
+            using Avalonia.Controls;
+
+            <Border />
+            <Button />
+            """,
+            currentIndent: 4,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var validWriter = valid.CreateWriter();
+        var fallbackWriter = fallback.CreateWriter();
+        ref readonly var validPlan = ref valid.Plan;
+        ref readonly var fallbackPlan = ref fallback.Plan;
+
+        Assert.False(validPlan.Lifecycle.UsesFallbackRoot);
+        Assert.True(fallbackPlan.Lifecycle.UsesFallbackRoot);
+        Assert.True(validWriter.WriteSupportFields(validPlan));
+        Assert.True(fallbackWriter.WriteSupportFields(fallbackPlan));
+
+        const string field =
+            "private global::Avalonia.Controls.Control __generatedRoot = null!;";
+        Assert.Equal(
+            1,
+            CountOccurrences(valid.CodeWriter.GetText().ToString(), field));
+        Assert.Equal(
+            1,
+            CountOccurrences(fallback.CodeWriter.GetText().ToString(), field));
+        Assert.Equal(4, valid.CodeWriter.CurrentIndent);
+        Assert.Equal(4, fallback.CodeWriter.CurrentIndent);
+    }
+
+    [Fact]
+    public void WriteMembers_DebugStructuralGuardsRenderRevisionWithAbort()
+    {
+        using var fixture = CreateFixture(
+            """
+            using Avalonia.Controls;
+
+            <StackPanel>
+                <TextBlock Text="Title" />
+            </StackPanel>
+            """,
+            currentIndent: 4,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var lifecycleWriter = fixture.CreateWriter();
+        ref readonly var plan = ref fixture.Plan;
+
+        lifecycleWriter.WriteMembers(plan);
+
+        Assert.Equal(4, fixture.CodeWriter.CurrentIndent);
+        var methods = SplitLifecycleMethods(
+            fixture.CodeWriter.GetText().ToString());
+
+        AssertRenderRevisionGuard(methods.FirstUpdate);
+        AssertRenderRevisionGuard(methods.Update);
+    }
+
+    [Fact]
+    public void WriteMembers_DebugStructuralPreparesBeforeContentPresenterRefresh()
+    {
+        using var fixture = CreateFixture(
+            """
+            using Avalonia.Controls.Presenters;
+
+            <ContentPresenter x.Name="presenter" Content="Title" />
+            """,
+            currentIndent: 4,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var lifecycleWriter = fixture.CreateWriter();
+        ref readonly var plan = ref fixture.Plan;
+
+        lifecycleWriter.WriteMembers(plan);
+
+        var methods = SplitLifecycleMethods(
+            fixture.CodeWriter.GetText().ToString());
+
+        AssertPreparedBeforeRefresh(methods.FirstUpdate);
+        AssertPreparedBeforeRefresh(methods.Update);
+    }
+
+    [Fact]
+    public void WriteMembers_DebugStructuralOwnsStylesOutsideInitialValueGuard()
+    {
+        using var fixture = CreateFixture(
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                @using Avalonia.Controls;
+
+                .card { Width: 20; }
+            }
+
+            <Border class="card" />
+            """,
+            currentIndent: 4,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var lifecycleWriter = fixture.CreateWriter();
+        ref readonly var plan = ref fixture.Plan;
+
+        lifecycleWriter.WriteMembers(plan);
+
+        var methods = SplitLifecycleMethods(
+            fixture.CodeWriter.GetText().ToString());
+        var guardStart = methods.HotReload.IndexOf(
+            ".ShouldApplyInitialValues(0)",
+            StringComparison.Ordinal);
+        var guardOpen = methods.HotReload.IndexOf(
+            '{',
+            guardStart);
+        var guardClose = methods.HotReload.IndexOf(
+            '}',
+            guardOpen);
+        var applyStyles = methods.HotReload.IndexOf(
+            ".ApplyAkcssStylesOperation(",
+            guardClose,
+            StringComparison.Ordinal);
+
+        Assert.True(guardStart >= 0, methods.HotReload);
+        Assert.True(guardOpen > guardStart, methods.HotReload);
+        Assert.True(guardClose > guardOpen, methods.HotReload);
+        Assert.True(applyStyles > guardClose, methods.HotReload);
+        Assert.Contains(
+            ".ApplyAkcssStylesOperation(",
+            methods.FirstUpdate,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ApplyAkcssStylesOperation",
+            methods.Update,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ReplaceAkcssStylesForHotReload",
+            methods.FirstUpdate + methods.HotReload,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WriteMembers_DebugStructuralOwnsImplicitRootDataContextBinding()
+    {
+        using var fixture = CreateFixture(
+            """
+            using Avalonia.Controls;
+
+            <Border />
+            """,
+            currentIndent: 4,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var lifecycleWriter = fixture.CreateWriter();
+        ref readonly var plan = ref fixture.Plan;
+
+        lifecycleWriter.WriteMembers(plan);
+
+        var methods = SplitLifecycleMethods(
+            fixture.CodeWriter.GetText().ToString());
+        const string applyBinding = ".ApplyObservableBindingOperation(";
+        const string operationSlot =
+            "\"property:Avalonia.StyledElement.DataContextProperty\"";
+
+        Assert.Contains(
+            ".ShouldApplyOwnedOperation(",
+            methods.FirstUpdate,
+            StringComparison.Ordinal);
+        Assert.Contains(applyBinding, methods.FirstUpdate, StringComparison.Ordinal);
+        Assert.Contains(operationSlot, methods.FirstUpdate, StringComparison.Ordinal);
+        Assert.Contains(
+            ".ShouldApplyOwnedOperation(",
+            methods.Update,
+            StringComparison.Ordinal);
+        Assert.Contains(applyBinding, methods.Update, StringComparison.Ordinal);
+        Assert.Contains(operationSlot, methods.Update, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            ".Bind(global::Avalonia.StyledElement.DataContextProperty",
+            methods.FirstUpdate,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            ".Bind(global::Avalonia.StyledElement.DataContextProperty",
+            methods.Update,
+            StringComparison.Ordinal);
+    }
+
     private static WriterFixture CreateFixture(
         string component,
         string? additionalCSharp = null,
         string resourcePath = "PlannerView.akbura",
-        int currentIndent = 0)
+        int currentIndent = 0,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         var semanticFixture = AkcssActivatorPlannerTests.CreateFixture(
             component,
@@ -271,10 +464,21 @@ public sealed class ComponentLifecycleWriterTests
         var componentSymbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
             semanticFixture.SemanticModel.GetSymbolInfo(
                 semanticFixture.ComponentTree.GetRoot()).Symbol);
+        var moduleTypeNames = new Dictionary<AkburaSyntax, string>();
+        var moduleId = 0;
+        foreach (var inlineAkcss in semanticFixture.ComponentTree.GetRoot()
+                     .Members.OfType<InlineAkcssBlockSyntax>())
+        {
+            moduleTypeNames.Add(
+                inlineAkcss,
+                "global::Demo.GeneratedStyles" + moduleId++);
+        }
+
         var plan = ComponentPlanner.Create(
             componentSymbol,
             semanticFixture.SemanticModel,
-            new Dictionary<AkburaSyntax, string>());
+            moduleTypeNames,
+            generationMode);
         var bindingEnvironment = semanticFixture.CreateBindingEnvironment();
         var sourceMap = new ComponentGenerationSourceMap(
             Assert.IsType<ComponentSyntaxTree>(semanticFixture.ComponentTree));
@@ -288,7 +492,8 @@ public sealed class ComponentLifecycleWriterTests
             bindingEnvironment,
             sourceMap,
             codeWriter,
-            resourcePath);
+            resourcePath,
+            generationMode);
     }
 
     private static LifecycleMethods SplitLifecycleMethods(string output)
@@ -320,6 +525,66 @@ public sealed class ComponentLifecycleWriterTests
         Assert.Contains("\"PlannerView.akbura\"", output, StringComparison.Ordinal);
     }
 
+    private static void AssertRenderRevisionGuard(string method)
+    {
+        const string beginRevision =
+            "var __akburaRenderRevisionChanged = __AkburaEnsureRenderTree();";
+        const string prepareRevision =
+            "__akburaRenderState.PrepareRevisionCompletion();";
+        const string completeRevision =
+            "__akburaRenderState.CompleteRevision();";
+        const string abortRevision =
+            "__akburaRenderState.AbortRevision(__exception);";
+
+        var beginIndex = method.IndexOf(beginRevision, StringComparison.Ordinal);
+        var tryIndex = method.IndexOf("try", StringComparison.Ordinal);
+        var prepareIndex = method.IndexOf(
+            prepareRevision,
+            StringComparison.Ordinal);
+        var completeIndex = method.IndexOf(
+            completeRevision,
+            StringComparison.Ordinal);
+        var catchIndex = method.IndexOf(
+            "catch (global::System.Exception __exception)",
+            StringComparison.Ordinal);
+        var abortIndex = method.IndexOf(abortRevision, StringComparison.Ordinal);
+        var rethrowIndex = method.IndexOf("throw;", StringComparison.Ordinal);
+
+        Assert.True(beginIndex >= 0, method);
+        Assert.True(tryIndex > beginIndex, method);
+        Assert.True(prepareIndex > tryIndex, method);
+        Assert.True(completeIndex > prepareIndex, method);
+        Assert.True(catchIndex > completeIndex, method);
+        Assert.True(abortIndex > catchIndex, method);
+        Assert.True(rethrowIndex > abortIndex, method);
+        Assert.Equal(1, CountOccurrences(method, beginRevision));
+        Assert.Equal(1, CountOccurrences(method, prepareRevision));
+        Assert.Equal(1, CountOccurrences(method, completeRevision));
+        Assert.Equal(1, CountOccurrences(method, abortRevision));
+        Assert.Equal(1, CountOccurrences(method, "throw;"));
+    }
+
+    private static void AssertPreparedBeforeRefresh(string method)
+    {
+        const string prepareRevision =
+            "__akburaRenderState.PrepareRevisionCompletion();";
+        const string refresh = ".UpdateChild();";
+        const string completeRevision =
+            "__akburaRenderState.CompleteRevision();";
+
+        var prepareIndex = method.IndexOf(
+            prepareRevision,
+            StringComparison.Ordinal);
+        var refreshIndex = method.IndexOf(refresh, StringComparison.Ordinal);
+        var completeIndex = method.IndexOf(
+            completeRevision,
+            StringComparison.Ordinal);
+
+        Assert.True(prepareIndex >= 0, method);
+        Assert.True(refreshIndex > prepareIndex, method);
+        Assert.True(completeIndex > refreshIndex, method);
+    }
+
     private static int CountOccurrences(string text, string value)
     {
         var count = 0;
@@ -345,19 +610,22 @@ public sealed class ComponentLifecycleWriterTests
         private readonly ComponentGenerationSourceMap _sourceMap;
         private readonly ComponentPlan _plan;
         private readonly string _resourcePath;
+        private readonly ComponentGenerationMode _generationMode;
 
         public WriterFixture(
             ComponentPlan plan,
             BindingWriterEnvironment bindingEnvironment,
             ComponentGenerationSourceMap sourceMap,
             CodeWriter codeWriter,
-            string resourcePath)
+            string resourcePath,
+            ComponentGenerationMode generationMode)
         {
             _plan = plan;
             _bindingEnvironment = bindingEnvironment;
             _sourceMap = sourceMap;
             CodeWriter = codeWriter;
             _resourcePath = resourcePath;
+            _generationMode = generationMode;
         }
 
         public ref readonly ComponentPlan Plan => ref _plan;
@@ -371,7 +639,8 @@ public sealed class ComponentLifecycleWriterTests
                 in _bindingEnvironment,
                 _sourceMap,
                 "global::Demo.PlannerView",
-                _resourcePath);
+                _resourcePath,
+                _generationMode);
         }
 
         public void Dispose()

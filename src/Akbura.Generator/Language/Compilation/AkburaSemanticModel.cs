@@ -2996,7 +2996,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 allowsText: false);
         }
 
-        if (TryGetIListElementType(propertyType, out var elementType))
+        if (TryGetContentCollectionElementType(propertyType, out var elementType))
         {
             return new MarkupContentModel(
                 property.CSharpDefinition,
@@ -4598,7 +4598,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             }
 
             var contentType = contentProperty.Type;
-            if (TryGetIListElementType(contentType, out var itemType))
+            if (TryGetContentCollectionElementType(contentType, out var itemType))
             {
                 return new MarkupContentModel(
                     new CSharpSymbolDefinition(contentProperty),
@@ -4614,7 +4614,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 allowsText: AllowsTextContent(contentType));
         }
 
-        if (TryGetIListElementType(componentType, out var elementType))
+        if (TryGetContentCollectionElementType(componentType, out var elementType))
         {
             return new MarkupContentModel(
                 contentProperty: default,
@@ -4647,7 +4647,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return default;
         }
 
-        if (TryGetIListElementType(parameterType, out var elementType))
+        if (TryGetContentCollectionElementType(parameterType, out var elementType))
         {
             return new MarkupContentModel(
                 contentProperty: default,
@@ -5305,12 +5305,50 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return false;
     }
 
+    private bool TryGetContentCollectionElementType(
+        ITypeSymbol type,
+        out ITypeSymbol elementType)
+    {
+        if (TryGetIListElementType(type, out elementType))
+        {
+            return true;
+        }
+
+        if (type is INamedTypeSymbol namedType &&
+            IsICollectionOfT(namedType))
+        {
+            elementType = namedType.TypeArguments[0];
+            return true;
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (IsICollectionOfT(@interface))
+            {
+                elementType = @interface.TypeArguments[0];
+                return true;
+            }
+        }
+
+        elementType = null!;
+        return false;
+    }
+
     private static bool IsIListOfT(INamedTypeSymbol type)
     {
         var original = type.OriginalDefinition;
         return original.Name == "IList" &&
             original.Arity == 1 &&
             original.ContainingNamespace.ToDisplayString() == "System.Collections.Generic";
+    }
+
+    private static bool IsICollectionOfT(INamedTypeSymbol type)
+    {
+        var original = type.OriginalDefinition;
+        return original.Name == "ICollection" &&
+            original.Arity == 1 &&
+            original.ContainingNamespace.ToDisplayString() ==
+                "System.Collections.Generic";
     }
 
     private static bool IsNonGenericIList(ITypeSymbol type)

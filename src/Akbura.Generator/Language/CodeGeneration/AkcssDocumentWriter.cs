@@ -36,7 +36,9 @@ internal static class AkcssDocumentWriter
         in AkcssGenerationInput input,
         AkcssGenerationSourceMap sourceMap,
         string rootNamespace,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
 #if STATS
         using var generationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.AkcssGeneration);
@@ -87,7 +89,12 @@ internal static class AkcssDocumentWriter
             writer.WriteLine("{");
             writer.CurrentIndent += writer.TabSize;
 
-            WriteModuleBody(writer, moduleWriter, plan, cancellationToken);
+            WriteModuleBody(
+                writer,
+                moduleWriter,
+                plan,
+                generationMode,
+                cancellationToken);
 
             writer.CurrentIndent -= writer.TabSize;
             writer.WriteLine("}");
@@ -157,6 +164,7 @@ internal static class AkcssDocumentWriter
         CodeWriter writer,
         AkcssModuleWriter moduleWriter,
         in AkcssModulePlan plan,
+        ComponentGenerationMode generationMode,
         CancellationToken cancellationToken)
     {
         moduleWriter.WriteConstants(plan);
@@ -164,6 +172,12 @@ internal static class AkcssDocumentWriter
         writer.WriteLine();
 
         moduleWriter.WriteStyleCollection(plan);
+
+        if (generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            writer.WriteLine();
+            moduleWriter.WriteDebugStyleAccessor(plan);
+        }
 
         if (!plan.Symbols.IsEmpty)
         {

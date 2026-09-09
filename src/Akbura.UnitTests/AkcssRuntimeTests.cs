@@ -119,6 +119,40 @@ public sealed class AkcssRuntimeTests
     }
 
     [Fact]
+    public void ReplaceAkcssStylesForHotReload_DetachesOldCascadeAndAppliesNewCascade()
+    {
+        var control = new Border();
+        var originalStyle = new WidthObservingClass();
+        var replacementStyle = new WidthObservingClass();
+        var original = ImmutableArray.Create<AkcssStyleActivator>(
+            new AkcssClassActivator(originalStyle));
+        var replacement = ImmutableArray.Create<AkcssStyleActivator>(
+            new AkcssClassActivator(replacementStyle));
+
+        AkburaControl.SetAkcssStyles(control, original);
+        AkburaControl.ReplaceAkcssStylesForHotReload(control, replacement);
+
+        Assert.Equal(replacement, AkburaControl.GetAkcssStyles(control));
+        Assert.Equal(2, originalStyle.ResetCount);
+        Assert.Equal(1, originalStyle.UpdateCount);
+        Assert.Equal(1, replacementStyle.ResetCount);
+        Assert.Equal(1, replacementStyle.UpdateCount);
+        Assert.Throws<InvalidOperationException>(
+            () => AkburaControl.SetAkcssStyles(control, replacement));
+    }
+
+    [Fact]
+    public void GetTargetProperty_CachesEachOwnerAndSlotPair()
+    {
+        var first = AkcssUtilityValueSource.GetTargetProperty<Border>(0);
+        var repeated = AkcssUtilityValueSource.GetTargetProperty<Border>(0);
+        var next = AkcssUtilityValueSource.GetTargetProperty<Border>(1);
+
+        Assert.Same(first, repeated);
+        Assert.NotSame(first, next);
+    }
+
+    [Fact]
     public void UtilityCandidates_ResolveBreakpointGroupAndFallback()
     {
         var control = new Border();

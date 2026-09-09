@@ -51,6 +51,7 @@ internal static class BlackSilenceGenerationRequestBuilder
             ? previous.DeclarationEnvironment
             : new object();
         var graph = AkburaDependencyGraph.Create(index, cancellationToken);
+        var externalModuleTypeNames = GetExternalModuleTypeNames(index);
         var components = new ComponentGenerationRequest[index.ComponentDescriptors.Length];
         var external = new AkcssGenerationRequest[index.ExternalAkcssDescriptors.Length];
         var inline = new AkcssGenerationRequest[index.InlineAkcssDescriptors.Length];
@@ -64,6 +65,11 @@ internal static class BlackSilenceGenerationRequestBuilder
             components[i] = new ComponentGenerationRequest(
                 descriptor,
                 generationVersion,
+                GetAkcssModuleTypeNames(
+                    descriptor,
+                    graph,
+                    externalModuleTypeNames,
+                    cancellationToken),
                 FindPrevious(previous, identity, generationVersion));
         }
 
@@ -113,6 +119,71 @@ internal static class BlackSilenceGenerationRequestBuilder
                     FindPrevious(previous, identity, generationVersion));
             }
         }
+    }
+
+    private static Dictionary<DocumentSyntaxVersion, string> GetExternalModuleTypeNames(
+        AkburaProjectIndex index)
+    {
+        var result = new Dictionary<DocumentSyntaxVersion, string>(
+            index.ExternalAkcssDescriptors.Length);
+
+        for (var i = 0; i < index.ExternalAkcssDescriptors.Length; i++)
+        {
+            var descriptor = index.ExternalAkcssDescriptors[i];
+            result.Add(
+                descriptor.DocumentVersion,
+                descriptor.GeneratedTypeName);
+        }
+
+        return result;
+    }
+
+    private static ImmutableArray<string> GetAkcssModuleTypeNames(
+        ComponentDocumentDescriptor descriptor,
+        AkburaDependencyGraph graph,
+        Dictionary<DocumentSyntaxVersion, string> externalModuleTypeNames,
+        CancellationToken cancellationToken)
+    {
+        var dependencies = graph.GetDependencies(
+            descriptor.DocumentVersion);
+        var inlineModules = descriptor.InlineAkcssDescriptors;
+        var typeNames = new string[
+            dependencies.Length + inlineModules.Length];
+        var count = 0;
+
+        for (var i = 0; i < dependencies.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (externalModuleTypeNames.TryGetValue(
+                    dependencies[i].Document,
+                    out var typeName))
+            {
+                typeNames[count++] = typeName;
+            }
+        }
+
+        for (var i = 0; i < inlineModules.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            typeNames[count++] = inlineModules[i].GeneratedTypeName;
+        }
+
+        if (count == 0)
+        {
+            return [];
+        }
+
+        Array.Sort(
+            typeNames,
+            0,
+            count,
+            StringComparer.Ordinal);
+
+        return ImmutableArray.Create(
+            typeNames,
+            0,
+            count);
     }
 
     private static DocumentGenerationVersion CreateVersion(

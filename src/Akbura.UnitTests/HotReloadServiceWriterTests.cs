@@ -1,7 +1,9 @@
 using Akbura.BlackSilence;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Reflection;
 
 namespace Akbura.UnitTests;
 
@@ -73,21 +75,26 @@ public sealed class HotReloadServiceWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Equal(
-            2,
+            1,
             CountOccurrences(
                 output,
                 "global::Demo.Alpha.__AkburaHotReloadApply();"));
         Assert.Equal(
-            2,
+            1,
             CountOccurrences(
                 output,
                 "global::Demo.Zeta.__AkburaHotReloadApply();"));
         Assert.Contains(
-            "private static void ReloadAll()\r\n" +
-            "        {\r\n" +
-            "            global::Demo.Alpha.__AkburaHotReloadApply();\r\n" +
-            "            global::Demo.Zeta.__AkburaHotReloadApply();\r\n" +
-            "        }",
+            "private static void ReloadAll()",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::System.Collections.Generic.List<global::System.Exception>? " +
+            "__exceptions = null;",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ThrowRefreshFailures(__exceptions);",
             output,
             StringComparison.Ordinal);
         Assert.True(
@@ -103,11 +110,165 @@ public sealed class HotReloadServiceWriterTests
             output,
             StringComparison.Ordinal);
         Assert.DoesNotContain("s_components", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "OrderBaseTypesFirst(componentTypes, componentCount);",
+            output,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             "\n",
             output.Replace("\r\n", string.Empty, StringComparison.Ordinal),
             StringComparison.Ordinal);
         Assert.EndsWith("#endif\r\n", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_AkcssNestedTypeUpdateReloadsOnlyDependentComponent()
+    {
+        const string hostSource =
+            """
+            namespace Demo
+            {
+                internal static class Dependent
+                {
+                    internal static int CallCount;
+
+                    internal static void __AkburaHotReloadApply()
+                    {
+                        CallCount++;
+                    }
+                }
+
+                internal static class Unrelated
+                {
+                    internal static int CallCount;
+
+                    internal static void __AkburaHotReloadApply()
+                    {
+                        CallCount++;
+                    }
+                }
+
+                internal static class ThemeModule
+                {
+                    internal sealed class Style
+                    {
+                    }
+                }
+            }
+            """;
+        var assemblyName =
+            "AkburaAkcssDispatch_" +
+            Guid.NewGuid().ToString("N");
+        var generated = HotReloadServiceWriter.Generate(
+            assemblyName,
+            ["Demo.Dependent", "Demo.Unrelated"],
+            new Dictionary<string, ImmutableArray<string>>(
+                StringComparer.Ordinal)
+            {
+                ["Demo.Dependent"] =
+                    ["global::Demo.ThemeModule"],
+            });
+        var output = generated.SourceText.ToString();
+
+        Assert.Contains(
+            "Affects(updatedTypes, typeof(global::Demo.ThemeModule))",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "static readonly global::System.Type",
+            output,
+            StringComparison.Ordinal);
+
+        var assembly = CompileAndLoad(
+            assemblyName,
+            hostSource,
+            generated);
+        var handler = GetRequiredType(
+            assembly,
+            "Akbura.Generated." +
+            HotReloadServiceWriter.GetHandlerTypeName(
+                assemblyName));
+        var style = GetRequiredType(
+            assembly,
+            "Demo.ThemeModule+Style");
+        var dependent = GetRequiredType(
+            assembly,
+            "Demo.Dependent");
+        var unrelated = GetRequiredType(
+            assembly,
+            "Demo.Unrelated");
+        var updateApplicationCore = GetRequiredStaticMethod(
+            handler,
+            "UpdateApplicationCore");
+
+        updateApplicationCore.Invoke(
+            null,
+            [new[] { style }]);
+
+        Assert.Equal(1, GetStaticCallCount(dependent));
+        Assert.Equal(0, GetStaticCallCount(unrelated));
+    }
+
+    [Fact]
+    public void Generate_ReloadsBaseBeforeLexicallyEarlierDerivedComponent()
+    {
+        const string hostSource =
+            """
+            namespace Demo
+            {
+                internal static class CallLog
+                {
+                    internal static readonly System.Collections.Generic.List<string> Entries = [];
+                }
+
+                internal class ZBase
+                {
+                    internal static void __AkburaHotReloadApply()
+                    {
+                        CallLog.Entries.Add("base");
+                    }
+                }
+
+                internal sealed class ADerived : ZBase
+                {
+                    internal new static void __AkburaHotReloadApply()
+                    {
+                        CallLog.Entries.Add("derived");
+                    }
+                }
+            }
+            """;
+        var assemblyName =
+            "AkburaBaseOrder_" +
+            Guid.NewGuid().ToString("N");
+        var generated = HotReloadServiceWriter.Generate(
+            assemblyName,
+            ["Demo.ADerived", "Demo.ZBase"]);
+        var assembly = CompileAndLoad(
+            assemblyName,
+            hostSource,
+            generated);
+        var handler = GetRequiredType(
+            assembly,
+            "Akbura.Generated." +
+            HotReloadServiceWriter.GetHandlerTypeName(
+                assemblyName));
+        var callLog = GetRequiredType(
+            assembly,
+            "Demo.CallLog");
+        var reloadAll = GetRequiredStaticMethod(
+            handler,
+            "ReloadAll");
+
+        reloadAll.Invoke(null, parameters: null);
+
+        var entries = Assert.IsType<List<string>>(
+            GetRequiredStaticField(
+                callLog,
+                "Entries").GetValue(null));
+        Assert.Equal(
+            ["base", "derived"],
+            entries);
     }
 
     [Fact]
@@ -214,9 +375,11 @@ public sealed class HotReloadServiceWriterTests
         var output = generated.SourceText.ToString();
 
         Assert.Contains(
-            "private static void ReloadAll()\r\n" +
-            "        {\r\n" +
-            "        }",
+            "private static void ReloadAll()",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ThrowRefreshFailures(__exceptions);",
             output,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -264,6 +427,88 @@ public sealed class HotReloadServiceWriterTests
                     "Akbura",
                     StringComparison.OrdinalIgnoreCase))
             .ToArray();
+    }
+
+    private static Assembly CompileAndLoad(
+        string assemblyName,
+        string hostSource,
+        GeneratedSource generated)
+    {
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview)
+            .WithPreprocessorSymbols("DEBUG");
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    hostSource,
+                    parseOptions),
+                CSharpSyntaxTree.ParseText(
+                    generated.SourceText,
+                    parseOptions),
+            ],
+            references: CreateHotReloadReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions:
+                    NullableContextOptions.Enable));
+        using var peStream = new MemoryStream();
+        var emit = compilation.Emit(peStream);
+
+        Assert.True(
+            emit.Success,
+            string.Join(
+                Environment.NewLine,
+                emit.Diagnostics.Select(
+                    static diagnostic =>
+                        diagnostic.ToString())) +
+            Environment.NewLine +
+            generated.SourceText);
+
+        return Assembly.Load(peStream.ToArray());
+    }
+
+    private static Type GetRequiredType(
+        Assembly assembly,
+        string metadataName)
+    {
+        return Assert.IsAssignableFrom<Type>(
+            assembly.GetType(metadataName));
+    }
+
+    private static MethodInfo GetRequiredStaticMethod(
+        Type type,
+        string name)
+    {
+        const BindingFlags flags =
+            BindingFlags.Static |
+            BindingFlags.Public |
+            BindingFlags.NonPublic;
+
+        return Assert.IsAssignableFrom<MethodInfo>(
+            type.GetMethod(name, flags));
+    }
+
+    private static FieldInfo GetRequiredStaticField(
+        Type type,
+        string name)
+    {
+        const BindingFlags flags =
+            BindingFlags.Static |
+            BindingFlags.Public |
+            BindingFlags.NonPublic;
+
+        return Assert.IsAssignableFrom<FieldInfo>(
+            type.GetField(name, flags));
+    }
+
+    private static int GetStaticCallCount(Type type)
+    {
+        return Assert.IsType<int>(
+            GetRequiredStaticField(
+                type,
+                "CallCount").GetValue(null));
     }
 
     private static int CountOccurrences(string text, string value)

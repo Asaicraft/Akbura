@@ -77,11 +77,13 @@ internal readonly struct ComponentRoutedEventPlan
     private ComponentRoutedEventPlan(
         ComponentRoutedEventKind kind,
         ISymbol eventSymbol,
+        ITypeSymbol handlerType,
         string handlerExpression,
         AkburaSyntax syntax)
     {
         Kind = kind;
         EventSymbol = eventSymbol;
+        HandlerType = handlerType;
         HandlerExpression = handlerExpression;
         Syntax = syntax;
     }
@@ -90,6 +92,8 @@ internal readonly struct ComponentRoutedEventPlan
 
     public ISymbol? EventSymbol { get; }
 
+    public ITypeSymbol? HandlerType { get; }
+
     public string? HandlerExpression { get; }
 
     public AkburaSyntax? Syntax { get; }
@@ -97,6 +101,7 @@ internal readonly struct ComponentRoutedEventPlan
     public bool IsValid =>
         Kind != ComponentRoutedEventKind.None &&
         EventSymbol != null &&
+        HandlerType != null &&
         !string.IsNullOrEmpty(HandlerExpression) &&
         Syntax != null;
 
@@ -108,18 +113,21 @@ internal readonly struct ComponentRoutedEventPlan
         return new ComponentRoutedEventPlan(
             ComponentRoutedEventKind.ClrEvent,
             eventSymbol,
+            eventSymbol.Type,
             handlerExpression,
             syntax);
     }
 
     public static ComponentRoutedEventPlan CreateAvaloniaRoutedEvent(
         ISymbol eventSymbol,
+        ITypeSymbol handlerType,
         string handlerExpression,
         AkburaSyntax syntax)
     {
         return new ComponentRoutedEventPlan(
             ComponentRoutedEventKind.AvaloniaRoutedEvent,
             eventSymbol,
+            handlerType,
             handlerExpression,
             syntax);
     }

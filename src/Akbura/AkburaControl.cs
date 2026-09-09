@@ -2,6 +2,7 @@
 using Akbura.ComponentTree;
 using Akbura.Diagnostics;
 using Akbura.Engine;
+using Akbura.HotReload;
 using Akbura.Hooks;
 using Akbura.Markup;
 using Avalonia;
@@ -111,6 +112,44 @@ public abstract class AkburaControl : Control, IComponentTree
     }
 
     /// <summary>
+    /// Replaces the generated AKCSS cascade during Hot Reload.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static void ReplaceAkcssStylesForHotReload(
+        Control control,
+        ImmutableArray<AkcssStyleActivator> styles)
+    {
+        ArgumentNullException.ThrowIfNull(control);
+
+        control.SetValue(
+            AkcssStylesProperty,
+            ValidateAkcssStyles(styles));
+    }
+
+    /// <summary>
+    /// Replaces the generated AKCSS cascade on an ordinary object during Hot Reload.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static void ReplaceAkcssStylesForHotReload(
+        object target,
+        ImmutableArray<AkcssStyleActivator> styles)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        if (target is Control control)
+        {
+            ReplaceAkcssStylesForHotReload(control, styles);
+            return;
+        }
+
+        AkcssRuntime.SetStyles(
+            target,
+            ValidateAkcssStyles(styles));
+    }
+
+    /// <summary>
     /// Reapplies the complete AKCSS cascade attached to a control.
     /// </summary>
     public static void ExecuteAkcssStyles(Control control)
@@ -169,7 +208,10 @@ public abstract class AkburaControl : Control, IComponentTree
     private bool _isUpdating;
     private bool _updatePending;
     private int _updateSuppressionDepth;
+    private long _hotReloadRequestGeneration;
+    private long _pendingHotReloadRequestGeneration;
     private readonly UseHookRuntime _useHooks;
+    private readonly long _hotReloadCreationRevision;
 
     public AkburaControl() : this(AkburaEngine.Singletone)
     {
@@ -180,7 +222,12 @@ public abstract class AkburaControl : Control, IComponentTree
     {
         _engine = akburaEngine;
         _useHooks = new UseHookRuntime(this);
+        _hotReloadCreationRevision =
+            AkburaHotReloadRuntime.CaptureRevision();
     }
+
+    internal long HotReloadCreationRevision =>
+        _hotReloadCreationRevision;
 
     IComponentTree? IComponentTree.ComponentParent
     {
@@ -442,15 +489,33 @@ public abstract class AkburaControl : Control, IComponentTree
         RequestUpdate();
     }
 
-    internal void ApplyHotReload()
+    internal void ApplyHotReload(
+        Action<long> scheduleRefresh)
     {
+        ArgumentNullException.ThrowIfNull(scheduleRefresh);
+
         var services = GetServices();
         for (var index = 0; index < services.Length; index++)
         {
             services[index].Inject(this, _engine);
         }
 
+        var requestGeneration =
+            ++_hotReloadRequestGeneration;
+        scheduleRefresh(requestGeneration);
+        _pendingHotReloadRequestGeneration =
+            requestGeneration;
         InvalidState();
+    }
+
+    internal void RetryPendingHotReload()
+    {
+        if (_pendingHotReloadRequestGeneration == 0)
+        {
+            return;
+        }
+
+        RequestUpdate();
     }
 
     /// <summary>
@@ -544,6 +609,10 @@ public abstract class AkburaControl : Control, IComponentTree
                 _updatePending = false;
                 _isUpdating = true;
 
+                var hotReloadRequestGeneration =
+                    _pendingHotReloadRequestGeneration;
+                _pendingHotReloadRequestGeneration = 0;
+
                 var hookFrameStarted = false;
 
                 try
@@ -555,9 +624,25 @@ public abstract class AkburaControl : Control, IComponentTree
 
                     _useHooks.CompleteFrame();
                     hookFrameStarted = false;
+
+                    if (hotReloadRequestGeneration != 0)
+                    {
+                        AkburaHotReloadRuntime.AcknowledgeRefreshes(
+                            this,
+                            hotReloadRequestGeneration);
+                    }
                 }
                 catch
                 {
+                    if (hotReloadRequestGeneration != 0)
+                    {
+                        _pendingHotReloadRequestGeneration =
+                            Math.Max(
+                                _pendingHotReloadRequestGeneration,
+                                hotReloadRequestGeneration);
+                        _updatePending = true;
+                    }
+
                     if (hookFrameStarted)
                     {
                         _useHooks.AbortFrame();
@@ -629,8 +714,12 @@ public abstract class AkburaControl : Control, IComponentTree
     {
         base.OnAttachedToVisualTree(e);
         SetComponentParent(FindComponentParent());
-        AkburaComponentRegistry.Attach(this);
-        if (_useHooks.NeedsRestart)
+        var participatesInHotReload =
+            AkburaComponentRegistry.Attach(this);
+        var appliedPendingHotReload =
+            participatesInHotReload &&
+            AkburaHotReloadRuntime.ApplyPendingRefreshes(this);
+        if (!appliedPendingHotReload && _useHooks.NeedsRestart)
         {
             RequestUpdate();
         }

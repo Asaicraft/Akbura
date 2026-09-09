@@ -37,6 +37,7 @@ internal enum ComponentElementFlags : ushort
     RequiresLocalMarkupContext = 1 << 6,
     IsLocal = 1 << 7,
     RequiresContentPresenterRefresh = 1 << 8,
+    UsesRuntimeStorage = 1 << 9,
 }
 
 internal enum ComponentElementScopeKind : byte
@@ -118,7 +119,9 @@ internal readonly struct ComponentElementPlan
         ComponentPlanRange children,
         ComponentPlanRange propertyWrites,
         ComponentPlanRange propertyElements,
-        AkcssElementActivatorPlan akcss)
+        AkcssElementActivatorPlan akcss,
+        string? explicitKey = null,
+        int runtimeStorageId = -1)
         : this(
             id,
             syntax,
@@ -134,7 +137,9 @@ internal readonly struct ComponentElementPlan
             firstUpdateActions: default,
             propertyElements,
             content: default,
-            akcss)
+            akcss,
+            explicitKey,
+            runtimeStorageId)
     {
     }
 
@@ -153,7 +158,9 @@ internal readonly struct ComponentElementPlan
         ComponentPlanRange firstUpdateActions,
         ComponentPlanRange propertyElements,
         ComponentContentTargetReference content,
-        AkcssElementActivatorPlan akcss)
+        AkcssElementActivatorPlan akcss,
+        string? explicitKey = null,
+        int runtimeStorageId = -1)
     {
         Id = id;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
@@ -170,6 +177,8 @@ internal readonly struct ComponentElementPlan
         PropertyElements = propertyElements;
         Content = content;
         Akcss = akcss;
+        ExplicitKey = explicitKey;
+        RuntimeStorageId = runtimeStorageId;
     }
 
     public int Id { get; }
@@ -179,6 +188,10 @@ internal readonly struct ComponentElementPlan
     public ITypeSymbol Type { get; }
 
     public string Identifier { get; }
+
+    public string? ExplicitKey { get; }
+
+    public int RuntimeStorageId { get; }
 
     public int ParentId { get; }
 
@@ -205,6 +218,9 @@ internal readonly struct ComponentElementPlan
     public bool IsRoot => (Flags & ComponentElementFlags.IsRoot) != 0;
 
     public bool IsLocal => (Flags & ComponentElementFlags.IsLocal) != 0;
+
+    public bool UsesRuntimeStorage =>
+        (Flags & ComponentElementFlags.UsesRuntimeStorage) != 0;
 
     public bool HasName => (Flags & ComponentElementFlags.HasName) != 0;
 

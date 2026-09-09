@@ -79,6 +79,23 @@ public sealed class CollectionWriterTests
     }
 
     [Fact]
+    public void WriteTarget_ComponentParameter_WritesTypedEscapedPropertyAccess()
+    {
+        var fixture = CreateFixture();
+        var plan = CollectionWritePlan.CreateComponentParameter(
+            fixture.CollectionType,
+            "class");
+        using var codeWriter = new CodeWriter("\n");
+        var writer = new CollectionWriter(codeWriter);
+
+        Assert.True(writer.WriteTarget(plan, "__component"));
+
+        Assert.Equal(
+            "((global::System.Collections.Generic.List<int>)__component.@class!)",
+            codeWriter.GetText().ToString());
+    }
+
+    [Fact]
     public void WriteStartAndEnd_StreamEscapedElementReference()
     {
         var fixture = CreateFixture();

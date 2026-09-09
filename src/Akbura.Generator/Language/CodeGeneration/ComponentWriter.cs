@@ -19,6 +19,7 @@ internal sealed class ComponentWriter : IDisposable
     private readonly ComponentPlan _plan;
     private readonly ComponentMemberPlan _memberPlan;
     private readonly ComponentHotReloadPlan _hotReloadPlan;
+    private readonly ComponentGenerationMode _generationMode;
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
@@ -30,7 +31,9 @@ internal sealed class ComponentWriter : IDisposable
         IAkburaComponentSymbol component,
         AkburaSemanticModel semanticModel,
         string resourcePath,
-        IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames)
+        IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
 
@@ -72,6 +75,7 @@ internal sealed class ComponentWriter : IDisposable
         _sourceMap = new ComponentGenerationSourceMap(syntaxTree);
         _ownerTypeName = GetGeneratedOwnerTypeName(component);
         _resourcePath = NormalizeResourcePath(resourcePath);
+        _generationMode = generationMode;
 
         if (_resourcePath.Length == 0)
         {
@@ -84,7 +88,8 @@ internal sealed class ComponentWriter : IDisposable
             component,
             semanticModel,
             akcssModuleTypeNames,
-            in resultEnvironment);
+            in resultEnvironment,
+            generationMode);
 
         try
         {
@@ -115,6 +120,8 @@ internal sealed class ComponentWriter : IDisposable
     {
         get => ref _hotReloadPlan;
     }
+
+    public ComponentGenerationMode GenerationMode => _generationMode;
 
     public PooledImmutableList<ComponentElementPlan> Elements => _plan.Elements;
 
@@ -165,7 +172,8 @@ internal sealed class ComponentWriter : IDisposable
             var writer = new ComponentHotReloadWriter(
                 _writer,
                 _sourceMap,
-                _ownerTypeName);
+                _ownerTypeName,
+                _generationMode);
             writer.Write(_memberPlan, _hotReloadPlan);
         }
         finally
@@ -206,6 +214,13 @@ internal sealed class ComponentWriter : IDisposable
 
     public bool WriteElementFields()
     {
+        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            var structuralWriter = new ComponentStructuralHotReloadWriter(_writer);
+            structuralWriter.WriteFields(_plan);
+            return true;
+        }
+
         var writer = new ElementWriter(_writer, _sourceMap);
         var wroteAny = false;
 
@@ -222,6 +237,27 @@ internal sealed class ComponentWriter : IDisposable
         }
 
         return wroteAny;
+    }
+
+    public bool WriteStructuralHotReloadMembers()
+    {
+        if (_generationMode != ComponentGenerationMode.DebugStructural)
+        {
+            return false;
+        }
+
+        var indent = _writer.CurrentIndent;
+
+        try
+        {
+            var writer = new ComponentStructuralHotReloadWriter(_writer);
+            writer.WriteMembers(_plan);
+            return true;
+        }
+        finally
+        {
+            _writer.CurrentIndent = indent;
+        }
     }
 
     public void WriteElementCreation(int elementId)
@@ -360,7 +396,8 @@ internal sealed class ComponentWriter : IDisposable
                 _writer,
                 in _bindingEnvironment,
                 _sourceMap,
-                _ownerTypeName);
+                _ownerTypeName,
+                _generationMode);
             var wroteAny = false;
 
             for (var i = 0; i < _plan.DeferredContents.Length; i++)
@@ -391,6 +428,11 @@ internal sealed class ComponentWriter : IDisposable
 
     public bool WritePropertySubscriptionHandlers()
     {
+        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            return false;
+        }
+
         if (_plan.PropertySubscriptions.IsDefaultOrEmpty)
         {
             return false;
@@ -434,6 +476,11 @@ internal sealed class ComponentWriter : IDisposable
         var indent = _writer.CurrentIndent;
         try
         {
+            if (_generationMode == ComponentGenerationMode.DebugStructural)
+            {
+                return false;
+            }
+
             var wroteAny = WriteCachedBindingPaths();
             if (!_plan.Akcss.IsEmpty)
             {
@@ -446,7 +493,8 @@ internal sealed class ComponentWriter : IDisposable
                     _writer,
                     in _bindingEnvironment,
                     _ownerTypeName,
-                    _sourceMap);
+                    _sourceMap,
+                    _generationMode);
                 writer.WriteStaticMembers(_plan.Akcss);
                 wroteAny = true;
             }
@@ -465,6 +513,11 @@ internal sealed class ComponentWriter : IDisposable
 
         try
         {
+            if (_generationMode == ComponentGenerationMode.DebugStructural)
+            {
+                return false;
+            }
+
             var scopeContext = CreateComponentScopeWriteContext();
             var wroteAny = false;
 
@@ -553,7 +606,8 @@ internal sealed class ComponentWriter : IDisposable
                 _writer,
                 in _bindingEnvironment,
                 _ownerTypeName,
-                _sourceMap);
+                _sourceMap,
+                _generationMode);
             return writer.WriteFactoryMethods(_plan.Akcss, element.Akcss, context);
         }
         finally
@@ -601,7 +655,8 @@ internal sealed class ComponentWriter : IDisposable
                 _writer,
                 in _bindingEnvironment,
                 _ownerTypeName,
-                _sourceMap);
+                _sourceMap,
+                _generationMode);
             writer.WriteRefresh(element.Akcss.Activators, targetExpression);
             return true;
         }
@@ -663,7 +718,8 @@ internal sealed class ComponentWriter : IDisposable
             _writer,
             in _bindingEnvironment,
             _sourceMap,
-            _ownerTypeName);
+            _ownerTypeName,
+            _generationMode);
     }
 
     private ComponentLifecycleWriter CreateLifecycleWriter()
@@ -673,7 +729,8 @@ internal sealed class ComponentWriter : IDisposable
             in _bindingEnvironment,
             _sourceMap,
             _ownerTypeName,
-            _resourcePath);
+            _resourcePath,
+            _generationMode);
     }
 
     private static string NormalizeResourcePath(string resourcePath)

@@ -1,6 +1,7 @@
 using Akbura.Language.CodeGeneration;
 using Akbura.Pools;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
@@ -151,12 +152,30 @@ internal sealed partial class BlackSilenceDocumentBatch
 
         using var componentTypeNames = ImmutableArrayBuilder<string>.Rent(
             componentCount);
+        var akcssModuleTypeNamesByComponent =
+            new Dictionary<string, ImmutableArray<string>>(
+                componentCount,
+                StringComparer.Ordinal);
         for (var i = 0; i < componentCount; i++)
         {
             if (results[i] != null)
             {
-                componentTypeNames.Add(
-                    request.Components[i].Descriptor.ComponentMetadataName);
+                var component = request.Components[i];
+                var componentTypeName =
+                    component.Descriptor.ComponentMetadataName;
+
+                componentTypeNames.Add(componentTypeName);
+
+                if (!component.AkcssModuleTypeNames.IsDefaultOrEmpty)
+                {
+                    akcssModuleTypeNamesByComponent[componentTypeName] =
+                        akcssModuleTypeNamesByComponent.TryGetValue(
+                            componentTypeName,
+                            out var existing)
+                            ? existing.AddRange(
+                                component.AkcssModuleTypeNames)
+                            : component.AkcssModuleTypeNames;
+                }
             }
         }
 
@@ -171,7 +190,8 @@ internal sealed partial class BlackSilenceDocumentBatch
             GetSources(results, componentCount + externalCount, request.InlineAkcss.Length),
             [HotReloadServiceWriter.Generate(
                 assemblyName,
-                componentTypeNames.ToImmutable())],
+                componentTypeNames.ToImmutable(),
+                akcssModuleTypeNamesByComponent)],
             GetDiagnostics(request, diagnosticEntries));
         var snapshot = new BlackSilenceProjectSnapshot(
             request.Version,
@@ -211,7 +231,8 @@ internal sealed partial class BlackSilenceDocumentBatch
                     input.SemanticModel,
                     input.SourcePath,
                     request.Index.AkcssModuleTypeNames,
-                    cancellationToken);
+                    cancellationToken,
+                    request.Options.ComponentGenerationMode);
                 results[index] = new GeneratedDocumentEntry(
                     component.Identity,
                     component.Version,
@@ -226,7 +247,8 @@ internal sealed partial class BlackSilenceDocumentBatch
                     input,
                     request.Index.AkcssSourceMap,
                     request.Index.RootNamespace,
-                    cancellationToken);
+                    cancellationToken,
+                    request.Options.ComponentGenerationMode);
                 results[index] = new GeneratedDocumentEntry(
                     module.Identity,
                     module.Version,

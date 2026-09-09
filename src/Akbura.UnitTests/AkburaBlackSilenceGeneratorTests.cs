@@ -1,13 +1,19 @@
 using Akbura.BlackSilence;
 using Akbura.Language;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Text;
 using System;
+using System.Collections.Immutable;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Threading;
 
 namespace Akbura.UnitTests;
@@ -126,6 +132,151 @@ public sealed class AkburaBlackSilenceGeneratorTests
     }
 
     [Fact]
+    public void HotReloadService_ContinuesComponentTypesAndAggregatesFailures()
+    {
+        const string hostSource =
+            """
+            namespace Demo
+            {
+                public static class First
+                {
+                    public static int CallCount;
+                    public static bool Throws;
+
+                    internal static void __AkburaHotReloadApply()
+                    {
+                        CallCount++;
+                        if (Throws)
+                        {
+                            throw new System.InvalidOperationException(
+                                "First component type failed.");
+                        }
+                    }
+                }
+
+                public static class Second
+                {
+                    public static int CallCount;
+                    public static bool Throws;
+
+                    internal static void __AkburaHotReloadApply()
+                    {
+                        CallCount++;
+                        if (Throws)
+                        {
+                            throw new System.InvalidOperationException(
+                                "Second component type failed.");
+                        }
+                    }
+                }
+
+                public static class Third
+                {
+                    public static int CallCount;
+                    public static bool Throws;
+
+                    internal static void __AkburaHotReloadApply()
+                    {
+                        CallCount++;
+                        if (Throws)
+                        {
+                            throw new System.InvalidOperationException(
+                                "Third component type failed.");
+                        }
+                    }
+                }
+            }
+            """;
+        var assemblyName =
+            "AkburaHotReloadIsolation_" + Guid.NewGuid().ToString("N");
+        var generated = HotReloadServiceWriter.Generate(
+            assemblyName,
+            ["Demo.First", "Demo.Second", "Demo.Third"]);
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview)
+            .WithPreprocessorSymbols("DEBUG");
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(hostSource, parseOptions),
+                CSharpSyntaxTree.ParseText(
+                    generated.SourceText,
+                    parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        using var peStream = new MemoryStream();
+        var emit = compilation.Emit(peStream);
+
+        Assert.True(emit.Success, FormatDiagnostics(emit.Diagnostics));
+
+        var assembly = Assembly.Load(peStream.ToArray());
+        var first = Assert.IsAssignableFrom<Type>(
+            assembly.GetType("Demo.First"));
+        var second = Assert.IsAssignableFrom<Type>(
+            assembly.GetType("Demo.Second"));
+        var third = Assert.IsAssignableFrom<Type>(
+            assembly.GetType("Demo.Third"));
+        var handler = Assert.IsAssignableFrom<Type>(
+            assembly.GetType(
+                "Akbura.Generated." +
+                HotReloadServiceWriter.GetHandlerTypeName(assemblyName)));
+        const BindingFlags flags =
+            BindingFlags.Static |
+            BindingFlags.Public |
+            BindingFlags.NonPublic;
+        var updateApplicationCore = Assert.IsAssignableFrom<MethodInfo>(
+            handler.GetMethod("UpdateApplicationCore", flags));
+        var reloadAll = Assert.IsAssignableFrom<MethodInfo>(
+            handler.GetMethod("ReloadAll", flags));
+
+        GetRequiredStaticField(first, "Throws").SetValue(null, true);
+
+        var singleFailure = Assert.Throws<TargetInvocationException>(
+            () => updateApplicationCore.Invoke(
+                null,
+                [new[] { first, second, third }]));
+
+        Assert.Equal(
+            "First component type failed.",
+            Assert.IsType<InvalidOperationException>(
+                singleFailure.InnerException).Message);
+        Assert.Equal(1, GetStaticCallCount(first));
+        Assert.Equal(1, GetStaticCallCount(second));
+        Assert.Equal(1, GetStaticCallCount(third));
+
+        foreach (var componentType in new[] { first, second, third })
+        {
+            GetRequiredStaticField(
+                componentType,
+                "CallCount").SetValue(null, 0);
+        }
+
+        GetRequiredStaticField(third, "Throws").SetValue(null, true);
+
+        var multipleFailures = Assert.Throws<TargetInvocationException>(
+            () => reloadAll.Invoke(null, parameters: null));
+        var aggregate = Assert.IsType<AggregateException>(
+            multipleFailures.InnerException);
+
+        Assert.Equal(2, aggregate.InnerExceptions.Count);
+        Assert.Contains(
+            aggregate.InnerExceptions,
+            static exception =>
+                exception.Message == "First component type failed.");
+        Assert.Contains(
+            aggregate.InnerExceptions,
+            static exception =>
+                exception.Message == "Third component type failed.");
+        Assert.Equal(1, GetStaticCallCount(first));
+        Assert.Equal(1, GetStaticCallCount(second));
+        Assert.Equal(1, GetStaticCallCount(third));
+    }
+
+    [Fact]
     public void GenerateSources_DebugCompilationLinksComponentToHotReloadService()
     {
         var projectDirectory = Path.Combine(
@@ -181,6 +332,453 @@ public sealed class AkburaBlackSilenceGeneratorTests
         Assert.Equal(Accessibility.Internal, applyMethod.DeclaredAccessibility);
         Assert.True(applyMethod.ReturnsVoid);
         Assert.Empty(applyMethod.Parameters);
+    }
+
+    [Fact]
+    public void GenerateSources_DebugStructuralEdit_PreservesDeclaredFieldContract()
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests),
+            Guid.NewGuid().ToString("N"));
+        var componentPath = Path.Combine(projectDirectory, "Page.akbura");
+        var original = new TestAdditionalText(
+            componentPath,
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <TextBlock Text=\"Hello\" />\r\n" +
+                "    <Border />\r\n" +
+                "    <TextBlock Text=\"Hi\" />\r\n" +
+                "</StackPanel>\r\n"));
+        var edited = new TestAdditionalText(
+            componentPath,
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <Border />\r\n" +
+                "    <TextBlock Text=\"Hi\" />\r\n" +
+                "</StackPanel>\r\n"));
+        var options = new TestAnalyzerConfigOptionsProvider(
+            "Demo",
+            projectDirectory);
+        var baseCompilation = CreateCompilation(string.Empty);
+        var driver = CreateDebugDriver(options, original);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var initialCompilation,
+            out _);
+
+        AssertGeneratedCompilation(driver, initialCompilation);
+
+        var initialContract = GetDeclaredFieldContract(
+            initialCompilation,
+            "Demo.Page");
+
+        driver = driver.ReplaceAdditionalText(original, edited);
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var updatedCompilation,
+            out _);
+
+        AssertGeneratedCompilation(driver, updatedCompilation);
+
+        var updatedContract = GetDeclaredFieldContract(
+            updatedCompilation,
+            "Demo.Page");
+
+        Assert.Equal(initialContract, updatedContract);
+        Assert.DoesNotContain(
+            updatedContract,
+            static field => field.StartsWith(
+                "__element",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void GenerateSources_DebugStructuralEdit_EmitsEditAndContinueDelta()
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests),
+            Guid.NewGuid().ToString("N"));
+        var componentPath = Path.Combine(projectDirectory, "Page.akbura");
+        var original = new TestAdditionalText(
+            componentPath,
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <Border />\r\n" +
+                "</StackPanel>\r\n"));
+        var edited = new TestAdditionalText(
+            componentPath,
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <TextBlock Text=\"Inserted\" />\r\n" +
+                "    <Border />\r\n" +
+                "</StackPanel>\r\n"));
+        var options = new TestAnalyzerConfigOptionsProvider(
+            "Demo",
+            projectDirectory);
+        var baseCompilation = CreateCompilation(string.Empty)
+            .RemoveAllSyntaxTrees();
+        var driver = CreateDebugDriver(options, original);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var initialCompilation,
+            out _);
+
+        AssertGeneratedCompilation(driver, initialCompilation);
+        var initialGeneratedSource = GetGeneratedComponentSource(driver);
+
+        driver = driver.ReplaceAdditionalText(original, edited);
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var updatedCompilation,
+            out _);
+
+        AssertGeneratedCompilation(driver, updatedCompilation);
+        var updatedGeneratedSource = GetGeneratedComponentSource(driver);
+        Assert.False(
+            initialGeneratedSource.SourceText.ContentEquals(
+                updatedGeneratedSource.SourceText));
+
+        var semanticEdits = GetChangedGeneratedMethodEdits(
+            initialCompilation,
+            updatedCompilation,
+            "Demo.Page");
+        Assert.NotEmpty(semanticEdits);
+
+        using var peStream = new MemoryStream();
+        using var pdbStream = new MemoryStream();
+        var initialEmit = initialCompilation.Emit(
+            peStream,
+            pdbStream,
+            options: new EmitOptions(
+                debugInformationFormat: DebugInformationFormat.PortablePdb));
+
+        Assert.True(
+            initialEmit.Success,
+            FormatDiagnostics(initialEmit.Diagnostics));
+
+        var peImage = ImmutableArray.Create(peStream.ToArray());
+        using var module = ModuleMetadata.CreateFromImage(peImage);
+        using var peReader = new PEReader(peImage);
+        var baseline = EmitBaseline.CreateInitialBaseline(
+            initialCompilation,
+            module,
+            static _ => default,
+            methodHandle => GetLocalSignature(peReader, methodHandle),
+            hasPortableDebugInformation: true);
+        using var metadataDelta = new MemoryStream();
+        using var ilDelta = new MemoryStream();
+        using var pdbDelta = new MemoryStream();
+
+        var difference = updatedCompilation.EmitDifference(
+            baseline,
+            semanticEdits,
+            static _ => false,
+            metadataDelta,
+            ilDelta,
+            pdbDelta,
+            CancellationToken.None);
+
+        Assert.DoesNotContain(
+            difference.Diagnostics,
+            static diagnostic =>
+                diagnostic.Id is "ENC0009" or "ENC0020" or "ENC0033");
+        Assert.True(
+            difference.Success,
+            FormatDiagnostics(difference.Diagnostics));
+        Assert.NotEmpty(difference.UpdatedMethods);
+        Assert.True(metadataDelta.Length > 0);
+        Assert.True(ilDelta.Length > 0);
+        Assert.True(pdbDelta.Length > 0);
+    }
+
+    [Fact]
+    public void GenerateSources_DebugStructuralOperationRemoval_EmitsEditAndContinueDelta()
+    {
+        const string eventHostSource =
+            "using Avalonia.Interactivity;\r\n" +
+            "\r\n" +
+            "namespace Demo;\r\n" +
+            "\r\n" +
+            "public partial class EventPage\r\n" +
+            "{\r\n" +
+            "    private void OnClick(object? sender, RoutedEventArgs eventArgs)\r\n" +
+            "    {\r\n" +
+            "    }\r\n" +
+            "}\r\n";
+
+        AssertDebugEditAndContinueDelta(
+            "EventPage.akbura",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <Button Click={OnClick} />\r\n" +
+                "</StackPanel>\r\n",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <Button />\r\n" +
+                "</StackPanel>\r\n",
+            eventHostSource,
+            "Demo.EventPage");
+
+        AssertDebugEditAndContinueDelta(
+            "EventExpressionPage.akbura",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "state int count = 0;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <Button Click={count++} />\r\n" +
+                "</StackPanel>\r\n",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "state int count = 0;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <Button />\r\n" +
+                "</StackPanel>\r\n",
+            string.Empty,
+            "Demo.EventExpressionPage");
+
+        AssertDebugEditAndContinueDelta(
+            "BindingPage.akbura",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <TextBox x.Name=\"source\" Text=\"Initial\" />\r\n" +
+                "    <TextBlock Text=${Binding #source.Text} />\r\n" +
+                "</StackPanel>\r\n",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "<StackPanel>\r\n" +
+                "    <TextBox x.Name=\"source\" Text=\"Initial\" />\r\n" +
+                "    <TextBlock />\r\n" +
+                "</StackPanel>\r\n",
+            string.Empty,
+            "Demo.BindingPage");
+
+        AssertDebugEditAndContinueDelta(
+            "ReverseBindingPage.akbura",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "state string value = \"Initial\";\r\n" +
+                "\r\n" +
+                "<TextBox x.Name=\"input\" bind:Text={value} />\r\n",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "state string value = \"Initial\";\r\n" +
+                "\r\n" +
+                "<TextBox x.Name=\"input\" />\r\n",
+            string.Empty,
+            "Demo.ReverseBindingPage");
+
+        AssertDebugEditAndContinueDelta(
+            "CommandPage.akbura",
+            "using Demo;\r\n" +
+                "\r\n" +
+                "command int Execute(int value);\r\n" +
+                "\r\n" +
+                "<Child Execute={value => value * 2} />\r\n",
+            "using Demo;\r\n" +
+                "\r\n" +
+                "command int Execute(int value);\r\n" +
+                "\r\n" +
+                "<Child />\r\n",
+            string.Empty,
+            "Demo.CommandPage",
+            "Child.akbura",
+            "namespace Demo;\r\n" +
+                "\r\n" +
+                "command int Execute(int value);\r\n");
+    }
+
+    [Fact]
+    public void GenerateSources_DebugAkcssEdit_PreservesDeclaredMemberContract()
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests),
+            Guid.NewGuid().ToString("N"));
+        var componentPath = Path.Combine(projectDirectory, "StyledPage.akbura");
+        var original = new TestAdditionalText(
+            componentPath,
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "using Demo.Extensions;\r\n" +
+                "\r\n" +
+                "@akcss {\r\n" +
+                "    @using Avalonia.Controls;\r\n" +
+                "    .card { Height: 20; }\r\n" +
+                "    @utilities {\r\n" +
+                "        Control.width-(double value) { Width: value; }\r\n" +
+                "    }\r\n" +
+                "}\r\n" +
+                "\r\n" +
+                "state double spacing = 4;\r\n" +
+                "\r\n" +
+                "<Border class=\"card\" width-${DirectPadding {spacing + 1}} />\r\n"));
+        var edited = new TestAdditionalText(
+            componentPath,
+            SourceText.From(
+                "using Avalonia.Controls;\r\n" +
+                "using Demo.Extensions;\r\n" +
+                "\r\n" +
+                "@akcss {\r\n" +
+                "    @using Avalonia.Controls;\r\n" +
+                "    .accent { Opacity: 0.5; }\r\n" +
+                "    .card { Height: 20; }\r\n" +
+                "    @utilities {\r\n" +
+                "        Control.height-(double value) { Height: value; }\r\n" +
+                "        Control.width-(double value) { Width: value; }\r\n" +
+                "    }\r\n" +
+                "}\r\n" +
+                "\r\n" +
+                "state double spacing = 4;\r\n" +
+                "\r\n" +
+                "<Border class=\"card accent\"\r\n" +
+                "        width-${DirectPadding {spacing + 2}}\r\n" +
+                "        height-${DirectPadding {spacing + 3}} />\r\n"));
+        var options = new TestAnalyzerConfigOptionsProvider(
+            "Demo",
+            projectDirectory);
+        var baseCompilation = CreateCompilation(
+            """
+            namespace Demo.Extensions;
+
+            public sealed class DirectPaddingExtension
+            {
+                public DirectPaddingExtension(double value)
+                {
+                }
+
+                public double ProvideValue(System.IServiceProvider services) => 0;
+            }
+            """);
+        var driver = CreateDebugDriver(options, original);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var initialCompilation,
+            out _);
+
+        AssertGeneratedCompilation(driver, initialCompilation);
+
+        var inlineModuleMetadataName =
+            AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                "Demo",
+                "StyledPage.akbura.inline.0.akcss")
+            .Substring("global::".Length);
+        var initialContract = GetDeclaredRuntimeMemberContract(
+            initialCompilation,
+            "Demo.StyledPage");
+        var initialModuleContract = GetDeclaredRuntimeMemberContract(
+            initialCompilation,
+            inlineModuleMetadataName);
+        var initialSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            static source => source.HintName.StartsWith(
+                "Akbura.Component.",
+                StringComparison.Ordinal)).SourceText.ToString();
+        var initialModuleSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            static source => source.HintName.StartsWith(
+                "Akbura.Akcss.",
+                StringComparison.Ordinal)).SourceText.ToString();
+
+        driver = driver.ReplaceAdditionalText(original, edited);
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var updatedCompilation,
+            out _);
+
+        AssertGeneratedCompilation(driver, updatedCompilation);
+
+        var updatedContract = GetDeclaredRuntimeMemberContract(
+            updatedCompilation,
+            "Demo.StyledPage");
+        var updatedModuleContract = GetDeclaredRuntimeMemberContract(
+            updatedCompilation,
+            inlineModuleMetadataName);
+        var updatedSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            static source => source.HintName.StartsWith(
+                "Akbura.Component.",
+                StringComparison.Ordinal)).SourceText.ToString();
+        var updatedModuleSource = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            static source => source.HintName.StartsWith(
+                "Akbura.Akcss.",
+                StringComparison.Ordinal)).SourceText.ToString();
+
+        Assert.Equal(initialContract, updatedContract);
+        Assert.Equal(
+            initialModuleContract,
+            updatedModuleContract);
+
+        foreach (var generatedSource in new[] { initialSource, updatedSource })
+        {
+            Assert.DoesNotContain("s_akcssClass", generatedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain("s_akcssApplications", generatedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain("s_akcssValueProperty", generatedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain("__CreateAkcssValue", generatedSource, StringComparison.Ordinal);
+            Assert.Contains(
+                "." +
+                AkcssModuleWriter.DebugStyleAccessorName +
+                "(",
+                generatedSource,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                ".Styles[",
+                generatedSource,
+                StringComparison.Ordinal);
+        }
+
+        foreach (var generatedSource in new[] { initialModuleSource, updatedModuleSource })
+        {
+            Assert.Contains(
+                "internal static global::Akbura.Akcss.AkcssStyle " +
+                AkcssModuleWriter.DebugStyleAccessorName +
+                "(int index)",
+                generatedSource,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void GenerateSources_DebugAkcssApplicationRemoval_EmitsEditAndContinueDelta()
+    {
+        AssertDebugEditAndContinueDelta(
+            "StyledPage.akbura",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "@akcss {\r\n" +
+                "    @using Avalonia.Controls;\r\n" +
+                "    .card { Width: 20; }\r\n" +
+                "}\r\n" +
+                "\r\n" +
+                "<Border class=\"card\" />\r\n",
+            "using Avalonia.Controls;\r\n" +
+                "\r\n" +
+                "@akcss {\r\n" +
+                "    @using Avalonia.Controls;\r\n" +
+                "    .card { Width: 20; }\r\n" +
+                "}\r\n" +
+                "\r\n" +
+                "<Border />\r\n",
+            string.Empty,
+            "Demo.StyledPage");
     }
 
     [Fact]
@@ -960,6 +1558,282 @@ public sealed class AkburaBlackSilenceGeneratorTests
             string.Join(Environment.NewLine, diagnostics.Select(static diagnostic => diagnostic.ToString())) +
             Environment.NewLine +
             string.Join(Environment.NewLine, result.GeneratedSources.Select(static source => source.SourceText.ToString())));
+    }
+
+    private static string[] GetDeclaredFieldContract(
+        Compilation compilation,
+        string metadataName)
+    {
+        var type = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            compilation.GetTypeByMetadataName(metadataName));
+
+        return type.GetMembers()
+            .OfType<IFieldSymbol>()
+            .Where(static field => !field.IsImplicitlyDeclared)
+            .Select(static field =>
+                field.MetadataName + "|" +
+                field.Type.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat) + "|" +
+                field.IsStatic + "|" +
+                field.IsReadOnly + "|" +
+                field.IsConst)
+            .OrderBy(static field => field, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string[] GetDeclaredRuntimeMemberContract(
+        Compilation compilation,
+        string metadataName)
+    {
+        var type = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            compilation.GetTypeByMetadataName(metadataName));
+
+        return type.GetMembers()
+            .Where(static member =>
+                !member.IsImplicitlyDeclared &&
+                member is IFieldSymbol or IMethodSymbol)
+            .Select(static member => member switch
+            {
+                IFieldSymbol field =>
+                    "F|" +
+                    field.MetadataName + "|" +
+                    field.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "|" +
+                    field.IsStatic + "|" +
+                    field.IsReadOnly + "|" +
+                    field.IsConst,
+                IMethodSymbol method =>
+                    "M|" +
+                    method.MetadataName + "|" +
+                    method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "|" +
+                    method.IsStatic + "|" +
+                    string.Join(
+                        ",",
+                        method.Parameters.Select(static parameter =>
+                            parameter.Type.ToDisplayString(
+                                SymbolDisplayFormat.FullyQualifiedFormat))),
+                _ => throw new InvalidOperationException(),
+            })
+            .OrderBy(static member => member, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static GeneratedSourceResult GetGeneratedComponentSource(
+        GeneratorDriver driver)
+    {
+        return Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            static source => source.HintName.StartsWith(
+                "Akbura.Component.",
+                StringComparison.Ordinal));
+    }
+
+    private static SemanticEdit[] GetChangedGeneratedMethodEdits(
+        Compilation initialCompilation,
+        Compilation updatedCompilation,
+        string metadataName)
+    {
+        var initialMethods = GetGeneratedMethods(
+            initialCompilation,
+            metadataName);
+        var updatedMethods = GetGeneratedMethods(
+            updatedCompilation,
+            metadataName);
+
+        Assert.Equal(
+            initialMethods.Keys.OrderBy(
+                static key => key,
+                StringComparer.Ordinal),
+            updatedMethods.Keys.OrderBy(
+                static key => key,
+                StringComparer.Ordinal));
+
+        return updatedMethods
+            .Where(pair => !GetMethodSyntax(initialMethods[pair.Key])
+                .IsEquivalentTo(GetMethodSyntax(pair.Value)))
+            .OrderBy(
+                static pair => pair.Key,
+                StringComparer.Ordinal)
+            .Select(pair => new SemanticEdit(
+                SemanticEditKind.Update,
+                initialMethods[pair.Key],
+                pair.Value))
+            .ToArray();
+    }
+
+    private static Dictionary<string, IMethodSymbol> GetGeneratedMethods(
+        Compilation compilation,
+        string metadataName)
+    {
+        var type = Assert.IsAssignableFrom<INamedTypeSymbol>(
+            compilation.GetTypeByMetadataName(metadataName));
+
+        return type.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Where(static method =>
+                !method.IsImplicitlyDeclared &&
+                !method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+            .ToDictionary(GetMethodKey, StringComparer.Ordinal);
+    }
+
+    private static string GetMethodKey(IMethodSymbol method)
+    {
+        return method.MetadataName + "|" +
+            method.Arity + "|" +
+            method.IsStatic + "|" +
+            method.ReturnType.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat) + "|" +
+            string.Join(
+                ",",
+                method.Parameters.Select(static parameter =>
+                    parameter.RefKind + ":" +
+                    parameter.Type.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat)));
+    }
+
+    private static SyntaxNode GetMethodSyntax(IMethodSymbol method)
+    {
+        return Assert.Single(
+            method.DeclaringSyntaxReferences).GetSyntax();
+    }
+
+    private static void AssertDebugEditAndContinueDelta(
+        string fileName,
+        string originalSource,
+        string editedSource,
+        string hostSource,
+        string componentMetadataName,
+        string? supportingFileName = null,
+        string? supportingSource = null)
+    {
+        var projectDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(AkburaBlackSilenceGeneratorTests),
+            Guid.NewGuid().ToString("N"));
+        var componentPath = Path.Combine(projectDirectory, fileName);
+        var original = new TestAdditionalText(
+            componentPath,
+            SourceText.From(originalSource));
+        var edited = new TestAdditionalText(
+            componentPath,
+            SourceText.From(editedSource));
+        var options = new TestAnalyzerConfigOptionsProvider(
+            "Demo",
+            projectDirectory);
+        var baseCompilation = CreateCompilation(hostSource);
+        var additionalTexts = supportingFileName == null
+            ? new AdditionalText[] { original }
+            :
+            [
+                original,
+                new TestAdditionalText(
+                    Path.Combine(projectDirectory, supportingFileName),
+                    SourceText.From(supportingSource!)),
+            ];
+        var driver = CreateDebugDriver(options, additionalTexts);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var initialCompilation,
+            out _);
+        AssertGeneratedCompilation(driver, initialCompilation);
+
+        driver = driver.ReplaceAdditionalText(original, edited);
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            baseCompilation,
+            out var updatedCompilation,
+            out _);
+        AssertGeneratedCompilation(driver, updatedCompilation);
+
+        var semanticEdits = GetChangedGeneratedMethodEdits(
+            initialCompilation,
+            updatedCompilation,
+            componentMetadataName);
+        Assert.NotEmpty(semanticEdits);
+
+        using var peStream = new MemoryStream();
+        using var pdbStream = new MemoryStream();
+        var initialEmit = initialCompilation.Emit(
+            peStream,
+            pdbStream,
+            options: new EmitOptions(
+                debugInformationFormat: DebugInformationFormat.PortablePdb));
+        Assert.True(
+            initialEmit.Success,
+            FormatDiagnostics(initialEmit.Diagnostics));
+
+        var peImage = ImmutableArray.Create(peStream.ToArray());
+        using var module = ModuleMetadata.CreateFromImage(peImage);
+        using var peReader = new PEReader(peImage);
+        var baseline = EmitBaseline.CreateInitialBaseline(
+            initialCompilation,
+            module,
+            static _ => default,
+            methodHandle => GetLocalSignature(peReader, methodHandle),
+            hasPortableDebugInformation: true);
+        using var metadataDelta = new MemoryStream();
+        using var ilDelta = new MemoryStream();
+        using var pdbDelta = new MemoryStream();
+
+        var difference = updatedCompilation.EmitDifference(
+            baseline,
+            semanticEdits,
+            static _ => false,
+            metadataDelta,
+            ilDelta,
+            pdbDelta,
+            CancellationToken.None);
+
+        Assert.DoesNotContain(
+            difference.Diagnostics,
+            static diagnostic =>
+                diagnostic.Id is "ENC0009" or "ENC0020" or "ENC0033");
+        Assert.True(
+            difference.Success,
+            FormatDiagnostics(difference.Diagnostics));
+        Assert.NotEmpty(difference.UpdatedMethods);
+        Assert.True(metadataDelta.Length > 0);
+        Assert.True(ilDelta.Length > 0);
+        Assert.True(pdbDelta.Length > 0);
+    }
+
+    private static StandaloneSignatureHandle GetLocalSignature(
+        PEReader peReader,
+        MethodDefinitionHandle methodHandle)
+    {
+        var method = peReader.GetMetadataReader()
+            .GetMethodDefinition(methodHandle);
+
+        return method.RelativeVirtualAddress == 0
+            ? default
+            : peReader.GetMethodBody(method.RelativeVirtualAddress)
+                .LocalSignature;
+    }
+
+    private static string FormatDiagnostics(
+        IEnumerable<Diagnostic> diagnostics)
+    {
+        return string.Join(
+            Environment.NewLine,
+            diagnostics.Select(static diagnostic => diagnostic.ToString()));
+    }
+
+    private static FieldInfo GetRequiredStaticField(
+        Type type,
+        string name)
+    {
+        const BindingFlags flags =
+            BindingFlags.Static |
+            BindingFlags.Public |
+            BindingFlags.NonPublic;
+
+        return Assert.IsAssignableFrom<FieldInfo>(
+            type.GetField(name, flags));
+    }
+
+    private static int GetStaticCallCount(Type type)
+    {
+        return Assert.IsType<int>(
+            GetRequiredStaticField(type, "CallCount").GetValue(null));
     }
 
     private static GeneratorDriver CreateDriver(

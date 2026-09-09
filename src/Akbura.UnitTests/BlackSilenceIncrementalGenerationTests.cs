@@ -353,6 +353,76 @@ public sealed class BlackSilenceIncrementalGenerationTests
     }
 
     [Fact]
+    public void RequestBuilder_TracksTransitiveAndInlineAkcssModulesForHotReload()
+    {
+        var project = new TestProject();
+        var page = project.File(
+            "Page.akbura",
+            Component(
+                "using Demo.Styles.Top.akcss;\r\n" +
+                "\r\n" +
+                "@akcss {\r\n" +
+                "    @using Avalonia.Controls;\r\n" +
+                "    .local { Height: 5; }\r\n" +
+                "}\r\n" +
+                "\r\n" +
+                "<Border class=\"top local\" />"));
+        var top = project.File(
+            "Styles/Top.akcss",
+            "@using Demo.Styles.Base.akcss;\r\n" +
+            ".top { @apply basic; }");
+        var @base = project.File(
+            "Styles/Base.akcss",
+            "@using Avalonia.Controls;\r\n" +
+            ".basic { Width: 10; }");
+        var run = Run(
+            project,
+            CreateDriver(
+                project.Options,
+                page,
+                top,
+                @base));
+        var component = Assert.Single(
+            run.Request.Components);
+        var expected = new[]
+        {
+            AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                "Demo",
+                "Page.akbura.inline.0.akcss"),
+            AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                "Demo",
+                "Styles/Base.akcss"),
+            AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(
+                "Demo",
+                "Styles/Top.akcss"),
+        };
+
+        Array.Sort(expected, StringComparer.Ordinal);
+
+        Assert.Equal(
+            expected,
+            component.AkcssModuleTypeNames);
+
+        var serviceSource = Assert.Single(
+            Assert.Single(
+                run.Driver.GetRunResult().Results)
+            .GeneratedSources,
+            static source =>
+                source.HintName ==
+                HotReloadServiceWriter.HintName)
+            .SourceText
+            .ToString();
+
+        foreach (var moduleTypeName in expected)
+        {
+            Assert.Contains(
+                "typeof(" + moduleTypeName + ")",
+                serviceSource,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void ReorderedSameShortNameComponents_KeepCanonicalDeclarationsAndMatchFreshGeneration()
     {
         var project = new TestProject();

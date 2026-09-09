@@ -42,7 +42,8 @@ internal static class ComponentDocumentWriter
         AkburaSemanticModel semanticModel,
         string sourcePath,
         IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ComponentGenerationMode mode = ComponentGenerationMode.ReleaseDirect)
     {
 #if STATS
         using var generationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ComponentGeneration);
@@ -80,7 +81,8 @@ internal static class ComponentDocumentWriter
             component,
             semanticModel,
             sourcePath,
-            akcssModuleTypeNames);
+            akcssModuleTypeNames,
+            mode);
 #if STATS
         planningMeasurement.Dispose();
         using var emissionMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEmission);
@@ -225,6 +227,11 @@ internal static class ComponentDocumentWriter
         }
 
         if (componentWriter.WriteDeferredContentBuilders())
+        {
+            writer.WriteLine();
+        }
+
+        if (componentWriter.WriteStructuralHotReloadMembers())
         {
             writer.WriteLine();
         }

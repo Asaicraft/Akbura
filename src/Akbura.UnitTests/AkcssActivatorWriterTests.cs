@@ -33,6 +33,115 @@ public sealed class AkcssActivatorWriterTests
         Assert.Contains("global::Akbura.Akcss.ZeroAkcssUtility", output, StringComparison.Ordinal);
         Assert.Contains("global::Akbura.Akcss.AkcssUtility<double>", output, StringComparison.Ordinal);
         Assert.Contains("(double)__arguments[0]!", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Demo.WriterStyles.Styles[",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            AkcssModuleWriter.DebugStyleAccessorName,
+            output,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DebugStructural_InlinesCachesAndMarkupExtensionFactories()
+    {
+        var basicFixture = CreateBasicFixture();
+        var richSemanticFixture = AkcssActivatorPlannerTests.CreateRichMarkupExtensionFixture();
+        var richFixture = CreateWriterFixture(
+            richSemanticFixture,
+            richSemanticFixture.GetRootElement(),
+            requiresLocalMarkupExtensionContext: false);
+
+        var staticOutput = WriteStaticMembers(
+            basicFixture,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var basicOutput = WriteElement(
+            basicFixture,
+            elementIndex: 0,
+            writeFactories: true,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var richOutput = WriteElement(
+            richFixture,
+            elementIndex: 0,
+            writeFactories: true,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var output = staticOutput + basicOutput + richOutput;
+
+        Assert.Equal(string.Empty, staticOutput);
+        Assert.Contains(
+            "new global::Akbura.Akcss.AkcssClassActivator(",
+            basicOutput,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ImmutableArray.Create<global::Akbura.Akcss.AkcssUtilityApplication>(",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.Akcss.AkcssUtilityValueSource.GetTargetProperty<" +
+            OwnerTypeName + ">(",
+            richOutput,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.AkburaControl.ReplaceAkcssStylesForHotReload(",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "global::Akbura.AkburaControl.SetAkcssStyles(",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("s_akcssClass", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("s_akcssApplications", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("s_akcssValueProperty", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("__CreateAkcssValue", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Demo.WriterStyles." +
+            AkcssModuleWriter.DebugStyleAccessorName +
+            "(",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "global::Demo.WriterStyles.Styles[",
+            output,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WriteApplyHotReloadStyles_WritesOwnedRenderStateOperation()
+    {
+        var fixture = CreateBasicFixture();
+        using var codeWriter = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var writer = new AkcssActivatorWriter(
+            codeWriter,
+            in environment,
+            OwnerTypeName,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        var context = CreateWriteContext();
+
+        writer.WriteApplyHotReloadStyles(
+            fixture.Plan,
+            fixture.Plan.Elements[0].Activators,
+            localId: 7,
+            "__target",
+            context);
+
+        var output = codeWriter.GetText().ToString();
+        Assert.Contains(
+            "__akburaRenderState.ApplyAkcssStylesOperation(\n" +
+            "    7,\n" +
+            "    __target,\n",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ReplaceAkcssStylesForHotReload",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "SetAkcssStyles",
+            output,
+            StringComparison.Ordinal);
+        Assert.Equal(0, codeWriter.CurrentIndent);
     }
 
     [Fact]
@@ -640,14 +749,17 @@ public sealed class AkcssActivatorWriterTests
 
     private static string WriteStaticMembers(
         WriterFixture fixture,
-        string ownerTypeName = OwnerTypeName)
+        string ownerTypeName = OwnerTypeName,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         using var codeWriter = new CodeWriter("\n");
         var environment = fixture.Environment;
         var writer = new AkcssActivatorWriter(
             codeWriter,
             in environment,
-            ownerTypeName);
+            ownerTypeName,
+            generationMode: generationMode);
 
         writer.WriteStaticMembers(fixture.Plan);
 
@@ -658,14 +770,17 @@ public sealed class AkcssActivatorWriterTests
         WriterFixture fixture,
         int elementIndex,
         bool writeFactories,
-        bool writeRefresh = false)
+        bool writeRefresh = false,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         using var codeWriter = new CodeWriter("\n");
         var environment = fixture.Environment;
         var writer = new AkcssActivatorWriter(
             codeWriter,
             in environment,
-            OwnerTypeName);
+            OwnerTypeName,
+            generationMode: generationMode);
         var context = CreateWriteContext();
         var element = fixture.Plan.Elements[elementIndex];
 

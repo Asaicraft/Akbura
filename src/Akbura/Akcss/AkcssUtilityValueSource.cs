@@ -1,8 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 
 namespace Akbura.Akcss;
 
@@ -260,6 +263,34 @@ public abstract class AkcssUtilityValueSource
             property,
             converter,
             recreateOnRefresh);
+    }
+
+    /// <summary>
+    /// Gets a stable target property for one generated AKCSS value-source slot.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static AttachedProperty<object?> GetTargetProperty<TOwner>(int slotId)
+        where TOwner : AvaloniaObject
+    {
+        if (slotId < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(slotId));
+        }
+
+#pragma warning disable AVP1001 // Each owner-and-slot pair is registered exactly once by the cache
+        var property = TargetPropertyCache<TOwner>.Properties.GetOrAdd(
+            slotId,
+            static id => new Lazy<AttachedProperty<object?>>(
+                () => AvaloniaProperty.RegisterAttached<
+                    TOwner,
+                    Control,
+                    object?>(
+                        "__AkcssValue" +
+                        id.ToString(CultureInfo.InvariantCulture)),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+#pragma warning restore AVP1001 // Each owner-and-slot pair is registered exactly once by the cache
+        return property.Value;
     }
 
     private sealed class DirectValueSource<TValue>
@@ -575,6 +606,14 @@ public abstract class AkcssUtilityValueSource
         void IObserver<object?>.OnCompleted()
         {
         }
+    }
+
+    private static class TargetPropertyCache<TOwner>
+        where TOwner : AvaloniaObject
+    {
+        public static readonly ConcurrentDictionary<
+            int,
+            Lazy<AttachedProperty<object?>>> Properties = new();
     }
 
     private static Control GetControl(object target)

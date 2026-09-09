@@ -16,7 +16,36 @@ internal static class AkburaComponentRegistry
     internal static void ExcludeTopLevel(TopLevel topLevel)
     {
         ArgumentNullException.ThrowIfNull(topLevel);
-        s_excludedTopLevels.GetValue(topLevel, static _ => new object());
+
+        var changed = false;
+        lock (s_gate)
+        {
+            s_excludedTopLevels.GetValue(
+                topLevel,
+                static _ => new object());
+
+            for (var index = s_components.Count - 1; index >= 0; index--)
+            {
+                if (!s_components[index].TryGetTarget(out var component))
+                {
+                    s_components.RemoveAt(index);
+                    continue;
+                }
+
+                if (ReferenceEquals(
+                        TopLevel.GetTopLevel(component),
+                        topLevel))
+                {
+                    s_components.RemoveAt(index);
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            Changed?.Invoke(null, EventArgs.Empty);
+        }
     }
 
     internal static ImmutableArray<AkburaControl> GetAttachedComponents()
@@ -60,18 +89,18 @@ internal static class AkburaComponentRegistry
         }
     }
 
-    internal static void Attach(AkburaControl component)
+    internal static bool Attach(AkburaControl component)
     {
         ArgumentNullException.ThrowIfNull(component);
 
-        if (TopLevel.GetTopLevel(component) is { } topLevel &&
-            s_excludedTopLevels.TryGetValue(topLevel, out _))
-        {
-            return;
-        }
-
         lock (s_gate)
         {
+            if (TopLevel.GetTopLevel(component) is { } topLevel &&
+                s_excludedTopLevels.TryGetValue(topLevel, out _))
+            {
+                return false;
+            }
+
             for (var index = s_components.Count - 1; index >= 0; index--)
             {
                 if (!s_components[index].TryGetTarget(out var existing))
@@ -82,7 +111,7 @@ internal static class AkburaComponentRegistry
 
                 if (ReferenceEquals(existing, component))
                 {
-                    return;
+                    return true;
                 }
             }
 
@@ -90,6 +119,37 @@ internal static class AkburaComponentRegistry
         }
 
         Changed?.Invoke(null, EventArgs.Empty);
+        return true;
+    }
+
+    internal static bool IsParticipating(AkburaControl component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        lock (s_gate)
+        {
+            if (TopLevel.GetTopLevel(component) is { } topLevel &&
+                s_excludedTopLevels.TryGetValue(topLevel, out _))
+            {
+                return false;
+            }
+
+            for (var index = s_components.Count - 1; index >= 0; index--)
+            {
+                if (!s_components[index].TryGetTarget(out var existing))
+                {
+                    s_components.RemoveAt(index);
+                    continue;
+                }
+
+                if (ReferenceEquals(existing, component))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 
     internal static void Detach(AkburaControl component)

@@ -15,11 +15,14 @@ internal readonly ref struct ComponentHotReloadWriter
     private readonly CSharpValueWriter _valueWriter;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
+    private readonly ComponentGenerationMode _generationMode;
 
     public ComponentHotReloadWriter(
         CodeWriter writer,
         ComponentGenerationSourceMap sourceMap,
-        string ownerTypeName)
+        string ownerTypeName,
+        ComponentGenerationMode generationMode =
+            ComponentGenerationMode.ReleaseDirect)
     {
         Debug.Assert(writer != null);
         Debug.Assert(sourceMap != null);
@@ -29,6 +32,7 @@ internal readonly ref struct ComponentHotReloadWriter
         _valueWriter = new CSharpValueWriter(writer!);
         _sourceMap = sourceMap!;
         _ownerTypeName = ownerTypeName;
+        _generationMode = generationMode;
     }
 
     public void Write(
@@ -337,7 +341,7 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteLine("__component.__states = default;");
-        WriteInitialValuesInvocation();
+        WritePrepareInvocation();
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
     }
@@ -351,13 +355,22 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine(" __component)");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
-        WriteInitialValuesInvocation();
+        WritePrepareInvocation();
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
     }
 
-    private void WriteInitialValuesInvocation()
+    private void WritePrepareInvocation()
     {
+        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            _writer.Write("__component.");
+            _writer.Write(
+                ComponentStructuralHotReloadWriter.RenderStateFieldName);
+            _writer.WriteLine(".Invalidate();");
+            return;
+        }
+
         _writer.Write("__component.");
         _writer.Write(
             ComponentLifecycleWriter.HotReloadUpdateInitialValuesMethodName);

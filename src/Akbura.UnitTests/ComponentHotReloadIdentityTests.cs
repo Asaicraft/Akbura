@@ -1,5 +1,6 @@
 ﻿using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
+using Akbura.Language.Syntax;
 
 namespace Akbura.UnitTests;
 
@@ -164,6 +165,179 @@ public sealed class ComponentHotReloadIdentityTests
         }
     }
 
+    [Fact]
+    public void RenderSyntaxIdentity_IsCompactStableAndContentSensitive()
+    {
+        var compact = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+
+            <Button Content="Stable identity text" Width="42" />
+            """);
+        var formatted = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+
+            <Button
+                Content = "Stable identity text"
+                Width = "42" />
+            """);
+        var changed = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+
+            <Button Content="Changed identity text" Width="42" />
+            """);
+
+        try
+        {
+            var compactIdentity =
+                ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
+                    compact.Elements.ItemRef(0).Syntax);
+            var formattedIdentity =
+                ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
+                    formatted.Elements.ItemRef(0).Syntax);
+            var changedIdentity =
+                ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
+                    changed.Elements.ItemRef(0).Syntax);
+
+            Assert.Equal(64, compactIdentity.Length);
+            Assert.Matches("^[0-9A-F]{64}$", compactIdentity);
+            Assert.Equal(compactIdentity, formattedIdentity);
+            Assert.NotEqual(compactIdentity, changedIdentity);
+            Assert.DoesNotContain(
+                "Stable identity text",
+                compactIdentity,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            compact.ReturnToPool();
+            formatted.ReturnToPool();
+            changed.ReturnToPool();
+        }
+    }
+
+    [Fact]
+    public void ContentSyntaxIdentity_IgnoresOwnerAttributesAndTracksContent()
+    {
+        var original = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+
+            <Button Width="100">Stable content</Button>
+            """);
+        var changedAttribute = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+
+            <Button Width="200">Stable content</Button>
+            """);
+        var changedContent = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+
+            <Button Width="200">Changed content</Button>
+            """);
+
+        try
+        {
+            var originalIdentity =
+                ComponentHotReloadIdentity.CreateContentSyntaxIdentity(
+                    Assert.Single(original.PropertyContents).Syntax);
+            var changedAttributeIdentity =
+                ComponentHotReloadIdentity.CreateContentSyntaxIdentity(
+                    Assert.Single(changedAttribute.PropertyContents).Syntax);
+            var changedContentIdentity =
+                ComponentHotReloadIdentity.CreateContentSyntaxIdentity(
+                    Assert.Single(changedContent.PropertyContents).Syntax);
+
+            Assert.Equal(originalIdentity, changedAttributeIdentity);
+            Assert.NotEqual(originalIdentity, changedContentIdentity);
+        }
+        finally
+        {
+            original.ReturnToPool();
+            changedAttribute.ReturnToPool();
+            changedContent.ReturnToPool();
+        }
+    }
+
+    [Fact]
+    public void RenderFingerprint_IncludesSemanticContentSlot()
+    {
+        const string types =
+            """
+            namespace Demo;
+
+            public sealed class SlotHost : Avalonia.Controls.Control
+            {
+                public Avalonia.Controls.Control? First { get; set; }
+
+                public Avalonia.Controls.Control? Second { get; set; }
+            }
+            """;
+        var first = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <SlotHost>
+                <SlotHost.First>
+                    <TextBlock Text="Same child" />
+                </SlotHost.First>
+            </SlotHost>
+            """,
+            types);
+        var second = CreateStructuralPlan(
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            <SlotHost>
+                <SlotHost.Second>
+                    <TextBlock Text="Same child" />
+                </SlotHost.Second>
+            </SlotHost>
+            """,
+            types);
+
+        try
+        {
+            Assert.Equal(2, first.Elements.Length);
+            Assert.Equal(2, second.Elements.Length);
+
+            ref readonly var firstChild = ref first.Elements.ItemRef(1);
+            ref readonly var secondChild = ref second.Elements.ItemRef(1);
+            var firstSlot = ComponentStructuralHotReloadWriter.GetElementSlot(
+                first,
+                firstChild);
+            var secondSlot = ComponentStructuralHotReloadWriter.GetElementSlot(
+                second,
+                secondChild);
+
+            Assert.Equal(
+                ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
+                    first.Elements.ItemRef(0).Syntax),
+                ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
+                    second.Elements.ItemRef(0).Syntax));
+            Assert.Equal(
+                ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
+                    firstChild.Syntax),
+                ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
+                    secondChild.Syntax));
+            Assert.NotEqual(firstSlot, secondSlot);
+            Assert.NotEqual(
+                ComponentHotReloadIdentity.CreateRenderFingerprint(first),
+                ComponentHotReloadIdentity.CreateRenderFingerprint(second));
+        }
+        finally
+        {
+            first.ReturnToPool();
+            second.ReturnToPool();
+        }
+    }
+
     private static ComponentMemberPlan CreatePlan(
         string componentSource,
         string? csharpSource = null)
@@ -178,5 +352,23 @@ public sealed class ComponentHotReloadIdentityTests
         return ComponentMemberPlanner.Create(
             component,
             fixture.SemanticModel);
+    }
+
+    private static ComponentPlan CreateStructuralPlan(
+        string componentSource,
+        string? csharpSource = null)
+    {
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(
+            componentSource,
+            csharpSource);
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            fixture.SemanticModel.GetSymbolInfo(
+                fixture.ComponentTree.GetRoot()).Symbol);
+
+        return ComponentPlanner.Create(
+            component,
+            fixture.SemanticModel,
+            new Dictionary<AkburaSyntax, string>(),
+            ComponentGenerationMode.DebugStructural);
     }
 }

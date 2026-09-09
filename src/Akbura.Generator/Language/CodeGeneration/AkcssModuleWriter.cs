@@ -8,6 +8,9 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal readonly ref struct AkcssModuleWriter
 {
+    internal const string DebugStyleAccessorName =
+        "__AkburaGetStyle";
+
     private const string RuntimeStyleType =
         "global::Akbura.Akcss.AkcssStyle";
 
@@ -121,6 +124,37 @@ internal readonly ref struct AkcssModuleWriter
         _writer.CurrentIndent = indent + _writer.TabSize;
         _writer.WriteLine(");");
         _writer.CurrentIndent = indent;
+    }
+
+    public void WriteDebugStyleAccessor(in AkcssModulePlan plan)
+    {
+        _writer.WriteHiddenApiAttributes();
+        _writer.Write("internal static ");
+        _writer.Write(RuntimeStyleType);
+        _writer.Write(" ");
+        _writer.Write(DebugStyleAccessorName);
+        _writer.WriteLine("(int index)");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("return index switch");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+
+        for (var i = 0; i < plan.RuntimeStyles.Length; i++)
+        {
+            _writer.WriteIntegerLiteral(i);
+            _writer.Write(" => ");
+            WriteRuntimeStyleCreation(plan.RuntimeStyles[i]);
+            _writer.WriteLine(",");
+        }
+
+        _writer.WriteLine(
+            "_ => throw new global::System.ArgumentOutOfRangeException(" +
+            "nameof(index)),");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("};");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     public void WriteMetadataCarriers(in AkcssModulePlan plan)

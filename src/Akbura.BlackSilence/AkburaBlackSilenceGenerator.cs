@@ -25,8 +25,14 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        var componentGenerationMode = context.ParseOptionsProvider
+            .Select(static (options, _) => GetComponentGenerationMode(options));
+
         var projectOptions = context.AnalyzerConfigOptionsProvider
-            .Select(static (provider, _) => GeneratorProjectOptions.Create(provider.GlobalOptions))
+            .Combine(componentGenerationMode)
+            .Select(static (input, _) => GeneratorProjectOptions.Create(
+                input.Left.GlobalOptions,
+                input.Right))
             .WithTrackingName(ProjectOptionsTrackingName);
 
         var diagnosticOptions = context.AnalyzerConfigOptionsProvider
@@ -154,6 +160,23 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             generatedProjectSources,
             static (productionContext, source) => AddGeneratedSource(productionContext, source));
+    }
+
+    private static ComponentGenerationMode GetComponentGenerationMode(
+        ParseOptions options)
+    {
+        if (options is CSharpParseOptions csharpOptions)
+        {
+            foreach (var symbol in csharpOptions.PreprocessorSymbolNames)
+            {
+                if (string.Equals(symbol, "DEBUG", StringComparison.Ordinal))
+                {
+                    return ComponentGenerationMode.DebugStructural;
+                }
+            }
+        }
+
+        return ComponentGenerationMode.ReleaseDirect;
     }
 
     private static ImmutableArray<AkburaDiagnosticRecord> SelectPublishedDiagnostics(

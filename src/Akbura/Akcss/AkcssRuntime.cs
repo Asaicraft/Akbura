@@ -23,6 +23,15 @@ internal static class AkcssRuntime
             .SetStyles(styles.IsDefault ? [] : styles);
     }
 
+    public static ImmutableArray<AkcssStyleActivator> GetStyles(object target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        return s_targets.TryGetValue(target, out var runtime)
+            ? runtime.Styles
+            : [];
+    }
+
     public static void Refresh(object target)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -52,6 +61,8 @@ internal static class AkcssRuntime
                 control.DetachedFromVisualTree += OnDetachedFromVisualTree;
             }
         }
+
+        public ImmutableArray<AkcssStyleActivator> Styles => _styles;
 
         public void SetStyles(ImmutableArray<AkcssStyleActivator> styles)
         {

@@ -4,32 +4,35 @@ summary: Connect Akbura diagnostics, open the developer window, and inspect comp
 order: 0
 ---
 
-Run the application in Debug configuration and press the shortcut configured for Akbura diagnostics. This opens the Akbura component inspector independently of Avalonia Developer Tools.
+[![NuGet](https://img.shields.io/nuget/vpre/Akbura.Diagnostics?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Akbura.Diagnostics)
 
-::: warning
-The `Akbura.Diagnostics` NuGet package has not been published yet. The package reference below is the intended setup once the package becomes available.
-:::
+Run the application in Debug configuration and press the shortcut configured for Akbura diagnostics. This opens the Akbura component inspector independently of Avalonia Developer Tools.
 
 ## Add the package
 
-Add the diagnostics package to the application project:
+Applications created with the `akbura.app` template already include diagnostics
+in Debug builds. No additional installation is required for those projects.
+
+For an existing Akbura application, install the package from NuGet:
+
+:::sh
+dotnet add package Akbura.Diagnostics --version 12.0.4-alpha.2
+:::
+
+Because diagnostics is a development tool, keep its assets private and reference
+it only in Debug builds. The resulting project entry should be:
 
 ```xml
-<PackageReference Include="Akbura.Diagnostics">
-    <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
-    <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
-</PackageReference>
+<ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Akbura.Diagnostics"
+                      Version="12.0.4-alpha.2"
+                      PrivateAssets="all" />
+</ItemGroup>
 ```
 
-The conditional metadata keeps the diagnostics dependency limited to Debug builds.
-
-While working directly from the Akbura repository, use a project reference instead:
-
-```xml
-<ProjectReference Include="..\..\Akbura.Diagnostics\Akbura.Diagnostics.csproj" />
-```
-
-Remove the project reference after switching to the published package.
+`PrivateAssets="all"` prevents the development dependency from flowing to projects
+that reference your application or library. The Debug condition keeps diagnostics
+out of Release restore, build, and publish output.
 
 ## Attach diagnostics
 

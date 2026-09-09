@@ -3,6 +3,8 @@ title: Akbura Documentation
 summary: Learn how to build declarative, reactive Avalonia interfaces with Akbura.
 ---
 
+[![NuGet](https://img.shields.io/nuget/vpre/Akbura?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Akbura)
+
 | Feature | Support level | Notes |
 |---------|:------------:|-------|
 | Compatibility with Avalonia | Full | Akbura components can be used directly in AXAML views and vice versa – any Avalonia control (including custom controls) works without extra attributes or imports. |
@@ -10,24 +12,69 @@ summary: Learn how to build declarative, reactive Avalonia interfaces with Akbur
 | Binding | Full | Bindings are fully supported: both `ReflectionBinding` and `CompiledBinding` work, including `BindingPath` parsing, mode selection, converters, etc. |
 | TemplateContent | Full | Properties decorated with `[TemplateContent]` are automatically handled – Akbura generates an `IDeferredContent` implementation, so templates work out of the box. |
 
-## Quick Start
+## Getting Started
 
 ::: warning Experimental
 Akbura is under active development. Syntax, generated code, and runtime APIs may change between releases.
 :::
 
-Install the package:
+### Create an application from the template
+
+Install the current template package from NuGet:
 
 :::sh
-dotnet add package Akbura
+dotnet new install Akbura.Templates::12.0.4-alpha.2
 :::
+
+Create and run an Avalonia desktop application:
+
+:::sh
+dotnet new akbura.app -n MyApp
+cd MyApp
+dotnet run
+:::
+
+The application template includes Akbura, AKCSS, Debug diagnostics, and optional
+dependency injection. Select a DI provider when creating the project if needed:
+
+:::sh
+dotnet new akbura.app -n MyApp --di Microsoft.Extensions.DependencyInjection
+dotnet new akbura.app -n MyApp --di Splat.Locator
+:::
+
+### Add Akbura to an existing project
+
+Install Akbura into an existing Avalonia project:
+
+:::sh
+dotnet add package Akbura --version 12.0.4-alpha.2
+:::
+
+If the template package is installed, create a component from the project
+directory:
+
+:::sh
+dotnet new akbura.component -n Counter --namespace MyApp.Components -o Components
+:::
+
+### Install editor support
+
+Install the extension for the IDE you use:
+
+- **VS Code:** install [Akbura Vs Code Extension](https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-language-server), or run `code --install-extension asaicraft.akbura-language-server`.
+- **Visual Studio:** install [Akbura Visual Studio Extension](https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-visual-studio-extension) from the Marketplace or search for its name under **Extensions → Manage Extensions**.
+
+Both extensions provide language support for `.akbura` and `.akcss` files. The
+NuGet package compiles these files during the project build.
+
+### Create your first component
 
 Create `Counter.akbura`:
 
 ```akbura
 using Avalonia.Controls;
 
-namespace Demo.Pages;
+namespace MyApp.Components;
 
 state int count = 0;
 
@@ -43,9 +90,9 @@ Use the generated component directly inside an Avalonia AXAML view:
 <UserControl
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:pages="using:Demo.Pages">
+    xmlns:components="using:MyApp.Components">
 
-    <pages:Counter />
+    <components:Counter />
 
 </UserControl>
 ```
@@ -225,6 +272,10 @@ Current limitations include:
 
 ## Community and Feedback
 
+- [Akbura on NuGet](https://www.nuget.org/packages/Akbura)
+- [Akbura Templates on NuGet](https://www.nuget.org/packages/Akbura.Templates)
+- [Akbura Vs Code Extension](https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-language-server)
+- [Akbura Visual Studio Extension](https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-visual-studio-extension)
 - [GitHub repository](https://github.com/Asaicraft/Akbura)
 - [Discord](https://discord.gg/zMj4MmJ9U5)
 - [Telegram](https://t.me/akburaui)

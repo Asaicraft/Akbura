@@ -1,4 +1,4 @@
-using Akbura.Language;
+﻿using Akbura.Language;
 using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -418,6 +418,182 @@ public sealed class WorkspaceClassificationTests
             classifications,
             "10",
             AkburaClassificationKind.Number);
+    }
+
+    [Theory]
+    [InlineData("\n", "    ")]
+    [InlineData("\r\n", "\t")]
+    public void SemanticClassification_AkcssShortEnumMembersUseSourceCoordinates(
+        string newLine,
+        string indent)
+    {
+        var source = string.Join(
+            newLine,
+            "@using Avalonia.Controls;",
+            "",
+            "Control.size-full {",
+            indent + "HorizontalAlignment: Stretch;",
+            indent + "VerticalAlignment: Stretch;",
+            "}") + newLine;
+
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Styles.akcss")),
+            text);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+
+        var horizontalPropertyStart = source.IndexOf(
+            "HorizontalAlignment",
+            StringComparison.Ordinal);
+        var verticalPropertyStart = source.IndexOf(
+            "VerticalAlignment",
+            StringComparison.Ordinal);
+        var firstStretchStart = source.IndexOf(
+            "Stretch",
+            StringComparison.Ordinal);
+        var secondStretchStart = source.IndexOf(
+            "Stretch",
+            firstStretchStart + "Stretch".Length,
+            StringComparison.Ordinal);
+
+        AssertOnlyClassification(
+            classifications,
+            horizontalPropertyStart,
+            "HorizontalAlignment".Length,
+            AkburaClassificationKind.PropertyName);
+        AssertOnlyClassification(
+            classifications,
+            firstStretchStart,
+            "Stretch".Length,
+            AkburaClassificationKind.EnumMemberName);
+        AssertOnlyClassification(
+            classifications,
+            verticalPropertyStart,
+            "VerticalAlignment".Length,
+            AkburaClassificationKind.PropertyName);
+        AssertOnlyClassification(
+            classifications,
+            secondStretchStart,
+            "Stretch".Length,
+            AkburaClassificationKind.EnumMemberName);
+        Assert.DoesNotContain(
+            classifications,
+            static classification =>
+                classification.Kind == AkburaClassificationKind.EnumName);
+
+        var secondLineSpan = text.Lines
+            .GetLineFromPosition(verticalPropertyStart)
+            .SpanIncludingLineBreak;
+        var secondLineClassifications =
+            workspace.LanguageServices.Classification.GetClassifications(
+                context,
+                secondLineSpan);
+
+        AssertOnlyClassification(
+            secondLineClassifications,
+            verticalPropertyStart,
+            "VerticalAlignment".Length,
+            AkburaClassificationKind.PropertyName);
+        AssertOnlyClassification(
+            secondLineClassifications,
+            secondStretchStart,
+            "Stretch".Length,
+            AkburaClassificationKind.EnumMemberName);
+        Assert.DoesNotContain(
+            secondLineClassifications,
+            classification =>
+                classification.Span.Contains(firstStretchStart));
+    }
+
+    [Fact]
+    public void SemanticClassification_AkcssQualifiedEnumMemberClassifiesWrittenReceiver()
+    {
+        const string source = """
+            @using Avalonia.Controls;
+
+            Control.size-full {
+                HorizontalAlignment: HorizontalAlignment.Stretch;
+            }
+            """;
+
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Styles.akcss")),
+            text);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+        var propertyStart = source.IndexOf(
+            "HorizontalAlignment",
+            StringComparison.Ordinal);
+        var receiverStart = source.LastIndexOf(
+            "HorizontalAlignment",
+            StringComparison.Ordinal);
+        var memberStart = source.IndexOf(
+            "Stretch",
+            StringComparison.Ordinal);
+
+        AssertOnlyClassification(
+            classifications,
+            propertyStart,
+            "HorizontalAlignment".Length,
+            AkburaClassificationKind.PropertyName);
+        AssertOnlyClassification(
+            classifications,
+            receiverStart,
+            "HorizontalAlignment".Length,
+            AkburaClassificationKind.EnumName);
+        AssertOnlyClassification(
+            classifications,
+            memberStart,
+            "Stretch".Length,
+            AkburaClassificationKind.EnumMemberName);
+    }
+
+    [Fact]
+    public void SemanticClassification_AkcssNamedColorsUseWrittenSourceRanges()
+    {
+        const string source = """
+            @using Avalonia.Controls;
+
+            Control.colors {
+                Foreground: Red;
+                Background: "Red";
+            }
+            """;
+
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Styles.akcss")),
+            text);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+        var identifierStart = source.IndexOf(
+            "Red;",
+            StringComparison.Ordinal);
+        var stringStart = source.IndexOf(
+            "\"Red\"",
+            StringComparison.Ordinal);
+
+        AssertOnlyClassification(
+            classifications,
+            identifierStart,
+            "Red".Length,
+            AkburaClassificationKind.PropertyName);
+        AssertOnlyClassification(
+            classifications,
+            stringStart,
+            "\"Red\"".Length,
+            AkburaClassificationKind.String);
     }
 
     [Fact]
@@ -1119,6 +1295,27 @@ public sealed class WorkspaceClassificationTests
                     StringComparison.Ordinal));
     }
 
+    private static void AssertOnlyClassification(
+        IEnumerable<AkburaClassifiedSpan> classifications,
+        int start,
+        int length,
+        AkburaClassificationKind expectedKind)
+    {
+        var expectedSpan = new TextSpan(start, length);
+
+        Assert.Contains(
+            classifications,
+            classification =>
+                classification.Span == expectedSpan &&
+                classification.Kind == expectedKind);
+        Assert.DoesNotContain(
+            classifications,
+            classification =>
+                classification.Span.OverlapsWith(expectedSpan) &&
+                (classification.Span != expectedSpan ||
+                 classification.Kind != expectedKind));
+    }
+
     private static AkburaWorkspace CreateSemanticWorkspace()
     {
         return new AkburaWorkspace(
@@ -1157,11 +1354,44 @@ public sealed class WorkspaceClassificationTests
                 }
             }
 
+            namespace Avalonia.Layout
+            {
+                public enum HorizontalAlignment
+                {
+                    Stretch,
+                }
+
+                public enum VerticalAlignment
+                {
+                    Stretch,
+                }
+            }
+
+            namespace Avalonia.Media
+            {
+                public readonly struct Color
+                {
+                }
+
+                public static class Colors
+                {
+                    public static Color Red { get; }
+                }
+            }
+
             namespace Avalonia.Controls
             {
                 public class Control
                 {
                     public double Width { get; set; }
+
+                    public Avalonia.Layout.HorizontalAlignment HorizontalAlignment { get; set; }
+
+                    public Avalonia.Layout.VerticalAlignment VerticalAlignment { get; set; }
+
+                    public Avalonia.Media.Color Foreground { get; set; }
+
+                    public Avalonia.Media.Color Background { get; set; }
                 }
 
                 public sealed class Border : Control

@@ -264,6 +264,47 @@ internal sealed class
             return;
         }
 
+        if (operation.ConvertedValue is CSharpSymbolDefinition
+            { Symbol: { } convertedSymbol })
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                    assignment.Expression,
+                    out var sourceExpression,
+                    out var sourceSpan))
+            {
+                return;
+            }
+
+            var sourceOffset =
+                sourceSpan.Start - sourceExpression.FullSpan.Start;
+            var seenSpans = new HashSet<TextSpan>();
+
+            AddSymbolReference(
+                sourceExpression,
+                convertedSymbol,
+                sourceOffset,
+                requestedSpan,
+                builder,
+                seenSpans);
+
+            if (sourceExpression is CSharp.MemberAccessExpressionSyntax
+                { Expression: CSharp.IdentifierNameSyntax receiver } &&
+                operation.Property?.Type.Symbol is ITypeSymbol receiverType)
+            {
+                EmbeddedCSharpSemanticClassificationService
+                    .AddTypeClassifications(
+                        receiver,
+                        receiverType,
+                        sourceOffset,
+                        requestedSpan,
+                        builder);
+            }
+
+            return;
+        }
+
         if (operation.ValueKind ==
             AkcssPropertyValueKind.ThicknessTuple)
         {
@@ -376,8 +417,22 @@ internal sealed class
                 .FullSpan
                 .Start;
 
+        var sourceExpressionSpan =
+            expressionSyntax.Tokens.FullSpan;
+
+        if (EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                expressionSyntax,
+                out _,
+                out var parsedSourceSpan))
+        {
+            sourceExpressionSpan = parsedSourceSpan;
+        }
+
         var seenSpans =
             new HashSet<TextSpan>();
+
+        using var classifications =
+            ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
 
         var pending =
             new Stack<RoslynOperation>();
@@ -397,7 +452,7 @@ internal sealed class
                 operation,
                 sourceOffset,
                 requestedSpan,
-                builder,
+                classifications,
                 seenSpans);
 
             foreach (var child in
@@ -405,6 +460,15 @@ internal sealed class
             {
                 pending.Push(
                     child);
+            }
+        }
+
+        foreach (var classification in classifications.WrittenSpan)
+        {
+            if (classification.Span.Start >= sourceExpressionSpan.Start &&
+                classification.Span.End <= sourceExpressionSpan.End)
+            {
+                builder.Add(classification);
             }
         }
     }

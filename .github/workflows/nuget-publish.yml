@@ -1,0 +1,300 @@
+name: Publish Akbura NuGet Packages
+
+on:
+  push:
+    tags:
+      - "nuget-v*"
+
+permissions: {}
+
+concurrency:
+  group: akbura-nuget-publish
+  cancel-in-progress: false
+
+env:
+  AKBURA_PROJECT: src/Akbura/Akbura.csproj
+  DIAGNOSTICS_PROJECT: src/Akbura.Diagnostics/Akbura.Diagnostics.csproj
+  TEST_PROJECT: src/Akbura.UnitTests/Akbura.UnitTests.csproj
+  ARTIFACTS_PATH: artifacts
+  NUGET_SOURCE: https://api.nuget.org/v3/index.json
+
+jobs:
+  package:
+    name: Test and package NuGet release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/nuget-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Verify release tag and version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin master:refs/remotes/origin/master
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::Release tag must point to a commit on master."
+            exit 1
+          fi
+
+          if [[ ! "$GITHUB_REF_NAME" =~ ^nuget-v(.+)$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' must have the form 'nuget-vVERSION'."
+            exit 1
+          fi
+          tag_version="${BASH_REMATCH[1]}"
+
+          avalonia_version="$(
+            sed -nE \
+              's:.*<AvaloniaVersion>([^<]+)</AvaloniaVersion>.*:\1:p' \
+              Directory.Build.props |
+              head -n 1
+          )"
+          akbura_version="$(
+            sed -nE \
+              's:.*<AkburaVersion>([^<]+)</AkburaVersion>.*:\1:p' \
+              Directory.Build.props |
+              head -n 1
+          )"
+
+          if [[ -z "$avalonia_version" ]]; then
+            echo "::error::Could not read AvaloniaVersion from Directory.Build.props."
+            exit 1
+          fi
+          if [[ "$akbura_version" != '$(AvaloniaVersion)' ]]; then
+            echo "::error::AkburaVersion must remain bound to \$(AvaloniaVersion)."
+            exit 1
+          fi
+
+          escaped_avalonia_version="${avalonia_version//./\\.}"
+          if [[ "$tag_version" == "$avalonia_version" ]]; then
+            :
+          elif [[ "$tag_version" =~ ^${escaped_avalonia_version}\.[0-9]+$ ]]; then
+            :
+          elif [[ "$tag_version" =~ ^${escaped_avalonia_version}-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*$ ]]; then
+            :
+          else
+            echo "::error::Akbura version '$tag_version' is not compatible with Avalonia '$avalonia_version'."
+            echo "Valid examples:"
+            echo "  nuget-v$avalonia_version"
+            echo "  nuget-v$avalonia_version.1"
+            echo "  nuget-v$avalonia_version-alpha.1"
+            echo "  nuget-v$avalonia_version-rc.1"
+            exit 1
+          fi
+
+          echo "Avalonia version: $avalonia_version"
+          echo "Akbura version:   $tag_version"
+          echo "version=$tag_version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore release projects
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dotnet restore "$TEST_PROJECT"
+          dotnet restore "$AKBURA_PROJECT"
+          dotnet restore "$DIAGNOSTICS_PROJECT"
+
+      - name: Test Akbura
+        shell: bash
+        run: |
+          dotnet test "$TEST_PROJECT" \
+            --configuration Release \
+            --no-restore
+
+      - name: Pack Akbura
+        shell: bash
+        run: |
+          dotnet pack "$AKBURA_PROJECT" \
+            --configuration Release \
+            --no-restore \
+            --output "$ARTIFACTS_PATH" \
+            -p:PackageVersion="${{ steps.release.outputs.version }}" \
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Pack Akbura Diagnostics
+        shell: bash
+        run: |
+          dotnet pack "$DIAGNOSTICS_PROJECT" \
+            --configuration Release \
+            --no-restore \
+            --output "$ARTIFACTS_PATH" \
+            -p:PackageVersion="${{ steps.release.outputs.version }}" \
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Verify NuGet packages
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          akbura_package="$ARTIFACTS_PATH/Akbura.$VERSION.nupkg"
+          akbura_symbols="$ARTIFACTS_PATH/Akbura.$VERSION.snupkg"
+          diagnostics_package="$ARTIFACTS_PATH/Akbura.Diagnostics.$VERSION.nupkg"
+          diagnostics_symbols="$ARTIFACTS_PATH/Akbura.Diagnostics.$VERSION.snupkg"
+
+          for package in \
+            "$akbura_package" \
+            "$akbura_symbols" \
+            "$diagnostics_package" \
+            "$diagnostics_symbols"; do
+            test -s "$package"
+            sha256sum "$package"
+          done
+
+          akbura_entries="$(unzip -Z1 "$akbura_package")"
+          diagnostics_entries="$(unzip -Z1 "$diagnostics_package")"
+
+          for entry in \
+            README.md \
+            LICENSE.txt \
+            icon.png \
+            lib/net10.0/Akbura.dll \
+            analyzers/dotnet/cs/Akbura.BlackSilence.dll \
+            analyzers/dotnet/cs/Akbura.Generator.dll \
+            buildTransitive/Akbura.targets \
+            tools/net10.0/Akbura.Build.Tasks.dll; do
+            grep -Fx "$entry" <<< "$akbura_entries" > /dev/null
+          done
+
+          for entry in \
+            README.md \
+            LICENSE.txt \
+            icon.png \
+            lib/net10.0/Akbura.Diagnostics.dll; do
+            grep -Fx "$entry" <<< "$diagnostics_entries" > /dev/null
+          done
+
+          akbura_nuspec="$(unzip -p "$akbura_package" Akbura.nuspec)"
+          diagnostics_nuspec="$(
+            unzip -p "$diagnostics_package" Akbura.Diagnostics.nuspec
+          )"
+
+          grep -F "<id>Akbura</id>" <<< "$akbura_nuspec" > /dev/null
+          grep -F "<version>$VERSION</version>" <<< "$akbura_nuspec" > /dev/null
+          grep -F "<icon>icon.png</icon>" <<< "$akbura_nuspec" > /dev/null
+          grep -F "<repository type=\"git\" url=\"https://github.com/Asaicraft/Akbura\"" \
+            <<< "$akbura_nuspec" > /dev/null
+
+          grep -F "<id>Akbura.Diagnostics</id>" \
+            <<< "$diagnostics_nuspec" > /dev/null
+          grep -F "<version>$VERSION</version>" \
+            <<< "$diagnostics_nuspec" > /dev/null
+          grep -F "<icon>icon.png</icon>" \
+            <<< "$diagnostics_nuspec" > /dev/null
+          grep -F "<dependency id=\"Akbura\" version=\"$VERSION\"" \
+            <<< "$diagnostics_nuspec" > /dev/null
+
+      - name: Upload NuGet release packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-nuget-packages-${{ steps.release.outputs.version }}
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  publish:
+    name: Publish to NuGet.org
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/nuget-v')
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: nuget-release
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download NuGet release packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-nuget-packages-${{ needs.package.outputs.version }}
+          path: ${{ runner.temp }}/akbura-nuget-packages
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Verify downloaded packages
+        shell: bash
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          PACKAGES_PATH: ${{ runner.temp }}/akbura-nuget-packages
+        run: |
+          set -euo pipefail
+
+          for package in \
+            "$PACKAGES_PATH/Akbura.$VERSION.nupkg" \
+            "$PACKAGES_PATH/Akbura.$VERSION.snupkg" \
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.nupkg" \
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.snupkg"; do
+            test -s "$package"
+            sha256sum "$package"
+          done
+
+      - name: NuGet login
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish Akbura
+        shell: bash
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          PACKAGES_PATH: ${{ runner.temp }}/akbura-nuget-packages
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push \
+            "$PACKAGES_PATH/Akbura.$VERSION.nupkg" \
+            --source "$NUGET_SOURCE" \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+      - name: Publish Akbura Diagnostics
+        shell: bash
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          PACKAGES_PATH: ${{ runner.temp }}/akbura-nuget-packages
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push \
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.nupkg" \
+            --source "$NUGET_SOURCE" \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+      - name: Write publication summary
+        shell: bash
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          {
+            echo "## NuGet.org"
+            echo
+            echo "Published **Akbura** and **Akbura.Diagnostics** version **$VERSION**."
+            echo
+            echo "Symbol packages were published to the NuGet.org symbol server."
+          } >> "$GITHUB_STEP_SUMMARY"

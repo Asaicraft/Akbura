@@ -4,8 +4,16 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <PackageId>Akbura</PackageId>
+    <Title>Akbura</Title>
+    <Description>Declarative UI language and incremental compiler for .NET and Avalonia, with reactive state and typed AKCSS styling.</Description>
+    <PackageTags>avalonia;ui;declarative-ui;source-generator;akcss</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
     <AkburaBuildTasksOutputDirectory>$(MSBuildThisFileDirectory)..\Akbura.Build.Tasks\bin\$(Configuration)\net10.0</AkburaBuildTasksOutputDirectory>
     <AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
@@ -38,6 +46,7 @@
     <None Update="buildTransitive\\Akbura.targets" Pack="true" PackagePath="buildTransitive/Akbura.targets" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="\" />
+    <None Include="..\..\icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <Import Project="buildTransitive\\Akbura.targets" />

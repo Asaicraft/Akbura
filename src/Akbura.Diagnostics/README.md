@@ -4,6 +4,10 @@ Akbura diagnostics displays the live component tree together with injected servi
 states, and parameters. State and parameter values can be edited while the application
 is running.
 
+```bash
+dotnet add package Akbura.Diagnostics
+```
+
 Attach it from `Application.Initialize()` in debug builds:
 
 ```csharp

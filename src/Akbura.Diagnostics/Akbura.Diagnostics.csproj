@@ -6,8 +6,14 @@
 		<Nullable>enable</Nullable>
 		<IsPackable>true</IsPackable>
 		<PackageId>Akbura.Diagnostics</PackageId>
+		<Title>Akbura Diagnostics</Title>
 		<Description>Developer diagnostics for Akbura component trees.</Description>
+		<PackageTags>akbura;avalonia;diagnostics;developer-tools</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<PackageIcon>icon.png</PackageIcon>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<Configurations>Debug;Release;DebugStats;ReleaseStats</Configurations>
 		<AkburaBuildTasksOutputDirectory>$(MSBuildThisFileDirectory)..\Akbura.Build.Tasks\bin\$(Configuration)\net10.0</AkburaBuildTasksOutputDirectory>
 		<AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
@@ -19,10 +25,12 @@
 
 	<ItemGroup>
 		<None Include="README.md" Pack="true" PackagePath="\" />
+		<None Include="..\..\LICENSE.txt" Pack="true" PackagePath="\" />
+		<None Include="..\..\icon.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Akbura\Akbura.csproj" />
+		<ProjectReference Include="..\Akbura\Akbura.csproj" PrivateAssets="none" />
 		<ProjectReference Include="..\Akbura.Build.Tasks\Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
 		<ProjectReference Include="..\Akbura.BlackSilence\Akbura.BlackSilence.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
 	</ItemGroup>

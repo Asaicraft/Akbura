@@ -18,7 +18,7 @@ The `Akbura` package includes BlackSilence, the production incremental compiler.
 dotnet add package Akbura
 ```
 
-```akbura
+```csharp
 using Avalonia.Controls;
 
 namespace Demo.Pages;
@@ -44,4 +44,4 @@ For installation, language syntax, state, commands, hooks, and AKCSS, see the **
 - [Akbura documentation](https://asaicraft.github.io/Akbura/)
 - [Discord](https://discord.gg/zMj4MmJ9U5)
 - [Telegram](https://t.me/akburaui)
-- [License](LICENSE.txt)
+- [License](https://github.com/Asaicraft/Akbura/blob/master/LICENSE.txt)

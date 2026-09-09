@@ -45,8 +45,12 @@
     <File Path="For Contributors/README.md" />
   </Folder>
   <Folder Name="/GitHub Actions/">
+    <File Path=".github/workflows/akbura-visualstudio-publish.yml" />
+    <File Path=".github/workflows/akbura-visualstudio.yml" />
+    <File Path=".github/workflows/akbura-vscode-publish.yml" />
     <File Path=".github/workflows/akbura-vscode.yml" />
     <File Path=".github/workflows/build.yml" />
+    <File Path=".github/workflows/nuget-publish.yml" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
@@ -92,9 +96,9 @@
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
   </Folder>
-  <Project Path="src/Akbura.BlackSilence/Akbura.BlackSilence.csproj" />
   <Project Path="src/Akbura.AotTest/Akbura.AotTest.csproj" />
   <Project Path="src/Akbura.Benchmarks/Akbura.Benchmarks.csproj" />
+  <Project Path="src/Akbura.BlackSilence/Akbura.BlackSilence.csproj" />
   <Project Path="src/Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />
   <Project Path="src/Akbura.Diagnostics/Akbura.Diagnostics.csproj" />
   <Project Path="src/Akbura.Furioso/Akbura.Furioso.csproj" Id="3ee5ad67-1b8f-4c3b-b023-626bc70e7a00" />

@@ -298,3 +298,109 @@ jobs:
             echo
             echo "Symbol packages were published to the NuGet.org symbol server."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  github-release:
+    name: Create GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/nuget-v')
+    needs:
+      - package
+      - publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download NuGet release packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-nuget-packages-${{ needs.package.outputs.version }}
+          path: ${{ runner.temp }}/akbura-nuget-github-release
+
+      - name: Prepare GitHub Release assets
+        id: assets
+        shell: bash
+        env:
+          PACKAGES_PATH: ${{ runner.temp }}/akbura-nuget-github-release
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          packages=(
+            "$PACKAGES_PATH/Akbura.$VERSION.nupkg"
+            "$PACKAGES_PATH/Akbura.$VERSION.snupkg"
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.nupkg"
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.snupkg"
+          )
+
+          for package in "${packages[@]}"; do
+            test -s "$package"
+          done
+
+          checksum_path="$PACKAGES_PATH/SHA256SUMS"
+          (
+            cd "$PACKAGES_PATH"
+            sha256sum \
+              "Akbura.$VERSION.nupkg" \
+              "Akbura.$VERSION.snupkg" \
+              "Akbura.Diagnostics.$VERSION.nupkg" \
+              "Akbura.Diagnostics.$VERSION.snupkg" \
+              > SHA256SUMS
+          )
+
+          echo "checksums=$checksum_path" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGES_PATH: ${{ runner.temp }}/akbura-nuget-github-release
+          VERSION: ${{ needs.package.outputs.version }}
+          CHECKSUM_PATH: ${{ steps.assets.outputs.checksums }}
+        run: |
+          set -euo pipefail
+
+          title="Akbura $VERSION"
+          notes="$(
+            printf '%s\n\n%s\n\n%s\n%s\n' \
+              "Akbura NuGet packages $VERSION." \
+              "This release contains the runtime, BlackSilence incremental compiler, build integration, and diagnostics tooling." \
+              "Install: dotnet add package Akbura --version $VERSION" \
+              "Diagnostics: dotnet add package Akbura.Diagnostics --version $VERSION"
+          )"
+          release_flags=()
+
+          if [[ "$VERSION" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
+
+          assets=(
+            "$PACKAGES_PATH/Akbura.$VERSION.nupkg"
+            "$PACKAGES_PATH/Akbura.$VERSION.snupkg"
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.nupkg"
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.snupkg"
+            "$CHECKSUM_PATH"
+          )
+
+          if gh release view "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "$title" \
+              --notes "$notes" \
+              "${release_flags[@]}" \
+              --repo "$GITHUB_REPOSITORY"
+            gh release upload "$GITHUB_REF_NAME" \
+              "${assets[@]}" \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "${assets[@]}" \
+              --verify-tag \
+              --title "$title" \
+              --notes "$notes" \
+              "${release_flags[@]}" \
+              --repo "$GITHUB_REPOSITORY"
+          fi

@@ -44,9 +44,12 @@ $hivePath = Join-Path $smokeRoot "hive"
 $projectsPath = Join-Path $smokeRoot "projects"
 $packagesPath = Join-Path $smokeRoot "packages"
 $templatePackage = Join-Path $feedPath "Akbura.Templates.$Version.nupkg"
+$diagnosticsPackage = Join-Path $feedPath "Akbura.Diagnostics.$Version.nupkg"
 
 Assert-Condition (Test-Path -LiteralPath $templatePackage -PathType Leaf) (
     "Template package does not exist: $templatePackage")
+Assert-Condition (Test-Path -LiteralPath $diagnosticsPackage -PathType Leaf) (
+    "Diagnostics package does not exist: $diagnosticsPackage")
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($templatePackage)
@@ -57,6 +60,7 @@ try {
         "LICENSE.txt",
         "icon.png",
         "content/templates/app/.template.config/template.json",
+        "content/templates/app/README.md",
         "content/templates/component/.template.config/template.json"
     )
 
@@ -126,8 +130,61 @@ finally {
     $archive.Dispose()
 }
 
+$diagnosticsArchive = [IO.Compression.ZipFile]::OpenRead(
+    $diagnosticsPackage)
+try {
+    Assert-Condition ($null -ne $diagnosticsArchive.GetEntry(
+        "lib/net10.0/Akbura.Diagnostics.dll")) (
+        "Diagnostics package does not contain Akbura.Diagnostics.dll.")
+
+    $diagnosticsNuspecEntry = $diagnosticsArchive.GetEntry(
+        "Akbura.Diagnostics.nuspec")
+    Assert-Condition ($null -ne $diagnosticsNuspecEntry) (
+        "Diagnostics package does not contain its nuspec.")
+
+    $diagnosticsNuspecReader = [IO.StreamReader]::new(
+        $diagnosticsNuspecEntry.Open())
+    try {
+        $diagnosticsNuspec = [xml] $diagnosticsNuspecReader.ReadToEnd()
+    }
+    finally {
+        $diagnosticsNuspecReader.Dispose()
+    }
+
+    $diagnosticsMetadata = $diagnosticsNuspec.package.metadata
+    Assert-Condition ($diagnosticsMetadata.id -eq "Akbura.Diagnostics") (
+        "Diagnostics package has an incorrect package ID.")
+    Assert-Condition ($diagnosticsMetadata.version -eq $Version) (
+        "Diagnostics package has version '$($diagnosticsMetadata.version)', " +
+        "expected '$Version'.")
+
+    $akburaDependency = $diagnosticsNuspec.SelectSingleNode(
+        "/*[local-name()='package']" +
+        "/*[local-name()='metadata']" +
+        "/*[local-name()='dependencies']" +
+        "//*[local-name()='dependency' and @id='Akbura']")
+    Assert-Condition ($null -ne $akburaDependency) (
+        "Diagnostics package does not depend on Akbura.")
+    Assert-Condition ($akburaDependency.version -eq $Version) (
+        "Diagnostics package targets Akbura " +
+        "'$($akburaDependency.version)', expected '$Version'.")
+}
+finally {
+    $diagnosticsArchive.Dispose()
+}
+
 New-Item -ItemType Directory -Path $hivePath -Force | Out-Null
 New-Item -ItemType Directory -Path $projectsPath -Force | Out-Null
+
+$isolatedMsBuildProject = "<Project />" + [Environment]::NewLine
+[IO.File]::WriteAllText(
+    (Join-Path $smokeRoot "Directory.Build.props"),
+    $isolatedMsBuildProject,
+    [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText(
+    (Join-Path $smokeRoot "Directory.Packages.props"),
+    $isolatedMsBuildProject,
+    [Text.UTF8Encoding]::new($false))
 
 Invoke-DotNet new install $templatePackage `
     --debug:custom-hive $hivePath
@@ -187,8 +244,10 @@ foreach ($case in $cases) {
     }
 
     $programPath = Join-Path $projectDirectory "Program.cs"
+    $appCodePath = Join-Path $projectDirectory "App.axaml.cs"
     $projectContent = Get-Content -LiteralPath $projectPath -Raw
     $programContent = Get-Content -LiteralPath $programPath -Raw
+    $appCodeContent = Get-Content -LiteralPath $appCodePath -Raw
     $appContent = Get-Content -LiteralPath (
         Join-Path $projectDirectory "App.axaml") -Raw
     $globalUsingsContent = Get-Content -LiteralPath (
@@ -204,6 +263,36 @@ foreach ($case in $cases) {
         "using Akbura.Styles.akcss;",
         [StringComparison]::Ordinal)) (
         "$($case.Name) does not import Akbura AKCSS utilities.")
+    Assert-Condition ($projectContent.Contains(
+        '<ItemGroup Condition="''$(Configuration)'' == ''Debug''">',
+        [StringComparison]::Ordinal)) (
+        "$($case.Name) does not condition diagnostics on Debug.")
+    Assert-Condition (
+        $projectContent.Contains(
+            'Include="Akbura.Diagnostics"',
+            [StringComparison]::Ordinal) -and
+        $projectContent.Contains(
+            'Include="AvaloniaUI.DiagnosticsSupport"',
+            [StringComparison]::Ordinal)) (
+        "$($case.Name) does not reference both diagnostics packages.")
+    Assert-Condition ($appCodeContent.Contains(
+        "#if DEBUG",
+        [StringComparison]::Ordinal)) (
+        "$($case.Name) does not preserve its Debug compilation guard.")
+    Assert-Condition (
+        $appCodeContent.Contains(
+            "this.AttachDeveloperTools();",
+            [StringComparison]::Ordinal) -and
+        $appCodeContent.Contains(
+            "this.AttachAkburaDevTools(options =>",
+            [StringComparison]::Ordinal) -and
+        $appCodeContent.Contains(
+            "KeyModifiers.Control",
+            [StringComparison]::Ordinal)) (
+        "$($case.Name) does not configure both diagnostics tools.")
+    Assert-Condition (Test-Path -LiteralPath (
+        Join-Path $projectDirectory "README.md") -PathType Leaf) (
+        "$($case.Name) does not contain its diagnostics README.")
     Assert-Condition (!(Test-Path -LiteralPath (Join-Path $projectDirectory "Variants"))) (
         "$($case.Name) contains the internal Variants directory.")
     Assert-Condition (!(Test-Path -LiteralPath (Join-Path $projectDirectory ".template.config"))) (
@@ -280,7 +369,9 @@ foreach ($case in $cases) {
         "AkburaComponentNamespace",
         "UseMicrosoftDI",
         "UseSplat",
-        "UseDI"
+        "UseDI",
+        "cnd:noEmit",
+        "msbuild-conditional:noEmit"
     )
     $generatedSourceFiles = Get-ChildItem `
         -LiteralPath $projectDirectory `
@@ -295,15 +386,93 @@ foreach ($case in $cases) {
         }
     }
 
-    Invoke-DotNet restore $projectPath `
-        --configfile $nugetConfig.FullName `
-        --packages $packagesPath
-    Invoke-DotNet build $projectPath `
-        --configuration Debug `
-        --no-restore
-    Invoke-DotNet build $projectPath `
-        --configuration Release `
-        --no-restore
+    foreach ($configuration in @("Debug", "Release")) {
+        Invoke-DotNet restore $projectPath `
+            "-p:Configuration=$configuration" `
+            --configfile $nugetConfig.FullName `
+            --packages $packagesPath
+
+        $assetsPath = Join-Path $projectDirectory "obj/project.assets.json"
+        $assets = Get-Content -LiteralPath $assetsPath -Raw |
+            ConvertFrom-Json
+        $libraries = @($assets.libraries.PSObject.Properties.Name)
+        $hasAkburaDiagnostics =
+            $libraries -contains "Akbura.Diagnostics/$Version"
+        $hasAvaloniaDiagnostics =
+            $libraries -contains "AvaloniaUI.DiagnosticsSupport/2.2.3"
+
+        if ($configuration -eq "Debug") {
+            Assert-Condition $hasAkburaDiagnostics (
+                "$($case.Name) Debug restore omitted Akbura.Diagnostics.")
+            Assert-Condition $hasAvaloniaDiagnostics (
+                "$($case.Name) Debug restore omitted Avalonia diagnostics.")
+        }
+        else {
+            Assert-Condition (!$hasAkburaDiagnostics) (
+                "$($case.Name) Release restore contains Akbura.Diagnostics.")
+            Assert-Condition (!$hasAvaloniaDiagnostics) (
+                "$($case.Name) Release restore contains Avalonia diagnostics.")
+        }
+
+        Invoke-DotNet build $projectPath `
+            --configuration $configuration `
+            --no-restore
+
+        $outputPath = Join-Path $projectDirectory (
+            "bin/$configuration/net10.0")
+        $akburaDiagnosticsAssembly = Join-Path (
+            $outputPath) "Akbura.Diagnostics.dll"
+        $avaloniaDiagnosticsAssembly = Join-Path (
+            $outputPath) "AvaloniaUI.DiagnosticsSupport.Avalonia.dll"
+
+        if ($configuration -eq "Debug") {
+            Assert-Condition (Test-Path -LiteralPath (
+                $akburaDiagnosticsAssembly) -PathType Leaf) (
+                "$($case.Name) Debug output omitted Akbura.Diagnostics.dll.")
+            Assert-Condition (Test-Path -LiteralPath (
+                $avaloniaDiagnosticsAssembly) -PathType Leaf) (
+                "$($case.Name) Debug output omitted Avalonia diagnostics.")
+            continue
+        }
+
+        Assert-Condition (!(Test-Path -LiteralPath (
+            $akburaDiagnosticsAssembly) -PathType Leaf)) (
+            "$($case.Name) Release output contains Akbura.Diagnostics.dll.")
+        Assert-Condition (!(Test-Path -LiteralPath (
+            $avaloniaDiagnosticsAssembly) -PathType Leaf)) (
+            "$($case.Name) Release output contains Avalonia diagnostics.")
+
+        $publishPath = Join-Path $smokeRoot (
+            "publish/" + $case.Name)
+        Invoke-DotNet publish $projectPath `
+            --configuration Release `
+            --no-restore `
+            --output $publishPath
+
+        $publishedFiles = @(
+            Get-ChildItem -LiteralPath $publishPath -File -Recurse)
+        Assert-Condition (!($publishedFiles.Name -contains
+            "Akbura.Diagnostics.dll")) (
+            "$($case.Name) Release publish contains Akbura.Diagnostics.dll.")
+        Assert-Condition (!($publishedFiles.Name -contains
+            "AvaloniaUI.DiagnosticsSupport.Avalonia.dll")) (
+            "$($case.Name) Release publish contains Avalonia diagnostics.")
+
+        $depsFile = @(
+            $publishedFiles |
+                Where-Object { $_.Name -like "*.deps.json" })
+        Assert-Condition ($depsFile.Count -eq 1) (
+            "$($case.Name) Release publish must contain one deps.json file.")
+        $depsContent = Get-Content -LiteralPath $depsFile[0].FullName -Raw
+        Assert-Condition (
+            !$depsContent.Contains(
+                "Akbura.Diagnostics",
+                [StringComparison]::OrdinalIgnoreCase) -and
+            !$depsContent.Contains(
+                "AvaloniaUI.DiagnosticsSupport",
+                [StringComparison]::OrdinalIgnoreCase)) (
+            "$($case.Name) Release deps.json contains diagnostics.")
+    }
 }
 
 Write-Host "Verified Akbura.Templates $Version in $smokeRoot"

@@ -31,6 +31,9 @@ Run the item template from an existing Akbura project:
 dotnet new akbura.component -n ProfileCard --namespace MyApp.Components -o Components
 ```
 
-The application template demonstrates reactive state, AKCSS utilities, responsive breakpoints, reusable components, and optional service injection.
+The application template demonstrates reactive state, AKCSS utilities, responsive
+breakpoints, reusable components, and optional service injection. Debug builds include
+Avalonia Developer Tools on `F12` and the Akbura component inspector on `Ctrl+F12`;
+diagnostic dependencies are excluded from Release builds.
 
 > The development template currently targets Akbura `12.0.4-template.1`. Replace the default with the tested public package version before publishing `Akbura.Templates`.

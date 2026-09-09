@@ -7,6 +7,7 @@ on:
       - "src/Akbura/**"
       - "src/Akbura.BlackSilence/**"
       - "src/Akbura.Build.Tasks/**"
+      - "src/Akbura.Diagnostics/**"
       - "src/Akbura.Generator/**"
       - "eng/Verify-AkburaTemplates.ps1"
       - "Directory.Build.props"
@@ -20,6 +21,7 @@ on:
       - "src/Akbura/**"
       - "src/Akbura.BlackSilence/**"
       - "src/Akbura.Build.Tasks/**"
+      - "src/Akbura.Diagnostics/**"
       - "src/Akbura.Generator/**"
       - "eng/Verify-AkburaTemplates.ps1"
       - "Directory.Build.props"
@@ -34,6 +36,7 @@ concurrency:
 
 env:
   AKBURA_PROJECT: src/Akbura/Akbura.csproj
+  DIAGNOSTICS_PROJECT: src/Akbura.Diagnostics/Akbura.Diagnostics.csproj
   TEMPLATES_PROJECT: src/Akbura.Templates/Akbura.Templates.csproj
   ARTIFACTS_PATH: artifacts/templates
 
@@ -97,9 +100,10 @@ jobs:
           set -euo pipefail
 
           dotnet restore "$AKBURA_PROJECT"
+          dotnet restore "$DIAGNOSTICS_PROJECT"
           dotnet restore "$TEMPLATES_PROJECT"
 
-      - name: Pack runtime and templates
+      - name: Pack runtime, diagnostics, and templates
         shell: bash
         env:
           VERSION: ${{ steps.versions.outputs.version }}
@@ -107,6 +111,13 @@ jobs:
           set -euo pipefail
 
           dotnet pack "$AKBURA_PROJECT" \
+            --configuration Release \
+            --no-restore \
+            --output "$ARTIFACTS_PATH" \
+            -p:PackageVersion="$VERSION" \
+            -p:ContinuousIntegrationBuild=true
+
+          dotnet pack "$DIAGNOSTICS_PROJECT" \
             --configuration Release \
             --no-restore \
             --output "$ARTIFACTS_PATH" \
@@ -136,7 +147,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: akbura-templates-${{ steps.versions.outputs.version }}
-          path: artifacts/templates/Akbura.Templates.*.nupkg
+          path: artifacts/templates/*.nupkg
           if-no-files-found: error
           retention-days: 14
           compression-level: 0

@@ -9,7 +9,7 @@
   "identity": "Asaicraft.Akbura.App.CSharp",
   "groupIdentity": "Akbura.App",
   "name": "Akbura App",
-  "description": "An Akbura desktop application with AKCSS and optional DI.",
+  "description": "An Akbura desktop application with AKCSS, Debug diagnostics, and optional DI.",
   "shortName": "akbura.app",
   "sourceName": "AkburaAppTemplate",
   "defaultName": "AkburaApplication",
@@ -43,7 +43,7 @@
       "datatype": "text",
       "defaultValue": "12.0.4-template.1",
       "replaces": "AkburaVersionTemplateParameter",
-      "description": "Akbura package version."
+      "description": "Version used for the Akbura and Akbura.Diagnostics packages."
     },
     "AvaloniaVersion": {
       "type": "parameter",

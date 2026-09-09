@@ -221,6 +221,7 @@ jobs:
             LICENSE.txt \
             icon.png \
             content/templates/app/.template.config/template.json \
+            content/templates/app/README.md \
             content/templates/component/.template.config/template.json; do
             grep -Fx "$entry" <<< "$templates_entries" > /dev/null
           done

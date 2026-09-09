@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<IsPackable>true</IsPackable>
+
+		<PackageType>Template</PackageType>
+		<PackageId>Akbura.Templates</PackageId>
+
+		<Title>Akbura Templates</Title>
+		<Description>Desktop application and component templates for Akbura.</Description>
+		<PackageTags>dotnet-new;templates;akbura;avalonia</PackageTags>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<PackageIcon>icon.png</PackageIcon>
+
+		<EnableDefaultItems>false</EnableDefaultItems>
+		<IncludeContentInPack>true</IncludeContentInPack>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<ContentTargetFolders>content</ContentTargetFolders>
+		<NoDefaultExcludes>true</NoDefaultExcludes>
+		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+		<NoPackageAnalysis>true</NoPackageAnalysis>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Content Include="templates\**\*"
+				 Exclude="templates\**\bin\**;templates\**\obj\**;templates\**\.vs\**;templates\**\.idea\**" />
+
+		<None Include="README.md"
+			  Pack="true"
+			  PackagePath="\" />
+
+		<None Include="LICENSE.txt"
+			  Pack="true"
+			  PackagePath="\" />
+
+		<None Include="..\..\icon.png"
+			  Pack="true"
+			  PackagePath="\" />
+	</ItemGroup>
+
+</Project>

@@ -14,6 +14,7 @@ concurrency:
 env:
   AKBURA_PROJECT: src/Akbura/Akbura.csproj
   DIAGNOSTICS_PROJECT: src/Akbura.Diagnostics/Akbura.Diagnostics.csproj
+  TEMPLATES_PROJECT: src/Akbura.Templates/Akbura.Templates.csproj
   TEST_PROJECT: src/Akbura.UnitTests/Akbura.UnitTests.csproj
   ARTIFACTS_PATH: artifacts
   NUGET_SOURCE: https://api.nuget.org/v3/index.json
@@ -27,6 +28,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      avalonia_version: ${{ steps.release.outputs.avalonia_version }}
       version: ${{ steps.release.outputs.version }}
 
     steps:
@@ -100,7 +102,25 @@ jobs:
 
           echo "Avalonia version: $avalonia_version"
           echo "Akbura version:   $tag_version"
+          echo "avalonia_version=$avalonia_version" >> "$GITHUB_OUTPUT"
           echo "version=$tag_version" >> "$GITHUB_OUTPUT"
+
+      - name: Set template release defaults
+        shell: pwsh
+        env:
+          AKBURA_VERSION: ${{ steps.release.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.release.outputs.avalonia_version }}
+        run: |
+          $path = "src/Akbura.Templates/templates/app/.template.config/template.json"
+          $configuration = Get-Content -LiteralPath $path -Raw |
+              ConvertFrom-Json
+          $configuration.symbols.AkburaVersion.defaultValue =
+              $env:AKBURA_VERSION
+          $configuration.symbols.AvaloniaVersion.defaultValue =
+              $env:AVALONIA_VERSION
+          $configuration |
+              ConvertTo-Json -Depth 50 |
+              Set-Content -LiteralPath $path -Encoding utf8
 
       - name: Restore release projects
         shell: bash
@@ -110,6 +130,7 @@ jobs:
           dotnet restore "$TEST_PROJECT"
           dotnet restore "$AKBURA_PROJECT"
           dotnet restore "$DIAGNOSTICS_PROJECT"
+          dotnet restore "$TEMPLATES_PROJECT"
 
       - name: Test Akbura
         shell: bash
@@ -138,6 +159,16 @@ jobs:
             -p:PackageVersion="${{ steps.release.outputs.version }}" \
             -p:ContinuousIntegrationBuild=true
 
+      - name: Pack Akbura Templates
+        shell: bash
+        run: |
+          dotnet pack "$TEMPLATES_PROJECT" \
+            --configuration Release \
+            --no-restore \
+            --output "$ARTIFACTS_PATH" \
+            -p:PackageVersion="${{ steps.release.outputs.version }}" \
+            -p:ContinuousIntegrationBuild=true
+
       - name: Verify NuGet packages
         shell: bash
         env:
@@ -149,18 +180,21 @@ jobs:
           akbura_symbols="$ARTIFACTS_PATH/Akbura.$VERSION.snupkg"
           diagnostics_package="$ARTIFACTS_PATH/Akbura.Diagnostics.$VERSION.nupkg"
           diagnostics_symbols="$ARTIFACTS_PATH/Akbura.Diagnostics.$VERSION.snupkg"
+          templates_package="$ARTIFACTS_PATH/Akbura.Templates.$VERSION.nupkg"
 
           for package in \
             "$akbura_package" \
             "$akbura_symbols" \
             "$diagnostics_package" \
-            "$diagnostics_symbols"; do
+            "$diagnostics_symbols" \
+            "$templates_package"; do
             test -s "$package"
             sha256sum "$package"
           done
 
           akbura_entries="$(unzip -Z1 "$akbura_package")"
           diagnostics_entries="$(unzip -Z1 "$diagnostics_package")"
+          templates_entries="$(unzip -Z1 "$templates_package")"
 
           for entry in \
             README.md \
@@ -182,9 +216,27 @@ jobs:
             grep -Fx "$entry" <<< "$diagnostics_entries" > /dev/null
           done
 
+          for entry in \
+            README.md \
+            LICENSE.txt \
+            icon.png \
+            content/templates/app/.template.config/template.json \
+            content/templates/component/.template.config/template.json; do
+            grep -Fx "$entry" <<< "$templates_entries" > /dev/null
+          done
+
+          if grep -Eq '(^|/)(bin|obj)/|Akbura\.Templates\.dll$' \
+              <<< "$templates_entries"; then
+            echo "::error::Akbura.Templates contains build output."
+            exit 1
+          fi
+
           akbura_nuspec="$(unzip -p "$akbura_package" Akbura.nuspec)"
           diagnostics_nuspec="$(
             unzip -p "$diagnostics_package" Akbura.Diagnostics.nuspec
+          )"
+          templates_nuspec="$(
+            unzip -p "$templates_package" Akbura.Templates.nuspec
           )"
 
           grep -F "<id>Akbura</id>" <<< "$akbura_nuspec" > /dev/null
@@ -201,6 +253,27 @@ jobs:
             <<< "$diagnostics_nuspec" > /dev/null
           grep -F "<dependency id=\"Akbura\" version=\"$VERSION\"" \
             <<< "$diagnostics_nuspec" > /dev/null
+
+          grep -F "<id>Akbura.Templates</id>" \
+            <<< "$templates_nuspec" > /dev/null
+          grep -F "<version>$VERSION</version>" \
+            <<< "$templates_nuspec" > /dev/null
+          grep -F "<icon>icon.png</icon>" \
+            <<< "$templates_nuspec" > /dev/null
+          grep -F "<packageType name=\"Template\"" \
+            <<< "$templates_nuspec" > /dev/null
+
+      - name: Verify generated applications
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.release.outputs.avalonia_version }}
+        run: |
+          ./eng/Verify-AkburaTemplates.ps1 `
+              -Version $env:VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION `
+              -Feed $env:ARTIFACTS_PATH `
+              -WorkingDirectory $env:RUNNER_TEMP
 
       - name: Upload NuGet release packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -249,7 +322,8 @@ jobs:
             "$PACKAGES_PATH/Akbura.$VERSION.nupkg" \
             "$PACKAGES_PATH/Akbura.$VERSION.snupkg" \
             "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.nupkg" \
-            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.snupkg"; do
+            "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.snupkg" \
+            "$PACKAGES_PATH/Akbura.Templates.$VERSION.nupkg"; do
             test -s "$package"
             sha256sum "$package"
           done
@@ -286,6 +360,19 @@ jobs:
             --api-key "$NUGET_API_KEY" \
             --skip-duplicate
 
+      - name: Publish Akbura Templates
+        shell: bash
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          PACKAGES_PATH: ${{ runner.temp }}/akbura-nuget-packages
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push \
+            "$PACKAGES_PATH/Akbura.Templates.$VERSION.nupkg" \
+            --source "$NUGET_SOURCE" \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
       - name: Write publication summary
         shell: bash
         env:
@@ -294,7 +381,7 @@ jobs:
           {
             echo "## NuGet.org"
             echo
-            echo "Published **Akbura** and **Akbura.Diagnostics** version **$VERSION**."
+            echo "Published **Akbura**, **Akbura.Diagnostics**, and **Akbura.Templates** version **$VERSION**."
             echo
             echo "Symbol packages were published to the NuGet.org symbol server."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -332,6 +419,7 @@ jobs:
             "$PACKAGES_PATH/Akbura.$VERSION.snupkg"
             "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.nupkg"
             "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.snupkg"
+            "$PACKAGES_PATH/Akbura.Templates.$VERSION.nupkg"
           )
 
           for package in "${packages[@]}"; do
@@ -346,6 +434,7 @@ jobs:
               "Akbura.$VERSION.snupkg" \
               "Akbura.Diagnostics.$VERSION.nupkg" \
               "Akbura.Diagnostics.$VERSION.snupkg" \
+              "Akbura.Templates.$VERSION.nupkg" \
               > SHA256SUMS
           )
 
@@ -363,11 +452,12 @@ jobs:
 
           title="Akbura $VERSION"
           notes="$(
-            printf '%s\n\n%s\n\n%s\n%s\n' \
+            printf '%s\n\n%s\n\n%s\n%s\n%s\n' \
               "Akbura NuGet packages $VERSION." \
-              "This release contains the runtime, BlackSilence incremental compiler, build integration, and diagnostics tooling." \
+              "This release contains the runtime, BlackSilence incremental compiler, build integration, diagnostics tooling, and project templates." \
               "Install: dotnet add package Akbura --version $VERSION" \
-              "Diagnostics: dotnet add package Akbura.Diagnostics --version $VERSION"
+              "Diagnostics: dotnet add package Akbura.Diagnostics --version $VERSION" \
+              "Templates: dotnet new install Akbura.Templates::$VERSION"
           )"
           release_flags=()
 
@@ -380,6 +470,7 @@ jobs:
             "$PACKAGES_PATH/Akbura.$VERSION.snupkg"
             "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.nupkg"
             "$PACKAGES_PATH/Akbura.Diagnostics.$VERSION.snupkg"
+            "$PACKAGES_PATH/Akbura.Templates.$VERSION.nupkg"
             "$CHECKSUM_PATH"
           )
 

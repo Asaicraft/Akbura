@@ -1,0 +1,83 @@
+namespace AkburaTemplateNamespace.Views;
+
+state count = 0;
+
+<ScrollViewer HorizontalScrollBarVisibility="Disabled"
+              VerticalScrollBarVisibility="Auto"
+              HorizontalContentAlignment="Stretch">
+    <Border MaxWidth="1200"
+            HorizontalAlignment="Stretch"
+            p-4 ${sm}:p-6 ${md}:p-8>
+        <StackPanel gap-4>
+            <TextBlock Text="Welcome to Akbura"
+                       FontSize="32"
+                       TextWrapping="Wrap"
+                       font-bold />
+
+            <WelcomeMessage />
+
+            <TextBlock Text="Resize the window to see the cards rearrange."
+                       TextWrapping="Wrap" />
+
+            <Row Columns="12" ColumnSpacing="16">
+                <Border col-span-12 ${sm}:col-span-6 ${md}:col-span-4
+                        p-4 mb-4 rounded-md
+                        bg-slate-100 ${dark}:bg-slate-800>
+                    <StackPanel gap-3>
+                        <TextBlock Text="Reactive state"
+                                   FontSize="20"
+                                   TextWrapping="Wrap"
+                                   font-bold />
+
+                        <TextBlock Text="State changes update the UI."
+                                   TextWrapping="Wrap" />
+
+                        <Button Click={() => count++}
+                                HorizontalAlignment="Left"
+                                px-4 py-2>
+                            Count is {count}
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <Border col-span-12 ${sm}:col-span-6 ${md}:col-span-4
+                        p-4 mb-4 rounded-md
+                        bg-slate-100 ${dark}:bg-slate-800>
+                    <StackPanel gap-3>
+                        <TextBlock Text="Responsive layout"
+                                   FontSize="20"
+                                   TextWrapping="Wrap"
+                                   font-bold />
+
+                        <TextBlock
+                            Text="One card per row on narrow windows, two from sm, and three from md."
+                            TextWrapping="Wrap" />
+
+                        <TextBlock Text="12 / 6 / 4 columns"
+                                   TextWrapping="Wrap"
+                                   font-bold />
+                    </StackPanel>
+                </Border>
+
+                <Border col-span-12 ${sm}:col-span-6 ${md}:col-span-4
+                        p-4 mb-4 rounded-md
+                        bg-slate-100 ${dark}:bg-slate-800>
+                    <StackPanel gap-3>
+                        <TextBlock Text="Reusable components"
+                                   FontSize="20"
+                                   TextWrapping="Wrap"
+                                   font-bold />
+
+                        <TextBlock
+                            Text="Create .akbura components and compose them in your views."
+                            TextWrapping="Wrap" />
+
+                        <TextBlock
+                            Text="Start with Components/WelcomeMessage.akbura."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Row>
+        </StackPanel>
+    </Border>
+</ScrollViewer>

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/ide.host",
+  "symbolInfo": [
+    {
+      "id": "Framework",
+      "name": {
+        "text": "Target framework"
+      },
+      "isVisible": true
+    },
+    {
+      "id": "DependencyInjection",
+      "name": {
+        "text": "Dependency injection"
+      },
+      "isVisible": true
+    },
+    {
+      "id": "AkburaVersion",
+      "isVisible": false
+    },
+    {
+      "id": "AvaloniaVersion",
+      "isVisible": false
+    },
+    {
+      "id": "skipRestore",
+      "isVisible": false
+    }
+  ]
+}

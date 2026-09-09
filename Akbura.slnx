@@ -104,7 +104,7 @@
   <Project Path="src/Akbura.Furioso/Akbura.Furioso.csproj" Id="3ee5ad67-1b8f-4c3b-b023-626bc70e7a00" />
   <Project Path="src/Akbura.Generator/Akbura.Generator.csproj" />
   <Project Path="src/Akbura.Preview/Akbura.Preview.csproj" />
-  <Project Path="src/Akbura.Templates/Akbura.Templates.csproj" Id="0ff629f0-7139-4e27-9573-ac41bc6ff22c" />
+  <Project Path="src/Akbura.Templates/Akbura.Templates.csproj" Id="8163303c-c28d-4b82-aa55-c88bebaa6ed5" />
   <Project Path="src/Akbura.UnitTests/Akbura.UnitTests.csproj" />
   <Project Path="src/Akbura/Akbura.csproj" />
   <Project Path="src/AkburaDocs/AkburaDocs.csproj">

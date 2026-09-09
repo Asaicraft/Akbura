@@ -1,0 +1,142 @@
+name: Akbura Templates
+
+on:
+  pull_request:
+    paths:
+      - "src/Akbura.Templates/**"
+      - "src/Akbura/**"
+      - "src/Akbura.BlackSilence/**"
+      - "src/Akbura.Build.Tasks/**"
+      - "src/Akbura.Generator/**"
+      - "eng/Verify-AkburaTemplates.ps1"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - ".github/workflows/akbura-templates.yml"
+  push:
+    branches:
+      - master
+    paths:
+      - "src/Akbura.Templates/**"
+      - "src/Akbura/**"
+      - "src/Akbura.BlackSilence/**"
+      - "src/Akbura.Build.Tasks/**"
+      - "src/Akbura.Generator/**"
+      - "eng/Verify-AkburaTemplates.ps1"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - ".github/workflows/akbura-templates.yml"
+
+permissions: {}
+
+concurrency:
+  group: akbura-templates-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AKBURA_PROJECT: src/Akbura/Akbura.csproj
+  TEMPLATES_PROJECT: src/Akbura.Templates/Akbura.Templates.csproj
+  ARTIFACTS_PATH: artifacts/templates
+
+jobs:
+  verify:
+    name: Pack and verify templates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Prepare CI package version
+        id: versions
+        shell: pwsh
+        run: |
+          $properties = [xml] (
+              Get-Content -LiteralPath "Directory.Build.props" -Raw)
+          $avaloniaVersion = [string] (
+              $properties.Project.PropertyGroup.AvaloniaVersion |
+                  Select-Object -First 1)
+
+          if ([string]::IsNullOrWhiteSpace($avaloniaVersion)) {
+              throw "Directory.Build.props does not define AvaloniaVersion."
+          }
+
+          $version = "$avaloniaVersion-ci.$env:GITHUB_RUN_NUMBER"
+          "avalonia_version=$avaloniaVersion" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Set template package defaults
+        shell: pwsh
+        env:
+          AKBURA_VERSION: ${{ steps.versions.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.versions.outputs.avalonia_version }}
+        run: |
+          $path = "src/Akbura.Templates/templates/app/.template.config/template.json"
+          $configuration = Get-Content -LiteralPath $path -Raw |
+              ConvertFrom-Json
+          $configuration.symbols.AkburaVersion.defaultValue =
+              $env:AKBURA_VERSION
+          $configuration.symbols.AvaloniaVersion.defaultValue =
+              $env:AVALONIA_VERSION
+          $configuration |
+              ConvertTo-Json -Depth 50 |
+              Set-Content -LiteralPath $path -Encoding utf8
+
+      - name: Restore package projects
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dotnet restore "$AKBURA_PROJECT"
+          dotnet restore "$TEMPLATES_PROJECT"
+
+      - name: Pack runtime and templates
+        shell: bash
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          dotnet pack "$AKBURA_PROJECT" \
+            --configuration Release \
+            --no-restore \
+            --output "$ARTIFACTS_PATH" \
+            -p:PackageVersion="$VERSION" \
+            -p:ContinuousIntegrationBuild=true
+
+          dotnet pack "$TEMPLATES_PROJECT" \
+            --configuration Release \
+            --no-restore \
+            --output "$ARTIFACTS_PATH" \
+            -p:PackageVersion="$VERSION" \
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Verify generated applications
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.versions.outputs.avalonia_version }}
+        run: |
+          ./eng/Verify-AkburaTemplates.ps1 `
+              -Version $env:VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION `
+              -Feed $env:ARTIFACTS_PATH `
+              -WorkingDirectory $env:RUNNER_TEMP
+
+      - name: Upload template package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-templates-${{ steps.versions.outputs.version }}
+          path: artifacts/templates/Akbura.Templates.*.nupkg
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

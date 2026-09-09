@@ -1,0 +1,4 @@
+namespace AkburaTemplateNamespace.Components;
+
+<TextBlock Text="Your Akbura application is ready."
+           TextWrapping="Wrap" />

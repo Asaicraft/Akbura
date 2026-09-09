@@ -1,0 +1,8 @@
+using AkburaTemplateNamespace.Services;
+
+namespace AkburaTemplateNamespace.Components;
+
+inject IGreetingService GreetingService;
+
+<TextBlock Text={GreetingService.GetMessage()}
+           TextWrapping="Wrap" />

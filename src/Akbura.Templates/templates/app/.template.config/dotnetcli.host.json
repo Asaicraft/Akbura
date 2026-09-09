@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json.schemastore.org/dotnetcli.host",
+  "symbolInfo": {
+    "Framework": {
+      "longName": "framework",
+      "shortName": "f"
+    },
+    "DependencyInjection": {
+      "longName": "di",
+      "shortName": ""
+    },
+    "AkburaVersion": {
+      "longName": "akbura-version",
+      "shortName": ""
+    },
+    "AvaloniaVersion": {
+      "longName": "avalonia-version",
+      "shortName": ""
+    },
+    "skipRestore": {
+      "longName": "no-restore",
+      "shortName": ""
+    }
+  },
+  "usageExamples": [
+    "-n MyApp",
+    "-n MyApp --di Microsoft.Extensions.DependencyInjection",
+    "-n MyApp --di Splat.Locator"
+  ]
+}

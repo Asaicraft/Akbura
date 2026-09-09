@@ -1,0 +1,10 @@
+using Avalonia.Controls;
+using Akbura.Markup;
+using Akbura.Styles.akcss;
+
+namespace AkburaComponentNamespace;
+
+<Border p-4>
+    <TextBlock Text="NewComponent"
+               TextWrapping="Wrap" />
+</Border>

@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json.schemastore.org/template",
+  "author": "Asaicraft",
+  "classifications": [
+    "Desktop",
+    "Avalonia",
+    "Akbura"
+  ],
+  "identity": "Asaicraft.Akbura.App.CSharp",
+  "groupIdentity": "Akbura.App",
+  "name": "Akbura App",
+  "description": "An Akbura desktop application with AKCSS and optional DI.",
+  "shortName": "akbura.app",
+  "sourceName": "AkburaAppTemplate",
+  "defaultName": "AkburaApplication",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "RootNamespace": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "safe_namespace",
+      "replaces": "AkburaTemplateNamespace"
+    },
+    "Framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "net10.0",
+      "replaces": "TemplateTargetFramework",
+      "description": "Target framework.",
+      "choices": [
+        {
+          "choice": "net10.0",
+          "description": ".NET 10"
+        }
+      ]
+    },
+    "AkburaVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "12.0.4-template.1",
+      "replaces": "AkburaVersionTemplateParameter",
+      "description": "Akbura package version."
+    },
+    "AvaloniaVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "12.0.4",
+      "replaces": "AvaloniaVersionTemplateParameter",
+      "description": "Avalonia package version."
+    },
+    "DependencyInjection": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "None",
+      "description": "Dependency injection provider.",
+      "choices": [
+        {
+          "choice": "None",
+          "description": "No external DI container"
+        },
+        {
+          "choice": "Microsoft.Extensions.DependencyInjection",
+          "description": "Microsoft.Extensions.DependencyInjection"
+        },
+        {
+          "choice": "Splat.Locator",
+          "description": "Splat.Locator"
+        }
+      ]
+    },
+    "UseMicrosoftDI": {
+      "type": "computed",
+      "value": "(DependencyInjection == \"Microsoft.Extensions.DependencyInjection\")"
+    },
+    "UseSplat": {
+      "type": "computed",
+      "value": "(DependencyInjection == \"Splat.Locator\")"
+    },
+    "UseDI": {
+      "type": "computed",
+      "value": "(UseMicrosoftDI || UseSplat)"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Skip automatic package restore."
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "modifiers": [
+        {
+          "condition": "true",
+          "exclude": [
+            "Variants/**",
+            ".vs/**",
+            ".idea/**"
+          ]
+        },
+        {
+          "condition": "(!UseDI)",
+          "exclude": [
+            "Services/**"
+          ]
+        },
+        {
+          "condition": "(!UseSplat)",
+          "exclude": [
+            "Infrastructure/**"
+          ]
+        }
+      ]
+    },
+    {
+      "condition": "(!UseDI)",
+      "source": "./Variants/None/",
+      "target": "./Components/"
+    },
+    {
+      "condition": "(UseDI)",
+      "source": "./Variants/WithDI/",
+      "target": "./Components/"
+    }
+  ],
+  "primaryOutputs": [
+    {
+      "path": "AkburaAppTemplate.csproj"
+    }
+  ],
+  "postActions": [
+    {
+      "id": "restore",
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages.",
+      "manualInstructions": [
+        {
+          "text": "Run dotnet restore."
+        }
+      ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    }
+  ]
+}

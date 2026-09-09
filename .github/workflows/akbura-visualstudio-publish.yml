@@ -43,6 +43,10 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Verify shared extension version
+        shell: pwsh
+        run: ./eng/Verify-AkburaExtensionVersions.ps1
+
       - name: Verify release tag and metadata
         id: release
         shell: pwsh

@@ -111,6 +111,10 @@ jobs:
           cache-dependency-path: >
             src/Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
 
+      - name: Verify shared extension version
+        shell: pwsh
+        run: ./eng/Verify-AkburaExtensionVersions.ps1
+
       - name: Verify release tag and metadata
         id: release
         working-directory: ${{ env.EXTENSION_DIRECTORY }}

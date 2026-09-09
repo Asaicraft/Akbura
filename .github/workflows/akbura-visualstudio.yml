@@ -8,6 +8,7 @@ on:
       - "src/Workspaces/Akbura.Workspaces.UnitTests/**"
       - "src/Workspaces/Akbura.VisualStudio/**"
       - "src/Workspaces/Akbura.VisualStudio.Vsix/**"
+      - "eng/Verify-AkburaExtensionVersions.ps1"
       - "Directory.Build.props"
       - "Directory.Packages.props"
       - ".github/workflows/akbura-visualstudio.yml"
@@ -22,6 +23,7 @@ on:
       - "src/Workspaces/Akbura.Workspaces.UnitTests/**"
       - "src/Workspaces/Akbura.VisualStudio/**"
       - "src/Workspaces/Akbura.VisualStudio.Vsix/**"
+      - "eng/Verify-AkburaExtensionVersions.ps1"
       - "Directory.Build.props"
       - "Directory.Packages.props"
       - ".github/workflows/akbura-visualstudio.yml"
@@ -53,6 +55,10 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "10.0.x"
+
+      - name: Verify shared extension version
+        shell: pwsh
+        run: ./eng/Verify-AkburaExtensionVersions.ps1
 
       - name: Restore Visual Studio projects
         shell: pwsh

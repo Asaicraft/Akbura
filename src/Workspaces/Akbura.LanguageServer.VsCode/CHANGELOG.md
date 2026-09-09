@@ -1,7 +1,8 @@
 # Change Log
 
-## 0.1.2
+## 12.0.4
 
+- Aligned the extension version with Akbura and Avalonia.
 - Added the Akbura icon to the VS Code Marketplace package.
 
 ## 0.1.1

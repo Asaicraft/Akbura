@@ -10,7 +10,10 @@ on:
       - "src/Workspaces/Akbura.LanguageServer.IntegrationTests/**"
       - "src/Workspaces/Akbura.Workspaces/**"
       - "src/Workspaces/Akbura.Workspaces.MSBuild/**"
+      - "eng/Verify-AkburaExtensionVersions.ps1"
+      - "Directory.Build.props"
       - ".github/workflows/akbura-vscode.yml"
+      - ".github/workflows/akbura-vscode-publish.yml"
 
   push:
     branches:
@@ -24,7 +27,10 @@ on:
       - "src/Workspaces/Akbura.LanguageServer.IntegrationTests/**"
       - "src/Workspaces/Akbura.Workspaces/**"
       - "src/Workspaces/Akbura.Workspaces.MSBuild/**"
+      - "eng/Verify-AkburaExtensionVersions.ps1"
+      - "Directory.Build.props"
       - ".github/workflows/akbura-vscode.yml"
+      - ".github/workflows/akbura-vscode-publish.yml"
 
 jobs:
   build:
@@ -46,6 +52,10 @@ jobs:
           cache: npm
           cache-dependency-path: >
             src/Workspaces/Akbura.LanguageServer.VsCode/package-lock.json
+
+      - name: Verify shared extension version
+        shell: pwsh
+        run: ./eng/Verify-AkburaExtensionVersions.ps1
 
       - name: Restore LSP projects
         run: |

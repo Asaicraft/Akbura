@@ -115,6 +115,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteValueDescriptorFactory(in ComponentParameterPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static global::Akbura.ComponentTree.Parameter<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
@@ -250,6 +251,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteSingleContentChangedHandler()
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.WriteLine(
             "private void __OnContentChanged(" +
             "global::Avalonia.AvaloniaPropertyChangedEventArgs __change)");
@@ -367,6 +369,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteCollectionBackingGetter(in ComponentParameterPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private ");
         _valueWriter.WriteTypeNameWithNullableAnnotation(plan.Collection.BackingType);
         _writer.Write(" ");
@@ -396,6 +399,7 @@ internal readonly ref struct ParameterWriter
     private void WriteCollectionLogicalChildrenGetter(
         in ComponentParameterPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.WriteLine(
             "private global::System.Collections.Generic.List<" +
             "global::Avalonia.Controls.Control>");
@@ -453,6 +457,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteCollectionDescriptorFactory(in ComponentParameterPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static global::Akbura.ComponentTree.ReadOnlyParameter<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
@@ -511,6 +516,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteCollectionGetter(in ComponentParameterPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static ");
         WriteCollectionPropertyType(plan);
         _writer.Write(" ");
@@ -579,10 +585,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteCollectionAddMethod(in ComponentParameterPlan plan)
     {
-        _writer.WriteLine(
-            "[global::System.ComponentModel.EditorBrowsable(" +
-            "global::System.ComponentModel.EditorBrowsableState.Never)]");
-        _writer.WriteLine("[global::System.ComponentModel.Browsable(false)]");
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("public void ");
 
         GeneratedMemberNameWriter.WriteCollectionAddMethod(_writer, plan.Name);
@@ -607,6 +610,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteCollectionChangedHandler(in ComponentParameterPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private void ");
         GeneratedMemberNameWriter.WriteCollectionChangedMethod(_writer, plan.GeneratedName);
         _writer.WriteLine("(");
@@ -648,6 +652,7 @@ internal readonly ref struct ParameterWriter
 
     private void WriteLogicalChildrenSynchronizer(in ComponentParameterPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private void ");
         GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.GeneratedName);
         _writer.WriteLine("()");

@@ -80,6 +80,7 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.Write(StateType);
         _writer.WriteLine("> __states;");
         _writer.WriteLine();
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private global::System.Collections.Immutable.ImmutableArray<");
         _writer.Write(StateType);
         _writer.WriteLine("> __GetStates()");

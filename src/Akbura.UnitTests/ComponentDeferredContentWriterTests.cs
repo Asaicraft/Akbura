@@ -104,6 +104,9 @@ public sealed class ComponentDeferredContentWriterTests
         Assert.Equal(8, fixture.CodeWriter.CurrentIndent);
 
         var output = fixture.CodeWriter.GetText().ToString();
+        GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(
+            output,
+            isMemberFragment: true);
         Assert.Contains(
             "private object __BuildDeferredContent" + deferred.Id +
             "(global::System.IServiceProvider __services)",

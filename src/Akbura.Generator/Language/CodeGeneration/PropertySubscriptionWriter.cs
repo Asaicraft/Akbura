@@ -164,6 +164,7 @@ internal readonly ref struct PropertySubscriptionWriter
 
     private void WriteHandlerStart(int id)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private void ");
         WriteHandlerName(id);
         _writer.WriteLine("(");

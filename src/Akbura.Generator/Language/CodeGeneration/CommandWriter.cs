@@ -99,6 +99,7 @@ internal readonly ref struct CommandWriter
 
     private void WriteDescriptorFactory(in ComponentCommandPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static ");
         WriteDescriptorType();
         _writer.Write(" ");

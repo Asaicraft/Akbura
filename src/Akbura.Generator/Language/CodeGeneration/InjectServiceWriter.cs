@@ -114,6 +114,7 @@ internal readonly ref struct InjectServiceWriter
 
     private void WriteDescriptorFactory(in ComponentInjectServicePlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.WriteLine("private static global::Akbura.ComponentTree.InjectService<");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write(_ownerTypeName);
@@ -175,6 +176,7 @@ internal readonly ref struct InjectServiceWriter
 
     private void WriteDirectPropertyGetter(in ComponentInjectServicePlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static ");
         WriteNullableServiceType(plan);
         _writer.Write(" ");
@@ -192,6 +194,7 @@ internal readonly ref struct InjectServiceWriter
 
     private void WriteDirectPropertySetter(in ComponentInjectServicePlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static void ");
         GeneratedMemberNameWriter.WriteServiceValueSetter(
             _writer,
@@ -209,6 +212,7 @@ internal readonly ref struct InjectServiceWriter
 
     private void WriteSetter(in ComponentInjectServicePlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private void ");
         GeneratedMemberNameWriter.WriteServiceSetter(
             _writer,

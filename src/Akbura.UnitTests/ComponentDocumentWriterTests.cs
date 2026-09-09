@@ -286,6 +286,8 @@ public sealed class ComponentDocumentWriterTests
             path: ComponentDocumentWriter.GetHintName(
                 component,
                 "Views/PlannerView.akbura"));
+        GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(
+            generatedSource);
         var diagnostics = fixture.CSharpCompilation
             .AddSyntaxTrees(syntaxTree)
             .GetDiagnostics()

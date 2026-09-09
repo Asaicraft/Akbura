@@ -463,6 +463,7 @@ internal readonly ref struct ComponentLifecycleWriter
     private void WriteHotReloadUpdateInitialValues(in ComponentPlan plan)
     {
         _writer.WriteLine("#if DEBUG");
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private void ");
         _writer.Write(HotReloadUpdateInitialValuesMethodName);
         _writer.WriteLine("()");

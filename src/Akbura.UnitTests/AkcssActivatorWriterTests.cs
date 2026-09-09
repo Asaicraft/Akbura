@@ -154,6 +154,10 @@ public sealed class AkcssActivatorWriterTests
             requiresLocalMarkupExtensionContext: false);
         var output = WriteElement(fixture, elementIndex: 0, writeFactories: true);
 
+        GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(
+            output,
+            isMemberFragment: true);
+
         Assert.Contains(
             "global::Akbura.Akcss.AkcssUtilityValueSource.Create<double>(",
             output,

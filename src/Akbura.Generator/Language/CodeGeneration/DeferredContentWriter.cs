@@ -59,6 +59,7 @@ internal readonly ref struct DeferredContentWriter
 
         try
         {
+            _writer.WriteHiddenApiAttributes();
             _writer.Write("private object ");
             WriteBuilderName(deferred.Id);
             _writer.WriteLine("(global::System.IServiceProvider __services)");

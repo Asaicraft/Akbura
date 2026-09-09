@@ -68,6 +68,7 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
 
     private void WriteRevisionMethod(in ComponentPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static string ");
         _writer.Write(RevisionMethodName);
         _writer.WriteLine("() =>");
@@ -80,6 +81,7 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
 
     private void WriteDescriptionMethod(in ComponentPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static void ");
         _writer.Write(DescribeMethodName);
         _writer.WriteLine("(");
@@ -135,6 +137,7 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
 
     private void WriteFactoryMethod(in ComponentPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.WriteLine(
             "private static object __AkburaCreateRenderNode(int __localId)");
         _writer.WriteLine("{");
@@ -168,6 +171,7 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
 
     private void WriteEnsureMethod()
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private bool ");
         _writer.Write(EnsureRenderTreeMethodName);
         _writer.WriteLine("()");

@@ -101,6 +101,7 @@ internal readonly ref struct ComponentHotReloadWriter
         string methodName,
         string fingerprint)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static string ");
         _writer.Write(methodName);
         _writer.WriteLine("() =>");
@@ -112,6 +113,7 @@ internal readonly ref struct ComponentHotReloadWriter
 
     private void WriteManifestFactory(in ComponentMemberPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.WriteLine(
             "private static global::System.Collections.Immutable.ImmutableArray<");
         _writer.CurrentIndent += _writer.TabSize;
@@ -180,6 +182,7 @@ internal readonly ref struct ComponentHotReloadWriter
 
     private void WriteDescriptorRebuilder(in ComponentMemberPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.WriteLine(
             "private static void __AkburaHotReloadRebuildDescriptors()");
         _writer.WriteLine("{");
@@ -314,6 +317,7 @@ internal readonly ref struct ComponentHotReloadWriter
 
     private void WriteStateInfoRebuilder(in ComponentMemberPlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.WriteLine(
             "private static void __AkburaHotReloadRebuildStateInfos()");
         _writer.WriteLine("{");
@@ -335,6 +339,7 @@ internal readonly ref struct ComponentHotReloadWriter
 
     private void WriteStateReset()
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static void __AkburaHotReloadResetStates(");
         _writer.Write(_ownerTypeName);
         _writer.WriteLine(" __component)");
@@ -348,6 +353,7 @@ internal readonly ref struct ComponentHotReloadWriter
 
     private void WritePrepare()
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static void ");
         _writer.Write(PrepareMethodName);
         _writer.Write("(");

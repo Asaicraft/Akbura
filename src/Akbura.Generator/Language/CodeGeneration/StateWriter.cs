@@ -95,6 +95,7 @@ internal readonly ref struct StateWriter
 
     private void WriteStateInfoFactory(in ComponentStatePlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static global::Akbura.ComponentTree.StateInfo<");
         WriteValueType(plan);
         _writer.Write("> ");
@@ -143,6 +144,7 @@ internal readonly ref struct StateWriter
 
     private void WriteStateInfoDelegate(in ComponentStatePlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private static ");
 
         if (plan.FactoryKind == ComponentStateFactoryKind.State)
@@ -258,6 +260,7 @@ internal readonly ref struct StateWriter
 
     private void WriteFactory(in ComponentStatePlan plan)
     {
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private ");
 
         if (plan.FactoryKind == ComponentStateFactoryKind.State)

@@ -17,6 +17,10 @@ public sealed class ParameterWriterTests
 
         var output = Write(fixture, parameterIndex: 0);
 
+        GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(
+            output,
+            isMemberFragment: true);
+
         Assert.Contains(
             "public static readonly global::Akbura.ComponentTree.Parameter<" +
             "global::Demo.PlannerView, string> TitleProperty =",
@@ -418,6 +422,8 @@ public sealed class ParameterWriterTests
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
             path: "ParameterWriterOutput.g.cs",
             encoding: Encoding.UTF8);
+        GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(
+            generatedSource);
         var errors = fixture.SemanticFixture.CSharpCompilation
             .AddSyntaxTrees(syntaxTree)
             .GetDiagnostics()

@@ -376,6 +376,7 @@ internal readonly ref struct AkcssActivatorWriter
     {
         var indent = _writer.CurrentIndent;
 
+        _writer.WriteHiddenApiAttributes();
         _writer.Write("private ");
         WriteFactoryReturnType(slot.FactoryValueType, slot.HasPriorityMember);
         _writer.Write(" ").Write(slot.FactoryName).Write("(");

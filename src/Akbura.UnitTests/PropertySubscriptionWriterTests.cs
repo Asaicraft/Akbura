@@ -436,6 +436,7 @@ public sealed class PropertySubscriptionWriterTests
         }
 
         var source = codeWriter.GetText().ToString();
+        GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(source);
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));

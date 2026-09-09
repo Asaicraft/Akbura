@@ -430,6 +430,12 @@ public sealed class ComponentStructuralHotReloadMetadataContractTests
             static diagnostic =>
                 diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error);
 
+        foreach (var generatedSource in result.GeneratedSources)
+        {
+            GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(
+                generatedSource.SourceText.ToString());
+        }
+
         var diagnostics = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error)

@@ -805,7 +805,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
         {
             var end = full.Segments.Count == 0
                 ? full.Name.Span.End
-                : full.Segments[full.Segments.Count - 1].Span.End;
+                : full.Segments[^1].Span.End;
             return TextSpan.FromBounds(
                 full.Name.Span.Start,
                 end);
@@ -1755,7 +1755,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 text.Length);
             var referenceKey =
                 module.Manifest.AssemblyName + "|" +
-                (module.Reference.FilePath ??
+                ((module.Reference as PortableExecutableReference)?.FilePath ??
                  module.Reference.Display ??
                  string.Empty);
             var targetPath =

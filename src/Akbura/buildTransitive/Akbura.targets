@@ -14,8 +14,7 @@
 
 	<PropertyGroup>
 		<AkburaEmbedSourceFiles Condition="'$(AkburaEmbedSourceFiles)' == ''">true</AkburaEmbedSourceFiles>
-		<AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Akbura.module.xml</AkburaModuleManifestPath>
-		<AkburaEmbeddedSourcesPath Condition="'$(AkburaEmbeddedSourcesPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura\Sources</AkburaEmbeddedSourcesPath>
+		<AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura.module.xml</AkburaModuleManifestPath>
 		<AkburaBuildTasksAssembly Condition="'$(AkburaBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tools\net10.0\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
 	</PropertyGroup>
 
@@ -51,6 +50,9 @@
 				   and '$(BuildingProject)' == 'true'
 				   and '$(DesignTimeBuild)' != 'true'">
 
+		<RemoveDir
+			Directories="$(IntermediateOutputPath)Akbura"
+			Condition="Exists('$(IntermediateOutputPath)Akbura')" />
 		<MakeDir
 			Directories="$([System.IO.Path]::GetDirectoryName('$(AkburaModuleManifestPath)'))" />
 
@@ -59,22 +61,16 @@
 			CSharpSources="@(Compile)"
 			References="@(ReferencePathWithRefAssemblies)"
 			OutputPath="$(AkburaModuleManifestPath)"
-			EmbeddedSourcesDirectory="$(AkburaEmbeddedSourcesPath)"
 			AssemblyName="$(AssemblyName)"
 			RootNamespace="$(RootNamespace)"
 			ProjectDirectory="$(MSBuildProjectDirectory)"
 			DefineConstants="$(DefineConstants)"
 			LanguageVersion="$(LangVersion)"
 			Nullable="$(Nullable)"
-			AllowUnsafeBlocks="$(AllowUnsafeBlocks)">
-
-			<Output
-				TaskParameter="EmbeddedSources"
-				ItemName="_AkburaEmbeddedSource" />
-		</GenerateAkburaModuleManifest>
+			AllowUnsafeBlocks="$(AllowUnsafeBlocks)" />
 
 		<ItemGroup>
-			<EmbeddedResource Include="@(_AkburaEmbeddedSource)" />
+			<EmbeddedResource Include="@(_AkburaModuleSource)" />
 		</ItemGroup>
 	</Target>
 

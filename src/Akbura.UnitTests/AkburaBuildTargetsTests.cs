@@ -58,16 +58,42 @@ public sealed class AkburaBuildTargetsTests
         Assert.True(widthParameter.SourceLength > 0);
 
         using var sourceStream = AkburaModuleManifestSerializer.OpenSource(assembly, source);
-        AssertUtf16LittleEndianBom(sourceStream);
-        using var reader = new StreamReader(sourceStream);
-        Assert.Contains("@utilities", reader.ReadToEnd(), StringComparison.Ordinal);
-    }
-    private static void AssertUtf16LittleEndianBom(Stream stream)
-    {
-        var position = stream.Position;
-        Assert.Equal(0xff, stream.ReadByte());
-        Assert.Equal(0xfe, stream.ReadByte());
-        stream.Position = position;
+        using var embeddedSource = new MemoryStream();
+        sourceStream.CopyTo(embeddedSource);
+
+        var repositoryRoot = FindRepositoryRoot();
+        var sourcePath = Path.Combine(repositoryRoot, "src", "Akbura", "Styles.akcss");
+        Assert.Equal(File.ReadAllBytes(sourcePath), embeddedSource.ToArray());
     }
 
+    [Fact]
+    public void AkburaBuild_DoesNotCreateAkburaIntermediateDirectory()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var configuration = typeof(AkburaControl).Assembly
+            .GetCustomAttribute<AssemblyConfigurationAttribute>()!
+            .Configuration;
+        var intermediateOutputPath = Path.Combine(
+            repositoryRoot,
+            "src",
+            "Akbura",
+            "obj",
+            configuration,
+            "net10.0");
+
+        Assert.False(Directory.Exists(Path.Combine(intermediateOutputPath, "Akbura")));
+        Assert.True(File.Exists(Path.Combine(intermediateOutputPath, "Akbura.module.xml")));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null &&
+               !File.Exists(Path.Combine(directory.FullName, "Akbura.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return Assert.IsType<DirectoryInfo>(directory).FullName;
+    }
 }

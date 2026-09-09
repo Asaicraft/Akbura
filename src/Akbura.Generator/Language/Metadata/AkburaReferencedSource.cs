@@ -12,9 +12,6 @@ namespace Akbura.Language;
 
 internal sealed class AkburaReferencedSource
 {
-    private static readonly Encoding s_embeddedSourceEncoding =
-        new UnicodeEncoding(bigEndian: false, byteOrderMark: true, throwOnInvalidBytes: true);
-
     private readonly PortableExecutableReference _reference;
     private readonly AkburaModuleTypeResolver _typeResolver;
     private readonly Lazy<AkburaSyntaxTree?> _lazySyntaxTree;
@@ -265,7 +262,7 @@ internal sealed class AkburaReferencedSource
         {
             try
             {
-                var sourceText = SourceText.From(sourceStream!, s_embeddedSourceEncoding);
+                var sourceText = SourceText.From(sourceStream!, encoding: null);
                 if (Source.Kind == AkburaModuleSourceKind.Component)
                 {
                     return ComponentSyntaxTree.ParseText(

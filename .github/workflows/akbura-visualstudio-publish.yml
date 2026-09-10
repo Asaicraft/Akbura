@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - "visualstudio-v*"
+  # Run this workflow FROM master, but build the specified existing release tag.
+  # This lets a workflow fix publish an old tag without moving that tag.
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release tag, for example visualstudio-v12.0.4"
+        required: true
+        type: string
 
 permissions: {}
 
@@ -12,17 +20,22 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   VSIX_PROJECT_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj
   VSIX_OUTPUT_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/bin/Release/net472/Akbura.VisualStudio.Vsix.vsix
   PUBLISH_MANIFEST_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/vs-publish.json
   OVERVIEW_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/overview.md
   VERIFY_SCRIPT_PATH: src/Workspaces/Akbura.VisualStudio.Vsix/scripts/verify-vsix.ps1
-  VSIX_PUBLISHER_VERSION: "17.13.2126"
+  # Only the publishing client is updated; build-time project packages stay unchanged.
+  # Keep this exact version pinned rather than downloading a floating latest.
+  VSIX_PUBLISHER_VERSION: "18.5.40034"
 
 jobs:
   package:
     name: Test and package Visual Studio VSIX
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/visualstudio-v')
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/visualstudio-v')) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
     runs-on: windows-2022
     timeout-minutes: 45
     permissions:
@@ -30,48 +43,58 @@ jobs:
     outputs:
       version: ${{ steps.release.outputs.version }}
       vsix-name: ${{ steps.release.outputs.vsix-name }}
-
+      release-tag: ${{ steps.release.outputs.release-tag }}
+      release-commit: ${{ steps.release.outputs.release-commit }}
     steps:
+      - name: Validate release request
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -cnotmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+)$') {
+            throw 'Release tag must have the form visualstudio-vX.Y.Z.'
+          }
+
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # A tag push is pinned to its event commit. Manual recovery checks out
+          # the requested tag, NOT the workflow's master commit.
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', env.RELEASE_TAG) || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Install .NET 10
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Verify shared extension version
-        shell: pwsh
-        run: ./eng/Verify-AkburaExtensionVersions.ps1
 
       - name: Verify release tag and metadata
         id: release
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
           git fetch --no-tags origin master:refs/remotes/origin/master
           if ($LASTEXITCODE -ne 0) {
             throw 'Unable to fetch origin/master.'
           }
 
-          git merge-base --is-ancestor $env:GITHUB_SHA origin/master
+          $releaseCommit = git rev-parse --verify HEAD
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to resolve the checked-out release commit.'
+          }
+          $tagCommit = git rev-parse --verify "refs/tags/$($env:RELEASE_TAG)^{commit}"
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $releaseCommit) {
+            throw 'The checked-out commit does not match the requested release tag.'
+          }
+          # GITHUB_SHA refers to master on workflow_dispatch; validate HEAD instead.
+          git merge-base --is-ancestor $releaseCommit origin/master
           if ($LASTEXITCODE -ne 0) {
             throw 'Release tag must point to a commit on master.'
           }
-
-          if ($env:GITHUB_REF_NAME -notmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+)$') {
-            throw "Release tag '$env:GITHUB_REF_NAME' must have the form 'visualstudio-vX.Y.Z'."
+          if ($env:RELEASE_TAG -cnotmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+)$') {
+            throw 'Release tag must have the form visualstudio-vX.Y.Z.'
           }
           $tagVersion = $Matches[1]
-
           [xml] $sourceManifest = Get-Content -Raw -LiteralPath `
             src/Workspaces/Akbura.VisualStudio.Vsix/source.extension.vsixmanifest
           $identity = $sourceManifest.PackageManifest.Metadata.Identity
           $manifestVersion = [string] $identity.Version
-
           if ($manifestVersion -cne $tagVersion) {
             throw "Tag version '$tagVersion' does not match VSIX version '$manifestVersion'."
           }
@@ -85,15 +108,22 @@ jobs:
           if ($displayName.Trim() -cne 'Akbura Visual Studio Extension') {
             throw "Unexpected source VSIX display name '$displayName'."
           }
+          @(
+            "version=$manifestVersion"
+            "vsix-name=akbura-visual-studio-extension-$manifestVersion.vsix"
+            "release-tag=$env:RELEASE_TAG"
+            "release-commit=$releaseCommit"
+          ) | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "Release: $env:RELEASE_TAG ($releaseCommit)."
 
-          "version=$manifestVersion" | Out-File `
-            -FilePath $env:GITHUB_OUTPUT `
-            -Encoding utf8 `
-            -Append
-          "vsix-name=akbura-visual-studio-extension-$manifestVersion.vsix" | Out-File `
-            -FilePath $env:GITHUB_OUTPUT `
-            -Encoding utf8 `
-            -Append
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Verify shared extension version
+        shell: pwsh
+        run: ./eng/Verify-AkburaExtensionVersions.ps1
 
       - name: Restore Visual Studio projects
         shell: pwsh
@@ -151,7 +181,6 @@ jobs:
             $env:RUNNER_TEMP `
             'akbura-visualstudio-extension'
           New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
-
           Copy-Item -LiteralPath $env:VSIX_OUTPUT_PATH `
             -Destination (Join-Path $artifactDirectory $env:VSIX_NAME)
           Copy-Item -LiteralPath $env:PUBLISH_MANIFEST_PATH `
@@ -172,17 +201,15 @@ jobs:
 
   publish:
     name: Publish to Visual Studio Marketplace
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/visualstudio-v')
     needs: package
     runs-on: windows-2022
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment:
       name: visualstudio-marketplace
       url: https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-visual-studio-extension
     permissions:
       actions: read
       contents: read
-
     steps:
       - name: Download Marketplace artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -208,7 +235,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-
+          $PSNativeCommandUseErrorActionPreference = $false
           $nuget = (Get-Command nuget.exe -ErrorAction Stop).Source
           $packageDirectory = Join-Path $env:RUNNER_TEMP 'vsix-publisher'
           $nugetArguments = @(
@@ -224,48 +251,30 @@ jobs:
             '-DirectDownload'
             '-NoHttpCache'
           )
-
           & $nuget @nugetArguments
           if ($LASTEXITCODE -ne 0) {
-            throw (
-              'Unable to install Microsoft.VSSDK.BuildTools ' +
-              "$env:VSIX_PUBLISHER_VERSION."
-            )
+            throw "Unable to install Microsoft.VSSDK.BuildTools $env:VSIX_PUBLISHER_VERSION."
           }
-
           $packageRoot = Join-Path $packageDirectory (
-            'Microsoft.VSSDK.BuildTools.' +
-            $env:VSIX_PUBLISHER_VERSION
+            'Microsoft.VSSDK.BuildTools.' + $env:VSIX_PUBLISHER_VERSION
           )
-          $publisherPath = Join-Path $packageRoot (
-            'tools\vssdk\bin\VsixPublisher.exe'
-          )
+          $publisherPath = Join-Path $packageRoot 'tools\vssdk\bin\VsixPublisher.exe'
           if (-not (Test-Path -LiteralPath $publisherPath -PathType Leaf)) {
-            throw (
-              'VsixPublisher.exe was not found in ' +
-              "Microsoft.VSSDK.BuildTools $env:VSIX_PUBLISHER_VERSION."
-            )
+            throw "VsixPublisher.exe was not found in Microsoft.VSSDK.BuildTools $env:VSIX_PUBLISHER_VERSION."
           }
-
-          $productVersion =
-            (Get-Item -LiteralPath $publisherPath).VersionInfo.ProductVersion
-          if ([string]::IsNullOrWhiteSpace($productVersion) -or
-              -not $productVersion.StartsWith(
-                $env:VSIX_PUBLISHER_VERSION,
-                [System.StringComparison]::Ordinal
-              )) {
-            throw (
-              "Unexpected VsixPublisher product version '$productVersion'."
-            )
-          }
-
-          Write-Host (
-            "Using VsixPublisher $productVersion at '$publisherPath'."
-          )
+          # NuGet's package version and an embedded executable's ProductVersion
+          # are separate metadata. Pin the package; log the executable version.
+          $productVersion = (Get-Item -LiteralPath $publisherPath).VersionInfo.ProductVersion
+          Write-Host "BuildTools package: $env:VSIX_PUBLISHER_VERSION."
+          Write-Host "VsixPublisher product version: $productVersion."
+          Write-Host "Runner image: $env:ImageOS / $env:ImageVersion."
           "VSIX_PUBLISHER_PATH=$publisherPath" |
             Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Publish VSIX
+        id: publish-vsix
         shell: pwsh
+        timeout-minutes: 10
         env:
           VS_MARKETPLACE_PAT: ${{ secrets.VS_MARKETPLACE_PAT }}
           VSIX_PATH: ${{ runner.temp }}/akbura-visualstudio-extension/${{ needs.package.outputs.vsix-name }}
@@ -273,11 +282,19 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $false
-
           if ([string]::IsNullOrWhiteSpace($env:VS_MARKETPLACE_PAT)) {
-            throw 'VS_MARKETPLACE_PAT is missing.'
+            throw 'VS_MARKETPLACE_PAT is missing in the visualstudio-marketplace job.'
           }
-
+          if ($env:VS_MARKETPLACE_PAT -match '\s') {
+            throw 'VS_MARKETPLACE_PAT contains whitespace. Check for a pasted newline.'
+          }
+          foreach ($path in @($env:VSIX_PUBLISHER_PATH, $env:VSIX_PATH, $env:PUBLISH_MANIFEST_PATH)) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Required publishing file was not found: $path"
+            }
+          }
+          # Pass the PAT as an argument, never interpolate it into generated code.
+          # Do not print the argument array or enable verbose HTTP tracing.
           $publisherArguments = @(
             'publish'
             '-payload'
@@ -287,65 +304,146 @@ jobs:
             '-personalAccessToken'
             $env:VS_MARKETPLACE_PAT
           )
-          $publisherOutput = @(
-            & $env:VSIX_PUBLISHER_PATH @publisherArguments 2>&1 |
-              ForEach-Object {
-                $line = $_.ToString()
-                Write-Host $line
-                $line
-              }
-          )
-          $publisherExitCode = $LASTEXITCODE
           $uploadPattern = (
             "\bVsixPub0038\b\s*:\s*Uploaded\s+" +
             "'Akbura Visual Studio Extension'\s+" +
             "to\s+the\s+marketplace\."
           )
-          $uploadConfirmed = @(
-            $publisherOutput |
-              Where-Object { $_ -match $uploadPattern }
-          ).Count -gt 0
-
-          if ($publisherExitCode -ne 0 -and -not $uploadConfirmed) {
-            throw (
-              'VsixPublisher.exe failed before Marketplace confirmed ' +
-              "the upload. Exit code: $publisherExitCode."
+          # VsixPub0035 alone is NOT a sufficient reason to retry. Require the
+          # exact authentication-timeout message seen in the failing run.
+          $authenticationTimeoutPattern = (
+            '\bVsixPub0035\b[^\r\n]*' +
+            'communication\s+with\s+the\s+marketplace\s+timed[-\s]?out'
+          )
+          $knownTeardownPattern = (
+            '(?s)\b(?:FileLoadException|FileNotFoundException)\b.*?' +
+            '(?:System\.Memory|System\.Runtime\.CompilerServices\.Unsafe)'
+          )
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "Publishing VSIX: attempt $attempt of $maxAttempts."
+            $timer = [System.Diagnostics.Stopwatch]::StartNew()
+            $publisherOutput = @(
+              & $env:VSIX_PUBLISHER_PATH @publisherArguments 2>&1 |
+                ForEach-Object {
+                  $line = $_.ToString().Replace($env:VS_MARKETPLACE_PAT, '***')
+                  Write-Host $line
+                  $line
+                }
             )
-          }
+            $publisherExitCode = $LASTEXITCODE
+            $timer.Stop()
+            Write-Host "VsixPublisher exit code: $publisherExitCode; elapsed: $($timer.Elapsed.TotalSeconds.ToString('F1')) seconds."
+            $text = $publisherOutput -join "`n"
 
-          if ($publisherExitCode -ne 0 -and $uploadConfirmed) {
-            Write-Warning (
-              'Marketplace confirmed the upload with VsixPub0038, but ' +
-              'VsixPublisher.exe later returned exit code ' +
-              "$publisherExitCode. Treating the publication as successful."
+            if ($publisherExitCode -eq 0) {
+              # GitHub appends an exit based on LASTEXITCODE to pwsh scripts.
+              exit 0
+            }
+            $uploadMatch = [regex]::Match(
+              $text, $uploadPattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
             )
+            if ($uploadMatch.Success) {
+              $afterUpload = $text.Substring($uploadMatch.Index + $uploadMatch.Length)
+              $hasPublisherError = $text -match '(?im)\bVSSDK\s*:\s*error\s+VsixPub\d+\b'
+              if (-not $hasPublisherError -and $afterUpload -match $knownTeardownPattern) {
+                Write-Warning (
+                  'Marketplace confirmed the upload with VsixPub0038, then a known ' +
+                  'dependency-load failure occurred. No retry will be performed.'
+                )
+                # A warning alone does not clear the native process exit code.
+                exit 0
+              }
+              throw (
+                'An upload confirmation was seen, but VsixPublisher then failed ' +
+                "with an unrecognized error (exit $publisherExitCode). " +
+                'Check the Marketplace version before retrying; no automatic retry was performed.'
+              )
+            }
+
+            $isAuthenticationTimeout = (
+              $publisherExitCode -eq 35 -and $text -match $authenticationTimeoutPattern
+            )
+            if (-not $isAuthenticationTimeout) {
+              throw "VsixPublisher failed with exit code $publisherExitCode. Not an authentication timeout; no retry."
+            }
+            if ($attempt -eq $maxAttempts) {
+              throw (
+                "Marketplace authentication timed out on all $maxAttempts attempts " +
+                '(VsixPub0035 / exit 35). Upload was not confirmed. ' +
+                'See the following network diagnostics; a timeout alone does not prove the PAT is invalid.'
+              )
+            }
+            $delaySeconds = 15 * $attempt
+            Write-Warning "Marketplace authentication timed out. Retrying in $delaySeconds seconds."
+            Start-Sleep -Seconds $delaySeconds
           }
+          throw 'Publishing ended without a successful result.'
+
+      - name: Diagnose Marketplace connectivity after failure
+        if: ${{ failure() && steps.publish-vsix.outcome == 'failure' }}
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          # Advisory, unauthenticated probes. No PAT is available in this step.
+          # An HTTP response demonstrates reachability, NOT successful PAT auth.
+          $ErrorActionPreference = 'Stop'
+          Write-Host "UTC: $([DateTime]::UtcNow.ToString('o'))"
+          Write-Host "Runner image: $env:ImageOS / $env:ImageVersion."
+          foreach ($hostName in @('marketplace.visualstudio.com', 'app.vssps.visualstudio.com')) {
+            Write-Host "Checking public DNS/HTTPS for $hostName."
+            try {
+              $addresses = Resolve-DnsName -Name $hostName -Type A -ErrorAction Stop |
+                Where-Object { $_.IPAddress } |
+                Select-Object -ExpandProperty IPAddress
+              Write-Host "DNS IPv4: $($addresses -join ', ')"
+            } catch {
+              Write-Warning "DNS probe failed for ${hostName}: $($_.Exception.Message)"
+            }
+            $handler = [System.Net.Http.HttpClientHandler]::new()
+            $handler.AllowAutoRedirect = $false
+            $client = [System.Net.Http.HttpClient]::new($handler)
+            $client.Timeout = [TimeSpan]::FromSeconds(30)
+            $response = $null
+            try {
+              $response = $client.GetAsync("https://$hostName/").GetAwaiter().GetResult()
+              Write-Host "Public HTTPS status: $([int] $response.StatusCode) $($response.ReasonPhrase)."
+            } catch {
+              Write-Warning "HTTPS probe failed for ${hostName}: $($_.Exception.Message)"
+            } finally {
+              if ($null -ne $response) { $response.Dispose() }
+              $client.Dispose()
+            }
+          }
+          Write-Host 'These public probes do not validate the PAT or publisher permissions.'
+          Write-Host 'A successful probe also does not rule out an authentication-backend timeout.'
+          # Keep the original Publish VSIX failure as the job's failure.
+          exit 0
+
       - name: Write publication summary
         shell: pwsh
         env:
           VERSION: ${{ needs.package.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.package.outputs.release-commit }}
         run: |
           @"
           ## Visual Studio Marketplace
-
-          Published **asaicraft.akbura-visual-studio-extension** version **$env:VERSION**.
+          Uploaded **asaicraft.akbura-visual-studio-extension** version **$env:VERSION**.
+          Release tag: **$env:RELEASE_TAG**. Commit: **$env:RELEASE_COMMIT**.
+          Publisher package: **$env:VSIX_PUBLISHER_VERSION**.
+          Marketplace processing or validation may still be pending.
           "@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
   github-release:
     name: Attach VSIX to GitHub Release
-    if: >
-      github.event_name == 'push' &&
-      startsWith(github.ref, 'refs/tags/visualstudio-v')
     needs:
       - package
       - publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-
     permissions:
       actions: read
       contents: write
-
     steps:
       - name: Download release VSIX
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -361,7 +459,6 @@ jobs:
           SOURCE_VSIX: ${{ runner.temp }}/akbura-visualstudio-github-release/${{ needs.package.outputs.vsix-name }}
         run: |
           set -euo pipefail
-
           release_directory="$RUNNER_TEMP/github-release-assets"
           release_name="Akbura-Visual-Studio-Extension-$VERSION.vsix"
           release_path="$release_directory/$release_name"
@@ -375,7 +472,6 @@ jobs:
             cd "$release_directory"
             sha256sum "$release_name" > "$release_name.sha256"
           )
-
           echo "vsix=$release_path" >> "$GITHUB_OUTPUT"
           echo "checksum=$checksum_path" >> "$GITHUB_OUTPUT"
 
@@ -383,12 +479,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.package.outputs.release-tag }}
           VERSION: ${{ needs.package.outputs.version }}
           VSIX_PATH: ${{ steps.assets.outputs.vsix }}
           CHECKSUM_PATH: ${{ steps.assets.outputs.checksum }}
         run: |
           set -euo pipefail
-
           title="Akbura Visual Studio Extension $VERSION"
           notes="$(
             printf '%s\n\n%s\n\n%s\n' \
@@ -396,21 +492,20 @@ jobs:
               "Install from the Visual Studio Marketplace or download the VSIX asset below for manual installation." \
               "Marketplace extension ID: asaicraft.akbura-visual-studio-extension"
           )"
-
-          if gh release view "$GITHUB_REF_NAME" \
+          if gh release view "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               > /dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" \
+            gh release edit "$RELEASE_TAG" \
               --title "$title" \
               --notes "$notes" \
               --repo "$GITHUB_REPOSITORY"
-            gh release upload "$GITHUB_REF_NAME" \
+            gh release upload "$RELEASE_TAG" \
               "$VSIX_PATH" \
               "$CHECKSUM_PATH" \
               --clobber \
               --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$GITHUB_REF_NAME" \
+            gh release create "$RELEASE_TAG" \
               "$VSIX_PATH" \
               "$CHECKSUM_PATH" \
               --verify-tag \

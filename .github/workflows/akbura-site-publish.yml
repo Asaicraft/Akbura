@@ -1,4 +1,4 @@
-name: Build
+name: Publish Akbura Website
 
 permissions:
   contents: write
@@ -11,7 +11,7 @@ on:
     paths:
       - "src/AkburaDocs/**"
       - "src/Akbura.FeatureGallery/**"
-      - ".github/workflows/build.yml"
+      - ".github/workflows/akbura-site-publish.yml"
 
 jobs:
   build:

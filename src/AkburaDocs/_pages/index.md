@@ -23,7 +23,7 @@ Akbura is under active development. Syntax, generated code, and runtime APIs may
 Install the current template package from NuGet:
 
 :::sh
-dotnet new install Akbura.Templates::12.0.4-alpha.2
+dotnet new install Akbura.Templates::12.0.4-alpha.3
 :::
 
 Create and run an Avalonia desktop application:
@@ -47,7 +47,7 @@ dotnet new akbura.app -n MyApp --di Splat.Locator
 Install Akbura into an existing Avalonia project:
 
 :::sh
-dotnet add package Akbura --version 12.0.4-alpha.2
+dotnet add package Akbura --version 12.0.4-alpha.3
 :::
 
 If the template package is installed, create a component from the project

@@ -198,22 +198,47 @@ Diagnostics									</span>
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>Run the application in Debug configuration and press the shortcut configured for Akbura diagnostics. This opens the Akbura component inspector independently of Avalonia Developer Tools.</p>
-<div class="warning custom-block">
-            <p class="custom-block-title">WARNING</p><p>The <code>Akbura.Diagnostics</code> NuGet package has not been published yet. The package reference below is the intended setup once the package becomes available.</p>
-</div>
+					<p><a href="https://www.nuget.org/packages/Akbura.Diagnostics"><img src="https://img.shields.io/nuget/vpre/Akbura.Diagnostics?logo=nuget&amp;label=NuGet" alt="NuGet" /></a></p>
+<p>Run the application in Debug configuration and press the shortcut configured for Akbura diagnostics. This opens the Akbura component inspector independently of Avalonia Developer Tools.</p>
 <h2 id="add-the-package">Add the package<a class="header-anchor" href="javascript:;" onclick="location.hash='#add-the-package'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Add the diagnostics package to the application project:</p>
-<pre><code class="language-xml">&lt;PackageReference Include=&quot;Akbura.Diagnostics&quot;&gt;
-    &lt;IncludeAssets Condition=&quot;'$(Configuration)' != 'Debug'&quot;&gt;None&lt;/IncludeAssets&gt;
-    &lt;PrivateAssets Condition=&quot;'$(Configuration)' != 'Debug'&quot;&gt;All&lt;/PrivateAssets&gt;
-&lt;/PackageReference&gt;
+<p>Applications created with the <code>akbura.app</code> template already include diagnostics
+in Debug builds. No additional installation is required for those projects.</p>
+<p>For an existing Akbura application, install the package from NuGet:</p>
+<div class="sh mb-4"><div class="not-prose group relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" onclick="shellCopy(this)">
+                <!-- Background pattern -->
+                <div class="absolute inset-0 bg-grid-slate-100 dark:bg-grid-slate-800 opacity-50" style="background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px); background-size: 16px 16px;"></div>
+
+                <div class="relative flex items-center justify-between px-4 py-3">
+                    <!-- Left side - Terminal icon and command -->
+                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                        <svg class="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg>
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <code class="text-sm font-mono text-slate-900 dark:text-slate-100 truncate"><p>dotnet add package Akbura.Diagnostics --version 12.0.4-alpha.2</p>
+</code>
+                            </div>
+                        </div>
+
+                        <!-- Right side - Copy button -->
+                        <div class="flex items-center gap-2 ml-4">
+                            <button class="shell-copy-btn flex items-center justify-center p-2 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-400 dark:hover:border-slate-500" aria-label="Copy command">
+                                <svg class="copied w-4 h-4" style="display:none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                <svg class="nocopy w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+</div>
+<p>Because diagnostics is a development tool, keep its assets private and reference
+it only in Debug builds. The resulting project entry should be:</p>
+<pre><code class="language-xml">&lt;ItemGroup Condition=&quot;'$(Configuration)' == 'Debug'&quot;&gt;
+    &lt;PackageReference Include=&quot;Akbura.Diagnostics&quot;
+                      Version=&quot;12.0.4-alpha.2&quot;
+                      PrivateAssets=&quot;all&quot; /&gt;
+&lt;/ItemGroup&gt;
 </code></pre>
-<p>The conditional metadata keeps the diagnostics dependency limited to Debug builds.</p>
-<p>While working directly from the Akbura repository, use a project reference instead:</p>
-<pre><code class="language-xml">&lt;ProjectReference Include=&quot;..\..\Akbura.Diagnostics\Akbura.Diagnostics.csproj&quot; /&gt;
-</code></pre>
-<p>Remove the project reference after switching to the published package.</p>
+<p><code>PrivateAssets=&quot;all&quot;</code> prevents the development dependency from flowing to projects
+that reference your application or library. The Debug condition keeps diagnostics
+out of Release restore, build, and publish output.</p>
 <h2 id="attach-diagnostics">Attach diagnostics<a class="header-anchor" href="javascript:;" onclick="location.hash='#attach-diagnostics'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Attach the diagnostics window from <code>Application.Initialize()</code> after the application resources have been loaded:</p>
 <pre><code class="language-csharp">using Akbura.Diagnostics;

@@ -231,6 +231,19 @@
 		RowSpacing: value * Amx.DynamicResource<double>("--spacing");
 	}
 
+	Row.gap-(double value) {
+		ColumnSpacing: value * Amx.DynamicResource<double>("--spacing");
+		RowSpacing: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Row.gap-x-(double value) {
+		ColumnSpacing: value * Amx.DynamicResource<double>("--spacing");
+	}
+
+	Row.gap-y-(double value) {
+		RowSpacing: value * Amx.DynamicResource<double>("--spacing");
+	}
+
 	// Layout and interaction.
 	Control.hidden {
 		IsVisible: false;

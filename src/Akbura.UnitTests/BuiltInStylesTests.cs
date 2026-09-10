@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -71,6 +71,7 @@ public sealed class BuiltInStylesTests
             "Akbura.Styles.akcss");
         var componentTree = AkburaSyntaxTree.ParseText(
             """
+            using Akbura;
             using Avalonia.Controls;
             using Akbura.Styles.akcss;
 
@@ -82,6 +83,7 @@ public sealed class BuiltInStylesTests
                 </Border>
                 <Button px-4 py-2 bg-blue-500 text-white rounded-full />
                 <Grid gap-x-2 />
+                <Row gap-3 gap-x-5 gap-y-7 />
             </StackPanel>
             """,
             "TailwindSample.akbura");
@@ -134,6 +136,13 @@ public sealed class BuiltInStylesTests
         AssertStaticUtility(operations["font-bold"], "font-bold");
         AssertStaticUtility(operations["rounded-md"], "rounded-md");
         AssertStaticUtility(operations["rounded-full"], "rounded-full");
+
+        Assert.Equal("Row.gap", operations["gap-3"].Utility?.MetadataName);
+        Assert.Equal("3", Assert.Single(operations["gap-3"].Arguments).Text);
+        Assert.Equal("Row.gap-x", operations["gap-x-5"].Utility?.MetadataName);
+        Assert.Equal("5", Assert.Single(operations["gap-x-5"].Arguments).Text);
+        Assert.Equal("Row.gap-y", operations["gap-y-7"].Utility?.MetadataName);
+        Assert.Equal("7", Assert.Single(operations["gap-y-7"].Arguments).Text);
     }
 
     private static void AssertStaticUtility(

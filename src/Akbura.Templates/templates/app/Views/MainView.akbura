@@ -2,82 +2,306 @@ namespace AkburaTemplateNamespace.Views;
 
 state count = 0;
 
-<ScrollViewer HorizontalScrollBarVisibility="Disabled"
-              VerticalScrollBarVisibility="Auto"
-              HorizontalContentAlignment="Stretch">
-    <Border MaxWidth="1200"
-            HorizontalAlignment="Stretch"
-            p-4 ${sm}:p-6 ${md}:p-8>
-        <StackPanel gap-4>
-            <TextBlock Text="Welcome to Akbura"
-                       FontSize="32"
-                       TextWrapping="Wrap"
-                       font-bold />
+@akcss {
+    Border.card {
+        @apply p-5
+               rounded-lg
+               border-1
+               bg-slate-50
+               border-slate-200;
 
-            <WelcomeMessage />
+        @if(ActualThemeVariant == ThemeVariant.Dark) {
+            @apply bg-slate-900
+                   border-slate-700;
+        }
+    }
 
-            <TextBlock Text="Resize the window to see the cards rearrange."
-                       TextWrapping="Wrap" />
+    Border.featured {
+        @apply bg-blue-50
+               border-blue-200;
 
-            <Row Columns="12" ColumnSpacing="16">
-                <Border col-span-12 ${sm}:col-span-6 ${md}:col-span-4
-                        p-4 mb-4 rounded-md
-                        bg-slate-100 ${dark}:bg-slate-800>
-                    <StackPanel gap-3>
-                        <TextBlock Text="Reactive state"
-                                   FontSize="20"
-                                   TextWrapping="Wrap"
-                                   font-bold />
+        @if(ActualThemeVariant == ThemeVariant.Dark) {
+            @apply bg-slate-900
+                   border-blue-800;
+        }
+    }
 
-                        <TextBlock Text="State changes update the UI."
-                                   TextWrapping="Wrap" />
+    StackPanel.cardBody {
+        @apply gap-3;
+    }
 
-                        <Button Click={() => count++}
-                                HorizontalAlignment="Left"
-                                px-4 py-2>
-                            Count is {count}
-                        </Button>
+    TextBlock.pageTitle {
+        @apply text-4xl
+               font-bold;
+    }
+
+    TextBlock.pageDescription {
+        @apply text-base;
+        Opacity: 0.75d;
+    }
+
+    TextBlock.cardLabel {
+        @apply text-xs
+               font-semibold
+               text-blue-600;
+
+        @if(ActualThemeVariant == ThemeVariant.Dark) {
+            @apply text-blue-400;
+        }
+    }
+
+    TextBlock.cardTitle {
+        @apply text-xl
+               font-semibold;
+    }
+
+    TextBlock.cardBodyText {
+        @apply text-sm;
+        Opacity: 0.8d;
+    }
+
+    TextBlock.metric {
+        @apply text-4xl
+               font-bold;
+    }
+
+    TextBlock.shortcut {
+        @apply font-semibold;
+    }
+
+    Button.action {
+        @apply px-4
+               py-2;
+    }
+}
+
+<ScrollViewer
+    HorizontalScrollBarVisibility="Disabled"
+    VerticalScrollBarVisibility="Auto"
+    HorizontalContentAlignment="Stretch">
+
+    <Border
+        MaxWidth="1200"
+        HorizontalAlignment="Stretch"
+        p-4
+        ${sm}:p-6
+        ${md}:p-8>
+
+        <StackPanel gap-5>
+
+            <StackPanel gap-2>
+                <TextBlock
+                    class="pageTitle"
+                    Text="Welcome to Akbura" />
+
+                <TextBlock
+                    class="pageDescription"
+                    Text="Declarative UI for Avalonia with reactive state, components and typed AKCSS."
+                    TextWrapping="Wrap" />
+
+                <WelcomeMessage />
+            </StackPanel>
+
+            <Row
+                Columns="12"
+                gap-4
+                ${md}:gap-6>
+
+                <Border
+                    class="card featured"
+                    col-span-12
+                    ${md}:col-span-8>
+
+                    <StackPanel class="cardBody">
+
+                        <TextBlock
+                            class="cardLabel"
+                            Text="REACTIVE STATE" />
+
+                        <TextBlock
+                            class="cardTitle"
+                            Text="State updates the UI automatically." />
+
+                        <TextBlock
+                            class="metric"
+                            Text={count.ToString()} />
+
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="Change state directly from an event handler and Akbura updates the affected view."
+                            TextWrapping="Wrap" />
+
+                        <StackPanel
+                            Orientation="Horizontal"
+                            gap-2>
+
+                            <Button
+                                class="action"
+                                Click={() => count++}>
+                                Increase
+                            </Button>
+
+                            <Button
+                                class="action"
+                                Click={() => count = 0}>
+                                Reset
+                            </Button>
+
+                        </StackPanel>
+
                     </StackPanel>
                 </Border>
 
-                <Border col-span-12 ${sm}:col-span-6 ${md}:col-span-4
-                        p-4 mb-4 rounded-md
-                        bg-slate-100 ${dark}:bg-slate-800>
-                    <StackPanel gap-3>
-                        <TextBlock Text="Responsive layout"
-                                   FontSize="20"
-                                   TextWrapping="Wrap"
-                                   font-bold />
+                <Border
+                    class="card"
+                    col-span-12
+                    ${sm}:col-span-6
+                    ${md}:col-span-4>
+
+                    <StackPanel class="cardBody">
 
                         <TextBlock
-                            Text="One card per row on narrow windows, two from sm, and three from md."
+                            class="cardLabel"
+                            Text="RESPONSIVE" />
+
+                        <TextBlock
+                            class="cardTitle"
+                            Text="Resize the window." />
+
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="This card is full width on small windows, half width from sm, and one third from md."
                             TextWrapping="Wrap" />
 
-                        <TextBlock Text="12 / 6 / 4 columns"
-                                   TextWrapping="Wrap"
-                                   font-bold />
+                        <TextBlock
+                            class="shortcut"
+                            Text="12 → 6 → 4 columns" />
+
                     </StackPanel>
                 </Border>
 
-                <Border col-span-12 ${sm}:col-span-6 ${md}:col-span-4
-                        p-4 mb-4 rounded-md
-                        bg-slate-100 ${dark}:bg-slate-800>
-                    <StackPanel gap-3>
-                        <TextBlock Text="Reusable components"
-                                   FontSize="20"
-                                   TextWrapping="Wrap"
-                                   font-bold />
+                <Border
+                    class="card"
+                    col-span-12
+                    ${sm}:col-span-6
+                    ${md}:col-span-4>
+
+                    <StackPanel class="cardBody">
 
                         <TextBlock
-                            Text="Create .akbura components and compose them in your views."
-                            TextWrapping="Wrap" />
+                            class="cardLabel"
+                            Text="COMPONENTS" />
 
                         <TextBlock
-                            Text="Start with Components/WelcomeMessage.akbura."
+                            class="cardTitle"
+                            Text="Compose reusable UI." />
+
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="Akbura components can be composed directly from other .akbura files."
                             TextWrapping="Wrap" />
+
+                        <WelcomeMessage />
+
                     </StackPanel>
                 </Border>
+
+                <Border
+                    class="card"
+                    col-span-12
+                    ${sm}:col-span-6
+                    ${md}:col-span-4>
+
+                    <StackPanel class="cardBody">
+
+                        <TextBlock
+                            class="cardLabel"
+                            Text="INLINE AKCSS" />
+
+                        <TextBlock
+                            class="cardTitle"
+                            Text="One style, many controls." />
+
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="Every card on this page shares the same component-local AKCSS class."
+                            TextWrapping="Wrap" />
+
+                        <TextBlock
+                            class="shortcut"
+                            Text={"class=\"card\""} />
+
+                    </StackPanel>
+                </Border>
+
+                <Border
+                    class="card"
+                    col-span-12
+                    ${sm}:col-span-6
+                    ${md}:col-span-4>
+
+                    <StackPanel class="cardBody">
+
+                        <TextBlock
+                            class="cardLabel"
+                            Text="ROW" />
+
+                        <TextBlock
+                            class="cardTitle"
+                            Text="Cards can span the grid." />
+
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="Use col-span utilities to mix full-width, two-column and single-column content."
+                            TextWrapping="Wrap" />
+
+                        <TextBlock
+                            class="shortcut"
+                            Text="4 / 8 / 12" />
+
+                    </StackPanel>
+                </Border>
+
+                <Border
+                    class="card"
+                    col-span-12>
+
+                    <StackPanel class="cardBody">
+
+                        <TextBlock
+                            class="cardLabel"
+                            Text="DEVELOPER TOOLS" />
+
+                        <TextBlock
+                            class="cardTitle"
+                            Text="Two diagnostics views, two perspectives." />
+
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="Use Avalonia Developer Tools for the visual and logical trees, and Akbura Diagnostics for components, states, parameters and injected services."
+                            TextWrapping="Wrap" />
+
+                        <StackPanel
+                            Orientation="Horizontal"
+                            gap-4>
+
+                            <TextBlock
+                                class="shortcut"
+                                Text="Avalonia: F12" />
+
+                            <TextBlock
+                                class="shortcut"
+                                Text="Akbura: Ctrl+F12" />
+
+                        </StackPanel>
+
+                    </StackPanel>
+                </Border>
+
             </Row>
+
         </StackPanel>
+
     </Border>
+
 </ScrollViewer>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Avalonia;
 using Avalonia.Controls;
 
@@ -10,7 +10,8 @@ public sealed class Row : Panel
     {
         AffectsMeasure<Row>(
             ColumnsProperty,
-            ColumnSpacingProperty);
+            ColumnSpacingProperty,
+            RowSpacingProperty);
 
         // Grid.ColumnSpan is defined on a child,
         // but changing it must invalidate the parent Row layout.
@@ -31,7 +32,15 @@ public sealed class Row : Panel
     public static readonly StyledProperty<double> ColumnSpacingProperty =
         AvaloniaProperty.Register<Row, double>(
             nameof(ColumnSpacing),
-            0);
+            0d);
+
+    /// <summary>
+    /// Defines the <see cref="RowSpacing"/> property.
+    /// </summary>
+    public static readonly StyledProperty<double> RowSpacingProperty =
+        AvaloniaProperty.Register<Row, double>(
+            nameof(RowSpacing),
+            0d);
 
     /// <summary>
     /// Gets or sets the number of logical columns in the row.
@@ -51,38 +60,63 @@ public sealed class Row : Panel
         set => SetValue(ColumnSpacingProperty, value);
     }
 
+    /// <summary>
+    /// Gets or sets the spacing between rows.
+    /// </summary>
+    public double RowSpacing
+    {
+        get => GetValue(RowSpacingProperty);
+        set => SetValue(RowSpacingProperty, value);
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         if (Children.Count == 0)
+        {
             return default;
+        }
 
         var columns = Math.Max(1, Columns);
-        var spacing = Math.Max(0, ColumnSpacing);
+        var columnSpacing = Math.Max(0d, ColumnSpacing);
+        var rowSpacing = Math.Max(0d, RowSpacing);
 
         var width = availableSize.Width;
 
         // Row normally receives a finite width from its parent.
         // Handle infinite width as well for Auto-sized containers.
         if (double.IsPositiveInfinity(width))
-            width = MeasureDesiredWidth(columns, spacing);
+        {
+            width = MeasureDesiredWidth(
+                columns,
+                columnSpacing);
+        }
 
-        var height = MeasureChildren(width, columns, spacing);
+        var height = MeasureChildren(
+            width,
+            columns,
+            columnSpacing,
+            rowSpacing);
 
-        return new Size(width, height);
+        return new Size(
+            width,
+            height);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
         if (Children.Count == 0)
+        {
             return finalSize;
+        }
 
         var columns = Math.Max(1, Columns);
-        var spacing = Math.Max(0, ColumnSpacing);
+        var columnSpacing = Math.Max(0d, ColumnSpacing);
+        var rowSpacing = Math.Max(0d, RowSpacing);
 
         var columnWidth = GetColumnWidth(
             finalSize.Width,
             columns,
-            spacing);
+            columnSpacing);
 
         var y = 0d;
         var index = 0;
@@ -98,7 +132,9 @@ public sealed class Row : Panel
             while (index < Children.Count)
             {
                 var child = Children[index];
-                var span = GetColumnSpan(child, columns);
+                var span = GetColumnSpan(
+                    child,
+                    columns);
 
                 if (usedColumns > 0 &&
                     usedColumns + span > columns)
@@ -115,7 +151,9 @@ public sealed class Row : Panel
                 index++;
 
                 if (usedColumns == columns)
+                {
                     break;
+                }
             }
 
             // Arrange all children in the current row.
@@ -124,13 +162,17 @@ public sealed class Row : Panel
             for (var i = rowStart; i < index; i++)
             {
                 var child = Children[i];
-                var span = GetColumnSpan(child, columns);
+                var span = GetColumnSpan(
+                    child,
+                    columns);
 
-                var x = column * (columnWidth + spacing);
+                var x =
+                    column *
+                    (columnWidth + columnSpacing);
 
                 var width =
                     columnWidth * span +
-                    spacing * (span - 1);
+                    columnSpacing * (span - 1);
 
                 child.Arrange(
                     new Rect(
@@ -143,17 +185,26 @@ public sealed class Row : Panel
             }
 
             y += rowHeight;
+
+            if (index < Children.Count)
+            {
+                y += rowSpacing;
+            }
         }
 
         return finalSize;
     }
 
-    private double MeasureChildren(double width, int columns, double spacing)
+    private double MeasureChildren(
+        double width,
+        int columns,
+        double columnSpacing,
+        double rowSpacing)
     {
         var columnWidth = GetColumnWidth(
             width,
             columns,
-            spacing);
+            columnSpacing);
 
         var usedColumns = 0;
         var rowHeight = 0d;
@@ -161,22 +212,26 @@ public sealed class Row : Panel
 
         foreach (var child in Children)
         {
-            var span = GetColumnSpan(child, columns);
+            var span = GetColumnSpan(
+                child,
+                columns);
 
             // Start a new row if the next child does not fit
             // into the remaining logical columns.
             if (usedColumns > 0 &&
                 usedColumns + span > columns)
             {
-                totalHeight += rowHeight;
+                totalHeight +=
+                    rowHeight +
+                    rowSpacing;
 
                 usedColumns = 0;
-                rowHeight = 0;
+                rowHeight = 0d;
             }
 
             var childWidth =
                 columnWidth * span +
-                spacing * (span - 1);
+                columnSpacing * (span - 1);
 
             child.Measure(
                 new Size(
@@ -195,13 +250,20 @@ public sealed class Row : Panel
                 totalHeight += rowHeight;
 
                 usedColumns = 0;
-                rowHeight = 0;
+                rowHeight = 0d;
+
+                if (child != Children[^1])
+                {
+                    totalHeight += rowSpacing;
+                }
             }
         }
 
         // Add the last partially filled row.
         if (usedColumns > 0)
+        {
             totalHeight += rowHeight;
+        }
 
         return totalHeight;
     }
@@ -210,13 +272,17 @@ public sealed class Row : Panel
     /// Calculates the desired width when the parent
     /// measures this panel with an infinite width.
     /// </summary>
-    private double MeasureDesiredWidth(int columns, double spacing)
+    private double MeasureDesiredWidth(
+        int columns,
+        double columnSpacing)
     {
         var columnWidth = 0d;
 
         foreach (var child in Children)
         {
-            var span = GetColumnSpan(child, columns);
+            var span = GetColumnSpan(
+                child,
+                columns);
 
             child.Measure(
                 new Size(
@@ -227,31 +293,43 @@ public sealed class Row : Panel
             // required to fit this child.
             var requiredColumnWidth =
                 (child.DesiredSize.Width -
-                 spacing * (span - 1)) / span;
+                 columnSpacing * (span - 1)) /
+                span;
 
             columnWidth = Math.Max(
                 columnWidth,
-                Math.Max(0, requiredColumnWidth));
+                Math.Max(
+                    0d,
+                    requiredColumnWidth));
         }
 
-        return columnWidth * columns +
-               spacing * (columns - 1);
+        return
+            columnWidth * columns +
+            columnSpacing * (columns - 1);
     }
 
     private static int GetColumnSpan(
         Control child,
         int columns)
     {
-        return Math.Clamp(Grid.GetColumnSpan(child), 1, columns);
+        return Math.Clamp(
+            Grid.GetColumnSpan(child),
+            1,
+            columns);
     }
 
     private static double GetColumnWidth(
         double totalWidth,
         int columns,
-        double spacing)
+        double columnSpacing)
     {
-        var totalSpacing = spacing * (columns - 1);
+        var totalSpacing =
+            columnSpacing *
+            (columns - 1);
 
-        return Math.Max(0, (totalWidth - totalSpacing) / columns);
+        return Math.Max(
+            0d,
+            (totalWidth - totalSpacing) /
+            columns);
     }
 }

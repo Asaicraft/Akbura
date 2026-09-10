@@ -60,7 +60,10 @@ try {
         "LICENSE.txt",
         "icon.png",
         "content/templates/app/.template.config/template.json",
+        "content/templates/app/GlobalUsings.akbura",
+        "content/templates/app/GlobalUsings.akcss",
         "content/templates/app/README.md",
+        "content/templates/app/Views/MainView.akbura",
         "content/templates/component/.template.config/template.json"
     )
 
@@ -252,6 +255,24 @@ foreach ($case in $cases) {
         Join-Path $projectDirectory "App.axaml") -Raw
     $globalUsingsContent = Get-Content -LiteralPath (
         Join-Path $projectDirectory "GlobalUsings.akbura") -Raw
+    $globalAkcssUsingsPath = Join-Path (
+        $projectDirectory) "GlobalUsings.akcss"
+    $mainViewPath = Join-Path (
+        $projectDirectory) "Views/MainView.akbura"
+
+    Assert-Condition (
+        Test-Path -LiteralPath $globalAkcssUsingsPath -PathType Leaf) (
+        "$($case.Name) does not contain GlobalUsings.akcss.")
+    Assert-Condition (
+        Test-Path -LiteralPath $mainViewPath -PathType Leaf) (
+        "$($case.Name) does not contain Views/MainView.akbura.")
+
+    $globalAkcssUsingsContent = Get-Content `
+        -LiteralPath $globalAkcssUsingsPath `
+        -Raw
+    $mainViewContent = Get-Content `
+        -LiteralPath $mainViewPath `
+        -Raw
 
     Assert-Condition ($programContent.Contains(".UseAkbura(", [StringComparison]::Ordinal)) (
         "$($case.Name) does not call UseAkbura.")
@@ -263,6 +284,29 @@ foreach ($case in $cases) {
         "using Akbura.Styles.akcss;",
         [StringComparison]::Ordinal)) (
         "$($case.Name) does not import Akbura AKCSS utilities.")
+    Assert-Condition ($globalAkcssUsingsContent.Contains(
+        "@using Akbura.Styles.akcss;",
+        [StringComparison]::Ordinal)) (
+        "$($case.Name) does not import built-in styles into AKCSS.")
+    Assert-Condition (
+        $mainViewContent.Contains(
+            "@akcss {",
+            [StringComparison]::Ordinal) -and
+        $mainViewContent.Contains(
+            "@apply p-5",
+            [StringComparison]::Ordinal) -and
+        $mainViewContent.Contains(
+            '${md}:gap-6',
+            [StringComparison]::Ordinal)) (
+        "$($case.Name) does not contain the responsive AKCSS gallery.")
+    Assert-Condition (
+        !$mainViewContent.Contains(
+            "Amx.DynamicResource",
+            [StringComparison]::Ordinal) -and
+        !$mainViewContent.Contains(
+            "mb-4",
+            [StringComparison]::Ordinal)) (
+        "$($case.Name) duplicates built-in utility behavior in MainView.")
     Assert-Condition ($projectContent.Contains(
         '<ItemGroup Condition="''$(Configuration)'' == ''Debug''">',
         [StringComparison]::Ordinal)) (

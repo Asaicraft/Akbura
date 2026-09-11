@@ -18,7 +18,7 @@ The `Akbura` package includes BlackSilence, the production incremental compiler.
 Install the current Akbura templates from NuGet:
 
 ```bash
-dotnet new install Akbura.Templates::12.0.4-alpha.3
+dotnet new install Akbura.Templates::12.0.4-alpha.4
 ```
 
 Create and run an Avalonia desktop application:
@@ -37,7 +37,7 @@ To add Akbura to an existing Avalonia project instead, install the package and
 create a component with the item template:
 
 ```bash
-dotnet add package Akbura --version 12.0.4-alpha.3
+dotnet add package Akbura --version 12.0.4-alpha.4
 dotnet new akbura.component -n Counter --namespace MyApp.Components -o Components
 ```
 

@@ -16,7 +16,7 @@ in Debug builds. No additional installation is required for those projects.
 For an existing Akbura application, install the package from NuGet:
 
 :::sh
-dotnet add package Akbura.Diagnostics --version 12.0.4-alpha.3
+dotnet add package Akbura.Diagnostics --version 12.0.4-alpha.4
 :::
 
 Because diagnostics is a development tool, keep its assets private and reference
@@ -25,7 +25,7 @@ it only in Debug builds. The resulting project entry should be:
 ```xml
 <ItemGroup Condition="'$(Configuration)' == 'Debug'">
     <PackageReference Include="Akbura.Diagnostics"
-                      Version="12.0.4-alpha.3"
+                      Version="12.0.4-alpha.4"
                       PrivateAssets="all" />
 </ItemGroup>
 ```

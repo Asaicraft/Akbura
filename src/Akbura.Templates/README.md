@@ -44,4 +44,4 @@ breakpoints, reusable components, and optional service injection. Debug builds i
 Avalonia Developer Tools on `F12` and the Akbura component inspector on `Ctrl+F12`;
 diagnostic dependencies are excluded from Release builds.
 
-> The development template currently targets Akbura `12.0.4-template.1`. Replace the default with the tested public package version before publishing `Akbura.Templates`.
+The templates target Akbura `12.0.4-alpha.4` by default.

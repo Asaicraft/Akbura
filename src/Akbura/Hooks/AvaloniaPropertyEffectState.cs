@@ -68,8 +68,28 @@ internal sealed class AvaloniaPropertyEffectState
 
     public void StopForDetach()
     {
-        _effect.StopForDetach();
-        DisposeSubscriptions();
+        List<Exception>? failures = null;
+        try
+        {
+            _effect.StopForDetach();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            DisposeSubscriptions();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "An Avalonia property effect could not be stopped.");
     }
 
     private bool HasSameSources(AvaloniaPropertyEffectArguments arguments)
@@ -135,17 +155,29 @@ internal sealed class AvaloniaPropertyEffectState
 
     private void DisposeSubscriptions()
     {
-        if (_subscriptions == null)
+        var subscriptions = _subscriptions;
+        _subscriptions = null;
+        if (subscriptions == null)
         {
             return;
         }
 
-        foreach (var subscription in _subscriptions)
+        List<Exception>? failures = null;
+        foreach (var subscription in subscriptions)
         {
-            subscription.Dispose();
+            try
+            {
+                subscription.Dispose();
+            }
+            catch (Exception exception)
+            {
+                UseHookFailures.Capture(ref failures, exception);
+            }
         }
 
-        _subscriptions = null;
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "One or more Avalonia property subscriptions could not be disposed.");
     }
 
     private sealed class PropertyObserver : IObserver<object?>

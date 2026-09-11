@@ -87,9 +87,9 @@ internal sealed class DelegateUseHookSlot<TState> : IUseHookSlot
         Action<TState, TArguments> apply,
         Action<TState>? detach)
     {
-        apply(_state, arguments);
         _isDetached = false;
         _detach = detach;
+        apply(_state, arguments);
     }
 
     public void StopForDetach()
@@ -110,7 +110,10 @@ internal sealed class UseHookRuntime
     private readonly List<IUseHookRegistration> _pending = [];
     private List<IUseHookSlot>? _slots;
     private bool _isCollecting;
+    private bool _isCompleting;
     private bool _needsRestart;
+    private bool _isSuspended;
+    private bool _resetForHotReloadPending;
 
     public UseHookRuntime(AkburaControl owner)
     {
@@ -123,7 +126,7 @@ internal sealed class UseHookRuntime
 
     public void BeginFrame()
     {
-        if (_isCollecting)
+        if (_isCollecting || _isCompleting)
         {
             throw new InvalidOperationException("A use hook frame is already active.");
         }
@@ -150,45 +153,171 @@ internal sealed class UseHookRuntime
         }
 
         _isCollecting = false;
-        ValidateFrame();
+        _isCompleting = true;
 
-        if (_slots == null)
+        try
         {
-            _slots = new List<IUseHookSlot>(_pending.Count);
-            foreach (var registration in _pending)
+            ValidateFrame();
+            if (_isSuspended)
             {
-                _slots.Add(registration.CreateSlot());
+                if (_resetForHotReloadPending)
+                {
+                    ResetForHotReloadCore();
+                }
+
+                return;
+            }
+
+            if (_slots == null)
+            {
+                _slots = CreateInitialSlots();
+            }
+            else
+            {
+                ApplyExistingSlots(_slots);
+            }
+
+            _needsRestart = false;
+            if (_resetForHotReloadPending)
+            {
+                ResetForHotReloadCore();
             }
         }
-
-        for (var index = 0; index < _pending.Count; index++)
+        finally
         {
-            _pending[index].Apply(_slots[index]);
+            _isCompleting = false;
+            _pending.Clear();
         }
-
-        _needsRestart = false;
-        _pending.Clear();
     }
 
     public void AbortFrame()
     {
         _isCollecting = false;
         _pending.Clear();
+
+        if (_resetForHotReloadPending)
+        {
+            ResetForHotReloadCore();
+        }
     }
 
     public void StopForDetach()
     {
+        _isSuspended = true;
+
         if (_slots == null)
         {
             return;
         }
 
-        foreach (var slot in _slots)
+        List<Exception>? failures = null;
+        StopSlots(_slots, ref failures);
+        _needsRestart = _slots.Count != 0;
+
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "One or more use hooks could not be stopped for detach.");
+    }
+
+    public void Resume()
+    {
+        _isSuspended = false;
+    }
+
+    public void ResetForHotReload()
+    {
+        if (_isCollecting || _isCompleting)
         {
-            slot.StopForDetach();
+            _resetForHotReloadPending = true;
+            return;
         }
 
-        _needsRestart = _slots.Count != 0;
+        ResetForHotReloadCore();
+    }
+
+    private void ResetForHotReloadCore()
+    {
+        var slots = _slots;
+        _slots = null;
+        _needsRestart = false;
+        _resetForHotReloadPending = false;
+        if (slots == null)
+        {
+            return;
+        }
+
+        List<Exception>? failures = null;
+        StopSlots(slots, ref failures);
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "One or more use hooks could not be reset for Hot Reload.");
+    }
+
+    private List<IUseHookSlot> CreateInitialSlots()
+    {
+        var slots = new List<IUseHookSlot>(_pending.Count);
+
+        try
+        {
+            for (var index = 0; index < _pending.Count; index++)
+            {
+                var registration = _pending[index];
+                var slot = registration.CreateSlot();
+                slots.Add(slot);
+                registration.Apply(slot);
+            }
+
+            return slots;
+        }
+        catch (Exception exception)
+        {
+            List<Exception>? failures = null;
+            UseHookFailures.Capture(ref failures, exception);
+            StopSlots(slots, ref failures);
+            UseHookFailures.ThrowIfAny(
+                failures,
+                "A use hook frame could not be created or cleaned up.");
+            throw;
+        }
+    }
+
+    private void ApplyExistingSlots(List<IUseHookSlot> slots)
+    {
+        try
+        {
+            for (var index = 0; index < _pending.Count; index++)
+            {
+                _pending[index].Apply(slots[index]);
+            }
+        }
+        catch (Exception exception)
+        {
+            List<Exception>? failures = null;
+            UseHookFailures.Capture(ref failures, exception);
+            StopSlots(slots, ref failures);
+            _needsRestart = slots.Count != 0;
+            UseHookFailures.ThrowIfAny(
+                failures,
+                "A use hook frame could not be applied or stopped.");
+            throw;
+        }
+    }
+
+    private static void StopSlots(
+        List<IUseHookSlot> slots,
+        ref List<Exception>? failures)
+    {
+        for (var index = 0; index < slots.Count; index++)
+        {
+            try
+            {
+                slots[index].StopForDetach();
+            }
+            catch (Exception exception)
+            {
+                UseHookFailures.Capture(ref failures, exception);
+            }
+        }
     }
 
     private void ValidateFrame()

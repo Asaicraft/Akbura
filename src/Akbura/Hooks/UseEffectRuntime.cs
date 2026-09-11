@@ -1,5 +1,4 @@
 using Avalonia.Threading;
-using System.Runtime.ExceptionServices;
 
 namespace Akbura.Hooks;
 
@@ -41,6 +40,7 @@ internal sealed class UseEffectSlot
     private object?[]? _dependencies;
     private long _generation;
     private bool _hasRun;
+    private bool _isActive;
     private bool _restartRequired;
 
     public UseEffectSlot(UseHookKey key)
@@ -69,13 +69,13 @@ internal sealed class UseEffectSlot
             return;
         }
 
-        StopCurrentRun();
         _restartRequired = true;
+        StopCurrentRun();
     }
 
     public void Trigger()
     {
-        if (_hasRun)
+        if (_isActive)
         {
             Restart();
         }
@@ -113,6 +113,7 @@ internal sealed class UseEffectSlot
 
     private void Restart()
     {
+        _restartRequired = true;
         StopCurrentRun();
         StartCurrentRun();
     }
@@ -121,6 +122,7 @@ internal sealed class UseEffectSlot
     {
         _restartRequired = false;
         _hasRun = true;
+        _isActive = true;
 
         var cancellation = new CancellationTokenSource();
         _cancellation = cancellation;
@@ -131,9 +133,23 @@ internal sealed class UseEffectSlot
         {
             pendingCleanup = _registration.Callback(cancellation.Token);
         }
-        catch
+        catch (Exception exception)
         {
-            StopCurrentRun();
+            List<Exception>? failures = null;
+            UseHookFailures.Capture(ref failures, exception);
+            try
+            {
+                StopCurrentRun();
+            }
+            catch (Exception stopException)
+            {
+                UseHookFailures.Capture(ref failures, stopException);
+            }
+
+            _restartRequired = true;
+            UseHookFailures.ThrowIfAny(
+                failures,
+                "A use effect failed while its run was being started.");
             throw;
         }
 
@@ -165,21 +181,49 @@ internal sealed class UseEffectSlot
             failure = exception;
         }
 
-        if (cancellation.IsCancellationRequested)
+        Dispatcher.UIThread.Post(() =>
+        {
+            CompleteObservedRun(
+                generation,
+                cancellation,
+                cleanup,
+                failure);
+        });
+    }
+
+    private void CompleteObservedRun(
+        long generation,
+        CancellationTokenSource cancellation,
+        IDisposable? cleanup,
+        Exception? failure)
+    {
+        if (!IsCurrentRun(generation, cancellation))
         {
             cleanup?.Dispose();
             return;
         }
 
-        Dispatcher.UIThread.Post(() =>
+        if (failure == null)
         {
-            if (failure != null)
-            {
-                ExceptionDispatchInfo.Capture(failure).Throw();
-            }
+            _cleanup = cleanup;
+            return;
+        }
 
-            CompleteRun(generation, cancellation, cleanup);
-        });
+        List<Exception>? failures = null;
+        UseHookFailures.Capture(ref failures, failure);
+        try
+        {
+            StopCurrentRun();
+        }
+        catch (Exception stopException)
+        {
+            UseHookFailures.Capture(ref failures, stopException);
+        }
+
+        _restartRequired = true;
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "An asynchronous use effect failed while its run was being stopped.");
     }
 
     private void CompleteRun(
@@ -187,9 +231,7 @@ internal sealed class UseEffectSlot
         CancellationTokenSource cancellation,
         IDisposable? cleanup)
     {
-        if (generation != _generation ||
-            !ReferenceEquals(cancellation, _cancellation) ||
-            cancellation.IsCancellationRequested)
+        if (!IsCurrentRun(generation, cancellation))
         {
             cleanup?.Dispose();
             return;
@@ -198,18 +240,56 @@ internal sealed class UseEffectSlot
         _cleanup = cleanup;
     }
 
+    private bool IsCurrentRun(
+        long generation,
+        CancellationTokenSource cancellation)
+    {
+        return generation == _generation &&
+            ReferenceEquals(cancellation, _cancellation) &&
+            !cancellation.IsCancellationRequested;
+    }
+
     private void StopCurrentRun()
     {
         _generation++;
 
         var cancellation = _cancellation;
         _cancellation = null;
-        cancellation?.Cancel();
-
         var cleanup = _cleanup;
         _cleanup = null;
-        cleanup?.Dispose();
-        cancellation?.Dispose();
+        _isActive = false;
+
+        List<Exception>? failures = null;
+        try
+        {
+            cancellation?.Cancel();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            cleanup?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            cancellation?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "A use effect could not cancel and clean up its current run.");
     }
 }
 

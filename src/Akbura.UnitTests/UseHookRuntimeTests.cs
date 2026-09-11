@@ -4,6 +4,8 @@ using Akbura.Engine;
 using Akbura.Hooks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Threading;
 using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
@@ -405,7 +407,7 @@ public sealed class UseHookRuntimeTests
     }
 
     [Fact]
-    public void StopForDetach_CancelsAndCleansUpBeforeTheNextFrameRestartsTheEffect()
+    public void StopForDetach_CancelsAndCleansUpBeforeResumeRestartsTheEffect()
     {
         var component = new HookComponent();
         var runtime = new UseHookRuntime(component);
@@ -430,6 +432,7 @@ public sealed class UseHookRuntimeTests
         Assert.True(runtime.NeedsRestart);
         Assert.Equal(["run:1", "cleanup:1:True"], events);
 
+        runtime.Resume();
         CompleteFrame(runtime, registration);
 
         Assert.False(runtime.NeedsRestart);
@@ -437,58 +440,545 @@ public sealed class UseHookRuntimeTests
     }
 
     [Fact]
-    public async Task CleanupFromStaleAsyncRun_IsDisposedImmediately()
+    public void InitialFrame_FactoryFailureCleansUpCreatedSlotsAndCanRetry()
+    {
+        var runtime = new UseHookRuntime(new HookComponent());
+        var firstKey = new UseHookKey();
+        var secondKey = new UseHookKey();
+        var creations = 0;
+        var applications = 0;
+        var detachments = 0;
+
+        runtime.BeginFrame();
+        runtime.Register(CreateTestRegistration(
+            firstKey,
+            () => creations++,
+            () => applications++,
+            () => detachments++));
+        runtime.Register(new DelegateUseHookRegistration<TestHookState, int>(
+            secondKey,
+            0,
+            static _ => throw new ExpectedFactoryException(),
+            static (_, _) => { },
+            static _ => { }));
+
+        Assert.Throws<ExpectedFactoryException>(runtime.CompleteFrame);
+        Assert.False(runtime.HasSlots);
+        Assert.Equal(1, creations);
+        Assert.Equal(1, applications);
+        Assert.Equal(1, detachments);
+
+        runtime.BeginFrame();
+        runtime.Register(CreateTestRegistration(
+            firstKey,
+            () => creations++,
+            () => applications++,
+            () => detachments++));
+        runtime.CompleteFrame();
+
+        Assert.True(runtime.HasSlots);
+        Assert.Equal(2, creations);
+        Assert.Equal(2, applications);
+        Assert.Equal(1, detachments);
+    }
+
+    [Fact]
+    public void InitialFrame_ApplyFailureCleansUpItsStateAndCanRetry()
+    {
+        var runtime = new UseHookRuntime(new HookComponent());
+        var key = new UseHookKey();
+        var creations = 0;
+        var applications = 0;
+        var detachments = 0;
+        var failApply = true;
+
+        runtime.BeginFrame();
+        runtime.Register(CreateTestRegistration(
+            key,
+            () => creations++,
+            () =>
+            {
+                applications++;
+                if (failApply)
+                {
+                    throw new ExpectedApplyException();
+                }
+            },
+            () => detachments++));
+
+        Assert.Throws<ExpectedApplyException>(runtime.CompleteFrame);
+        Assert.False(runtime.HasSlots);
+        Assert.Equal(1, creations);
+        Assert.Equal(1, applications);
+        Assert.Equal(1, detachments);
+
+        failApply = false;
+        runtime.BeginFrame();
+        runtime.Register(CreateTestRegistration(
+            key,
+            () => creations++,
+            () => applications++,
+            () => detachments++));
+        runtime.CompleteFrame();
+
+        Assert.True(runtime.HasSlots);
+        Assert.Equal(2, creations);
+        Assert.Equal(2, applications);
+        Assert.Equal(1, detachments);
+    }
+
+    [Fact]
+    public void ExistingFrame_ApplyFailureStopsAllSlotsAndCanRetry()
+    {
+        var runtime = new UseHookRuntime(new HookComponent());
+        var firstKey = new UseHookKey();
+        var secondKey = new UseHookKey();
+        var firstApplications = 0;
+        var secondApplications = 0;
+        var firstDetachments = 0;
+        var secondDetachments = 0;
+        var failSecondApply = false;
+
+        void CompleteCurrentFrame()
+        {
+            runtime.BeginFrame();
+            runtime.Register(CreateTestRegistration(
+                firstKey,
+                static () => { },
+                () => firstApplications++,
+                () => firstDetachments++));
+            runtime.Register(CreateTestRegistration(
+                secondKey,
+                static () => { },
+                () =>
+                {
+                    secondApplications++;
+                    if (failSecondApply)
+                    {
+                        throw new ExpectedApplyException();
+                    }
+                },
+                () => secondDetachments++));
+            runtime.CompleteFrame();
+        }
+
+        CompleteCurrentFrame();
+        failSecondApply = true;
+
+        Assert.Throws<ExpectedApplyException>(CompleteCurrentFrame);
+        Assert.True(runtime.HasSlots);
+        Assert.True(runtime.NeedsRestart);
+        Assert.Equal(1, firstDetachments);
+        Assert.Equal(1, secondDetachments);
+
+        failSecondApply = false;
+        CompleteCurrentFrame();
+
+        Assert.False(runtime.NeedsRestart);
+        Assert.Equal(3, firstApplications);
+        Assert.Equal(3, secondApplications);
+        Assert.Equal(1, firstDetachments);
+        Assert.Equal(1, secondDetachments);
+    }
+
+    [Fact]
+    public void StopForDetach_StopsEverySlotAndAggregatesFailures()
+    {
+        var runtime = new UseHookRuntime(new HookComponent());
+        var firstDetachments = 0;
+        var secondDetachments = 0;
+
+        runtime.BeginFrame();
+        runtime.Register(CreateTestRegistration(
+            new UseHookKey(),
+            static () => { },
+            static () => { },
+            () =>
+            {
+                firstDetachments++;
+                throw new FirstDetachException();
+            }));
+        runtime.Register(CreateTestRegistration(
+            new UseHookKey(),
+            static () => { },
+            static () => { },
+            () =>
+            {
+                secondDetachments++;
+                throw new SecondDetachException();
+            }));
+        runtime.CompleteFrame();
+
+        var exception = Assert.Throws<AggregateException>(runtime.StopForDetach);
+
+        Assert.True(runtime.NeedsRestart);
+        Assert.Equal(1, firstDetachments);
+        Assert.Equal(1, secondDetachments);
+        Assert.Collection(
+            exception.InnerExceptions,
+            failure => Assert.IsType<FirstDetachException>(failure),
+            failure => Assert.IsType<SecondDetachException>(failure));
+    }
+
+    [Fact]
+    public void DetachedRuntime_DoesNotApplyFramesUntilItIsResumed()
+    {
+        var runtime = new UseHookRuntime(new HookComponent());
+        var key = new UseHookKey();
+        var applications = 0;
+        var detachments = 0;
+        var registration = CreateTestRegistration(
+            key,
+            static () => { },
+            () => applications++,
+            () => detachments++);
+
+        CompleteFrame(runtime, registration);
+        runtime.StopForDetach();
+        CompleteFrame(runtime, registration);
+
+        Assert.True(runtime.NeedsRestart);
+        Assert.Equal(1, applications);
+        Assert.Equal(1, detachments);
+
+        runtime.Resume();
+        CompleteFrame(runtime, registration);
+
+        Assert.False(runtime.NeedsRestart);
+        Assert.Equal(2, applications);
+        Assert.Equal(1, detachments);
+    }
+
+    [Fact]
+    public void ResetForHotReload_RecreatesEffectsWithUnchangedDependencies()
+    {
+        var runtime = new UseHookRuntime(new HookComponent());
+        var key = new UseHookKey();
+        var events = new List<string>();
+
+        CompleteFrame(runtime, CreateEffectRegistration(
+            key,
+            () =>
+            {
+                events.Add("run:before");
+                return new CallbackDisposable(
+                    () => events.Add("cleanup:before"));
+            }));
+
+        runtime.ResetForHotReload();
+
+        CompleteFrame(runtime, CreateEffectRegistration(
+            key,
+            () =>
+            {
+                events.Add("run:after");
+                return new CallbackDisposable(
+                    () => events.Add("cleanup:after"));
+            }));
+
+        Assert.Equal(
+            ["run:before", "cleanup:before", "run:after"],
+            events);
+    }
+
+    [Fact]
+    public void AbortedFrame_CompletesPendingHotReloadReset()
+    {
+        var runtime = new UseHookRuntime(new HookComponent());
+        var key = new UseHookKey();
+        var events = new List<string>();
+
+        CompleteFrame(runtime, CreateEffectRegistration(
+            key,
+            () =>
+            {
+                events.Add("run:before");
+                return new CallbackDisposable(
+                    () => events.Add("cleanup:before"));
+            }));
+
+        runtime.BeginFrame();
+        runtime.ResetForHotReload();
+        runtime.AbortFrame();
+
+        Assert.False(runtime.HasSlots);
+        Assert.Equal(["run:before", "cleanup:before"], events);
+
+        CompleteFrame(runtime, CreateEffectRegistration(
+            key,
+            () =>
+            {
+                events.Add("run:after");
+                return null;
+            }));
+
+        Assert.Equal(
+            ["run:before", "cleanup:before", "run:after"],
+            events);
+    }
+
+    [Fact]
+    public void ApplyHotReload_ReplaysAnEffectWithUnchangedDependencies()
+    {
+        var component = new HookComponent
+        {
+            Dependency = 1,
+            RenderFrame = control =>
+            {
+                var version = control.Dependency;
+                EffectHooks.useEffect(
+                    control,
+                    (Func<Action?>)(() =>
+                    {
+                        control.Events.Add($"run:{version}");
+                        return () => control.Events.Add(
+                            $"cleanup:{version}");
+                    }),
+                    []);
+            },
+        };
+        component.InitializeForTest();
+        component.Dependency = 2;
+
+        component.ApplyHotReload(static _ => { });
+
+        Assert.Equal(
+            ["run:1", "cleanup:1", "run:2"],
+            component.Events);
+    }
+
+    [Fact]
+    public void ApplyHotReload_RecreatesReorderedCompatibleEffects()
+    {
+        var component = new HookComponent
+        {
+            RenderFrame = control =>
+            {
+                if (control.ReverseHooks)
+                {
+                    RegisterTrackedEffect(control, "second");
+                    RegisterTrackedEffect(control, "first");
+                }
+                else
+                {
+                    RegisterTrackedEffect(control, "first");
+                    RegisterTrackedEffect(control, "second");
+                }
+            },
+        };
+        component.InitializeForTest();
+        component.ReverseHooks = true;
+
+        component.ApplyHotReload(static _ => { });
+
+        Assert.Equal(
+            [
+                "run:first",
+                "run:second",
+                "cleanup:first",
+                "cleanup:second",
+                "run:second",
+                "run:first",
+            ],
+            component.Events);
+    }
+
+    [Fact]
+    public void EffectStop_AttemptsCleanupAfterCancellationFailure()
     {
         var key = new UseHookKey();
         var slot = new UseEffectSlot(key);
-        var firstCompletion = new TaskCompletionSource<IDisposable?>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var staleCleanup = new TrackingDisposable();
-        var run = 0;
-        UseEffectCallback callback = _ =>
+        var events = new List<string>();
+
+        slot.Apply(CreateEffectRegistration(
+            key,
+            cancellationToken =>
+            {
+                cancellationToken.Register(() =>
+                {
+                    events.Add("cancel");
+                    throw new ExpectedCancellationException();
+                });
+                return new CallbackDisposable(() =>
+                {
+                    events.Add("cleanup");
+                    throw new ExpectedCleanupException();
+                });
+            }));
+
+        var exception = Assert.Throws<AggregateException>(slot.StopForDetach);
+
+        Assert.Equal(["cancel", "cleanup"], events);
+        Assert.Contains(
+            exception.InnerExceptions,
+            failure => failure is ExpectedCancellationException);
+        Assert.Contains(
+            exception.InnerExceptions,
+            failure => failure is ExpectedCleanupException);
+
+        slot.Apply(CreateEffectRegistration(
+            key,
+            () =>
+            {
+                events.Add("restart");
+                return null;
+            }));
+
+        Assert.Equal(["cancel", "cleanup", "restart"], events);
+    }
+
+    [Fact]
+    public async Task CleanupFromStaleAsyncRun_IsDisposedOnUiThread()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(async () =>
         {
-            run++;
-            return run == 1
+            var key = new UseHookKey();
+            var slot = new UseEffectSlot(key);
+            var firstCompletion = new TaskCompletionSource<IDisposable?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var cleanupUsedUiThread = false;
+            var staleCleanup = new TrackingDisposable(
+                () => cleanupUsedUiThread =
+                    Dispatcher.UIThread.CheckAccess());
+            var run = 0;
+            UseEffectCallback callback = _ =>
+            {
+                run++;
+                return run == 1
+                    ? new ValueTask<IDisposable?>(firstCompletion.Task)
+                    : ValueTask.FromResult<IDisposable?>(null);
+            };
+
+            slot.Apply(new UseEffectRegistration(
+                key,
+                callback,
+                hasDependencies: true,
+                dependencies: [1],
+                comparer: null));
+            slot.Apply(new UseEffectRegistration(
+                key,
+                callback,
+                hasDependencies: true,
+                dependencies: [2],
+                comparer: null));
+
+            firstCompletion.SetResult(staleCleanup);
+            for (var attempt = 0;
+                attempt < 50 && !staleCleanup.IsDisposed;
+                attempt++)
+            {
+                await Task.Delay(10);
+            }
+
+            Assert.True(staleCleanup.IsDisposed);
+            Assert.True(cleanupUsedUiThread);
+            Assert.Equal(2, run);
+            return true;
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task FailureFromStaleAsyncRun_IsIgnoredAfterGenerationChanges()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(
+            typeof(AvaloniaTestAppBuilder));
+        await session.Dispatch(async () =>
+        {
+            var key = new UseHookKey();
+            var slot = new UseEffectSlot(key);
+            var firstCompletion = new TaskCompletionSource<IDisposable?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var run = 0;
+            UseEffectCallback callback = _ => ++run == 1
                 ? new ValueTask<IDisposable?>(firstCompletion.Task)
                 : ValueTask.FromResult<IDisposable?>(null);
-        };
 
-        slot.Apply(new UseEffectRegistration(
-            key,
-            callback,
-            hasDependencies: true,
-            dependencies: [1],
-            comparer: null));
-        slot.Apply(new UseEffectRegistration(
-            key,
-            callback,
-            hasDependencies: true,
-            dependencies: [2],
-            comparer: null));
+            slot.Apply(new UseEffectRegistration(
+                key,
+                callback,
+                hasDependencies: true,
+                dependencies: [1],
+                comparer: null));
+            slot.Apply(new UseEffectRegistration(
+                key,
+                callback,
+                hasDependencies: true,
+                dependencies: [2],
+                comparer: null));
 
-        firstCompletion.SetResult(staleCleanup);
-        for (var attempt = 0; attempt < 50 && !staleCleanup.IsDisposed; attempt++)
-        {
-            await Task.Delay(10);
-        }
+            firstCompletion.SetException(
+                new ExpectedAsyncEffectException());
 
-        Assert.True(staleCleanup.IsDisposed);
-        Assert.Equal(2, run);
+            await Task.Delay(100);
+
+            slot.Trigger();
+            Assert.Equal(3, run);
+            return true;
+        }, CancellationToken.None);
+
     }
 
     private static void CompleteFrame(
         UseHookRuntime runtime,
         UseEffectRegistration registration)
     {
-        runtime.BeginFrame();
-        runtime.Register(
+        CompleteFrame(
+            runtime,
             new DelegateUseHookRegistration<UseEffectSlot, UseEffectRegistration>(
                 registration.Key,
                 registration,
                 static current => new UseEffectSlot(current.Key),
                 static (slot, current) => slot.Apply(current),
                 static slot => slot.StopForDetach()));
+    }
+
+    private static void CompleteFrame(
+        UseHookRuntime runtime,
+        IUseHookRegistration registration)
+    {
+        runtime.BeginFrame();
+        runtime.Register(registration);
         runtime.CompleteFrame();
+    }
+
+    private static IUseHookRegistration CreateTestRegistration(
+        UseHookKey key,
+        Action create,
+        Action apply,
+        Action detach)
+    {
+        return new DelegateUseHookRegistration<TestHookState, Action>(
+            key,
+            apply,
+            _ =>
+            {
+                create();
+                return new TestHookState(detach);
+            },
+            static (_, currentApply) => currentApply(),
+            static state => state.Detach());
+    }
+
+    private static UseEffectRegistration CreateEffectRegistration(
+        UseHookKey key,
+        Func<IDisposable?> effect)
+    {
+        return CreateEffectRegistration(key, _ => effect());
+    }
+
+    private static UseEffectRegistration CreateEffectRegistration(
+        UseHookKey key,
+        Func<CancellationToken, IDisposable?> effect)
+    {
+        return new UseEffectRegistration(
+            key,
+            cancellationToken => ValueTask.FromResult(
+                effect(cancellationToken)),
+            hasDependencies: true,
+            dependencies: [],
+            comparer: null);
     }
 
     private static void RegisterActionEffect(HookComponent control)
@@ -499,6 +989,20 @@ public sealed class UseHookRuntimeTests
     private static void RegisterTokenEffect(HookComponent control)
     {
         EffectHooks.useEffect(control, (Action<CancellationToken>)(_ => { }), []);
+    }
+
+    private static void RegisterTrackedEffect(
+        HookComponent control,
+        string name)
+    {
+        EffectHooks.useEffect(
+            control,
+            (Func<Action?>)(() =>
+            {
+                control.Events.Add($"run:{name}");
+                return () => control.Events.Add($"cleanup:{name}");
+            }),
+            []);
     }
 
     private sealed class HookComponent : AkburaControl
@@ -691,6 +1195,21 @@ public sealed class UseHookRuntimeTests
         public int ApplicationCount { get; set; }
     }
 
+    private sealed class TestHookState
+    {
+        private readonly Action _detach;
+
+        public TestHookState(Action detach)
+        {
+            _detach = detach;
+        }
+
+        public void Detach()
+        {
+            _detach();
+        }
+    }
+
     private sealed class ParityDependenciesComparer : IUseHookDependenciesComparer
     {
         public int CallCount { get; private set; }
@@ -722,14 +1241,51 @@ public sealed class UseHookRuntimeTests
 
     private sealed class TrackingDisposable : IDisposable
     {
+        private readonly Action? _dispose;
         private int _isDisposed;
+
+        public TrackingDisposable(Action? dispose = null)
+        {
+            _dispose = dispose;
+        }
 
         public bool IsDisposed => Volatile.Read(ref _isDisposed) != 0;
 
         public void Dispose()
         {
-            Interlocked.Exchange(ref _isDisposed, 1);
+            if (Interlocked.Exchange(ref _isDisposed, 1) == 0)
+            {
+                _dispose?.Invoke();
+            }
         }
+    }
+
+    private sealed class ExpectedFactoryException : Exception
+    {
+    }
+
+    private sealed class ExpectedApplyException : Exception
+    {
+    }
+
+    private sealed class FirstDetachException : Exception
+    {
+    }
+
+    private sealed class SecondDetachException : Exception
+    {
+    }
+
+    private sealed class ExpectedCancellationException : Exception
+    {
+    }
+
+    private sealed class ExpectedCleanupException : Exception
+    {
+    }
+
+    private sealed class ExpectedAsyncEffectException : Exception
+    {
     }
 
     private sealed class ExpectedRenderException : Exception

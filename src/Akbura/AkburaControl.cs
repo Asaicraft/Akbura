@@ -1,4 +1,4 @@
-﻿using Akbura.Akcss;
+using Akbura.Akcss;
 using Akbura.ComponentTree;
 using Akbura.Diagnostics;
 using Akbura.Engine;
@@ -489,23 +489,34 @@ public abstract class AkburaControl : Control, IComponentTree
         RequestUpdate();
     }
 
-    internal void ApplyHotReload(
-        Action<long> scheduleRefresh)
+    internal void ApplyHotReload(Action<long> scheduleRefresh)
     {
         ArgumentNullException.ThrowIfNull(scheduleRefresh);
 
-        var services = GetServices();
-        for (var index = 0; index < services.Length; index++)
+        var updateWasPending = _updatePending;
+        using var updateSuppression = SuppressUpdates();
+        try
         {
-            services[index].Inject(this, _engine);
-        }
+            _useHooks.ResetForHotReload();
 
-        var requestGeneration =
-            ++_hotReloadRequestGeneration;
-        scheduleRefresh(requestGeneration);
-        _pendingHotReloadRequestGeneration =
-            requestGeneration;
-        InvalidState();
+            var services = GetServices();
+            for (var index = 0; index < services.Length; index++)
+            {
+                services[index].Inject(this, _engine);
+            }
+
+            var requestGeneration =
+                ++_hotReloadRequestGeneration;
+            scheduleRefresh(requestGeneration);
+            _pendingHotReloadRequestGeneration =
+                requestGeneration;
+            InvalidState();
+        }
+        catch
+        {
+            _updatePending = updateWasPending;
+            throw;
+        }
     }
 
     internal void RetryPendingHotReload()
@@ -523,7 +534,7 @@ public abstract class AkburaControl : Control, IComponentTree
     /// </summary>
     /// <typeparam name="TState">The persistent runtime state owned by this hook slot.</typeparam>
     /// <typeparam name="TArguments">The arguments captured for the current frame.</typeparam>
-    /// <param name="key">The reference identity of the logical hook contract.</param>
+    /// <param name="key">The reference identity of a compatible hook contract.</param>
     /// <param name="arguments">The arguments for the current frame.</param>
     /// <param name="createState">Creates the slot state on the first completed frame.</param>
     /// <param name="apply">Applies the current arguments after each completed frame.</param>
@@ -632,7 +643,7 @@ public abstract class AkburaControl : Control, IComponentTree
                             hotReloadRequestGeneration);
                     }
                 }
-                catch
+                catch (Exception exception)
                 {
                     if (hotReloadRequestGeneration != 0)
                     {
@@ -645,7 +656,24 @@ public abstract class AkburaControl : Control, IComponentTree
 
                     if (hookFrameStarted)
                     {
-                        _useHooks.AbortFrame();
+                        try
+                        {
+                            _useHooks.AbortFrame();
+                        }
+                        catch (Exception abortException)
+                        {
+                            List<Exception>? failures = null;
+                            UseHookFailures.Capture(
+                                ref failures,
+                                exception);
+                            UseHookFailures.Capture(
+                                ref failures,
+                                abortException);
+                            UseHookFailures.ThrowIfAny(
+                                failures,
+                                "A component update and its hook-frame " +
+                                "cleanup failed.");
+                        }
                     }
 
                     throw;
@@ -713,6 +741,7 @@ public abstract class AkburaControl : Control, IComponentTree
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        _useHooks.Resume();
         SetComponentParent(FindComponentParent());
         var participatesInHotReload =
             AkburaComponentRegistry.Attach(this);
@@ -727,10 +756,46 @@ public abstract class AkburaControl : Control, IComponentTree
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        base.OnDetachedFromVisualTree(e);
-        _useHooks.StopForDetach();
-        SetComponentParent(null);
-        AkburaComponentRegistry.Detach(this);
+        List<Exception>? failures = null;
+        try
+        {
+            base.OnDetachedFromVisualTree(e);
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            _useHooks.StopForDetach();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            SetComponentParent(null);
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            AkburaComponentRegistry.Detach(this);
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "The Akbura component could not be fully detached.");
     }
 
     private IComponentTree? FindComponentParent()

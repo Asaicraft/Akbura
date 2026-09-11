@@ -67,7 +67,7 @@ public sealed class AkburaBuildTargetsTests
     }
 
     [Fact]
-    public void AkburaBuild_DoesNotCreateAkburaIntermediateDirectory()
+    public void AkburaBuild_EmbedsManifestWithoutCreatingAkburaIntermediateDirectory()
     {
         var repositoryRoot = FindRepositoryRoot();
         var configuration = typeof(AkburaControl).Assembly
@@ -82,7 +82,9 @@ public sealed class AkburaBuildTargetsTests
             "net10.0");
 
         Assert.False(Directory.Exists(Path.Combine(intermediateOutputPath, "Akbura")));
-        Assert.True(File.Exists(Path.Combine(intermediateOutputPath, "Akbura.module.xml")));
+        Assert.Contains(
+            AkburaModuleManifest.ResourceName,
+            typeof(AkburaControl).Assembly.GetManifestResourceNames());
     }
 
     private static string FindRepositoryRoot()

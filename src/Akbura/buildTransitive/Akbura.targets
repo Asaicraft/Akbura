@@ -37,12 +37,6 @@
 						 Exclude="@(AdditionalFiles)" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(AkburaEmbedSourceFiles)' == 'true'">
-		<EmbeddedResource Include="$(AkburaModuleManifestPath)">
-			<LogicalName>!Akbura</LogicalName>
-		</EmbeddedResource>
-	</ItemGroup>
-
 	<Target Name="GenerateAkburaModuleManifest"
 		  BeforeTargets="AssignTargetPaths"
 		  DependsOnTargets="FindReferenceAssembliesForReferences"
@@ -70,6 +64,12 @@
 			AllowUnsafeBlocks="$(AllowUnsafeBlocks)" />
 
 		<ItemGroup>
+			<EmbeddedResource Include="$(AkburaModuleManifestPath)">
+				<LogicalName>!Akbura</LogicalName>
+				<WithCulture>false</WithCulture>
+				<Visible>false</Visible>
+			</EmbeddedResource>
+
 			<EmbeddedResource Include="@(_AkburaModuleSource)" />
 		</ItemGroup>
 	</Target>

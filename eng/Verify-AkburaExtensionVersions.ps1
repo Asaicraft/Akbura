@@ -21,6 +21,24 @@ function Assert-ExactVersion {
     }
 }
 
+function Assert-CompatibleVsixVersion {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Actual,
+
+        [Parameter(Mandatory)]
+        [string] $AkburaVersion
+    )
+
+    $escapedVersion = [Regex]::Escape($AkburaVersion)
+    if ($Actual -cnotmatch "^$escapedVersion(?:\.[1-9][0-9]*)?$") {
+        throw (
+            "Visual Studio VSIX version '$Actual' must match Akbura version " +
+            "'$AkburaVersion' or add a positive extension revision."
+        )
+    }
+}
+
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $propertiesPath = Join-Path $repositoryRoot "Directory.Build.props"
 $vsixManifestPath = Join-Path $repositoryRoot (
@@ -58,7 +76,7 @@ $packageVersion = [string] $package.version
 $packageLockVersion = [string] $packageLock["version"]
 $packageLockRootVersion = [string] $packageLock["packages"][""]["version"]
 
-Assert-ExactVersion $vsixVersion $avaloniaVersion "Visual Studio VSIX"
+Assert-CompatibleVsixVersion $vsixVersion $avaloniaVersion
 Assert-ExactVersion $packageVersion $avaloniaVersion "VS Code package.json"
 Assert-ExactVersion $packageLockVersion $avaloniaVersion "VS Code package-lock.json"
 Assert-ExactVersion `
@@ -67,5 +85,5 @@ Assert-ExactVersion `
     "VS Code package-lock.json root package"
 
 Write-Host (
-    "Verified extension versions: Akbura, Visual Studio, and VS Code are " +
-    "$avaloniaVersion.")
+    "Verified extension versions: Akbura and VS Code are $avaloniaVersion; " +
+    "Visual Studio VSIX is $vsixVersion.")

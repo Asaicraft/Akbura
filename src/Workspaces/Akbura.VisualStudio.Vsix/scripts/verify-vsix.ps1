@@ -4,7 +4,7 @@ param(
     [string] $VsixPath,
 
     [Parameter(Mandatory)]
-    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')]
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?$')]
     [string] $ExpectedVersion,
 
     [string] $PublishManifestPath

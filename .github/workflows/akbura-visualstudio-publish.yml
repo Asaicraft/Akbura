@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing release tag, for example visualstudio-v12.0.4"
+        description: "Existing release tag, for example visualstudio-v12.0.4.1"
         required: true
         type: string
 
@@ -50,8 +50,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:RELEASE_TAG -cnotmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+)$') {
-            throw 'Release tag must have the form visualstudio-vX.Y.Z.'
+          if ($env:RELEASE_TAG -cnotmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)$') {
+            throw 'Release tag must have the form visualstudio-vX.Y.Z or visualstudio-vX.Y.Z.REVISION.'
           }
 
       - name: Checkout release tag
@@ -87,8 +87,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'Release tag must point to a commit on master.'
           }
-          if ($env:RELEASE_TAG -cnotmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+)$') {
-            throw 'Release tag must have the form visualstudio-vX.Y.Z.'
+          if ($env:RELEASE_TAG -cnotmatch '^visualstudio-v([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)$') {
+            throw 'Release tag must have the form visualstudio-vX.Y.Z or visualstudio-vX.Y.Z.REVISION.'
           }
           $tagVersion = $Matches[1]
           [xml] $sourceManifest = Get-Content -Raw -LiteralPath `

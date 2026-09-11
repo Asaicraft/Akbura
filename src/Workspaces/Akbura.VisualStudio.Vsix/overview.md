@@ -21,6 +21,10 @@ Language support for `.akbura` and `.akcss` files in Visual Studio.
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
 
+## What's new in 12.0.4.1
+
+- Added the native **Akbura Component** item template for Add New Item and Quick Add.
+
 ## What's new in 12.0.4
 
 - Aligned the extension version with Akbura and Avalonia.

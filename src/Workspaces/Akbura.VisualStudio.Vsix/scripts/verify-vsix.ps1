@@ -17,6 +17,7 @@ $expectedVsixId =
     'Akbura.VisualStudio.Vsix.09fb6c7e-e90e-4536-ac90-4c71949913da'
 $expectedDisplayName = 'Akbura Visual Studio Extension'
 $expectedPublisher = 'Asaicraft'
+$itemTemplateRoot = 'ItemTemplates/CSharp/1033/AkburaComponent'
 $expectedTargetIds = @(
     'Microsoft.VisualStudio.Community'
     'Microsoft.VisualStudio.Enterprise'
@@ -27,10 +28,14 @@ $requiredEntries = @(
     'Akbura.VisualStudio.Vsix.dll'
     'Akbura.VisualStudio.Vsix.pkgdef'
     'AkburaFileIcons.pkgdef'
+    "$itemTemplateRoot/AkburaComponent.akbura"
+    "$itemTemplateRoot/AkburaComponent.vstemplate"
+    "$itemTemplateRoot/icon.png"
     'Resources/Marketplace/icon-90.png'
     'Resources/Marketplace/preview-200.png'
 )
 $expectedImageDimensions = @{
+    "$itemTemplateRoot/icon.png" = @(90, 90)
     'Resources/Marketplace/icon-90.png' = @(90, 90)
     'Resources/Marketplace/preview-200.png' = @(200, 200)
 }
@@ -82,6 +87,129 @@ try {
             throw "VSIX does not contain required entry '$requiredEntry'."
         }
     }
+
+    $templateManifestEntries = @(
+        $archive.Entries |
+            Where-Object {
+                $_.FullName -match '^ItemTemplates/templateManifest\d+\.1033\.vstman$'
+            }
+    )
+    if ($templateManifestEntries.Count -ne 1) {
+        throw (
+            'VSIX must contain exactly one English item-template manifest; ' +
+            "found $($templateManifestEntries.Count)."
+        )
+    }
+
+    $reader = [System.IO.StreamReader]::new(
+        $templateManifestEntries[0].Open()
+    )
+    try {
+        [xml] $templateManifest = $reader.ReadToEnd()
+    }
+    finally {
+        $reader.Dispose()
+    }
+
+    $templateManifestNamespaceManager =
+        [System.Xml.XmlNamespaceManager]::new($templateManifest.NameTable)
+    $templateManifestNamespaceManager.AddNamespace(
+        'vsm',
+        $templateManifest.DocumentElement.NamespaceURI
+    )
+    $templateContainer = $templateManifest.SelectSingleNode(
+        '/vsm:VSTemplateManifest/vsm:VSTemplateContainer',
+        $templateManifestNamespaceManager
+    )
+    if ($null -eq $templateContainer) {
+        throw 'Item-template manifest does not contain VSTemplateContainer.'
+    }
+    Assert-Exact $templateContainer.GetAttribute('TemplateType') 'Item' `
+        'template manifest type'
+    Assert-Exact (
+        $templateContainer.SelectSingleNode(
+            'vsm:RelativePathOnDisk',
+            $templateManifestNamespaceManager
+        ).InnerText
+    ) 'CSharp\1033\AkburaComponent' 'item-template relative path'
+    Assert-Exact (
+        $templateContainer.SelectSingleNode(
+            'vsm:TemplateFileName',
+            $templateManifestNamespaceManager
+        ).InnerText
+    ) 'AkburaComponent.vstemplate' 'item-template file name'
+
+    $itemTemplateEntry = $archive.GetEntry(
+        "$itemTemplateRoot/AkburaComponent.vstemplate"
+    )
+    $reader = [System.IO.StreamReader]::new($itemTemplateEntry.Open())
+    try {
+        [xml] $itemTemplate = $reader.ReadToEnd()
+    }
+    finally {
+        $reader.Dispose()
+    }
+
+    $itemTemplateNamespaceManager =
+        [System.Xml.XmlNamespaceManager]::new($itemTemplate.NameTable)
+    $itemTemplateNamespaceManager.AddNamespace(
+        'vst',
+        $itemTemplate.DocumentElement.NamespaceURI
+    )
+    $templateData = $itemTemplate.SelectSingleNode(
+        '/vst:VSTemplate/vst:TemplateData',
+        $itemTemplateNamespaceManager
+    )
+    if ($null -eq $templateData) {
+        throw 'Akbura item template does not contain TemplateData.'
+    }
+    Assert-Exact (
+        $templateData.SelectSingleNode(
+            'vst:Name',
+            $itemTemplateNamespaceManager
+        ).InnerText
+    ) 'Akbura Component' 'item-template name'
+    Assert-Exact (
+        $templateData.SelectSingleNode(
+            'vst:ProjectType',
+            $itemTemplateNamespaceManager
+        ).InnerText
+    ) 'CSharp' 'item-template project type'
+    Assert-Exact (
+        $templateData.SelectSingleNode(
+            'vst:DefaultName',
+            $itemTemplateNamespaceManager
+        ).InnerText
+    ) 'Component.akbura' 'item-template default name'
+
+    $projectItem = $itemTemplate.SelectSingleNode(
+        '/vst:VSTemplate/vst:TemplateContent/vst:ProjectItem',
+        $itemTemplateNamespaceManager
+    )
+    if ($null -eq $projectItem) {
+        throw 'Akbura item template does not contain ProjectItem.'
+    }
+    Assert-Exact $projectItem.GetAttribute('ReplaceParameters') 'true' `
+        'item-template parameter replacement'
+    Assert-Exact $projectItem.InnerText.Trim() 'AkburaComponent.akbura' `
+        'item-template source file'
+
+    $itemTemplateSourceEntry = $archive.GetEntry(
+        "$itemTemplateRoot/AkburaComponent.akbura"
+    )
+    $reader = [System.IO.StreamReader]::new($itemTemplateSourceEntry.Open())
+    try {
+        $itemTemplateSource = $reader.ReadToEnd()
+    }
+    finally {
+        $reader.Dispose()
+    }
+    $normalizedItemTemplateSource =
+        $itemTemplateSource.Replace("`r`n", "`n").TrimEnd("`n")
+    $expectedItemTemplateSource =
+        "namespace `$rootnamespace`$;`n`n<StackPanel>`n`n</StackPanel>"
+    Assert-Exact $normalizedItemTemplateSource $expectedItemTemplateSource `
+        'item-template source'
 
     Add-Type -AssemblyName System.Drawing
     foreach ($imageEntryName in $expectedImageDimensions.Keys) {
@@ -158,6 +286,21 @@ if ($null -eq $previewImage) {
     throw 'VSIX manifest does not contain Metadata/PreviewImage.'
 }
 Assert-Exact ($previewImage.InnerText.Trim().Replace('\', '/')) 'Resources/Marketplace/preview-200.png' 'VSIX preview image path'
+
+$itemTemplateAssets = @($manifest.SelectNodes(
+    '/vs:PackageManifest/vs:Assets/vs:Asset[@Type="Microsoft.VisualStudio.ItemTemplate"]',
+    $namespaceManager
+))
+if ($itemTemplateAssets.Count -ne 1) {
+    throw (
+        'Unexpected Visual Studio item-template asset count: ' +
+        "$($itemTemplateAssets.Count); expected 1."
+    )
+}
+Assert-Exact (
+    $itemTemplateAssets[0].GetAttribute('Path').Replace('\', '/')
+) 'ItemTemplates' 'VSIX item-template asset path'
+
 $targets = @($manifest.SelectNodes(
     '/vs:PackageManifest/vs:Installation/vs:InstallationTarget',
     $namespaceManager

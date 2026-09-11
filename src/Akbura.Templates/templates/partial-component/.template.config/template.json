@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json.schemastore.org/template",
+  "author": "Asaicraft",
+  "classifications": [
+    "Akbura",
+    "Avalonia"
+  ],
+  "identity": "Asaicraft.Akbura.PartialComponent.CSharp",
+  "name": "Akbura Partial Component",
+  "description": "An Akbura component with a C# code-behind partial class.",
+  "shortName": "akbura.partial-component",
+  "sourceName": "NewComponent",
+  "defaultName": "Component",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated component."
+    },
+    "ProjectNamespace": {
+      "type": "bind",
+      "binding": "msbuild:RootNamespace",
+      "defaultValue": "App"
+    },
+    "UserOrProjectNamespace": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "namespace",
+        "fallbackVariableName": "ProjectNamespace"
+      }
+    },
+    "FallbackNamespace": {
+      "type": "generated",
+      "generator": "constant",
+      "parameters": {
+        "value": "App"
+      }
+    },
+    "ResolvedNamespace": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "UserOrProjectNamespace",
+        "fallbackVariableName": "FallbackNamespace"
+      }
+    },
+    "ComponentNamespace": {
+      "type": "derived",
+      "valueSource": "ResolvedNamespace",
+      "valueTransform": "safe_namespace",
+      "replaces": "AkburaComponentNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "NewComponent.akbura"
+    },
+    {
+      "path": "NewComponent.akbura.cs"
+    }
+  ]
+}

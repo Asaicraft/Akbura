@@ -15,6 +15,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<VSTemplate Include="ItemTemplates\AkburaComponent\AkburaComponent.vstemplate" />
+		<Content Include="$(OutputPath)ItemTemplates\CSharp\1033\AkburaComponent.zip">
+			<IncludeInVSIX>true</IncludeInVSIX>
+			<VSIXSubPath>ItemTemplates\CSharp\1033</VSIXSubPath>
+			<Visible>false</Visible>
+		</Content>
+
 		<Resource Include="Resources\Icons\akbura_64.png" />
 		<Resource Include="Resources\Icons\akcss_64.png" />
 		<Resource Include="Resources\Icons\state_16.png" />

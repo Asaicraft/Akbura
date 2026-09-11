@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/ide.host",
+  "defaultItemExtension": "akbura",
+  "itemHierarchyPaths": [
+    "Akbura"
+  ],
+  "symbolInfo": [
+    {
+      "id": "namespace",
+      "name": {
+        "text": "Namespace"
+      },
+      "isVisible": true
+    }
+  ]
+}

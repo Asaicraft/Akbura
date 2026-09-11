@@ -31,6 +31,14 @@ Run the item template from an existing Akbura project:
 dotnet new akbura.component -n ProfileCard --namespace MyApp.Components -o Components
 ```
 
+To create a component together with a C# code-behind partial class, use:
+
+```powershell
+dotnet new akbura.partial-component -n ProfileCard --namespace MyApp.Components -o Components
+```
+
+This creates `ProfileCard.akbura` and `ProfileCard.akbura.cs`.
+
 The application template demonstrates reactive state, AKCSS utilities, responsive
 breakpoints, reusable components, and optional service injection. Debug builds include
 Avalonia Developer Tools on `F12` and the Akbura component inspector on `Ctrl+F12`;

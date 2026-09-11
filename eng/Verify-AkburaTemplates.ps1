@@ -64,7 +64,10 @@ try {
         "content/templates/app/GlobalUsings.akcss",
         "content/templates/app/README.md",
         "content/templates/app/Views/MainView.akbura",
-        "content/templates/component/.template.config/template.json"
+        "content/templates/component/.template.config/template.json",
+        "content/templates/partial-component/.template.config/template.json",
+        "content/templates/partial-component/NewComponent.akbura",
+        "content/templates/partial-component/NewComponent.akbura.cs"
     )
 
     foreach ($entry in $requiredEntries) {
@@ -241,6 +244,12 @@ foreach ($case in $cases) {
             --namespace ($case.Name + ".Components") `
             --output Components `
             --debug:custom-hive $hivePath
+
+        Invoke-DotNet new akbura.partial-component `
+            --name SettingsCard `
+            --namespace ($case.Name + ".Components") `
+            --output Components `
+            --debug:custom-hive $hivePath
     }
     finally {
         Pop-Location
@@ -357,6 +366,33 @@ foreach ($case in $cases) {
             "namespace $($case.Name).Components;",
             [StringComparison]::Ordinal)) (
         "$($case.Name) generated an incorrect component namespace.")
+
+    $settingsCardPath = Join-Path (
+        $projectDirectory) "Components/SettingsCard.akbura"
+    $settingsCardCodePath = Join-Path (
+        $projectDirectory) "Components/SettingsCard.akbura.cs"
+    Assert-Condition (
+        Test-Path -LiteralPath $settingsCardPath -PathType Leaf) (
+        "$($case.Name) did not generate SettingsCard.akbura.")
+    Assert-Condition (
+        Test-Path -LiteralPath $settingsCardCodePath -PathType Leaf) (
+        "$($case.Name) did not generate SettingsCard.akbura.cs.")
+
+    $settingsCard = Get-Content -LiteralPath $settingsCardPath -Raw
+    $settingsCardCode = Get-Content -LiteralPath $settingsCardCodePath -Raw
+    Assert-Condition (
+        $settingsCard.Contains(
+            "namespace $($case.Name).Components;",
+            [StringComparison]::Ordinal) -and
+        $settingsCardCode.Contains(
+            "namespace $($case.Name).Components;",
+            [StringComparison]::Ordinal)) (
+        "$($case.Name) generated inconsistent partial component namespaces.")
+    Assert-Condition (
+        $settingsCardCode.Contains(
+            "public partial class SettingsCard",
+            [StringComparison]::Ordinal)) (
+        "$($case.Name) generated an incorrect partial component class.")
 
     switch ($case.DependencyInjection) {
         "None" {

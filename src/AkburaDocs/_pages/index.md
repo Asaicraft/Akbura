@@ -57,6 +57,13 @@ directory:
 dotnet new akbura.component -n Counter --namespace MyApp.Components -o Components
 :::
 
+To create both `Counter.akbura` and its C# code-behind partial class
+`Counter.akbura.cs`, use:
+
+:::sh
+dotnet new akbura.partial-component -n Counter --namespace MyApp.Components -o Components
+:::
+
 ### Install editor support
 
 Install the extension for the IDE you use:

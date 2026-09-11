@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate
+	Version="3.0.0"
+	Type="Item"
+	xmlns="http://schemas.microsoft.com/developer/vstemplate/2005">
+	<TemplateData>
+		<Name>Akbura Component</Name>
+		<Description>Creates a new Akbura UI component.</Description>
+		<ProjectType>CSharp</ProjectType>
+		<DefaultName>Component.akbura</DefaultName>
+		<ProvideDefaultName>true</ProvideDefaultName>
+		<Icon>icon.png</Icon>
+	</TemplateData>
+	<TemplateContent>
+		<ProjectItem ReplaceParameters="true">AkburaComponent.akbura</ProjectItem>
+	</TemplateContent>
+</VSTemplate>

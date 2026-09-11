@@ -7,6 +7,7 @@ Language support for `.akbura` and `.akcss` files in Visual Studio.
 - syntax highlighting and classification;
 - completion and completion commit behavior;
 - diagnostics and suggested actions;
+- native **Akbura Component** item template for Add New Item and Quick Add;
 - quick info and navigation;
 - outlining and smart indentation;
 - syntax-aware automatic pairing and markup editing.

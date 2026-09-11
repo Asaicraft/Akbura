@@ -41,6 +41,9 @@ dotnet add package Akbura --version 12.0.4-alpha.3
 dotnet new akbura.component -n Counter --namespace MyApp.Components -o Components
 ```
 
+For a component with a C# code-behind partial class, use
+`dotnet new akbura.partial-component` instead.
+
 Install the editor extension for the IDE you use:
 
 - **VS Code:** install [Akbura Vs Code Extension](https://marketplace.visualstudio.com/items?itemName=asaicraft.akbura-language-server), or run `code --install-extension asaicraft.akbura-language-server`.

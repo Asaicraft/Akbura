@@ -40,5 +40,10 @@
 			d:Source="Project"
 			d:ProjectName="%CurrentProject%"
 			Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+
+		<Asset
+			Type="Microsoft.VisualStudio.ItemTemplate"
+			Path="ItemTemplates"
+			d:Source="File" />
 	</Assets>
 </PackageManifest>

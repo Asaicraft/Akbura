@@ -24,20 +24,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Content Include="templates\**\*"
-				 Exclude="templates\**\bin\**;templates\**\obj\**;templates\**\.vs\**;templates\**\.idea\**" />
+		<Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**;templates\**\.vs\**;templates\**\.idea\**" />
 
-		<None Include="README.md"
-			  Pack="true"
-			  PackagePath="\" />
+		<None Include="README.md" Pack="true" PackagePath="\" />
 
-		<None Include="LICENSE.txt"
-			  Pack="true"
-			  PackagePath="\" />
+		<None Include="LICENSE.txt" Pack="true" PackagePath="\" />
 
-		<None Include="..\..\icon.png"
-			  Pack="true"
-			  PackagePath="\" />
+		<None Include="..\..\icon.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 </Project>

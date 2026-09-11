@@ -41,8 +41,10 @@
   </Folder>
   <Folder Name="/For Contributors/">
     <File Path="For Contributors/adding-features-without-new-syntax.md" />
+    <File Path="For Contributors/hot-reload.md" />
     <File Path="For Contributors/Make Your Own Syntax.md" />
     <File Path="For Contributors/README.md" />
+    <File Path="For Contributors/red-green-trees.md" />
   </Folder>
   <Folder Name="/GitHub Actions/">
     <File Path=".github/workflows/akbura-visualstudio-publish.yml" />

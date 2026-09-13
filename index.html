@@ -223,6 +223,11 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/hooks" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Composable Hooks
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/#commands" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Commands
 									</a>
@@ -759,6 +764,8 @@ types; it cannot distinguish every swap of otherwise identical calls in arbitrar
 effects. Akbura's existing Avalonia-property state hooks use that compatibility
 contract. A normal <code>[UseHook]</code> returning <code>State&lt;T&gt;</code> uses the composable per-render
 contract.</p>
+<p>See <a href="/akbura/hooks">Composable Hooks</a> for derived state, refs, timers, throttle,
+async loading, external subscriptions and reducers built from these primitives.</p>
 <h2 id="commands">Commands<a class="header-anchor" href="javascript:;" onclick="location.hash='#commands'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Commands expose typed operations with reactive execution state:</p>
 <pre><code class="language-akbura">command int Refresh(int userId);

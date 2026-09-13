@@ -13,6 +13,7 @@ Language
  - [Binding](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Markup Extensions](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Effects and Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
+ - [Composable Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/hooks.md)
  - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [AKCSS](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
 
@@ -22,6 +23,7 @@ Project
  - [GitHub](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/https://github.com/Asaicraft/Akbura.md)
 
 Akbura
+ - [Composable Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/hooks.md)
  - [Using Components in AXAML](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/axaml-integration.md): Using Akbura Components in AXAML
  - [XML, XAML and AXAML differences](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/xml-xaml-axaml.md): Differences between XML, XAML and AXAML
  - [Grid](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/grid.md)

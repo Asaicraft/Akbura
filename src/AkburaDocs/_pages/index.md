@@ -342,6 +342,9 @@ effects. Akbura's existing Avalonia-property state hooks use that compatibility
 contract. A normal `[UseHook]` returning `State<T>` uses the composable per-render
 contract.
 
+See [Composable Hooks](/akbura/hooks) for derived state, refs, timers, throttle,
+async loading, external subscriptions and reducers built from these primitives.
+
 ## Commands
 
 Commands expose typed operations with reactive execution state:

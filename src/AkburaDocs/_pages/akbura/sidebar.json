@@ -4,6 +4,10 @@
     "link": "/akbura/",
     "children": [
       {
+        "text": "Composable Hooks",
+        "link": "/akbura/hooks"
+      },
+      {
         "text": "Using Components in AXAML",
         "link": "/akbura/axaml-integration"
       },

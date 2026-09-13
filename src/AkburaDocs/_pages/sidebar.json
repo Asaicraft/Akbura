@@ -41,6 +41,10 @@
         "link": "/#effects-and-hooks"
       },
       {
+        "text": "Composable Hooks",
+        "link": "/akbura/hooks"
+      },
+      {
         "text": "Commands",
         "link": "/#commands"
       },

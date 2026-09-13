@@ -670,7 +670,95 @@ useEffect(
     () =&gt; Console.WriteLine(count),
     [count]);
 </code></pre>
-<p>Akbura also supports Avalonia-property hooks and experimental user-defined hooks.</p>
+<p><code>useEffect</code> without a dependency list runs after every successful render. An empty
+list runs it once until the component is detached or the hook is reset. Changing
+dependencies cancels the previous run and invokes its cleanup before the next run.</p>
+<h3 id="debouncing-state">Debouncing state<a class="header-anchor" href="javascript:;" onclick="location.hash='#debouncing-state'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p><code>useDebounce</code> keeps the initial value available immediately, then publishes changes
+after the source has stayed unchanged for the requested delay:</p>
+<pre><code class="language-akbura">using Akbura.Hooks;
+
+state int count = 0;
+state int debouncedCount = useDebounce(count, 300);
+state int debouncedEffectedCount = useDebounce(count, x =&gt; x + 1, 300);
+</code></pre>
+<p>Declare the source state before a hook that consumes it. For the <code>State&lt;T&gt;</code> argument,
+the compiler passes the live state object; ordinary expressions such as <code>count + 1</code>
+continue to read its value. The hook result remains the same state object across
+renders, and separate calls have independent results and delays.</p>
+<p>Both integer milliseconds and <code>TimeSpan</code> are accepted, from zero through
+<code>Int32.MaxValue</code> milliseconds. A source value change, replacement of the source state,
+or change to the delay restarts the full delay. Unrelated renders and updates of the
+debounced result do not restart it. Changes merged into one render count as one input.
+Values are captured from that render; mutable objects are not deep-copied.</p>
+<p>The selector is called once for the initial result, then after the delay. It should
+be pure: initialization may be retried if the first render fails. Each pending run
+keeps the selector from the render that started it. Replacing an inline selector
+alone does not restart the delay, and captured values are not automatic dependencies.</p>
+<p>For additional dependencies, use the callback overload:</p>
+<pre><code class="language-akbura">state string query = &quot;&quot;;
+state string debouncedQuery = &quot;&quot;;
+
+useDebounce(
+    () =&gt; { debouncedQuery = query; },
+    TimeSpan.FromMilliseconds(350),
+    [query]);
+</code></pre>
+<p>Callbacks run on the UI dispatcher, including zero-delay callbacks. The callback
+form also accepts <code>Func&lt;CancellationToken, Task&gt;</code>; its task is awaited and failures
+are observed by the effect runtime. Cancellation stops a pending delay or queued
+callback. Already-running asynchronous callbacks must cooperate with the token.
+Dependencies and delay select a run; an unrelated render does not replace the
+callback already captured by that run.</p>
+<p>Detaching cancels pending work and preserves hook state. Reattaching starts a full
+new delay using the latest source. Hot Reload currently recreates hook-owned state;
+ordinary component state follows the existing preservation rules.</p>
+<h3 id="writing-a-composable-hook">Writing a composable hook<a class="header-anchor" href="javascript:;" onclick="location.hash='#writing-a-composable-hook'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>A user-defined hook runs during each component render and combines primitives.
+<code>useHookState</code> returns persistent state immediately; <code>useEffect</code> registers work to
+run after a successful render. Their order must stay the same on every render.</p>
+<pre><code class="language-csharp">using Akbura;
+using Akbura.CompilerAnotations;
+using Akbura.ComponentTree;
+using Akbura.Hooks;
+
+public static class MyHooks
+{
+    [UseHook]
+    public static State&lt;int&gt; useDoubled(
+        [Self] this AkburaControl control,
+        State&lt;int&gt; source)
+    {
+        var value = source.Value;
+        var result = control.useHookState(() =&gt; value * 2);
+
+        control.useEffect(
+            () =&gt; { result.Value = value * 2; },
+            [source, value]);
+
+        return result;
+    }
+}
+</code></pre>
+<p>The component uses it as <code>state int doubled = useDoubled(count);</code>. Its internal
+state belongs to the component and requests rendering when it changes. The author
+does not manage slot numbers, attach the returned state again, or maintain a second
+registry. Wrapping a hook does not allocate an additional slot: only the primitives
+participate in the shared sequence.</p>
+<p><code>useHookState</code> accepts an initial value, a lazy <code>Func&lt;T&gt;</code>, or a <code>StateInfo&lt;T&gt;</code>
+descriptor. Initialization happens only when a new slot is needed; later initial
+values do not overwrite existing state. Static descriptors can be shared across
+calls, while each component and primitive position has its own state instance.</p>
+<p>Call primitives only while a render is collecting hooks. Do not call them from
+conditions that change the sequence, event handlers, effect callbacks, lazy state
+initializers, or after <code>await</code>. Put conditional behavior inside an effect and include
+the condition in its dependencies. The runtime checks the sequence's shape and
+types; it cannot distinguish every swap of otherwise identical calls in arbitrary C#.</p>
+<p>Older hooks that create state and subscriptions once must explicitly use
+<code>[UseHook(IsInitializer = true)]</code> until migrated to <code>useHookState</code> and resource-owning
+effects. Akbura's existing Avalonia-property state hooks use that compatibility
+contract. A normal <code>[UseHook]</code> returning <code>State&lt;T&gt;</code> uses the composable per-render
+contract.</p>
 <h2 id="commands">Commands<a class="header-anchor" href="javascript:;" onclick="location.hash='#commands'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Commands expose typed operations with reactive execution state:</p>
 <pre><code class="language-akbura">command int Refresh(int userId);

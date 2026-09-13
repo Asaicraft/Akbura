@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>Using Akbura Components in AXAML</title>
+    <title>Conditional Markup</title>
 
     <script>
             if (location.search === "?dark") {
@@ -154,6 +154,8 @@
             
 
 
+
+
 <style>
 .active {
 	color: #0ea5e9 !important;
@@ -198,7 +200,7 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/conditional-markup" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akbura/conditional-markup" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
 										Conditional Markup
 									</a>
 								</li>
@@ -231,239 +233,198 @@ Akbura									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							Using Akbura Components in AXAML
+							Conditional Markup
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>Akbura components can be used directly inside regular Avalonia AXAML.</p>
-<p>A separate host control is not required. Every generated Akbura component is an Avalonia control, so it can be referenced through an XML namespace and placed in the visual tree like any other custom control.</p>
-<h2 id="basic-usage">Basic usage<a class="header-anchor" href="javascript:;" onclick="location.hash='#basic-usage'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Suppose the project contains the following component:</p>
-<pre><code class="language-akbura">// Counter.akbura
+					<h1 id="conditional-markup">Conditional Markup<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-markup'" aria-label="Permalink">&ZeroWidthSpace;</a></h1>
+<p><code>$if</code>, <code>$else if</code>, and <code>$else</code> describe alternative markup content without
+adding a visual wrapper. These compiler and editor changes are being integrated;
+they do not imply support in an already published alpha package. Use matching
+compiler and runtime versions when the feature is released.</p>
+<h2 id="syntax">Syntax<a class="header-anchor" href="javascript:;" onclick="location.hash='#syntax'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<pre><code class="language-akbura">using Avalonia.Controls;
 
-namespace MyControls;
-
-state int count = 0;
-
-&lt;Button Click={count++}&gt;
-    Count: {count}
-&lt;/Button&gt;
-</code></pre>
-<p>Import its namespace in AXAML:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
-
-    &lt;myControls:Counter /&gt;
-
-&lt;/UserControl&gt;
-</code></pre>
-<p>The XML namespace points to the C# namespace declared by the <code>.akbura</code> component:</p>
-<pre><code class="language-xml">xmlns:myControls=&quot;using:MyControls&quot;
-</code></pre>
-<p>The component can then be created directly:</p>
-<pre><code class="language-xml">&lt;myControls:Counter /&gt;
-</code></pre>
-<h2 id="passing-parameters">Passing parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#passing-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Akbura parameters are exposed as Avalonia properties and can be assigned through AXAML attributes.</p>
-<p>Consider this component:</p>
-<pre><code class="language-akbura">// AkParams.akbura
-
-namespace MyControls;
-
-param int Count = 1;
-param int B;
+state bool expanded = false;
 
 &lt;StackPanel&gt;
-    &lt;TextBlock Text={$&quot;Count: {Count}&quot;} /&gt;
-    &lt;TextBlock Text={$&quot;B: {B}&quot;} /&gt;
-&lt;/StackPanel&gt;
-</code></pre>
-<p>The component declares two parameters:</p>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Required</th>
-<th>Reason</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>Count</code></td>
-<td>No</td>
-<td>It has the default value <code>1</code></td>
-</tr>
-<tr>
-<td><code>B</code></td>
-<td>Yes</td>
-<td>It has no default value</td>
-</tr>
-</tbody>
-</table>
-<p>You can use the component from AXAML:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
+    &lt;Button Click={expanded = !expanded}&gt;Toggle details&lt;/Button&gt;
 
-    &lt;StackPanel&gt;
-        &lt;myControls:AkParams Count=&quot;10&quot; /&gt;
-
-        &lt;myControls:AkParams B=&quot;10&quot; /&gt;
-
-        &lt;myControls:AkParams
-            Count=&quot;1&quot;
-            B=&quot;10&quot; /&gt;
-    &lt;/StackPanel&gt;
-
-&lt;/UserControl&gt;
-</code></pre>
-<p>The first component is invalid:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams Count=&quot;10&quot; /&gt;
-</code></pre>
-<p>Although <code>Count</code> is set, the required <code>B</code> parameter is missing.</p>
-<p>When the component is initialized, Akbura throws:</p>
-<pre><code class="language-text">AkburaParameterNotSettedException
-</code></pre>
-<p>The following component is valid:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams B=&quot;10&quot; /&gt;
-</code></pre>
-<p><code>B</code> is explicitly set, while <code>Count</code> uses its default value of <code>1</code>.</p>
-<p>Both parameters may also be set explicitly:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams
-    Count=&quot;10&quot;
-    B=&quot;20&quot; /&gt;
-</code></pre>
-<h2 id="binding-parameters">Binding parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#binding-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Because parameters are Avalonia properties, normal AXAML bindings can be used:</p>
-<pre><code class="language-xml">&lt;myControls:AkParams
-    Count=&quot;{Binding CurrentCount}&quot;
-    B=&quot;{Binding RequiredValue}&quot; /&gt;
-</code></pre>
-<p>The binding result must be compatible with the parameter type.</p>
-<p>For example, the view model may expose:</p>
-<pre><code class="language-csharp">public sealed class MyViewModel
-{
-    public int CurrentCount { get; set; }
-
-    public int RequiredValue { get; set; }
-}
-</code></pre>
-<h2 id="passing-injected-services">Passing injected services<a class="header-anchor" href="javascript:;" onclick="location.hash='#passing-injected-services'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Services declared with <code>inject</code> are also exposed as Avalonia properties.</p>
-<p>Consider the following component:</p>
-<pre><code class="language-akbura">// Counter.akbura
-
-namespace MyControls;
-
-inject ILogger&lt;Counter&gt; Logger;
-
-state int count = 0;
-
-useEffect(() =&gt;
-{
-    Logger.LogInformation(&quot;Count changed to {Count}&quot;, count);
-}, [count]);
-
-&lt;Button Click={count++}&gt;
-    Count: {count}
-&lt;/Button&gt;
-</code></pre>
-<p>Normally, Akbura attempts to resolve <code>Logger</code> through its service provider.</p>
-<p>The service may instead be passed directly from AXAML:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
-
-    &lt;myControls:Counter
-        Logger=&quot;{Binding Logger}&quot; /&gt;
-
-&lt;/UserControl&gt;
-</code></pre>
-<p>The AXAML view model must expose a compatible service:</p>
-<pre><code class="language-csharp">public sealed class MyViewModel
-{
-    public ILogger&lt;Counter&gt; Logger { get; }
-
-    public MyViewModel(ILogger&lt;Counter&gt; logger)
+    $if (expanded)
     {
-        Logger = logger;
+        &lt;TextBlock Text=&quot;Details are visible.&quot; /&gt;
     }
-}
-</code></pre>
-<p>When an injected service property already contains a value, Akbura keeps that value and does not replace it through dependency injection.</p>
-<p>This makes it possible to provide services through:</p>
-<ul>
-<li>an AXAML binding;</li>
-<li>a property assignment in C#;</li>
-<li>Akbura's configured service provider.</li>
-</ul>
-<h2 id="setting-services-from-code">Setting services from code<a class="header-anchor" href="javascript:;" onclick="location.hash='#setting-services-from-code'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>An injected service can also be assigned when creating the component from C#:</p>
-<pre><code class="language-csharp">var counter = new Counter
-{
-    Logger = logger
-};
-</code></pre>
-<p>The explicitly assigned service is used when the component initializes.</p>
-<h2 id="complete-example">Complete example<a class="header-anchor" href="javascript:;" onclick="location.hash='#complete-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Akbura component:</p>
-<pre><code class="language-akbura">// UserCard.akbura
-
-namespace MyControls;
-
-param int UserId;
-param string Title = &quot;User&quot;;
-
-inject IUserService UserService;
-
-state string userName = &quot;&quot;;
-
-useEffect(async () =&gt;
-{
-    var user = await UserService.GetUser(UserId);
-    userName = user.Name;
-}, [UserId]);
-
-&lt;StackPanel&gt;
-    &lt;TextBlock Text={Title} /&gt;
-    &lt;TextBlock Text={userName} /&gt;
+    $else
+    {
+        &lt;TextBlock Text=&quot;Open the details to continue.&quot; /&gt;
+    }
 &lt;/StackPanel&gt;
 </code></pre>
-<p>Avalonia view:</p>
-<pre><code class="language-xml">&lt;UserControl
-    xmlns=&quot;https://github.com/avaloniaui&quot;
-    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
-    xmlns:myControls=&quot;using:MyControls&quot;&gt;
-
-    &lt;StackPanel&gt;
-        &lt;myControls:UserCard
-            UserId=&quot;{Binding SelectedUserId}&quot;
-            Title=&quot;Profile&quot;
-            UserService=&quot;{Binding UserService}&quot; /&gt;
-    &lt;/StackPanel&gt;
-
-&lt;/UserControl&gt;
+<p>Conditions are ordinary C# boolean expressions, evaluated in order until the
+first successful branch. Nullable booleans need an explicit check such as
+<code>enabled == true</code>; values are not treated as JavaScript-like truthy values.</p>
+<p>A chain can have several <code>$else if (condition)</code> clauses and one final <code>$else</code>.
+<code>$else if</code> contains one <code>$</code>, not <code>$else $if</code>. Formatting whitespace can separate
+clauses, but another element or meaningful text ends the chain.</p>
+<p>Blocks may be empty or nested. Without a matching condition and without an
+<code>$else</code>, the statement contributes no child. The contents of a block are markup,
+not arbitrary C# statements or component declarations.</p>
+<h2 id="content-destinations">Content destinations<a class="header-anchor" href="javascript:;" onclick="location.hash='#content-destinations'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Statements belong inside an element body or a property-element body:</p>
+<pre><code class="language-akbura">&lt;Border&gt;
+    &lt;Border.Child&gt;
+        $if (expanded)
+        {
+            &lt;TextBlock Text=&quot;Expanded&quot; /&gt;
+        }
+        $else
+        {
+            &lt;Button&gt;Expand&lt;/Button&gt;
+        }
+    &lt;/Border.Child&gt;
+&lt;/Border&gt;
 </code></pre>
-<p>Akbura components therefore integrate into existing Avalonia applications without a wrapper or a separate hosting element.</p>
+<p>For a scalar property such as <code>Border.Child</code>, each possible active branch must
+contribute at most one compatible child. Two alternative children are not two
+simultaneous children. A branch containing two controls is still invalid; no
+hidden <code>StackPanel</code> is inserted to make it fit.</p>
+<p>Top-level conditionals that replace the component's root are outside this
+syntax contract. Add-only destinations also need an explicit reversible
+lifecycle contract before reactive switching can be supported.</p>
+<h2 id="templates">Templates<a class="header-anchor" href="javascript:;" onclick="location.hash='#templates'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Conditional content can appear beneath a stable root:</p>
+<pre><code class="language-akbura">&lt;ItemsControl.ItemTemplate x.DataType=&quot;Person&quot; x.ItemName=&quot;person&quot;&gt;
+    &lt;Border&gt;
+        $if (person is { Selected: true })
+        {
+            &lt;TextBlock Text={person.Name} /&gt;
+        }
+    &lt;/Border&gt;
+&lt;/ItemsControl.ItemTemplate&gt;
+</code></pre>
+<p>Each built instance owns separate branch storage. Parent updates refresh its
+active content without sharing controls or branch selection between instances.
+Removing an instance releases its conditional resources. In this example the
+stable root is the <code>Border</code> written in the template, not an extra wrapper
+inserted by the compiler.</p>
+<p>A typed <code>IDataTemplate</code> destination, native <code>DataTemplate.Content</code>, or native
+<code>ControlTemplate.Content</code> can also select the entire returned control:</p>
+<pre><code class="language-akbura">&lt;ContentControl.ContentTemplate x.DataType=&quot;Person&quot; x.ItemName=&quot;person&quot;&gt;
+    $if (person is { Selected: true })
+    {
+        &lt;TextBlock Text={person.Name} /&gt;
+    }
+    $else if (person is { CanEdit: true })
+    {
+        &lt;Button&gt;Edit&lt;/Button&gt;
+    }
+&lt;/ContentControl.ContentTemplate&gt;
+</code></pre>
+<p>An inactive chain can return no control. Each possible active branch still
+contributes at most one compatible control. Switching the selected root updates
+the native <code>ContentPresenter</code> or templated-control host; a nonvisual per-instance
+coordinator stores its lifetime, and no hidden visual wrapper is added. Native
+data-template matching and the per-instance name scope remain in use.
+Native generic data-template matching can accept <code>null</code> for a reference data
+type. Guard nullable data in the condition rather than relying on the adapter
+to change that matching contract.</p>
+<p>Whole-root factories require their actual native host. A standalone manual
+<code>IDataTemplate.Build</code> call without that host does not create a provisional
+control. Custom template contracts and hosts that do not provide this bridge
+are not supported; unsupported deferred destinations are diagnosed rather than
+silently dropping their content.</p>
+<p>Render locals used by a retained conditional template are read from the current
+parent render, including nullable values and later assignments in that render.
+Pattern and <code>out</code> variables from an enclosing conditional are captured from
+the currently reached branch; separate template instances retain separate
+item contexts.
+Capturing anonymous, ref-like, or pointer types into this retained storage is
+currently unsupported and diagnosed. Ordinary parent expressions do not acquire
+this additional capture restriction.</p>
+<p>Conditional assignment of complete <code>DataTemplate</code> objects to a template
+property is a different operation and remains allowed. Such an assignment is
+evaluated outside the template build: its conditions, assignment values, and
+template headers cannot read an item alias declared only on that same
+destination. An enclosing template's item alias
+remains available in its normal scope.</p>
+<h2 id="c-and-branch-local-scope">C# and branch-local scope<a class="header-anchor" href="javascript:;" onclick="location.hash='#c-and-branch-local-scope'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Parameters, reactive state, imports, and existing item/data contexts remain
+available to conditions and active content. Pattern variables belong to their
+C# branch scope:</p>
+<pre><code class="language-akbura">&lt;StackPanel&gt;
+    $if (model is Person person)
+    {
+        &lt;TextBlock Text={person.Name} /&gt;
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The editor uses the same connected C# projection for condition checks and branch
+expressions. It does not invent a second set of binding rules. Changing an
+ancestor condition refreshes completion for its descendants, even when their
+text is unchanged.</p>
+<p>An <code>x.Name</code> declared in a conditional branch is branch-local, including access
+from nested branches. Native element-name bindings and template <code>PART</code> lookup
+use that branch's name scope; separate template instances do not share names.
+Inner names shadow enclosing names and do not become visible in the enclosing
+scope. Do not assume a non-null, unconditional accessor outside that branch.
+Parent hooks must be called unconditionally outside conditional
+expressions; branch switching does not reset the parent's hook frame.</p>
+<h2 id="lifetime-contract">Lifetime contract<a class="header-anchor" href="javascript:;" onclick="location.hash='#lifetime-contract'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Only the active branch creates controls, bindings, event handlers, and markup
+extension results. While that branch remains active, its dynamic properties
+continue updating and compatible controls are retained. Inactive alternatives
+are not eagerly constructed.</p>
+<p>The default exit policy is unmount, not keep-alive: switching <code>A → B → A</code>
+creates a new A. Parent state is retained, but control-local input from the
+previous A is not promised after leaving it. Hot Reload reconciliation of a
+still-active branch is a separate operation from an ordinary condition toggle.</p>
+<h2 id="editor-support">Editor support<a class="header-anchor" href="javascript:;" onclick="location.hash='#editor-support'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Directive completion is available in markup content. <code>$else if</code> and <code>$else</code> are
+offered only after an eligible chain. Conditions and branch expressions use C#
+completion, symbol information, and source-mapped navigation. Braces and
+parentheses participate in pairing, indentation, and folding.</p>
+<p><code>${Binding ...}</code> remains a markup extension; <code>&quot;$if&quot;</code> in an attribute remains a
+string. To render literal directive-looking text in content, use an existing
+inline string expression such as <code>{&quot;$if&quot;}</code>.</p>
+<p>See <a href="/#components-and-markup">Components and Markup</a>,
+<a href="/#parameters">Parameters</a>, and <a href="/#binding">Binding</a> for the surrounding language
+rules.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/index.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/conditional-markup.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
 
 					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/#dictionary-resources" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												Dictionary Resources
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+											<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Avalonia Styles
+												<!-- Heroicon name: mini/arrow-long-right -->
+												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+												</svg>
+											</a>
+									</div>
+								</nav>
 					</div>
 			</div>
 				
@@ -475,33 +436,33 @@ useEffect(async () =&gt;
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#basic-usage'" data-id="basic-usage" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Basic usage
+										<span v-hash="'#syntax'" data-id="syntax" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Syntax
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#passing-parameters'" data-id="passing-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Passing parameters
+										<span v-hash="'#content-destinations'" data-id="content-destinations" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Content destinations
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#binding-parameters'" data-id="binding-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Binding parameters
+										<span v-hash="'#templates'" data-id="templates" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Templates
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#passing-injected-services'" data-id="passing-injected-services" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Passing injected services
+										<span v-hash="'#c-and-branch-local-scope'" data-id="c-and-branch-local-scope" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											C# and branch-local scope
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#setting-services-from-code'" data-id="setting-services-from-code" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Setting services from code
+										<span v-hash="'#lifetime-contract'" data-id="lifetime-contract" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Lifetime contract
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#complete-example'" data-id="complete-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Complete example
+										<span v-hash="'#editor-support'" data-id="editor-support" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Editor support
 										</span>
 									</li>
 							</ul>

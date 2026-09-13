@@ -27,5 +27,7 @@ internal interface IUseHookOperation : IOperation
 
     bool HasPropertyArgumentSubstitution { get; }
 
+    ImmutableArray<UseHookStateArgument> StateArguments { get; }
+
     ICSharpOperation? InvocationOperation { get; }
 }

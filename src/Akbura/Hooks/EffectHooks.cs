@@ -5,228 +5,228 @@ namespace Akbura.Hooks;
 public static class EffectHooks
 {
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Action effect) =>
+    public static void useEffect([Self] this AkburaControl control, Action effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Action effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Action effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Action<CancellationToken> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Action<CancellationToken> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Action<CancellationToken> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Action<CancellationToken> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<Action?> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<Action?> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Action?> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Action?> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<CancellationToken, Action?> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<CancellationToken, Action?> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Action?> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Action?> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<IDisposable?> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<IDisposable?> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<IDisposable?> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<IDisposable?> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<CancellationToken, IDisposable?> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<CancellationToken, IDisposable?> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, IDisposable?> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, IDisposable?> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<Task> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<Task> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Task> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Task> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<CancellationToken, Task> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<CancellationToken, Task> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Task> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Task> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<Task<Action?>> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<Task<Action?>> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Task<Action?>> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Task<Action?>> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<CancellationToken, Task<Action?>> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<CancellationToken, Task<Action?>> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Task<Action?>> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Task<Action?>> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<Task<IDisposable?>> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<Task<IDisposable?>> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Task<IDisposable?>> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<Task<IDisposable?>> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>
         Register(control, effect, Normalize(effect), dependencies, comparer);
 
     [UseHook]
-    public static void useEffect([Self] AkburaControl control, Func<CancellationToken, Task<IDisposable?>> effect) =>
+    public static void useEffect([Self] this AkburaControl control, Func<CancellationToken, Task<IDisposable?>> effect) =>
         Register(control, effect, Normalize(effect));
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Task<IDisposable?>> effect,
         ReadOnlySpan<object?> dependencies) =>
         Register(control, effect, Normalize(effect), dependencies);
 
     [UseHook]
     public static void useEffect(
-        [Self] AkburaControl control,
+        [Self] this AkburaControl control,
         Func<CancellationToken, Task<IDisposable?>> effect,
         ReadOnlySpan<object?> dependencies,
         IUseHookDependenciesComparer comparer) =>

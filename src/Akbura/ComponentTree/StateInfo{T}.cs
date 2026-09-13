@@ -34,6 +34,13 @@ public sealed class StateInfo<T> : StateInfo
 
     internal State<T> CreateTypedState(AkburaControl owner)
     {
+        var state = CreateUnattachedState(owner);
+        state.Attach(owner, this);
+        return state;
+    }
+
+    internal State<T> CreateUnattachedState(AkburaControl owner)
+    {
         ArgumentNullException.ThrowIfNull(owner);
 
         var state = _stateFactory != null
@@ -45,7 +52,6 @@ public sealed class StateInfo<T> : StateInfo
                 $"State factory for '{Name}' returned null.");
         }
 
-        state.Attach(owner, this);
         return state;
     }
 

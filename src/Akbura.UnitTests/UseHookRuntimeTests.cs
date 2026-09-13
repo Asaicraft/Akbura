@@ -19,7 +19,7 @@ public sealed class UseHookRuntimeTests
         {
             RenderFrame = control =>
             {
-                EffectHooks.useEffect(control, (Action)(() => control.EveryRenderCount++));
+                control.useEffect((Action)(() => control.EveryRenderCount++));
                 EffectHooks.useEffect(control, (Action)(() => control.FirstRenderCount++), []);
             },
         };
@@ -39,8 +39,7 @@ public sealed class UseHookRuntimeTests
         var component = new HookComponent
         {
             Dependency = 1,
-            RenderFrame = control => EffectHooks.useEffect(
-                control,
+            RenderFrame = control => control.useEffect(
                 (Action)(() => control.EffectRuns++),
                 [control.Dependency]),
         };
@@ -61,8 +60,7 @@ public sealed class UseHookRuntimeTests
         var component = new HookComponent
         {
             Dependency = 1,
-            RenderFrame = control => EffectHooks.useEffect(
-                control,
+            RenderFrame = control => control.useEffect(
                 (Action)(() => control.EffectRuns++),
                 [control.Dependency],
                 comparer),
@@ -84,8 +82,7 @@ public sealed class UseHookRuntimeTests
         var component = new HookComponent
         {
             Dependency = 1,
-            RenderFrame = control => EffectHooks.useEffect(
-                control,
+            RenderFrame = control => control.useEffect(
                 (Func<CancellationToken, Action?>)(cancellationToken =>
                 {
                     var dependency = control.Dependency;
@@ -440,7 +437,7 @@ public sealed class UseHookRuntimeTests
     }
 
     [Fact]
-    public void InitialFrame_FactoryFailureCleansUpCreatedSlotsAndCanRetry()
+    public void InitialFrame_FactoryFailureCleansUpCreatedSlotsWithoutApplyingEffectsAndCanRetry()
     {
         var runtime = new UseHookRuntime(new HookComponent());
         var firstKey = new UseHookKey();
@@ -465,7 +462,7 @@ public sealed class UseHookRuntimeTests
         Assert.Throws<ExpectedFactoryException>(runtime.CompleteFrame);
         Assert.False(runtime.HasSlots);
         Assert.Equal(1, creations);
-        Assert.Equal(1, applications);
+        Assert.Equal(0, applications);
         Assert.Equal(1, detachments);
 
         runtime.BeginFrame();
@@ -478,12 +475,12 @@ public sealed class UseHookRuntimeTests
 
         Assert.True(runtime.HasSlots);
         Assert.Equal(2, creations);
-        Assert.Equal(2, applications);
+        Assert.Equal(1, applications);
         Assert.Equal(1, detachments);
     }
 
     [Fact]
-    public void InitialFrame_ApplyFailureCleansUpItsStateAndCanRetry()
+    public void InitialFrame_ApplyFailureStopsCommittedSlotsAndCanRetry()
     {
         var runtime = new UseHookRuntime(new HookComponent());
         var key = new UseHookKey();
@@ -507,7 +504,9 @@ public sealed class UseHookRuntimeTests
             () => detachments++));
 
         Assert.Throws<ExpectedApplyException>(runtime.CompleteFrame);
-        Assert.False(runtime.HasSlots);
+        Assert.True(runtime.HasSlots);
+        Assert.True(runtime.IsFrameCommitted);
+        Assert.True(runtime.NeedsRestart);
         Assert.Equal(1, creations);
         Assert.Equal(1, applications);
         Assert.Equal(1, detachments);
@@ -522,7 +521,8 @@ public sealed class UseHookRuntimeTests
         runtime.CompleteFrame();
 
         Assert.True(runtime.HasSlots);
-        Assert.Equal(2, creations);
+        Assert.False(runtime.NeedsRestart);
+        Assert.Equal(1, creations);
         Assert.Equal(2, applications);
         Assert.Equal(1, detachments);
     }

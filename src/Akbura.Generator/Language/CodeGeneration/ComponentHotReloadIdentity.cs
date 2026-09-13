@@ -68,12 +68,14 @@ internal static class ComponentHotReloadIdentity
     public static string CreateStateKey(
         string name,
         ITypeSymbol type,
-        ComponentStateFactoryKind factoryKind)
+        ComponentStateFactoryKind factoryKind,
+        bool isComposable = false)
     {
         return "state:" +
             name + ":" +
             GetTypeIdentity(type) + ":" +
-            (factoryKind == ComponentStateFactoryKind.State ? "state" : "value");
+            (isComposable ? "hook" :
+                factoryKind == ComponentStateFactoryKind.State ? "state" : "value");
     }
 
     public static string CreateGeneratedName(string name, string identity)

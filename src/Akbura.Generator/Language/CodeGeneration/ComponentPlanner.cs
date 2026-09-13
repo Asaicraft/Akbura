@@ -566,7 +566,8 @@ internal static class ComponentPlanner
                             hook.EffectiveInvocation,
                             syntax,
                             ComponentRenderStatementPhase.Update,
-                            hookMethod: hook.Method));
+                            hookMethod: hook.Method,
+                            stateArguments: hook.StateArguments));
                     }
 
                     continue;

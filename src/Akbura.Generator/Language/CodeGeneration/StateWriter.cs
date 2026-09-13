@@ -222,6 +222,15 @@ internal readonly ref struct StateWriter
         GeneratedMemberNameWriter.WriteStateField(
             _writer,
             plan.GeneratedName);
+        if (plan.IsComposable)
+        {
+            _writer.WriteLine(" ?? throw new global::System.InvalidOperationException(");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.WriteLine("\"The composed hook state is not prepared for this frame.\");");
+            _writer.CurrentIndent -= _writer.TabSize * 2;
+            return;
+        }
+
         _writer.Write(" ??= CreateState(");
         GeneratedMemberNameWriter.WriteStateInfoField(
             _writer,
@@ -322,7 +331,7 @@ internal readonly ref struct StateWriter
     {
         if (plan.HookMethod is { } method)
         {
-            _hookWriter.Write(method, (InvocationExpressionSyntax)plan.Initializer);
+            _hookWriter.Write(method, (InvocationExpressionSyntax)plan.Initializer, plan.StateArguments);
         }
         else
         {

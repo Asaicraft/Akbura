@@ -20,7 +20,8 @@ internal sealed class BoundUseHookInvocation : BoundExpression
         ImmutableArray<BoundExpression> effectiveArguments,
         bool hasSyntheticSelf,
         bool hasPropertyArgumentSubstitution,
-        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
+        ImmutableArray<UseHookStateArgument> stateArguments = default)
         : base(
             BoundKind.UseHookInvocation,
             syntax,
@@ -40,6 +41,9 @@ internal sealed class BoundUseHookInvocation : BoundExpression
             : effectiveArguments;
         HasSyntheticSelf = hasSyntheticSelf;
         HasPropertyArgumentSubstitution = hasPropertyArgumentSubstitution;
+        StateArguments = stateArguments.IsDefault
+            ? ImmutableArray<UseHookStateArgument>.Empty
+            : stateArguments;
     }
 
     public IUseHookSymbol Hook { get; }
@@ -55,6 +59,8 @@ internal sealed class BoundUseHookInvocation : BoundExpression
     public bool HasSyntheticSelf { get; }
 
     public bool HasPropertyArgumentSubstitution { get; }
+
+    public ImmutableArray<UseHookStateArgument> StateArguments { get; }
 
     public ImmutableArray<ITypeSymbol> TypeArguments => Hook.Method.TypeArguments;
 
@@ -82,7 +88,8 @@ internal sealed class BoundUseHookInvocation : BoundExpression
             effectiveArguments,
             HasSyntheticSelf,
             HasPropertyArgumentSubstitution,
-            Diagnostics);
+            Diagnostics,
+            StateArguments);
     }
 
     public override void Accept(BoundTreeVisitor visitor)

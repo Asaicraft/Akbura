@@ -4,6 +4,7 @@ using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -236,13 +237,19 @@ internal static class ComponentMemberPlanner
                     : ComponentStateFlags.None;
                 var factoryKind = ComponentStateFactoryKind.Value;
                 IMethodSymbol? hookMethod = null;
+                var stateArguments = ImmutableArray<UseHookStateArgument>.Empty;
 
                 if (_semanticModel.GetOperation(state.InitializerSyntax) is IUseHookOperation hook)
                 {
                     initializer = hook.EffectiveInvocation;
                     hookMethod = hook.Method;
+                    stateArguments = hook.StateArguments;
                     factoryKind = ComponentStateFactoryKind.State;
                     flags |= ComponentStateFlags.UsesHook;
+                    if (!ComponentStatePlan.IsInitializerHook(hook.Method))
+                    {
+                        flags |= ComponentStateFlags.IsComposable;
+                    }
                 }
 
                 _states.Add(new ComponentStatePlan(
@@ -254,7 +261,8 @@ internal static class ComponentMemberPlanner
                     flags,
                     initializer,
                     state.DeclarationSyntax,
-                    hookMethod));
+                    hookMethod,
+                    stateArguments));
             }
         }
 

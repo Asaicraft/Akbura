@@ -456,12 +456,40 @@ internal sealed class AkburaOperationFactory : IOperationFactory
 
     private IUseHookOperation CreateUseHookOperation(BoundUseHookInvocation boundNode)
     {
+        var symbolMapper = CreateCSharpOperationSymbolMapper(
+            boundNode.Syntax,
+            containingAkcssSymbol: null);
         var csharpOperation = CreateCSharpOperationTree(
             boundNode.Syntax,
             boundNode.BindingResult.OperationDefinition,
-            CreateCSharpOperationSymbolMapper(
-                boundNode.Syntax,
-                containingAkcssSymbol: null));
+            symbol =>
+            {
+                foreach (var stateArgument in boundNode.StateArguments)
+                {
+                    if (boundNode.EffectiveArguments[stateArgument.ArgumentIndex] is
+                            BoundCSharpExpression expression &&
+                        Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                            symbol,
+                            expression.BindingResult.Symbol))
+                    {
+                        return stateArgument.State;
+                    }
+                }
+
+                if (symbol is Microsoft.CodeAnalysis.IParameterSymbol
+                    {
+                        ContainingSymbol: Microsoft.CodeAnalysis.IMethodSymbol
+                        {
+                            MethodKind: Microsoft.CodeAnalysis.MethodKind.AnonymousFunction or
+                                Microsoft.CodeAnalysis.MethodKind.LocalFunction,
+                        },
+                    })
+                {
+                    return null;
+                }
+
+                return symbolMapper(symbol);
+            });
         return new UseHookOperation(
             boundNode.Syntax,
             boundNode.Hook,
@@ -471,7 +499,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             boundNode.HasSyntheticSelf,
             boundNode.HasPropertyArgumentSubstitution,
             boundNode.HasErrors,
-            csharpOperation);
+            csharpOperation,
+            boundNode.StateArguments);
     }
 
     private ICSharpOperation? CreateCSharpStatementOperation(BoundCSharpStatement boundNode)

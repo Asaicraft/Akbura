@@ -152,7 +152,8 @@ internal sealed class UseHookBinder : Binder
                 invocation,
                 hookTypes,
                 attempt.InjectSelf,
-                attempt.RewritePropertyArguments);
+                attempt.RewritePropertyArguments,
+                attempt.RewriteStateArguments);
             var probeScore = GetProbeScore(
                 hookTypes,
                 invocationName,
@@ -237,7 +238,8 @@ internal sealed class UseHookBinder : Binder
                 probe.EffectiveArguments,
                 probe.HasSyntheticSelf,
                 probe.HasPropertyArgumentSubstitution,
-                diagnostics);
+                diagnostics,
+                probe.StateArguments);
             return true;
         }
 
@@ -304,6 +306,16 @@ internal sealed class UseHookBinder : Binder
         if (probe.HasPropertyArgumentSubstitution)
         {
             score++;
+        }
+
+        if (!probe.StateArguments.IsEmpty)
+        {
+            score++;
+        }
+
+        if (probe.BindingResult.CandidateReason == Symbols.CandidateReason.Ambiguous)
+        {
+            score += 2;
         }
 
         return score;
@@ -596,7 +608,8 @@ internal sealed class UseHookBinder : Binder
                 invocation,
                 hookTypes,
                 attempt.InjectSelf,
-                attempt.RewritePropertyArguments);
+                attempt.RewritePropertyArguments,
+                attempt.RewriteStateArguments);
             if (probe.Method != null &&
                 HasAttribute(probe.Method, UseHookAttributeMetadataName))
             {
@@ -720,6 +733,21 @@ internal sealed class UseHookBinder : Binder
         CSharpBindingResult bindingResult)
     {
         using var builder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        if (bindingResult.CandidateReason == Symbols.CandidateReason.Ambiguous &&
+            bindingResult.Diagnostics.IsEmpty)
+        {
+            builder.Add(new AkburaSemanticDiagnostic(
+                syntax,
+                ErrorCodes.AKBURA_SEMANTIC_CSharpExpressionError,
+                [
+                    invocation.WithoutLeadingTrivia().ToFullString().Trim(),
+                    "The call is ambiguous after state argument adaptation: " +
+                        string.Join(", ", bindingResult.CandidateSymbols.Select(
+                            static symbol => symbol.ToDisplayString())),
+                ]));
+            return builder.ToImmutable();
+        }
+
         AkburaSemanticModel.AddCSharpBindingDiagnostics(
             syntax,
             invocation.WithoutLeadingTrivia().ToFullString().Trim(),
@@ -817,6 +845,10 @@ internal sealed class UseHookBinder : Binder
         new(InjectSelf: false, RewritePropertyArguments: true),
         new(InjectSelf: true, RewritePropertyArguments: false),
         new(InjectSelf: true, RewritePropertyArguments: true),
+        new(InjectSelf: false, RewritePropertyArguments: false, RewriteStateArguments: true),
+        new(InjectSelf: false, RewritePropertyArguments: true, RewriteStateArguments: true),
+        new(InjectSelf: true, RewritePropertyArguments: false, RewriteStateArguments: true),
+        new(InjectSelf: true, RewritePropertyArguments: true, RewriteStateArguments: true),
     ];
 
     private enum UseHookContext : byte
@@ -827,7 +859,8 @@ internal sealed class UseHookBinder : Binder
 
     private readonly record struct UseHookBindingAttempt(
         bool InjectSelf,
-        bool RewritePropertyArguments);
+        bool RewritePropertyArguments,
+        bool RewriteStateArguments = false);
 }
 
 internal readonly struct UseHookInitializerBinding

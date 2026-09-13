@@ -35,7 +35,7 @@ internal readonly ref struct ComponentRenderStatementWriter
 
             case ComponentRenderStatementKind.UseHookInvocation:
                 AkburaDebug.Assert(plan.HookMethod != null);
-                _hookWriter.Write(plan.HookMethod, (InvocationExpressionSyntax)plan.Node);
+                _hookWriter.Write(plan.HookMethod, (InvocationExpressionSyntax)plan.Node, plan.StateArguments);
                 _writer.WriteLine(";");
                 return;
 

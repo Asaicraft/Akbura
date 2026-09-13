@@ -202,6 +202,15 @@ internal readonly ref struct ComponentLifecycleWriter
         {
             WriteBeginRenderRevision();
             _writer.WriteLine();
+            _writer.Write("if (!");
+            _writer.Write(RenderRevisionChangedLocalName);
+            _writer.WriteLine(")");
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+            WriteReturnRoot(plan);
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("}");
+            _writer.WriteLine();
             WriteRenderRevisionTryStart();
         }
 

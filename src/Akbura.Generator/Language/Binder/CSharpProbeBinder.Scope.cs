@@ -480,7 +480,8 @@ internal sealed partial class CSharpProbeBinder
         string name,
         CSharpSymbolDefinition type,
         AkburaSymbol? sourceSymbol,
-        string? annotationKind = null)
+        string? annotationKind = null,
+        SymbolDisplayFormat? typeDisplayFormat = null)
     {
         if (string.IsNullOrWhiteSpace(name) ||
             type.Symbol is not ITypeSymbol typeSymbol)
@@ -489,7 +490,7 @@ internal sealed partial class CSharpProbeBinder
         }
 
         var typeSyntax = CSharpSyntaxFactory.ParseTypeName(
-            typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            typeSymbol.ToDisplayString(typeDisplayFormat ?? SymbolDisplayFormat.FullyQualifiedFormat));
         var declarator = CSharpSyntaxFactory.VariableDeclarator(
                 CSharpSyntaxFactory.Identifier(name))
             .WithInitializer(CSharpSyntaxFactory.EqualsValueClause(

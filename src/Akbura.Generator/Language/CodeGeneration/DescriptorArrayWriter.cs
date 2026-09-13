@@ -36,6 +36,9 @@ internal readonly ref struct DescriptorArrayWriter
         WriteStateCache(plan.States.AsSpan());
         _writer.WriteLine();
         WriteGetters();
+        _writer.WriteLine();
+        var hooks = new ComponentHookStateWriter(_writer);
+        hooks.Write(plan);
     }
 
     public void WriteHotReloadAssignments(in ComponentMemberPlan plan)

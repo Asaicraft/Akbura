@@ -1,3 +1,5 @@
+using Akbura.ComponentTree;
+
 namespace Akbura.Hooks;
 
 internal interface IUseHookRegistration
@@ -55,7 +57,7 @@ internal readonly struct DelegateUseHookRegistration<TState, TArguments> : IUseH
                 "A use hook runtime state factory returned null.");
         }
 
-        return new DelegateUseHookSlot<TState>(Key, state);
+        return new DelegateUseHookSlot<TState>(Key, state, _detach);
     }
 
     public void Apply(IUseHookSlot slot)
@@ -72,10 +74,11 @@ internal sealed class DelegateUseHookSlot<TState> : IUseHookSlot
     private Action<TState>? _detach;
     private bool _isDetached;
 
-    public DelegateUseHookSlot(UseHookKey key, TState state)
+    public DelegateUseHookSlot(UseHookKey key, TState state, Action<TState>? detach)
     {
         Key = key;
         _state = state;
+        _detach = detach;
     }
 
     public UseHookKey Key { get; }
@@ -111,6 +114,9 @@ internal sealed class UseHookRuntime
     private List<IUseHookSlot>? _slots;
     private bool _isCollecting;
     private bool _isCompleting;
+    private bool _isInitializingState;
+    private int _frameThreadId;
+    private int _lifecycleCallbackDepth;
     private bool _needsRestart;
     private bool _isSuspended;
     private bool _resetForHotReloadPending;
@@ -124,6 +130,8 @@ internal sealed class UseHookRuntime
 
     public bool NeedsRestart => _needsRestart;
 
+    public bool IsFrameCommitted { get; private set; }
+
     public void BeginFrame()
     {
         if (_isCollecting || _isCompleting)
@@ -132,20 +140,123 @@ internal sealed class UseHookRuntime
         }
 
         _pending.Clear();
+        IsFrameCommitted = false;
+        _frameThreadId = Environment.CurrentManagedThreadId;
         _isCollecting = true;
     }
 
     public void Register(IUseHookRegistration registration)
     {
-        if (!_isCollecting)
-        {
-            throw new AkburaUseHookOutsideRenderException(_owner);
-        }
-
+        EnsureCollecting();
         _pending.Add(registration);
     }
 
-    public void CompleteFrame()
+    public State<T> GetState<T>(StateInfo<T> info, T initialValue)
+    {
+        return GetState(info, initialValue, static (_, value) => new State<T>(value));
+    }
+
+    public State<T> GetState<T>(StateInfo<T> info, Func<T> initialize)
+    {
+        ArgumentNullException.ThrowIfNull(initialize);
+        return GetState(info, initialize, static (_, factory) => new State<T>(factory()));
+    }
+
+    public State<T> GetState<T>(StateInfo<T> info)
+    {
+        return GetState(info, info, static (owner, descriptor) => descriptor.CreateUnattachedState(owner));
+    }
+
+    public void ValidateStateAlias(State state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        EnsureCollecting();
+        if (state.IsOwnedBy(_owner))
+        {
+            return;
+        }
+
+        for (var index = 0; index < _pending.Count; index++)
+        {
+            if (_pending[index] is IHookStateSlot slot && ReferenceEquals(slot.UntypedState, state))
+            {
+                return;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "A composable hook must return a state owned by its component or created by useHookState.");
+    }
+
+    private State<T> GetState<T, TArgument>(
+        StateInfo<T> info,
+        TArgument argument,
+        Func<AkburaControl, TArgument, State<T>> createState)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        EnsureCollecting();
+
+        HookStateSlot<T> slot;
+        if (_slots != null)
+        {
+            var index = _pending.Count;
+            if (index >= _slots.Count ||
+                _slots[index] is not HookStateSlot<T> existing ||
+                !ReferenceEquals(existing.Info, info))
+            {
+                throw new AkburaUseHooksFrameChangedException(
+                    _owner,
+                    _slots.Count,
+                    index + 1,
+                    index);
+            }
+
+            slot = existing;
+        }
+        else
+        {
+            if (_isSuspended)
+            {
+                throw new InvalidOperationException(
+                    "A new hook state cannot be created while its component is detached.");
+            }
+
+            _isInitializingState = true;
+            try
+            {
+                var state = createState(_owner, argument);
+                if (state.IsAttached)
+                {
+                    throw new InvalidOperationException(
+                        "A hook state factory must return an unattached state.");
+                }
+
+                slot = new HookStateSlot<T>(info, state);
+            }
+            finally
+            {
+                _isInitializingState = false;
+            }
+        }
+
+        _pending.Add(slot);
+        return slot.State;
+    }
+
+    private void EnsureCollecting()
+    {
+        if (!_isCollecting ||
+            _isInitializingState ||
+            _lifecycleCallbackDepth != 0 ||
+            _frameThreadId != Environment.CurrentManagedThreadId)
+        {
+            throw new AkburaUseHookOutsideRenderException(_owner);
+        }
+    }
+
+    public void CompleteFrame() => CompleteFrame(null);
+
+    public void CompleteFrame(Action? commitFrame)
     {
         if (!_isCollecting)
         {
@@ -160,6 +271,16 @@ internal sealed class UseHookRuntime
             ValidateFrame();
             if (_isSuspended)
             {
+                if (_slots != null)
+                {
+                    IsFrameCommitted = true;
+                    commitFrame?.Invoke();
+                }
+                else
+                {
+                    _needsRestart = true;
+                }
+
                 if (_resetForHotReloadPending)
                 {
                     ResetForHotReloadCore();
@@ -172,12 +293,12 @@ internal sealed class UseHookRuntime
             {
                 _slots = CreateInitialSlots();
             }
-            else
-            {
-                ApplyExistingSlots(_slots);
-            }
 
-            _needsRestart = false;
+            IsFrameCommitted = true;
+            commitFrame?.Invoke();
+            ApplyExistingSlots(_slots);
+
+            _needsRestart = _isSuspended && _slots.Count != 0;
             if (_resetForHotReloadPending)
             {
                 ResetForHotReloadCore();
@@ -248,6 +369,7 @@ internal sealed class UseHookRuntime
 
         List<Exception>? failures = null;
         StopSlots(slots, ref failures);
+        ReleaseStates(slots);
         UseHookFailures.ThrowIfAny(
             failures,
             "One or more use hooks could not be reset for Hot Reload.");
@@ -264,7 +386,14 @@ internal sealed class UseHookRuntime
                 var registration = _pending[index];
                 var slot = registration.CreateSlot();
                 slots.Add(slot);
-                registration.Apply(slot);
+            }
+
+            for (var index = 0; index < slots.Count; index++)
+            {
+                if (slots[index] is IHookStateSlot stateSlot)
+                {
+                    stateSlot.Attach(_owner);
+                }
             }
 
             return slots;
@@ -274,6 +403,7 @@ internal sealed class UseHookRuntime
             List<Exception>? failures = null;
             UseHookFailures.Capture(ref failures, exception);
             StopSlots(slots, ref failures);
+            ReleaseStates(slots);
             UseHookFailures.ThrowIfAny(
                 failures,
                 "A use hook frame could not be created or cleaned up.");
@@ -287,6 +417,11 @@ internal sealed class UseHookRuntime
         {
             for (var index = 0; index < _pending.Count; index++)
             {
+                if (_isSuspended)
+                {
+                    break;
+                }
+
                 _pending[index].Apply(slots[index]);
             }
         }
@@ -303,19 +438,38 @@ internal sealed class UseHookRuntime
         }
     }
 
-    private static void StopSlots(
+    private void StopSlots(
         List<IUseHookSlot> slots,
         ref List<Exception>? failures)
     {
+        _lifecycleCallbackDepth++;
+        try
+        {
+            for (var index = 0; index < slots.Count; index++)
+            {
+                try
+                {
+                    slots[index].StopForDetach();
+                }
+                catch (Exception exception)
+                {
+                    UseHookFailures.Capture(ref failures, exception);
+                }
+            }
+        }
+        finally
+        {
+            _lifecycleCallbackDepth--;
+        }
+    }
+
+    private void ReleaseStates(List<IUseHookSlot> slots)
+    {
         for (var index = 0; index < slots.Count; index++)
         {
-            try
+            if (slots[index] is IHookStateSlot stateSlot)
             {
-                slots[index].StopForDetach();
-            }
-            catch (Exception exception)
-            {
-                UseHookFailures.Capture(ref failures, exception);
+                stateSlot.Release(_owner);
             }
         }
     }
@@ -338,7 +492,9 @@ internal sealed class UseHookRuntime
         for (var index = 0; index < _slots.Count; index++)
         {
             if (!ReferenceEquals(_slots[index].Key, _pending[index].Key) ||
-                _slots[index].StateType != _pending[index].StateType)
+                _slots[index].StateType != _pending[index].StateType ||
+                _slots[index] is IHookStateSlot &&
+                !ReferenceEquals(_slots[index], _pending[index]))
             {
                 throw new AkburaUseHooksFrameChangedException(
                     _owner,
@@ -347,5 +503,49 @@ internal sealed class UseHookRuntime
                     index);
             }
         }
+    }
+}
+
+internal interface IHookStateSlot : IUseHookSlot
+{
+    State UntypedState { get; }
+
+    void Attach(AkburaControl owner);
+
+    void Release(AkburaControl owner);
+}
+
+internal sealed class HookStateSlot<T> : IHookStateSlot, IUseHookRegistration
+{
+    private static readonly UseHookKey s_key = new();
+
+    public HookStateSlot(StateInfo<T> info, State<T> state)
+    {
+        Info = info;
+        State = state;
+    }
+
+    public StateInfo<T> Info { get; }
+
+    public State<T> State { get; }
+
+    public State UntypedState => State;
+
+    public UseHookKey Key => s_key;
+
+    public Type StateType => typeof(State<T>);
+
+    public IUseHookSlot CreateSlot() => this;
+
+    public void Apply(IUseHookSlot slot)
+    {
+    }
+
+    public void Attach(AkburaControl owner) => State.Attach(owner, Info);
+
+    public void Release(AkburaControl owner) => State.Detach(owner);
+
+    public void StopForDetach()
+    {
     }
 }

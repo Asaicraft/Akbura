@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using System.Collections;
+using System.Collections.Immutable;
 using System.Globalization;
 
 namespace Akbura.Diagnostics;
@@ -14,6 +15,7 @@ internal partial class DiagnosticsRoot : AkburaControl
 {
     private readonly Dictionary<TreeViewItem, AkburaControl> _componentByItem = [];
     private AkburaControl? _selectedComponent;
+    private ImmutableArray<State> _selectedStates = [];
     private bool _isAttached;
     private bool _isRenderingDetails;
 
@@ -201,6 +203,7 @@ internal partial class DiagnosticsRoot : AkburaControl
     {
         if (ReferenceEquals(_selectedComponent, component))
         {
+            UpdateSelectedStateSubscriptions();
             RenderDetails();
             return;
         }
@@ -208,22 +211,43 @@ internal partial class DiagnosticsRoot : AkburaControl
         if (_selectedComponent != null)
         {
             _selectedComponent.PropertyChanged -= OnSelectedPropertyChanged;
-            foreach (var state in _selectedComponent.GetDiagnosticStates())
-            {
-                state.ValueChanged -= OnSelectedStateChanged;
-            }
+            _selectedComponent.DiagnosticStatesChanged -= OnSelectedDiagnosticStatesChanged;
         }
 
         _selectedComponent = component;
         if (_selectedComponent != null)
         {
             _selectedComponent.PropertyChanged += OnSelectedPropertyChanged;
-            foreach (var state in _selectedComponent.GetDiagnosticStates())
-            {
-                state.ValueChanged += OnSelectedStateChanged;
-            }
+            _selectedComponent.DiagnosticStatesChanged += OnSelectedDiagnosticStatesChanged;
         }
 
+        UpdateSelectedStateSubscriptions();
+        RenderDetails();
+    }
+
+    private void UpdateSelectedStateSubscriptions()
+    {
+        var states = _selectedComponent?.GetDiagnosticStates() ?? [];
+        if (_selectedStates == states)
+        {
+            return;
+        }
+
+        foreach (var state in _selectedStates)
+        {
+            state.ValueChanged -= OnSelectedStateChanged;
+        }
+
+        _selectedStates = states;
+        foreach (var state in _selectedStates)
+        {
+            state.ValueChanged += OnSelectedStateChanged;
+        }
+    }
+
+    private void OnSelectedDiagnosticStatesChanged()
+    {
+        UpdateSelectedStateSubscriptions();
         RenderDetails();
     }
 
@@ -309,9 +333,12 @@ internal partial class DiagnosticsRoot : AkburaControl
         }
         else
         {
-            foreach (var state in states)
+            for (var index = 0; index < states.Length; index++)
             {
-                section.Children.Add(CreateStateRow(component, state));
+                section.Children.Add(CreateStateRow(
+                    component,
+                    states[index],
+                    component.GetDiagnosticStateName(index)));
             }
         }
 
@@ -384,11 +411,12 @@ internal partial class DiagnosticsRoot : AkburaControl
 
     private Control CreateStateRow(
         AkburaControl component,
-        State state)
+        State state,
+        string name)
     {
         return CreateEditableRow(
             component,
-            state.Info?.Name ?? "State",
+            name,
             state.ValueType,
             $"initial {DebugString.Format(state.BoxedInitialValue)}",
             DataVariation.State,

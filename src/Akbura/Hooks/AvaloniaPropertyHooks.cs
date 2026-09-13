@@ -6,7 +6,7 @@ namespace Akbura.Hooks;
 
 public static class AvaloniaPropertyHooks
 {
-    [UseHook]
+    [UseHook(IsInitializer = true)]
     public static State<TValue> useAvaloniaProperty<TObject, TValue>(
         [Self] TObject control,
         AvaloniaProperty<TValue> property)
@@ -27,7 +27,7 @@ public static class AvaloniaPropertyHooks
         return state;
     }
 
-    [UseHook]
+    [UseHook(IsInitializer = true)]
     public static State<TValue> useAvaloniaProperty<TObject, TValue>(
         [Self] TObject control,
         Parameter<TValue> parameter)

@@ -1,5 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.CSharp;
+using Akbura.Language.Symbols;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -19,7 +22,10 @@ internal readonly ref struct UseHookInvocationWriter
         _syntaxWriter = new CSharpSyntaxWriter(writer);
     }
 
-    public void Write(IMethodSymbol method, InvocationExpressionSyntax invocation)
+    public void Write(
+        IMethodSymbol method,
+        InvocationExpressionSyntax invocation,
+        ImmutableArray<UseHookStateArgument> stateArguments = default)
     {
         AkburaDebug.Assert(method != null);
         AkburaDebug.Assert(invocation != null);
@@ -46,6 +52,26 @@ internal readonly ref struct UseHookInvocationWriter
             _writer.Write(">");
         }
 
-        _syntaxWriter.WriteArgumentList(invocation.ArgumentList);
+        var arguments = invocation.ArgumentList;
+        if (!stateArguments.IsDefaultOrEmpty)
+        {
+            foreach (var substitution in stateArguments)
+            {
+                var argument = arguments.Arguments[substitution.ArgumentIndex];
+                var state = substitution.State;
+                var isHook = state.UseHook != null;
+                var identity = ComponentHotReloadIdentity.CreateStateKey(
+                    state.Name,
+                    (ITypeSymbol)state.Type.Symbol!,
+                    isHook ? ComponentStateFactoryKind.State : ComponentStateFactoryKind.Value,
+                    isHook && !ComponentStatePlan.IsInitializerHook(state.UseHook!.Method));
+                var name = ComponentHotReloadIdentity.CreateGeneratedName(state.Name, identity);
+                var expression = SyntaxFactory.IdentifierName("__State_" + name)
+                    .WithTriviaFrom(argument.Expression);
+                arguments = arguments.ReplaceNode(argument, argument.WithExpression(expression));
+            }
+        }
+
+        _syntaxWriter.WriteArgumentList(arguments);
     }
 }

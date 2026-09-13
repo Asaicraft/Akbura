@@ -232,7 +232,115 @@ useEffect(
     [count]);
 ```
 
-Akbura also supports Avalonia-property hooks and experimental user-defined hooks.
+`useEffect` without a dependency list runs after every successful render. An empty
+list runs it once until the component is detached or the hook is reset. Changing
+dependencies cancels the previous run and invokes its cleanup before the next run.
+
+### Debouncing state
+
+`useDebounce` keeps the initial value available immediately, then publishes changes
+after the source has stayed unchanged for the requested delay:
+
+```akbura
+using Akbura.Hooks;
+
+state int count = 0;
+state int debouncedCount = useDebounce(count, 300);
+state int debouncedEffectedCount = useDebounce(count, x => x + 1, 300);
+```
+
+Declare the source state before a hook that consumes it. For the `State<T>` argument,
+the compiler passes the live state object; ordinary expressions such as `count + 1`
+continue to read its value. The hook result remains the same state object across
+renders, and separate calls have independent results and delays.
+
+Both integer milliseconds and `TimeSpan` are accepted, from zero through
+`Int32.MaxValue` milliseconds. A source value change, replacement of the source state,
+or change to the delay restarts the full delay. Unrelated renders and updates of the
+debounced result do not restart it. Changes merged into one render count as one input.
+Values are captured from that render; mutable objects are not deep-copied.
+
+The selector is called once for the initial result, then after the delay. It should
+be pure: initialization may be retried if the first render fails. Each pending run
+keeps the selector from the render that started it. Replacing an inline selector
+alone does not restart the delay, and captured values are not automatic dependencies.
+
+For additional dependencies, use the callback overload:
+
+```akbura
+state string query = "";
+state string debouncedQuery = "";
+
+useDebounce(
+    () => { debouncedQuery = query; },
+    TimeSpan.FromMilliseconds(350),
+    [query]);
+```
+
+Callbacks run on the UI dispatcher, including zero-delay callbacks. The callback
+form also accepts `Func<CancellationToken, Task>`; its task is awaited and failures
+are observed by the effect runtime. Cancellation stops a pending delay or queued
+callback. Already-running asynchronous callbacks must cooperate with the token.
+Dependencies and delay select a run; an unrelated render does not replace the
+callback already captured by that run.
+
+Detaching cancels pending work and preserves hook state. Reattaching starts a full
+new delay using the latest source. Hot Reload currently recreates hook-owned state;
+ordinary component state follows the existing preservation rules.
+
+### Writing a composable hook
+
+A user-defined hook runs during each component render and combines primitives.
+`useHookState` returns persistent state immediately; `useEffect` registers work to
+run after a successful render. Their order must stay the same on every render.
+
+```csharp
+using Akbura;
+using Akbura.CompilerAnotations;
+using Akbura.ComponentTree;
+using Akbura.Hooks;
+
+public static class MyHooks
+{
+    [UseHook]
+    public static State<int> useDoubled(
+        [Self] this AkburaControl control,
+        State<int> source)
+    {
+        var value = source.Value;
+        var result = control.useHookState(() => value * 2);
+
+        control.useEffect(
+            () => { result.Value = value * 2; },
+            [source, value]);
+
+        return result;
+    }
+}
+```
+
+The component uses it as `state int doubled = useDoubled(count);`. Its internal
+state belongs to the component and requests rendering when it changes. The author
+does not manage slot numbers, attach the returned state again, or maintain a second
+registry. Wrapping a hook does not allocate an additional slot: only the primitives
+participate in the shared sequence.
+
+`useHookState` accepts an initial value, a lazy `Func<T>`, or a `StateInfo<T>`
+descriptor. Initialization happens only when a new slot is needed; later initial
+values do not overwrite existing state. Static descriptors can be shared across
+calls, while each component and primitive position has its own state instance.
+
+Call primitives only while a render is collecting hooks. Do not call them from
+conditions that change the sequence, event handlers, effect callbacks, lazy state
+initializers, or after `await`. Put conditional behavior inside an effect and include
+the condition in its dependencies. The runtime checks the sequence's shape and
+types; it cannot distinguish every swap of otherwise identical calls in arbitrary C#.
+
+Older hooks that create state and subscriptions once must explicitly use
+`[UseHook(IsInitializer = true)]` until migrated to `useHookState` and resource-owning
+effects. Akbura's existing Avalonia-property state hooks use that compatibility
+contract. A normal `[UseHook]` returning `State<T>` uses the composable per-render
+contract.
 
 ## Commands
 

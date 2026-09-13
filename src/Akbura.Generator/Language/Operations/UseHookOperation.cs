@@ -21,7 +21,8 @@ internal sealed class UseHookOperation : IUseHookOperation
         bool hasSyntheticSelf,
         bool hasPropertyArgumentSubstitution,
         bool hasErrors,
-        ICSharpOperation? invocationOperation)
+        ICSharpOperation? invocationOperation,
+        ImmutableArray<UseHookStateArgument> stateArguments = default)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         Hook = hook ?? throw new ArgumentNullException(nameof(hook));
@@ -32,6 +33,9 @@ internal sealed class UseHookOperation : IUseHookOperation
         CSharpDefinition = csharpDefinition;
         HasSyntheticSelf = hasSyntheticSelf;
         HasPropertyArgumentSubstitution = hasPropertyArgumentSubstitution;
+        StateArguments = stateArguments.IsDefault
+            ? ImmutableArray<UseHookStateArgument>.Empty
+            : stateArguments;
         HasErrors = hasErrors;
         InvocationOperation = invocationOperation;
         Children = invocationOperation == null
@@ -85,6 +89,8 @@ internal sealed class UseHookOperation : IUseHookOperation
     public bool HasSyntheticSelf { get; }
 
     public bool HasPropertyArgumentSubstitution { get; }
+
+    public ImmutableArray<UseHookStateArgument> StateArguments { get; }
 
     public ICSharpOperation? InvocationOperation { get; }
 

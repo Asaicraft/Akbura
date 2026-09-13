@@ -205,6 +205,9 @@ public abstract class AkburaControl : Control, IComponentTree
 
     private readonly AkburaEngine _engine;
     private bool _updatesEnabled;
+    private bool _initialUpdatePending;
+    private bool _hookStateResetPending;
+    private bool _diagnosticStatesChangedPending;
     private bool _isUpdating;
     private bool _updatePending;
     private int _updateSuppressionDepth;
@@ -276,8 +279,25 @@ public abstract class AkburaControl : Control, IComponentTree
             services[index].Inject(this, _engine);
         }
 
-        Child = FirstUpdate();
+        _initialUpdatePending = true;
+        _updatesEnabled = true;
+        try
+        {
+            RequestUpdate();
+        }
+        catch
+        {
+            if (_initialUpdatePending)
+            {
+                _updatesEnabled = false;
+            }
 
+            throw;
+        }
+    }
+
+    private void ValidateComponentDescriptors()
+    {
         var parameters = GetParameters();
         for (var index = 0; index < parameters.Length; index++)
         {
@@ -309,14 +329,46 @@ public abstract class AkburaControl : Control, IComponentTree
         {
             throw new AkburaStatesArrayChangedException(this);
         }
-
-        _updatesEnabled = true;
-        RequestUpdate();
     }
 
     protected abstract Control Update();
 
     protected abstract Control FirstUpdate();
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected virtual void PrepareHookStates() { }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected virtual void CommitHookStates() { }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected virtual void AbortHookStates() { }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected virtual void ResetHookStatesForHotReload() { }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected State<T> BindHookState<T>(State<T> state, State<T>? previous)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (previous != null && !ReferenceEquals(state, previous))
+        {
+            throw new InvalidOperationException(
+                "A composed hook must return the same state between completed frames.");
+        }
+
+        _useHooks.ValidateStateAlias(state);
+        return state;
+    }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected virtual string? GetStateName(int index) => null;
 
     /// <summary>
     /// Creates an instance state from a state description.
@@ -484,6 +536,13 @@ public abstract class AkburaControl : Control, IComponentTree
         return GetStates();
     }
 
+    internal string GetDiagnosticStateName(int index)
+    {
+        return GetStateName(index) ?? GetStates()[index].Info?.Name ?? "State";
+    }
+
+    internal event Action? DiagnosticStatesChanged;
+
     internal void OnParameterChanged()
     {
         RequestUpdate();
@@ -497,6 +556,7 @@ public abstract class AkburaControl : Control, IComponentTree
         using var updateSuppression = SuppressUpdates();
         try
         {
+            _hookStateResetPending = true;
             _useHooks.ResetForHotReload();
 
             var services = GetServices();
@@ -559,6 +619,15 @@ public abstract class AkburaControl : Control, IComponentTree
             apply,
             detach));
     }
+
+    internal State<T> GetHookState<T>(StateInfo<T> info, T initialValue) =>
+        _useHooks.GetState(info, initialValue);
+
+    internal State<T> GetHookState<T>(StateInfo<T> info, Func<T> initialize) =>
+        _useHooks.GetState(info, initialize);
+
+    internal State<T> GetHookState<T>(StateInfo<T> info) =>
+        _useHooks.GetState(info);
 
     internal void BeginStateNotification()
     {
@@ -628,19 +697,51 @@ public abstract class AkburaControl : Control, IComponentTree
 
                 try
                 {
+                    if (_hookStateResetPending)
+                    {
+                        ResetHookStatesForHotReload();
+                        _hookStateResetPending = false;
+                        _diagnosticStatesChangedPending = true;
+                    }
+
                     _useHooks.BeginFrame();
                     hookFrameStarted = true;
+                    PrepareHookStates();
+
+                    if (_initialUpdatePending)
+                    {
+                        Child = FirstUpdate();
+                        ValidateComponentDescriptors();
+                    }
 
                     Child = Update();
 
-                    _useHooks.CompleteFrame();
+                    _useHooks.CompleteFrame(CommitUseHookFrame);
+                    if (_useHooks.IsFrameCommitted)
+                    {
+                        _initialUpdatePending = false;
+                    }
+                    else
+                    {
+                        AbortHookStates();
+                    }
+
                     hookFrameStarted = false;
 
                     if (hotReloadRequestGeneration != 0)
                     {
-                        AkburaHotReloadRuntime.AcknowledgeRefreshes(
-                            this,
-                            hotReloadRequestGeneration);
+                        if (_useHooks.IsFrameCommitted)
+                        {
+                            AkburaHotReloadRuntime.AcknowledgeRefreshes(
+                                this,
+                                hotReloadRequestGeneration);
+                        }
+                        else
+                        {
+                            _pendingHotReloadRequestGeneration = Math.Max(
+                                _pendingHotReloadRequestGeneration,
+                                hotReloadRequestGeneration);
+                        }
                     }
                 }
                 catch (Exception exception)
@@ -656,24 +757,7 @@ public abstract class AkburaControl : Control, IComponentTree
 
                     if (hookFrameStarted)
                     {
-                        try
-                        {
-                            _useHooks.AbortFrame();
-                        }
-                        catch (Exception abortException)
-                        {
-                            List<Exception>? failures = null;
-                            UseHookFailures.Capture(
-                                ref failures,
-                                exception);
-                            UseHookFailures.Capture(
-                                ref failures,
-                                abortException);
-                            UseHookFailures.ThrowIfAny(
-                                failures,
-                                "A component update and its hook-frame " +
-                                "cleanup failed.");
-                        }
+                        AbortUseHookFrame(exception);
                     }
 
                     throw;
@@ -700,6 +784,55 @@ public abstract class AkburaControl : Control, IComponentTree
                 Diagnostic.Tags.UpdateCount,
                 updateCount);
         }
+    }
+
+    private void CommitUseHookFrame()
+    {
+        CommitHookStates();
+        if (_diagnosticStatesChangedPending)
+        {
+            _diagnosticStatesChangedPending = false;
+            DiagnosticStatesChanged?.Invoke();
+        }
+    }
+
+    private void AbortUseHookFrame(Exception originalException)
+    {
+        List<Exception>? failures = null;
+        try
+        {
+            if (!_useHooks.IsFrameCommitted)
+            {
+                AbortHookStates();
+            }
+            else
+            {
+                _initialUpdatePending = false;
+            }
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, originalException);
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            _useHooks.AbortFrame();
+        }
+        catch (Exception exception)
+        {
+            if (failures == null)
+            {
+                UseHookFailures.Capture(ref failures, originalException);
+            }
+
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        UseHookFailures.ThrowIfAny(
+            failures,
+            "A component update and its hook-frame cleanup failed.");
     }
 
     private void EndUpdateSuppression()

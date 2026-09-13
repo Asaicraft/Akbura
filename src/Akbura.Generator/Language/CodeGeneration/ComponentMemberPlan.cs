@@ -3,6 +3,7 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
+using System.Collections.Immutable;
 using Akbura.Pools;
 
 namespace Akbura.Language.CodeGeneration;
@@ -165,6 +166,7 @@ internal enum ComponentStateFlags : byte
     None = 0,
     IsReadOnly = 1 << 0,
     UsesHook = 1 << 1,
+    IsComposable = 1 << 2,
 }
 
 internal readonly struct ComponentStatePlan
@@ -178,7 +180,8 @@ internal readonly struct ComponentStatePlan
         ComponentStateFlags flags,
         ExpressionSyntax initializer,
         StateDeclarationSyntax syntax,
-        IMethodSymbol? hookMethod = null)
+        IMethodSymbol? hookMethod = null,
+        ImmutableArray<UseHookStateArgument> stateArguments = default)
     {
         Id = id;
         Name = name;
@@ -189,10 +192,12 @@ internal readonly struct ComponentStatePlan
         Initializer = initializer;
         Syntax = syntax;
         HookMethod = hookMethod;
+        StateArguments = stateArguments;
         HotReloadKey = ComponentHotReloadIdentity.CreateStateKey(
             name,
             valueType,
-            factoryKind);
+            factoryKind,
+            (flags & ComponentStateFlags.IsComposable) != 0);
         GeneratedName = ComponentHotReloadIdentity.CreateGeneratedName(
             name,
             HotReloadKey);
@@ -216,6 +221,8 @@ internal readonly struct ComponentStatePlan
 
     public IMethodSymbol? HookMethod { get; }
 
+    public ImmutableArray<UseHookStateArgument> StateArguments { get; }
+
     public string HotReloadKey { get; }
 
     public string GeneratedName { get; }
@@ -223,6 +230,30 @@ internal readonly struct ComponentStatePlan
     public bool IsReadOnly => (Flags & ComponentStateFlags.IsReadOnly) != 0;
 
     public bool UsesHook => (Flags & ComponentStateFlags.UsesHook) != 0;
+
+    public bool IsComposable => (Flags & ComponentStateFlags.IsComposable) != 0;
+
+    internal static bool IsInitializerHook(IMethodSymbol method)
+    {
+        foreach (var attribute in method.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString() !=
+                "Akbura.CompilerAnotations.UseHookAttribute")
+            {
+                continue;
+            }
+
+            foreach (var argument in attribute.NamedArguments)
+            {
+                if (argument.Key == "IsInitializer" && argument.Value.Value is true)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }
 
 internal readonly struct ComponentCommandParameterPlan

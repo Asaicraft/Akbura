@@ -17,6 +17,16 @@ public abstract class State
 
     public bool IsAttached => _owner != null;
 
+    internal bool IsOwnedBy(AkburaControl owner) => ReferenceEquals(_owner, owner);
+
+    internal void Detach(AkburaControl owner)
+    {
+        if (ReferenceEquals(_owner, owner))
+        {
+            _owner = null;
+        }
+    }
+
     public abstract Type ValueType
     {
         get;
@@ -33,8 +43,7 @@ public abstract class State
 
         if (_owner != null)
         {
-            throw new InvalidOperationException(
-                "A state instance can only be attached to one component.");
+            throw new InvalidOperationException("A state instance can only be attached to one component.");
         }
 
         if (info.ValueType != ValueType)

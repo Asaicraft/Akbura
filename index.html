@@ -203,6 +203,16 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#dictionary-resources" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Dictionary Resources
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Avalonia Styles
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/#parameters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Parameters
 									</a>
@@ -614,6 +624,194 @@ state bool isOpen = false;
 &lt;/StackPanel&gt;
 </code></pre>
 <p>Attributes may contain literals, C# expressions, bindings, and markup extensions.</p>
+<h2 id="dictionary-resources">Dictionary Resources<a class="header-anchor" href="javascript:;" onclick="location.hash='#dictionary-resources'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>x.key</code> to insert a child into a dictionary content slot, such as an
+Avalonia control's <code>Resources</code>. <code>x.Key</code> is an alias of the same directive:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Avalonia.Media;
+
+state int resourceIndex = 0;
+
+&lt;StackPanel&gt;
+    &lt;StackPanel.Resources&gt;
+        &lt;SolidColorBrush x.key=&quot;AccentBrush&quot; Color=&quot;Red&quot; /&gt;
+        &lt;SolidColorBrush x.Key={resourceIndex + 1} Color=&quot;Blue&quot; /&gt;
+    &lt;/StackPanel.Resources&gt;
+
+    &lt;Button Click={resourceIndex++}&gt;Move the numbered resource&lt;/Button&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The directive describes the entry in the parent dictionary. It does not set a
+<code>Key</code> property on the brush, name the element, or replace <code>x.Name</code>.</p>
+<p>A mutable <code>IDictionary&lt;TKey, TValue&gt;</code> accepts children compatible with <code>TValue</code>;
+the key expression is checked against <code>TKey</code>. Non-generic <code>IDictionary</code> uses
+<code>object</code> keys and values. This applies to dictionary properties, <code>[Content]</code>
+properties, dictionaries used as element content, and dictionary component
+parameters. Explicit interface implementations are supported.</p>
+<p>A dictionary parameter named <code>Content</code> has a per-component mutable backing
+dictionary. Other dictionary parameters retain the usual parameter rules:
+provide their dictionary through an attribute or declare a default initializer,
+for example <code>param IDictionary&lt;int, SolidColorBrush&gt; Entries = new Dictionary&lt;int, SolidColorBrush&gt;();</code>. Entries inside <code>&lt;MyComponent.Entries&gt;</code>
+populate that dictionary; they do not assign the parameter itself or satisfy a
+missing required receiver.</p>
+<p>Quoted keys remain strings, including their spaces and case. For an int-keyed
+dictionary, use <code>x.key={42}</code>; <code>x.key=&quot;42&quot;</code> is a type error. In an object-keyed
+dictionary these produce different keys. No implicit <code>ToString()</code> conversion is
+performed. Missing keys, keys outside a dictionary, incompatible types, and
+<code>x.key=&quot;A&quot; x.Key=&quot;B&quot;</code> on the same child produce semantic diagnostics.</p>
+<h3 id="updating-owned-entries">Updating owned entries<a class="header-anchor" href="javascript:;" onclick="location.hash='#updating-owned-entries'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Akbura evaluates each key expression once for the corresponding update and
+reconciles the declaration's whole set of entries. Changing <code>resourceIndex</code>
+moves the compatible existing brush to its new key and removes its old entry.
+Two owned entries can exchange keys without a temporary collision caused by
+adding one before removing the other.</p>
+<p>Ownership belongs to a content slot, not to the dictionary as a whole. Akbura
+does not call <code>Resources.Clear()</code> or overwrite foreign entries. An entry is
+removed only while its key still refers to the owned object; externally replaced
+values are left alone. Structural Hot Reload also removes owned entries when
+their declaration or property element disappears.</p>
+<p>Dictionary lookups and insertion use the actual dictionary's equality rules.
+A case-insensitive dictionary may therefore reject <code>&quot;A&quot;</code> and <code>&quot;a&quot;</code> as a
+collision, even if the compiler cannot prove it statically. A conflicting foreign
+entry or duplicate desired key fails the update rather than being overwritten.
+Read-only dictionaries, non-generic fixed-size dictionaries, and ambiguous
+mutable dictionary contracts are unsupported write targets.</p>
+<p>If a custom dictionary mutator throws, reconciliation attempts to restore the
+previous owned entries. This is best-effort rollback: arbitrary dictionaries may
+publish notifications during removal, insertion, or restoration. Notification
+atomicity is not guaranteed; if restoration also fails, both failures are
+reported. A new ownership snapshot is committed only after successful
+reconciliation.</p>
+<h2 id="avalonia-styles">Avalonia Styles<a class="header-anchor" href="javascript:;" onclick="location.hash='#avalonia-styles'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Native Avalonia <code>Style</code> and <code>Setter</code> objects can be declared directly in markup:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Styling;
+
+state bool highlighted = false;
+
+&lt;StackPanel&gt;
+    &lt;StackPanel.Styles&gt;
+        &lt;Style Selector=&quot;Button&quot;&gt;
+            &lt;Setter
+                Property=&quot;Background&quot;
+                Value={highlighted ? Brushes.Red : Brushes.Blue} /&gt;
+
+            &lt;Style Selector=&quot;^:pointerover&quot;&gt;
+                &lt;Setter Property=&quot;Opacity&quot; Value=&quot;0.7&quot; /&gt;
+            &lt;/Style&gt;
+        &lt;/Style&gt;
+    &lt;/StackPanel.Styles&gt;
+
+    &lt;Button Click={highlighted = !highlighted}&gt;Change the style&lt;/Button&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>Each child is added through its applicable typed <code>Add</code> overload: setters and
+nested styles are different content routes. This fallback is also available to
+custom types with suitable accessible instance <code>Add</code> methods; ambiguous
+overloads produce a diagnostic.</p>
+<p>Style subtrees are fully initialized before being attached to a live host.
+Currently, each applicable component render recreates and replaces the owned
+style subtree, even when its values are unchanged. Hot Reload also creates a new
+subtree. The surrounding live control tree and foreign styles are preserved;
+this does not rely on changing an already attached <code>Setter.Value</code> in place.</p>
+<h3 id="avalonia-property-references">Avalonia property references<a class="header-anchor" href="javascript:;" onclick="location.hash='#avalonia-property-references'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>For a destination whose declared type is <code>AvaloniaProperty</code> or one of its derived
+types, a quoted value is resolved to a compatible static property field:</p>
+<pre><code class="language-akbura">&lt;Setter Property=&quot;Button.Background&quot; Value=&quot;Red&quot; /&gt;
+</code></pre>
+<p>This refers to <code>Button.BackgroundProperty</code>, including properties inherited from
+a base class. Styled, attached, and direct property fields are supported. The
+same mechanism applies to custom CLR properties of type <code>AvaloniaProperty</code>,
+regardless of the holder class or property name.</p>
+<p>Inside a known style target, the owner can be omitted:</p>
+<pre><code class="language-akbura">&lt;Style Selector=&quot;Button /template/ Border&quot;&gt;
+    &lt;Setter Property=&quot;Background&quot; Value=&quot;Red&quot; /&gt;
+&lt;/Style&gt;
+</code></pre>
+<p>Here <code>Background</code> is resolved for the selected <code>Border</code>, not the first <code>Button</code>
+in the selector. The referenced property's value type supplies the contextual
+conversion for <code>Value</code>; its actual CLR type remains <code>object</code>.</p>
+<p>The supported literal selector forms include type names, namespace-qualified
+type names with <code>|</code>, classes, names, simple pseudo-classes, <code>:is(Type)</code>, <code>^</code>,
+descendant and child combinators, <code>/template/</code>, and comma-separated lists.
+Nested <code>^</code> inherits the parent target. <code>ControlTheme.TargetType</code> also supplies
+target context. Advanced selector expressions such as <code>:not(...)</code>, nth-child
+functions, and property filters are not currently supported as markup literals.</p>
+<p>For type-less, dynamic, or ambiguous targets, use an owner-qualified reference
+or a statically resolvable C# field:</p>
+<pre><code class="language-akbura">&lt;Setter Property=&quot;Button.Background&quot; Value=&quot;Red&quot; /&gt;
+&lt;Setter Property={Button.BackgroundProperty} Value=&quot;Red&quot; /&gt;
+</code></pre>
+<p>Akbura does not guess a target from the nearest visual parent. An unqualified
+reference in a selector list must resolve consistently for all target branches.</p>
+<h3 id="property-metadata-and-custom-assignments">Property metadata and custom assignments<a class="header-anchor" href="javascript:;" onclick="location.hash='#property-metadata-and-custom-assignments'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p><code>[DependsOn]</code>, <code>[AssignBinding]</code>, and <code>[Content]</code> have independent roles:</p>
+<ul>
+<li><code>[DependsOn]</code> orders assignment actions. It does not create a subscription,
+watcher, effect, or hook.</li>
+<li><code>[AssignBinding]</code> stores the binding object in the holder property instead of
+applying the binding to that property.</li>
+<li><code>[Content]</code> chooses the destination for implicit element content.</li>
+</ul>
+<p>For example, a custom holder can use different names from Avalonia's <code>Setter</code>:</p>
+<pre><code class="language-csharp">using Avalonia;
+using Avalonia.Data;
+using Avalonia.Metadata;
+
+namespace MyApp.Markup;
+
+public sealed class CustomAssignment
+{
+    public AvaloniaProperty? Target { get; set; }
+
+    [Content]
+    [AssignBinding]
+    [DependsOn(nameof(Target))]
+    public object? Payload { get; set; }
+}
+</code></pre>
+<p>For an <code>object</code> property depending on one unambiguous Avalonia property
+reference, Akbura uses that reference's value type for ordinary value conversion.
+It does not change the declared <code>object</code> type or apply this convention to
+unrelated dependencies.</p>
+<p>These three content routes share the assignment contract:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using MyApp.Markup;
+
+&lt;CustomAssignment Payload=&quot;Red&quot; Target=&quot;Button.Background&quot; /&gt;
+
+&lt;CustomAssignment Target=&quot;Button.Background&quot;&gt;
+    Red
+&lt;/CustomAssignment&gt;
+
+&lt;CustomAssignment Target=&quot;Button.Background&quot;&gt;
+    &lt;CustomAssignment.Payload&gt;Red&lt;/CustomAssignment.Payload&gt;
+&lt;/CustomAssignment&gt;
+</code></pre>
+<p><code>Target</code> is assigned before <code>Payload</code>, including when the dependency is declared
+through a property element. Independent assignments retain source order.
+Invalid dependency metadata and cycles are diagnosed. A dependency not assigned
+in the declaration does not create an artificial assignment.</p>
+<p>If a dynamic non-generic <code>AvaloniaProperty</code> does not reveal its value type, use
+a qualified/static reference or an explicitly typed value expression for
+contextual conversion. Conflicting property dependencies are diagnosed rather
+than choosing an arbitrary one.</p>
+<p>With <code>[AssignBinding]</code>, this stores the extension result as a binding object:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Akbura.Markup;
+using MyApp.Markup;
+
+&lt;CustomAssignment
+    Target=&quot;Button.Background&quot;
+    Payload=${Binding AccentBrush} /&gt;
+</code></pre>
+<p><code>ProvideValue</code> is still evaluated with the normal service provider. An extension
+declared to return <code>object</code> follows the same delivery policy when its actual
+result is a binding. The holder's own runtime contract decides how that object
+is later used. See <a href="/akcss/markup-extensions">Markup Extensions</a> for extension
+evaluation and <a href="/akbura/xml-xaml-axaml#dictionary-keys">AXAML syntax differences</a>
+for the directive spelling.</p>
 <h2 id="reactive-state">Reactive State<a class="header-anchor" href="javascript:;" onclick="location.hash='#reactive-state'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Declare local reactive values with <code>state</code>:</p>
 <pre><code class="language-akbura">state int selectedIndex = 0;

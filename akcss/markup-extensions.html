@@ -278,6 +278,24 @@ added implicitly either:</p>
 
 &lt;Border p-1 ${md}:p-3 /&gt;
 </code></pre>
+<h2 id="binding-objects-in-holder-properties">Binding objects in holder properties<a class="header-anchor" href="javascript:;" onclick="location.hash='#binding-objects-in-holder-properties'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Normal markup properties apply binding results to their target. A CLR property
+marked with Avalonia's <code>[AssignBinding]</code> instead stores the binding object:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Avalonia.Styling;
+using Akbura.Markup;
+
+&lt;Setter Property=&quot;Button.Background&quot; Value=${Binding AccentBrush} /&gt;
+</code></pre>
+<p>Akbura still calls <code>ProvideValue</code> and supplies the normal extension services.
+The delivery policy applies both to a statically known binding result and to an
+extension whose <code>ProvideValue</code> returns <code>object</code> containing a binding. It does
+not bind <code>Setter.Value</code> itself or subscribe merely to assign the current brush.
+Avalonia later applies the stored binding to the styled target.</p>
+<p>The same metadata works for custom holders with different property names.
+<code>[DependsOn]</code> controls assignment ordering independently; it does not create
+reactive subscriptions. See <a href="/#avalonia-styles">Avalonia Styles</a> for custom
+<code>[Content]</code>/<code>[AssignBinding]</code> assignments and contextual value types.</p>
 <h2 id="utility-arguments">Utility arguments<a class="header-anchor" href="javascript:;" onclick="location.hash='#utility-arguments'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>A markup extension can supply an argument to a parameterized utility:</p>
 <pre><code class="language-akcss">@using Avalonia;
@@ -554,6 +572,11 @@ use <code>${...}</code> and do not call it.</p>
 								On This Page
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#binding-objects-in-holder-properties'" data-id="binding-objects-in-holder-properties" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Binding objects in holder properties
+										</span>
+									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#utility-arguments'" data-id="utility-arguments" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Utility arguments

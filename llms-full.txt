@@ -173,6 +173,183 @@ The getter is captured by the subscribing run: list store/filter changes in the
 dependencies. Event listeners use the latest committed handler without duplicate
 subscriptions, and remove exactly the delegate that was added.
 
+## Transitions and animations
+
+Animation hooks compose the same state and effect primitives. Avalonia updates
+animated visual properties directly: these hooks do not publish a component state
+for each animation frame.
+
+### Follow a property with transitions
+
+```akbura
+using Avalonia;
+using Avalonia.Controls;
+using Akbura.Hooks;
+
+state bool expanded = false;
+state bool motionEnabled = true;
+
+useTransition(panel, Visual.OpacityProperty, 250, enabled: motionEnabled);
+
+<StackPanel>
+    <Button Click={() => expanded = !expanded}>Toggle</Button>
+    <Border x.Name="panel" Opacity={expanded ? 1d : 0.25d}>
+        <TextBlock Text="Animated panel" />
+    </Border>
+</StackPanel>
+```
+
+The expression sets the property's target value; `useTransition` installs the
+matching Avalonia transition. Milliseconds and `TimeSpan` overloads accept a
+nonnegative duration and an optional `Easing`, with `CubicEaseOut` as the default.
+The target, property, duration, easing and `enabled` flag configure the rule. The
+current property value is not an installation dependency, so changing `expanded`
+does not replace the transition. An interrupted transition starts from Avalonia's
+current animated value. Installing a transition alone does not create an entrance
+animation from zero.
+
+Built-in property types include `double`, `float`, `int`, `bool`, `Point`,
+`RelativePoint`, `Size`, `Vector`, `Thickness`, `CornerRadius`, `Color`, `IBrush`,
+`BoxShadows` and `ITransform`. Unsupported types and direct properties cannot use
+this short form. For `ITransform`, use transform operations compatible with
+Avalonia's `TransformOperationsTransition`.
+
+For several properties, `useTransitions(target, factory, dependencies, enabled)`
+accepts a factory returning `Avalonia.Animation.Transitions`. The factory runs
+after commit when its explicit dependencies change; an inline factory's identity
+does not cause a restart. Each hook removes only its own rules during cleanup and
+preserves rules supplied by styles, application code or other hooks. Do not share
+mutable transition instances between independently animated targets.
+
+### Play a finite keyframe scenario
+
+```akbura
+using Avalonia.Controls;
+using Akbura.Hooks;
+
+state int replay = 0;
+state bool motionEnabled = true;
+
+useAnimation(panel, MyApp.PulseAnimations.CreatePulseAnimation,
+    [replay], enabled: motionEnabled);
+
+<StackPanel>
+    <Button Click={() => replay++}>Replay</Button>
+    <Border x.Name="panel">
+        <TextBlock Text="Pulse" />
+    </Border>
+</StackPanel>
+```
+
+The factory is ordinary C#. This companion helper can be shared by declarative
+hooks and event handlers; replace `MyApp` with your application's namespace:
+
+```csharp
+using System;
+using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Styling;
+
+namespace MyApp;
+
+public static class PulseAnimations
+{
+    public static Animation CreatePulseAnimation() => new()
+    {
+        Duration = TimeSpan.FromMilliseconds(400),
+        FillMode = FillMode.None,
+        Children =
+        {
+            new KeyFrame
+            {
+                Cue = new Cue(0d),
+                Setters = { new Setter(Visual.OpacityProperty, 1d) }
+            },
+            new KeyFrame
+            {
+                Cue = new Cue(0.5d),
+                Setters = { new Setter(Visual.OpacityProperty, 0.35d) }
+            },
+            new KeyFrame
+            {
+                Cue = new Cue(1d),
+                Setters = { new Setter(Visual.OpacityProperty, 1d) }
+            }
+        }
+    };
+}
+```
+
+The factory creates a fresh `Animation` only when its effect starts. Dependencies
+are copied; list replay counters and all captured configuration values explicitly.
+A new factory delegate on an unrelated render does not restart playback. Target
+replacement, changed dependencies, disablement and component or target detach
+cancel the previous run. Avalonia 12.0.4 supports finite animations through this
+API; `IterationCount.Infinite` is rejected before playback.
+
+Effects start after the UI update has committed. If a named target can be replaced
+during a structural update, use the resolver overload:
+`useAnimation(() => panel, MyApp.PulseAnimations.CreatePulseAnimation, [replay])`.
+For conditional or replaceable content, resolve the currently present control, for example
+`() => host.Content as Animatable` for a named `ContentControl`, importing
+`Avalonia.Animation` for `Animatable`. Transitions accept the same resolver form.
+The resolver runs after the UI update; a null target means no active resource.
+A created element may still need layout: these hooks do not promise measured
+dimensions or a ready composition visual.
+
+### Start and stop from handlers
+
+```akbura
+using Avalonia.Controls;
+using Akbura.Hooks;
+
+state AnimationController animator = useAnimate();
+
+<StackPanel>
+    <Button Click={async () =>
+    {
+        await animator.RunAsync(panel, MyApp.PulseAnimations.CreatePulseAnimation());
+    }}>Animate</Button>
+    <Button Click={() => animator.Stop(panel)}>Stop</Button>
+    <Border x.Name="panel">
+        <TextBlock Text="Manual playback" />
+    </Border>
+</StackPanel>
+```
+
+The controller is stable for its hook slot. Call `RunAsync` from UI-thread handlers
+or effects after the hook lifetime has committed. It accepts an optional
+`CancellationToken`; `Stop(target)` cancels this controller's runs for one target,
+and `Stop()` cancels all its runs. Component detach cancels active runs; reattach
+activates the same controller without automatically replaying them. A target's
+own detach also cancels its run. After cancellation, the returned task is canceled
+even when Avalonia's underlying `RunAsync` task completes successfully.
+
+A new run cancels this controller's older runs that animate any of the same
+properties on the same target; disjoint properties can run concurrently. External
+animation owners are not stopped. Choose one active mechanism per target/property:
+combining a transition, declarative animation and manual controller for the same
+property requires application-level coordination. Use `await` for sequences and
+`Task.WhenAll` for independent parallel runs; pause, seek and reverse are not part
+of this API.
+
+Pass `enabled: false` to any animation hook for an application-level reduced-motion
+setting without changing hook order. This affects only the hook's own resources;
+theme transitions and other animation owners need their own reduced-motion policy.
+Disabled hooks leave the rendered base values in control; they do not synthesize
+an animation's final keyframe. Keep the correct final UI state in ordinary markup.
+`FillMode.None` returns control to base values after successful playback; forward
+fill modes can retain the animation's ending
+value and should be chosen explicitly. In Avalonia 12.0.4, stopping a `Forward` or
+`Both` animation can also retain its last interpolated value in the base property,
+not necessarily its final keyframe. Disabling an already-running animation follows
+that same fill policy. Cleanup does not erase foreign property values to undo it;
+use `FillMode.None` and a rendered target value when cancellation must reveal the
+application's existing base value. Use render transforms for movement that should
+not reflow neighboring controls.
+Presence, spring physics and composition animations are separate APIs and are not
+implemented by these hooks.
+
 ## Reducers and lifecycle
 
 ```akbura
@@ -374,6 +551,183 @@ gap between render and subscription. Cleanup also runs if that second read fails
 The getter is captured by the subscribing run: list store/filter changes in the
 dependencies. Event listeners use the latest committed handler without duplicate
 subscriptions, and remove exactly the delegate that was added.
+
+## Transitions and animations
+
+Animation hooks compose the same state and effect primitives. Avalonia updates
+animated visual properties directly: these hooks do not publish a component state
+for each animation frame.
+
+### Follow a property with transitions
+
+```akbura
+using Avalonia;
+using Avalonia.Controls;
+using Akbura.Hooks;
+
+state bool expanded = false;
+state bool motionEnabled = true;
+
+useTransition(panel, Visual.OpacityProperty, 250, enabled: motionEnabled);
+
+<StackPanel>
+    <Button Click={() => expanded = !expanded}>Toggle</Button>
+    <Border x.Name="panel" Opacity={expanded ? 1d : 0.25d}>
+        <TextBlock Text="Animated panel" />
+    </Border>
+</StackPanel>
+```
+
+The expression sets the property's target value; `useTransition` installs the
+matching Avalonia transition. Milliseconds and `TimeSpan` overloads accept a
+nonnegative duration and an optional `Easing`, with `CubicEaseOut` as the default.
+The target, property, duration, easing and `enabled` flag configure the rule. The
+current property value is not an installation dependency, so changing `expanded`
+does not replace the transition. An interrupted transition starts from Avalonia's
+current animated value. Installing a transition alone does not create an entrance
+animation from zero.
+
+Built-in property types include `double`, `float`, `int`, `bool`, `Point`,
+`RelativePoint`, `Size`, `Vector`, `Thickness`, `CornerRadius`, `Color`, `IBrush`,
+`BoxShadows` and `ITransform`. Unsupported types and direct properties cannot use
+this short form. For `ITransform`, use transform operations compatible with
+Avalonia's `TransformOperationsTransition`.
+
+For several properties, `useTransitions(target, factory, dependencies, enabled)`
+accepts a factory returning `Avalonia.Animation.Transitions`. The factory runs
+after commit when its explicit dependencies change; an inline factory's identity
+does not cause a restart. Each hook removes only its own rules during cleanup and
+preserves rules supplied by styles, application code or other hooks. Do not share
+mutable transition instances between independently animated targets.
+
+### Play a finite keyframe scenario
+
+```akbura
+using Avalonia.Controls;
+using Akbura.Hooks;
+
+state int replay = 0;
+state bool motionEnabled = true;
+
+useAnimation(panel, MyApp.PulseAnimations.CreatePulseAnimation,
+    [replay], enabled: motionEnabled);
+
+<StackPanel>
+    <Button Click={() => replay++}>Replay</Button>
+    <Border x.Name="panel">
+        <TextBlock Text="Pulse" />
+    </Border>
+</StackPanel>
+```
+
+The factory is ordinary C#. This companion helper can be shared by declarative
+hooks and event handlers; replace `MyApp` with your application's namespace:
+
+```csharp
+using System;
+using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Styling;
+
+namespace MyApp;
+
+public static class PulseAnimations
+{
+    public static Animation CreatePulseAnimation() => new()
+    {
+        Duration = TimeSpan.FromMilliseconds(400),
+        FillMode = FillMode.None,
+        Children =
+        {
+            new KeyFrame
+            {
+                Cue = new Cue(0d),
+                Setters = { new Setter(Visual.OpacityProperty, 1d) }
+            },
+            new KeyFrame
+            {
+                Cue = new Cue(0.5d),
+                Setters = { new Setter(Visual.OpacityProperty, 0.35d) }
+            },
+            new KeyFrame
+            {
+                Cue = new Cue(1d),
+                Setters = { new Setter(Visual.OpacityProperty, 1d) }
+            }
+        }
+    };
+}
+```
+
+The factory creates a fresh `Animation` only when its effect starts. Dependencies
+are copied; list replay counters and all captured configuration values explicitly.
+A new factory delegate on an unrelated render does not restart playback. Target
+replacement, changed dependencies, disablement and component or target detach
+cancel the previous run. Avalonia 12.0.4 supports finite animations through this
+API; `IterationCount.Infinite` is rejected before playback.
+
+Effects start after the UI update has committed. If a named target can be replaced
+during a structural update, use the resolver overload:
+`useAnimation(() => panel, MyApp.PulseAnimations.CreatePulseAnimation, [replay])`.
+For conditional or replaceable content, resolve the currently present control, for example
+`() => host.Content as Animatable` for a named `ContentControl`, importing
+`Avalonia.Animation` for `Animatable`. Transitions accept the same resolver form.
+The resolver runs after the UI update; a null target means no active resource.
+A created element may still need layout: these hooks do not promise measured
+dimensions or a ready composition visual.
+
+### Start and stop from handlers
+
+```akbura
+using Avalonia.Controls;
+using Akbura.Hooks;
+
+state AnimationController animator = useAnimate();
+
+<StackPanel>
+    <Button Click={async () =>
+    {
+        await animator.RunAsync(panel, MyApp.PulseAnimations.CreatePulseAnimation());
+    }}>Animate</Button>
+    <Button Click={() => animator.Stop(panel)}>Stop</Button>
+    <Border x.Name="panel">
+        <TextBlock Text="Manual playback" />
+    </Border>
+</StackPanel>
+```
+
+The controller is stable for its hook slot. Call `RunAsync` from UI-thread handlers
+or effects after the hook lifetime has committed. It accepts an optional
+`CancellationToken`; `Stop(target)` cancels this controller's runs for one target,
+and `Stop()` cancels all its runs. Component detach cancels active runs; reattach
+activates the same controller without automatically replaying them. A target's
+own detach also cancels its run. After cancellation, the returned task is canceled
+even when Avalonia's underlying `RunAsync` task completes successfully.
+
+A new run cancels this controller's older runs that animate any of the same
+properties on the same target; disjoint properties can run concurrently. External
+animation owners are not stopped. Choose one active mechanism per target/property:
+combining a transition, declarative animation and manual controller for the same
+property requires application-level coordination. Use `await` for sequences and
+`Task.WhenAll` for independent parallel runs; pause, seek and reverse are not part
+of this API.
+
+Pass `enabled: false` to any animation hook for an application-level reduced-motion
+setting without changing hook order. This affects only the hook's own resources;
+theme transitions and other animation owners need their own reduced-motion policy.
+Disabled hooks leave the rendered base values in control; they do not synthesize
+an animation's final keyframe. Keep the correct final UI state in ordinary markup.
+`FillMode.None` returns control to base values after successful playback; forward
+fill modes can retain the animation's ending
+value and should be chosen explicitly. In Avalonia 12.0.4, stopping a `Forward` or
+`Both` animation can also retain its last interpolated value in the base property,
+not necessarily its final keyframe. Disabling an already-running animation follows
+that same fill policy. Cleanup does not erase foreign property values to undo it;
+use `FillMode.None` and a rendered target value when cancellation must reveal the
+application's existing base value. Use render transforms for movement that should
+not reflow neighboring controls.
+Presence, spring physics and composition animations are separate APIs and are not
+implemented by these hooks.
 
 ## Reducers and lifecycle
 
@@ -690,6 +1044,71 @@ This distinction matters when syntax from XML or AXAML is copied into an Akbura 
 **AXAML** means Avalonia XAML. Avalonia uses the `.axaml` extension to distinguish its XAML dialect from XAML files used by other frameworks.
 
 Akbura keeps familiar concepts such as elements, attributes and property elements, but it is compiled by the Akbura compiler rather than treated as an XML document.
+
+## Dictionary keys
+
+AXAML uses the XML directive `x:Key`. Akbura uses `x.key` or its alias `x.Key`:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Media;
+
+state int resourceIndex = 0;
+
+<Border>
+    <Border.Resources>
+        <SolidColorBrush x.key="AccentBrush" Color="Red" />
+        <SolidColorBrush x.Key={resourceIndex + 1} Color="Blue" />
+    </Border.Resources>
+</Border>
+```
+
+These are two spellings of one dictionary-entry directive. `x:Key` is not an
+additional spelling in Akbura. Other attribute names are still case-sensitive.
+A quoted key is a string; `{resourceIndex + 1}` is a typed C# key expression.
+The key is attached to the parent dictionary entry rather than assigned to a
+property of `SolidColorBrush`.
+
+`x.Name` continues to name an element in the component and serves a different
+purpose. Dynamic dictionary keys do not replace element identity. See
+[Dictionary Resources](/#dictionary-resources) for key typing, updates,
+ownership, and collisions.
+
+## Styles and property references
+
+Avalonia styles use the familiar property-element shape in Akbura:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Styling;
+
+<Border>
+    <Border.Styles>
+        <Style Selector="Button">
+            <Setter Property="Background" Value="Red" />
+        </Style>
+    </Border.Styles>
+</Border>
+```
+
+`Property="Background"` resolves a static Avalonia property reference using the
+style's target context. `Property="Button.Background"` supplies an explicit
+owner, and `Property={Button.BackgroundProperty}` uses C# directly. This also
+works for custom holder properties of type `AvaloniaProperty`.
+
+Markup extensions keep Akbura's `${...}` syntax, including bindings stored in
+a setter:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Styling;
+using Akbura.Markup;
+
+<Setter Property="Button.Background" Value=${Binding AccentBrush} />
+```
+
+See [Avalonia Styles](/#avalonia-styles) for supported literal selector forms,
+typed child insertion, contextual values, and property metadata.
 
 ## Whitespace and `xml:space`
 
@@ -2284,6 +2703,30 @@ using Akbura.Markup;
 
 <Border p-1 ${md}:p-3 />
 ```
+
+## Binding objects in holder properties
+
+Normal markup properties apply binding results to their target. A CLR property
+marked with Avalonia's `[AssignBinding]` instead stores the binding object:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Styling;
+using Akbura.Markup;
+
+<Setter Property="Button.Background" Value=${Binding AccentBrush} />
+```
+
+Akbura still calls `ProvideValue` and supplies the normal extension services.
+The delivery policy applies both to a statically known binding result and to an
+extension whose `ProvideValue` returns `object` containing a binding. It does
+not bind `Setter.Value` itself or subscribe merely to assign the current brush.
+Avalonia later applies the stored binding to the styled target.
+
+The same metadata works for custom holders with different property names.
+`[DependsOn]` controls assignment ordering independently; it does not create
+reactive subscriptions. See [Avalonia Styles](/#avalonia-styles) for custom
+`[Content]`/`[AssignBinding]` assignments and contextual value types.
 
 ## Utility arguments
 

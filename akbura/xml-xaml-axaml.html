@@ -195,6 +195,16 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#dictionary-resources" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Dictionary Resources
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Avalonia Styles
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Grid
 									</a>
@@ -232,6 +242,56 @@ Akbura									</span>
 <p><strong>XAML</strong> is an XML-based language for declaring .NET object graphs and user interfaces.</p>
 <p><strong>AXAML</strong> means Avalonia XAML. Avalonia uses the <code>.axaml</code> extension to distinguish its XAML dialect from XAML files used by other frameworks.</p>
 <p>Akbura keeps familiar concepts such as elements, attributes and property elements, but it is compiled by the Akbura compiler rather than treated as an XML document.</p>
+<h2 id="dictionary-keys">Dictionary keys<a class="header-anchor" href="javascript:;" onclick="location.hash='#dictionary-keys'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>AXAML uses the XML directive <code>x:Key</code>. Akbura uses <code>x.key</code> or its alias <code>x.Key</code>:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Avalonia.Media;
+
+state int resourceIndex = 0;
+
+&lt;Border&gt;
+    &lt;Border.Resources&gt;
+        &lt;SolidColorBrush x.key=&quot;AccentBrush&quot; Color=&quot;Red&quot; /&gt;
+        &lt;SolidColorBrush x.Key={resourceIndex + 1} Color=&quot;Blue&quot; /&gt;
+    &lt;/Border.Resources&gt;
+&lt;/Border&gt;
+</code></pre>
+<p>These are two spellings of one dictionary-entry directive. <code>x:Key</code> is not an
+additional spelling in Akbura. Other attribute names are still case-sensitive.
+A quoted key is a string; <code>{resourceIndex + 1}</code> is a typed C# key expression.
+The key is attached to the parent dictionary entry rather than assigned to a
+property of <code>SolidColorBrush</code>.</p>
+<p><code>x.Name</code> continues to name an element in the component and serves a different
+purpose. Dynamic dictionary keys do not replace element identity. See
+<a href="/#dictionary-resources">Dictionary Resources</a> for key typing, updates,
+ownership, and collisions.</p>
+<h2 id="styles-and-property-references">Styles and property references<a class="header-anchor" href="javascript:;" onclick="location.hash='#styles-and-property-references'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Avalonia styles use the familiar property-element shape in Akbura:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Avalonia.Styling;
+
+&lt;Border&gt;
+    &lt;Border.Styles&gt;
+        &lt;Style Selector=&quot;Button&quot;&gt;
+            &lt;Setter Property=&quot;Background&quot; Value=&quot;Red&quot; /&gt;
+        &lt;/Style&gt;
+    &lt;/Border.Styles&gt;
+&lt;/Border&gt;
+</code></pre>
+<p><code>Property=&quot;Background&quot;</code> resolves a static Avalonia property reference using the
+style's target context. <code>Property=&quot;Button.Background&quot;</code> supplies an explicit
+owner, and <code>Property={Button.BackgroundProperty}</code> uses C# directly. This also
+works for custom holder properties of type <code>AvaloniaProperty</code>.</p>
+<p>Markup extensions keep Akbura's <code>${...}</code> syntax, including bindings stored in
+a setter:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Avalonia.Styling;
+using Akbura.Markup;
+
+&lt;Setter Property=&quot;Button.Background&quot; Value=${Binding AccentBrush} /&gt;
+</code></pre>
+<p>See <a href="/#avalonia-styles">Avalonia Styles</a> for supported literal selector forms,
+typed child insertion, contextual values, and property metadata.</p>
 <h2 id="whitespace-and-xmlspace">Whitespace and <code>xml:space</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#whitespace-and-xmlspace'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>CDATA and <code>xml:space</code> solve different problems.</p>
 <p>CDATA prevents its contents from being interpreted as XML markup:</p>
@@ -470,8 +530,8 @@ Value: {value}
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
-											<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
-												Grid
+											<a href="https://asaicraft.github.io/Akbura/#dictionary-resources" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Dictionary Resources
 												<!-- Heroicon name: mini/arrow-long-right -->
 												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
@@ -492,6 +552,16 @@ Value: {value}
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#xml-xaml-and-axaml'" data-id="xml-xaml-and-axaml" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											XML, XAML and AXAML
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#dictionary-keys'" data-id="dictionary-keys" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Dictionary keys
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#styles-and-property-references'" data-id="styles-and-property-references" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Styles and property references
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

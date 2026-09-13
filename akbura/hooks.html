@@ -195,6 +195,16 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#dictionary-resources" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Dictionary Resources
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Avalonia Styles
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Grid
 									</a>
@@ -358,6 +368,161 @@ gap between render and subscription. Cleanup also runs if that second read fails
 The getter is captured by the subscribing run: list store/filter changes in the
 dependencies. Event listeners use the latest committed handler without duplicate
 subscriptions, and remove exactly the delegate that was added.</p>
+<h2 id="transitions-and-animations">Transitions and animations<a class="header-anchor" href="javascript:;" onclick="location.hash='#transitions-and-animations'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Animation hooks compose the same state and effect primitives. Avalonia updates
+animated visual properties directly: these hooks do not publish a component state
+for each animation frame.</p>
+<h3 id="follow-a-property-with-transitions">Follow a property with transitions<a class="header-anchor" href="javascript:;" onclick="location.hash='#follow-a-property-with-transitions'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-akbura">using Avalonia;
+using Avalonia.Controls;
+using Akbura.Hooks;
+
+state bool expanded = false;
+state bool motionEnabled = true;
+
+useTransition(panel, Visual.OpacityProperty, 250, enabled: motionEnabled);
+
+&lt;StackPanel&gt;
+    &lt;Button Click={() =&gt; expanded = !expanded}&gt;Toggle&lt;/Button&gt;
+    &lt;Border x.Name=&quot;panel&quot; Opacity={expanded ? 1d : 0.25d}&gt;
+        &lt;TextBlock Text=&quot;Animated panel&quot; /&gt;
+    &lt;/Border&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The expression sets the property's target value; <code>useTransition</code> installs the
+matching Avalonia transition. Milliseconds and <code>TimeSpan</code> overloads accept a
+nonnegative duration and an optional <code>Easing</code>, with <code>CubicEaseOut</code> as the default.
+The target, property, duration, easing and <code>enabled</code> flag configure the rule. The
+current property value is not an installation dependency, so changing <code>expanded</code>
+does not replace the transition. An interrupted transition starts from Avalonia's
+current animated value. Installing a transition alone does not create an entrance
+animation from zero.</p>
+<p>Built-in property types include <code>double</code>, <code>float</code>, <code>int</code>, <code>bool</code>, <code>Point</code>,
+<code>RelativePoint</code>, <code>Size</code>, <code>Vector</code>, <code>Thickness</code>, <code>CornerRadius</code>, <code>Color</code>, <code>IBrush</code>,
+<code>BoxShadows</code> and <code>ITransform</code>. Unsupported types and direct properties cannot use
+this short form. For <code>ITransform</code>, use transform operations compatible with
+Avalonia's <code>TransformOperationsTransition</code>.</p>
+<p>For several properties, <code>useTransitions(target, factory, dependencies, enabled)</code>
+accepts a factory returning <code>Avalonia.Animation.Transitions</code>. The factory runs
+after commit when its explicit dependencies change; an inline factory's identity
+does not cause a restart. Each hook removes only its own rules during cleanup and
+preserves rules supplied by styles, application code or other hooks. Do not share
+mutable transition instances between independently animated targets.</p>
+<h3 id="play-a-finite-keyframe-scenario">Play a finite keyframe scenario<a class="header-anchor" href="javascript:;" onclick="location.hash='#play-a-finite-keyframe-scenario'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Akbura.Hooks;
+
+state int replay = 0;
+state bool motionEnabled = true;
+
+useAnimation(panel, MyApp.PulseAnimations.CreatePulseAnimation,
+    [replay], enabled: motionEnabled);
+
+&lt;StackPanel&gt;
+    &lt;Button Click={() =&gt; replay++}&gt;Replay&lt;/Button&gt;
+    &lt;Border x.Name=&quot;panel&quot;&gt;
+        &lt;TextBlock Text=&quot;Pulse&quot; /&gt;
+    &lt;/Border&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The factory is ordinary C#. This companion helper can be shared by declarative
+hooks and event handlers; replace <code>MyApp</code> with your application's namespace:</p>
+<pre><code class="language-csharp">using System;
+using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Styling;
+
+namespace MyApp;
+
+public static class PulseAnimations
+{
+    public static Animation CreatePulseAnimation() =&gt; new()
+    {
+        Duration = TimeSpan.FromMilliseconds(400),
+        FillMode = FillMode.None,
+        Children =
+        {
+            new KeyFrame
+            {
+                Cue = new Cue(0d),
+                Setters = { new Setter(Visual.OpacityProperty, 1d) }
+            },
+            new KeyFrame
+            {
+                Cue = new Cue(0.5d),
+                Setters = { new Setter(Visual.OpacityProperty, 0.35d) }
+            },
+            new KeyFrame
+            {
+                Cue = new Cue(1d),
+                Setters = { new Setter(Visual.OpacityProperty, 1d) }
+            }
+        }
+    };
+}
+</code></pre>
+<p>The factory creates a fresh <code>Animation</code> only when its effect starts. Dependencies
+are copied; list replay counters and all captured configuration values explicitly.
+A new factory delegate on an unrelated render does not restart playback. Target
+replacement, changed dependencies, disablement and component or target detach
+cancel the previous run. Avalonia 12.0.4 supports finite animations through this
+API; <code>IterationCount.Infinite</code> is rejected before playback.</p>
+<p>Effects start after the UI update has committed. If a named target can be replaced
+during a structural update, use the resolver overload:
+<code>useAnimation(() =&gt; panel, MyApp.PulseAnimations.CreatePulseAnimation, [replay])</code>.
+For conditional or replaceable content, resolve the currently present control, for example
+<code>() =&gt; host.Content as Animatable</code> for a named <code>ContentControl</code>, importing
+<code>Avalonia.Animation</code> for <code>Animatable</code>. Transitions accept the same resolver form.
+The resolver runs after the UI update; a null target means no active resource.
+A created element may still need layout: these hooks do not promise measured
+dimensions or a ready composition visual.</p>
+<h3 id="start-and-stop-from-handlers">Start and stop from handlers<a class="header-anchor" href="javascript:;" onclick="location.hash='#start-and-stop-from-handlers'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Akbura.Hooks;
+
+state AnimationController animator = useAnimate();
+
+&lt;StackPanel&gt;
+    &lt;Button Click={async () =&gt;
+    {
+        await animator.RunAsync(panel, MyApp.PulseAnimations.CreatePulseAnimation());
+    }‎}&gt;Animate&lt;/Button&gt;
+    &lt;Button Click={() =&gt; animator.Stop(panel)}&gt;Stop&lt;/Button&gt;
+    &lt;Border x.Name=&quot;panel&quot;&gt;
+        &lt;TextBlock Text=&quot;Manual playback&quot; /&gt;
+    &lt;/Border&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The controller is stable for its hook slot. Call <code>RunAsync</code> from UI-thread handlers
+or effects after the hook lifetime has committed. It accepts an optional
+<code>CancellationToken</code>; <code>Stop(target)</code> cancels this controller's runs for one target,
+and <code>Stop()</code> cancels all its runs. Component detach cancels active runs; reattach
+activates the same controller without automatically replaying them. A target's
+own detach also cancels its run. After cancellation, the returned task is canceled
+even when Avalonia's underlying <code>RunAsync</code> task completes successfully.</p>
+<p>A new run cancels this controller's older runs that animate any of the same
+properties on the same target; disjoint properties can run concurrently. External
+animation owners are not stopped. Choose one active mechanism per target/property:
+combining a transition, declarative animation and manual controller for the same
+property requires application-level coordination. Use <code>await</code> for sequences and
+<code>Task.WhenAll</code> for independent parallel runs; pause, seek and reverse are not part
+of this API.</p>
+<p>Pass <code>enabled: false</code> to any animation hook for an application-level reduced-motion
+setting without changing hook order. This affects only the hook's own resources;
+theme transitions and other animation owners need their own reduced-motion policy.
+Disabled hooks leave the rendered base values in control; they do not synthesize
+an animation's final keyframe. Keep the correct final UI state in ordinary markup.
+<code>FillMode.None</code> returns control to base values after successful playback; forward
+fill modes can retain the animation's ending
+value and should be chosen explicitly. In Avalonia 12.0.4, stopping a <code>Forward</code> or
+<code>Both</code> animation can also retain its last interpolated value in the base property,
+not necessarily its final keyframe. Disabling an already-running animation follows
+that same fill policy. Cleanup does not erase foreign property values to undo it;
+use <code>FillMode.None</code> and a rendered target value when cancellation must reveal the
+application's existing base value. Use render transforms for movement that should
+not reflow neighboring controls.
+Presence, spring physics and composition animations are separate APIs and are not
+implemented by these hooks.</p>
 <h2 id="reducers-and-lifecycle">Reducers and lifecycle<a class="header-anchor" href="javascript:;" onclick="location.hash='#reducers-and-lifecycle'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <pre><code class="language-akbura">state HookReducer&lt;int, int&gt; counter =
     useReducer&lt;int, int&gt;((value, delta) =&gt; value + delta, 0);
@@ -455,6 +620,31 @@ component state follows its own preservation rules.</p>
 										<span v-hash="'#external-sources-and-events'" data-id="external-sources-and-events" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											External sources and events
 										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#transitions-and-animations'" data-id="transitions-and-animations" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Transitions and animations
+										</span>
+											<ul class="ml-4">
+													<li data-id="follow-a-property-with-transitions" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#follow-a-property-with-transitions'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Follow a property with transitions
+														</span>
+													</li>
+													<li data-id="play-a-finite-keyframe-scenario" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#play-a-finite-keyframe-scenario'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Play a finite keyframe scenario
+														</span>
+													</li>
+													<li data-id="start-and-stop-from-handlers" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#start-and-stop-from-handlers'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Start and stop from handlers
+														</span>
+													</li>
+											</ul>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#reducers-and-lifecycle'" data-id="reducers-and-lifecycle" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">

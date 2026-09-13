@@ -342,4 +342,55 @@
   <data name="AKBURA_SEMANTIC_MarkupWhitespaceDuplicate" xml:space="preserve">
     <value>The xml.space directive is specified more than once on this element.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyReferenceNotFound" xml:space="preserve">
+    <value>Avalonia property reference '{0}' was not found.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyReferenceTargetUnknown" xml:space="preserve">
+    <value>The target type for property reference '{0}' is unknown. Use an owner-qualified or static property reference.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyReferenceTargetAmbiguous" xml:space="preserve">
+    <value>Property reference '{0}' is ambiguous across selector targets. Use an owner-qualified property reference.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyDependencyInvalid" xml:space="preserve">
+    <value>Property '{0}' depends on an unknown or ambiguous member '{1}'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyContextualTypeUnknown" xml:space="preserve">
+    <value>The contextual value type of '{0}' is unknown. Use a static property reference or a typed value expression.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyContextualTypeAmbiguous" xml:space="preserve">
+    <value>Property '{0}' has dependencies with incompatible contextual value types.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryKeyRequired" xml:space="preserve">
+    <value>A dictionary child requires an x.key directive.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryKeyValueInvalid" xml:space="preserve">
+    <value>A dictionary key requires a quoted string or a C# expression in braces.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryKeyOutsideDictionary" xml:space="preserve">
+    <value>The x.key directive is only valid for a child of a dictionary content sink.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryKeyDuplicateDirective" xml:space="preserve">
+    <value>The dictionary key is specified more than once. x.key and x.Key are aliases.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryKeyTypeMismatch" xml:space="preserve">
+    <value>Dictionary key type '{0}' cannot be implicitly converted to '{1}'. Quoted keys remain strings.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryValueTypeMismatch" xml:space="preserve">
+    <value>Dictionary child type '{0}' cannot be implicitly converted to value type '{1}'.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryDuplicateConstantKey" xml:space="preserve">
+    <value>Dictionary key '{0}' is specified more than once.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryContractAmbiguous" xml:space="preserve">
+    <value>The content sink implements multiple different mutable dictionary contracts.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupDictionaryReadOnlyTarget" xml:space="preserve">
+    <value>The content sink only provides a read-only dictionary contract.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupPropertyDependencyCycle" xml:space="preserve">
+    <value>Markup assignment dependency cycle: {0}.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupContentAddMethodAmbiguous" xml:space="preserve">
+    <value>Markup child '{0}' matches more than one equally applicable Add overload.</value>
+  </data>
 </root>

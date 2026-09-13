@@ -305,10 +305,77 @@ internal static class ComponentPlanner
                     element.Content,
                     elementAkcss,
                     element.ExplicitKey,
-                    element.RuntimeStorageId));
+                    element.RuntimeStorageId,
+                    CreateAssignments(element)));
             }
 
             return elements.ToPooledImmutableList();
+        }
+
+        private ImmutableArray<ComponentAssignmentReference> CreateAssignments(in PendingElementPlan element)
+        {
+            var order = _semanticModel.GetMarkupAssignmentOrder(element.Syntax, out _);
+            var entries = new List<(int Order, int Source, ComponentAssignmentReference Reference)>();
+            for (var i = 0; i < element.PropertyWrites.Length; i++)
+            {
+                var index = element.PropertyWrites.Start + i;
+                var syntax = _propertyWrites.WrittenSpan[index].Syntax;
+                entries.Add((GetAssignmentOrdinal(order, syntax), syntax.Span.Start,
+                    new(ComponentAssignmentKind.Property, index)));
+            }
+
+            for (var i = 0; i < element.FirstUpdateActions.Length; i++)
+            {
+                var index = element.FirstUpdateActions.Start + i;
+                var action = _firstUpdateActions.WrittenSpan[index];
+                if (action.Kind == ComponentFirstUpdateActionKind.PropertyWrite)
+                {
+                    continue;
+                }
+
+                var syntax = (action.Kind switch
+                {
+                    ComponentFirstUpdateActionKind.NameAssignment => _nameAssignments.WrittenSpan[action.Index].Syntax,
+                    ComponentFirstUpdateActionKind.PropertySubscription => _propertySubscriptions.WrittenSpan[action.Index].Syntax,
+                    ComponentFirstUpdateActionKind.RoutedEvent => _routedEvents.WrittenSpan[action.Index].Syntax,
+                    ComponentFirstUpdateActionKind.CommandBinding => _commandBindings.WrittenSpan[action.Index].Syntax,
+                    _ => element.Syntax,
+                }) ?? element.Syntax;
+                entries.Add((GetAssignmentOrdinal(order, syntax), syntax.Span.Start,
+                    new(ComponentAssignmentKind.FirstUpdateAction, index)));
+            }
+
+            if (element.Content.IsValid)
+            {
+                entries.Add((GetAssignmentOrdinal(order, element.Syntax), element.Syntax.Span.Start,
+                    new(ComponentAssignmentKind.Content, -1, element.Content)));
+            }
+
+            for (var i = 0; i < element.PropertyElements.Length; i++)
+            {
+                var property = _propertyElements[element.PropertyElements.Start + i];
+                if (property.Content.IsValid)
+                {
+                    entries.Add((GetAssignmentOrdinal(order, property.Syntax), property.Syntax.Span.Start,
+                        new(ComponentAssignmentKind.Content, -1, property.Content)));
+                }
+            }
+
+            return entries.OrderBy(static entry => entry.Order).ThenBy(static entry => entry.Source)
+                .Select(static entry => entry.Reference).ToImmutableArray();
+        }
+
+        private static int GetAssignmentOrdinal(ImmutableArray<AkburaSyntax> order, AkburaSyntax syntax)
+        {
+            for (var i = 0; i < order.Length; i++)
+            {
+                if (ReferenceEquals(order[i], syntax))
+                {
+                    return i;
+                }
+            }
+
+            return int.MaxValue;
         }
 
         public void Dispose()
@@ -621,9 +688,10 @@ internal static class ComponentPlanner
             var nameOperation = FindNameOperation(symbol);
             elementId = _elements.Count;
             var explicitKey = nameOperation?.NameSymbol?.Name;
+            var isStyleSubtree = IsStyleSubtree(type, syntax);
             var usesRuntimeStorage =
                 _generationMode == ComponentGenerationMode.DebugStructural &&
-                !scope.IsLocal;
+                !scope.IsLocal && !isStyleSubtree;
             var runtimeStorageId = usesRuntimeStorage
                 ? _nextRuntimeStorageId++
                 : -1;
@@ -732,6 +800,11 @@ internal static class ComponentPlanner
                 isRoot,
                 nameOperation != null,
                 scope);
+            if (isStyleSubtree)
+            {
+                flags &= ~ComponentElementFlags.UsesRuntimeStorage;
+                flags |= ComponentElementFlags.IsStyleSubtree | ComponentElementFlags.IsLocal;
+            }
             _elements[elementId] = new PendingElementPlan(
                 elementId,
                 syntax,
@@ -1449,7 +1522,9 @@ internal static class ComponentPlanner
         private ComponentContentTargetReference LowerContent(in PendingContentPlan pending)
         {
             var operation = pending.Operation;
-            if (operation.HasErrors || operation.Property == null)
+            if (operation.HasErrors || (operation.Property == null &&
+                operation.ContentModel.Kind is not (MarkupContentKind.Dictionary or
+                    MarkupContentKind.Collection or MarkupContentKind.AddMethods)))
             {
                 return default;
             }
@@ -1459,7 +1534,8 @@ internal static class ComponentPlanner
                 return LowerPropertyContent(pending, pending.BoundaryValue);
             }
 
-            return operation.ContentModel.IsCollection
+            return operation.ContentModel.Kind is MarkupContentKind.Collection or
+                MarkupContentKind.Dictionary or MarkupContentKind.AddMethods
                 ? LowerCollectionContent(pending)
                 : LowerPropertyContent(pending, boundaryValue: default);
         }
@@ -1492,12 +1568,21 @@ internal static class ComponentPlanner
             }
             else if (!firstUpdateValue.IsValid && HasExpressionContent(content))
             {
+                var fixedPropertyReference = IsFixedAvaloniaPropertyReference(operation.ValueOperation.Operation);
                 var expressionValue = AddWholeContentValue(
                     operation,
-                    ComponentContentValueKind.CSharpExpression);
-                updateValue = expressionValue;
+                    fixedPropertyReference ? ComponentContentValueKind.Constant :
+                        ComponentContentValueKind.CSharpExpression);
+                if (!fixedPropertyReference)
+                {
+                    updateValue = expressionValue;
+                }
 
-                if (destination.Kind == PropertyWriteKind.ComponentParameter)
+                if (fixedPropertyReference || destination.Kind == PropertyWriteKind.ComponentParameter ||
+                    destination.AssignBinding ||
+                    (destination.ClrProperty != null &&
+                        (!_semanticModel.MarkupPropertyMetadata.GetMetadata(destination.ClrProperty).Dependencies.IsDefaultOrEmpty ||
+                            _semanticModel.IsAvaloniaPropertyType(destination.ClrProperty.Type))))
                 {
                     firstUpdateValue = expressionValue;
                 }
@@ -1525,6 +1610,18 @@ internal static class ComponentPlanner
             return new ComponentContentTargetReference(
                 ComponentContentTargetKind.Property,
                 index);
+        }
+
+        private bool IsFixedAvaloniaPropertyReference(Microsoft.CodeAnalysis.IOperation? operation)
+        {
+            while (operation is Microsoft.CodeAnalysis.Operations.IConversionOperation conversion && conversion.IsImplicit)
+            {
+                operation = conversion.Operand;
+            }
+
+            return operation is Microsoft.CodeAnalysis.Operations.IFieldReferenceOperation
+                { Instance: null, Field: { IsStatic: true, IsReadOnly: true } field } &&
+                _semanticModel.IsAvaloniaPropertyType(field.Type);
         }
 
         private ComponentContentTargetReference LowerCollectionContent(
@@ -1576,25 +1673,61 @@ internal static class ComponentPlanner
 
                 if (value.IsValid)
                 {
-                    _contentItems.Add(new ComponentContentItemPlan(value, child.Syntax));
+                    var key = default(ComponentContentValueReference);
+                    if (operation.ContentModel.IsDictionary && child.ComponentSymbol != null)
+                    {
+                        var keyOperation = child.ComponentSymbol.AttributeOperations
+                            .OfType<IMarkupDictionaryKeyOperation>().FirstOrDefault();
+                        if (keyOperation == null || keyOperation.HasErrors)
+                        {
+                            continue;
+                        }
+
+                        var keyIndex = _csharpValues.Count;
+                        _csharpValues.Add(new ComponentCSharpValuePlan(
+                            keyOperation.ValueOperation,
+                            convertedValue: null,
+                            keyOperation.LiteralValue,
+                            keyOperation.KeyType.Symbol as ITypeSymbol));
+                        key = new ComponentContentValueReference(
+                            keyOperation.ValueSyntax is MarkupLiteralAttributeValueSyntax
+                                ? ComponentContentValueKind.Constant
+                                : ComponentContentValueKind.CSharpExpression,
+                            keyIndex);
+                    }
+
+                    _contentItems.Add(new ComponentContentItemPlan(value, child.Syntax, child.InsertionMethod, key));
                 }
             }
 
             Debug.Assert(elementOffset == pending.ChildElements.Length);
 
             var itemCount = _contentItems.Count - itemStart;
-            if (itemCount == 0)
+            if (itemCount == 0 && !operation.ContentModel.IsDictionary)
             {
                 return default;
             }
 
             var index = _collectionContents.Count;
+            var replacesStyles = false;
+            if (operation.ContentModel.IsCollection)
+            {
+                var styleBaseType = _compilation.GetTypeByMetadataName("Avalonia.Styling.StyleBase");
+                foreach (var child in content)
+                {
+                    replacesStyles |= child.ComponentSymbol?.ComponentType is { } childType &&
+                        IsImplicitConversion(childType, styleBaseType);
+                }
+            }
+
             _collectionContents.Add(new ComponentCollectionContentPlan(
                 index,
                 pending.OwnerElementId,
                 destination,
                 new ComponentPlanRange(itemStart, itemCount),
-                operation.Syntax));
+                operation.Syntax,
+                operation.ContentModel.DictionaryShape,
+                replacesStyles));
             return new ComponentContentTargetReference(
                 ComponentContentTargetKind.Collection,
                 index);
@@ -1700,11 +1833,10 @@ internal static class ComponentPlanner
                 index);
         }
 
-        private static CollectionWritePlan CreateCollectionWritePlan(IMarkupContentOperation operation)
+        private CollectionWritePlan CreateCollectionWritePlan(IMarkupContentOperation operation)
         {
             var property = operation.Property;
             var elementType = operation.ContentModel.AllowedChildType.Symbol as ITypeSymbol;
-            Debug.Assert(property != null);
 
             if (property?.Parameter is { } parameter)
             {
@@ -1722,7 +1854,9 @@ internal static class ComponentPlanner
 
             if (property == null)
             {
-                return default;
+                return operation.ContainingComponent?.ComponentType is ITypeSymbol ownerType
+                    ? CollectionWritePlan.CreateSelf(ownerType, elementType)
+                    : default;
             }
 
             var read = PropertyReadPlan.Create(property);
@@ -1821,6 +1955,21 @@ internal static class ComponentPlanner
             int scopeId,
             in PropertyWritePlan destination)
         {
+            if (destination.AssignBinding)
+            {
+                var assignedResult = MarkupExtensionResultPlan.Create(in _resultEnvironment, extension,
+                    MarkupExtensionDeliveryPolicy.AssignBindingObject);
+                if (!assignedResult.IsValid)
+                {
+                    return default;
+                }
+
+                var assignedIndex = _markupExtensions.Count;
+                _markupExtensions.Add(assignedResult);
+                return new ComponentPropertyValueReference(
+                    ComponentPropertyValueKind.MarkupExtensionValue, assignedIndex);
+            }
+
             if (extension.Binding != null)
             {
                 return LowerMarkupBinding(extension, scopeId, destination);
@@ -1997,6 +2146,27 @@ internal static class ComponentPlanner
             }
 
             return flags;
+        }
+
+        private bool IsStyleSubtree(ITypeSymbol type, MarkupElementSyntax syntax)
+        {
+            var styleBase = _compilation.GetTypeByMetadataName("Avalonia.Styling.StyleBase");
+            if (IsImplicitConversion(type, styleBase))
+            {
+                return true;
+            }
+
+            for (var parent = syntax.Parent; parent != null; parent = parent.Parent)
+            {
+                if (parent is MarkupElementSyntax element &&
+                    _semanticModel.GetSymbolInfo(element).Symbol is IMarkupComponentSymbol component &&
+                    component.ComponentType is { } parentType && IsImplicitConversion(parentType, styleBase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string CreateRuntimeStorageExpression(

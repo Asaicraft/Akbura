@@ -1,4 +1,4 @@
-﻿using Akbura.Language.BoundTree;
+using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -350,6 +350,19 @@ internal sealed partial class MarkupBinder : Binder
             return false;
         }
 
+        if (parameter.BindingKind == ParamBindingKind.Default && parameter.Name == "Content" &&
+            parameter.Type.Symbol is CSharpTypeSymbol dictionaryType)
+        {
+            var dictionary = MarkupDictionaryShape.Create(dictionaryType,
+                SemanticModel.Compilation.CSharpCompilation);
+            if (dictionary.ContractType != null && !dictionary.IsAmbiguous && !dictionary.IsReadOnlyOnly)
+            {
+                // Generated [Content] dictionaries have their own mutable backing even
+                // when a compiled facade exposes the sink as a CLR content property.
+                return true;
+            }
+        }
+
         foreach (var attribute in markupElement.StartTag.Attributes)
         {
             if (SemanticModel.GetSymbolInfo(attribute).Symbol is IPropertySymbol
@@ -368,10 +381,16 @@ internal sealed partial class MarkupBinder : Binder
                 SemanticModel.GetSymbolInfo(elementContent.Element).Symbol is IPropertySymbol
                 {
                     Parameter: { } setParameter
-                } &&
+                } property &&
                 ReferenceEquals(setParameter, parameter))
             {
-                return true;
+                // Entries populate an existing dictionary; they do not assign the
+                // parameter that supplies it. A required receiver still needs an
+                // attribute assignment (or a declared default value).
+                if (!SemanticModel.CreateMarkupPropertyElementContentModel(property).IsDictionary)
+                {
+                    return true;
+                }
             }
         }
 
@@ -387,7 +406,10 @@ internal sealed partial class MarkupBinder : Binder
             return false;
         }
 
-        if (component?.ContentModel.IsCollection == true)
+        if (component?.ContentModel.IsCollection == true ||
+            (component?.ContentModel.DictionaryShape.ContractType != null &&
+                !component.ContentModel.DictionaryShape.IsAmbiguous &&
+                !component.ContentModel.DictionaryShape.IsReadOnlyOnly))
         {
             return true;
         }
@@ -428,17 +450,35 @@ internal sealed partial class MarkupBinder : Binder
             SemanticModel.BindingSession.MarkupWhitespace
                 .GetEffectiveMode(markupElement);
 
+        if (containingElement != null && TryBindAssignmentContent(markupElement,
+                containingElement, containingComponent, property, contentModel, whitespaceMode,
+                content: default, out var assignmentSetter))
+        {
+            return assignmentSetter;
+        }
+
         var content = SemanticModel.CreateMarkupChildren(
             markupElement,
             contentModel,
             out var contentDiagnostics);
+        SemanticModel.GetMarkupAssignmentOrder(markupElement, out var assignmentOrderDiagnostics);
 
         using var diagnosticsBuilder =
             ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
 
         diagnosticsBuilder.AddRange(contentDiagnostics);
+        diagnosticsBuilder.AddRange(assignmentOrderDiagnostics);
 
-        if (!contentModel.IsCollection && !property.CanWrite)
+        var assignmentContract = SemanticModel.GetMarkupPropertyAssignmentContract(property, containingElement);
+        AddAssignmentContractDiagnostics(markupElement, property.Name, assignmentContract,
+            requiresLiteralConversion: false, diagnosticsBuilder);
+        foreach (var child in content)
+        {
+            AddAssignmentValueDiagnostics(child.Syntax, property.Name, assignmentContract,
+                child.Type.Symbol as CSharpTypeSymbol, diagnosticsBuilder);
+        }
+
+        if (!contentModel.IsCollection && !contentModel.IsDictionary && !property.CanWrite)
         {
             diagnosticsBuilder.Add(
                 new AkburaSemanticDiagnostic(
@@ -508,6 +548,21 @@ internal sealed partial class MarkupBinder : Binder
                 SemanticModel.GetCachedSemanticDiagnostics(
                     markupElement);
 
+            if (elementProperty != null)
+            {
+                using var assignmentDiagnostics = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                assignmentDiagnostics.AddRange(elementDiagnostics);
+                var contract = SemanticModel.GetMarkupPropertyAssignmentContract(elementProperty, markupElement);
+                AddAssignmentContractDiagnostics(markupElement, elementProperty.Name, contract,
+                    requiresLiteralConversion: false, assignmentDiagnostics);
+                foreach (var child in componentSymbol.Children)
+                {
+                    AddAssignmentValueDiagnostics(child.Syntax, elementProperty.Name, contract,
+                        child.Type.Symbol as CSharpTypeSymbol, assignmentDiagnostics);
+                }
+                elementDiagnostics = assignmentDiagnostics.ToImmutable();
+            }
+
             var elementValueType =
                 componentSymbol.Children.Length == 1
                     ? componentSymbol.Children[0].Type
@@ -538,7 +593,10 @@ internal sealed partial class MarkupBinder : Binder
                 isSynthesizedString: false,
                 diagnostics: elementDiagnostics,
                 hasErrors:
-                    elementProperty == null ||
+                    (elementProperty == null &&
+                        !componentSymbol.ContentModel.IsDictionary &&
+                        !componentSymbol.ContentModel.IsCollection &&
+                        componentSymbol.ContentModel.Kind != MarkupContentKind.AddMethods) ||
                     elementDiagnostics.Length > 0);
         }
 
@@ -557,6 +615,13 @@ internal sealed partial class MarkupBinder : Binder
         var property =
             SemanticModel.CreateMarkupContentPropertySymbol(
                 componentSymbol);
+
+        if (property != null && TryBindAssignmentContent(markupElement, markupElement,
+                componentSymbol, property, componentSymbol.ContentModel, whitespaceMode,
+                componentSymbol.Children, out var assignmentSetter))
+        {
+            return assignmentSetter;
+        }
 
         var targetType =
             AkburaSemanticModel.GetMarkupContentTargetType(
@@ -698,6 +763,11 @@ internal sealed partial class MarkupBinder : Binder
 
     private BoundNode BindMarkupPropertyOrEvent(MarkupAttributeSyntax markupAttribute)
     {
+        if (AkburaSemanticModel.IsMarkupDictionaryKeyDirective(markupAttribute))
+        {
+            return BindMarkupDictionaryKey((MarkupAttachedPropertyAttributeSyntax)markupAttribute);
+        }
+
         if (AkburaSemanticModel.IsMarkupWhitespaceDirective(markupAttribute))
         {
             return BindMarkupWhitespaceDirective(
@@ -795,7 +865,16 @@ internal sealed partial class MarkupBinder : Binder
         var valueBinding = CSharpBindingResult.Empty;
         var markupExtensionBinding = default(MarkupExtensionBindingResult);
         var literalConversionStatus = MarkupLiteralConversionStatus.Unsupported;
+        var assignmentElement = AkburaSemanticModel.GetContainingMarkupElement(markupAttribute);
+        var assignmentContract = SemanticModel.GetMarkupPropertyAssignmentContract(property, assignmentElement);
         var targetType = GetExpectedValueType(property);
+        if (property?.Command == null && !assignmentContract.AssignBinding &&
+            assignmentContract.ContextualValueType is { } contextualType &&
+            !Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(contextualType, assignmentContract.DeclaredType))
+        {
+            targetType = contextualType;
+        }
+        var propertyReference = default(ResolvedMarkupPropertyReference);
         object? convertedValue = null;
         var appliedAkcssSymbols = ImmutableArray<IAkcssSymbol>.Empty;
 
@@ -828,7 +907,42 @@ internal sealed partial class MarkupBinder : Binder
                     convertedValue = gridDefinitions;
                 }
             }
-            else if (property?.Type.Symbol is CSharpTypeSymbol targetLiteralType)
+            else if (assignmentContract.ContextualValueType is CSharpTypeSymbol typeLiteralTarget &&
+                typeLiteralTarget.Name == "Type" && typeLiteralTarget.ContainingNamespace.ToDisplayString() == "System")
+            {
+                convertedValue = SemanticModel.ResolveMarkupReferenceOwner(literalValue);
+                literalConversionStatus = convertedValue == null
+                    ? MarkupLiteralConversionStatus.Invalid : MarkupLiteralConversionStatus.Success;
+                if (convertedValue != null)
+                {
+                    valueType = new CSharpSymbolDefinition(typeLiteralTarget);
+                }
+            }
+            else if (assignmentContract.ContextualValueType is CSharpTypeSymbol selectorTarget &&
+                selectorTarget.Name == "Selector" && selectorTarget.ContainingNamespace.ToDisplayString() == "Avalonia.Styling")
+            {
+                convertedValue = SemanticModel.ResolveMarkupSelectorLiteral(literalValue,
+                    AkburaSemanticModel.GetMarkupLiteralTextSpan(literalValueSyntax));
+                literalConversionStatus = convertedValue == null
+                    ? MarkupLiteralConversionStatus.Invalid : MarkupLiteralConversionStatus.Success;
+                if (convertedValue != null)
+                {
+                    valueType = new CSharpSymbolDefinition(selectorTarget);
+                }
+            }
+            else if (assignmentContract.ContextualValueType is CSharpTypeSymbol referenceTarget &&
+                SemanticModel.IsAvaloniaPropertyType(referenceTarget) && assignmentElement != null)
+            {
+                propertyReference = SemanticModel.ResolveMarkupAvaloniaPropertyReference(literalValue,
+                    assignmentElement, AkburaSemanticModel.GetMarkupLiteralTextSpan(literalValueSyntax));
+                if (propertyReference != null)
+                {
+                    convertedValue = new CSharpSymbolDefinition(propertyReference.Field);
+                    valueType = new CSharpSymbolDefinition(propertyReference.Field.Type);
+                    literalConversionStatus = MarkupLiteralConversionStatus.Success;
+                }
+            }
+            else if (assignmentContract.ContextualValueType is CSharpTypeSymbol targetLiteralType)
             {
                 literalConversionStatus = MarkupLiteralValueConverter.Convert(
                     literalValue,
@@ -896,6 +1010,21 @@ internal sealed partial class MarkupBinder : Binder
             var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                AddAssignmentContractDiagnostics(markupAttribute, property.Name, assignmentContract,
+                    literalValue != null, diagnosticsBuilder);
+                if (valueKind == MarkupAttributeValueKind.DynamicExpression)
+                {
+                    AddAssignmentValueDiagnostics(markupAttribute, property.Name, assignmentContract,
+                        valueBinding.Conversion.SourceType ?? valueType.Symbol as CSharpTypeSymbol,
+                        diagnosticsBuilder);
+                }
+                if (literalValue != null && assignmentElement != null &&
+                    assignmentContract.DeclaredType is { } referenceTargetType &&
+                    SemanticModel.IsAvaloniaPropertyType(referenceTargetType) && propertyReference == null)
+                {
+                    AddPropertyReferenceDiagnostic(markupAttribute, literalValue,
+                        assignmentElement, diagnosticsBuilder);
+                }
                 AkburaSemanticModel.AddMarkupAttributeBindingDiagnostics(
                     markupAttribute,
                     property,

@@ -1,5 +1,6 @@
 using Akbura.Language.Syntax;
 using Akbura.Pools;
+using Akbura.Workspaces.Documents;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 #if DEBUG
@@ -173,6 +174,9 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             semanticBuilder,
             cancellationToken);
 
+        AddMarkupPropertyReferenceClassifications(semanticModel, root, span,
+            semanticBuilder, cancellationToken);
+
 #if DEBUG
         WriteClassificationStage(
             document.FilePath,
@@ -336,6 +340,12 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
         foreach (var syntactic in syntacticSpans)
         {
+            if (syntactic.Kind == AkburaClassificationKind.String)
+            {
+                AddUncoveredStringParts(syntactic, orderedSemantic, prefixMaximumEnd, items);
+                continue;
+            }
+
             if (!IsCoveredBySemanticSpan(
                     syntactic.Span,
                     orderedSemantic,
@@ -348,6 +358,107 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         items.Sort(CompareClassifications);
 
         return [.. items];
+    }
+
+    private static void AddMarkupPropertyReferenceClassifications(
+        Akbura.Language.AkburaSemanticModel semanticModel,
+        AkburaSyntax root,
+        TextSpan span,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
+        CancellationToken cancellationToken)
+    {
+        foreach (var literal in root.DescendantNodes().OfType<MarkupLiteralAttributeValueSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!literal.Span.IntersectsWith(span))
+            {
+                continue;
+            }
+
+            if (semanticModel.GetMarkupAvaloniaPropertyReference(literal) is { } reference)
+            {
+                if (reference.OwnerSpan.Length > 0 && reference.OwnerSpan.IntersectsWith(span))
+                {
+                    builder.Add(new AkburaClassifiedSpan(reference.OwnerSpan,
+                        AkburaClassificationKind.ClassName));
+                }
+
+                if (reference.PropertySpan.Length > 0 && reference.PropertySpan.IntersectsWith(span))
+                {
+                    builder.Add(new AkburaClassifiedSpan(reference.PropertySpan,
+                        AkburaClassificationKind.FieldName));
+                }
+            }
+            else if (semanticModel.GetMarkupSelectorLiteral(literal) is { } selector)
+            {
+                foreach (var branch in selector.Branches)
+                {
+                    foreach (var node in branch)
+                    {
+                        if (node.Type != null && node.Span.IntersectsWith(span))
+                        {
+                            builder.Add(new AkburaClassifiedSpan(node.Span,
+                                AkburaClassificationKind.ClassName));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void AddUncoveredStringParts(
+        AkburaClassifiedSpan syntactic,
+        AkburaClassifiedSpan[] semantic,
+        int[] prefixMaximumEnd,
+        List<AkburaClassifiedSpan> items)
+    {
+        var start = syntactic.Span.Start;
+        var low = 0;
+        var high = semantic.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (prefixMaximumEnd[middle] <= start)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        for (var index = low; index < semantic.Length; index++)
+        {
+            var classification = semantic[index];
+            if (classification.Span.Start >= syntactic.Span.End)
+            {
+                break;
+            }
+
+            if (!classification.Span.IntersectsWith(syntactic.Span))
+            {
+                continue;
+            }
+
+            if (classification.Span.Start > start)
+            {
+                items.Add(new AkburaClassifiedSpan(TextSpan.FromBounds(start,
+                    Math.Min(classification.Span.Start, syntactic.Span.End)), syntactic.Kind));
+            }
+
+            start = Math.Max(start, classification.Span.End);
+            if (start >= syntactic.Span.End)
+            {
+                return;
+            }
+        }
+
+        if (start < syntactic.Span.End)
+        {
+            items.Add(new AkburaClassifiedSpan(TextSpan.FromBounds(start, syntactic.Span.End),
+                syntactic.Kind));
+        }
     }
 
     private static bool IsCoveredBySemanticSpan(
@@ -476,15 +587,20 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         var classification =
             AkburaSyntaxClassificationFacts.GetClassification(token);
 
+        var tokenSpan = token.Parent is MarkupTextLiteralSyntax
+            { Parent: MarkupLiteralAttributeValueSyntax literal }
+            ? AkburaMarkupSyntaxFacts.GetAttributeLiteralSpan(literal)
+            : token.Span;
+
         if (classification is null ||
-            token.Span.Length == 0 ||
-            !token.Span.OverlapsWith(requestedSpan))
+            tokenSpan.Length == 0 ||
+            !tokenSpan.OverlapsWith(requestedSpan))
         {
             return;
         }
 
         builder.Add(new AkburaClassifiedSpan(
-            token.Span,
+            tokenSpan,
             classification.Value));
     }
 

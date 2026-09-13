@@ -10,7 +10,7 @@ using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;
 
 namespace Akbura.Workspaces.Completion;
 
-internal sealed class AkburaCompletionService : IAkburaCompletionService
+internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 {
     private const int MaximumCompletionItems = 50;
     private const string HooksNamespace = "Akbura.Hooks";
@@ -160,6 +160,14 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
                 GetAttributeItems(
                     semanticModel,
                     syntaxContext,
+                    position,
+                    cancellationToken),
+
+            AkburaCompletionContextKind.AttributeValue =>
+                GetAttributeValueItems(
+                    semanticModel,
+                    syntaxContext,
+                    position,
                     cancellationToken),
 
             AkburaCompletionContextKind.PropertyElementName =>
@@ -937,6 +945,7 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         GetAttributeItems(
             AkburaSemanticModel semanticModel,
             AkburaSyntacticCompletionContext context,
+            int position,
             CancellationToken cancellationToken)
     {
         var members = GetMemberItems(
@@ -956,7 +965,8 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
         return OrderCompletionItems(
             members
                 .Concat(attachedProperties)
-                .Concat(utilities),
+                .Concat(utilities)
+                .Concat(GetDictionaryKeyItems(semanticModel, context, position)),
             context.Prefix);
     }
 
@@ -1448,6 +1458,7 @@ internal sealed class AkburaCompletionService : IAkburaCompletionService
             AkburaCompletionContextKind.ComponentName or
             AkburaCompletionContextKind.AttributeName or
             AkburaCompletionContextKind.PropertyElementName or
+            AkburaCompletionContextKind.AttributeValue or
             AkburaCompletionContextKind.MarkupExtensionType;
     }
 

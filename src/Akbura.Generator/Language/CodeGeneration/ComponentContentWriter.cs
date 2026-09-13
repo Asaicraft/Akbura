@@ -261,6 +261,36 @@ internal readonly ref struct ComponentContentWriter
         in ComponentPlan component,
         in ComponentCollectionContentPlan plan)
     {
+        if (plan.DictionaryShape.IsDictionary)
+        {
+            return WriteDictionary(component, plan, useRenderState: false);
+        }
+
+        if (plan.ReplacesStyles)
+        {
+            ref readonly var styleOwner = ref component.Elements.ItemRef(plan.OwnerElementId);
+            var types = new CSharpValueWriter(_writer);
+            using var styleMapping = _mappings.WriteStart(plan.Syntax);
+            _writer.Write(GetStyleStateName(plan.Id)).Write(".Reconcile(");
+            _writer.Write("((global::System.Collections.Generic.IList<");
+            types.WriteTypeName(plan.Destination.ElementType);
+            _writer.Write(">)");
+            new CollectionWriter(_writer).WriteTarget(plan.Destination, styleOwner.Identifier);
+            _writer.Write("), new ");
+            types.WriteTypeName(plan.Destination.ElementType);
+            _writer.WriteLine("[] {");
+            _writer.CurrentIndent += _writer.TabSize;
+            for (var i = 0; i < plan.Items.Length; i++)
+            {
+                WriteValue(component, component.ContentItems.ItemRef(plan.Items.Start + i).Value);
+                _writer.WriteLine(",");
+            }
+
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("});");
+            return true;
+        }
+
         Debug.Assert((uint)plan.OwnerElementId < (uint)component.Elements.Length);
         ref readonly var owner = ref component.Elements.ItemRef(plan.OwnerElementId);
         var targetExpression = owner.Identifier;
@@ -282,9 +312,21 @@ internal readonly ref struct ComponentContentWriter
                 continue;
             }
 
+            if (item.InsertionMethod != null)
+            {
+                _writer.Write("(");
+                new CSharpValueWriter(_writer).WriteTypeName(item.InsertionMethod.Parameters[0].Type);
+                _writer.Write(")(");
+            }
+
             if (!WriteValue(component, item.Value))
             {
                 continue;
+            }
+
+            if (item.InsertionMethod != null)
+            {
+                _writer.Write(")");
             }
 
             collectionWriter.WriteEnd();
@@ -299,6 +341,11 @@ internal readonly ref struct ComponentContentWriter
         in ComponentPlan component,
         in ComponentCollectionContentPlan plan)
     {
+        if (plan.DictionaryShape.IsDictionary)
+        {
+            return WriteDictionary(component, plan, useRenderState: true);
+        }
+
         if (!CanWriteStructuralCollection(component, plan))
         {
             return false;
@@ -389,6 +436,11 @@ internal readonly ref struct ComponentContentWriter
         ref readonly var owner =
             ref component.Elements.ItemRef(plan.OwnerElementId);
 
+        if (plan.DictionaryShape.IsDictionary)
+        {
+            return owner.UsesRuntimeStorage;
+        }
+
         return owner.UsesRuntimeStorage &&
             plan.Destination.Kind is (
                 CollectionWriteKind.Property or
@@ -428,8 +480,8 @@ internal readonly ref struct ComponentContentWriter
 
             if (item.Value.Kind == ComponentContentValueKind.Element &&
                 ((uint)item.Value.Index >= (uint)component.Elements.Length ||
-                    !component.Elements.ItemRef(
-                        item.Value.Index).UsesRuntimeStorage))
+                    !(component.Elements.ItemRef(item.Value.Index).UsesRuntimeStorage ||
+                        component.Elements.ItemRef(item.Value.Index).IsStyleSubtree)))
             {
                 return false;
             }
@@ -451,6 +503,105 @@ internal readonly ref struct ComponentContentWriter
         valueWriter.WriteTypeName(destination.ReceiverType);
         _writer.Write(")");
     }
+
+    public static string GetDictionaryStateName(int contentId) => "__dictionaryContent" + contentId;
+
+    public static string GetStyleStateName(int contentId) => "__styleContent" + contentId;
+
+    public static void WriteStyleStateType(CodeWriter writer, in ComponentCollectionContentPlan plan)
+    {
+        writer.Write("global::Akbura.HotReload.AkburaRenderCollectionOwner<");
+        new CSharpValueWriter(writer).WriteTypeName(plan.Destination.ElementType);
+        writer.Write(">");
+    }
+
+    public static void WriteDictionaryStateType(CodeWriter writer, in ComponentCollectionContentPlan plan)
+    {
+        writer.Write("global::Akbura.HotReload.AkburaRenderDictionaryReconciler");
+        if (plan.DictionaryShape.IsGeneric)
+        {
+            var types = new CSharpValueWriter(writer);
+            writer.Write("<");
+            types.WriteTypeNameWithNullableAnnotation(plan.DictionaryShape.KeyType);
+            writer.Write(", ");
+            types.WriteTypeNameWithNullableAnnotation(plan.DictionaryShape.ValueType);
+            writer.Write(">");
+        }
+    }
+
+    public bool WriteDictionary(
+        in ComponentPlan component,
+        in ComponentCollectionContentPlan plan,
+        bool useRenderState)
+    {
+        ref readonly var owner = ref component.Elements.ItemRef(plan.OwnerElementId);
+        var shape = plan.DictionaryShape;
+        if (shape.ContractType == null || shape.IsAmbiguous || shape.IsReadOnlyOnly)
+        {
+            return false;
+        }
+
+        using var mapping = _mappings.WriteStart(plan.Syntax);
+        var types = new CSharpValueWriter(_writer);
+        if (useRenderState && owner.UsesRuntimeStorage)
+        {
+            _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+            _writer.Write(".ReconcileDictionary(");
+            _writer.WriteIntegerLiteral(owner.RuntimeStorageId).Write(", ");
+            _writer.WriteStringLiteral(GetDictionarySlot(plan)).Write(", ");
+        }
+        else
+        {
+            _writer.Write(GetDictionaryStateName(plan.Id)).Write(".Reconcile(");
+        }
+
+        _writer.Write("((");
+        types.WriteTypeNameWithNullableAnnotation(shape.ContractType);
+        _writer.Write(")");
+        new CollectionWriter(_writer).WriteTarget(plan.Destination, owner.Identifier);
+        _writer.Write("), new ");
+        WriteDictionaryEntryType(shape);
+        _writer.WriteLine("[]");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        for (var i = 0; i < plan.Items.Length; i++)
+        {
+            ref readonly var item = ref component.ContentItems.ItemRef(plan.Items.Start + i);
+            _writer.Write("new ");
+            WriteDictionaryEntryType(shape);
+            _writer.Write("(");
+            WriteValue(component, item.Key);
+            _writer.Write(", ");
+            WriteValue(component, item.Value);
+            _writer.WriteLine("),");
+        }
+
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("});");
+        return true;
+    }
+
+    private void WriteDictionaryEntryType(Akbura.Language.Symbols.MarkupDictionaryShape shape)
+    {
+        if (!shape.IsGeneric)
+        {
+            _writer.Write("global::System.Collections.DictionaryEntry");
+            return;
+        }
+
+        var types = new CSharpValueWriter(_writer);
+        _writer.Write("global::System.Collections.Generic.KeyValuePair<");
+        types.WriteTypeNameWithNullableAnnotation(shape.KeyType);
+        _writer.Write(", ");
+        types.WriteTypeNameWithNullableAnnotation(shape.ValueType);
+        _writer.Write(">");
+    }
+
+    private static string GetDictionarySlot(in ComponentCollectionContentPlan plan) =>
+        plan.Destination.Kind == CollectionWriteKind.Self
+            ? "$dictionary"
+            : "dictionary:" + (plan.Destination.ComponentParameterName ??
+                plan.Destination.Property.ClrProperty?.Name ?? "content");
 
     private bool WriteValue(
         in ComponentPlan component,

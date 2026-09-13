@@ -363,7 +363,7 @@ public sealed class ComponentLifecycleWriterTests
                 .card { Width: 20; }
             }
 
-            <Border class="card" />
+            <Border x.Name="root" class="card" />
             """,
             currentIndent: 4,
             generationMode: ComponentGenerationMode.DebugStructural);
@@ -377,6 +377,7 @@ public sealed class ComponentLifecycleWriterTests
         var guardStart = methods.HotReload.IndexOf(
             ".ShouldApplyInitialValues(0)",
             StringComparison.Ordinal);
+        Assert.True(guardStart >= 0, methods.HotReload);
         var guardOpen = methods.HotReload.IndexOf(
             '{',
             guardStart);
@@ -388,9 +389,9 @@ public sealed class ComponentLifecycleWriterTests
             guardClose,
             StringComparison.Ordinal);
 
-        Assert.True(guardStart >= 0, methods.HotReload);
         Assert.True(guardOpen > guardStart, methods.HotReload);
         Assert.True(guardClose > guardOpen, methods.HotReload);
+        Assert.Contains(".Name = \"root\";", methods.HotReload[guardOpen..guardClose], StringComparison.Ordinal);
         Assert.True(applyStyles > guardClose, methods.HotReload);
         Assert.Contains(
             ".ApplyAkcssStylesOperation(",

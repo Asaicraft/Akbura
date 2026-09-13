@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -595,6 +595,15 @@ internal partial class AkburaSemanticModel
         var returnType = isAsync
             ? CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.Task<object>")
             : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword));
+        if (IsMarkupDictionaryKeyDirective(markupAttribute) &&
+            attributeSymbol is Symbols.IPropertySymbol { Type.Symbol: ITypeSymbol keyType })
+        {
+            var keyTypeName = keyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            returnType = CSharpSyntaxFactory.ParseTypeName(isAsync
+                ? "global::System.Threading.Tasks.Task<" + keyTypeName + ">"
+                : keyTypeName);
+        }
+
         var method = CSharpSyntaxFactory.MethodDeclaration(returnType, MarkupInlineReferenceProbeMethodName)
             .WithParameterList(CreateMarkupInlineReferenceProbeParameterList(
                 markupAttribute,

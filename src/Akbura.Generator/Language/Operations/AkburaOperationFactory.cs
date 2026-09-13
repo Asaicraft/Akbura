@@ -34,6 +34,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             BoundKind.MarkupComponent => CreateMarkupContentOperation((BoundMarkupComponent)boundNode),
             BoundKind.MarkupContentSetter => CreateMarkupContentOperation((BoundMarkupContentSetter)boundNode),
             BoundKind.MarkupNameAssignment => CreateMarkupNameAssignmentOperation((BoundMarkupNameAssignment)boundNode),
+            BoundKind.MarkupDictionaryKey => CreateMarkupDictionaryKeyOperation((BoundMarkupDictionaryKey)boundNode),
             BoundKind.MarkupPropertySetter => CreateMarkupPropertySetterOperation((BoundMarkupPropertySetter)boundNode),
             BoundKind.MarkupCommandBinding => CreateMarkupCommandBindingOperation((BoundMarkupCommandBinding)boundNode),
             BoundKind.MarkupRoutedEventBinding => CreateMarkupRoutedEventBindingOperation((BoundMarkupRoutedEventBinding)boundNode),
@@ -227,6 +228,11 @@ internal sealed class AkburaOperationFactory : IOperationFactory
                 boundNode.ValueOperation,
                 CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
     }
+
+    private MarkupDictionaryKeyOperation CreateMarkupDictionaryKeyOperation(BoundMarkupDictionaryKey node) =>
+        new(node.Syntax, node.ContainingComponent, node.DictionaryShape, node.Binding, node.LiteralValue,
+            node.HasErrors, CreateCSharpOperationTree(node.Syntax, node.Binding.OperationDefinition,
+                CreateCSharpOperationSymbolMapper(node.Syntax, containingAkcssSymbol: null)));
 
     private static MarkupNameAssignmentOperation CreateMarkupNameAssignmentOperation(
         BoundMarkupNameAssignment boundNode)

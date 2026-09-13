@@ -85,7 +85,8 @@ internal sealed class CSharpProbeBuilder
     public CSharpProbeProjection CreateExpressionProjection(
         AkburaSyntax scope,
         CSharp.ExpressionSyntax expression,
-        int relativePosition)
+        int relativePosition,
+        ITypeSymbol? targetType = null)
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
@@ -96,7 +97,7 @@ internal sealed class CSharpProbeBuilder
             scope,
             placeholder,
             expression,
-            targetType: null,
+            targetType,
             includeAllVisibleSymbols: true);
 
         return CreateExpressionProjectionCore(

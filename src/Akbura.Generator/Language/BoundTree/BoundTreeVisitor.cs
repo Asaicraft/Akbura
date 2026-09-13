@@ -54,6 +54,7 @@ internal abstract class BoundTreeVisitor
     public virtual void VisitAkcssUtility(BoundAkcssUtility node) => DefaultVisit(node);
 
     public virtual void VisitMarkupNameAssignment(BoundMarkupNameAssignment node) => DefaultVisit(node);
+    public virtual void VisitMarkupDictionaryKey(BoundMarkupDictionaryKey node) => DefaultVisit(node);
 
     public virtual void VisitMarkupPropertySetter(BoundMarkupPropertySetter node) => DefaultVisit(node);
 
@@ -150,6 +151,7 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitAkcssUtility(BoundAkcssUtility node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupNameAssignment(BoundMarkupNameAssignment node) => DefaultVisit(node);
+    public virtual TResult? VisitMarkupDictionaryKey(BoundMarkupDictionaryKey node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupPropertySetter(BoundMarkupPropertySetter node) => DefaultVisit(node);
 
@@ -268,6 +270,9 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupNameAssignment(BoundMarkupNameAssignment node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupDictionaryKey(BoundMarkupDictionaryKey node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupPropertySetter(BoundMarkupPropertySetter node, TParameter parameter) =>

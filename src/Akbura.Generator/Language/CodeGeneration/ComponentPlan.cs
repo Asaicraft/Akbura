@@ -38,6 +38,7 @@ internal enum ComponentElementFlags : ushort
     IsLocal = 1 << 7,
     RequiresContentPresenterRefresh = 1 << 8,
     UsesRuntimeStorage = 1 << 9,
+    IsStyleSubtree = 1 << 10,
 }
 
 internal enum ComponentElementScopeKind : byte
@@ -160,7 +161,8 @@ internal readonly struct ComponentElementPlan
         ComponentContentTargetReference content,
         AkcssElementActivatorPlan akcss,
         string? explicitKey = null,
-        int runtimeStorageId = -1)
+        int runtimeStorageId = -1,
+        ImmutableArray<ComponentAssignmentReference> assignments = default)
     {
         Id = id;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
@@ -179,6 +181,7 @@ internal readonly struct ComponentElementPlan
         Akcss = akcss;
         ExplicitKey = explicitKey;
         RuntimeStorageId = runtimeStorageId;
+        Assignments = assignments.IsDefault ? [] : assignments;
     }
 
     public int Id { get; }
@@ -213,11 +216,15 @@ internal readonly struct ComponentElementPlan
 
     public ComponentContentTargetReference Content { get; }
 
+    public ImmutableArray<ComponentAssignmentReference> Assignments { get; }
+
     public AkcssElementActivatorPlan Akcss { get; }
 
     public bool IsRoot => (Flags & ComponentElementFlags.IsRoot) != 0;
 
     public bool IsLocal => (Flags & ComponentElementFlags.IsLocal) != 0;
+
+    public bool IsStyleSubtree => (Flags & ComponentElementFlags.IsStyleSubtree) != 0;
 
     public bool UsesRuntimeStorage =>
         (Flags & ComponentElementFlags.UsesRuntimeStorage) != 0;

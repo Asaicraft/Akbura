@@ -211,6 +211,12 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             children);
     }
 
+    public override BoundNode? VisitMarkupDictionaryKey(BoundMarkupDictionaryKey node)
+    {
+        var component = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
+        return node.Update(component, VisitCSharpBindingResult(node.Binding));
+    }
+
     public override BoundNode? VisitMarkupNameAssignment(BoundMarkupNameAssignment node)
     {
         var symbolInfo = VisitSymbolInfo(node.SymbolInfo);

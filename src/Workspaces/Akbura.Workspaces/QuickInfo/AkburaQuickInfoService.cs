@@ -1,4 +1,5 @@
 using Akbura.Language.Symbols;
+using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -28,6 +29,83 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        var semanticModel = context.Project.Compilation.GetSemanticModel(
+            context.Document.SyntaxTree);
+        if (AkburaMarkupSemanticFacts.GetPropertyReference(semanticModel, position)
+            is { } propertyReference)
+        {
+            if (propertyReference.OwnerSpan.Contains(position))
+            {
+                return new AkburaQuickInfo(propertyReference.OwnerSpan, AkburaQuickInfoKind.Type,
+                    GetTypeSignature(propertyReference.LookupOwner), []);
+            }
+
+            if (propertyReference.PropertySpan.Contains(position))
+            {
+                return new AkburaQuickInfo(propertyReference.PropertySpan,
+                    AkburaQuickInfoKind.Property, propertyReference.Field.ToDisplayString(),
+                    ["Avalonia property reference", "Value type: " + propertyReference.ValueType
+                        .ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)]);
+            }
+        }
+
+        if (AkburaMarkupSemanticFacts.GetSelectorTypeReference(semanticModel, position)
+            is { Type: { } selectorType } selectorReference)
+        {
+            return new AkburaQuickInfo(selectorReference.Span, AkburaQuickInfoKind.Type,
+                GetTypeSignature(selectorType), ["Selector target type"]);
+        }
+
+        if (AkburaMarkupSemanticFacts.TryGetAssignment(semanticModel, position,
+                out var assignmentProperty, out var contract, out var nameSpan))
+        {
+            using var details = ImmutableArrayBuilder<string>.Rent();
+            if (contract.ContextualValueType != null &&
+                !SymbolEqualityComparer.Default.Equals(contract.DeclaredType, contract.ContextualValueType))
+            {
+                details.Add("Contextual value type: " + contract.ContextualValueType
+                    .ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+            }
+
+            if (contract.TargetPropertyReference is { } target)
+            {
+                details.Add("Target property: " + target.Field.ToDisplayString());
+            }
+
+            if (contract.AssignBinding)
+            {
+                details.Add("Binding objects are assigned directly.");
+            }
+
+            return new AkburaQuickInfo(nameSpan, AkburaQuickInfoKind.Property,
+                _display.FormatProperty(assignmentProperty), details.ToImmutable());
+        }
+
+        foreach (var inline in context.Document.SyntaxTree.GetRootSyntax()
+                     .DescendantNodes().OfType<InlineExpressionSyntax>())
+        {
+            if (!inline.Span.Contains(position))
+            {
+                continue;
+            }
+
+            foreach (var symbolReference in semanticModel.GetCSharpSymbolReferences(inline))
+            {
+                if (!symbolReference.SourceSpan.Contains(position))
+                {
+                    continue;
+                }
+
+                var signature = symbolReference.AkburaSymbol?.ToDisplayString() ??
+                    symbolReference.CSharpDefinition.Symbol?.ToDisplayString();
+                if (signature != null)
+                {
+                    return new AkburaQuickInfo(symbolReference.SourceSpan,
+                        AkburaQuickInfoKind.Symbol, signature, []);
+                }
+            }
+        }
+
         if (!_referenceResolver.TryResolve(
                 context,
                 position,

@@ -3,6 +3,7 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -135,7 +136,12 @@ internal static class ComponentMemberPlanner
 
                 var kind = ComponentParameterKind.Value;
                 var collection = default(ComponentParameterCollectionPlan);
-                if (TryCreateCollectionPlan(parameter, type, out collection))
+                var dictionary = default(ComponentParameterDictionaryPlan);
+                if (TryCreateDictionaryPlan(parameter, type, out dictionary))
+                {
+                    kind = ComponentParameterKind.Dictionary;
+                }
+                else if (TryCreateCollectionPlan(parameter, type, out collection))
                 {
                     kind = ComponentParameterKind.Collection;
                 }
@@ -150,8 +156,66 @@ internal static class ComponentMemberPlanner
                     flags,
                     defaultValue,
                     collection,
-                    parameter.DeclarationSyntax));
+                    parameter.DeclarationSyntax,
+                    dictionary));
             }
+        }
+
+        private bool TryCreateDictionaryPlan(IParamSymbol parameter, ITypeSymbol parameterType,
+            out ComponentParameterDictionaryPlan dictionary)
+        {
+            dictionary = default;
+            if (parameter.BindingKind != ParamBindingKind.Default || parameter.Name != "Content")
+            {
+                return false;
+            }
+
+            var compilation = _semanticModel.Compilation.CSharpCompilation;
+            var shape = MarkupDictionaryShape.Create(parameterType, compilation);
+            if (shape.ContractType == null || shape.IsAmbiguous || shape.IsReadOnlyOnly)
+            {
+                return false;
+            }
+
+            ITypeSymbol backingType = parameterType;
+            var canCreate = false;
+            var usesStandardDictionaryFactory = false;
+            if (parameterType is INamedTypeSymbol namedType && namedType.TypeKind == TypeKind.Class &&
+                !namedType.IsAbstract)
+            {
+                foreach (var constructor in namedType.InstanceConstructors)
+                {
+                    if (constructor.DeclaredAccessibility == Accessibility.Public && constructor.Parameters.Length == 0)
+                    {
+                        canCreate = true;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                var standardBacking = shape.IsGeneric
+                    ? compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")?
+                        .Construct(shape.KeyType!, shape.ValueType!)
+                    : compilation.GetTypeByMetadataName("System.Collections.Hashtable");
+                if (standardBacking != null && compilation.ClassifyConversion(standardBacking, parameterType).IsImplicit)
+                {
+                    backingType = shape.IsGeneric ? parameterType : standardBacking;
+                    canCreate = true;
+                    usesStandardDictionaryFactory = shape.IsGeneric;
+                }
+            }
+
+            if (parameter.HasDefaultValue)
+            {
+                backingType = parameterType;
+                canCreate = true;
+                usesStandardDictionaryFactory = false;
+            }
+
+            dictionary = new ComponentParameterDictionaryPlan(parameterType, backingType, shape, canCreate,
+                usesStandardDictionaryFactory);
+            return true;
         }
 
         private bool TryCreateCollectionPlan(

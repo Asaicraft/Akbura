@@ -15,13 +15,15 @@ public readonly struct AkburaSyntacticCompletionContext
         string prefix,
         string? componentName,
         string? parentComponentName,
-        ImmutableArray<string> existingAttributeNames)
+        ImmutableArray<string> existingAttributeNames,
+        string? attributeName = null)
     {
         Kind = kind;
         ApplicableSpan = applicableSpan;
         Prefix = prefix ?? string.Empty;
         ComponentName = componentName;
         ParentComponentName = parentComponentName;
+        AttributeName = attributeName;
         ExistingAttributeNames = existingAttributeNames.IsDefault
             ? ImmutableArray<string>.Empty
             : existingAttributeNames;
@@ -36,6 +38,8 @@ public readonly struct AkburaSyntacticCompletionContext
     public string? ComponentName { get; }
 
     public string? ParentComponentName { get; }
+
+    public string? AttributeName { get; }
 
     public ImmutableArray<string> ExistingAttributeNames { get; }
 

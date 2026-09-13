@@ -45,11 +45,33 @@ internal abstract partial class AkburaSemanticModel
                 ? BinderUsage.Markup
                 : BinderUsage.Expression);
 
+        Microsoft.CodeAnalysis.ITypeSymbol? expectedType = null;
+        if (isMarkup)
+        {
+            for (var node = expressionSyntax.Parent; node != null; node = node.Parent)
+            {
+                if (node is not MarkupAttributeSyntax attribute)
+                {
+                    continue;
+                }
+
+                if (IsMarkupDictionaryKeyDirective(attribute) &&
+                    GetContainingMarkupElement(attribute) is { } child &&
+                    TryGetMarkupDictionaryContext(child, out var contentModel))
+                {
+                    expectedType = contentModel.DictionaryShape.KeyType;
+                }
+
+                break;
+            }
+        }
+
         return new CSharpProbeBuilder(binder)
             .CreateExpressionProjection(
                 scope,
                 expression,
-                relativePosition);
+                relativePosition,
+                expectedType);
     }
 
     internal CSharpProbeProjection CreateCSharpCompletionProjection(

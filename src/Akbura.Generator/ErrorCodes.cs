@@ -5,6 +5,8 @@ using System.Text;
 namespace Akbura;
 internal static class ErrorCodes
 {
+    public const string AKBURA_SEMANTIC_MarkupPropertyDependencyCycle = nameof(AKBURA_SEMANTIC_MarkupPropertyDependencyCycle);
+    public const string AKBURA_SEMANTIC_MarkupContentAddMethodAmbiguous = nameof(AKBURA_SEMANTIC_MarkupContentAddMethodAmbiguous);
     public const string ERR_IllegalEscape = nameof(ERR_IllegalEscape);
     public const string ERR_OpenEndedComment = nameof(ERR_OpenEndedComment);
     public const string ERR_UnexpectedCharacter = nameof(ERR_UnexpectedCharacter);
@@ -21,6 +23,15 @@ internal static class ErrorCodes
     public const string ERR_RbraceExpected = nameof(ERR_RbraceExpected);
     public const string ERR_SyntaxError = nameof(ERR_SyntaxError);
     public const string AKBURA_SEMANTIC_InvalidMarkupChild = nameof(AKBURA_SEMANTIC_InvalidMarkupChild);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryKeyRequired = nameof(AKBURA_SEMANTIC_MarkupDictionaryKeyRequired);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryKeyValueInvalid = nameof(AKBURA_SEMANTIC_MarkupDictionaryKeyValueInvalid);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryKeyOutsideDictionary = nameof(AKBURA_SEMANTIC_MarkupDictionaryKeyOutsideDictionary);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryKeyDuplicateDirective = nameof(AKBURA_SEMANTIC_MarkupDictionaryKeyDuplicateDirective);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryKeyTypeMismatch = nameof(AKBURA_SEMANTIC_MarkupDictionaryKeyTypeMismatch);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryValueTypeMismatch = nameof(AKBURA_SEMANTIC_MarkupDictionaryValueTypeMismatch);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryDuplicateConstantKey = nameof(AKBURA_SEMANTIC_MarkupDictionaryDuplicateConstantKey);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryContractAmbiguous = nameof(AKBURA_SEMANTIC_MarkupDictionaryContractAmbiguous);
+    public const string AKBURA_SEMANTIC_MarkupDictionaryReadOnlyTarget = nameof(AKBURA_SEMANTIC_MarkupDictionaryReadOnlyTarget);
     public const string AKBURA_SEMANTIC_AkcssInvalidColor = nameof(AKBURA_SEMANTIC_AkcssInvalidColor);
     public const string AKBURA_SEMANTIC_AkcssInvalidThickness = nameof(AKBURA_SEMANTIC_AkcssInvalidThickness);
     public const string AKBURA_SEMANTIC_AkcssExpressionError = nameof(AKBURA_SEMANTIC_AkcssExpressionError);
@@ -79,5 +90,11 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid = nameof(AKBURA_SEMANTIC_MarkupWhitespaceValueInvalid);
     public const string AKBURA_SEMANTIC_MarkupWhitespaceDuplicate = nameof(AKBURA_SEMANTIC_MarkupWhitespaceDuplicate);
     public const string AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing = nameof(AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing);
+    public const string AKBURA_SEMANTIC_MarkupPropertyReferenceNotFound = nameof(AKBURA_SEMANTIC_MarkupPropertyReferenceNotFound);
+    public const string AKBURA_SEMANTIC_MarkupPropertyReferenceTargetUnknown = nameof(AKBURA_SEMANTIC_MarkupPropertyReferenceTargetUnknown);
+    public const string AKBURA_SEMANTIC_MarkupPropertyReferenceTargetAmbiguous = nameof(AKBURA_SEMANTIC_MarkupPropertyReferenceTargetAmbiguous);
+    public const string AKBURA_SEMANTIC_MarkupPropertyDependencyInvalid = nameof(AKBURA_SEMANTIC_MarkupPropertyDependencyInvalid);
+    public const string AKBURA_SEMANTIC_MarkupPropertyContextualTypeUnknown = nameof(AKBURA_SEMANTIC_MarkupPropertyContextualTypeUnknown);
+    public const string AKBURA_SEMANTIC_MarkupPropertyContextualTypeAmbiguous = nameof(AKBURA_SEMANTIC_MarkupPropertyContextualTypeAmbiguous);
     public const string WRN_ErrorOverride = nameof(WRN_ErrorOverride);
 }

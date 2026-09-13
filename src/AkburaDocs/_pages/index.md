@@ -137,6 +137,242 @@ state bool isOpen = false;
 
 Attributes may contain literals, C# expressions, bindings, and markup extensions.
 
+## Dictionary Resources
+
+Use `x.key` to insert a child into a dictionary content slot, such as an
+Avalonia control's `Resources`. `x.Key` is an alias of the same directive:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Media;
+
+state int resourceIndex = 0;
+
+<StackPanel>
+    <StackPanel.Resources>
+        <SolidColorBrush x.key="AccentBrush" Color="Red" />
+        <SolidColorBrush x.Key={resourceIndex + 1} Color="Blue" />
+    </StackPanel.Resources>
+
+    <Button Click={resourceIndex++}>Move the numbered resource</Button>
+</StackPanel>
+```
+
+The directive describes the entry in the parent dictionary. It does not set a
+`Key` property on the brush, name the element, or replace `x.Name`.
+
+A mutable `IDictionary<TKey, TValue>` accepts children compatible with `TValue`;
+the key expression is checked against `TKey`. Non-generic `IDictionary` uses
+`object` keys and values. This applies to dictionary properties, `[Content]`
+properties, dictionaries used as element content, and dictionary component
+parameters. Explicit interface implementations are supported.
+
+A dictionary parameter named `Content` has a per-component mutable backing
+dictionary. Other dictionary parameters retain the usual parameter rules:
+provide their dictionary through an attribute or declare a default initializer,
+for example `param IDictionary<int, SolidColorBrush> Entries = new
+Dictionary<int, SolidColorBrush>();`. Entries inside `<MyComponent.Entries>`
+populate that dictionary; they do not assign the parameter itself or satisfy a
+missing required receiver.
+
+Quoted keys remain strings, including their spaces and case. For an int-keyed
+dictionary, use `x.key={42}`; `x.key="42"` is a type error. In an object-keyed
+dictionary these produce different keys. No implicit `ToString()` conversion is
+performed. Missing keys, keys outside a dictionary, incompatible types, and
+`x.key="A" x.Key="B"` on the same child produce semantic diagnostics.
+
+### Updating owned entries
+
+Akbura evaluates each key expression once for the corresponding update and
+reconciles the declaration's whole set of entries. Changing `resourceIndex`
+moves the compatible existing brush to its new key and removes its old entry.
+Two owned entries can exchange keys without a temporary collision caused by
+adding one before removing the other.
+
+Ownership belongs to a content slot, not to the dictionary as a whole. Akbura
+does not call `Resources.Clear()` or overwrite foreign entries. An entry is
+removed only while its key still refers to the owned object; externally replaced
+values are left alone. Structural Hot Reload also removes owned entries when
+their declaration or property element disappears.
+
+Dictionary lookups and insertion use the actual dictionary's equality rules.
+A case-insensitive dictionary may therefore reject `"A"` and `"a"` as a
+collision, even if the compiler cannot prove it statically. A conflicting foreign
+entry or duplicate desired key fails the update rather than being overwritten.
+Read-only dictionaries, non-generic fixed-size dictionaries, and ambiguous
+mutable dictionary contracts are unsupported write targets.
+
+If a custom dictionary mutator throws, reconciliation attempts to restore the
+previous owned entries. This is best-effort rollback: arbitrary dictionaries may
+publish notifications during removal, insertion, or restoration. Notification
+atomicity is not guaranteed; if restoration also fails, both failures are
+reported. A new ownership snapshot is committed only after successful
+reconciliation.
+
+## Avalonia Styles
+
+Native Avalonia `Style` and `Setter` objects can be declared directly in markup:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Styling;
+
+state bool highlighted = false;
+
+<StackPanel>
+    <StackPanel.Styles>
+        <Style Selector="Button">
+            <Setter
+                Property="Background"
+                Value={highlighted ? Brushes.Red : Brushes.Blue} />
+
+            <Style Selector="^:pointerover">
+                <Setter Property="Opacity" Value="0.7" />
+            </Style>
+        </Style>
+    </StackPanel.Styles>
+
+    <Button Click={highlighted = !highlighted}>Change the style</Button>
+</StackPanel>
+```
+
+Each child is added through its applicable typed `Add` overload: setters and
+nested styles are different content routes. This fallback is also available to
+custom types with suitable accessible instance `Add` methods; ambiguous
+overloads produce a diagnostic.
+
+Style subtrees are fully initialized before being attached to a live host.
+Currently, each applicable component render recreates and replaces the owned
+style subtree, even when its values are unchanged. Hot Reload also creates a new
+subtree. The surrounding live control tree and foreign styles are preserved;
+this does not rely on changing an already attached `Setter.Value` in place.
+
+### Avalonia property references
+
+For a destination whose declared type is `AvaloniaProperty` or one of its derived
+types, a quoted value is resolved to a compatible static property field:
+
+```akbura
+<Setter Property="Button.Background" Value="Red" />
+```
+
+This refers to `Button.BackgroundProperty`, including properties inherited from
+a base class. Styled, attached, and direct property fields are supported. The
+same mechanism applies to custom CLR properties of type `AvaloniaProperty`,
+regardless of the holder class or property name.
+
+Inside a known style target, the owner can be omitted:
+
+```akbura
+<Style Selector="Button /template/ Border">
+    <Setter Property="Background" Value="Red" />
+</Style>
+```
+
+Here `Background` is resolved for the selected `Border`, not the first `Button`
+in the selector. The referenced property's value type supplies the contextual
+conversion for `Value`; its actual CLR type remains `object`.
+
+The supported literal selector forms include type names, namespace-qualified
+type names with `|`, classes, names, simple pseudo-classes, `:is(Type)`, `^`,
+descendant and child combinators, `/template/`, and comma-separated lists.
+Nested `^` inherits the parent target. `ControlTheme.TargetType` also supplies
+target context. Advanced selector expressions such as `:not(...)`, nth-child
+functions, and property filters are not currently supported as markup literals.
+
+For type-less, dynamic, or ambiguous targets, use an owner-qualified reference
+or a statically resolvable C# field:
+
+```akbura
+<Setter Property="Button.Background" Value="Red" />
+<Setter Property={Button.BackgroundProperty} Value="Red" />
+```
+
+Akbura does not guess a target from the nearest visual parent. An unqualified
+reference in a selector list must resolve consistently for all target branches.
+
+### Property metadata and custom assignments
+
+`[DependsOn]`, `[AssignBinding]`, and `[Content]` have independent roles:
+
+- `[DependsOn]` orders assignment actions. It does not create a subscription,
+  watcher, effect, or hook.
+- `[AssignBinding]` stores the binding object in the holder property instead of
+  applying the binding to that property.
+- `[Content]` chooses the destination for implicit element content.
+
+For example, a custom holder can use different names from Avalonia's `Setter`:
+
+```csharp
+using Avalonia;
+using Avalonia.Data;
+using Avalonia.Metadata;
+
+namespace MyApp.Markup;
+
+public sealed class CustomAssignment
+{
+    public AvaloniaProperty? Target { get; set; }
+
+    [Content]
+    [AssignBinding]
+    [DependsOn(nameof(Target))]
+    public object? Payload { get; set; }
+}
+```
+
+For an `object` property depending on one unambiguous Avalonia property
+reference, Akbura uses that reference's value type for ordinary value conversion.
+It does not change the declared `object` type or apply this convention to
+unrelated dependencies.
+
+These three content routes share the assignment contract:
+
+```akbura
+using Avalonia.Controls;
+using MyApp.Markup;
+
+<CustomAssignment Payload="Red" Target="Button.Background" />
+
+<CustomAssignment Target="Button.Background">
+    Red
+</CustomAssignment>
+
+<CustomAssignment Target="Button.Background">
+    <CustomAssignment.Payload>Red</CustomAssignment.Payload>
+</CustomAssignment>
+```
+
+`Target` is assigned before `Payload`, including when the dependency is declared
+through a property element. Independent assignments retain source order.
+Invalid dependency metadata and cycles are diagnosed. A dependency not assigned
+in the declaration does not create an artificial assignment.
+
+If a dynamic non-generic `AvaloniaProperty` does not reveal its value type, use
+a qualified/static reference or an explicitly typed value expression for
+contextual conversion. Conflicting property dependencies are diagnosed rather
+than choosing an arbitrary one.
+
+With `[AssignBinding]`, this stores the extension result as a binding object:
+
+```akbura
+using Avalonia.Controls;
+using Akbura.Markup;
+using MyApp.Markup;
+
+<CustomAssignment
+    Target="Button.Background"
+    Payload=${Binding AccentBrush} />
+```
+
+`ProvideValue` is still evaluated with the normal service provider. An extension
+declared to return `object` follows the same delivery policy when its actual
+result is a binding. The holder's own runtime contract decides how that object
+is later used. See [Markup Extensions](/akcss/markup-extensions) for extension
+evaluation and [AXAML syntax differences](/akbura/xml-xaml-axaml#dictionary-keys)
+for the directive spelling.
+
 ## Reactive State
 
 Declare local reactive values with `state`:

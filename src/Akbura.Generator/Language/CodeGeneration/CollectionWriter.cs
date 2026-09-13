@@ -8,6 +8,7 @@ internal enum CollectionWriteKind : byte
     None,
     Property,
     ComponentParameter,
+    Self,
 }
 
 /// <summary>
@@ -50,6 +51,9 @@ internal readonly struct CollectionWritePlan
     public string? ComponentParameterName { get; }
 
     public bool IsValid => Kind != CollectionWriteKind.None;
+
+    public static CollectionWritePlan CreateSelf(ITypeSymbol type, ITypeSymbol? elementType = null) =>
+        new(CollectionWriteKind.Self, default, type, elementType, null);
 
     public static CollectionWritePlan CreateProperty(
         in PropertyReadPlan property,
@@ -185,6 +189,7 @@ internal readonly ref struct CollectionWriter
         switch (plan.Kind)
         {
             case CollectionWriteKind.Property:
+            case CollectionWriteKind.Self:
                 if (!WriteTarget(plan, targetExpression))
                 {
                     return false;
@@ -220,6 +225,7 @@ internal readonly ref struct CollectionWriter
         var hasValidTarget = plan.Kind switch
         {
             CollectionWriteKind.Property => plan.Property.IsValid,
+            CollectionWriteKind.Self => true,
             CollectionWriteKind.ComponentParameter =>
                 !string.IsNullOrEmpty(plan.ComponentParameterName),
             _ => false,
@@ -246,6 +252,10 @@ internal readonly ref struct CollectionWriter
                 _writer.Write(targetExpression);
                 _writer.Write(".");
                 _valueWriter.WriteIdentifier(plan.ComponentParameterName!);
+                break;
+
+            case CollectionWriteKind.Self:
+                _writer.Write(targetExpression);
                 break;
 
             default:

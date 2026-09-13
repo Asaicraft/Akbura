@@ -1,9 +1,9 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
-internal readonly ref struct ParameterWriter
+internal readonly ref partial struct ParameterWriter
 {
     private readonly CodeWriter _writer;
     private readonly CSharpValueWriter _valueWriter;
@@ -29,6 +29,12 @@ internal readonly ref struct ParameterWriter
 
     public void Write(in ComponentParameterPlan plan)
     {
+        if (plan.Kind == ComponentParameterKind.Dictionary)
+        {
+            WriteDictionary(plan);
+            return;
+        }
+
         if (plan.Kind == ComponentParameterKind.Collection)
         {
             WriteCollection(plan);
@@ -715,12 +721,15 @@ internal readonly ref struct ParameterWriter
 
     private void WriteCollectionPropertyType(in ComponentParameterPlan plan)
     {
-        _valueWriter.WriteTypeNameWithNullableAnnotation(plan.Collection.PropertyType);
+        _valueWriter.WriteTypeNameWithNullableAnnotation(
+            plan.Kind == ComponentParameterKind.Dictionary
+                ? plan.Dictionary.PropertyType
+                : plan.Collection.PropertyType);
     }
 
     private void WriteHotReloadPropertyType(in ComponentParameterPlan plan)
     {
-        if (plan.Kind == ComponentParameterKind.Collection)
+        if (plan.Kind is ComponentParameterKind.Collection or ComponentParameterKind.Dictionary)
         {
             _writer.Write("global::Avalonia.DirectProperty<");
             _writer.Write(_ownerTypeName);

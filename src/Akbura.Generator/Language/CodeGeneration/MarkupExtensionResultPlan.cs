@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Operations;
+using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
@@ -14,6 +14,12 @@ internal enum MarkupExtensionResultKind : byte
     StaticResource,
     BindingBase,
     Runtime,
+}
+
+internal enum MarkupExtensionDeliveryPolicy : byte
+{
+    ApplyBinding,
+    AssignBindingObject,
 }
 
 /// <summary>
@@ -146,16 +152,20 @@ internal readonly struct MarkupExtensionResultPlan
 {
     public MarkupExtensionResultPlan(
         MarkupExtensionValue extension,
-        MarkupExtensionResultKind kind)
+        MarkupExtensionResultKind kind,
+        MarkupExtensionDeliveryPolicy deliveryPolicy = MarkupExtensionDeliveryPolicy.ApplyBinding)
     {
         Extension = extension ??
             throw new ArgumentNullException(nameof(extension));
         Kind = kind;
+        DeliveryPolicy = deliveryPolicy;
     }
 
     public MarkupExtensionValue Extension { get; }
 
     public MarkupExtensionResultKind Kind { get; }
+
+    public MarkupExtensionDeliveryPolicy DeliveryPolicy { get; }
 
     public bool IsValid =>
         Extension != null &&
@@ -163,11 +173,13 @@ internal readonly struct MarkupExtensionResultPlan
 
     public static MarkupExtensionResultPlan Create(
         in MarkupExtensionResultEnvironment environment,
-        MarkupExtensionValue extension)
+        MarkupExtensionValue extension,
+        MarkupExtensionDeliveryPolicy deliveryPolicy = MarkupExtensionDeliveryPolicy.ApplyBinding)
     {
         return new MarkupExtensionResultPlan(
             extension,
-            environment.GetResultKind(extension));
+            environment.GetResultKind(extension),
+            deliveryPolicy);
     }
 }
 

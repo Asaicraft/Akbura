@@ -7,7 +7,7 @@ namespace Akbura.Language.CodeGeneration;
 /// scope. Nested scopes are represented by deferred or template values and are
 /// never traversed here.
 /// </summary>
-internal readonly ref struct ComponentScopeWriter
+internal readonly ref partial struct ComponentScopeWriter
 {
     private readonly CodeWriter _writer;
     private readonly BindingWriterEnvironment _bindingEnvironment;
@@ -51,58 +51,15 @@ internal readonly ref struct ComponentScopeWriter
             WriteBeginInit(plan, scope);
             WriteInitialRenderStatements(plan);
 
+            var initialized = new bool[plan.Elements.Length];
             for (var i = 0; i < scope.Elements.Length; i++)
             {
                 var elementId = GetScopeElementId(plan, scope, i);
-                ref readonly var element = ref plan.Elements.ItemRef(elementId);
-                var targetExpression = element.Identifier;
-                var elementContext = context.ForElement(elementId);
-
-                if (_generationMode == ComponentGenerationMode.DebugStructural &&
-                    element.UsesRuntimeStorage)
-                {
-                    WriteStructuralOneTimeActions(
-                        plan,
-                        element,
-                        elementContext);
-                    WriteInitialNonStructuralContent(
-                        plan,
-                        element,
-                        elementContext);
-                    WriteSetStyles(
-                        plan,
-                        elementId,
-                        targetExpression,
-                        elementContext);
-                    WriteStructuralRevisionActions(
-                        plan,
-                        element,
-                        elementContext);
-                    WriteStructuralConstantContent(plan, element);
-                    WriteStructuralConnections(plan, element, elementContext);
-                }
-                else
-                {
-                    WriteFirstUpdateActions(plan, elementId, elementContext);
-                    WriteElementContent(
-                        plan,
-                        element,
-                        isFirstUpdate: true,
-                        elementContext);
-                    WritePropertyElements(
-                        plan,
-                        element,
-                        isFirstUpdate: true,
-                        elementContext);
-                    WriteSetStyles(
-                        plan,
-                        elementId,
-                        targetExpression,
-                        elementContext);
-                }
+                WriteElementAssignments(plan, elementId, context, initialized, ComponentAssignmentPhase.Initial);
             }
 
             WriteEndInit(plan, scope);
+            WriteApplyReplacedStyles(plan, scope);
         }
         finally
         {
@@ -145,23 +102,15 @@ internal readonly ref struct ComponentScopeWriter
             WriteElementCreation(plan, scope);
             WriteBeginInit(plan, scope);
 
+            var initialized = new bool[plan.Elements.Length];
             for (var i = 0; i < scope.Elements.Length; i++)
             {
                 var elementId = GetScopeElementId(plan, scope, i);
-                ref readonly var element = ref plan.Elements.ItemRef(elementId);
-                var targetExpression = element.Identifier;
-                var elementContext = context.ForElement(elementId);
-
-                WriteFirstUpdateActions(plan, elementId, elementContext);
-                WriteInitialDynamicProperties(plan, elementId, elementContext);
-                WriteElementContent(plan, element, isFirstUpdate: true, elementContext);
-                WriteElementContent(plan, element, isFirstUpdate: false, elementContext);
-                WritePropertyElements(plan, element, isFirstUpdate: true, elementContext);
-                WritePropertyElements(plan, element, isFirstUpdate: false, elementContext);
-                WriteSetStyles(plan, elementId, targetExpression, elementContext);
+                WriteElementAssignments(plan, elementId, context, initialized, ComponentAssignmentPhase.LocalInitial);
             }
 
             WriteEndInit(plan, scope);
+            WriteApplyReplacedStyles(plan, scope);
         }
         finally
         {
@@ -182,18 +131,15 @@ internal readonly ref struct ComponentScopeWriter
 
         try
         {
+            WriteStyleElementCreation(plan, scope);
+            var initialized = new bool[plan.Elements.Length];
             for (var i = 0; i < scope.Elements.Length; i++)
             {
                 var elementId = GetScopeElementId(plan, scope, i);
-                ref readonly var element = ref plan.Elements.ItemRef(elementId);
-                var targetExpression = element.Identifier;
-                var elementContext = context.ForElement(elementId);
-
-                WriteRuntimeUpdateProperties(plan, elementId, elementContext);
-                WriteElementContent(plan, element, isFirstUpdate: false, elementContext);
-                WritePropertyElements(plan, element, isFirstUpdate: false, elementContext);
-                WriteRefresh(element, targetExpression);
+                WriteElementAssignments(plan, elementId, context, initialized, ComponentAssignmentPhase.Update);
             }
+
+            WriteApplyReplacedStyles(plan, scope);
         }
         finally
         {
@@ -225,7 +171,13 @@ internal readonly ref struct ComponentScopeWriter
                 var elementId = GetScopeElementId(plan, scope, i);
                 var elementContext = context.ForElement(elementId);
 
-                WriteHotReloadProperties(plan, elementId, elementContext);
+                if (plan.Elements.ItemRef(elementId).IsStyleSubtree)
+                {
+                    continue;
+                }
+
+                WriteOrderedAssignments(plan, plan.Elements.ItemRef(elementId), elementContext,
+                    ComponentAssignmentPhase.HotReload);
             }
         }
         finally
@@ -239,7 +191,7 @@ internal readonly ref struct ComponentScopeWriter
         in ComponentScopePlan scope,
         in ComponentScopeWriteContext context)
     {
-        for (var i = 0; i < scope.Elements.Length; i++)
+        for (var i = scope.Elements.Length - 1; i >= 0; i--)
         {
             var elementId = GetScopeElementId(plan, scope, i);
             ref readonly var element = ref plan.Elements.ItemRef(elementId);
@@ -249,6 +201,9 @@ internal readonly ref struct ComponentScopeWriter
             }
 
             var elementContext = context.ForElement(elementId);
+            WriteStructuralOrderedAssignments(plan, element, elementContext,
+                conditionalOneTime: true, skipFrameContents: true);
+
             _writer.Write("if (");
             _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
             _writer.Write(".IsNew(");
@@ -256,28 +211,12 @@ internal readonly ref struct ComponentScopeWriter
             _writer.WriteLine("))");
             _writer.WriteLine("{");
             _writer.CurrentIndent += _writer.TabSize;
-            WriteStructuralOneTimeActions(
-                plan,
-                element,
-                elementContext);
-            WriteInitialNonStructuralContent(plan, element, elementContext);
             WriteSetStyles(plan, elementId, element.Identifier, elementContext);
             _writer.CurrentIndent -= _writer.TabSize;
             _writer.WriteLine("}");
             _writer.WriteLine("else");
             _writer.WriteLine("{");
             _writer.CurrentIndent += _writer.TabSize;
-            _writer.Write("if (");
-            _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
-            _writer.Write(".ShouldApplyInitialValues(");
-            _writer.WriteIntegerLiteral(element.RuntimeStorageId);
-            _writer.WriteLine("))");
-            _writer.WriteLine("{");
-            _writer.CurrentIndent += _writer.TabSize;
-            WriteInitialNonStructuralContent(plan, element, elementContext);
-            _writer.CurrentIndent -= _writer.TabSize;
-            _writer.WriteLine("}");
-
             WriteHotReloadStyles(
                 plan,
                 elementId,
@@ -286,324 +225,6 @@ internal readonly ref struct ComponentScopeWriter
             _writer.CurrentIndent -= _writer.TabSize;
             _writer.WriteLine("}");
 
-            WriteStructuralRevisionActions(
-                plan,
-                element,
-                elementContext);
-            WriteStructuralConstantContent(plan, element);
-            WriteStructuralConnections(plan, element, elementContext);
-        }
-    }
-
-    private void WriteStructuralOneTimeActions(
-        in ComponentPlan plan,
-        in ComponentElementPlan element,
-        in MarkupExtensionWriteContext context)
-    {
-        var targetExpression = element.Identifier;
-        var propertyContext = context.WithTarget(
-            targetExpression,
-            context.TargetProperty,
-            element.ScopeId,
-            plan.ElementReferences.AsSpan());
-        var propertyWriter = new ComponentPropertyWriter(
-            _writer,
-            in _bindingEnvironment,
-            _sourceMap);
-        var actionWriter = new ComponentFirstUpdateActionWriter(
-            _writer,
-            _sourceMap);
-
-        for (var i = 0; i < element.FirstUpdateActions.Length; i++)
-        {
-            ref readonly var action = ref plan.FirstUpdateActions.ItemRef(
-                element.FirstUpdateActions.Start + i);
-
-            switch (action.Kind)
-            {
-                case ComponentFirstUpdateActionKind.NameAssignment:
-                {
-                    ref readonly var name = ref plan.NameAssignments.ItemRef(
-                        action.Index);
-                    actionWriter.WriteNameAssignment(
-                        name,
-                        targetExpression,
-                        nameScopeExpression: null);
-                    break;
-                }
-
-                case ComponentFirstUpdateActionKind.PropertyWrite:
-                {
-                    ref readonly var property = ref plan.PropertyWrites.ItemRef(
-                        action.Index);
-                    if (property.ValueKind == ComponentPropertyValueKind.Constant ||
-                        ComponentPropertyWriter.CanWriteStructuralBindingValue(
-                            property))
-                    {
-                        break;
-                    }
-
-                    propertyWriter.Write(
-                        plan,
-                        property,
-                        targetExpression,
-                        propertyContext);
-                    break;
-                }
-
-                case ComponentFirstUpdateActionKind.CommandBinding:
-                {
-                    ref readonly var command = ref plan.CommandBindings.ItemRef(
-                        action.Index);
-                    if (!ComponentFirstUpdateActionWriter
-                        .CanWriteStructuralCommandBinding(command))
-                    {
-                        actionWriter.WriteCommandBinding(
-                            command,
-                            targetExpression);
-                    }
-
-                    break;
-                }
-            }
-        }
-    }
-
-    private void WriteStructuralRevisionActions(
-        in ComponentPlan plan,
-        in ComponentElementPlan element,
-        in MarkupExtensionWriteContext context)
-    {
-        var targetExpression = element.Identifier;
-        var propertyContext = context.WithTarget(
-            targetExpression,
-            context.TargetProperty,
-            element.ScopeId,
-            plan.ElementReferences.AsSpan());
-        var propertyWriter = new ComponentPropertyWriter(
-            _writer,
-            in _bindingEnvironment,
-            _sourceMap);
-        var subscriptionWriter = new PropertySubscriptionWriter(
-            _writer,
-            _sourceMap,
-            writeInlineHandlers: true);
-        var actionWriter = new ComponentFirstUpdateActionWriter(
-            _writer,
-            _sourceMap);
-
-        for (var i = 0; i < element.FirstUpdateActions.Length; i++)
-        {
-            ref readonly var action = ref plan.FirstUpdateActions.ItemRef(
-                element.FirstUpdateActions.Start + i);
-
-            switch (action.Kind)
-            {
-                case ComponentFirstUpdateActionKind.PropertyWrite:
-                {
-                    ref readonly var property = ref plan.PropertyWrites.ItemRef(
-                        action.Index);
-                    if (property.ValueKind == ComponentPropertyValueKind.Constant)
-                    {
-                        WriteStructuralPropertyOperation(
-                            plan,
-                            element,
-                            property,
-                            targetExpression,
-                            propertyContext);
-                    }
-                    else
-                    {
-                        propertyWriter.WriteStructuralBindingValue(
-                            plan,
-                            property,
-                            element.RuntimeStorageId,
-                            targetExpression,
-                            propertyContext);
-                    }
-
-                    break;
-                }
-
-                case ComponentFirstUpdateActionKind.PropertySubscription:
-                {
-                    ref readonly var subscription = ref
-                        plan.PropertySubscriptions.ItemRef(action.Index);
-                    subscriptionWriter.WriteStructuralRegistration(
-                        element,
-                        subscription);
-                    break;
-                }
-
-                case ComponentFirstUpdateActionKind.RoutedEvent:
-                {
-                    ref readonly var routedEvent = ref plan.RoutedEvents.ItemRef(
-                        action.Index);
-                    actionWriter.WriteStructuralRoutedEvent(
-                        routedEvent,
-                        element.RuntimeStorageId,
-                        targetExpression);
-                    break;
-                }
-
-                case ComponentFirstUpdateActionKind.CommandBinding:
-                {
-                    ref readonly var command = ref plan.CommandBindings.ItemRef(
-                        action.Index);
-                    actionWriter.WriteStructuralCommandBinding(
-                        command,
-                        element.RuntimeStorageId,
-                        targetExpression);
-                    break;
-                }
-            }
-        }
-    }
-
-    private void WriteInitialNonStructuralContent(
-        in ComponentPlan plan,
-        in ComponentElementPlan element,
-        in MarkupExtensionWriteContext context)
-    {
-        WriteInitialNonStructuralContentTarget(plan, element.Content, context);
-
-        for (var i = 0; i < element.PropertyElements.Length; i++)
-        {
-            ref readonly var propertyElement = ref plan.PropertyElements.ItemRef(
-                element.PropertyElements.Start + i);
-            WriteInitialNonStructuralContentTarget(
-                plan,
-                propertyElement.Content,
-                context);
-        }
-    }
-
-    private void WriteStructuralConstantContent(
-        in ComponentPlan plan,
-        in ComponentElementPlan element)
-    {
-        WriteStructuralConstantContentTarget(plan, element.Content);
-
-        for (var i = 0; i < element.PropertyElements.Length; i++)
-        {
-            ref readonly var propertyElement = ref plan.PropertyElements.ItemRef(
-                element.PropertyElements.Start + i);
-            WriteStructuralConstantContentTarget(
-                plan,
-                propertyElement.Content);
-        }
-    }
-
-    private void WriteStructuralConstantContentTarget(
-        in ComponentPlan plan,
-        in ComponentContentTargetReference target)
-    {
-        if (target.Kind != ComponentContentTargetKind.Property)
-        {
-            return;
-        }
-
-        Debug.Assert((uint)target.Index < (uint)plan.PropertyContents.Length);
-        ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
-        if (content.FirstUpdateValue.Kind != ComponentContentValueKind.Constant)
-        {
-            return;
-        }
-
-        var writer = new ComponentContentWriter(_writer, _sourceMap);
-        writer.WriteStructuralConstantValue(plan, content);
-    }
-
-    private void WriteInitialNonStructuralContentTarget(
-        in ComponentPlan plan,
-        in ComponentContentTargetReference target,
-        in MarkupExtensionWriteContext context)
-    {
-        if (target.Kind == ComponentContentTargetKind.Collection)
-        {
-            Debug.Assert(
-                (uint)target.Index <
-                (uint)plan.CollectionContents.Length);
-            ref readonly var collection =
-                ref plan.CollectionContents.ItemRef(target.Index);
-            if (!ComponentContentWriter.CanWriteStructuralCollection(
-                    plan,
-                    collection))
-            {
-                var contentWriter = new ComponentContentWriter(
-                    _writer,
-                    _sourceMap);
-                contentWriter.WriteCollection(plan, collection);
-            }
-
-            return;
-        }
-
-        if (target.Kind != ComponentContentTargetKind.Property)
-        {
-            return;
-        }
-
-        Debug.Assert((uint)target.Index < (uint)plan.PropertyContents.Length);
-        ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
-        if (content.FirstUpdateValue.Kind == ComponentContentValueKind.Element)
-        {
-            return;
-        }
-
-        if (ComponentContentWriter.CanWriteStructuralConstantValue(
-                plan,
-                content))
-        {
-            return;
-        }
-
-        WritePropertyContent(plan, target.Index, isFirstUpdate: true, context);
-    }
-
-    private void WriteStructuralConnections(
-        in ComponentPlan plan,
-        in ComponentElementPlan element,
-        in MarkupExtensionWriteContext context)
-    {
-        WriteStructuralConnection(plan, element.Content, context);
-
-        for (var i = 0; i < element.PropertyElements.Length; i++)
-        {
-            ref readonly var propertyElement = ref plan.PropertyElements.ItemRef(
-                element.PropertyElements.Start + i);
-            WriteStructuralConnection(plan, propertyElement.Content, context);
-        }
-    }
-
-    private void WriteStructuralConnection(
-        in ComponentPlan plan,
-        in ComponentContentTargetReference target,
-        in MarkupExtensionWriteContext context)
-    {
-        switch (target.Kind)
-        {
-            case ComponentContentTargetKind.Property:
-            {
-                Debug.Assert((uint)target.Index < (uint)plan.PropertyContents.Length);
-                ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
-                if (content.FirstUpdateValue.Kind == ComponentContentValueKind.Element)
-                {
-                    WritePropertyContent(plan, target.Index, isFirstUpdate: true, context);
-                }
-
-                break;
-            }
-
-            case ComponentContentTargetKind.Collection:
-            {
-                Debug.Assert((uint)target.Index < (uint)plan.CollectionContents.Length);
-                var contentWriter = new ComponentContentWriter(_writer, _sourceMap);
-                contentWriter.WriteStructuralCollection(
-                    plan,
-                    plan.CollectionContents.ItemRef(target.Index));
-                break;
-            }
         }
     }
 
@@ -994,12 +615,58 @@ internal readonly ref struct ComponentScopeWriter
         in ComponentPlan plan,
         in ComponentScopePlan scope)
     {
+        WriteLocalContentStates(plan, scope, styleOnly: false);
         var writer = new ElementWriter(_writer, _sourceMap);
-
         for (var i = 0; i < scope.Elements.Length; i++)
         {
             var elementId = GetScopeElementId(plan, scope, i);
             writer.WriteCreation(plan.Elements.ItemRef(elementId));
+        }
+    }
+
+    private void WriteLocalContentStates(in ComponentPlan plan, in ComponentScopePlan scope, bool styleOnly)
+    {
+        foreach (ref readonly var content in plan.CollectionContents.AsSpan())
+        {
+            ref readonly var owner = ref plan.Elements.ItemRef(content.OwnerElementId);
+            if ((!content.DictionaryShape.IsDictionary && !content.ReplacesStyles) ||
+                !owner.IsLocal || owner.ScopeId != scope.Id)
+            {
+                continue;
+            }
+
+            if (styleOnly && !owner.IsStyleSubtree)
+            {
+                continue;
+            }
+
+            if (content.ReplacesStyles)
+            {
+                ComponentContentWriter.WriteStyleStateType(_writer, content);
+                _writer.Write(" ").Write(ComponentContentWriter.GetStyleStateName(content.Id));
+            }
+            else
+            {
+                ComponentContentWriter.WriteDictionaryStateType(_writer, content);
+                _writer.Write(" ").Write(ComponentContentWriter.GetDictionaryStateName(content.Id));
+            }
+            _writer.WriteLine(" = new();");
+        }
+
+    }
+
+    private void WriteStyleElementCreation(in ComponentPlan plan, in ComponentScopePlan scope)
+    {
+        WriteLocalContentStates(plan, scope, styleOnly: true);
+        var writer = new ElementWriter(_writer, _sourceMap);
+        for (var i = 0; i < scope.Elements.Length; i++)
+        {
+            ref readonly var element = ref plan.Elements.ItemRef(GetScopeElementId(plan, scope, i));
+            if (element.IsStyleSubtree)
+            {
+                writer.WriteCreation(element);
+                writer.WriteBeginInit(element);
+            }
         }
     }
 
@@ -1025,7 +692,11 @@ internal readonly ref struct ComponentScopeWriter
         for (var i = scope.Elements.Length - 1; i >= 0; i--)
         {
             var elementId = GetScopeElementId(plan, scope, i);
-            writer.WriteEndInit(plan.Elements.ItemRef(elementId));
+            ref readonly var element = ref plan.Elements.ItemRef(elementId);
+            if (!element.IsStyleSubtree)
+            {
+                writer.WriteEndInit(element);
+            }
         }
     }
 
@@ -1079,13 +750,20 @@ internal readonly ref struct ComponentScopeWriter
                 return WritePropertyContent(plan, target.Index, isFirstUpdate, context);
 
             case ComponentContentTargetKind.Collection:
-                if (!isFirstUpdate)
+                ref readonly var collection = ref plan.CollectionContents.ItemRef(target.Index);
+                if (!isFirstUpdate && !collection.DictionaryShape.IsDictionary && !collection.ReplacesStyles)
                 {
                     return false;
                 }
 
                 Debug.Assert((uint)target.Index < (uint)plan.CollectionContents.Length);
                 var eagerWriter = new ComponentContentWriter(_writer, _sourceMap);
+                if (collection.DictionaryShape.IsDictionary)
+                {
+                    return eagerWriter.WriteDictionary(plan, collection,
+                        _generationMode == ComponentGenerationMode.DebugStructural);
+                }
+
                 if (_generationMode == ComponentGenerationMode.DebugStructural &&
                     eagerWriter.WriteStructuralCollection(
                         plan,

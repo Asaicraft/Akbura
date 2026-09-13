@@ -27,7 +27,9 @@ internal static class ComponentHotReloadIdentity
     {
         var isContent =
             (flags & ComponentParameterFlags.IsContent) != 0;
-        var propertyKind = kind == ComponentParameterKind.Collection
+        var propertyKind = kind == ComponentParameterKind.Dictionary
+            ? "direct:content-dictionary"
+            : kind == ComponentParameterKind.Collection
             ? isContent
                 ? "direct:content-collection"
                 : "direct:collection"
@@ -154,8 +156,15 @@ internal static class ComponentHotReloadIdentity
         for (var i = 0; i < plan.Elements.Length; i++)
         {
             ref readonly var element = ref plan.Elements.ItemRef(i);
-            if (!element.UsesRuntimeStorage)
+            if (!element.UsesRuntimeStorage && !element.IsStyleSubtree)
             {
+                continue;
+            }
+
+            if (element.IsStyleSubtree)
+            {
+                hash.Add(element.Type);
+                hash.Add(CreateOperationSyntaxIdentity(element.Syntax));
                 continue;
             }
 
@@ -168,6 +177,14 @@ internal static class ComponentHotReloadIdentity
             hash.Add(element.Type);
             hash.Add(element.ExplicitKey ?? string.Empty);
             hash.Add(CreateRenderSyntaxIdentity(element.Syntax));
+        }
+
+        foreach (ref readonly var content in plan.CollectionContents.AsSpan())
+        {
+            hash.Add(content.DictionaryShape.ContractType);
+            hash.Add(content.DictionaryShape.KeyType);
+            hash.Add(content.DictionaryShape.ValueType);
+            hash.Add(content.ReplacesStyles);
         }
 
         return hash.ToString();

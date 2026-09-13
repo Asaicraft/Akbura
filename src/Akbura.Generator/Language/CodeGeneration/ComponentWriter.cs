@@ -236,6 +236,30 @@ internal sealed class ComponentWriter : IDisposable
             wroteAny = true;
         }
 
+        foreach (ref readonly var content in _plan.CollectionContents.AsSpan())
+        {
+            ref readonly var owner = ref _plan.Elements.ItemRef(content.OwnerElementId);
+            if ((!content.DictionaryShape.IsDictionary && !content.ReplacesStyles) ||
+                owner.IsLocal || owner.UsesRuntimeStorage)
+            {
+                continue;
+            }
+
+            _writer.Write("private readonly ");
+            if (content.ReplacesStyles)
+            {
+                ComponentContentWriter.WriteStyleStateType(_writer, content);
+                _writer.Write(" ").Write(ComponentContentWriter.GetStyleStateName(content.Id));
+            }
+            else
+            {
+                ComponentContentWriter.WriteDictionaryStateType(_writer, content);
+                _writer.Write(" ").Write(ComponentContentWriter.GetDictionaryStateName(content.Id));
+            }
+            _writer.WriteLine(" = new();");
+            wroteAny = true;
+        }
+
         return wroteAny;
     }
 

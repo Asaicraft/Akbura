@@ -203,7 +203,8 @@ internal static class AkburaMarkupEditingFacts
 
     public static bool IsPotentialCompletionPosition(
         ITextSnapshot snapshot,
-        int position)
+        int position,
+        bool allowLiteralValues = false)
     {
         if (IsMarkupExtensionTypeCompletionPosition(
                 snapshot,
@@ -277,7 +278,12 @@ internal static class AkburaMarkupEditingFacts
             }
         }
 
-        if (quote != '\0' || expressionDepth != 0)
+        if (quote != '\0')
+        {
+            return allowLiteralValues && expressionDepth == 0;
+        }
+
+        if (expressionDepth != 0)
         {
             return false;
         }

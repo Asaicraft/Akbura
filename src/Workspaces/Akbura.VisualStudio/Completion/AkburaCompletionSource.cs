@@ -29,6 +29,12 @@ internal sealed class AkburaCompletionSource :
         MemberCommitCharacters = ['=', ' ', '\t', '\n'];
 
     private static readonly ImmutableArray<char>
+        LiteralValueCommitCharacters = ['"', '\'', '\t', '\n'];
+
+    private static readonly ImmutableArray<char>
+        LiteralOwnerCommitCharacters = ['.', '\t', '\n'];
+
+    private static readonly ImmutableArray<char>
         MarkupExtensionCommitCharacters = [' ', '\t', '\n'];
 
     private static readonly ImmutableArray<char>
@@ -308,7 +314,8 @@ internal sealed class AkburaCompletionSource :
             !isUsingDirectiveName &&
             AkburaMarkupEditingFacts.IsPotentialCompletionPosition(
                 snapshot,
-                position);
+                position,
+                allowLiteralValues: true);
 
         var start = position;
         while (start > 0)
@@ -912,7 +919,12 @@ internal sealed class AkburaCompletionSource :
             filterText: completion.FilterText,
             automationText: completion.DisplayText,
             attributeIcons: ImmutableArray<ImageElement>.Empty,
-            commitCharacters: GetCommitCharacters(completion.Kind),
+            commitCharacters: sourceSpan.Start > 0 &&
+                snapshot[sourceSpan.Start - 1] is '"' or '\''
+                    ? completion.InsertText.EndsWith(".", StringComparison.Ordinal)
+                        ? LiteralOwnerCommitCharacters
+                        : LiteralValueCommitCharacters
+                    : GetCommitCharacters(completion.Kind),
             applicableToSpan: new SnapshotSpan(
                 snapshot,
                 new Span(sourceSpan.Start, sourceSpan.Length)),
@@ -1159,6 +1171,14 @@ internal sealed class AkburaCompletionSource :
                 .IsCommandParameterListStartPosition(
                     triggerLocation.Snapshot,
                     triggerLocation.Position))
+        {
+            return true;
+        }
+        if (trigger.Character is '"' or '\'' &&
+            AkburaMarkupEditingFacts.IsPotentialCompletionPosition(
+                triggerLocation.Snapshot,
+                triggerLocation.Position,
+                allowLiteralValues: true))
         {
             return true;
         }

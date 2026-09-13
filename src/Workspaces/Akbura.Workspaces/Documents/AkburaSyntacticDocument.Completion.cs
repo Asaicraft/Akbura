@@ -105,7 +105,7 @@ public sealed partial class AkburaSyntacticDocument
                 startTag,
                 position))
         {
-            return default;
+            return GetLiteralAttributeValueContext(startTag, position);
         }
 
         var element = startTag.Parent as MarkupElementSyntax;
@@ -863,6 +863,65 @@ public sealed partial class AkburaSyntacticDocument
         }
 
         return false;
+    }
+
+    private AkburaSyntacticCompletionContext GetLiteralAttributeValueContext(
+        MarkupStartTagSyntax startTag,
+        int position)
+    {
+        foreach (var attribute in startTag.Attributes)
+        {
+            var value = attribute switch
+            {
+                MarkupPlainAttributeSyntax plain => plain.Value,
+                MarkupAttachedPropertyAttributeSyntax attached => attached.Value,
+                MarkupPrefixedAttributeSyntax prefixed => prefixed.Value,
+                _ => null,
+            };
+            if (value is not MarkupLiteralAttributeValueSyntax literal ||
+                literal.Span.Length == 0 ||
+                position <= literal.Span.Start ||
+                position > literal.Span.End)
+            {
+                continue;
+            }
+
+            var literalSpan = AkburaMarkupSyntaxFacts.GetAttributeLiteralSpan(literal);
+            var start = literalSpan.Start + 1;
+            var end = Math.Min(position, literalSpan.End);
+            if (position > literalSpan.End ||
+                end > start && Text[end - 1] == Text[literalSpan.Start])
+            {
+                return default;
+            }
+
+            var contentEnd = literalSpan.End;
+            if (contentEnd > start && Text[contentEnd - 1] == Text[literalSpan.Start])
+            {
+                contentEnd--;
+            }
+
+            var span = TextSpan.FromBounds(start, contentEnd);
+            var name = attribute switch
+            {
+                MarkupPlainAttributeSyntax plain => plain.Name.ToFullString().Trim(),
+                MarkupAttachedPropertyAttributeSyntax attached =>
+                    attached.OwnerType.ToFullString().Trim() + "." + attached.Name.ToFullString().Trim(),
+                MarkupPrefixedAttributeSyntax prefixed =>
+                    prefixed.Prefix.ToString() + ":" + prefixed.Name.ToFullString().Trim(),
+                _ => null,
+            };
+            return new AkburaSyntacticCompletionContext(
+                AkburaCompletionContextKind.AttributeValue,
+                span,
+                Text.ToString(TextSpan.FromBounds(start, end)),
+                startTag.Name.ToFullString().Trim(),
+                GetParentElementName(startTag.Parent as MarkupElementSyntax),
+                GetExistingAttributeNames(startTag),
+                name);
+        }
+
+        return default;
     }
 
     private bool IsInsideAssignedAttributeValue(

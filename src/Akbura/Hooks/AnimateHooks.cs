@@ -19,10 +19,12 @@ public static class AnimateHooks
         bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(control);
+        
         var controller = control.useHookState(s_controller);
         control.useEffect(
             (Func<IDisposable?>)(() => controller.Value.Activate(enabled)),
             [enabled]);
+
         return controller;
     }
 }

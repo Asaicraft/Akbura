@@ -2570,7 +2570,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         return new PropertySymbol(
             contentProperty.Name,
-            componentSymbol.ContentModel.AllowedChildType,
+            componentSymbol.ContentModel.IsDictionary
+                ? new CSharpSymbolDefinition(contentProperty.Type)
+                : componentSymbol.ContentModel.AllowedChildType,
             avaloniaPropertyDefinition: avaloniaProperty == null ? default : new CSharpSymbolDefinition(avaloniaProperty),
             clrPropertyDefinition: new CSharpSymbolDefinition(contentProperty),
             containingSymbol: componentSymbol,
@@ -2842,6 +2844,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             SetSemanticDiagnostics(markupElement, diagnostics);
             symbol.SetChildren(children);
             symbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
+            GetMarkupAssignmentOrder(markupElement, out var assignmentDiagnostics);
+            SetSemanticDiagnostics(markupElement, diagnostics.AddRange(assignmentDiagnostics));
 
             return AkburaSymbolInfo.Success(symbol);
         }
@@ -2996,6 +3000,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 allowsText: false);
         }
 
+        if (TryCreateMarkupDictionaryContentModel(propertyType, property.CSharpDefinition,
+                null, out var dictionaryModel))
+        {
+            return dictionaryModel;
+        }
+
         if (TryGetContentCollectionElementType(propertyType, out var elementType))
         {
             return new MarkupContentModel(
@@ -3136,9 +3146,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         string componentNameText,
         IAkburaComponentSymbol componentSymbol)
     {
-        var contentModel = componentSymbol.ComponentType is { } componentType
-            ? CreateMarkupContentModel(componentType, markupElement)
-            : default;
+        var declaredParameterContent = CreateAkburaParameterContentModel(componentSymbol.Parameters);
+        var contentModel = declaredParameterContent.IsDictionary
+            ? declaredParameterContent
+            : componentSymbol.ComponentType is { } componentType
+                ? CreateMarkupContentModel(componentType, markupElement)
+                : default;
         if (contentModel.IsDefault)
         {
             contentModel = componentSymbol.ContentModel.IsDefault
@@ -3160,6 +3173,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         SetSemanticDiagnostics(markupElement, diagnostics);
         usageSymbol.SetChildren(children);
         usageSymbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
+        GetMarkupAssignmentOrder(markupElement, out var assignmentDiagnostics);
+        SetSemanticDiagnostics(markupElement, diagnostics.AddRange(assignmentDiagnostics));
 
         return usageSymbol;
     }
@@ -3429,6 +3444,15 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
+        if (IsMarkupDictionaryKeyDirective(markupAttribute))
+        {
+            var element = GetContainingMarkupElement(markupAttribute);
+            var keyType = element != null && TryGetMarkupDictionaryContext(element, out var model)
+                ? model.DictionaryShape.KeyType : null;
+            return AkburaSymbolInfo.Success(new PropertySymbol("key", new CSharpSymbolDefinition(
+                keyType ?? Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object))));
+        }
+
         if (IsMarkupNameDirective(markupAttribute))
         {
             return ResolveMarkupNameDirective(Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute));
@@ -3474,7 +3498,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         var componentSymbolInfo = GetSymbolInfo(markupElement);
-        if (componentSymbolInfo.Symbol is not IMarkupComponentSymbol componentSymbol)
+        var componentSymbol = componentSymbolInfo.Symbol as IMarkupComponentSymbol;
+        if (componentSymbol == null && markupElement.StartTag is { CloseToken.IsMissing: true } startTag &&
+            TryResolveMarkupComponentForCompletion(startTag.Name.ToFullString().Trim(), out var incompleteComponent))
+        {
+            componentSymbol = incompleteComponent;
+        }
+
+        if (componentSymbol == null)
         {
             SetSemanticDiagnosticsIfAbsent(markupAttribute, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
             return AkburaSymbolInfo.None(componentSymbolInfo.CandidateReason);
@@ -4372,7 +4403,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return null;
     }
 
-    private bool IsAvaloniaPropertyType(ITypeSymbol type)
+    internal bool IsAvaloniaPropertyType(ITypeSymbol type)
     {
         return TryGetAvaloniaPropertyType(out var avaloniaPropertyType) &&
             IsAssignableTo(type, avaloniaPropertyType);
@@ -4598,6 +4629,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             }
 
             var contentType = contentProperty.Type;
+            if (TryCreateMarkupDictionaryContentModel(contentType,
+                    new CSharpSymbolDefinition(contentProperty), null, out var dictionaryModel))
+            {
+                return dictionaryModel;
+            }
+
             if (TryGetContentCollectionElementType(contentType, out var itemType))
             {
                 return new MarkupContentModel(
@@ -4614,6 +4651,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 allowsText: AllowsTextContent(contentType));
         }
 
+        if (TryCreateMarkupDictionaryContentModel(componentType, default,
+                null, out var selfDictionaryModel))
+        {
+            return selfDictionaryModel;
+        }
+
         if (TryGetContentCollectionElementType(componentType, out var elementType))
         {
             return new MarkupContentModel(
@@ -4621,6 +4664,18 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 allowedChildType: new CSharpSymbolDefinition(elementType),
                 isCollection: true,
                 allowsText: AllowsTextContent(elementType));
+        }
+
+        var addMethods = GetMarkupContentAddMethods(componentType);
+        if (!addMethods.IsDefaultOrEmpty)
+        {
+            return new MarkupContentModel(
+                contentProperty: default,
+                allowedChildType: new CSharpSymbolDefinition(
+                    Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object)),
+                isCollection: false,
+                allowsText: true,
+                addMethods: addMethods);
         }
 
         return default;
@@ -4645,6 +4700,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         if (parameter.Type.Symbol is not ITypeSymbol parameterType)
         {
             return default;
+        }
+
+        if (TryCreateMarkupDictionaryContentModel(parameterType, default,
+                parameter, out var dictionaryModel))
+        {
+            return dictionaryModel;
         }
 
         if (TryGetContentCollectionElementType(parameterType, out var elementType))
@@ -5006,8 +5067,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 diagnosticsBuilder);
         }
 
+        AddMarkupDictionaryContentDiagnostics(markupElement, contentModel,
+            childrenBuilder, diagnosticsBuilder);
+        var children = BindMarkupContentInsertions(
+            contentModel, containingType, childrenBuilder.ToImmutable(), diagnosticsBuilder);
         diagnostics = diagnosticsBuilder.ToImmutable();
-        return childrenBuilder.ToImmutable();
+        return children;
     }
 
     private bool IsMarkupPropertyElementContent(
@@ -5071,12 +5136,21 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return;
         }
 
+        if (contentModel.IsDictionary &&
+            (contentModel.DictionaryShape.IsAmbiguous || contentModel.DictionaryShape.IsReadOnlyOnly))
+        {
+            // The selected sink's contract diagnostic is the cause; its value type is
+            // not a valid writable target against which to diagnose descendants.
+            return;
+        }
+
         if (!IsAllowedMarkupChildType(componentType, contentModel))
         {
-            diagnosticsBuilder.Add(CreateInvalidMarkupChildDiagnostic(
-                elementContent,
-                childType,
-                contentModel));
+            diagnosticsBuilder.Add(contentModel.IsDictionary
+                ? new AkburaSemanticDiagnostic(elementContent,
+                    ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryValueTypeMismatch,
+                    [childType.ToDisplayString(), contentModel.AllowedChildType.ToDisplayString()])
+                : CreateInvalidMarkupChildDiagnostic(elementContent, childType, contentModel));
         }
     }
 
@@ -5257,16 +5331,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private bool HasAvaloniaContentAttribute(RoslynPropertySymbol property)
     {
-        foreach (var attribute in property.GetAttributes())
-        {
-            if (attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==
-                "global::Avalonia.Metadata.ContentAttribute")
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return MarkupPropertyMetadata.GetMetadata(property).IsContent;
     }
 
     private bool TryGetAvaloniaControlType(out INamedTypeSymbol controlType)

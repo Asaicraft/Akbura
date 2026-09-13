@@ -16,7 +16,7 @@ namespace Akbura.HotReload;
 /// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
-public sealed class AkburaRenderState
+public sealed partial class AkburaRenderState
 {
     private const string AkcssOperationSlot = "$akcss";
     private const string AkcssOperationIdentity = "generated-akcss";
@@ -545,6 +545,35 @@ public sealed class AkburaRenderState
         ArgumentNullException.ThrowIfNull(collection);
         ArgumentNullException.ThrowIfNull(desiredItems);
 
+        if (_pendingRevision == null)
+        {
+            var owner = GetNode(ownerLocalId);
+            var key = new RenderSlotKey(owner.NodeId, slot);
+            _collections.TryGetValue(key, out var previous);
+            if (previous != null && previous is not RenderCollectionState<T>)
+            {
+                throw new InvalidOperationException($"Render collection slot '{slot}' changed its item type.");
+            }
+
+            var typed = previous as RenderCollectionState<T>;
+            if (typed != null && !ReferenceEquals(typed.Collection, collection))
+            {
+                typed.RemoveOwnedItemsAndCreateEmptyState();
+                typed = null;
+            }
+
+            var anchor = AkburaRenderCollectionReconciler.Reconcile(collection,
+                typed?.Items ?? Array.Empty<T>(), desiredItems, typed?.Anchor ?? -1);
+            _collections[key] = new RenderCollectionState<T>(
+                owner.NodeId, slot, collection, component, [.. desiredItems], anchor);
+            if (component != null)
+            {
+                SynchronizeComponentContentCollections(component);
+            }
+
+            return;
+        }
+
         var pendingRevision = GetMutablePendingRevision();
         try
         {
@@ -701,6 +730,35 @@ public sealed class AkburaRenderState
                 $"Render collection target '{target.GetType().FullName}' does " +
                 "not implement System.Collections.IList.",
                 nameof(target));
+        }
+
+        if (_pendingRevision == null)
+        {
+            var owner = GetNode(ownerLocalId);
+            var key = new RenderSlotKey(owner.NodeId, slot);
+            _collections.TryGetValue(key, out var previous);
+            if (previous != null && previous is not UntypedRenderCollectionState)
+            {
+                throw new InvalidOperationException($"Render collection slot '{slot}' changed its item type.");
+            }
+
+            var untyped = previous as UntypedRenderCollectionState;
+            if (untyped != null && !ReferenceEquals(untyped.Target, target))
+            {
+                untyped.RemoveOwnedItemsAndCreateEmptyState();
+                untyped = null;
+            }
+
+            var anchor = AkburaRenderCollectionReconciler.Reconcile(collection,
+                untyped?.Items ?? Array.Empty<object>(), desiredItems, untyped?.Anchor ?? -1);
+            _collections[key] = new UntypedRenderCollectionState(
+                owner.NodeId, slot, target, collection, component, [.. desiredItems], anchor);
+            if (component != null)
+            {
+                SynchronizeComponentContentCollections(component);
+            }
+
+            return;
         }
 
         var pendingRevision = GetMutablePendingRevision();

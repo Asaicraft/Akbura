@@ -1,6 +1,6 @@
 ---
 title: Differences between XML, XAML and AXAML
-summary: Learn how XML and AXAML concepts map to Akbura syntax, starting with CDATA and C# raw string literals.
+summary: Map XML and AXAML concepts to Akbura keys, styles, whitespace and C# raw strings.
 ---
 
 Akbura uses an XML-like element structure, but an `.akbura` file is not an XML, XAML or AXAML document. It is an Akbura component that can contain normal C# declarations and expressions.
@@ -16,6 +16,71 @@ This distinction matters when syntax from XML or AXAML is copied into an Akbura 
 **AXAML** means Avalonia XAML. Avalonia uses the `.axaml` extension to distinguish its XAML dialect from XAML files used by other frameworks.
 
 Akbura keeps familiar concepts such as elements, attributes and property elements, but it is compiled by the Akbura compiler rather than treated as an XML document.
+
+## Dictionary keys
+
+AXAML uses the XML directive `x:Key`. Akbura uses `x.key` or its alias `x.Key`:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Media;
+
+state int resourceIndex = 0;
+
+<Border>
+    <Border.Resources>
+        <SolidColorBrush x.key="AccentBrush" Color="Red" />
+        <SolidColorBrush x.Key={resourceIndex + 1} Color="Blue" />
+    </Border.Resources>
+</Border>
+```
+
+These are two spellings of one dictionary-entry directive. `x:Key` is not an
+additional spelling in Akbura. Other attribute names are still case-sensitive.
+A quoted key is a string; `{resourceIndex + 1}` is a typed C# key expression.
+The key is attached to the parent dictionary entry rather than assigned to a
+property of `SolidColorBrush`.
+
+`x.Name` continues to name an element in the component and serves a different
+purpose. Dynamic dictionary keys do not replace element identity. See
+[Dictionary Resources](/#dictionary-resources) for key typing, updates,
+ownership, and collisions.
+
+## Styles and property references
+
+Avalonia styles use the familiar property-element shape in Akbura:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Styling;
+
+<Border>
+    <Border.Styles>
+        <Style Selector="Button">
+            <Setter Property="Background" Value="Red" />
+        </Style>
+    </Border.Styles>
+</Border>
+```
+
+`Property="Background"` resolves a static Avalonia property reference using the
+style's target context. `Property="Button.Background"` supplies an explicit
+owner, and `Property={Button.BackgroundProperty}` uses C# directly. This also
+works for custom holder properties of type `AvaloniaProperty`.
+
+Markup extensions keep Akbura's `${...}` syntax, including bindings stored in
+a setter:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Styling;
+using Akbura.Markup;
+
+<Setter Property="Button.Background" Value=${Binding AccentBrush} />
+```
+
+See [Avalonia Styles](/#avalonia-styles) for supported literal selector forms,
+typed child insertion, contextual values, and property metadata.
 
 ## Whitespace and `xml:space`
 

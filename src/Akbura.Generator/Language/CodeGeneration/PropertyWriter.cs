@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
@@ -43,6 +43,9 @@ internal readonly struct PropertyWritePlan
         AttachedSetter = attachedSetter;
         ReceiverType = receiverType;
         MemberName = memberName;
+        var assignmentMember = (RoslynSymbol?)clrProperty ?? attachedSetter;
+        AssignBinding = assignmentMember != null &&
+            Akbura.Language.Binder.MarkupPropertyMetadataReader.HasAssignBinding(assignmentMember);
     }
 
     public PropertyWriteKind Kind { get; }
@@ -63,6 +66,8 @@ internal readonly struct PropertyWritePlan
     public string? MemberName { get; }
 
     public bool IsValid => Kind != PropertyWriteKind.None;
+
+    public bool AssignBinding { get; }
 
     public bool HasAvaloniaPropertyTarget =>
         TargetProperty.Kind is MarkupTargetPropertyKind.StaticMember or

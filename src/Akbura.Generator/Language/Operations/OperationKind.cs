@@ -13,6 +13,7 @@ internal enum OperationKind
     MarkupText,
     InlineExpression,
     MarkupNameAssignment,
+    MarkupDictionaryKey,
     MarkupWhitespaceDirective,
     StateDeclaration,
     StateInitializer,

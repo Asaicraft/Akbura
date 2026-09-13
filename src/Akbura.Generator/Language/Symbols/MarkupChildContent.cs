@@ -14,7 +14,8 @@ internal readonly struct MarkupChildContent
         string? rawText = null,
         MarkupWhitespaceMode whitespaceMode =
             MarkupWhitespaceMode.Default,
-        bool isDeferred = false)
+        bool isDeferred = false,
+        Microsoft.CodeAnalysis.IMethodSymbol? insertionMethod = null)
     {
         Syntax = syntax ??
             throw new ArgumentNullException(nameof(syntax));
@@ -27,6 +28,7 @@ internal readonly struct MarkupChildContent
         RawText = rawText ?? Text;
         WhitespaceMode = whitespaceMode;
         IsDeferred = isDeferred;
+        InsertionMethod = insertionMethod;
     }
 
     public MarkupContentSyntax Syntax { get; }
@@ -48,4 +50,10 @@ internal readonly struct MarkupChildContent
     /// by a deferred template factory, not eagerly.
     /// </summary>
     public bool IsDeferred { get; }
+
+    /// <summary>The statically selected content Add overload, when applicable.</summary>
+    public Microsoft.CodeAnalysis.IMethodSymbol? InsertionMethod { get; }
+
+    public MarkupChildContent WithInsertionMethod(Microsoft.CodeAnalysis.IMethodSymbol method) =>
+        new(Syntax, Kind, Type, ComponentSymbol, Text, RawText, WhitespaceMode, IsDeferred, method);
 }

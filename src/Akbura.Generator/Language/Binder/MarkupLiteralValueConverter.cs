@@ -60,6 +60,24 @@ internal static class MarkupLiteralValueConverter
         }
 
         var stringType = compilation.GetSpecialType(SpecialType.System_String);
+        // Avalonia exposes brush parsing on Brush, while property references commonly
+        // have the interface IBrush as their declared value type.
+        if (namedType.Name == "IBrush" && namedType.ContainingNamespace.ToDisplayString() == "Avalonia.Media" &&
+            compilation.GetTypeByMetadataName("Avalonia.Media.Brush") is { } brushType)
+        {
+            var brushParser = brushType.GetMembers("Parse").OfType<IMethodSymbol>().FirstOrDefault(method =>
+                method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
+                method.Parameters.Length == 1 &&
+                SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, stringType) &&
+                compilation.ClassifyConversion(method.ReturnType, targetType).IsImplicit);
+            if (brushParser != null)
+            {
+                value = new MarkupLiteralValue(text, new CSharpSymbolDefinition(targetType),
+                    MarkupLiteralConverterKind.ParseMethod, new CSharpSymbolDefinition(brushParser));
+                return MarkupLiteralConversionStatus.Success;
+            }
+        }
+
         var parseMethod = namedType.GetMembers("Parse")
             .OfType<IMethodSymbol>()
             .FirstOrDefault(method =>

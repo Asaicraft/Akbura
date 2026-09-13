@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -50,6 +50,31 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
         cancellationToken
             .ThrowIfCancellationRequested();
+
+        var markupSemanticModel = context.Project.Compilation
+            .GetSemanticModel(document.SyntaxTree);
+        if (AkburaMarkupSemanticFacts.GetPropertyReference(markupSemanticModel, position)
+            is { } propertyReference)
+        {
+            if (propertyReference.OwnerSpan.Contains(position))
+            {
+                return CreateDefinition(context, propertyReference.OwnerSpan, null,
+                    propertyReference.LookupOwner, cancellationToken);
+            }
+
+            if (propertyReference.PropertySpan.Contains(position))
+            {
+                return CreateDefinition(context, propertyReference.PropertySpan, null,
+                    propertyReference.Field, cancellationToken);
+            }
+        }
+
+        if (AkburaMarkupSemanticFacts.GetSelectorTypeReference(markupSemanticModel, position)
+            is { Type: { } selectorType } selectorReference)
+        {
+            return CreateDefinition(context, selectorReference.Span, null, selectorType,
+                cancellationToken);
+        }
 
         var projectedDefinition =
             GetProjectedCSharpDefinition(

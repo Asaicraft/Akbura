@@ -1,5 +1,8 @@
 ﻿using Akbura.Language.Syntax;
 
+using Akbura.Language.Symbols;
+using Microsoft.CodeAnalysis;
+
 namespace Akbura.Language.CodeGeneration;
 
 internal enum ComponentContentValueKind : byte
@@ -78,13 +81,17 @@ internal readonly struct ComponentCollectionContentPlan
         int ownerElementId,
         CollectionWritePlan destination,
         ComponentPlanRange items,
-        AkburaSyntax syntax)
+        AkburaSyntax syntax,
+        MarkupDictionaryShape dictionaryShape = default,
+        bool replacesStyles = false)
     {
         Id = id;
         OwnerElementId = ownerElementId;
         Destination = destination;
         Items = items;
         Syntax = syntax;
+        DictionaryShape = dictionaryShape;
+        ReplacesStyles = replacesStyles;
     }
 
     public int Id { get; }
@@ -95,6 +102,10 @@ internal readonly struct ComponentCollectionContentPlan
 
     public ComponentPlanRange Items { get; }
 
+    public MarkupDictionaryShape DictionaryShape { get; }
+
+    public bool ReplacesStyles { get; }
+
     public AkburaSyntax Syntax { get; }
 }
 
@@ -102,13 +113,21 @@ internal readonly struct ComponentContentItemPlan
 {
     public ComponentContentItemPlan(
         ComponentContentValueReference value,
-        AkburaSyntax syntax)
+        AkburaSyntax syntax,
+        IMethodSymbol? insertionMethod = null,
+        ComponentContentValueReference key = default)
     {
         Value = value;
         Syntax = syntax;
+        InsertionMethod = insertionMethod;
+        Key = key;
     }
 
     public ComponentContentValueReference Value { get; }
+
+    public IMethodSymbol? InsertionMethod { get; }
+
+    public ComponentContentValueReference Key { get; }
 
     public AkburaSyntax Syntax { get; }
 }

@@ -16,6 +16,14 @@
         "link": "/akbura/xml-xaml-axaml"
       },
       {
+        "text": "Dictionary Resources",
+        "link": "/#dictionary-resources"
+      },
+      {
+        "text": "Avalonia Styles",
+        "link": "/#avalonia-styles"
+      },
+      {
         "text": "Grid",
         "link": "/akbura/grid"
       },

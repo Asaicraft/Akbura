@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Operations;
+using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 
@@ -33,6 +33,12 @@ internal readonly ref struct ComponentValueWriter
         if (constant.HasValue)
         {
             _valueWriter.WriteConstant(constant.Value, value.TargetType);
+            return;
+        }
+
+        if (value.LiteralValue == null && value.Operation.Syntax != null)
+        {
+            _writer.Write(value.Operation.Syntax.ToString());
             return;
         }
 
@@ -74,6 +80,10 @@ internal readonly ref struct ComponentValueWriter
     {
         switch (convertedValue)
         {
+            case MarkupSelectorValue selector:
+                new MarkupSelectorWriter(_writer).Write(selector);
+                return;
+
             case GridDefinitionListValue definitions:
                 WriteGridDefinitions(definitions, targetType);
                 return;

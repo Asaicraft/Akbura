@@ -158,6 +158,7 @@ internal sealed class AkburaCompletionCommitManager :
             completion.TriggerCompletionAfterInsert &&
             (typedChar == ' ' ||
              completion.CaretOffsetFromEnd > 0 ||
+             completion.InsertText.EndsWith(".", StringComparison.Ordinal) ||
              completion.InsertText.EndsWith(
                  " ",
                  StringComparison.Ordinal));
@@ -171,6 +172,12 @@ internal sealed class AkburaCompletionCommitManager :
         var replacementText = appendTypedCharacter
             ? completion.InsertText + typedChar
             : completion.InsertText;
+        var overtypeClosingQuote =
+            typedChar is '"' or '\'' &&
+            applicableSpan.Start.Position > 0 &&
+            currentSnapshot[applicableSpan.Start.Position - 1] == typedChar &&
+            applicableSpan.End.Position < currentSnapshot.Length &&
+            currentSnapshot[applicableSpan.End.Position] == typedChar;
 
         using var edit = buffer.CreateEdit();
         if (!edit.Replace(
@@ -215,7 +222,8 @@ internal sealed class AkburaCompletionCommitManager :
             var caretPosition = applicableSpan.Start.Position +
                 importDeltaBeforeCompletion +
                 replacementText.Length -
-                completion.CaretOffsetFromEnd;
+                completion.CaretOffsetFromEnd +
+                (overtypeClosingQuote ? 1 : 0);
             session.TextView.Caret.MoveTo(
                 new SnapshotPoint(appliedSnapshot, caretPosition));
 
@@ -229,7 +237,7 @@ internal sealed class AkburaCompletionCommitManager :
         }
 
         var suppressTypedCharacter =
-            triggerNextCompletion ||
+            triggerNextCompletion || overtypeClosingQuote ||
             (completion.CaretOffsetFromEnd > 0 &&
              typedChar is '=' or ' ');
         return suppressTypedCharacter

@@ -45,6 +45,30 @@ using Akbura.Markup;
 <Border p-1 ${md}:p-3 />
 ```
 
+## Binding objects in holder properties
+
+Normal markup properties apply binding results to their target. A CLR property
+marked with Avalonia's `[AssignBinding]` instead stores the binding object:
+
+```akbura
+using Avalonia.Controls;
+using Avalonia.Styling;
+using Akbura.Markup;
+
+<Setter Property="Button.Background" Value=${Binding AccentBrush} />
+```
+
+Akbura still calls `ProvideValue` and supplies the normal extension services.
+The delivery policy applies both to a statically known binding result and to an
+extension whose `ProvideValue` returns `object` containing a binding. It does
+not bind `Setter.Value` itself or subscribe merely to assign the current brush.
+Avalonia later applies the stored binding to the styled target.
+
+The same metadata works for custom holders with different property names.
+`[DependsOn]` controls assignment ordering independently; it does not create
+reactive subscriptions. See [Avalonia Styles](/#avalonia-styles) for custom
+`[Content]`/`[AssignBinding]` assignments and contextual value types.
+
 ## Utility arguments
 
 A markup extension can supply an argument to a parameterized utility:

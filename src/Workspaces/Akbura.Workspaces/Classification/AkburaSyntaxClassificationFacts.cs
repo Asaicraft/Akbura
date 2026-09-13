@@ -40,6 +40,13 @@ internal static class AkburaSyntaxClassificationFacts
 
         return token.Kind switch
         {
+            SyntaxKind.AkTextLiteral
+                when token.Parent is MarkupTextLiteralSyntax
+                {
+                    Parent: MarkupLiteralAttributeValueSyntax,
+                } =>
+                AkburaClassificationKind.String,
+
             SyntaxKind.StringLiteralToken or
             SyntaxKind.CharLiteralToken =>
                 AkburaClassificationKind.String,

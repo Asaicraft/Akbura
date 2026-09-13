@@ -12,6 +12,7 @@ internal enum ComponentParameterKind : byte
 {
     Value,
     Collection,
+    Dictionary,
 }
 
 [Flags]
@@ -58,7 +59,8 @@ internal readonly struct ComponentParameterPlan
         ComponentParameterFlags flags,
         ExpressionSyntax? defaultValue,
         ComponentParameterCollectionPlan collection,
-        ParamDeclarationSyntax syntax)
+        ParamDeclarationSyntax syntax,
+        ComponentParameterDictionaryPlan dictionary = default)
     {
         Id = id;
         Name = name;
@@ -68,6 +70,7 @@ internal readonly struct ComponentParameterPlan
         Flags = flags;
         DefaultValue = defaultValue;
         Collection = collection;
+        Dictionary = dictionary;
         Syntax = syntax;
         HotReloadKey = ComponentHotReloadIdentity.CreateParameterKey(
             name,
@@ -94,6 +97,8 @@ internal readonly struct ComponentParameterPlan
     public ExpressionSyntax? DefaultValue { get; }
 
     public ComponentParameterCollectionPlan Collection { get; }
+
+    public ComponentParameterDictionaryPlan Dictionary { get; }
 
     public ParamDeclarationSyntax Syntax { get; }
 

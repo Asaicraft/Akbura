@@ -59,7 +59,7 @@ internal readonly ref struct ComponentLifecycleWriter
                 _resourcePath);
             var lifecycle = plan.Lifecycle;
             bool wroteAny;
-            if (_generationMode == ComponentGenerationMode.DebugStructural)
+            if (_generationMode.UsesStructuralRuntime())
             {
                 markupContextWriter.WriteBaseUriField();
                 wroteAny = true;
@@ -69,7 +69,7 @@ internal readonly ref struct ComponentLifecycleWriter
                 wroteAny = markupContextWriter.WriteFields(lifecycle);
             }
 
-            if (_generationMode == ComponentGenerationMode.DebugStructural ||
+            if (_generationMode.UsesStructuralRuntime() ||
                 lifecycle.UsesFallbackRoot)
             {
                 if (wroteAny)
@@ -95,6 +95,10 @@ internal readonly ref struct ComponentLifecycleWriter
 
         try
         {
+            _writer.WriteHiddenApiAttributes();
+            _writer.Write("protected override bool __AkburaUsesSinglePassRender => ");
+            _writer.WriteLine(plan.HasConditionalRegions ? "true;" : "false;");
+            _writer.WriteLine();
             WriteFirstUpdate(plan);
             _writer.WriteLine();
             WriteUpdate(plan);
@@ -109,7 +113,7 @@ internal readonly ref struct ComponentLifecycleWriter
 
     private void WriteFallbackRootField()
     {
-        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        if (_generationMode.UsesStructuralRuntime())
         {
             _writer.WriteLine("#pragma warning disable CS0414");
         }
@@ -118,7 +122,7 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.Write(FallbackRootFieldName);
         _writer.WriteLine(" = null!;");
 
-        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        if (_generationMode.UsesStructuralRuntime())
         {
             _writer.WriteLine("#pragma warning restore CS0414");
         }
@@ -164,7 +168,7 @@ internal readonly ref struct ComponentLifecycleWriter
 
     private void WriteValidateFallbackUpdate()
     {
-        if (_generationMode != ComponentGenerationMode.DebugStructural)
+        if (!_generationMode.UsesStructuralRuntime())
         {
             return;
         }
@@ -241,7 +245,7 @@ internal readonly ref struct ComponentLifecycleWriter
             WritePrepareRenderRevision();
         }
 
-        WriteContentPresenterRefresh(plan, scope);
+        WriteContentPresenterRefresh(plan, scope, initialRefresh: true);
 
         if (usesStructuralHotReload)
         {
@@ -390,8 +394,18 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.WriteLine(")");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.Write(HotReloadUpdateInitialValuesMethodName);
-        _writer.WriteLine("();");
+        if (NeedsInlineStructuralInitialization(plan))
+        {
+            ref readonly var scope = ref plan.Scopes.ItemRef(0);
+            var context = CreateComponentScopeContext(plan);
+            new ComponentScopeWriter(_writer, in _bindingEnvironment, _sourceMap,
+                _ownerTypeName, _generationMode).WriteHotReloadState(plan, scope, context);
+        }
+        else
+        {
+            _writer.Write(HotReloadUpdateInitialValuesMethodName);
+            _writer.WriteLine("();");
+        }
 
         var lifecycle = plan.Lifecycle;
         if (!lifecycle.HasExplicitRootDataContext)
@@ -427,7 +441,7 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("if (");
-        _writer.Write(RenderRevisionChangedLocalName);
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).Write(".HasPendingRevision");
         _writer.WriteLine(")");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
@@ -444,7 +458,7 @@ internal readonly ref struct ComponentLifecycleWriter
     private void WriteCompleteRenderRevision()
     {
         _writer.Write("if (");
-        _writer.Write(RenderRevisionChangedLocalName);
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).Write(".HasPendingRevision");
         _writer.WriteLine(")");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
@@ -458,7 +472,7 @@ internal readonly ref struct ComponentLifecycleWriter
     private void WritePrepareRenderRevision()
     {
         _writer.Write("if (");
-        _writer.Write(RenderRevisionChangedLocalName);
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).Write(".HasPendingRevision");
         _writer.WriteLine(")");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
@@ -471,7 +485,10 @@ internal readonly ref struct ComponentLifecycleWriter
 
     private void WriteHotReloadUpdateInitialValues(in ComponentPlan plan)
     {
-        _writer.WriteLine("#if DEBUG");
+        if (_generationMode != ComponentGenerationMode.ReleaseConditional)
+        {
+            _writer.WriteLine("#if DEBUG");
+        }
         _writer.WriteHiddenApiAttributes();
         _writer.Write("private void ");
         _writer.Write(HotReloadUpdateInitialValuesMethodName);
@@ -479,7 +496,7 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
 
-        if (!plan.Lifecycle.UsesFallbackRoot)
+        if (!plan.Lifecycle.UsesFallbackRoot && !NeedsInlineStructuralInitialization(plan))
         {
             Debug.Assert(!plan.Scopes.IsDefaultOrEmpty);
 
@@ -497,7 +514,10 @@ internal readonly ref struct ComponentLifecycleWriter
 
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
-        _writer.WriteLine("#endif");
+        if (_generationMode != ComponentGenerationMode.ReleaseConditional)
+        {
+            _writer.WriteLine("#endif");
+        }
     }
 
     private void WriteRenderStatements(in ComponentPlan plan)
@@ -517,11 +537,40 @@ internal readonly ref struct ComponentLifecycleWriter
                 writer.Write(statement);
             }
         }
+
+        new ComponentRenderCaptureWriter(_writer).WritePublishes(
+            plan, ComponentRenderStatementPhase.Update);
+    }
+
+    private bool NeedsInlineStructuralInitialization(in ComponentPlan plan)
+    {
+        if (!_generationMode.UsesStructuralRuntime())
+        {
+            return false;
+        }
+
+        if (plan.HasConditionalRegions || !plan.RenderStatements.IsEmpty)
+        {
+            return true;
+        }
+
+        // A retained factory must stay in the same CLR method when its last
+        // conditional is removed but its local runtime contract remains active.
+        foreach (var scope in plan.Scopes)
+        {
+            if (scope.Kind is ComponentElementScopeKind.DataTemplate or ComponentElementScopeKind.DeferredContent &&
+                ComponentLocalScopeWriter.CanWrite(plan, scope))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void WriteContentPresenterRefresh(
         in ComponentPlan plan,
-        in ComponentScopePlan scope)
+        in ComponentScopePlan scope,
+        bool initialRefresh = false)
     {
         if (!plan.Lifecycle.HasComponentContentPresenters)
         {
@@ -537,10 +586,81 @@ internal readonly ref struct ComponentLifecycleWriter
                 continue;
             }
 
+            var retainedTemplate = !initialRefresh && element.UsesRuntimeStorage &&
+                HasRetainedContentTemplate(plan, element.Id);
+            if (retainedTemplate)
+            {
+                _writer.Write("if (").Write(element.Identifier).WriteLine(".Child is null)");
+                _writer.WriteLine("{");
+                _writer.CurrentIndent += _writer.TabSize;
+            }
+
             _writer.Write(element.Identifier);
             _writer.WriteLine(".UpdateChild();");
+            if (retainedTemplate)
+            {
+                _writer.CurrentIndent -= _writer.TabSize;
+                _writer.WriteLine("}");
+            }
         }
     }
+
+    private static bool HasRetainedContentTemplate(in ComponentPlan plan, int elementId)
+    {
+        foreach (var content in plan.PropertyContents)
+        {
+            if (content.OwnerElementId != elementId ||
+                !IsContentTemplateDestination(content.Destination))
+            {
+                continue;
+            }
+
+            var value = content.FirstUpdateValue;
+            if (value.Kind == ComponentContentValueKind.Template)
+            {
+                var scopeId = plan.Templates.ItemRef(value.Index).ScopeId;
+                return ComponentLocalScopeWriter.CanWrite(plan, plan.Scopes.ItemRef(scopeId));
+            }
+
+            if (value.Kind != ComponentContentValueKind.Element)
+            {
+                return false;
+            }
+
+            ref readonly var template = ref plan.Elements.ItemRef(value.Index);
+            if (template.Type.MetadataName != "DataTemplate" ||
+                template.Type.ContainingNamespace.ToDisplayString() != "Avalonia.Markup.Xaml.Templates")
+            {
+                return false;
+            }
+
+            foreach (var deferredContent in plan.PropertyContents)
+            {
+                if (deferredContent.OwnerElementId != template.Id ||
+                    deferredContent.Destination.ClrProperty?.Name != "Content")
+                {
+                    continue;
+                }
+
+                var deferredValue = deferredContent.FirstUpdateValue;
+                if (deferredValue.Kind != ComponentContentValueKind.DeferredContent)
+                {
+                    return false;
+                }
+
+                var deferredScopeId = plan.DeferredContents.ItemRef(deferredValue.Index).ScopeId;
+                return ComponentLocalScopeWriter.CanWrite(plan, plan.Scopes.ItemRef(deferredScopeId));
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private static bool IsContentTemplateDestination(in PropertyWritePlan destination) =>
+        destination.ClrProperty?.Name == "ContentTemplate" ||
+        destination.AvaloniaProperty?.Name == "ContentTemplateProperty";
 
     private void WriteReturnRoot(in ComponentPlan plan)
     {
@@ -580,7 +700,7 @@ internal readonly ref struct ComponentLifecycleWriter
 
     private bool UsesStructuralHotReload(in ComponentPlan plan)
     {
-        return _generationMode == ComponentGenerationMode.DebugStructural &&
+        return _generationMode.UsesStructuralRuntime() &&
             !plan.Lifecycle.UsesFallbackRoot;
     }
 }

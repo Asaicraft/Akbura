@@ -6,7 +6,6 @@ using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.VisualTree;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -435,7 +434,7 @@ public sealed class ComposableHookIntegrationTests
 
     private static async Task OnDispatcher(Action test)
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(test, CancellationToken.None);
     }
 

@@ -1,4 +1,4 @@
-﻿
+
 // ─────────────────────────────────────────────────────────────
 // TOKENS  (well-known text; must remain contiguous)
 // ─────────────────────────────────────────────────────────────
@@ -402,6 +402,44 @@ node MarkupElementContentSyntax : MarkupContentSyntax {
 node MarkupInlineExpressionSyntax : MarkupContentSyntax {
 	Expression : InlineExpressionSyntax;
 }
+
+[id 576]
+abstract node MarkupStatementSyntax : MarkupContentSyntax;
+
+node MarkupIfStatementSyntax : MarkupStatementSyntax {
+    DollarToken     : DollarToken;
+    IfKeyword       : IfKeyword;
+    OpenParenToken  : OpenParenToken;
+    Condition       : CSharpExpressionSyntax;
+    CloseParenToken : CloseParenToken;
+    Body            : MarkupBlockSyntax;
+    ElseIfClauses   : syntaxlist<MarkupElseIfClauseSyntax>;
+    ElseClause?     : MarkupElseClauseSyntax;
+}
+
+node MarkupElseIfClauseSyntax {
+    DollarToken     : DollarToken;
+    ElseKeyword     : ElseKeyword;
+    IfKeyword       : IfKeyword;
+    OpenParenToken  : OpenParenToken;
+    Condition       : CSharpExpressionSyntax;
+    CloseParenToken : CloseParenToken;
+    Body            : MarkupBlockSyntax;
+}
+
+node MarkupElseClauseSyntax {
+    DollarToken : DollarToken;
+    ElseKeyword : ElseKeyword;
+    Body        : MarkupBlockSyntax;
+}
+
+node MarkupBlockSyntax {
+    OpenBraceToken  : OpenBraceToken;
+    Content         : syntaxlist<MarkupContentSyntax>;
+    CloseBraceToken : CloseBraceToken;
+}
+
+[id 530]
 
 
 // ─────────────────────────────────────────────────────────────

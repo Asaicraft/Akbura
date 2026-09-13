@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -156,9 +156,27 @@ internal readonly ref struct ComponentContentWriter
             return false;
         }
 
-        var value = plan.FirstUpdateValue;
+        using var mapping = _mappings.WriteStart(plan.Syntax);
+        if (!WriteStructuralValueStart(component, plan))
+        {
+            return false;
+        }
+
+        WriteValue(component, plan.FirstUpdateValue);
+        WriteStructuralValueEnd();
+        return true;
+    }
+
+    public bool WriteStructuralValueStart(in ComponentPlan component, in ComponentPropertyContentPlan plan,
+        string? declarationIdentity = null)
+    {
         ref readonly var owner = ref component.Elements.ItemRef(
             plan.OwnerElementId);
+        if (!owner.UsesRuntimeStorage)
+        {
+            return false;
+        }
+
         var destination = plan.Destination;
         var methodName = destination.Kind switch
         {
@@ -175,7 +193,6 @@ internal readonly ref struct ComponentContentWriter
             return false;
         }
 
-        using var mapping = _mappings.WriteStart(plan.Syntax);
         _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
         _writer.Write(".");
         _writer.Write(methodName);
@@ -224,13 +241,15 @@ internal readonly ref struct ComponentContentWriter
         }
 
         _writer.WriteStringLiteral(
-            ComponentHotReloadIdentity.CreateContentSyntaxIdentity(
-                plan.Syntax));
+            declarationIdentity ?? ComponentHotReloadIdentity.CreateContentSyntaxIdentity(plan.Syntax));
         _writer.WriteLine(",");
-        WriteValue(component, value);
+        return true;
+    }
+
+    public void WriteStructuralValueEnd()
+    {
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;
-        return true;
     }
 
     public static bool CanWriteStructuralConstantValue(

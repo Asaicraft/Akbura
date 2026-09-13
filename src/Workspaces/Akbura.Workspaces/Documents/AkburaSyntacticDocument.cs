@@ -304,6 +304,11 @@ public sealed partial class AkburaSyntacticDocument
 
         switch (node)
         {
+            case MarkupBlockSyntax block:
+                openBrace = block.OpenBraceToken;
+                closeBrace = block.CloseBraceToken;
+                break;
+
             case CSharpBlockSyntax block:
                 openBrace = block.OpenBrace;
                 closeBrace = block.CloseBrace;

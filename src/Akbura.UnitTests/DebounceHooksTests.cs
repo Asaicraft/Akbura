@@ -4,7 +4,6 @@ using Akbura.Engine;
 using Akbura.Hooks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Threading;
 
 namespace Akbura.UnitTests;
@@ -454,7 +453,7 @@ public sealed class DebounceHooksTests
 
     private static async Task OnDispatcher(Func<Task> test)
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(async () =>
         {
             await test();

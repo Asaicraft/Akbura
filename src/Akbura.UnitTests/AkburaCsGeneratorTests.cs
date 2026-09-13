@@ -6,7 +6,6 @@ using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
 using Microsoft.CodeAnalysis;
@@ -566,8 +565,7 @@ public sealed class AkburaCsGeneratorTests
             string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -784,7 +782,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -903,7 +901,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -1067,8 +1065,7 @@ public sealed class AkburaCsGeneratorTests
             string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -1192,8 +1189,7 @@ public sealed class AkburaCsGeneratorTests
             string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -1349,8 +1345,7 @@ public sealed class AkburaCsGeneratorTests
             string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -1558,9 +1553,7 @@ public sealed class AkburaCsGeneratorTests
         var assembly =
             Assembly.Load(assemblyStream.ToArray());
 
-        using var session =
-            HeadlessUnitTestSession.StartNew(
-                typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -1793,9 +1786,7 @@ public sealed class AkburaCsGeneratorTests
         var assembly =
             Assembly.Load(assemblyStream.ToArray());
 
-        using var session =
-            HeadlessUnitTestSession.StartNew(
-                typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -2105,8 +2096,7 @@ public sealed class AkburaCsGeneratorTests
         var assembly =
             Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -2286,7 +2276,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -2395,7 +2385,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -2668,8 +2658,7 @@ public sealed class AkburaCsGeneratorTests
         var assembly =
             Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -3200,7 +3189,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -3315,8 +3304,7 @@ public sealed class AkburaCsGeneratorTests
             string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -3470,8 +3458,7 @@ public sealed class AkburaCsGeneratorTests
                 emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -3657,8 +3644,7 @@ public sealed class AkburaCsGeneratorTests
                 emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -3890,8 +3876,7 @@ public sealed class AkburaCsGeneratorTests
                 emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -4192,8 +4177,7 @@ public sealed class AkburaCsGeneratorTests
                 emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -4456,8 +4440,7 @@ public sealed class AkburaCsGeneratorTests
             string.Join(Environment.NewLine, emitResult.Diagnostics));
         var assembly = Assembly.Load(assemblyStream.ToArray());
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -4587,7 +4570,7 @@ public sealed class AkburaCsGeneratorTests
         var utility = Assert.IsAssignableFrom<AkcssUtility<double>>(
             Activator.CreateInstance(utilityType, nonPublic: true));
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -5048,7 +5031,7 @@ public sealed class AkburaCsGeneratorTests
         var style = Assert.IsAssignableFrom<AkcssClass>(
             Activator.CreateInstance(styleType, nonPublic: true));
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -5195,7 +5178,7 @@ public sealed class AkburaCsGeneratorTests
         var style = Assert.IsAssignableFrom<AkcssClass>(
             Activator.CreateInstance(styleType, nonPublic: true));
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

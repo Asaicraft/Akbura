@@ -45,6 +45,13 @@ internal abstract partial class AkburaSemanticModel
         using var result = ImmutableArrayBuilder<MarkupChildContent>.Rent();
         foreach (var child in children)
         {
+            if (child.Kind == MarkupChildKind.Conditional)
+            {
+                // Each alternative has already selected overloads for its actual child types.
+                result.Add(child);
+                continue;
+            }
+
             var ambiguous = false;
             var method = child.Type.Symbol is ITypeSymbol childType
                 ? ResolveMarkupContentAddMethod(ownerType, childType, out ambiguous)

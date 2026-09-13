@@ -81,15 +81,27 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                 _display.FormatProperty(assignmentProperty), details.ToImmutable());
         }
 
-        foreach (var inline in context.Document.SyntaxTree.GetRootSyntax()
-                     .DescendantNodes().OfType<InlineExpressionSyntax>())
+        foreach (var expression in context.Document.SyntaxTree.GetRootSyntax().DescendantNodes())
         {
-            if (!inline.Span.Contains(position))
+            if (!expression.Span.Contains(position))
             {
                 continue;
             }
 
-            foreach (var symbolReference in semanticModel.GetCSharpSymbolReferences(inline))
+            var references = expression switch
+            {
+                InlineExpressionSyntax inline => semanticModel.GetCSharpSymbolReferences(inline),
+                CSharpExpressionSyntax condition when condition.Parent is
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax =>
+                    semanticModel.GetCSharpSymbolReferences(condition),
+                _ => default,
+            };
+            if (references.IsDefaultOrEmpty)
+            {
+                continue;
+            }
+
+            foreach (var symbolReference in references)
             {
                 if (!symbolReference.SourceSpan.Contains(position))
                 {
@@ -97,7 +109,7 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                 }
 
                 var signature = symbolReference.AkburaSymbol?.ToDisplayString() ??
-                    symbolReference.CSharpDefinition.Symbol?.ToDisplayString();
+                    GetCSharpSignature(symbolReference.CSharpDefinition.Symbol);
                 if (signature != null)
                 {
                     return new AkburaQuickInfo(symbolReference.SourceSpan,
@@ -273,6 +285,13 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
         };
         return prefix + type.ToDisplayString(
             SymbolDisplayFormat.MinimallyQualifiedFormat);
+    }
+
+    private static string? GetCSharpSignature(Microsoft.CodeAnalysis.ISymbol? symbol)
+    {
+        return symbol is ILocalSymbol local
+            ? local.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + " " + local.Name
+            : symbol?.ToDisplayString();
     }
 
     private static void AddDeclaredIn(

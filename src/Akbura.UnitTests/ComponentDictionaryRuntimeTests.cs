@@ -4,7 +4,6 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.HotReload;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Media;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -46,7 +45,7 @@ public sealed class ComponentDictionaryRuntimeTests
               </DictionaryHost>
               """;
         var type = Compile(source, structural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(type));
@@ -165,7 +164,7 @@ public sealed class ComponentDictionaryRuntimeTests
         Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
         var assembly = Assembly.Load(output.ToArray());
         var type = assembly.GetType("Demo.PlannerView")!;
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(type));
@@ -278,7 +277,7 @@ public sealed class ComponentDictionaryRuntimeTests
         Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
         var assembly = Assembly.Load(output.ToArray());
         var type = assembly.GetType("Demo.PlannerView")!;
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(type));
@@ -454,7 +453,7 @@ public sealed class ComponentDictionaryRuntimeTests
         Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
         var assembly = Assembly.Load(output.ToArray());
         var type = assembly.GetType("Demo.PlannerView")!;
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(type));

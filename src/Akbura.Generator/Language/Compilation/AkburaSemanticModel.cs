@@ -2591,7 +2591,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         foreach (var content in markupElement.Body)
         {
-            if (content.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)
+            if (content.Kind is AkburaSyntaxKind.MarkupElementContentSyntax or AkburaSyntaxKind.MarkupIfStatementSyntax)
             {
                 return true;
             }
@@ -2602,6 +2602,19 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     internal static bool TryCreateMarkupContentValueExpression(
         MarkupElementSyntax markupElement,
+        MarkupWhitespaceMode whitespaceMode,
+        out CSharp.ExpressionSyntax expression,
+        out string? literalValue,
+        out bool isSynthesizedString,
+        out bool hasText,
+        out MarkupContentSyntax diagnosticSyntax)
+    {
+        return TryCreateMarkupContentValueExpression(markupElement.Body, whitespaceMode,
+            out expression, out literalValue, out isSynthesizedString, out hasText, out diagnosticSyntax);
+    }
+
+    internal static bool TryCreateMarkupContentValueExpression(
+        Akbura.Language.Syntax.SyntaxList<MarkupContentSyntax> contentSyntax,
         MarkupWhitespaceMode whitespaceMode,
         out CSharp.ExpressionSyntax expression,
         out string? literalValue,
@@ -2620,7 +2633,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         CSharp.ExpressionSyntax? singleExpression = null;
         var expressionCount = 0;
 
-        foreach (var content in markupElement.Body)
+        foreach (var content in contentSyntax)
         {
             switch (content.Kind)
             {
@@ -2846,6 +2859,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             symbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
             GetMarkupAssignmentOrder(markupElement, out var assignmentDiagnostics);
             SetSemanticDiagnostics(markupElement, diagnostics.AddRange(assignmentDiagnostics));
+            InvalidateMarkupComponentBinding(markupElement);
 
             return AkburaSymbolInfo.Success(symbol);
         }
@@ -3175,6 +3189,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         usageSymbol.SetAttributeOperations(CreateMarkupAttributeOperations(markupElement));
         GetMarkupAssignmentOrder(markupElement, out var assignmentDiagnostics);
         SetSemanticDiagnostics(markupElement, diagnostics.AddRange(assignmentDiagnostics));
+        InvalidateMarkupComponentBinding(markupElement);
 
         return usageSymbol;
     }
@@ -3197,6 +3212,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         return builder.ToImmutable();
+    }
+
+    internal virtual void InvalidateMarkupComponentBinding(MarkupElementSyntax syntax)
+    {
+        _bindingCache.InvalidateMarkupComponentBinding(syntax);
     }
 
     private IEnumerable<string> GetAkburaComponentCandidateMetadataNames(
@@ -3894,7 +3914,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         };
     }
 
-    internal static MarkupElementSyntax? GetContainingMarkupElement(MarkupAttributeSyntax markupAttribute)
+    internal static MarkupElementSyntax? GetContainingMarkupElement(AkburaSyntax markupAttribute)
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
         {
@@ -4841,7 +4861,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return content.Kind is
             AkburaSyntaxKind.MarkupElementContentSyntax or
             AkburaSyntaxKind.MarkupTextLiteralSyntax or
-            AkburaSyntaxKind.MarkupInlineExpressionSyntax;
+            AkburaSyntaxKind.MarkupInlineExpressionSyntax or
+            AkburaSyntaxKind.MarkupIfStatementSyntax;
     }
 
     private static bool ContainsOnlyMarkupWhitespace(string text)
@@ -4886,6 +4907,16 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         out ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
         INamedTypeSymbol? containingType = null)
     {
+        return CreateMarkupChildren(markupElement, markupElement.Body, contentModel, out diagnostics, containingType);
+    }
+
+    internal ImmutableArray<MarkupChildContent> CreateMarkupChildren(
+        MarkupElementSyntax markupElement,
+        Akbura.Language.Syntax.SyntaxList<MarkupContentSyntax> contentSyntax,
+        MarkupContentModel contentModel,
+        out ImmutableArray<AkburaSemanticDiagnostic> diagnostics,
+        INamedTypeSymbol? containingType = null)
+    {
         using var childrenBuilder =
             ImmutableArrayBuilder<MarkupChildContent>.Rent();
 
@@ -4903,7 +4934,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         var valueContentCount = 0;
 
-        foreach (var childSyntax in markupElement.Body)
+        foreach (var childSyntax in contentSyntax)
         {
             if (IsMarkupPropertyElementContent(
                     childSyntax,
@@ -4923,7 +4954,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var inlineExpressionCount = 0;
         var valueContentIndex = 0;
 
-        foreach (var childSyntax in markupElement.Body)
+        foreach (var childSyntax in contentSyntax)
         {
             if (IsMarkupPropertyElementContent(
                     childSyntax,
@@ -4982,7 +5013,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         valueContentIndex = 0;
 
-        foreach (var childSyntax in markupElement.Body)
+        foreach (var childSyntax in contentSyntax)
         {
             if (IsMarkupPropertyElementContent(
                     childSyntax,
@@ -5002,6 +5033,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
             switch (childSyntax.Kind)
             {
+                case AkburaSyntaxKind.MarkupIfStatementSyntax:
+                    var conditional = GetOperation(childSyntax) as IMarkupIfOperation;
+                    if (conditional != null)
+                    {
+                        childrenBuilder.Add(new(childSyntax, MarkupChildKind.Conditional,
+                            contentModel.AllowedChildType, whitespaceMode: whitespaceMode,
+                            isDeferred: isDeferred, conditionalOperation: conditional));
+                        diagnosticsBuilder.AddRange(GetCachedSemanticDiagnostics(childSyntax));
+                    }
+
+                    break;
                 case AkburaSyntaxKind.MarkupElementContentSyntax:
                     AddElementChild(
                         Unsafe.As<MarkupElementContentSyntax>(
@@ -5045,6 +5087,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         if (!hasValueText &&
             inlineExpressionCount > 1 &&
             !hasValueElement &&
+            contentSyntax == markupElement.Body &&
+            !HasMarkupConditionalContent(contentSyntax) &&
             TryCreateMarkupContentValueExpression(
                 markupElement,
                 whitespaceMode,
@@ -5071,6 +5115,23 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             childrenBuilder, diagnosticsBuilder);
         var children = BindMarkupContentInsertions(
             contentModel, containingType, childrenBuilder.ToImmutable(), diagnosticsBuilder);
+        if (contentModel.IsDictionary && HasMarkupConditionalContent(contentSyntax))
+        {
+            AddMarkupConditionalDictionaryDiagnostics(contentModel, children, diagnosticsBuilder);
+        }
+
+        if (HasMarkupConditionalContent(contentSyntax) &&
+            contentModel.Kind == MarkupContentKind.Property)
+        {
+            var cardinality = MarkupContentCardinality.FromSequence(children);
+            if (cardinality.Maximum > 1)
+            {
+                diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(markupElement,
+                    ErrorCodes.AKBURA_SEMANTIC_MarkupConditionalContentCardinality,
+                    [cardinality.Maximum.ToString(System.Globalization.CultureInfo.InvariantCulture)]));
+            }
+        }
+
         diagnostics = diagnosticsBuilder.ToImmutable();
         return children;
     }

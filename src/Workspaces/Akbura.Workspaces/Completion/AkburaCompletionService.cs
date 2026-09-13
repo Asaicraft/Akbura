@@ -109,6 +109,12 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 ImmutableArray<AkburaCompletionItem>.Empty);
         }
 
+        if (syntaxContext.Kind is AkburaCompletionContextKind.MarkupStatement or
+            AkburaCompletionContextKind.MarkupConditionalContinuation)
+        {
+            return CreateMarkupStatementResult(document, syntaxContext);
+        }
+
         if (syntaxContext.Kind ==
                 AkburaCompletionContextKind.ClosingComponentName)
         {

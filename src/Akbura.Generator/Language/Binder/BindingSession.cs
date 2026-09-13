@@ -222,6 +222,7 @@ internal sealed class BindingSession
         return kind switch
         {
             AkburaSyntaxKind.MarkupElementSyntax or
+                AkburaSyntaxKind.MarkupIfStatementSyntax or
                 AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
@@ -240,6 +241,7 @@ internal sealed class BindingSession
         return kind switch
         {
             AkburaSyntaxKind.MarkupRootSyntax or
+                AkburaSyntaxKind.MarkupIfStatementSyntax or
                 AkburaSyntaxKind.MarkupElementSyntax or
                 AkburaSyntaxKind.MarkupElementContentSyntax or
                 AkburaSyntaxKind.MarkupInlineExpressionSyntax or

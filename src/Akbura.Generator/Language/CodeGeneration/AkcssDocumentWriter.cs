@@ -173,7 +173,7 @@ internal static class AkcssDocumentWriter
 
         moduleWriter.WriteStyleCollection(plan);
 
-        if (generationMode == ComponentGenerationMode.DebugStructural)
+        if (generationMode.UsesStructuralRuntime())
         {
             writer.WriteLine();
             moduleWriter.WriteDebugStyleAccessor(plan);

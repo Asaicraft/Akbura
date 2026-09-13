@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -56,6 +57,28 @@ internal readonly ref struct TemplateWriter
         var targetExpression = owner.Identifier;
         var propertyWriter = new PropertyWriter(_writer);
         var end = PropertyWriteEnd.None;
+        var structural = false;
+        string? conditionalServices = null;
+        ref readonly var scope = ref plan.Scopes.ItemRef(template.ScopeId);
+        if (ComponentLocalScopeWriter.CanWrite(plan, scope))
+        {
+            conditionalServices = "__templateServices" + template.Id;
+            _writer.Write("var __templateParentState").WriteIntegerLiteral(template.Id)
+                .WriteLine(" = __akburaRenderState;");
+            _writer.Write("var __templateOwner").WriteIntegerLiteral(template.Id).Write(" = ")
+                .Write(targetExpression).WriteLine(";");
+            var targetContext = parentContext.WithTarget(targetExpression, content.Destination.TargetProperty,
+                owner.ScopeId, plan.ElementReferences.AsSpan());
+            if (!MarkupServiceProviderWriter.CanWrite(targetContext))
+            {
+                Debug.Fail("The conditional-template service-provider context is incomplete.");
+                return false;
+            }
+
+            _writer.Write("var ").Write(conditionalServices).Write(" = ");
+            new MarkupServiceProviderWriter(_writer).Write(targetContext, includeNameScope: true, retainedFactory: true);
+            _writer.WriteLine(";");
+        }
 
         // Mapping is deliberately closed before the lambda body. Statements
         // emitted by ComponentScopeWriter carry their own source mappings.
@@ -63,20 +86,38 @@ internal readonly ref struct TemplateWriter
             using var mapping = new SourceMappingWriter(_writer, _sourceMap)
                 .WriteStart(content.Syntax);
 
-            end = propertyWriter.WriteStart(content.Destination, targetExpression);
-            if (end == PropertyWriteEnd.None)
+            var factoryIdentity = ComponentLocalScopeWriter.CanWrite(plan, scope)
+                ? ComponentHotReloadIdentity.CreateLocalTemplateFactoryIdentity(plan, content, template)
+                : null;
+            structural = new ComponentContentWriter(_writer, _sourceMap)
+                .WriteStructuralValueStart(plan, content, factoryIdentity);
+            if (!structural)
             {
-                return false;
+                end = propertyWriter.WriteStart(content.Destination, targetExpression);
+                if (end == PropertyWriteEnd.None)
+                {
+                    return false;
+                }
             }
 
-            WriteHeader(template);
+            WriteHeader(plan, template);
         }
 
-        WriteBody(plan, template, parentContext);
+        WriteBody(plan, template, parentContext, conditionalServices);
 
         _writer.Write(")");
-        propertyWriter.WriteEnd(end);
-        _writer.WriteLine();
+        if (structural)
+        {
+            new ComponentContentWriter(_writer, _sourceMap).WriteStructuralValueEnd();
+        }
+        else
+        {
+            propertyWriter.WriteEnd(end);
+        }
+        if (!structural)
+        {
+            _writer.WriteLine();
+        }
         return true;
     }
 
@@ -107,24 +148,50 @@ internal readonly ref struct TemplateWriter
         }
 
         ref readonly var root = ref plan.Elements.ItemRef(rootId);
-        return root.ScopeId == template.ScopeId && root.IsControl;
+        return root.ScopeId == template.ScopeId && (root.IsControl || root.IsConditionalTemplateRoot);
     }
 
-    private void WriteHeader(in ComponentTemplatePlan template)
+    private void WriteHeader(in ComponentPlan plan, in ComponentTemplatePlan template)
     {
-        _writer.Write("new global::Avalonia.Controls.Templates.FuncDataTemplate<");
+        ref readonly var scope = ref plan.Scopes.ItemRef(template.ScopeId);
+        var conditionalRoot = plan.Elements.ItemRef(plan.ScopeRootElementIds[scope.Roots.Start]).IsConditionalTemplateRoot;
+        _writer.Write(conditionalRoot ? "new global::Akbura.Markup.AkburaConditionalDataTemplate<" :
+            "new global::Avalonia.Controls.Templates.FuncDataTemplate<");
         _valueWriter.WriteTypeName(template.DataType);
         _writer.Write(">((");
         _valueWriter.WriteIdentifier(template.ItemName);
-        _writer.Write(", __nameScope) =>");
+        _writer.Write(conditionalRoot ? ", __nameScope, __templateHost) =>" : ", __nameScope) =>");
     }
 
     private void WriteBody(
         in ComponentPlan plan,
         in ComponentTemplatePlan template,
-        in MarkupExtensionWriteContext parentContext)
+        in MarkupExtensionWriteContext parentContext,
+        string? conditionalServices)
     {
         ref readonly var scope = ref plan.Scopes.ItemRef(template.ScopeId);
+        if (ComponentLocalScopeWriter.CanWrite(plan, scope))
+        {
+            WriteConditionalBuilderName(template.Id);
+            _writer.Write("(");
+            _valueWriter.WriteIdentifier(template.ItemName);
+            foreach (var ancestor in GetAncestorTemplates(plan, template))
+            {
+                _writer.Write(", ");
+                _valueWriter.WriteIdentifier(ancestor.ItemName);
+            }
+            _writer.Write(", __nameScope, ");
+            _writer.Write(conditionalServices!);
+            _writer.Write(", __templateParentState").WriteIntegerLiteral(template.Id);
+            _writer.Write(", __templateOwner").WriteIntegerLiteral(template.Id);
+            if (plan.Elements.ItemRef(plan.ScopeRootElementIds[scope.Roots.Start]).IsConditionalTemplateRoot)
+            {
+                _writer.Write(", __templateHost");
+            }
+
+            _writer.Write(")");
+            return;
+        }
         var rootId = plan.ScopeRootElementIds[scope.Roots.Start];
         ref readonly var root = ref plan.Elements.ItemRef(rootId);
         var rootExpression = root.Identifier;
@@ -160,6 +227,85 @@ internal readonly ref struct TemplateWriter
 
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.Write("}");
+    }
+
+    public bool WriteConditionalBuilder(in ComponentPlan plan, in ComponentTemplatePlan template)
+    {
+        ref readonly var scope = ref plan.Scopes.ItemRef(template.ScopeId);
+        if (!ComponentLocalScopeWriter.CanWrite(plan, scope))
+        {
+            return false;
+        }
+
+        ref readonly var root = ref plan.Elements.ItemRef(plan.ScopeRootElementIds[scope.Roots.Start]);
+        _writer.WriteHiddenApiAttributes();
+        _writer.Write("private ");
+        _valueWriter.WriteTypeName(root.Type);
+        _writer.Write(" ");
+        WriteConditionalBuilderName(template.Id);
+        _writer.Write("(");
+        _valueWriter.WriteTypeName(template.DataType);
+        _writer.Write(" ");
+        _valueWriter.WriteIdentifier(template.ItemName);
+        foreach (var ancestor in GetAncestorTemplates(plan, template))
+        {
+            _writer.Write(", ");
+            _valueWriter.WriteTypeName(ancestor.DataType);
+            _writer.Write(" ");
+            _valueWriter.WriteIdentifier(ancestor.ItemName);
+        }
+        _writer.WriteLine(", global::Avalonia.Controls.INameScope __nameScope, global::System.IServiceProvider? __services,");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("global::Akbura.HotReload.AkburaRenderState __parentRenderState, object __parentOwner");
+        if (root.IsConditionalTemplateRoot)
+        {
+            _writer.Write(", global::Avalonia.Controls.Presenters.ContentPresenter __templateHost");
+        }
+
+        _writer.WriteLine(")");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        var context = new ComponentScopeWriteContext(root.Identifier, "__akburaBaseUri", "__services",
+            "__nameScope", scope.Id, MarkupParentStackTraversalKind.ExactScope,
+            plan.Elements.AsSpan(), plan.ElementReferences.AsSpan());
+        new ComponentLocalScopeWriter(_writer, in _bindingEnvironment, _sourceMap, _ownerTypeName, _generationMode)
+            .WriteInitialState(plan, scope, context);
+        _writer.Write("return ").Write(root.IsConditionalTemplateRoot ? "__localRoot" : root.Identifier).WriteLine(";");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        return true;
+    }
+
+    private void WriteConditionalBuilderName(int id) =>
+        _writer.Write("__BuildConditionalTemplate").WriteIntegerLiteral(id);
+
+    private static List<ComponentTemplatePlan> GetAncestorTemplates(in ComponentPlan plan, in ComponentTemplatePlan template)
+        => GetAncestorTemplates(plan, template.ScopeId, template.ItemName);
+
+    internal static List<ComponentTemplatePlan> GetAncestorTemplates(in ComponentPlan plan, int scopeId,
+        string? excludedItemName = null)
+    {
+        var ancestors = new List<ComponentTemplatePlan>();
+        var names = new HashSet<string>();
+        if (excludedItemName != null)
+        {
+            names.Add(excludedItemName);
+        }
+
+        for (var ancestorScopeId = plan.Scopes.ItemRef(scopeId).ParentScopeId; ancestorScopeId > 0;
+            ancestorScopeId = plan.Scopes.ItemRef(ancestorScopeId).ParentScopeId)
+        {
+            foreach (var candidate in plan.Templates)
+            {
+                if (candidate.ScopeId == ancestorScopeId && names.Add(candidate.ItemName))
+                {
+                    ancestors.Add(candidate);
+                }
+            }
+        }
+
+        return ancestors;
     }
 
 }

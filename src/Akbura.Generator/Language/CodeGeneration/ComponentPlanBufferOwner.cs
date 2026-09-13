@@ -68,6 +68,10 @@ internal ref struct ComponentPlanBufferOwner
 
     public AkcssComponentActivatorPlan Akcss;
 
+    public PooledImmutableList<ComponentConditionalRegionPlan> ConditionalRegions;
+
+    public PooledImmutableList<ComponentConditionalContentPlan> ConditionalContents;
+
     public ComponentPlan MoveToPlan(ComponentLifecyclePlan lifecycle)
     {
         Debug.Assert(_ownsBuffers);
@@ -97,7 +101,9 @@ internal ref struct ComponentPlanBufferOwner
             ElementReferences,
             lifecycle,
             RenderStatements,
-            Akcss);
+            Akcss,
+            ConditionalRegions,
+            ConditionalContents);
 
         this = default;
 

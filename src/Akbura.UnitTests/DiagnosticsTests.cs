@@ -2,7 +2,6 @@ using Akbura.ComponentTree;
 using Akbura.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
-using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
@@ -116,7 +115,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task DiagnosticsWindow_LoadsGeneratedAkburaComponent()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -134,7 +133,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task DiagnosticsWindow_DoesNotRegisterItsOwnComponentSubtree()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -166,7 +165,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task AkburaControl_WithNoGeneratedChild_DoesNotCrashLayout()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -292,7 +291,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task InputBuilderBinding_SynchronizesValuesInBothDirections()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -316,8 +315,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task InputBuilders_LoadTheirIconsFromDiagnosticsResources()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -364,8 +362,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task CollectionInput_UsesNestedDiagnosticInputsForItems()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -461,8 +458,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task DiagnosticsDetails_ConstrainLongErrorsToAvailableWidth()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -539,8 +535,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task DiagnosticInput_ActionButtonsContainPathIcons()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -599,8 +594,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task DiagnosticInput_ItemTemplateAcceptsTransientNullItem()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -644,7 +638,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task DiagnosticsWindow_TracksExternalComponentAndStateChanges()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -678,7 +672,7 @@ public sealed class DiagnosticsTests
     [Fact]
     public async Task DiagnosticsWindow_EditsParametersAndStates()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

@@ -4,7 +4,6 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Interactivity;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -84,8 +83,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -139,8 +137,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -185,8 +182,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -235,8 +231,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -287,8 +282,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -338,8 +332,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -391,8 +384,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -443,8 +435,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -491,8 +482,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -550,8 +540,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var changedRevision = CompileRevision(changedComponent);
         var removedRevision = CompileRevision(removedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -642,8 +631,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -695,8 +683,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var originalRevision = CompileRevision(originalComponent);
         var updatedRevision = CompileRevision(updatedComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -753,8 +740,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
         var validRevision = CompileRevision(validComponent);
         var fallbackRevision = CompileRevision(fallbackComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -820,8 +806,7 @@ public sealed class ComponentStructuralHotReloadIntegrationTests
                 StringComparison.Ordinal);
         }
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

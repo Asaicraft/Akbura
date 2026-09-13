@@ -5,7 +5,6 @@ using Akbura.Language.CodeGeneration;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
-using Avalonia.Headless;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -176,7 +175,7 @@ public sealed class AkcssUtilityWriterTests
 
         var utility = Assert.Single(CompileUtilities(source));
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -242,7 +241,7 @@ public sealed class AkcssUtilityWriterTests
 
         Assert.Equal(17, utility.Parameters.Length);
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>

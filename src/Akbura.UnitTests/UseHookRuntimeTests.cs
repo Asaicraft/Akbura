@@ -4,7 +4,6 @@ using Akbura.Engine;
 using Akbura.Hooks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Threading;
 using System.Collections.Immutable;
 
@@ -830,8 +829,7 @@ public sealed class UseHookRuntimeTests
     [Fact]
     public async Task CleanupFromStaleAsyncRun_IsDisposedOnUiThread()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(async () =>
         {
             var key = new UseHookKey();
@@ -882,8 +880,7 @@ public sealed class UseHookRuntimeTests
     [Fact]
     public async Task FailureFromStaleAsyncRun_IsIgnoredAfterGenerationChanges()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(async () =>
         {
             var key = new UseHookKey();

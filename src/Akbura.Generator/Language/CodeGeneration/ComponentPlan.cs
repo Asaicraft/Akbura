@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Operations;
+using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using Akbura.Language.Binder;
 using Microsoft.CodeAnalysis;
@@ -39,6 +39,7 @@ internal enum ComponentElementFlags : ushort
     RequiresContentPresenterRefresh = 1 << 8,
     UsesRuntimeStorage = 1 << 9,
     IsStyleSubtree = 1 << 10,
+    IsConditionalTemplateRoot = 1 << 11,
 }
 
 internal enum ComponentElementScopeKind : byte
@@ -46,6 +47,7 @@ internal enum ComponentElementScopeKind : byte
     Component,
     DeferredContent,
     DataTemplate,
+    ConditionalBranch,
 }
 
 [Flags]
@@ -122,7 +124,8 @@ internal readonly struct ComponentElementPlan
         ComponentPlanRange propertyElements,
         AkcssElementActivatorPlan akcss,
         string? explicitKey = null,
-        int runtimeStorageId = -1)
+        int runtimeStorageId = -1,
+        int runtimeStorageRootScopeId = 0)
         : this(
             id,
             syntax,
@@ -140,7 +143,8 @@ internal readonly struct ComponentElementPlan
             content: default,
             akcss,
             explicitKey,
-            runtimeStorageId)
+            runtimeStorageId,
+            runtimeStorageRootScopeId: runtimeStorageRootScopeId)
     {
     }
 
@@ -162,7 +166,10 @@ internal readonly struct ComponentElementPlan
         AkcssElementActivatorPlan akcss,
         string? explicitKey = null,
         int runtimeStorageId = -1,
-        ImmutableArray<ComponentAssignmentReference> assignments = default)
+        ImmutableArray<ComponentAssignmentReference> assignments = default,
+        int conditionalRegionId = -1,
+        int conditionalBranchId = -1,
+        int runtimeStorageRootScopeId = 0)
     {
         Id = id;
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
@@ -181,7 +188,10 @@ internal readonly struct ComponentElementPlan
         Akcss = akcss;
         ExplicitKey = explicitKey;
         RuntimeStorageId = runtimeStorageId;
+        RuntimeStorageRootScopeId = runtimeStorageRootScopeId;
         Assignments = assignments.IsDefault ? [] : assignments;
+        ConditionalRegionId = conditionalRegionId;
+        ConditionalBranchId = conditionalBranchId;
     }
 
     public int Id { get; }
@@ -195,6 +205,8 @@ internal readonly struct ComponentElementPlan
     public string? ExplicitKey { get; }
 
     public int RuntimeStorageId { get; }
+
+    public int RuntimeStorageRootScopeId { get; }
 
     public int ParentId { get; }
 
@@ -218,6 +230,10 @@ internal readonly struct ComponentElementPlan
 
     public ImmutableArray<ComponentAssignmentReference> Assignments { get; }
 
+    public int ConditionalRegionId { get; }
+
+    public int ConditionalBranchId { get; }
+
     public AkcssElementActivatorPlan Akcss { get; }
 
     public bool IsRoot => (Flags & ComponentElementFlags.IsRoot) != 0;
@@ -225,6 +241,9 @@ internal readonly struct ComponentElementPlan
     public bool IsLocal => (Flags & ComponentElementFlags.IsLocal) != 0;
 
     public bool IsStyleSubtree => (Flags & ComponentElementFlags.IsStyleSubtree) != 0;
+
+    public bool IsConditionalTemplateRoot =>
+        (Flags & ComponentElementFlags.IsConditionalTemplateRoot) != 0;
 
     public bool UsesRuntimeStorage =>
         (Flags & ComponentElementFlags.UsesRuntimeStorage) != 0;
@@ -424,13 +443,17 @@ internal readonly struct ComponentDeferredContentPlan
         int scopeId,
         int targetElementId,
         ITypeSymbol resultType,
-        AkburaSyntax syntax)
+        AkburaSyntax syntax,
+        ITypeSymbol? dataType = null,
+        string? itemName = null)
     {
         Id = id;
         ScopeId = scopeId;
         TargetElementId = targetElementId;
         ResultType = resultType ?? throw new ArgumentNullException(nameof(resultType));
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
+        DataType = dataType;
+        ItemName = itemName;
     }
 
     public int Id { get; }
@@ -442,6 +465,10 @@ internal readonly struct ComponentDeferredContentPlan
     public ITypeSymbol ResultType { get; }
 
     public AkburaSyntax Syntax { get; }
+
+    public ITypeSymbol? DataType { get; }
+
+    public string? ItemName { get; }
 }
 
 internal readonly struct ComponentTemplatePlan
@@ -502,7 +529,9 @@ internal readonly struct ComponentPlan
         PooledImmutableList<BindingElementReference> elementReferences,
         ComponentLifecyclePlan lifecycle,
         PooledImmutableList<ComponentRenderStatementPlan> renderStatements,
-        AkcssComponentActivatorPlan akcss)
+        AkcssComponentActivatorPlan akcss,
+        PooledImmutableList<ComponentConditionalRegionPlan> conditionalRegions = default,
+        PooledImmutableList<ComponentConditionalContentPlan> conditionalContents = default)
     {
         Elements = elements;
         RootElementIds = rootElementIds;
@@ -533,6 +562,8 @@ internal readonly struct ComponentPlan
         Lifecycle = lifecycle;
         RenderStatements = renderStatements;
         Akcss = akcss;
+        ConditionalRegions = conditionalRegions;
+        ConditionalContents = conditionalContents;
     }
 
     public PooledImmutableList<ComponentElementPlan> Elements { get; }
@@ -585,6 +616,12 @@ internal readonly struct ComponentPlan
 
     public AkcssComponentActivatorPlan Akcss { get; }
 
+    public PooledImmutableList<ComponentConditionalRegionPlan> ConditionalRegions { get; }
+
+    public PooledImmutableList<ComponentConditionalContentPlan> ConditionalContents { get; }
+
+    public bool HasConditionalRegions => !ConditionalRegions.IsEmpty;
+
     public bool IsEmpty => Elements.IsEmpty;
 
     internal void ReturnToPool()
@@ -618,5 +655,7 @@ internal readonly struct ComponentPlan
         RenderStatements.ReturnToPool();
 
         Akcss.ReturnToPool();
+        ConditionalRegions.ReturnToPool();
+        ConditionalContents.ReturnToPool();
     }
 }

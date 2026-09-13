@@ -4,7 +4,6 @@ using Akbura.HotReload;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
-using Avalonia.Headless;
 using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
@@ -361,8 +360,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task Refresh_PreparesAttachedComponentsAndDetachedComponentsCatchUpOnAttach()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -451,8 +449,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task Refresh_ContinuesAttachedComponentsAfterOneFailure()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -505,8 +502,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task Refresh_AggregatesFailuresAfterTryingEveryAttachedComponent()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -572,8 +568,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task QueuedRefresh_IsAcknowledgedOnlyAfterSuccessfulUpdate()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -637,8 +632,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task ReentrantRefresh_IsNotAcknowledgedByCurrentUpdate()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -682,8 +676,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task Refresh_CoalescesMissedRevisionsAndSkipsNewInstances()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -729,8 +722,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task DetachedCatchUp_PreparesEveryMissedRevisionBeforeLatestUpdate()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -775,8 +767,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task Refresh_ReentrantPendingCheckDoesNotApplyRevisionTwice()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -816,8 +807,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task ApplyPendingRefreshes_RetriesFailedRevisionBeforeQueuedNewerRevision()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -892,8 +882,7 @@ public sealed class AkburaHotReloadRuntimeTests
     [Fact]
     public async Task Refresh_DoesNotEnterAnExcludedTopLevel()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

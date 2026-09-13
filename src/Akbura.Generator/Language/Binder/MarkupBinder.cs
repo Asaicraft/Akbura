@@ -4,6 +4,7 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
@@ -113,9 +114,14 @@ internal sealed partial class MarkupBinder : Binder
         }
 
         IMarkupItemSymbol? itemSymbol = null;
-        if (ScopeDesignator?.Kind == AkburaSyntaxKind.MarkupElementSyntax)
+        var scope = ScopeDesignator switch
         {
-            var scope = Unsafe.As<MarkupElementSyntax>(ScopeDesignator);
+            MarkupRootSyntax root => root.Element,
+            MarkupElementSyntax element => element,
+            _ => null,
+        };
+        if (scope != null)
+        {
             if (!MarkupDataTypeResolver.HasItemNameDirective(scope))
             {
                 Volatile.Write(ref _itemSymbolInitialized, 1);
@@ -189,6 +195,7 @@ internal sealed partial class MarkupBinder : Binder
     {
         return syntax.Kind switch
         {
+            AkburaSyntaxKind.MarkupIfStatementSyntax => BindMarkupIfStatement((MarkupIfStatementSyntax)syntax),
             AkburaSyntaxKind.MarkupElementSyntax =>
                 BindMarkupComponent(Unsafe.As<MarkupElementSyntax>(syntax)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
@@ -205,6 +212,7 @@ internal sealed partial class MarkupBinder : Binder
     {
         return syntax.Kind switch
         {
+            AkburaSyntaxKind.MarkupIfStatementSyntax => BindMarkupIfStatement((MarkupIfStatementSyntax)syntax),
             AkburaSyntaxKind.MarkupRootSyntax or
                 AkburaSyntaxKind.MarkupElementSyntax or
                 AkburaSyntaxKind.MarkupElementContentSyntax or
@@ -387,8 +395,18 @@ internal sealed partial class MarkupBinder : Binder
                 // Entries populate an existing dictionary; they do not assign the
                 // parameter that supplies it. A required receiver still needs an
                 // attribute assignment (or a declared default value).
-                if (!SemanticModel.CreateMarkupPropertyElementContentModel(property).IsDictionary)
+                var propertyContentModel = SemanticModel.CreateMarkupPropertyElementContentModel(property);
+                if (!propertyContentModel.IsDictionary)
                 {
+                    if (!propertyContentModel.IsCollection &&
+                        AkburaSemanticModel.HasMarkupConditionalContent(elementContent.Element.Body))
+                    {
+                        var propertyContent = SemanticModel.GetOperation(elementContent.Element)
+                            as Operations.IMarkupContentOperation;
+                        return propertyContent != null &&
+                            MarkupContentCardinality.FromSequence(propertyContent.Content).Minimum > 0;
+                    }
+
                     return true;
                 }
             }
@@ -412,6 +430,12 @@ internal sealed partial class MarkupBinder : Binder
                 !component.ContentModel.DictionaryShape.IsReadOnlyOnly))
         {
             return true;
+        }
+
+        if (AkburaSemanticModel.HasMarkupConditionalContent(markupElement.Body))
+        {
+            return component != null &&
+                MarkupContentCardinality.FromSequence(component.Children).Minimum > 0;
         }
 
         foreach (var content in markupElement.Body)
@@ -523,9 +547,9 @@ internal sealed partial class MarkupBinder : Binder
     }
 
     private BoundMarkupContentSetter? BindMarkupContentSetter(
-    MarkupElementSyntax markupElement,
-    MarkupWhitespaceMode whitespaceMode,
-    IMarkupComponentSymbol? componentSymbol)
+        MarkupElementSyntax markupElement,
+        MarkupWhitespaceMode whitespaceMode,
+        IMarkupComponentSymbol? componentSymbol)
     {
         if (componentSymbol == null ||
             componentSymbol.ContentModel.IsDefault)

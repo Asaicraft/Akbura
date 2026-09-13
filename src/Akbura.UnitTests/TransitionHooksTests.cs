@@ -8,7 +8,6 @@ using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Diagnostics;
-using Avalonia.Headless;
 using Avalonia.Layout;
 using Avalonia.Media;
 
@@ -460,7 +459,7 @@ public sealed class TransitionHooksTests
 
     private static async Task OnDispatcher(Action test)
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             test();

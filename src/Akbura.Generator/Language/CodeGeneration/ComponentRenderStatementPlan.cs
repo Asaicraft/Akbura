@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
 using Akbura.Language.Symbols;
@@ -32,7 +32,8 @@ internal readonly struct ComponentRenderStatementPlan
         CSharpStatementSyntax syntax,
         ComponentRenderStatementPhase phase = ComponentRenderStatementPhase.Update,
         IMethodSymbol? hookMethod = null,
-        ImmutableArray<UseHookStateArgument> stateArguments = default)
+        ImmutableArray<UseHookStateArgument> stateArguments = default,
+        ImmutableArray<ComponentRenderCapturePlan> renderCaptures = default)
     {
         Debug.Assert(kind != ComponentRenderStatementKind.None);
         Debug.Assert(node != null);
@@ -46,6 +47,7 @@ internal readonly struct ComponentRenderStatementPlan
         Phase = phase;
         HookMethod = hookMethod;
         StateArguments = stateArguments;
+        RenderCaptures = renderCaptures;
     }
 
     public ComponentRenderStatementKind Kind { get; }
@@ -59,6 +61,8 @@ internal readonly struct ComponentRenderStatementPlan
     public IMethodSymbol? HookMethod { get; }
 
     public ImmutableArray<UseHookStateArgument> StateArguments { get; }
+
+    public ImmutableArray<ComponentRenderCapturePlan> RenderCaptures { get; }
 
     public bool WritesDuringFirstUpdate =>
         (Phase & ComponentRenderStatementPhase.FirstUpdate) != 0;

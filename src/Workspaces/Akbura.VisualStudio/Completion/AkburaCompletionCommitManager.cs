@@ -172,6 +172,21 @@ internal sealed class AkburaCompletionCommitManager :
         var replacementText = appendTypedCharacter
             ? completion.InsertText + typedChar
             : completion.InsertText;
+        var nextCharacter = applicableSpan.End.Position;
+        while (nextCharacter < currentSnapshot.Length && char.IsWhiteSpace(currentSnapshot[nextCharacter]))
+        {
+            nextCharacter++;
+        }
+
+        var overtypeOpeningParenthesis = typedChar == '(' &&
+            AkburaMarkupStatementCompletionFacts.IsStatement(completion) && completion.DisplayText != "$else" &&
+            nextCharacter < currentSnapshot.Length && currentSnapshot[nextCharacter] == '(';
+        if (overtypeOpeningParenthesis)
+        {
+            replacementText = AkburaMarkupStatementCompletionFacts.GetInsertTextBeforeExistingParenthesis(
+                completion, nextCharacter > applicableSpan.End.Position);
+        }
+
         var overtypeClosingQuote =
             typedChar is '"' or '\'' &&
             applicableSpan.Start.Position > 0 &&
@@ -222,7 +237,8 @@ internal sealed class AkburaCompletionCommitManager :
             var caretPosition = applicableSpan.Start.Position +
                 importDeltaBeforeCompletion +
                 replacementText.Length -
-                completion.CaretOffsetFromEnd +
+                (overtypeOpeningParenthesis ? 0 : completion.CaretOffsetFromEnd) +
+                (overtypeOpeningParenthesis ? nextCharacter - applicableSpan.End.Position + 1 : 0) +
                 (overtypeClosingQuote ? 1 : 0);
             session.TextView.Caret.MoveTo(
                 new SnapshotPoint(appliedSnapshot, caretPosition));
@@ -237,7 +253,8 @@ internal sealed class AkburaCompletionCommitManager :
         }
 
         var suppressTypedCharacter =
-            triggerNextCompletion || overtypeClosingQuote ||
+            triggerNextCompletion || overtypeClosingQuote || overtypeOpeningParenthesis ||
+            AkburaMarkupStatementCompletionFacts.IncludesCommitCharacter(completion, typedChar) ||
             (completion.CaretOffsetFromEnd > 0 &&
              typedChar is '=' or ' ');
         return suppressTypedCharacter

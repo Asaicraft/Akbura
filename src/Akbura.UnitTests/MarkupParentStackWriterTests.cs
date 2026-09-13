@@ -9,6 +9,36 @@ namespace Akbura.UnitTests;
 public sealed class MarkupParentStackWriterTests
 {
     [Fact]
+    public void ConditionalTemplateRoot_ParentStackContainsControlsButNotNonvisualCoordinator()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <ContentControl>
+                <ContentControl.ContentTemplate>
+                    $if (true)
+                    {
+                        <Border><TextBlock /></Border>
+                    }
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+            """;
+        var fixture = CreatePlan(component);
+        var target = Assert.Single(fixture.Plan.Elements, static element => element.Type.Name == "TextBlock");
+        var root = Assert.Single(fixture.Plan.Elements, static element => element.Type.Name == "Border");
+        var coordinator = Assert.Single(fixture.Plan.Elements, static element => element.IsConditionalTemplateRoot);
+        using var codeWriter = new CodeWriter("\r\n");
+        var plan = new MarkupParentStackPlan(fixture.Plan.Elements.AsSpan(), target.Id, target.ScopeId,
+            MarkupParentStackTraversalKind.RuntimeStorageRoot);
+
+        Assert.True(new MarkupParentStackWriter(codeWriter).Write(plan));
+        Assert.Equal("new global::System.Object[] { " + root.Identifier + ", " + target.Identifier + " }",
+            codeWriter.GetText().ToString());
+        Assert.DoesNotContain(coordinator.Identifier, codeWriter.GetText().ToString());
+    }
+
+    [Fact]
     public void Expression_WritesExistingExpression()
     {
         using var codeWriter = new CodeWriter("\n");

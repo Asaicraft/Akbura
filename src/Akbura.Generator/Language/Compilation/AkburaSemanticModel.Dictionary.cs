@@ -151,6 +151,11 @@ internal partial class AkburaSemanticModel
         var constants = new HashSet<object>();
         foreach (var child in children.WrittenSpan)
         {
+            if (child.Kind == MarkupChildKind.Conditional)
+            {
+                continue;
+            }
+
             if (child.Syntax is not MarkupElementContentSyntax childElement)
             {
                 diagnostics.Add(new AkburaSemanticDiagnostic(child.Syntax,

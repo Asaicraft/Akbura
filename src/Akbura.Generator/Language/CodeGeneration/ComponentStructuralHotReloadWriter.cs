@@ -36,6 +36,8 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
         {
             ref readonly var element = ref plan.Elements.ItemRef(i);
             if (!element.UsesRuntimeStorage ||
+                element.RuntimeStorageRootScopeId != 0 ||
+                element.ConditionalRegionId >= 0 ||
                 !element.HasName ||
                 string.IsNullOrEmpty(element.ExplicitKey))
             {
@@ -92,10 +94,18 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
 
+        WriteDescriptionContents(plan, 0);
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+    }
+
+    internal void WriteDescriptionContents(in ComponentPlan plan, int rootScopeId)
+    {
+
         for (var i = 0; i < plan.Elements.Length; i++)
         {
             ref readonly var element = ref plan.Elements.ItemRef(i);
-            if (!element.UsesRuntimeStorage)
+            if (!element.UsesRuntimeStorage || element.RuntimeStorageRootScopeId != rootScopeId)
             {
                 continue;
             }
@@ -108,7 +118,7 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
             _writer.WriteLine(",");
             _writer.WriteIntegerLiteral(GetRuntimeParentId(plan, element));
             _writer.WriteLine(",");
-            _writer.WriteStringLiteral(GetElementSlot(plan, element));
+            _writer.WriteStringLiteral(GetRuntimeParentId(plan, element) < 0 ? "$root" : GetElementSlot(plan, element));
             _writer.WriteLine(",");
             _writer.Write("typeof(");
             _valueWriter.WriteTypeName(element.Type);
@@ -127,12 +137,48 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
             _writer.WriteStringLiteral(
                 ComponentHotReloadIdentity.CreateRenderSyntaxIdentity(
                     element.Syntax));
+            _writer.WriteLine(",");
+            var conditionalRuntimeId = element.ConditionalRegionId >= 0 &&
+                plan.ConditionalRegions.ItemRef(element.ConditionalRegionId).RuntimeStorageRootScopeId == rootScopeId
+                ? ComponentRuntimeScopeFacts.GetConditionalRuntimeId(plan, element.ConditionalRegionId)
+                : -1;
+            _writer.WriteIntegerLiteral(conditionalRuntimeId).WriteLine(",");
+            _writer.WriteIntegerLiteral(conditionalRuntimeId >= 0 ? element.ConditionalBranchId : -1);
             _writer.WriteLine("));");
             _writer.CurrentIndent -= _writer.TabSize;
         }
 
-        _writer.CurrentIndent -= _writer.TabSize;
-        _writer.WriteLine("}");
+        foreach (var region in plan.ConditionalRegions)
+        {
+            ref readonly var owner = ref plan.Elements.ItemRef(region.OwnerElementId);
+            if (!owner.UsesRuntimeStorage || region.RuntimeStorageRootScopeId != rootScopeId)
+            {
+                continue;
+            }
+            _writer.WriteLine("__builder.AddConditional(new global::Akbura.HotReload.AkburaRenderConditionalDefinition(");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.WriteIntegerLiteral(ComponentRuntimeScopeFacts.GetConditionalRuntimeId(plan, region.Id)).WriteLine(",");
+            _writer.WriteIntegerLiteral(owner.RuntimeStorageId).WriteLine(",");
+            _writer.WriteStringLiteral(GetConditionalSlot(plan, region.Id)).WriteLine(",");
+            _writer.WriteStringLiteral(ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(region.Syntax)).WriteLine(",");
+            _writer.WriteLine("new global::Akbura.HotReload.AkburaRenderConditionalBranchDefinition[]");
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+            foreach (var branch in region.Branches)
+            {
+                _writer.Write("new(");
+                _writer.WriteStringLiteral(branch.Condition?.ToString() ?? string.Empty).Write(", ");
+                _writer.WriteStringLiteral(branch.ShapeIdentity).WriteLine("),");
+            }
+
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("},");
+            var parentRuntimeId = ComponentRuntimeScopeFacts.GetConditionalParentRuntimeId(plan, region.Id);
+            _writer.WriteIntegerLiteral(parentRuntimeId).WriteLine(",");
+            _writer.WriteIntegerLiteral(parentRuntimeId >= 0 ? region.ParentBranchId : -1).WriteLine("));");
+            _writer.CurrentIndent -= _writer.TabSize;
+        }
+
     }
 
     private void WriteFactoryMethod(in ComponentPlan plan)
@@ -149,7 +195,7 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
         for (var i = 0; i < plan.Elements.Length; i++)
         {
             ref readonly var element = ref plan.Elements.ItemRef(i);
-            if (!element.UsesRuntimeStorage)
+            if (!element.UsesRuntimeStorage || element.RuntimeStorageRootScopeId != 0)
             {
                 continue;
             }
@@ -196,14 +242,7 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
         in ComponentPlan plan,
         in ComponentElementPlan element)
     {
-        if (element.ParentId < 0)
-        {
-            return -1;
-        }
-
-        ref readonly var parent = ref plan.Elements.ItemRef(element.ParentId);
-        Debug.Assert(parent.UsesRuntimeStorage);
-        return parent.RuntimeStorageId;
+        return ComponentRuntimeScopeFacts.GetRuntimeParentId(plan, element);
     }
 
     internal static string GetElementSlot(
@@ -213,6 +252,14 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
         if (element.ParentId < 0)
         {
             return "$root";
+        }
+
+        foreach (var content in plan.ConditionalContents)
+        {
+            if (content.OwnerElementId == element.ParentId && ContainsConditionalElement(plan, content.Items, element.Id))
+            {
+                return GetConditionalContentSlot(content);
+            }
         }
 
         for (var i = 0; i < plan.CollectionContents.Length; i++)
@@ -249,6 +296,75 @@ internal readonly ref struct ComponentStructuralHotReloadWriter
         }
 
         return "content";
+    }
+
+    internal static string GetConditionalContentSlot(in ComponentConditionalContentPlan content) =>
+        content.Collection.IsValid ? ComponentHotReloadIdentity.CreateCollectionSlot(content.Collection)
+            : ComponentHotReloadIdentity.CreatePropertySlot(content.Property);
+
+    private static string GetConditionalSlot(in ComponentPlan plan, int regionId)
+    {
+        foreach (var content in plan.ConditionalContents)
+        {
+            if (ContainsConditionalRegion(plan, content.Items, regionId))
+            {
+                return GetConditionalContentSlot(content);
+            }
+        }
+
+        return "content";
+    }
+
+    private static bool ContainsConditionalElement(in ComponentPlan plan, ComponentPlanRange items, int elementId)
+    {
+        for (var i = 0; i < items.Length; i++)
+        {
+            var value = plan.ContentItems.ItemRef(items.Start + i).Value;
+            if (value.Kind == ComponentContentValueKind.Element && value.Index == elementId)
+            {
+                return true;
+            }
+
+            if (value.Kind == ComponentContentValueKind.Conditional)
+            {
+                foreach (var branch in plan.ConditionalRegions.ItemRef(value.Index).Branches)
+                {
+                    if (ContainsConditionalElement(plan, branch.Items, elementId))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsConditionalRegion(in ComponentPlan plan, ComponentPlanRange items, int regionId)
+    {
+        for (var i = 0; i < items.Length; i++)
+        {
+            var value = plan.ContentItems.ItemRef(items.Start + i).Value;
+            if (value.Kind != ComponentContentValueKind.Conditional)
+            {
+                continue;
+            }
+
+            if (value.Index == regionId)
+            {
+                return true;
+            }
+
+            foreach (var branch in plan.ConditionalRegions.ItemRef(value.Index).Branches)
+            {
+                if (ContainsConditionalRegion(plan, branch.Items, regionId))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static bool IsElementReference(

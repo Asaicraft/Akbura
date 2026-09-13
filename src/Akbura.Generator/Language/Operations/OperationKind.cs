@@ -9,6 +9,7 @@ internal enum OperationKind
     Component,
     MarkupElement,
     MarkupContent,
+    MarkupIf,
     MarkupAttribute,
     MarkupText,
     InlineExpression,

@@ -4,7 +4,6 @@ using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -83,7 +82,7 @@ public sealed class UsefulHookIntegrationTests
             <TextBlock Text={total.ToString()} />
             """;
         var ownerType = Compile(source, DerivedOwner, debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));

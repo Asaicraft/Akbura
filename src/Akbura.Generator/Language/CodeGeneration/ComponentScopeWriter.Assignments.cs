@@ -80,6 +80,18 @@ internal readonly ref partial struct ComponentScopeWriter
                 }
             }
         }
+        else if (target.Kind == ComponentContentTargetKind.Conditional)
+        {
+            var items = plan.ConditionalContents.ItemRef(target.Index).Items;
+            for (var i = 0; i < items.Length; i++)
+            {
+                var value = plan.ContentItems.ItemRef(items.Start + i).Value;
+                if (value.Kind == ComponentContentValueKind.Element)
+                {
+                    WriteElementAssignments(plan, value.Index, scopeContext, initialized, phase);
+                }
+            }
+        }
     }
 
     private void WriteStructuralOrderedAssignments(
@@ -128,6 +140,21 @@ internal readonly ref partial struct ComponentScopeWriter
             if (assignment.Kind == ComponentAssignmentKind.Content)
             {
                 var target = assignment.Content;
+                if (target.Kind == ComponentContentTargetKind.Conditional)
+                {
+                    if (!skipFrameContents)
+                    {
+                        if (initialized != null)
+                        {
+                            WriteContentChildren(plan, target, initializationContext, initialized, ComponentAssignmentPhase.Initial);
+                        }
+
+                        WriteConditionalContent(plan, plan.ConditionalContents.ItemRef(target.Index), context);
+                    }
+
+                    continue;
+                }
+
                 if (initialized != null)
                 {
                     WriteContentChildren(plan, target, initializationContext, initialized, ComponentAssignmentPhase.Initial);
@@ -155,9 +182,16 @@ internal readonly ref partial struct ComponentScopeWriter
                 else if (target.Kind == ComponentContentTargetKind.Property)
                 {
                     ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
+                    var hasOwnedFactory =
+                        content.FirstUpdateValue.Kind is ComponentContentValueKind.Template or ComponentContentValueKind.DeferredContent &&
+                        content.Destination.Kind is PropertyWriteKind.ClrProperty or PropertyWriteKind.AvaloniaProperty or
+                            PropertyWriteKind.ComponentParameter or PropertyWriteKind.DirectMember;
                     if (content.FirstUpdateValue.Kind == ComponentContentValueKind.Element ||
-                        ComponentContentWriter.CanWriteStructuralConstantValue(plan, content))
+                        ComponentContentWriter.CanWriteStructuralConstantValue(plan, content) || hasOwnedFactory)
                     {
+                        // Source initialization must visit an owned factory slot even
+                        // when its receiver's own declaration stayed unchanged. Normal
+                        // frames do not enter this structural initialization path.
                         WriteContentTarget(plan, target, isFirstUpdate: true, context);
                     }
                     else
@@ -180,13 +214,28 @@ internal readonly ref partial struct ComponentScopeWriter
                     WriteConditionalInitialEnd(conditionalOneTime);
                     break;
                 case ComponentFirstUpdateActionKind.PropertySubscription:
+                    if (element.ConditionalRegionId >= 0)
+                    {
+                        break;
+                    }
+
                     subscriptions.WriteStructuralRegistration(element, plan.PropertySubscriptions.ItemRef(action.Index));
                     break;
                 case ComponentFirstUpdateActionKind.RoutedEvent:
+                    if (element.ConditionalRegionId >= 0)
+                    {
+                        break;
+                    }
+
                     actions.WriteStructuralRoutedEvent(plan.RoutedEvents.ItemRef(action.Index),
                         element.RuntimeStorageId, element.Identifier);
                     break;
                 case ComponentFirstUpdateActionKind.CommandBinding:
+                    if (element.ConditionalRegionId >= 0 || element.RuntimeStorageRootScopeId > 0)
+                    {
+                        break;
+                    }
+
                     ref readonly var command = ref plan.CommandBindings.ItemRef(action.Index);
                     if (ComponentFirstUpdateActionWriter.CanWriteStructuralCommandBinding(command))
                     {
@@ -242,7 +291,7 @@ internal readonly ref partial struct ComponentScopeWriter
         var propertyWriter = new ComponentPropertyWriter(_writer, in _bindingEnvironment, _sourceMap);
         var actionWriter = new ComponentFirstUpdateActionWriter(_writer, _sourceMap);
         var subscriptions = new PropertySubscriptionWriter(_writer, _sourceMap,
-            writeInlineHandlers: _generationMode == ComponentGenerationMode.DebugStructural);
+            writeInlineHandlers: _generationMode.UsesStructuralRuntime());
         var wroteAny = false;
         foreach (var assignment in element.Assignments)
         {
@@ -269,6 +318,22 @@ internal readonly ref partial struct ComponentScopeWriter
                     break;
                 }
                 case ComponentAssignmentKind.Content:
+                    if (assignment.Content.Kind == ComponentContentTargetKind.Conditional)
+                    {
+                        if (phase != ComponentAssignmentPhase.HotReload)
+                        {
+                            if (initialized != null)
+                            {
+                                WriteContentChildren(plan, assignment.Content, initializationContext, initialized, childPhase);
+                            }
+
+                            WriteConditionalContent(plan, plan.ConditionalContents.ItemRef(assignment.Content.Index), context);
+                            wroteAny = true;
+                        }
+
+                        break;
+                    }
+
                     if (initialized != null)
                     {
                         WriteContentChildren(plan, assignment.Content, initializationContext, initialized, childPhase);

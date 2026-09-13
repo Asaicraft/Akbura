@@ -306,6 +306,11 @@ internal partial class AkburaSemanticModel
                 .Start -
             expression.FullSpan.Start;
 
+        if (CSharpProbeBuilder.HasMarkupConditionalScope(inlineExpressionSyntax))
+        {
+            return GetConnectedMarkupExpressionReferences(inlineExpressionSyntax, expression, sourcePositionOffset);
+        }
+
         return TryGetContainingMarkupAttribute(inlineExpressionSyntax, out var markupAttribute)
             ? GetMarkupInlineExpressionCSharpSymbolReferences(markupAttribute, expression, sourcePositionOffset)
             : GetMarkupExpressionCSharpSymbolReferences(inlineExpressionSyntax, expression, sourcePositionOffset);
@@ -490,6 +495,7 @@ internal partial class AkburaSemanticModel
                 var symbol = GetReferenceSymbol(semanticModel, name);
 
                 AddCSharpSymbolReference(
+                    semanticModel,
                     references,
                     seenReferences,
                     name,
@@ -913,14 +919,14 @@ internal partial class AkburaSemanticModel
     }
 
     private static void AddCSharpSymbolReference(
-    ImmutableArrayBuilder<CSharpSymbolReference> references,
-    HashSet<string> seenReferences,
-    CSharp.ExpressionSyntax syntax,
-    TextSpan sourceSpan,
-    RoslynSymbol? symbol,
-    Dictionary<string, AkburaSymbol> akburaSymbolsByName,
-    Dictionary<string, AkburaSymbol>
-        akburaSymbolsByCommandTypeName)
+        SemanticModel semanticModel,
+        ImmutableArrayBuilder<CSharpSymbolReference> references,
+        HashSet<string> seenReferences,
+        CSharp.ExpressionSyntax syntax,
+        TextSpan sourceSpan,
+        RoslynSymbol? symbol,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
+        Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
     {
         if (symbol == null)
         {
@@ -955,7 +961,27 @@ internal partial class AkburaSemanticModel
                     symbol,
                     akburaSymbolsByName,
                     akburaSymbolsByCommandTypeName),
-                GetCSharpReferenceName(syntax)));
+                GetCSharpReferenceName(syntax),
+                symbol is ILocalSymbol
+                    ? semanticModel.GetTypeInfo(syntax).Nullability.FlowState
+                    : NullableFlowState.None,
+                IsCSharpNameOfOperand(semanticModel, syntax)));
+    }
+
+    private static bool IsCSharpNameOfOperand(SemanticModel semanticModel, CSharp.ExpressionSyntax syntax)
+    {
+        for (var ancestor = syntax.Parent; ancestor != null; ancestor = ancestor.Parent)
+        {
+            if (ancestor is CSharp.InvocationExpressionSyntax invocation &&
+                invocation.Expression is CSharp.IdentifierNameSyntax identifier &&
+                identifier.Identifier.ValueText == "nameof" &&
+                semanticModel.GetOperation(invocation) is Microsoft.CodeAnalysis.Operations.INameOfOperation)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string GetCSharpReferenceName(CSharp.ExpressionSyntax syntax)

@@ -421,6 +421,7 @@ internal readonly partial struct Blender
         {
             return mode is
                 Lexer.LexerMode.InInlineExpression or
+                Lexer.LexerMode.InMarkupCondition or
                 Lexer.LexerMode.InExpressionUntilSemicolon or
                 Lexer.LexerMode.InExpressionUntilComma or
                 Lexer.LexerMode.InArgumentExpression or

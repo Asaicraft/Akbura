@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -85,7 +85,8 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
     public void WriteStructuralRoutedEvent(
         in ComponentRoutedEventPlan plan,
         int ownerRuntimeId,
-        string targetExpression)
+        string targetExpression,
+        bool refreshClosure = false)
     {
         Debug.Assert(plan.IsValid);
         Debug.Assert(ownerRuntimeId >= 0);
@@ -94,11 +95,16 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
         var slot = ComponentHotReloadIdentity.CreateRoutedEventSlot(plan);
         using var mapping = _mappings.WriteStart(plan.Syntax!);
 
-        WriteOwnedOperationCondition(
-            ownerRuntimeId,
-            slot,
-            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
-                plan.Syntax!));
+        if (refreshClosure)
+        {
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+        }
+        else
+        {
+            WriteOwnedOperationCondition(ownerRuntimeId, slot,
+                ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(plan.Syntax!));
+        }
 
         switch (plan.Kind)
         {
@@ -106,12 +112,17 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
                 when plan.EventSymbol is IEventSymbol clrEvent:
                 _writer.Write(
                     ComponentStructuralHotReloadWriter.RenderStateFieldName);
-                _writer.WriteLine(".ApplyClrEventOperation(");
+                _writer.WriteLine(refreshClosure ? ".RefreshClrEventOperation(" : ".ApplyClrEventOperation(");
                 _writer.CurrentIndent += _writer.TabSize;
                 _writer.WriteIntegerLiteral(ownerRuntimeId);
                 _writer.WriteLine(",");
                 _writer.WriteStringLiteral(slot);
                 _writer.WriteLine(",");
+                if (refreshClosure)
+                {
+                    _writer.WriteStringLiteral(ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(plan.Syntax!)).WriteLine(",");
+                }
+
                 _writer.Write(targetExpression);
                 _writer.WriteLine(",");
                 _writer.Write("typeof(");
@@ -128,12 +139,17 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
                 when plan.EventSymbol != null:
                 _writer.Write(
                     ComponentStructuralHotReloadWriter.RenderStateFieldName);
-                _writer.WriteLine(".ApplyRoutedEventOperation(");
+                _writer.WriteLine(refreshClosure ? ".RefreshRoutedEventOperation(" : ".ApplyRoutedEventOperation(");
                 _writer.CurrentIndent += _writer.TabSize;
                 _writer.WriteIntegerLiteral(ownerRuntimeId);
                 _writer.WriteLine(",");
                 _writer.WriteStringLiteral(slot);
                 _writer.WriteLine(",");
+                if (refreshClosure)
+                {
+                    _writer.WriteStringLiteral(ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(plan.Syntax!)).WriteLine(",");
+                }
+
                 _writer.Write("(global::Avalonia.Interactivity.Interactive)");
                 _writer.Write(targetExpression);
                 _writer.WriteLine(",");
@@ -164,7 +180,7 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
         using var mapping = _mappings.WriteStart(plan.Syntax);
         var propertyWriter = new PropertyWriter(_writer);
         var end = propertyWriter.WriteStart(plan.Destination, targetExpression);
-        _valueWriter.WriteIdentifier(plan.CommandName);
+        new ComponentCommandBindingWriter(_writer).WriteValue(plan);
         propertyWriter.WriteEnd(end);
         _writer.WriteLine();
     }
@@ -189,7 +205,8 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
     public bool WriteStructuralCommandBinding(
         in ComponentCommandBindingPlan plan,
         int ownerRuntimeId,
-        string targetExpression)
+        string targetExpression,
+        bool refreshClosure = false)
     {
         Debug.Assert(ownerRuntimeId >= 0);
         Debug.Assert(!string.IsNullOrEmpty(targetExpression));
@@ -203,8 +220,8 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
 
         var destination = plan.Destination;
         var methodName = destination.Kind == PropertyWriteKind.AvaloniaProperty
-            ? "ReconcileAvaloniaValue"
-            : "ReconcileClrValue";
+            ? refreshClosure ? "ReconcileConditionalAvaloniaValue" : "ReconcileAvaloniaValue"
+            : refreshClosure ? "ReconcileConditionalClrValue" : "ReconcileClrValue";
 
         using var mapping = _mappings.WriteStart(plan.Syntax);
         _writer.Write(
@@ -243,7 +260,7 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
             ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
                 plan.Syntax));
         _writer.WriteLine(",");
-        _valueWriter.WriteIdentifier(plan.CommandName);
+        new ComponentCommandBindingWriter(_writer).WriteValue(plan);
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;
         return true;

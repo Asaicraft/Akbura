@@ -3,7 +3,6 @@ using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Reflection;
@@ -84,8 +83,7 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
             """;
         var fixture = CompileRuntimeFixture(component, csharp, childComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -191,8 +189,7 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
             csharp,
             childComponent);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -296,8 +293,7 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
             """;
         var fixture = CompileRuntimeFixture(component, csharp);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -355,8 +351,7 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
             """;
         var fixture = CompileRuntimeFixture(component, csharp);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -412,8 +407,7 @@ public sealed class ComponentLifecycleRuntimeCoverageTests
             """;
         var fixture = CompileRuntimeFixture(component, csharp);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

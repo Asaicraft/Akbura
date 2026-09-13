@@ -907,21 +907,26 @@ internal sealed partial class Parser
             return content;
         }
 
+        if (IsMarkupConditionalDirectiveStart(incremental: true))
+        {
+            return ParseMarkupIfStatementSyntax(openTags, ref pendingEndTag, incremental: true);
+        }
+
         return PeekIncrementalTokenKind() switch
         {
             SyntaxKind.LessThanToken => GreenSyntaxFactory.MarkupElementContentSyntax(
                 ParseIncrementalMarkupElementSyntax(openTags, ref pendingEndTag)),
             SyntaxKind.OpenBraceToken => GreenSyntaxFactory.MarkupInlineExpressionSyntax(
                 ParseIncrementalInlineExpressionSyntax()),
-            _ => ParseIncrementalMarkupTextLiteralSyntax(),
+            _ => ParseIncrementalMarkupTextLiteralSyntax(_markupBlockTagDepth == openTags.Count),
         };
     }
 
-    private GreenMarkupTextLiteralSyntax ParseIncrementalMarkupTextLiteralSyntax()
+    private GreenMarkupTextLiteralSyntax ParseIncrementalMarkupTextLiteralSyntax(bool inConditionalBlock = false)
     {
         return TryReadReusableIncrementalNode<GreenMarkupTextLiteralSyntax>(out var text)
             ? text
-            : ParseMarkupTextLiteralSyntax();
+            : ParseMarkupTextLiteralSyntax(inConditionalBlock);
     }
 
     private GreenMarkupAttributeSyntax ParseIncrementalMarkupAttributeSyntax()
@@ -2067,7 +2072,8 @@ internal sealed partial class Parser
         var savedPosition = _lexer.TextWindow.Position;
         var blended = _blender.ReadNode(_mode);
         if (blended.Node?.Green is not TNode green ||
-            !CanReuseIncrementalNode(green))
+            !CanReuseIncrementalNode(green) ||
+            !CanReuseMarkupConditionalNode(green))
         {
             _lexer.TextWindow.Reset(savedPosition);
             return false;

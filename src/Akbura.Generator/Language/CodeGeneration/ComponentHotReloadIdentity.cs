@@ -190,6 +190,97 @@ internal static class ComponentHotReloadIdentity
         return hash.ToString();
     }
 
+    public static string CreateLocalTemplateFactoryIdentity(in ComponentPlan plan,
+        in ComponentPropertyContentPlan content, in ComponentTemplatePlan template)
+    {
+        var hash = CreateLocalFactoryContract(plan, content, template.ScopeId,
+            "__BuildConditionalTemplate" + template.Id, template.Syntax);
+        AddFactoryType(ref hash, template.DataType);
+        hash.Add(template.ItemName);
+        AddLocalFactoryCaptures(ref hash, plan, template.ScopeId, template.ItemName);
+        return hash.ToString();
+    }
+
+    public static string CreateLocalDeferredFactoryIdentity(in ComponentPlan plan,
+        in ComponentPropertyContentPlan content, in ComponentDeferredContentPlan deferred)
+    {
+        var hash = CreateLocalFactoryContract(plan, content, deferred.ScopeId,
+            "__BuildDeferredContent" + deferred.Id, deferred.Syntax);
+        AddFactoryType(ref hash, deferred.ResultType);
+        AddFactoryType(ref hash, deferred.DataType);
+        hash.Add(deferred.ItemName ?? string.Empty);
+        AddLocalFactoryCaptures(ref hash, plan, deferred.ScopeId, deferred.ItemName);
+        return hash.ToString();
+    }
+
+    private static FingerprintHash CreateLocalFactoryContract(in ComponentPlan plan,
+        in ComponentPropertyContentPlan content, int scopeId, string helperName, AkburaSyntax boundary)
+    {
+        var hash = new FingerprintHash();
+        ref readonly var scope = ref plan.Scopes.ItemRef(scopeId);
+        ref readonly var root = ref plan.Elements.ItemRef(plan.ScopeRootElementIds[scope.Roots.Start]);
+        hash.Add(helperName);
+        hash.Add((int)scope.Kind);
+        AddFactoryType(ref hash, plan.Elements.ItemRef(content.OwnerElementId).Type);
+        AddFactoryType(ref hash, root.Type);
+        hash.Add(CreatePropertySlot(content.Destination));
+        hash.Add(boundary is MarkupElementSyntax { StartTag: { } startTag }
+            ? CreateOperationSyntaxIdentity(startTag)
+            : boundary.Kind.ToString());
+        return hash;
+    }
+
+    private static void AddLocalFactoryCaptures(ref FingerprintHash hash, in ComponentPlan plan,
+        int scopeId, string? itemName)
+    {
+        foreach (var ancestor in TemplateWriter.GetAncestorTemplates(plan, scopeId, itemName))
+        {
+            hash.Add(ancestor.ItemName);
+            AddFactoryType(ref hash, ancestor.DataType);
+        }
+
+        var captures = new System.Collections.Generic.SortedDictionary<string, ITypeSymbol>(StringComparer.Ordinal);
+        foreach (var statement in plan.RenderStatements)
+        {
+            if (statement.RenderCaptures.IsDefaultOrEmpty)
+            {
+                continue;
+            }
+            foreach (var capture in statement.RenderCaptures)
+            {
+                if (capture.IsReadByScope(scopeId))
+                {
+                    captures[capture.Key] = capture.Type;
+                }
+            }
+        }
+        foreach (var region in plan.ConditionalRegions)
+        {
+            foreach (var branch in region.Branches)
+            {
+                foreach (var capture in branch.Captures)
+                {
+                    if (capture.IsReadByScope(scopeId))
+                    {
+                        captures[capture.Key] = capture.Type;
+                    }
+                }
+            }
+        }
+        foreach (var capture in captures)
+        {
+            hash.Add(capture.Key);
+            AddFactoryType(ref hash, capture.Value);
+        }
+    }
+
+    private static void AddFactoryType(ref FingerprintHash hash, ITypeSymbol? type)
+    {
+        hash.Add(type?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)) ?? string.Empty);
+    }
+
     public static string CreateRenderSyntaxIdentity(MarkupElementSyntax syntax)
     {
         if (syntax == null)

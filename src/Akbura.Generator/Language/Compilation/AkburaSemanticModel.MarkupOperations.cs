@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -3295,6 +3295,7 @@ internal partial class AkburaSemanticModel
             expressionText,
             binding.Diagnostics,
             diagnosticsBuilder);
+        AddMarkupConditionalHookDiagnostics(syntax, binding.OperationDefinition, diagnosticsBuilder);
     }
 
     internal void AddMarkupExpressionDiagnostics(
@@ -3753,7 +3754,8 @@ internal partial class AkburaSemanticModel
                     : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ObjectKeyword)),
                 "__AkburaCommandHandlerProbe")
             .WithParameterList(CreateCommandHandlerProbeParameterList(command, parameterNames))
-            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements, returnStatement));
+            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements,
+                CSharpProbeBuilder.WrapMarkupConditionalScopes(markupAttribute, returnStatement)));
 
         if (ContainsAwaitExpression(expressionSyntax))
         {
@@ -3790,7 +3792,8 @@ internal partial class AkburaSemanticModel
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
                 "__AkburaCommandHandlerProbe")
             .WithParameterList(CreateCommandHandlerProbeParameterList(command, parameterNames))
-            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements, statement));
+            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements,
+                CSharpProbeBuilder.WrapMarkupConditionalScopes(markupAttribute, statement)));
 
         using var membersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
@@ -3822,7 +3825,8 @@ internal partial class AkburaSemanticModel
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
                 "__AkburaEventHandlerProbe")
             .WithParameterList(CreateEventHandlerProbeParameterList(routedEvent, parameterNames))
-            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements, statement));
+            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements,
+                CSharpProbeBuilder.WrapMarkupConditionalScopes(markupAttribute, statement)));
 
         if (isAsync)
         {
@@ -3859,7 +3863,8 @@ internal partial class AkburaSemanticModel
                 CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
                 "__AkburaEventHandlerProbe")
             .WithParameterList(CreateEventHandlerProbeParameterList(routedEvent, parameterNames))
-            .WithBody(PrependMarkupHandlerProbeLocals(block, probeScope.LocalStatements));
+            .WithBody(CreateMarkupHandlerProbeBlock(probeScope.LocalStatements,
+                CSharpProbeBuilder.WrapMarkupConditionalScopes(markupAttribute, block)));
 
         if (isAsync)
         {
@@ -3887,9 +3892,12 @@ internal partial class AkburaSemanticModel
         ImmutableArray<string> parameterNames)
     {
         var scope = GetMarkupBindingScope(markupAttribute);
+        csharpNode = CSharpProbeBuilder.WrapMarkupConditionalScopes(markupAttribute,
+            csharpNode is CSharp.StatementSyntax statement ? statement :
+                CSharpSyntaxFactory.ExpressionStatement((CSharp.ExpressionSyntax)csharpNode));
         return BindingSession
             .GetCSharpProbeBinder(scope, BinderUsage.Markup)
-            .CreateProbeScope(scope, csharpNode, parameterNames);
+            .CreateProbeScope(markupAttribute, csharpNode, parameterNames);
     }
 
     private void AddMarkupAttributeProbeMembers(
@@ -4062,7 +4070,7 @@ internal partial class AkburaSemanticModel
         var scope = GetMarkupBindingScope(scopeSyntax);
         var bound = BindingSession
             .GetCSharpProbeBinder(scope, BinderUsage.Markup)
-            .BindExpression(scope, expressionSyntax, targetType);
+            .BindExpression(scopeSyntax, expressionSyntax, targetType);
 
         return GetCSharpBindingResult(bound);
     }

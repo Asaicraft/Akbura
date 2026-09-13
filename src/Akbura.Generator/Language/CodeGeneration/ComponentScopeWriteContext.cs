@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -17,7 +17,8 @@ internal readonly ref struct ComponentScopeWriteContext
         int scopeId,
         MarkupParentStackTraversalKind parentStackTraversalKind,
         ReadOnlySpan<ComponentElementPlan> elements,
-        ReadOnlySpan<BindingElementReference> elementReferences)
+        ReadOnlySpan<BindingElementReference> elementReferences,
+        bool isConditionalNameScope = false)
     {
         IntermediateRootExpression = intermediateRootExpression;
         BaseUriExpression = baseUriExpression;
@@ -27,6 +28,7 @@ internal readonly ref struct ComponentScopeWriteContext
         ParentStackTraversalKind = parentStackTraversalKind;
         Elements = elements;
         ElementReferences = elementReferences;
+        IsConditionalNameScope = isConditionalNameScope;
     }
 
     public string IntermediateRootExpression { get; }
@@ -39,11 +41,20 @@ internal readonly ref struct ComponentScopeWriteContext
 
     public int ScopeId { get; }
 
+    public bool IsConditionalNameScope { get; }
+
     public MarkupParentStackTraversalKind ParentStackTraversalKind { get; }
 
     public ReadOnlySpan<ComponentElementPlan> Elements { get; }
 
     public ReadOnlySpan<BindingElementReference> ElementReferences { get; }
+
+    public ComponentScopeWriteContext WithNameScope(string nameScopeExpression)
+    {
+        return new ComponentScopeWriteContext(IntermediateRootExpression, BaseUriExpression,
+            FallbackServiceProviderExpression, nameScopeExpression, ScopeId, ParentStackTraversalKind,
+            Elements, ElementReferences, isConditionalNameScope: true);
+    }
 
     public MarkupExtensionWriteContext ForElement(int elementId)
     {
@@ -65,7 +76,8 @@ internal readonly ref struct ComponentScopeWriteContext
             FallbackServiceProviderExpression,
             NameScopeExpression,
             ScopeId,
-            ElementReferences);
+            ElementReferences,
+            IsConditionalNameScope);
     }
 
 }

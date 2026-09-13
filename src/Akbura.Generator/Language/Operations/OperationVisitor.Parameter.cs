@@ -49,6 +49,9 @@ internal abstract class OperationVisitor<TParameter, TResult>
         TParameter parameter) =>
         DefaultVisit(operation, parameter);
 
+    public virtual TResult? VisitMarkupIf(IMarkupIfOperation operation, TParameter parameter) =>
+        DefaultVisit(operation, parameter);
+
     public virtual TResult? VisitMarkupDictionaryKey(IMarkupDictionaryKeyOperation operation,
         TParameter parameter) => DefaultVisit(operation, parameter);
 

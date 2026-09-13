@@ -20,7 +20,7 @@ using System.Runtime.CompilerServices;
 
 namespace Akbura;
 
-public abstract class AkburaControl : Control, IComponentTree
+public abstract partial class AkburaControl : Control, IComponentTree
 {
     private readonly AvaloniaList<IComponentTree> _componentChildren = [];
     private IComponentTree? _componentParent;
@@ -334,6 +334,11 @@ public abstract class AkburaControl : Control, IComponentTree
     protected abstract Control Update();
 
     protected abstract Control FirstUpdate();
+
+    /// <summary>Lets the generated structural renderer initialize and update in one hook frame pass.</summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected virtual bool __AkburaUsesSinglePassRender => false;
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
@@ -688,6 +693,7 @@ public abstract class AkburaControl : Control, IComponentTree
                 updateCount++;
                 _updatePending = false;
                 _isUpdating = true;
+                BeginLocalRenderScopeFrame();
 
                 var hotReloadRequestGeneration =
                     _pendingHotReloadRequestGeneration;
@@ -710,11 +716,19 @@ public abstract class AkburaControl : Control, IComponentTree
 
                     if (_initialUpdatePending)
                     {
-                        Child = FirstUpdate();
-                        ValidateComponentDescriptors();
+                        if (!__AkburaUsesSinglePassRender)
+                        {
+                            Child = FirstUpdate();
+                            ValidateComponentDescriptors();
+                        }
                     }
 
                     Child = Update();
+                    if (_initialUpdatePending && __AkburaUsesSinglePassRender)
+                    {
+                        ValidateComponentDescriptors();
+                    }
+                    UpdateLocalRenderScopes();
 
                     _useHooks.CompleteFrame(CommitUseHookFrame);
                     if (_useHooks.IsFrameCommitted)
@@ -902,6 +916,15 @@ public abstract class AkburaControl : Control, IComponentTree
         try
         {
             _useHooks.StopForDetach();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
+            SuspendLocalRenderScopes();
         }
         catch (Exception exception)
         {

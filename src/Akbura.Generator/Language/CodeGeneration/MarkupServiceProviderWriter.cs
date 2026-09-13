@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -16,7 +16,7 @@ internal readonly ref struct MarkupServiceProviderWriter
         _writer = writer!;
     }
 
-    public bool Write(in MarkupExtensionWriteContext context)
+    public bool Write(in MarkupExtensionWriteContext context, bool includeNameScope = false, bool retainedFactory = false)
     {
         var isComplete = CanWrite(context);
 
@@ -27,6 +27,21 @@ internal readonly ref struct MarkupServiceProviderWriter
         if (!isComplete)
         {
             return false;
+        }
+
+        var writeNameScope = context.IsConditionalNameScope || includeNameScope && !string.IsNullOrEmpty(context.NameScopeExpression);
+        if (writeNameScope)
+        {
+            if (retainedFactory)
+            {
+                _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
+                    .Write(".CreateRetainedFactoryServiceProvider(");
+            }
+            else
+            {
+                _writer.Write("new global::Akbura.Markup.AkburaNameScopeServiceProvider(");
+            }
+            _writer.Write(context.NameScopeExpression!).Write(", ");
         }
 
         _writer
@@ -55,6 +70,10 @@ internal readonly ref struct MarkupServiceProviderWriter
         }
 
         _writer.Write(")");
+        if (writeNameScope)
+        {
+            _writer.Write(")");
+        }
         return true;
     }
 

@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -22,7 +22,7 @@ namespace Akbura.Language.CodeGeneration;
 /// Converts component syntax and semantic information into one immutable,
 /// densely indexed generation plan.
 /// </summary>
-internal static class ComponentPlanner
+internal static partial class ComponentPlanner
 {
     public static ComponentPlan Create(
         IAkburaComponentSymbol component,
@@ -77,7 +77,8 @@ internal static class ComponentPlanner
 
         if (generationMode is not (
             ComponentGenerationMode.ReleaseDirect or
-            ComponentGenerationMode.DebugStructural))
+            ComponentGenerationMode.DebugStructural or
+            ComponentGenerationMode.ReleaseConditional))
         {
             throw new ArgumentOutOfRangeException(nameof(generationMode));
         }
@@ -87,11 +88,11 @@ internal static class ComponentPlanner
             semanticModel,
             akcssModuleTypeNames,
             in resultEnvironment,
-            generationMode);
+            generationMode.ForComponent(component));
         return planner.Create();
     }
 
-    private ref struct Planner
+    private ref partial struct Planner
     {
         private readonly IAkburaComponentSymbol _component;
         private readonly AkburaSemanticModel _semanticModel;
@@ -131,8 +132,15 @@ internal static class ComponentPlanner
         private ImmutableArrayBuilder<ComponentContentItemPlan> _contentItems;
         private ImmutableArrayBuilder<BindingElementReference> _elementReferences;
         private ImmutableArrayBuilder<ComponentRenderStatementPlan> _renderStatements;
+        private readonly ArrayBuilder<PendingConditionalRegion> _pendingConditionalRegions;
+        private readonly Dictionary<int, (int Region, int Branch)> _conditionalScopes;
+        private readonly Dictionary<AkburaSyntax, int> _conditionalSyntaxIds;
+        private readonly Dictionary<MarkupElementSyntax, int> _syntaxElementIds;
+        private readonly ArrayBuilder<ComponentConditionalRegionPlan> _conditionalRegions;
+        private ImmutableArrayBuilder<ComponentConditionalContentPlan> _conditionalContents;
         private int _nextCachedBindingPathId;
         private int _nextRuntimeStorageId;
+        private readonly Dictionary<int, int> _localRuntimeStorageCounts;
 
         public Planner(
             IAkburaComponentSymbol component,
@@ -187,8 +195,15 @@ internal static class ComponentPlanner
             _contentItems = ImmutableArrayBuilder<ComponentContentItemPlan>.Rent();
             _elementReferences = ImmutableArrayBuilder<BindingElementReference>.Rent();
             _renderStatements = ImmutableArrayBuilder<ComponentRenderStatementPlan>.Rent();
+            _pendingConditionalRegions = ArrayBuilder<PendingConditionalRegion>.GetInstance();
+            _conditionalScopes = new();
+            _conditionalSyntaxIds = new();
+            _syntaxElementIds = new();
+            _conditionalRegions = ArrayBuilder<ComponentConditionalRegionPlan>.GetInstance();
+            _conditionalContents = ImmutableArrayBuilder<ComponentConditionalContentPlan>.Rent();
             _nextCachedBindingPathId = 0;
             _nextRuntimeStorageId = 0;
+            _localRuntimeStorageCounts = new();
         }
 
         public ComponentPlan Create()
@@ -203,6 +218,7 @@ internal static class ComponentPlanner
 
             LowerFirstUpdateActions();
             LowerContent();
+            LowerConditionalCaptures();
             LowerRenderStatements();
             BuildScopeIndex();
 
@@ -234,7 +250,8 @@ internal static class ComponentPlanner
                     element.Id,
                     element.Symbol,
                     element.Type,
-                    element.RequiresLocalMarkupContext));
+                    element.RequiresLocalMarkupContext,
+                    (element.Flags & ComponentElementFlags.IsConditionalTemplateRoot) != 0));
             }
 
             return AkcssActivatorPlanner.Create(
@@ -273,6 +290,8 @@ internal static class ComponentPlanner
 
             owner.ElementReferences = _elementReferences.ToPooledImmutableList();
             owner.RenderStatements = _renderStatements.ToPooledImmutableList();
+            owner.ConditionalRegions = _conditionalRegions.ToPooledImmutableList();
+            owner.ConditionalContents = _conditionalContents.ToPooledImmutableList();
         }
 
         private PooledImmutableList<ComponentElementPlan> CreateElementPlans(in AkcssComponentActivatorPlan akcss)
@@ -306,7 +325,10 @@ internal static class ComponentPlanner
                     elementAkcss,
                     element.ExplicitKey,
                     element.RuntimeStorageId,
-                    CreateAssignments(element)));
+                    CreateAssignments(element),
+                    _conditionalScopes.TryGetValue(element.ScopeId, out var conditional) ? conditional.Region : -1,
+                    _conditionalScopes.TryGetValue(element.ScopeId, out conditional) ? conditional.Branch : -1,
+                    element.RuntimeStorageRootScopeId));
             }
 
             return elements.ToPooledImmutableList();
@@ -314,6 +336,13 @@ internal static class ComponentPlanner
 
         private ImmutableArray<ComponentAssignmentReference> CreateAssignments(in PendingElementPlan element)
         {
+            if ((element.Flags & ComponentElementFlags.IsConditionalTemplateRoot) != 0)
+            {
+                return element.Content.IsValid
+                    ? [new ComponentAssignmentReference(ComponentAssignmentKind.Content, -1, element.Content)]
+                    : [];
+            }
+
             var order = _semanticModel.GetMarkupAssignmentOrder(element.Syntax, out _);
             var entries = new List<(int Order, int Source, ComponentAssignmentReference Reference)>();
             for (var i = 0; i < element.PropertyWrites.Length; i++)
@@ -407,6 +436,9 @@ internal static class ComponentPlanner
             _contentItems.Dispose();
             _elementReferences.Dispose();
             _renderStatements.Dispose();
+            _pendingConditionalRegions.Free();
+            _conditionalRegions.Free();
+            _conditionalContents.Dispose();
         }
 
         private ComponentLifecyclePlan CreateLifecyclePlan(in AkcssComponentActivatorPlan akcss)
@@ -598,6 +630,7 @@ internal static class ComponentPlanner
         private void LowerRenderStatements()
         {
             var members = _component.DeclarationSyntax.Members;
+            var captureReferences = CreateRenderCaptureReferences();
 
             for (var i = 0; i < members.Count; i++)
             {
@@ -645,13 +678,17 @@ internal static class ComponentPlanner
                     continue;
                 }
 
+                var declaredLocals = _conditionalRegions.Count > 0 || captureReferences is { Count: > 0 }
+                    ? _semanticModel.GetCSharpDeclaredLocals(syntax)
+                    : ImmutableArray<CSharpLocalSymbol>.Empty;
                 _renderStatements.Add(new ComponentRenderStatementPlan(
                     ComponentRenderStatementKind.Statement,
                     statement,
                     syntax,
-                    statement is CSharp.LocalDeclarationStatementSyntax
+                    statement is CSharp.LocalDeclarationStatementSyntax || !declaredLocals.IsDefaultOrEmpty
                         ? ComponentRenderStatementPhase.Both
-                        : ComponentRenderStatementPhase.Update));
+                        : ComponentRenderStatementPhase.Update,
+                    renderCaptures: CreateRenderCaptures(declaredLocals, captureReferences)));
             }
         }
 
@@ -689,11 +726,12 @@ internal static class ComponentPlanner
             elementId = _elements.Count;
             var explicitKey = nameOperation?.NameSymbol?.Name;
             var isStyleSubtree = IsStyleSubtree(type, syntax);
+            var runtimeStorageRootScopeId = GetRuntimeStorageRootScopeId(context);
             var usesRuntimeStorage =
-                _generationMode == ComponentGenerationMode.DebugStructural &&
-                !scope.IsLocal && !isStyleSubtree;
+                _generationMode.UsesStructuralRuntime() &&
+                runtimeStorageRootScopeId >= 0 && !isStyleSubtree;
             var runtimeStorageId = usesRuntimeStorage
-                ? _nextRuntimeStorageId++
+                ? GetNextRuntimeStorageId(runtimeStorageRootScopeId)
                 : -1;
             var identifier = usesRuntimeStorage
                 ? CreateRuntimeStorageExpression(type, runtimeStorageId)
@@ -702,6 +740,7 @@ internal static class ComponentPlanner
                     : "__element" + elementId.ToString(CultureInfo.InvariantCulture);
 
             _elements.Add(default);
+            _syntaxElementIds.Add(syntax, elementId);
 
             var pendingFirstUpdateActionStart = _pendingFirstUpdateActions.Count;
             AddPendingTemplateDataType(elementId, syntax, type);
@@ -716,7 +755,9 @@ internal static class ComponentPlanner
                     nameSymbol.Name,
                     identifier,
                     scope.ScopeId,
-                    isClassMember: !scope.IsLocal));
+                    isClassMember: !scope.IsLocal && scope.Kind != ComponentElementScopeKind.ConditionalBranch,
+                    elementType: type,
+                    isComponentRuntimeStorage: usesRuntimeStorage && runtimeStorageRootScopeId == 0));
             }
 
             var contentOperation = _semanticModel.GetOperation(syntax) as IMarkupContentOperation;
@@ -729,10 +770,36 @@ internal static class ComponentPlanner
             using var deferredRoots = ImmutableArrayBuilder<int>.Rent();
             using var templateRoots = ImmutableArrayBuilder<int>.Rent();
             using var directPropertyElements = ImmutableArrayBuilder<PendingPropertyElementPlan>.Rent();
-
-            foreach (var content in syntax.Body.OfType<MarkupElementContentSyntax>())
+            var hasConditionalTemplateRoot = TryBuildConditionalTemplateBoundary(implicitBoundary, context,
+                out var conditionalBoundaryValue, out var conditionalRootId);
+            if (hasConditionalTemplateRoot)
             {
+                directChildren.Add(conditionalRootId);
+            }
+
+            foreach (var bodyContent in syntax.Body)
+            {
+                if (bodyContent is MarkupIfStatementSyntax conditionalSyntax)
+                {
+                    if (!hasConditionalTemplateRoot)
+                    {
+                        BuildConditional(elementId, conditionalSyntax, contentOperation, context);
+                    }
+
+                    continue;
+                }
+
+                if (bodyContent is not MarkupElementContentSyntax content)
+                {
+                    continue;
+                }
+
                 var semanticChild = FindMarkupChild(contentOperation, content);
+                if (hasConditionalTemplateRoot && semanticChild != null)
+                {
+                    continue;
+                }
+
                 var childContext = ResolveChildContext(
                     content.Element,
                     semanticChild,
@@ -761,7 +828,7 @@ internal static class ComponentPlanner
                     context));
             }
 
-            var boundaryValue = CompleteBoundary(
+            var boundaryValue = hasConditionalTemplateRoot ? conditionalBoundaryValue : CompleteBoundary(
                 implicitBoundary,
                 deferredRoots.WrittenSpan,
                 templateRoots.WrittenSpan);
@@ -800,6 +867,12 @@ internal static class ComponentPlanner
                 isRoot,
                 nameOperation != null,
                 scope);
+            flags = usesRuntimeStorage ? flags | ComponentElementFlags.UsesRuntimeStorage :
+                flags & ~ComponentElementFlags.UsesRuntimeStorage;
+            if (runtimeStorageRootScopeId > 0)
+            {
+                flags |= ComponentElementFlags.IsLocal | ComponentElementFlags.RequiresLocalMarkupContext;
+            }
             if (isStyleSubtree)
             {
                 flags &= ~ComponentElementFlags.UsesRuntimeStorage;
@@ -819,7 +892,8 @@ internal static class ComponentPlanner
                 pendingFirstUpdateActions,
                 new ComponentPlanRange(propertyElementStart, _propertyElements.Count - propertyElementStart),
                 explicitKey: explicitKey,
-                runtimeStorageId: runtimeStorageId);
+                runtimeStorageId: runtimeStorageId,
+                runtimeStorageRootScopeId: runtimeStorageRootScopeId);
             return true;
         }
 
@@ -839,10 +913,36 @@ internal static class ComponentPlanner
             using var children = ImmutableArrayBuilder<int>.Rent();
             using var deferredRoots = ImmutableArrayBuilder<int>.Rent();
             using var templateRoots = ImmutableArrayBuilder<int>.Rent();
-
-            foreach (var content in syntax.Body.OfType<MarkupElementContentSyntax>())
+            var hasConditionalTemplateRoot = TryBuildConditionalTemplateBoundary(boundary, inheritedContext,
+                out var conditionalBoundaryValue, out var conditionalRootId);
+            if (hasConditionalTemplateRoot)
             {
+                children.Add(conditionalRootId);
+            }
+
+            foreach (var bodyContent in syntax.Body)
+            {
+                if (bodyContent is MarkupIfStatementSyntax conditionalSyntax)
+                {
+                    if (!hasConditionalTemplateRoot)
+                    {
+                        BuildConditional(ownerElementId, conditionalSyntax, operation, inheritedContext);
+                    }
+
+                    continue;
+                }
+
+                if (bodyContent is not MarkupElementContentSyntax content)
+                {
+                    continue;
+                }
+
                 var semanticChild = FindMarkupChild(operation, content);
+                if (hasConditionalTemplateRoot && semanticChild != null)
+                {
+                    continue;
+                }
+
                 var childContext = ResolveChildContext(
                     content.Element,
                     semanticChild,
@@ -858,7 +958,7 @@ internal static class ComponentPlanner
                 TrackBoundaryRoot(boundary, childId, deferredRoots, templateRoots);
             }
 
-            var boundaryValue = CompleteBoundary(
+            var boundaryValue = hasConditionalTemplateRoot ? conditionalBoundaryValue : CompleteBoundary(
                 boundary,
                 deferredRoots.WrittenSpan,
                 templateRoots.WrittenSpan);
@@ -886,7 +986,8 @@ internal static class ComponentPlanner
                 AddPendingScope(
                     parentScopeId,
                     ownerElementId,
-                    ComponentElementScopeKind.DeferredContent),
+                    ComponentElementScopeKind.DeferredContent,
+                    RequiresLocalRuntimeScope(syntax)),
                 ownerElementId,
                 syntax,
                 property,
@@ -915,7 +1016,8 @@ internal static class ComponentPlanner
                     ownerElementId,
                     isDeferred
                         ? ComponentElementScopeKind.DeferredContent
-                        : ComponentElementScopeKind.DataTemplate),
+                        : ComponentElementScopeKind.DataTemplate,
+                    RequiresLocalRuntimeScope(syntax)),
                 ownerElementId,
                 syntax,
                 property,
@@ -941,13 +1043,26 @@ internal static class ComponentPlanner
                     return default;
                 }
 
+                ITypeSymbol? dataType = null;
+                string? itemName = null;
+                if ((_elements[deferredRoots[0]].Flags & ComponentElementFlags.IsConditionalTemplateRoot) != 0)
+                {
+                    if (_semanticModel.BindingSession.MarkupDataTypes.TryGetTemplateContract(
+                        boundary.Syntax, out var resolvedDataType, out itemName))
+                    {
+                        dataType = resolvedDataType;
+                    }
+                }
+
                 var id = _deferredContents.Count;
                 _deferredContents.Add(new ComponentDeferredContentPlan(
                     id,
                     boundary.ScopeId,
                     boundary.OwnerElementId,
                     GetDeferredResultType(boundary.Property),
-                    boundary.Syntax));
+                    boundary.Syntax,
+                    dataType,
+                    itemName));
                 return new ComponentContentValueReference(
                     ComponentContentValueKind.DeferredContent,
                     id);
@@ -974,7 +1089,7 @@ internal static class ComponentPlanner
 
             var root = _elements[roots[0]];
             if (root.ScopeId != boundary.ScopeId ||
-                (root.Flags & ComponentElementFlags.IsControl) == 0)
+                (root.Flags & (ComponentElementFlags.IsControl | ComponentElementFlags.IsConditionalTemplateRoot)) == 0)
             {
                 return default;
             }
@@ -1014,7 +1129,8 @@ internal static class ComponentPlanner
         private int AddPendingScope(
             int parentScopeId,
             int ownerElementId,
-            ComponentElementScopeKind kind)
+            ComponentElementScopeKind kind,
+            bool hasConditionalContent = false)
         {
             Debug.Assert((uint)parentScopeId < (uint)_pendingScopes.Count);
             Debug.Assert(ownerElementId >= 0);
@@ -1026,7 +1142,105 @@ internal static class ComponentPlanner
                 parentScopeId,
                 ownerElementId,
                 kind));
+            if (hasConditionalContent && kind is
+                ComponentElementScopeKind.DataTemplate or ComponentElementScopeKind.DeferredContent)
+            {
+                _localRuntimeStorageCounts.Add(id, 0);
+            }
             return id;
+        }
+
+        private int GetRuntimeStorageRootScopeId(in TraversalContext context)
+        {
+            var local = context.Template.ScopeId >= context.Deferred.ScopeId ? context.Template : context.Deferred;
+            return !local.IsValid ? 0 : _localRuntimeStorageCounts.ContainsKey(local.ScopeId) ? local.ScopeId : -1;
+        }
+
+        private int GetNextRuntimeStorageId(int rootScopeId)
+        {
+            if (rootScopeId == 0)
+            {
+                return _nextRuntimeStorageId++;
+            }
+
+            var id = _localRuntimeStorageCounts[rootScopeId];
+            _localRuntimeStorageCounts[rootScopeId] = id + 1;
+            return id;
+        }
+
+        private bool RequiresLocalRuntimeScope(MarkupElementSyntax syntax)
+        {
+            foreach (var child in syntax.DescendantNodes())
+            {
+                if (child is MarkupIfStatementSyntax)
+                {
+                    return true;
+                }
+            }
+
+            var needsNativeLookup = false;
+            foreach (var child in syntax.DescendantNodes())
+            {
+                if (!_generationMode.UsesStructuralRuntime() || child is not MarkupAttributeSyntax attribute ||
+                    AkburaSemanticModel.GetMarkupAttributeValue(attribute) is not MarkupExtensionAttributeValueSyntax)
+                {
+                    continue;
+                }
+                if (_semanticModel.GetOperation(attribute) is IMarkupPropertySetterOperation operation &&
+                    operation.ConvertedValue is MarkupExtensionValue extension &&
+                    BindingWritePlan.UsesDynamicElementName(extension))
+                {
+                    needsNativeLookup = true;
+                    break;
+                }
+            }
+
+            return needsNativeLookup && !HasUnsupportedNativeTemplateCaptures(syntax);
+        }
+
+        private bool HasUnsupportedNativeTemplateCaptures(MarkupElementSyntax boundary)
+        {
+            HashSet<string>? unsupportedRenderLocals = null;
+            foreach (var member in _component.DeclarationSyntax.Members)
+            {
+                if (member is not CSharpStatementSyntax statement)
+                {
+                    continue;
+                }
+                foreach (var local in _semanticModel.GetCSharpDeclaredLocals(statement))
+                {
+                    if (AkburaSemanticModel.TryGetUnsupportedConditionalCaptureType(local.Local.Type, out _))
+                    {
+                        (unsupportedRenderLocals ??= new HashSet<string>(StringComparer.Ordinal)).Add(local.Name);
+                    }
+                }
+            }
+
+            foreach (var child in boundary.DescendantNodes())
+            {
+                var references = child switch
+                {
+                    MarkupAttributeSyntax attribute => _semanticModel.GetCSharpSymbolReferences(attribute),
+                    InlineExpressionSyntax expression => _semanticModel.GetCSharpSymbolReferences(expression),
+                    CSharpExpressionSyntax expression => _semanticModel.GetCSharpSymbolReferences(expression),
+                    _ => ImmutableArray<CSharpSymbolReference>.Empty,
+                };
+                foreach (var reference in references)
+                {
+                    if (reference.CSharpDefinition.Symbol is not ILocalSymbol local ||
+                        !AkburaSemanticModel.TryGetUnsupportedConditionalCaptureType(local.Type, out _))
+                    {
+                        continue;
+                    }
+                    if (unsupportedRenderLocals?.Contains(local.Name) == true ||
+                        AkburaSemanticModel.IsProjectedLocalDeclaredOutsideBoundary(local, boundary))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private void BuildScopeIndex()
@@ -1156,7 +1370,7 @@ internal static class ComponentPlanner
                 deferred = inherited.Deferred;
             }
 
-            return new TraversalContext(template, deferred);
+            return new TraversalContext(template, deferred, inherited.Conditional);
         }
 
         private ITypeSymbol GetElementType(
@@ -1442,10 +1656,38 @@ internal static class ComponentPlanner
             IMarkupCommandBindingOperation operation,
             ITypeSymbol targetType)
         {
+            var handler = operation.ValueSyntax is MarkupDynamicAttributeValueSyntax value
+                ? value.Expression.Expression.GetRawCSharpExpression()
+                : null;
+            if (handler == null || operation.HasErrors)
+            {
+                return;
+            }
+
+            using var parameters = ImmutableArrayBuilder<ITypeSymbol>.Rent(operation.Parameters.Length);
+            foreach (var parameter in operation.Parameters)
+            {
+                parameters.Add((ITypeSymbol)parameter.Type.Symbol!);
+            }
+
             var plan = new ComponentCommandBindingPlan(
                 PropertyWritePlan.Create(operation.Property, targetType),
                 operation.Command.Name,
-                operation.Syntax);
+                operation.Syntax,
+                handler,
+                GetCommandHandlerKind(operation),
+                GetCommandArgumentMode(operation),
+                GetCommandResultMode(operation),
+                parameters.ToImmutable(),
+                operation.ResultType.Symbol as ITypeSymbol,
+                operation.IsAsync,
+                operation.ContainsAwait,
+                operation.HandlerParameterCount,
+                operation.HandlerType.Symbol as ITypeSymbol,
+                operation.HandlerResultType.Symbol as ITypeSymbol,
+                GetCommandAwaitableKind(operation),
+                IsDirectCommandReference(operation),
+                GetCommandAwaitableResultType(operation));
             if (!plan.IsValid)
             {
                 return;
@@ -1522,7 +1764,7 @@ internal static class ComponentPlanner
         private ComponentContentTargetReference LowerContent(in PendingContentPlan pending)
         {
             var operation = pending.Operation;
-            if (operation.HasErrors || (operation.Property == null &&
+            if (operation.HasErrors || (!pending.DestinationOverride.IsValid && operation.Property == null &&
                 operation.ContentModel.Kind is not (MarkupContentKind.Dictionary or
                     MarkupContentKind.Collection or MarkupContentKind.AddMethods)))
             {
@@ -1532,6 +1774,11 @@ internal static class ComponentPlanner
             if (pending.BoundaryValue.IsValid)
             {
                 return LowerPropertyContent(pending, pending.BoundaryValue);
+            }
+
+            if (operation.Content.Any(child => child.Kind == MarkupChildKind.Conditional))
+            {
+                return LowerConditionalContent(pending);
             }
 
             return operation.ContentModel.Kind is MarkupContentKind.Collection or
@@ -2003,7 +2250,7 @@ internal static class ComponentPlanner
                 return default;
             }
 
-            var binding = _generationMode == ComponentGenerationMode.DebugStructural
+            var binding = _generationMode.UsesStructuralRuntime()
                 ? BindingWritePlan.CreateInline(
                     in _bindingEnvironment,
                     extension,
@@ -2140,7 +2387,7 @@ internal static class ComponentPlanner
                 flags |= ComponentElementFlags.IsLocal |
                     ComponentElementFlags.RequiresLocalMarkupContext;
             }
-            else if (_generationMode == ComponentGenerationMode.DebugStructural)
+            else if (_generationMode.UsesStructuralRuntime())
             {
                 flags |= ComponentElementFlags.UsesRuntimeStorage;
             }
@@ -2398,7 +2645,8 @@ internal static class ComponentPlanner
             ComponentPlanRange firstUpdateActions = default,
             ComponentContentTargetReference content = default,
             string? explicitKey = null,
-            int runtimeStorageId = -1)
+            int runtimeStorageId = -1,
+            int runtimeStorageRootScopeId = 0)
         {
             Id = id;
             Syntax = syntax;
@@ -2418,6 +2666,7 @@ internal static class ComponentPlanner
             Content = content;
             ExplicitKey = explicitKey;
             RuntimeStorageId = runtimeStorageId;
+            RuntimeStorageRootScopeId = runtimeStorageRootScopeId;
         }
 
         public int Id { get; }
@@ -2427,6 +2676,7 @@ internal static class ComponentPlanner
         public string Identifier { get; }
         public string? ExplicitKey { get; }
         public int RuntimeStorageId { get; }
+        public int RuntimeStorageRootScopeId { get; }
         public int ParentId { get; }
         public int ScopeId { get; }
         public ComponentElementScopeKind ScopeKind { get; }
@@ -2464,7 +2714,8 @@ internal static class ComponentPlanner
                 firstUpdateActions,
                 Content,
                 ExplicitKey,
-                RuntimeStorageId);
+                RuntimeStorageId,
+                RuntimeStorageRootScopeId);
         }
 
         public PendingElementPlan WithContent(ComponentContentTargetReference content)
@@ -2487,7 +2738,8 @@ internal static class ComponentPlanner
                 FirstUpdateActions,
                 content,
                 ExplicitKey,
-                RuntimeStorageId);
+                RuntimeStorageId,
+                RuntimeStorageRootScopeId);
         }
     }
 
@@ -2643,13 +2895,17 @@ internal static class ComponentPlanner
             IMarkupContentOperation operation,
             ComponentPlanRange childElements,
             int propertyElementId,
-            ComponentContentValueReference boundaryValue)
+            ComponentContentValueReference boundaryValue,
+            PropertyWritePlan destinationOverride = default,
+            MarkupContentModel? contentModelOverride = null)
         {
             OwnerElementId = ownerElementId;
             Operation = operation;
             ChildElements = childElements;
             PropertyElementId = propertyElementId;
             BoundaryValue = boundaryValue;
+            DestinationOverride = destinationOverride;
+            ContentModel = contentModelOverride ?? operation.ContentModel;
         }
 
         public int OwnerElementId { get; }
@@ -2657,6 +2913,8 @@ internal static class ComponentPlanner
         public ComponentPlanRange ChildElements { get; }
         public int PropertyElementId { get; }
         public ComponentContentValueReference BoundaryValue { get; }
+        public PropertyWritePlan DestinationOverride { get; }
+        public MarkupContentModel ContentModel { get; }
     }
 
     private readonly struct ContentBoundary
@@ -2730,17 +2988,25 @@ internal static class ComponentPlanner
 
     private readonly struct TraversalContext
     {
-        public TraversalContext(ScopeReference template, ScopeReference deferred)
+        public TraversalContext(ScopeReference template, ScopeReference deferred, ScopeReference conditional = default)
         {
             Template = template;
             Deferred = deferred;
+            Conditional = conditional;
         }
 
         public ScopeReference Template { get; }
         public ScopeReference Deferred { get; }
+        public ScopeReference Conditional { get; }
 
         public EffectiveScope GetEffectiveScope()
         {
+            if (Conditional.IsValid && Conditional.ScopeId >= Template.ScopeId && Conditional.ScopeId >= Deferred.ScopeId)
+            {
+                return new EffectiveScope(Conditional.ScopeId, Conditional.OwnerElementId,
+                    ComponentElementScopeKind.ConditionalBranch, isDeferred: false);
+            }
+
             if (Deferred.IsValid && (!Template.IsValid || Deferred.ScopeId >= Template.ScopeId))
             {
                 return new EffectiveScope(
@@ -2774,6 +3040,6 @@ internal static class ComponentPlanner
         public int OwnerElementId { get; }
         public ComponentElementScopeKind Kind { get; }
         public bool IsDeferred { get; }
-        public bool IsLocal => ScopeId > 0;
+        public bool IsLocal => ScopeId > 0 && Kind != ComponentElementScopeKind.ConditionalBranch;
     }
 }

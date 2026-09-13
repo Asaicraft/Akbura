@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Diagnostics;
 
@@ -15,6 +15,7 @@ internal enum MarkupParentStackTraversalKind : byte
 {
     ExactScope,
     FullHierarchy,
+    RuntimeStorageRoot,
 }
 
 /// <summary>
@@ -184,6 +185,7 @@ internal readonly ref struct MarkupParentStackWriter
         }
 
         var currentId = plan.ElementId;
+        var visitedCount = 0;
 
         while (currentId >= 0)
         {
@@ -205,11 +207,20 @@ internal readonly ref struct MarkupParentStackWriter
                 break;
             }
 
-            hierarchyLength++;
+            if (plan.TraversalKind == MarkupParentStackTraversalKind.RuntimeStorageRoot &&
+                element.RuntimeStorageRootScopeId != plan.Elements[plan.ElementId].RuntimeStorageRootScopeId)
+            {
+                break;
+            }
 
-            if (hierarchyLength > plan.Elements.Length)
+            if (++visitedCount > plan.Elements.Length)
             {
                 return false;
+            }
+
+            if (!element.IsConditionalTemplateRoot)
+            {
+                hierarchyLength++;
             }
 
             currentId = element.ParentId;
@@ -224,9 +235,13 @@ internal readonly ref struct MarkupParentStackWriter
     {
         var currentId = plan.ElementId;
 
-        for (var i = hierarchy.Length - 1; i >= 0; i--)
+        for (var i = hierarchy.Length - 1; i >= 0;)
         {
-            hierarchy[i] = currentId;
+            if (!plan.Elements[currentId].IsConditionalTemplateRoot)
+            {
+                hierarchy[i--] = currentId;
+            }
+
             currentId = plan.Elements[currentId].ParentId;
         }
     }

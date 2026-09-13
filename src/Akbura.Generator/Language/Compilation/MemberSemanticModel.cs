@@ -41,6 +41,29 @@ internal abstract class MemberSemanticModel : AkburaSemanticModel
         return _containingSemanticModel.GetMemberSemanticModel(syntax);
     }
 
+    internal override void InvalidateMarkupComponentBinding(MarkupElementSyntax syntax)
+    {
+        _containingSemanticModel.InvalidateMarkupComponentBinding(syntax);
+    }
+
+    internal void InvalidateMarkupComponentNodeMap(MarkupElementSyntax syntax)
+    {
+        _nodeMapLock.EnterWriteLock();
+        try
+        {
+            for (AkburaSyntax? current = syntax; current != null; current = current.Parent)
+            {
+                // An aggregate bound tree can otherwise import its old receiver
+                // child back into this map after the receiver itself was cleared.
+                _guardedBoundNodeMap.Remove(current);
+            }
+        }
+        finally
+        {
+            _nodeMapLock.ExitWriteLock();
+        }
+    }
+
     public abstract BoundNode BindSemanticSyntax(AkburaSyntax syntax);
 
     public virtual BoundNode BindOperationSyntax(AkburaSyntax syntax)

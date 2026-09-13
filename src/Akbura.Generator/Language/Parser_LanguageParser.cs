@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
 using System;
@@ -1500,13 +1500,18 @@ partial class Parser
         ArrayBuilder<GreenMarkupComponentNameSyntax> openTags,
         ref GreenMarkupEndTagSyntax? pendingEndTag)
     {
+        if (IsMarkupConditionalDirectiveStart(incremental: false))
+        {
+            return ParseMarkupIfStatementSyntax(openTags, ref pendingEndTag, incremental: false);
+        }
+
         return CurrentToken.Kind switch
         {
             SyntaxKind.LessThanToken => GreenSyntaxFactory.MarkupElementContentSyntax(
                 ParseMarkupElementSyntax(openTags, ref pendingEndTag)),
             SyntaxKind.OpenBraceToken => GreenSyntaxFactory.MarkupInlineExpressionSyntax(
                 ParseInlineExpressionSyntax()),
-            _ => ParseMarkupTextLiteralSyntax(),
+            _ => ParseMarkupTextLiteralSyntax(_markupBlockTagDepth == openTags.Count),
         };
     }
 
@@ -1580,7 +1585,7 @@ partial class Parser
         return false;
     }
 
-    private GreenMarkupTextLiteralSyntax ParseMarkupTextLiteralSyntax()
+    private GreenMarkupTextLiteralSyntax ParseMarkupTextLiteralSyntax(bool inConditionalBlock = false)
     {
         var rawText = new StringBuilder();
         var hasUnsupportedControlFlowDirective = false;
@@ -1591,6 +1596,12 @@ partial class Parser
                SyntaxKind.OpenBraceToken))
         {
             _cancellationToken.ThrowIfCancellationRequested();
+
+            if (IsMarkupConditionalDirectiveStart(incremental: false) ||
+                inConditionalBlock && CurrentToken.Kind == SyntaxKind.CloseBraceToken)
+            {
+                break;
+            }
 
             if (IsUnsupportedMarkupControlFlowDirectiveStart())
             {

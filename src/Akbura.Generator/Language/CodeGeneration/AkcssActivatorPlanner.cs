@@ -22,7 +22,8 @@ internal readonly struct AkcssActivatorElementInput
         int id,
         IMarkupComponentSymbol symbol,
         ITypeSymbol type,
-        bool requiresLocalMarkupExtensionContext)
+        bool requiresLocalMarkupExtensionContext,
+        bool isSynthetic = false)
     {
         if (id < 0)
         {
@@ -33,6 +34,7 @@ internal readonly struct AkcssActivatorElementInput
         Symbol = symbol ?? throw new ArgumentNullException(nameof(symbol));
         Type = type ?? throw new ArgumentNullException(nameof(type));
         RequiresLocalMarkupExtensionContext = requiresLocalMarkupExtensionContext;
+        IsSynthetic = isSynthetic;
     }
 
     public int Id { get; }
@@ -42,6 +44,8 @@ internal readonly struct AkcssActivatorElementInput
     public ITypeSymbol Type { get; }
 
     public bool RequiresLocalMarkupExtensionContext { get; }
+
+    public bool IsSynthetic { get; }
 }
 
 /// <summary>
@@ -158,7 +162,9 @@ internal static class AkcssActivatorPlanner
         {
             var activatorStart = _activators.Count;
             var slotStart = _slots.Count;
-            var operations = element.Symbol.AttributeOperations;
+            var operations = element.IsSynthetic
+                ? ImmutableArray<IMarkupAttributeOperation>.Empty
+                : element.Symbol.AttributeOperations;
             var isControlTarget = IsControlElement(element.Type);
 
             for (var sourceOrder = 0; sourceOrder < operations.Length; sourceOrder++)

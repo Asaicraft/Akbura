@@ -240,6 +240,27 @@ internal sealed class SemanticBindingCache
         }
     }
 
+    internal void InvalidateMarkupComponentBinding(MarkupElementSyntax syntax)
+    {
+        _cacheLock.EnterWriteLock();
+        try
+        {
+            // Name and template scope lookup can bind a component while its
+            // published symbol is still being populated. Such a bound node
+            // must not retain the shell's empty content after completion.
+            for (AkburaSyntax? current = syntax; current != null; current = current.Parent)
+            {
+                _boundNodeCache.Remove(current);
+                _operationCache.Remove(current);
+            }
+            InvalidateAggregatedDiagnostics(syntax);
+        }
+        finally
+        {
+            _cacheLock.ExitWriteLock();
+        }
+    }
+
     public ImmutableArray<AkburaSemanticDiagnostic> GetDiagnostics(
         AkburaSyntax syntax,
         Func<ImmutableArray<AkburaSemanticDiagnostic>> bind)

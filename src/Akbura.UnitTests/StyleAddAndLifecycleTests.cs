@@ -5,7 +5,6 @@ using Akbura.Language.Syntax;
 using Akbura.ComponentTree;
 using Avalonia.Data;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Microsoft.CodeAnalysis;
@@ -74,7 +73,7 @@ public sealed class StyleAddAndLifecycleTests
             </Border>
             """;
         var ownerType = Compile(AkcssActivatorPlannerTests.CreateFixture(source, OwnerSource), debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
@@ -178,7 +177,7 @@ public sealed class StyleAddAndLifecycleTests
             }
             """;
         var ownerType = Compile(AkcssActivatorPlannerTests.CreateFixture(source, OwnerSource + "\r\n" + custom), debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
@@ -238,7 +237,7 @@ public sealed class StyleAddAndLifecycleTests
             </Border>
             """;
         var ownerType = Compile(AkcssActivatorPlannerTests.CreateFixture(source, OwnerSource), debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
@@ -304,7 +303,7 @@ public sealed class StyleAddAndLifecycleTests
             """;
         var ownerType = Compile(AkcssActivatorPlannerTests.CreateFixture(source,
             OwnerSource + "\r\n" + OrderedAssignmentSource + "\r\n" + extension), debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
@@ -354,7 +353,7 @@ public sealed class StyleAddAndLifecycleTests
         var symbol = fixture.GetElementSymbol(container);
         Assert.Equal("Target", Assert.Single(symbol.Children).InsertionMethod!.Parameters.Single().Type.Name);
         var ownerType = Compile(fixture, debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
@@ -447,7 +446,7 @@ public sealed class StyleAddAndLifecycleTests
             """;
         var ownerType = Compile(AkcssActivatorPlannerTests.CreateFixture(source,
             OwnerSource + "\r\n" + OrderedAssignmentSource), debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));

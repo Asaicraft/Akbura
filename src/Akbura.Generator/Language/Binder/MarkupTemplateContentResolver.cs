@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
@@ -119,15 +119,23 @@ internal sealed class MarkupTemplateContentResolver
         AkburaSyntax syntax)
     {
         MarkupElementSyntax? element = null;
+        var insideConditional = false;
         for (var current = syntax;
              current != null;
              current = current.Parent)
         {
+            insideConditional |= current is MarkupIfStatementSyntax;
             if (current is MarkupElementSyntax markupElement)
             {
                 element = markupElement;
                 break;
             }
+        }
+
+        if (insideConditional && element != null &&
+            _semanticModel.GetConditionalTemplateRootInfo(element, resolveExpressionRootTypes: false).IsImplicitControlRoot)
+        {
+            return element;
         }
 
         return element == null

@@ -32,6 +32,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         return boundNode.Kind switch
         {
             BoundKind.MarkupComponent => CreateMarkupContentOperation((BoundMarkupComponent)boundNode),
+            BoundKind.MarkupIf => CreateMarkupIfOperation((BoundMarkupIfStatement)boundNode),
             BoundKind.MarkupContentSetter => CreateMarkupContentOperation((BoundMarkupContentSetter)boundNode),
             BoundKind.MarkupNameAssignment => CreateMarkupNameAssignmentOperation((BoundMarkupNameAssignment)boundNode),
             BoundKind.MarkupDictionaryKey => CreateMarkupDictionaryKeyOperation((BoundMarkupDictionaryKey)boundNode),
@@ -206,6 +207,42 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         }
 
         return null;
+    }
+
+    private MarkupIfOperation CreateMarkupIfOperation(BoundMarkupIfStatement node)
+    {
+        using var branches = ImmutableArrayBuilder<MarkupConditionalBranch>.Rent(node.Branches.Length);
+        using var children = ImmutableArrayBuilder<IOperation>.Rent();
+        foreach (var branch in node.Branches)
+        {
+            branches.Add(new(branch.Syntax, branch.ConditionSyntax, branch.Condition, branch.Content,
+                branch.ValueOperation, branch.LiteralValue, branch.IsSynthesizedString));
+            var condition = CreateCSharpOperationTree(branch.ConditionSyntax ?? branch.Syntax,
+                branch.Condition, CreateCSharpOperationSymbolMapper(branch.Syntax, containingAkcssSymbol: null));
+            if (condition != null)
+            {
+                children.Add(condition);
+            }
+
+            foreach (var child in branch.Content)
+            {
+                if (child.ConditionalOperation != null)
+                {
+                    children.Add(child.ConditionalOperation);
+                }
+            }
+        }
+
+        var operation = new MarkupIfOperation(node.Syntax, branches.ToImmutable(), children.ToImmutable(), node.HasErrors);
+        foreach (var child in operation.Children)
+        {
+            if (child is CSharpOperation csharp)
+            {
+                csharp.SetParent(operation);
+            }
+        }
+
+        return operation;
     }
 
     private MarkupContentOperation CreateMarkupContentOperation(

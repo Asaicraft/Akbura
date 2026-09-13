@@ -703,15 +703,33 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         {
             using var builder =
                 ImmutableArrayBuilder<Declaration>.Rent();
-            foreach (var content in element.Body)
+            CollectMarkupContentDeclarations(element.Body, builder);
+            return builder.ToImmutable();
+        }
+
+        private void CollectMarkupContentDeclarations(SyntaxList<MarkupContentSyntax> content,
+            ImmutableArrayBuilder<Declaration> builder)
+        {
+            foreach (var child in content)
             {
-                if (content.Kind == AkburaSyntaxKind.MarkupElementContentSyntax)
+                if (child is MarkupElementContentSyntax elementContent)
                 {
-                    builder.Add(CreateMarkupElementDeclaration(Unsafe.As<MarkupElementContentSyntax>(content).Element));
+                    builder.Add(CreateMarkupElementDeclaration(elementContent.Element));
+                }
+                else if (child is MarkupIfStatementSyntax conditional)
+                {
+                    builder.Add(CreateMarkupBranchDeclaration(conditional.Body));
+                    foreach (var clause in conditional.ElseIfClauses)
+                    {
+                        builder.Add(CreateMarkupBranchDeclaration(clause.Body));
+                    }
+
+                    if (conditional.ElseClause is { } finalClause)
+                    {
+                        builder.Add(CreateMarkupBranchDeclaration(finalClause.Body));
+                    }
                 }
             }
-
-            return builder.ToImmutable();
         }
 
         private Declaration CreateMarkupElementDeclaration(MarkupElementSyntax element)
@@ -728,6 +746,14 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         private static string GetMarkupElementName(MarkupElementSyntax element)
         {
             return element.StartTag?.Name.ToFullString().Trim() ?? string.Empty;
+        }
+
+        private Declaration CreateMarkupBranchDeclaration(MarkupBlockSyntax block)
+        {
+            using var children = ImmutableArrayBuilder<Declaration>.Rent();
+            CollectMarkupContentDeclarations(block.Content, children);
+            return new SingleSyntaxDeclaration(DeclarationKind.MarkupConditionalBranch,
+                string.Empty, block, _syntaxTree, _akcssSyntaxTree, children.ToImmutable());
         }
 
         private void Add(

@@ -16,6 +16,8 @@ internal enum BoundKind : byte
     MarkupRoot,
     MarkupComponent,
     MarkupContent,
+    MarkupIf,
+    MarkupConditionalBranch,
     MarkupContentSetter,
     MarkupNameAssignment,
     MarkupDictionaryKey,

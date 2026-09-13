@@ -1539,7 +1539,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
             StringComparison.Ordinal));
     }
 
-    private static void AssertGeneratedCompilation(GeneratorDriver driver, Compilation compilation)
+    internal static void AssertGeneratedCompilation(GeneratorDriver driver, Compilation compilation)
     {
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
@@ -1627,7 +1627,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
                 StringComparison.Ordinal));
     }
 
-    private static SemanticEdit[] GetChangedGeneratedMethodEdits(
+    internal static SemanticEdit[] GetChangedGeneratedMethodEdits(
         Compilation initialCompilation,
         Compilation updatedCompilation,
         string metadataName)
@@ -1796,7 +1796,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
         Assert.True(pdbDelta.Length > 0);
     }
 
-    private static StandaloneSignatureHandle GetLocalSignature(
+    internal static StandaloneSignatureHandle GetLocalSignature(
         PEReader peReader,
         MethodDefinitionHandle methodHandle)
     {
@@ -1809,7 +1809,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
                 .LocalSignature;
     }
 
-    private static string FormatDiagnostics(
+    internal static string FormatDiagnostics(
         IEnumerable<Diagnostic> diagnostics)
     {
         return string.Join(
@@ -1853,7 +1853,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
                 trackIncrementalGeneratorSteps: true));
     }
 
-    private static GeneratorDriver CreateDebugDriver(
+    internal static GeneratorDriver CreateDebugDriver(
         AnalyzerConfigOptionsProvider optionsProvider,
         params AdditionalText[] additionalTexts)
     {
@@ -1904,7 +1904,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
                 nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static CSharpCompilation CreateCompilation(string source)
+    internal static CSharpCompilation CreateCompilation(string source)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
@@ -1971,7 +1971,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
             $"Expected Cached or Unchanged, but received {reason}.");
     }
 
-    private sealed class TestAdditionalText : AdditionalText
+    internal sealed class TestAdditionalText : AdditionalText
     {
         private readonly SourceText _sourceText;
         private int _readCount;
@@ -1995,7 +1995,7 @@ public sealed class AkburaBlackSilenceGeneratorTests
         }
     }
 
-    private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
+    internal sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
     {
         private static readonly AnalyzerConfigOptions s_emptyOptions =
             new TestAnalyzerConfigOptions(

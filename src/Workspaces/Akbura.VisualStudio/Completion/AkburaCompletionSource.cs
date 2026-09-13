@@ -49,6 +49,9 @@ internal sealed class AkburaCompletionSource :
     private static readonly ImmutableArray<char>
         KeywordCommitCharacters = [' ', '\t', '\n'];
 
+    private static readonly ImmutableArray<char>
+        MarkupStatementCommitCharacters = ['(', ' ', '\t', '\n'];
+
     private static readonly ImageElement ComponentIcon =
         CreateImageElement(KnownMonikers.Class, "Component");
 
@@ -351,6 +354,25 @@ internal sealed class AkburaCompletionSource :
             snapshot[start - 1] == '@')
         {
             start--;
+        }
+
+        if (_documentKind == AkburaEditorDocumentKind.Component)
+        {
+            var statementStart = position;
+            while (statementStart > 0 &&
+                   (char.IsLetter(snapshot[statementStart - 1]) || snapshot[statementStart - 1] is ' ' or '\t'))
+            {
+                statementStart--;
+            }
+
+            if (statementStart > 0 && snapshot[statementStart - 1] == '$')
+            {
+                var prefix = snapshot.GetText(statementStart - 1, position - statementStart + 1).TrimEnd();
+                if ("$if".StartsWith(prefix, StringComparison.Ordinal) || "$else if".StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    start = statementStart - 1;
+                }
+            }
         }
 
         return new CompletionStartData(
@@ -919,7 +941,9 @@ internal sealed class AkburaCompletionSource :
             filterText: completion.FilterText,
             automationText: completion.DisplayText,
             attributeIcons: ImmutableArray<ImageElement>.Empty,
-            commitCharacters: sourceSpan.Start > 0 &&
+            commitCharacters: AkburaMarkupStatementCompletionFacts.IsStatement(completion) && completion.DisplayText != "$else"
+                ? MarkupStatementCommitCharacters
+                : sourceSpan.Start > 0 &&
                 snapshot[sourceSpan.Start - 1] is '"' or '\''
                     ? completion.InsertText.EndsWith(".", StringComparison.Ordinal)
                         ? LiteralOwnerCommitCharacters
@@ -1179,6 +1203,10 @@ internal sealed class AkburaCompletionSource :
                 triggerLocation.Snapshot,
                 triggerLocation.Position,
                 allowLiteralValues: true))
+        {
+            return true;
+        }
+        if (trigger.Character == '$')
         {
             return true;
         }

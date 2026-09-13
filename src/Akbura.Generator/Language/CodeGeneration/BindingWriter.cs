@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using IAkburaComponentSymbol = Akbura.Language.Symbols.IAkburaComponentSymbol;
 using Microsoft.CodeAnalysis;
@@ -18,17 +18,25 @@ internal readonly struct BindingElementReference
         string name,
         string expression,
         int scopeId,
-        bool isClassMember)
+        bool isClassMember,
+        ITypeSymbol? elementType = null,
+        bool isComponentRuntimeStorage = false)
     {
         Name = name;
         Expression = expression;
         ScopeId = scopeId;
         IsClassMember = isClassMember;
+        ElementType = elementType;
+        IsComponentRuntimeStorage = isComponentRuntimeStorage;
     }
 
     public string Name { get; }
 
     public string Expression { get; }
+
+    public ITypeSymbol? ElementType { get; }
+
+    public bool IsComponentRuntimeStorage { get; }
 
     /// <summary>
     /// Identifies a template, deferred-content builder or another local scope.
@@ -260,7 +268,8 @@ internal readonly struct BindingWritePlan
         int cachedPathId,
         int consumedElementNamePropertyIndex,
         int explicitElementNamePathPropertyIndex,
-        bool isValid)
+        bool isValid,
+        int sourceElementReferenceIndex = -1)
     {
         Extension = extension;
         Binding = binding;
@@ -271,6 +280,7 @@ internal readonly struct BindingWritePlan
         ConsumedElementNamePropertyIndex = consumedElementNamePropertyIndex;
         ExplicitElementNamePathPropertyIndex = explicitElementNamePathPropertyIndex;
         IsValid = isValid;
+        SourceElementReferenceIndex = sourceElementReferenceIndex;
     }
 
     public MarkupExtensionValue Extension { get; }
@@ -283,6 +293,8 @@ internal readonly struct BindingWritePlan
     /// and this expression is assigned to Binding.Source.
     /// </summary>
     public string? SourceExpression { get; }
+
+    public int SourceElementReferenceIndex { get; }
 
     public int PathElementStart { get; }
 
@@ -381,6 +393,7 @@ internal readonly struct BindingWritePlan
         var hasExplicitSource = sourcePropertyIndex >= 0 || relativeSourcePropertyIndex >= 0;
 
         string? sourceExpression = null;
+        var sourceElementReferenceIndex = -1;
         var pathElementStart = 0;
         var reflectionPathStart = 0;
         var consumedElementNamePropertyIndex = -1;
@@ -401,7 +414,8 @@ internal readonly struct BindingWritePlan
                     elements,
                     elementName.Span,
                     scopeId,
-                    out sourceExpression))
+                    out sourceExpression,
+                    out sourceElementReferenceIndex))
             {
                 consumedElementNamePropertyIndex = elementNamePropertyIndex;
             }
@@ -435,7 +449,8 @@ internal readonly struct BindingWritePlan
                         elements,
                         elementName.Span,
                         scopeId,
-                        out sourceExpression))
+                        out sourceExpression,
+                        out sourceElementReferenceIndex))
                 {
                     pathElementStart = 1;
 
@@ -491,7 +506,8 @@ internal readonly struct BindingWritePlan
             cachedPathId,
             consumedElementNamePropertyIndex,
             explicitElementNamePathPropertyIndex,
-            isValid);
+            isValid,
+            sourceElementReferenceIndex);
     }
 
     private static PathAnalysis AnalyzeCompiledPath(
@@ -659,6 +675,18 @@ internal readonly struct BindingWritePlan
         return new PathAnalysis(isValid, isValid && isCacheable);
     }
 
+    internal static bool UsesDynamicElementName(MarkupExtensionValue extension)
+    {
+        if (extension.Binding == null || FindPropertyIndex(extension, "Source") >= 0 ||
+            FindPropertyIndex(extension, "RelativeSource") >= 0)
+        {
+            return false;
+        }
+
+        var index = FindPropertyIndex(extension, "ElementName");
+        return index >= 0 && !TryGetStringValue(extension.Properties[index], out _);
+    }
+
     private static int FindPropertyIndex(
         MarkupExtensionValue extension,
         string name)
@@ -707,7 +735,8 @@ internal readonly struct BindingWritePlan
         ReadOnlySpan<BindingElementReference> elements,
         ReadOnlySpan<char> name,
         int scopeId,
-        out string? expression)
+        out string? expression,
+        out int referenceIndex)
     {
         // Search backwards so a local name shadows a class member.
         for (var i = elements.Length - 1; i >= 0; i--)
@@ -720,10 +749,12 @@ internal readonly struct BindingWritePlan
             }
 
             expression = element.Expression;
+            referenceIndex = i;
             return true;
         }
 
         expression = null;
+        referenceIndex = -1;
         return false;
     }
 
@@ -1132,7 +1163,14 @@ internal ref struct BindingWriter
 
         _writer.Write("new ");
 
-        WriteTypeName(bindingType);
+        if (context.IsConditionalNameScope)
+        {
+            _writer.Write("global::Avalonia.Markup.Xaml.MarkupExtensions.ReflectionBindingExtension");
+        }
+        else
+        {
+            WriteTypeName(bindingType);
+        }
 
         _writer.Write("(");
 
@@ -1141,6 +1179,12 @@ internal ref struct BindingWriter
         _writer.Write(")");
 
         WriteBindingInitializer(plan, context, isCompiled: false);
+        if (context.IsConditionalNameScope)
+        {
+            _writer.Write(".ProvideValue(");
+            new MarkupServiceProviderWriter(_writer).Write(context);
+            _writer.Write(")");
+        }
     }
 
     private void WriteCompiledBindingPath(
@@ -1682,6 +1726,31 @@ internal ref struct BindingWriter
         _writer.Write(element.Arguments[index]);
     }
 
+    private void WriteElementSource(in BindingWritePlan plan, in MarkupExtensionWriteContext context)
+    {
+        if ((uint)plan.SourceElementReferenceIndex < (uint)context.ElementReferences.Length)
+        {
+            ref readonly var reference = ref context.ElementReferences[plan.SourceElementReferenceIndex];
+            if (reference.ScopeId != context.ScopeId && reference.IsComponentRuntimeStorage)
+            {
+                _writer.Write("this.").Write(plan.SourceExpression!);
+                return;
+            }
+
+            if (reference.ScopeId != context.ScopeId && reference.ElementType != null &&
+                context.IsConditionalNameScope && context.NameScopeExpression != null)
+            {
+                _writer.Write("(");
+                _valueWriter.WriteTypeName(reference.ElementType);
+                _writer.Write(")").Write(context.NameScopeExpression).Write(".Find(")
+                    .WriteStringLiteral(reference.Name).Write(")!");
+                return;
+            }
+        }
+
+        _writer.Write(plan.SourceExpression!);
+    }
+
     private void WriteBindingInitializer(
         in BindingWritePlan plan,
         in MarkupExtensionWriteContext context,
@@ -1699,7 +1768,8 @@ internal ref struct BindingWriter
 
         if (plan.SourceExpression != null)
         {
-            _writer.Write("Source = ").Write(plan.SourceExpression);
+            _writer.Write("Source = ");
+            WriteElementSource(plan, context);
 
             hasPreviousValue = true;
         }

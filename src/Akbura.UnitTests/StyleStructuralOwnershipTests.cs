@@ -1,7 +1,6 @@
 using Akbura.HotReload;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Styling;
 
 namespace Akbura.UnitTests;
@@ -12,7 +11,7 @@ public sealed class StyleStructuralOwnershipTests
     [Fact]
     public async Task StructuralRevision_OmittingStylesAfterOrdinaryUpdatePreservesForeignStylesAndLiveControl()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var state = new AkburaRenderState();

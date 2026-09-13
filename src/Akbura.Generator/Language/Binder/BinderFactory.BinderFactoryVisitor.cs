@@ -88,6 +88,11 @@ internal sealed partial class BinderFactory
             return CreateMarkupBinder();
         }
 
+        public override Binder VisitMarkupBlockSyntax(MarkupBlockSyntax node)
+        {
+            return CreateMarkupBinder();
+        }
+
         public override Binder VisitInlineAkcssBlockSyntax(InlineAkcssBlockSyntax node)
         {
             return CreateAkcssModuleBinder();
@@ -112,7 +117,8 @@ internal sealed partial class BinderFactory
         {
             var declaration = RequiredDeclaration(
                 DeclarationKind.MarkupRoot,
-                DeclarationKind.MarkupElement);
+                DeclarationKind.MarkupElement,
+                DeclarationKind.MarkupConditionalBranch);
             var next = Factory.BindingSession.AddContainingBlockBinders(
                 Next,
                 DeclarationFacts.GetSyntax(declaration),

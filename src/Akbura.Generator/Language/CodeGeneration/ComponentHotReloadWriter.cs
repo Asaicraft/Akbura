@@ -368,7 +368,7 @@ internal readonly ref struct ComponentHotReloadWriter
 
     private void WritePrepareInvocation()
     {
-        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        if (_generationMode.UsesStructuralRuntime())
         {
             _writer.Write("__component.");
             _writer.Write(

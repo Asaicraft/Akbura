@@ -4,7 +4,6 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Microsoft.CodeAnalysis.CSharp;
@@ -17,7 +16,7 @@ public sealed class BuiltInStylesTests
     [Fact]
     public async Task StylesResources_ProvideTailwindThemeValues()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         var resources = await session.Dispatch(
             () => Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
                 new Uri("avares://Akbura/Styles.axaml"),

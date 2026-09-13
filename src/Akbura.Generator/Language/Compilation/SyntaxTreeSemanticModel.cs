@@ -49,4 +49,15 @@ internal sealed class SyntaxTreeSemanticModel : AkburaSemanticModel
                 arg.Scope),
             (Factory: _memberSemanticModelFactory, Kind: kind, Scope: scope));
     }
+
+    internal override void InvalidateMarkupComponentBinding(MarkupElementSyntax syntax)
+    {
+        base.InvalidateMarkupComponentBinding(syntax);
+        // NodeMapBuilder acquires the member map before the shared cache. Keep
+        // these invalidations sequential, and inspect only existing models.
+        foreach (var model in _memberModels.Values)
+        {
+            model.InvalidateMarkupComponentNodeMap(syntax);
+        }
+    }
 }

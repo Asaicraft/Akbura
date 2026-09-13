@@ -135,6 +135,30 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node.Update(symbolInfo, children);
     }
 
+    public override BoundNode? VisitMarkupIf(BoundMarkupIfStatement node)
+    {
+        var children = VisitList(node.Children);
+        if (children == node.Children)
+        {
+            return node;
+        }
+
+        using var branches = ImmutableArrayBuilder<BoundMarkupConditionalBranch>.Rent();
+        foreach (var child in children)
+        {
+            branches.Add((BoundMarkupConditionalBranch)child);
+        }
+
+        return node.Update(branches.ToImmutable());
+    }
+
+    public override BoundNode? VisitMarkupConditionalBranch(BoundMarkupConditionalBranch node)
+    {
+        return node.Update(VisitCSharpOperationDefinition(node.Condition),
+            VisitMarkupChildContentList(node.Content), VisitList(node.Children),
+            VisitCSharpOperationDefinition(node.ValueOperation));
+    }
+
     public override BoundNode? VisitMarkupContentSetter(BoundMarkupContentSetter node)
     {
         var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
@@ -724,7 +748,9 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             text: content.Text,
             rawText: content.RawText,
             whitespaceMode: content.WhitespaceMode,
-            isDeferred: content.IsDeferred);
+            isDeferred: content.IsDeferred,
+            insertionMethod: content.InsertionMethod,
+            conditionalOperation: content.ConditionalOperation);
     }
 
     protected virtual BoundTailwindUtilityArgument VisitTailwindUtilityArgument(

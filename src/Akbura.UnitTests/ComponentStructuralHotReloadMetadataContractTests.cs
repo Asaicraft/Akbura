@@ -8,6 +8,41 @@ namespace Akbura.UnitTests;
 
 public sealed class ComponentStructuralHotReloadMetadataContractTests
 {
+    [Theory]
+    [InlineData("$if (ready) { <TextBlock Text=\"A\" /> } $else if (other) { <Border /> } $else { <Button /> }")]
+    [InlineData("$if (ready) { <TextBlock Text=\"A\" /> }")]
+    [InlineData("$if (ready) { <CheckBox /> } $else { <Button /> }")]
+    public void DebugStructural_ConditionalTemplateRootChanges_PreserveCompleteMetadataContract(string editedConditional)
+    {
+        const string header = "using Avalonia.Controls; param bool ready = true; param bool other = false; " +
+            "<ContentControl Content=\"item\"><ContentControl.ContentTemplate>";
+        const string suffix = "</ContentControl.ContentTemplate></ContentControl>";
+        const string originalConditional = "$if (ready) { <TextBlock Text=\"A\" /> } $else { <Button /> }";
+        var initialContract = GenerateEmitAndReadContract("Page.akbura", header + originalConditional + suffix,
+            string.Empty, "Demo.Page");
+        var editedContract = GenerateEmitAndReadContract("Page.akbura", header + editedConditional + suffix,
+            string.Empty, "Demo.Page");
+
+        AssertContractEqual(initialContract, editedContract);
+    }
+
+    [Theory]
+    [InlineData("$if (ready) { <TextBlock x.Name=\"title\" Text=\"A\" /> } $else if (other) { <Border /> } $else { <Button /> }")]
+    [InlineData("$if (ready) { <TextBlock x.Name=\"title\" Text=\"A\" /> }")]
+    [InlineData("$if (ready) { <CheckBox x.Name=\"replacement\" /> <Border /> } $else { <Button /> }")]
+    public void DebugStructural_ConditionalBranchInsertionRemovalAndTypeChange_PreserveCompleteMetadataContract(string editedConditional)
+    {
+        const string header = "using Avalonia.Controls; param bool ready = true; param bool other = false; <StackPanel><TextBox />";
+        const string suffix = "<TextBlock Text=\"suffix\" /></StackPanel>";
+        const string originalConditional = "$if (ready) { <TextBlock x.Name=\"title\" Text=\"A\" /> } $else { <Button /> }";
+        var initialContract = GenerateEmitAndReadContract("Page.akbura", header + originalConditional + suffix,
+            string.Empty, "Demo.Page");
+        var editedContract = GenerateEmitAndReadContract("Page.akbura", header + editedConditional + suffix,
+            string.Empty, "Demo.Page");
+
+        AssertContractEqual(initialContract, editedContract);
+    }
+
     [Fact]
     public void DebugStructural_EagerChildInsertionAndRemoval_PreserveCompleteMetadataContract()
     {

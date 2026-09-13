@@ -7,7 +7,6 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
-using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Media;
 using Microsoft.CodeAnalysis;
@@ -168,8 +167,7 @@ public sealed class ExtendedBuiltInUtilityVariantTests
     [Fact]
     public async Task AvailabilityVariants_ObserveEffectiveEnabledStateFromParent()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -216,8 +214,7 @@ public sealed class ExtendedBuiltInUtilityVariantTests
     [Fact]
     public async Task FocusVariants_DistinguishWithinAndKeyboardVisibleFocus()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -288,8 +285,7 @@ public sealed class ExtendedBuiltInUtilityVariantTests
     [Fact]
     public async Task PseudoClassVariants_TrackRealToggleSelectionAndDisclosureControls()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -789,8 +785,7 @@ public sealed class ExtendedBuiltInUtilityVariantTests
     [Fact]
     public async Task ViewportOrientationAndContrastVariants_ResolveFromTopLevel()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>

@@ -45,6 +45,12 @@ internal abstract partial class AkburaSemanticModel
                 ? BinderUsage.Markup
                 : BinderUsage.Expression);
 
+        if (CSharpProbeBuilder.IsMarkupCondition(expressionSyntax))
+        {
+            return new CSharpProbeBuilder(binder).CreateMarkupConditionProjection(expressionSyntax,
+                expression, relativePosition);
+        }
+
         Microsoft.CodeAnalysis.ITypeSymbol? expectedType = null;
         if (isMarkup)
         {
@@ -68,7 +74,7 @@ internal abstract partial class AkburaSemanticModel
 
         return new CSharpProbeBuilder(binder)
             .CreateExpressionProjection(
-                scope,
+                expressionSyntax,
                 expression,
                 relativePosition,
                 expectedType);

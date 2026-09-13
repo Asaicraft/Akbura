@@ -49,13 +49,14 @@ internal readonly ref partial struct ComponentScopeWriter
         {
             WriteElementCreation(plan, scope);
             WriteBeginInit(plan, scope);
+            var assignmentContext = WriteComponentNameScope(plan, scope, context, "__componentInitialNameScope");
             WriteInitialRenderStatements(plan);
 
             var initialized = new bool[plan.Elements.Length];
             for (var i = 0; i < scope.Elements.Length; i++)
             {
                 var elementId = GetScopeElementId(plan, scope, i);
-                WriteElementAssignments(plan, elementId, context, initialized, ComponentAssignmentPhase.Initial);
+                WriteElementAssignments(plan, elementId, assignmentContext, initialized, ComponentAssignmentPhase.Initial);
             }
 
             WriteEndInit(plan, scope);
@@ -84,6 +85,9 @@ internal readonly ref partial struct ComponentScopeWriter
                 writer.Write(statement);
             }
         }
+
+        new ComponentRenderCaptureWriter(_writer).WritePublishes(
+            plan, ComponentRenderStatementPhase.FirstUpdate);
     }
 
     public void WriteLocalInitialState(
@@ -131,12 +135,13 @@ internal readonly ref partial struct ComponentScopeWriter
 
         try
         {
+            var assignmentContext = WriteComponentNameScope(plan, scope, context, "__componentUpdateNameScope");
             WriteStyleElementCreation(plan, scope);
             var initialized = new bool[plan.Elements.Length];
             for (var i = 0; i < scope.Elements.Length; i++)
             {
                 var elementId = GetScopeElementId(plan, scope, i);
-                WriteElementAssignments(plan, elementId, context, initialized, ComponentAssignmentPhase.Update);
+                WriteElementAssignments(plan, elementId, assignmentContext, initialized, ComponentAssignmentPhase.Update);
             }
 
             WriteApplyReplacedStyles(plan, scope);
@@ -160,16 +165,17 @@ internal readonly ref partial struct ComponentScopeWriter
 
         try
         {
-            if (_generationMode == ComponentGenerationMode.DebugStructural)
+            var assignmentContext = WriteComponentNameScope(plan, scope, context, "__componentSourceNameScope");
+            if (_generationMode.UsesStructuralRuntime())
             {
-                WriteStructuralHotReloadState(plan, scope, context);
+                WriteStructuralHotReloadState(plan, scope, assignmentContext);
                 return;
             }
 
             for (var i = 0; i < scope.Elements.Length; i++)
             {
                 var elementId = GetScopeElementId(plan, scope, i);
-                var elementContext = context.ForElement(elementId);
+                var elementContext = assignmentContext.ForElement(elementId);
 
                 if (plan.Elements.ItemRef(elementId).IsStyleSubtree)
                 {
@@ -253,7 +259,7 @@ internal readonly ref partial struct ComponentScopeWriter
             _writer,
             _sourceMap,
             writeInlineHandlers:
-                _generationMode == ComponentGenerationMode.DebugStructural);
+                _generationMode.UsesStructuralRuntime());
         var actionWriter = new ComponentFirstUpdateActionWriter(_writer, _sourceMap);
 
         for (var i = 0; i < element.FirstUpdateActions.Length; i++)
@@ -279,7 +285,7 @@ internal readonly ref partial struct ComponentScopeWriter
                 {
                     Debug.Assert((uint)action.Index < (uint)plan.PropertyWrites.Length);
                     ref readonly var property = ref plan.PropertyWrites.ItemRef(action.Index);
-                    if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                    if (_generationMode.UsesStructuralRuntime() &&
                         element.UsesRuntimeStorage &&
                         property.ValueKind == ComponentPropertyValueKind.Constant)
                     {
@@ -419,7 +425,7 @@ internal readonly ref partial struct ComponentScopeWriter
                 continue;
             }
 
-            if (_generationMode == ComponentGenerationMode.DebugStructural &&
+            if (_generationMode.UsesStructuralRuntime() &&
                 element.UsesRuntimeStorage &&
                 filter == ComponentPropertyWriteFilter.HotReload)
             {
@@ -549,7 +555,7 @@ internal readonly ref partial struct ComponentScopeWriter
             _ownerTypeName,
             _sourceMap,
             _generationMode);
-        if (_generationMode == ComponentGenerationMode.DebugStructural &&
+        if (_generationMode.UsesStructuralRuntime() &&
             element.UsesRuntimeStorage)
         {
             writer.WriteApplyHotReloadStyles(
@@ -655,7 +661,7 @@ internal readonly ref partial struct ComponentScopeWriter
 
     }
 
-    private void WriteStyleElementCreation(in ComponentPlan plan, in ComponentScopePlan scope)
+    private void WriteStyleElementCreation(in ComponentPlan plan, in ComponentScopePlan scope, bool alreadyDeclared = false)
     {
         WriteLocalContentStates(plan, scope, styleOnly: true);
         var writer = new ElementWriter(_writer, _sourceMap);
@@ -664,7 +670,7 @@ internal readonly ref partial struct ComponentScopeWriter
             ref readonly var element = ref plan.Elements.ItemRef(GetScopeElementId(plan, scope, i));
             if (element.IsStyleSubtree)
             {
-                writer.WriteCreation(element);
+                writer.WriteCreation(element, alreadyDeclared);
                 writer.WriteBeginInit(element);
             }
         }
@@ -745,6 +751,10 @@ internal readonly ref partial struct ComponentScopeWriter
     {
         switch (target.Kind)
         {
+            case ComponentContentTargetKind.Conditional:
+                WriteConditionalContent(plan, plan.ConditionalContents.ItemRef(target.Index), context);
+                return true;
+
             case ComponentContentTargetKind.Property:
                 Debug.Assert((uint)target.Index < (uint)plan.PropertyContents.Length);
                 return WritePropertyContent(plan, target.Index, isFirstUpdate, context);
@@ -761,10 +771,10 @@ internal readonly ref partial struct ComponentScopeWriter
                 if (collection.DictionaryShape.IsDictionary)
                 {
                     return eagerWriter.WriteDictionary(plan, collection,
-                        _generationMode == ComponentGenerationMode.DebugStructural);
+                        _generationMode.UsesStructuralRuntime());
                 }
 
-                if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                if (_generationMode.UsesStructuralRuntime() &&
                     eagerWriter.WriteStructuralCollection(
                         plan,
                         plan.CollectionContents.ItemRef(target.Index)))
@@ -799,7 +809,7 @@ internal readonly ref partial struct ComponentScopeWriter
             case ComponentContentValueKind.CSharpExpression:
             {
                 var writer = new ComponentContentWriter(_writer, _sourceMap);
-                if (_generationMode == ComponentGenerationMode.DebugStructural &&
+                if (_generationMode.UsesStructuralRuntime() &&
                     isFirstUpdate)
                 {
                     if (value.Kind == ComponentContentValueKind.Element &&

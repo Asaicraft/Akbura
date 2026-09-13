@@ -32,7 +32,7 @@ internal readonly ref struct ElementWriter
         _writer.WriteLine(" = null!;");
     }
 
-    public void WriteCreation(in ComponentElementPlan element)
+    public void WriteCreation(in ComponentElementPlan element, bool alreadyDeclared = false)
     {
         if (element.UsesRuntimeStorage)
         {
@@ -41,7 +41,7 @@ internal readonly ref struct ElementWriter
 
         using var mapping = _sourceMappingWriter.WriteStart(element.Syntax);
 
-        if (element.IsLocal)
+        if (element.IsLocal && !alreadyDeclared)
         {
             _writer.Write("var ");
         }

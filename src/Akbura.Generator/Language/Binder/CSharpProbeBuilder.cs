@@ -10,10 +10,11 @@ using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Akbura.Language.Binder;
 
-internal sealed class CSharpProbeBuilder
+internal sealed partial class CSharpProbeBuilder
 {
     private const string CompletionAnnotationKind =
         "AkburaCSharpCompletionTarget";
+    private const string ReturnProbeAnnotationKind = "AkburaCSharpReturnProbe";
 
     private readonly CSharpProbeBinder _binder;
 
@@ -55,7 +56,7 @@ internal sealed class CSharpProbeBuilder
         var analyzedBlock = CSharpProbeBinder.CreateProbeBlock(
             ImmutableArray<CSharp.StatementSyntax>.Empty,
             precedingLocals,
-            statement);
+            WrapMarkupConditionalScopes(scope, statement));
         var probeScope = includeAllVisibleSymbols
             ? _binder.CreateCompletionProbeScope(
                 scope,
@@ -73,7 +74,7 @@ internal sealed class CSharpProbeBuilder
             .WithBody(CSharpProbeBinder.CreateProbeBlock(
                 probeScope.LocalStatements,
                 precedingLocals,
-                statement));
+                WrapMarkupConditionalScopes(scope, statement)));
         method = ApplyContainingMethodContext(method, containingMethod);
         return _binder.CreateComponentProbeCompilationUnit(
             CSharpProbeBinder.AddProbeMethod(
@@ -303,6 +304,8 @@ internal sealed class CSharpProbeBuilder
         var precedingLocals = GetPrecedingLocalDeclarations(scope);
         var containingMethod = GetContainingComponentMethodProbe(scope);
         var excludedNames = GetParameterNames(containingMethod);
+        completionScopeNode = WrapMarkupConditionalScopes(scope,
+            CSharpSyntaxFactory.ReturnStatement(completionScopeNode as CSharp.ExpressionSyntax ?? probeExpression));
         var probeScope = includeAllVisibleSymbols
             ? _binder.CreateCompletionProbeScope(
                 scope,
@@ -313,7 +316,7 @@ internal sealed class CSharpProbeBuilder
                 completionScopeNode,
                 excludedNames);
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(
-            probeExpression);
+            probeExpression).WithAdditionalAnnotations(new SyntaxAnnotation(ReturnProbeAnnotationKind));
         var returnType = targetType == null
             ? CSharpSyntaxFactory.PredefinedType(
                 CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword))
@@ -326,7 +329,7 @@ internal sealed class CSharpProbeBuilder
             .WithBody(CSharpProbeBinder.CreateProbeBlock(
                 probeScope.LocalStatements,
                 precedingLocals,
-                returnStatement));
+                WrapMarkupConditionalScopes(scope, returnStatement)));
         method = ApplyContainingMethodContext(method, containingMethod);
         return _binder.CreateComponentProbeCompilationUnit(
             CSharpProbeBinder.AddProbeMethod(
@@ -593,25 +596,50 @@ internal sealed class CSharpProbeBuilder
             }
 
             if (member is CSharpStatementSyntax statement &&
-                statement.GetRawCSharpStatement() is
-                    CSharp.LocalDeclarationStatementSyntax localDeclaration)
+                statement.GetRawCSharpStatement() is { } declarationStatement &&
+                (declarationStatement is CSharp.LocalDeclarationStatementSyntax ||
+                    declarationStatement is not CSharp.LocalFunctionStatementSyntax &&
+                    declarationStatement.DescendantNodes(descendIntoChildren: static node =>
+                        node is not (CSharp.BlockSyntax or CSharp.LambdaExpressionSyntax or
+                            CSharp.AnonymousMethodExpressionSyntax or CSharp.LocalFunctionStatementSyntax))
+                        .OfType<CSharp.SingleVariableDesignationSyntax>().Any()))
             {
                 var hostOffset = statement.Tokens.FullSpan.Start;
-                builder.Add(localDeclaration.ReplaceNodes(
-                    localDeclaration.Declaration.Variables,
-                    (original, _) => original.WithAdditionalAnnotations(
+                var declarations = declarationStatement.DescendantNodes()
+                    .Where(static node => node is CSharp.VariableDeclaratorSyntax or CSharp.SingleVariableDesignationSyntax);
+                builder.Add(declarationStatement.ReplaceNodes(declarations,
+                    (original, rewritten) => rewritten.WithAdditionalAnnotations(
                         new SyntaxAnnotation(
                             CSharpProbeBinder.ProjectedSymbolAnnotationKind,
                             new CSharpProbeSymbolOrigin(
                                 Guid.NewGuid().ToString("N"),
                                 Akbura.Language.Symbols.SymbolKind.CSharpSymbol,
-                                original.Identifier.ValueText,
+                                GetCSharpDeclarationIdentifier(original).ValueText,
                                 new TextSpan(
-                                    hostOffset + original.Identifier.Span.Start,
-                                    original.Identifier.Span.Length))
+                                    hostOffset + GetCSharpDeclarationIdentifier(original).Span.Start,
+                                    GetCSharpDeclarationIdentifier(original).Span.Length))
                             .Serialize()))));
             }
         }
+    }
+
+    private static Microsoft.CodeAnalysis.SyntaxToken GetCSharpDeclarationIdentifier(SyntaxNode declaration)
+    {
+        return declaration switch
+        {
+            CSharp.VariableDeclaratorSyntax variable => variable.Identifier,
+            CSharp.SingleVariableDesignationSyntax variable => variable.Identifier,
+            _ => default,
+        };
+    }
+
+    internal static CSharp.ExpressionSyntax? GetReturnProbeExpression(CSharp.CompilationUnitSyntax root)
+    {
+        var annotated = root.GetAnnotatedNodes(ReturnProbeAnnotationKind)
+            .OfType<CSharp.ReturnStatementSyntax>().SingleOrDefault();
+        return annotated != null
+            ? annotated.Expression
+            : root.DescendantNodes().OfType<CSharp.ReturnStatementSyntax>().Single().Expression;
     }
 }
 

@@ -2,7 +2,6 @@ using Akbura.Markup;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
-using Avalonia.Headless;
 using Avalonia.Styling;
 using System.Reflection;
 
@@ -71,8 +70,7 @@ public sealed class BuiltInUtilityVariantTests
     [Fact]
     public async Task InteractionVariants_ResolveHoverAndObserveFocusState()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -130,8 +128,7 @@ public sealed class BuiltInUtilityVariantTests
     [Fact]
     public async Task ColorSchemeVariants_ObserveEffectiveThemeChanges()
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>

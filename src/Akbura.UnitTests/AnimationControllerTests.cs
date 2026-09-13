@@ -400,7 +400,7 @@ public sealed class AnimationControllerTests
 
     private static async Task OnDispatcher(Func<Task> test)
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(async () =>
         {
             await test();

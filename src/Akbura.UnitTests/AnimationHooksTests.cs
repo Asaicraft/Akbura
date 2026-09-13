@@ -5,7 +5,6 @@ using Akbura.Hooks;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 
@@ -351,7 +350,7 @@ public sealed class AnimationHooksTests
 
     private static async Task OnDispatcher(Action test)
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(test, CancellationToken.None);
     }
 

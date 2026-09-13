@@ -21,6 +21,10 @@
         "link": "/#components-and-markup"
       },
       {
+        "text": "Conditional Markup",
+        "link": "/akbura/conditional-markup"
+      },
+      {
         "text": "Reactive State",
         "link": "/#reactive-state"
       },

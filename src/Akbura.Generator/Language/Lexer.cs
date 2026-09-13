@@ -1,4 +1,4 @@
-﻿// THis file is ported and adopted from roslyn
+// THis file is ported and adopted from roslyn
 
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
@@ -49,6 +49,7 @@ internal sealed partial class Lexer : IDisposable
 		InCSharpParameterList = 1 << 7,
 		InCSharpArgumentList = 1 << 8,
 		InCSharpStatement = 1 << 9,
+		InMarkupCondition = 1 << 10,
 	}
 
 	internal struct TokenInfo
@@ -169,6 +170,7 @@ internal sealed partial class Lexer : IDisposable
 				LexerMode.InTypeName => ParseTypeName(),
 				LexerMode.InCSharpParameterList => ParseCSharpParameterList(),
 				LexerMode.InCSharpArgumentList => ParseCSharpArgumentList(),
+				LexerMode.InMarkupCondition => ParseMarkupCondition(),
 				_ => default
 			};
 

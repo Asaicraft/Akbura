@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Operations;
+using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 
@@ -215,6 +215,10 @@ internal readonly ref struct ComponentPropertyWriter
         _writer.WriteStringLiteral(
             ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
                 plan.Syntax));
+        if (context.IsConditionalNameScope)
+        {
+            _writer.Write(", true");
+        }
         _writer.WriteLine("))");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("{");

@@ -222,6 +222,13 @@ namespace Akbura.Language.Syntax
 		AkcssUtilitySelectorSyntax = 574,
 		AkcssUtilityDeclarationSyntax = 575,
 
+		// Conditional markup content
+		MarkupStatementSyntax = 576,
+		MarkupIfStatementSyntax = 577,
+		MarkupElseIfClauseSyntax = 578,
+		MarkupElseClauseSyntax = 579,
+		MarkupBlockSyntax = 580,
+
 		// Identifiers and types
 		Type = 700,
 		Name = 701,

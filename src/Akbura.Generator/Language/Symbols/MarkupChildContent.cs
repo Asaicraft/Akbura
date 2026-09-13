@@ -1,4 +1,5 @@
 using Akbura.Language.Syntax;
+using Akbura.Language.Operations;
 using System;
 
 namespace Akbura.Language.Symbols;
@@ -15,7 +16,8 @@ internal readonly struct MarkupChildContent
         MarkupWhitespaceMode whitespaceMode =
             MarkupWhitespaceMode.Default,
         bool isDeferred = false,
-        Microsoft.CodeAnalysis.IMethodSymbol? insertionMethod = null)
+        Microsoft.CodeAnalysis.IMethodSymbol? insertionMethod = null,
+        IMarkupIfOperation? conditionalOperation = null)
     {
         Syntax = syntax ??
             throw new ArgumentNullException(nameof(syntax));
@@ -29,6 +31,7 @@ internal readonly struct MarkupChildContent
         WhitespaceMode = whitespaceMode;
         IsDeferred = isDeferred;
         InsertionMethod = insertionMethod;
+        ConditionalOperation = conditionalOperation;
     }
 
     public MarkupContentSyntax Syntax { get; }
@@ -54,6 +57,8 @@ internal readonly struct MarkupChildContent
     /// <summary>The statically selected content Add overload, when applicable.</summary>
     public Microsoft.CodeAnalysis.IMethodSymbol? InsertionMethod { get; }
 
+    public IMarkupIfOperation? ConditionalOperation { get; }
+
     public MarkupChildContent WithInsertionMethod(Microsoft.CodeAnalysis.IMethodSymbol method) =>
-        new(Syntax, Kind, Type, ComponentSymbol, Text, RawText, WhitespaceMode, IsDeferred, method);
+        new(Syntax, Kind, Type, ComponentSymbol, Text, RawText, WhitespaceMode, IsDeferred, method, ConditionalOperation);
 }

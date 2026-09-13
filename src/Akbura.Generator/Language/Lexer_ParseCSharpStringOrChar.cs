@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -84,6 +84,11 @@ partial class Lexer
 
     private bool ScanCSharpStringOrChar()
     {
+        if (IsCSharpInterpolatedStringStart())
+        {
+            return true;
+        }
+
         var ch = TextWindow.PeekChar();
 
         // Character literal: 'a'
@@ -167,6 +172,8 @@ partial class Lexer
     private static bool IsCSharpStringOrCharKind(CSharpSyntaxKind cSharpSyntaxKind)
     {
         return cSharpSyntaxKind == CSharpSyntaxKind.StringLiteralToken ||
+               cSharpSyntaxKind == CSharpSyntaxKind.SingleLineRawStringLiteralToken ||
+               cSharpSyntaxKind == CSharpSyntaxKind.Utf8SingleLineRawStringLiteralToken ||
                cSharpSyntaxKind == CSharpSyntaxKind.InterpolatedStringTextToken ||
                cSharpSyntaxKind == CSharpSyntaxKind.MultiLineRawStringLiteralToken ||
                cSharpSyntaxKind == CSharpSyntaxKind.InterpolatedMultiLineRawStringStartToken ||

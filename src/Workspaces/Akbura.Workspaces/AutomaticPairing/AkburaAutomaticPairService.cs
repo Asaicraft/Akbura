@@ -45,6 +45,8 @@ internal sealed class AkburaAutomaticPairService
         {
             AkburaPairContextKind.MarkupText when openingCharacter == '<' => ">",
             AkburaPairContextKind.MarkupText when openingCharacter == '{' => "}",
+            AkburaPairContextKind.MarkupText when openingCharacter == '(' &&
+                document.CanStartMarkupCondition(position) => ")",
             AkburaPairContextKind.MarkupStartTag when openingCharacter == '{' => "}",
             AkburaPairContextKind.MarkupStartTag when openingCharacter == '"' &&
                 document.IsMarkupAttributeValueStart(position) => "\"",

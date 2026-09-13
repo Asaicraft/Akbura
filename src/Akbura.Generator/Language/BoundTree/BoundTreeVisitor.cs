@@ -45,6 +45,10 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitMarkupContent(BoundMarkupContent node) => DefaultVisit(node);
 
+    public virtual void VisitMarkupIf(BoundMarkupIfStatement node) => DefaultVisit(node);
+
+    public virtual void VisitMarkupConditionalBranch(BoundMarkupConditionalBranch node) => DefaultVisit(node);
+
     public virtual void VisitMarkupContentSetter(BoundMarkupContentSetter node) => DefaultVisit(node);
 
     public virtual void VisitAkcssModule(BoundAkcssModule node) => DefaultVisit(node);
@@ -141,6 +145,10 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitMarkupComponent(BoundMarkupComponent node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupContent(BoundMarkupContent node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupIf(BoundMarkupIfStatement node) => DefaultVisit(node);
+
+    public virtual TResult? VisitMarkupConditionalBranch(BoundMarkupConditionalBranch node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupContentSetter(BoundMarkupContentSetter node) => DefaultVisit(node);
 
@@ -255,6 +263,12 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupContent(BoundMarkupContent node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupIf(BoundMarkupIfStatement node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitMarkupConditionalBranch(BoundMarkupConditionalBranch node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupContentSetter(BoundMarkupContentSetter node, TParameter parameter) =>

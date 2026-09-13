@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -10,7 +11,9 @@ internal readonly struct CSharpSymbolReference
         TextSpan sourceSpan,
         CSharpSymbolDefinition csharpDefinition,
         ISymbol? akburaSymbol,
-        string? name = null)
+        string? name = null,
+        NullableFlowState nullableFlowState = Microsoft.CodeAnalysis.NullableFlowState.None,
+        bool isNameOfOperand = false)
     {
         Syntax = syntax ??
             throw new ArgumentNullException(
@@ -19,6 +22,8 @@ internal readonly struct CSharpSymbolReference
         SourceSpan = sourceSpan;
         CSharpDefinition = csharpDefinition;
         AkburaSymbol = akburaSymbol;
+        NullableFlowState = nullableFlowState;
+        IsNameOfOperand = isNameOfOperand;
 
         Name = string.IsNullOrWhiteSpace(name)
             ? csharpDefinition.Name
@@ -42,6 +47,11 @@ internal readonly struct CSharpSymbolReference
     public CSharpSymbolDefinition CSharpDefinition { get; }
 
     public ISymbol? AkburaSymbol { get; }
+
+    /// <summary>Gets the nullable flow state at this reference in its real C# lexical context.</summary>
+    public NullableFlowState NullableFlowState { get; }
+
+    public bool IsNameOfOperand { get; }
 
     public bool IsAkburaSymbol =>
         AkburaSymbol != null;

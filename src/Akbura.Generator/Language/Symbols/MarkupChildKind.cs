@@ -5,4 +5,5 @@ internal enum MarkupChildKind
     Element,
     Text,
     Expression,
+    Conditional,
 }

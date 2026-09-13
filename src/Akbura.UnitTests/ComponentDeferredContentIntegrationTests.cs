@@ -4,7 +4,6 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using Avalonia.Headless;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Reflection;
@@ -19,8 +18,7 @@ public sealed class ComponentDeferredContentIntegrationTests
     {
         var fixture = CreateRuntimeFixture();
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -46,8 +44,7 @@ public sealed class ComponentDeferredContentIntegrationTests
     {
         var fixture = CreateRuntimeFixture();
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

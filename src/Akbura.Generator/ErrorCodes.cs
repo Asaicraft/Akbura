@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -97,4 +97,10 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_MarkupPropertyContextualTypeUnknown = nameof(AKBURA_SEMANTIC_MarkupPropertyContextualTypeUnknown);
     public const string AKBURA_SEMANTIC_MarkupPropertyContextualTypeAmbiguous = nameof(AKBURA_SEMANTIC_MarkupPropertyContextualTypeAmbiguous);
     public const string WRN_ErrorOverride = nameof(WRN_ErrorOverride);
+    public const string AKBURA_SEMANTIC_MarkupConditionalHookNotSupported = nameof(AKBURA_SEMANTIC_MarkupConditionalHookNotSupported);
+    public const string AKBURA_SEMANTIC_MarkupConditionalContentCardinality = nameof(AKBURA_SEMANTIC_MarkupConditionalContentCardinality);
+    public const string AKBURA_SEMANTIC_UnsupportedConditionalContentDestination = nameof(AKBURA_SEMANTIC_UnsupportedConditionalContentDestination);
+    public const string AKBURA_SEMANTIC_UnsupportedConditionalTemplateRoot = nameof(AKBURA_SEMANTIC_UnsupportedConditionalTemplateRoot);
+    public const string AKBURA_SEMANTIC_UnsupportedConditionalTemplateCapture = nameof(AKBURA_SEMANTIC_UnsupportedConditionalTemplateCapture);
+    public const string AKBURA_SEMANTIC_ConditionalTemplateItemOutsideBuild = nameof(AKBURA_SEMANTIC_ConditionalTemplateItemOutsideBuild);
 }

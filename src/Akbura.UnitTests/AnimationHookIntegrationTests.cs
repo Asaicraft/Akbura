@@ -6,7 +6,6 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -78,7 +77,7 @@ public sealed class AnimationHookIntegrationTests
             </Border>
             """;
         var ownerType = Compile(source, AnimationOwner, debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
@@ -156,7 +155,7 @@ public sealed class AnimationHookIntegrationTests
                 Child={show ? (alternate ? SecondPanel : FirstPanel) : null} />
             """;
         var ownerType = Compile(source, ResolvedOwner, debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
@@ -228,7 +227,7 @@ public sealed class AnimationHookIntegrationTests
             </Border>
             """;
         var ownerType = Compile(source, AnimationOwner, debugStructural);
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(async () =>
         {
             var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));

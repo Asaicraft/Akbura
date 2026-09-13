@@ -24,6 +24,11 @@ public sealed partial class AkburaSyntacticDocument
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = SyntaxTree.GetRootSyntax();
+        if (TryGetMarkupStatementContext(root, position, out var statementContext))
+        {
+            return statementContext;
+        }
+
         if (TryGetDeclarationModifierContext(
                 root,
                 position,

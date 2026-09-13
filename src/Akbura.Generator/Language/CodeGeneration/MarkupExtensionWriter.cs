@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using CSharpSymbolDefinition = Akbura.Language.Symbols.CSharpSymbolDefinition;
 using Microsoft.CodeAnalysis;
@@ -22,7 +22,8 @@ internal readonly ref struct MarkupExtensionWriteContext
         string? fallbackServiceProviderExpression,
         string? nameScopeExpression,
         int scopeId,
-        ReadOnlySpan<BindingElementReference> elementReferences = default)
+        ReadOnlySpan<BindingElementReference> elementReferences = default,
+        bool isConditionalNameScope = false)
         : this(
             targetObjectExpression,
             targetProperty,
@@ -32,7 +33,8 @@ internal readonly ref struct MarkupExtensionWriteContext
             fallbackServiceProviderExpression,
             nameScopeExpression,
             scopeId,
-            elementReferences)
+            elementReferences,
+            isConditionalNameScope)
     {
     }
 
@@ -45,7 +47,8 @@ internal readonly ref struct MarkupExtensionWriteContext
         string? fallbackServiceProviderExpression,
         string? nameScopeExpression,
         int scopeId,
-        ReadOnlySpan<BindingElementReference> elementReferences = default)
+        ReadOnlySpan<BindingElementReference> elementReferences = default,
+        bool isConditionalNameScope = false)
     {
         TargetObjectExpression = targetObjectExpression;
         TargetProperty = targetProperty;
@@ -56,6 +59,7 @@ internal readonly ref struct MarkupExtensionWriteContext
         NameScopeExpression = nameScopeExpression;
         ScopeId = scopeId;
         ElementReferences = elementReferences;
+        IsConditionalNameScope = isConditionalNameScope;
     }
 
     public string TargetObjectExpression { get; }
@@ -82,6 +86,8 @@ internal readonly ref struct MarkupExtensionWriteContext
     public string? NameScopeExpression { get; }
 
     public int ScopeId { get; }
+
+    public bool IsConditionalNameScope { get; }
 
     public ReadOnlySpan<BindingElementReference> ElementReferences { get; }
 
@@ -111,7 +117,8 @@ internal readonly ref struct MarkupExtensionWriteContext
             FallbackServiceProviderExpression,
             NameScopeExpression,
             scopeId,
-            elementReferences);
+            elementReferences,
+            IsConditionalNameScope);
     }
 
     internal MarkupExtensionWriteContext WithElementReferences(
@@ -131,7 +138,16 @@ internal readonly ref struct MarkupExtensionWriteContext
             FallbackServiceProviderExpression,
             NameScopeExpression,
             ScopeId,
-            elementReferences);
+            elementReferences,
+            IsConditionalNameScope);
+    }
+
+    internal MarkupExtensionWriteContext WithNameScope(string nameScopeExpression)
+    {
+        return new MarkupExtensionWriteContext(TargetObjectExpression, TargetProperty,
+            IntermediateRootExpression, BaseUriExpression, DirectParentsStack,
+            FallbackServiceProviderExpression, nameScopeExpression, ScopeId,
+            ElementReferences, isConditionalNameScope: true);
     }
 }
 

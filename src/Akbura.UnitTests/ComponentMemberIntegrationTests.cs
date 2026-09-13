@@ -3,7 +3,6 @@ using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.LogicalTree;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -230,8 +229,7 @@ public sealed class ComponentMemberIntegrationTests
 
         Assert.NotNull(ownerType);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -290,8 +288,7 @@ public sealed class ComponentMemberIntegrationTests
 
         Assert.NotNull(ownerType);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {
@@ -340,7 +337,7 @@ public sealed class ComponentMemberIntegrationTests
 
         Assert.NotNull(ownerType);
 
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
 
         await session.Dispatch(
             () =>
@@ -398,8 +395,7 @@ public sealed class ComponentMemberIntegrationTests
 
         Assert.NotNull(ownerType);
 
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

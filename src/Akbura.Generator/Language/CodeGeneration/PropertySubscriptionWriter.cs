@@ -91,7 +91,8 @@ internal readonly ref struct PropertySubscriptionWriter
 
     public void WriteStructuralRegistration(
         in ComponentElementPlan element,
-        in ComponentPropertySubscriptionPlan subscription)
+        in ComponentPropertySubscriptionPlan subscription,
+        bool refreshClosure = false)
     {
         Debug.Assert(element.UsesRuntimeStorage);
 
@@ -105,13 +106,13 @@ internal readonly ref struct PropertySubscriptionWriter
                 case PropertyObservationKind.GeneratedParameter:
                     WriteStructuralAvaloniaRegistration(
                         element,
-                        subscription);
+                        subscription, refreshClosure);
                     return;
 
                 case PropertyObservationKind.NotifyPropertyChanged:
                     WriteStructuralNotifyPropertyChangedRegistration(
                         element,
-                        subscription);
+                        subscription, refreshClosure);
                     return;
 
                 default:
@@ -198,24 +199,25 @@ internal readonly ref struct PropertySubscriptionWriter
 
     private void WriteStructuralAvaloniaRegistration(
         in ComponentElementPlan element,
-        in ComponentPropertySubscriptionPlan subscription)
+        in ComponentPropertySubscriptionPlan subscription, bool refreshClosure)
     {
         var slot = ComponentHotReloadIdentity.CreatePropertySubscriptionSlot(
             subscription.Observation);
-        WriteOwnedOperationCondition(
-            element.RuntimeStorageId,
-            slot,
-            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
-                subscription.Syntax));
+        WriteStructuralSubscriptionStart(element.RuntimeStorageId, slot, subscription, refreshClosure);
 
         _writer.Write(
             ComponentStructuralHotReloadWriter.RenderStateFieldName);
-        _writer.WriteLine(".ApplyClrEventOperation(");
+        _writer.WriteLine(refreshClosure ? ".RefreshClrEventOperation(" : ".ApplyClrEventOperation(");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteIntegerLiteral(element.RuntimeStorageId);
         _writer.WriteLine(",");
         _writer.WriteStringLiteral(slot);
         _writer.WriteLine(",");
+        if (refreshClosure)
+        {
+            _writer.WriteStringLiteral(ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(subscription.Syntax)).WriteLine(",");
+        }
+
         _writer.Write("(global::Avalonia.AvaloniaObject)");
         WriteElementReference(element);
         _writer.WriteLine(",");
@@ -279,7 +281,7 @@ internal readonly ref struct PropertySubscriptionWriter
 
     private void WriteStructuralNotifyPropertyChangedRegistration(
         in ComponentElementPlan element,
-        in ComponentPropertySubscriptionPlan subscription)
+        in ComponentPropertySubscriptionPlan subscription, bool refreshClosure)
     {
         var property = subscription.Observation.Symbol as IPropertySymbol;
 
@@ -300,20 +302,21 @@ internal readonly ref struct PropertySubscriptionWriter
 
         var slot = ComponentHotReloadIdentity.CreatePropertySubscriptionSlot(
             subscription.Observation);
-        WriteOwnedOperationCondition(
-            element.RuntimeStorageId,
-            slot,
-            ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
-                subscription.Syntax));
+        WriteStructuralSubscriptionStart(element.RuntimeStorageId, slot, subscription, refreshClosure);
 
         _writer.Write(
             ComponentStructuralHotReloadWriter.RenderStateFieldName);
-        _writer.WriteLine(".ApplyClrEventOperation(");
+        _writer.WriteLine(refreshClosure ? ".RefreshClrEventOperation(" : ".ApplyClrEventOperation(");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteIntegerLiteral(element.RuntimeStorageId);
         _writer.WriteLine(",");
         _writer.WriteStringLiteral(slot);
         _writer.WriteLine(",");
+        if (refreshClosure)
+        {
+            _writer.WriteStringLiteral(ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(subscription.Syntax)).WriteLine(",");
+        }
+
         WriteNotifierName(subscription.Id);
         _writer.WriteLine(",");
         _writer.WriteLine(
@@ -338,6 +341,19 @@ internal readonly ref struct PropertySubscriptionWriter
 
         CloseBlock();
         CloseBlock();
+    }
+
+    private void WriteStructuralSubscriptionStart(int runtimeId, string slot,
+        in ComponentPropertySubscriptionPlan subscription, bool refreshClosure)
+    {
+        if (refreshClosure)
+        {
+            OpenBlock();
+        }
+        else
+        {
+            WriteOwnedOperationCondition(runtimeId, slot, ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(subscription.Syntax));
+        }
     }
 
     private void WriteAvaloniaGuard(

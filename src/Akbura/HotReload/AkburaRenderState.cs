@@ -16,7 +16,7 @@ namespace Akbura.HotReload;
 /// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
-public sealed partial class AkburaRenderState
+public sealed partial class AkburaRenderState : IDisposable
 {
     private const string AkcssOperationSlot = "$akcss";
     private const string AkcssOperationIdentity = "generated-akcss";
@@ -83,15 +83,25 @@ public sealed partial class AkburaRenderState
 
         var builder = new AkburaRenderPlanBuilder();
         describe(builder);
+        var conditionalDefinitions = builder.CompleteConditionals();
         var definitions = builder.Complete();
         var pendingRevision = new PendingRevision(
             revision,
-            definitions);
+            definitions)
+        {
+            ConditionalDefinitions = conditionalDefinitions,
+            ConditionalRegions = new ConditionalRegionState[conditionalDefinitions.Length],
+            Factory = factory,
+        };
         _pendingRevision = pendingRevision;
 
         try
         {
             MatchAndCreate(pendingRevision, factory);
+            for (var i = 0; i < conditionalDefinitions.Length; i++)
+            {
+                MatchConditionalRegion(pendingRevision, i);
+            }
         }
         catch (Exception exception)
         {
@@ -131,7 +141,7 @@ public sealed partial class AkburaRenderState
 
         throw new InvalidOperationException(
             $"Render node {localId} contains " +
-            $"'{node.Instance.GetType().FullName}', not '{typeof(T).FullName}'.");
+            $"'{node.Instance?.GetType().FullName ?? "an inactive definition"}', not '{typeof(T).FullName}'.");
     }
 
     /// <summary>
@@ -205,6 +215,16 @@ public sealed partial class AkburaRenderState
         string slot,
         string identity)
     {
+        return ShouldApplyOwnedOperation(localId, slot, identity, forceSourceReplacement: false);
+    }
+
+    /// <summary>Rebinds a source-dependent resource when its lexical scope changes.</summary>
+    public bool ShouldApplyOwnedOperation(
+        int localId,
+        string slot,
+        string identity,
+        bool forceSourceReplacement)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(slot);
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
 
@@ -212,6 +232,11 @@ public sealed partial class AkburaRenderState
         try
         {
             ValidateLocalId(localId, pendingRevision.Nodes.Length);
+            if (forceSourceReplacement && !pendingRevision.IsActivation)
+            {
+                pendingRevision.Nodes[localId].RegisterOwnedOperationForReplacement(slot, identity);
+                return true;
+            }
             return pendingRevision.Nodes[localId]
                 .RegisterOwnedOperation(
                     slot,
@@ -599,6 +624,7 @@ public sealed partial class AkburaRenderState
 
             var ownerNodeId = pendingRevision.Nodes[ownerLocalId].NodeId;
             var key = new RenderSlotKey(ownerNodeId, slot);
+            PrepareConditionalCollectionSlot(pendingRevision, key);
             if (pendingRevision.Collections.ContainsKey(key))
             {
                 throw new InvalidOperationException(
@@ -786,6 +812,7 @@ public sealed partial class AkburaRenderState
 
             var ownerNodeId = pendingRevision.Nodes[ownerLocalId].NodeId;
             var key = new RenderSlotKey(ownerNodeId, slot);
+            PrepareConditionalCollectionSlot(pendingRevision, key);
             if (pendingRevision.Collections.ContainsKey(key))
             {
                 throw new InvalidOperationException(
@@ -868,13 +895,11 @@ public sealed partial class AkburaRenderState
         object target,
         Type? declaringType,
         string propertyName,
-        object desiredValue)
+        object? desiredValue)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(slot);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentException.ThrowIfNullOrWhiteSpace(propertyName);
-        ArgumentNullException.ThrowIfNull(desiredValue);
-
         var pendingRevision = GetMutablePendingRevision();
         try
         {
@@ -929,13 +954,11 @@ public sealed partial class AkburaRenderState
         string slot,
         AvaloniaObject target,
         AvaloniaProperty property,
-        object desiredValue)
+        object? desiredValue)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(slot);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(property);
-        ArgumentNullException.ThrowIfNull(desiredValue);
-
         var pendingRevision = GetMutablePendingRevision();
         try
         {
@@ -992,6 +1015,20 @@ public sealed partial class AkburaRenderState
         string identity,
         object? desiredValue)
     {
+        ReconcileClrValueCore(ownerLocalId, slot, target, declaringType,
+            propertyName, identity, desiredValue, compareDesiredValue: false);
+    }
+
+    private void ReconcileClrValueCore(
+        int ownerLocalId,
+        string slot,
+        object target,
+        Type? declaringType,
+        string propertyName,
+        string identity,
+        object? desiredValue,
+        bool compareDesiredValue)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(slot);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentException.ThrowIfNullOrWhiteSpace(propertyName);
@@ -1026,7 +1063,8 @@ public sealed partial class AkburaRenderState
                     target,
                     property,
                     desiredValue,
-                    identity));
+                    identity),
+                compareDesiredValue);
         }
         catch (Exception exception)
         {
@@ -1053,6 +1091,19 @@ public sealed partial class AkburaRenderState
         AvaloniaProperty property,
         string identity,
         object? desiredValue)
+    {
+        ReconcileAvaloniaValueCore(ownerLocalId, slot, target, property,
+            identity, desiredValue, compareDesiredValue: false);
+    }
+
+    private void ReconcileAvaloniaValueCore(
+        int ownerLocalId,
+        string slot,
+        AvaloniaObject target,
+        AvaloniaProperty property,
+        string identity,
+        object? desiredValue,
+        bool compareDesiredValue)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(slot);
         ArgumentNullException.ThrowIfNull(target);
@@ -1084,7 +1135,8 @@ public sealed partial class AkburaRenderState
                     target,
                     property,
                     desiredValue,
-                    identity));
+                    identity),
+                compareDesiredValue);
         }
         catch (Exception exception)
         {
@@ -1132,12 +1184,22 @@ public sealed partial class AkburaRenderState
     {
         PrepareRevisionCompletion();
         var pendingRevision = GetPendingRevision();
+        CompleteConditionalRenderCaptureRevision(pendingRevision);
 
         _nodes = pendingRevision.Nodes;
         _collections = pendingRevision.Collections;
         _properties = pendingRevision.Properties;
         _revision = pendingRevision.Revision;
+        _conditionalDefinitions = pendingRevision.ConditionalDefinitions;
+        _conditionalRegions = pendingRevision.ConditionalRegions;
+        _nodeFactory = pendingRevision.Factory ?? _nodeFactory;
         _pendingRevision = null;
+
+        CompleteConditionalNameScopes(pendingRevision);
+
+        // Destructive child-scope disposal is delayed until activation/source
+        // commit. A failed preparation must leave the old local scopes intact.
+        CompleteLocalScopeLifetimes(pendingRevision);
     }
 
     /// <summary>
@@ -1177,11 +1239,17 @@ public sealed partial class AkburaRenderState
         PendingRevision pendingRevision,
         int ownerLocalId,
         string slot,
-        RenderPropertyState desiredState)
+        RenderPropertyState desiredState,
+        bool compareDesiredValue = false)
     {
         var key = new RenderSlotKey(
             pendingRevision.Nodes[ownerLocalId].NodeId,
             slot);
+        if (pendingRevision.IsActivation && pendingRevision.ActivationPropertiesTouched.Add(key))
+        {
+            pendingRevision.Properties.Remove(key);
+        }
+
         if (pendingRevision.ContainsOperation(key))
         {
             throw new InvalidOperationException(
@@ -1206,7 +1274,9 @@ public sealed partial class AkburaRenderState
 
         if (previousState.Matches(desiredState))
         {
-            if (previousState.HasSameDeclaration(desiredState))
+            if (compareDesiredValue
+                ? ReferenceEquals(previousState.DesiredValue, desiredState.DesiredValue)
+                : previousState.HasSameDeclaration(desiredState))
             {
                 pendingRevision.Properties.Add(key, previousState);
                 return;
@@ -1398,30 +1468,15 @@ public sealed partial class AkburaRenderState
             ? null
             : pendingRevision.Nodes[parentId].NodeId;
         var oldNodeIds = GetOldNodeIds(parentNodeId, slot);
-
-        MatchExplicitKeys(
-            pendingRevision,
-            newNodeIds,
-            oldNodeIds,
-            oldMatched,
-            assignedInstances);
-        MatchExactSyntax(
-            pendingRevision,
-            newNodeIds,
-            oldNodeIds,
-            oldMatched,
-            assignedInstances);
-        MatchCompatibleTypes(
-            pendingRevision,
-            newNodeIds,
-            oldNodeIds,
-            oldMatched,
-            assignedInstances);
-        CreateUnmatchedNodes(
-            pendingRevision,
-            newNodeIds,
-            assignedInstances,
-            factory);
+        foreach (var group in newNodeIds.GroupBy(id => GetConditionalActivationIdentity(pendingRevision, id)))
+        {
+            var newGroup = group.ToArray();
+            var oldGroup = oldNodeIds.Where(id => _nodes[id].ActivationIdentity == group.Key).ToArray();
+            MatchExplicitKeys(pendingRevision, newGroup, oldGroup, oldMatched, assignedInstances);
+            MatchExactSyntax(pendingRevision, newGroup, oldGroup, oldMatched, assignedInstances);
+            MatchCompatibleTypes(pendingRevision, newGroup, oldGroup, oldMatched, assignedInstances);
+            CreateUnmatchedNodes(pendingRevision, newGroup, assignedInstances, factory);
+        }
     }
 
     private void MatchExplicitKeys(
@@ -1598,7 +1653,7 @@ public sealed partial class AkburaRenderState
         HashSet<object> assignedInstances)
     {
         var oldNode = _nodes[oldLocalId];
-        if (!assignedInstances.Add(oldNode.Instance))
+        if (oldNode.Instance != null && !assignedInstances.Add(oldNode.Instance))
         {
             throw new InvalidOperationException(
                 $"Render node instance at old position {oldLocalId} is ambiguous.");
@@ -1609,8 +1664,9 @@ public sealed partial class AkburaRenderState
         pendingRevision.Nodes[newLocalId] = new RenderNodeState(
             oldNode.NodeId,
             definition,
-            oldNode.Instance,
-            oldNode.GetAppliedOperations());
+            oldNode.Instance!,
+            oldNode.GetAppliedOperations(),
+            oldNode.ActivationIdentity);
         pendingRevision.ShouldApplyInitialValues[newLocalId] =
             !string.Equals(
                 oldNode.Definition.SyntaxIdentity,
@@ -1635,6 +1691,14 @@ public sealed partial class AkburaRenderState
 
             ref readonly var definition =
                 ref pendingRevision.Definitions[localId];
+            if (definition.ConditionalRegionId >= 0)
+            {
+                pendingRevision.Nodes[localId] = new RenderNodeState(
+                    _nextNodeId++, definition, null!,
+                    activationIdentity: GetConditionalActivationIdentity(pendingRevision, localId));
+                continue;
+            }
+
             var instance = factory(localId) ??
                 throw new InvalidOperationException(
                     $"The render node factory returned null for node {localId}.");
@@ -1752,7 +1816,7 @@ public sealed partial class AkburaRenderState
             index++)
         {
             var node = pendingRevision.Nodes[index];
-            if (node.Definition.ParentId == ownerLocalId &&
+            if (node.Instance != null && node.Definition.ParentId == ownerLocalId &&
                 string.Equals(
                     node.Definition.Slot,
                     slot,
@@ -1804,7 +1868,7 @@ public sealed partial class AkburaRenderState
         int ownerLocalId,
         string slot,
         object target,
-        object desiredValue)
+        object? desiredValue)
     {
         ValidatePropertyOwner(
             pendingRevision,
@@ -1818,7 +1882,7 @@ public sealed partial class AkburaRenderState
             index++)
         {
             var node = pendingRevision.Nodes[index];
-            if (node.Definition.ParentId == ownerLocalId &&
+            if (node.Instance != null && node.Definition.ParentId == ownerLocalId &&
                 string.Equals(
                     node.Definition.Slot,
                     slot,
@@ -1829,7 +1893,14 @@ public sealed partial class AkburaRenderState
             }
         }
 
-        if (expectedCount != 1 ||
+        var conditional = pendingRevision.ConditionalDefinitions.Any(definition =>
+            definition.OwnerLocalId == ownerLocalId && definition.Slot == slot);
+        if (desiredValue == null && !conditional)
+        {
+            throw new ArgumentNullException(nameof(desiredValue));
+        }
+
+        if ((conditional ? expectedCount > 1 : expectedCount != 1) ||
             !ReferenceEquals(expectedValue, desiredValue))
         {
             throw new ArgumentException(
@@ -2032,7 +2103,10 @@ public sealed partial class AkburaRenderState
             index < pendingRevision.Nodes.Length;
             index++)
         {
-            retainedNodeIds.Add(pendingRevision.Nodes[index].NodeId);
+            if (pendingRevision.Nodes[index].Instance != null)
+            {
+                retainedNodeIds.Add(pendingRevision.Nodes[index].NodeId);
+            }
         }
 
         foreach (var pair in _collections)
@@ -2105,7 +2179,7 @@ public sealed partial class AkburaRenderState
         }
     }
 
-    private sealed class PendingRevision
+    private sealed partial class PendingRevision
     {
         public PendingRevision(
             string revision,
@@ -2290,11 +2364,13 @@ public sealed partial class AkburaRenderState
             long nodeId,
             AkburaRenderNodeDefinition definition,
             object instance,
-            IReadOnlyDictionary<string, RenderOperationState>? previousOperations = null)
+            IReadOnlyDictionary<string, RenderOperationState>? previousOperations = null,
+            string? activationIdentity = null)
         {
             NodeId = nodeId;
             Definition = definition;
             Instance = instance;
+            ActivationIdentity = activationIdentity;
             PreviousOperations = previousOperations ??
                 EmptyOperations;
         }
@@ -2309,6 +2385,16 @@ public sealed partial class AkburaRenderState
         public AkburaRenderNodeDefinition Definition { get; }
 
         public object Instance { get; }
+
+        public string? ActivationIdentity { get; }
+
+        public void PreserveAppliedOperations()
+        {
+            foreach (var pair in PreviousOperations)
+            {
+                Operations.Add(pair.Key, pair.Value);
+            }
+        }
 
         private IReadOnlyDictionary<string, RenderOperationState>
             PreviousOperations { get; }
@@ -2392,6 +2478,31 @@ public sealed partial class AkburaRenderState
             }
 
             return operation.SetResource(resource);
+        }
+
+        public RenderOperationState? ReplaceDynamicOwnedOperation(string slot, string identity, RenderOperationResource resource)
+        {
+            if (!Operations.TryGetValue(slot, out var previous))
+            {
+                PreviousOperations.TryGetValue(slot, out previous);
+            }
+
+            var operation = new RenderOperationState(identity, requiresResource: true, previous?.Resource);
+            operation.SetResource(resource);
+            Operations[slot] = operation;
+            return previous;
+        }
+
+        public void RestoreDynamicOwnedOperation(string slot, RenderOperationState? previous)
+        {
+            if (previous == null)
+            {
+                Operations.Remove(slot);
+            }
+            else
+            {
+                Operations[slot] = previous;
+            }
         }
 
         public bool ContainsOperation(string slot)
@@ -2551,6 +2662,8 @@ public sealed partial class AkburaRenderState
 
         public abstract int ItemCount { get; }
 
+        public virtual bool IsContiguousLayout(object collection) => false;
+
         public abstract RenderRevisionMutation CreateMutation();
 
         public abstract RenderCollectionState
@@ -2580,6 +2693,25 @@ public sealed partial class AkburaRenderState
         public T[] Items { get; }
 
         public override int ItemCount => Items.Length;
+
+        public override bool IsContiguousLayout(object collection)
+        {
+            if (!ReferenceEquals(collection, Collection) || (Items.Length != 0 &&
+                (Anchor < 0 || Anchor + Items.Length > Collection.Count)))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < Items.Length; i++)
+            {
+                if (!EqualityComparer<T>.Default.Equals(Collection[Anchor + i], Items[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         public override RenderRevisionMutation CreateMutation()
         {
@@ -2640,6 +2772,25 @@ public sealed partial class AkburaRenderState
 
         public override int ItemCount => Items.Length;
 
+        public override bool IsContiguousLayout(object collection)
+        {
+            if (!ReferenceEquals(collection, Collection) || (Items.Length != 0 &&
+                (Anchor < 0 || Anchor + Items.Length > Collection.Count)))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < Items.Length; i++)
+            {
+                if (!ReferenceEquals(Collection[Anchor + i], Items[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         public override RenderRevisionMutation CreateMutation()
         {
             return new UntypedRenderCollectionMutation(
@@ -2694,7 +2845,16 @@ public sealed partial class AkburaRenderState
 
         public object Target { get; }
 
-        public object? DesiredValue { get; }
+        public object? DesiredValue { get; private set; }
+
+        public void UpdateAppliedValue(object? value)
+        {
+            if (!ReferenceEquals(value, DesiredValue))
+            {
+                ApplyValue(value);
+                DesiredValue = value;
+            }
+        }
 
         public string? DeclarationIdentity { get; }
 
@@ -2741,7 +2901,7 @@ public sealed partial class AkburaRenderState
             string slot,
             object target,
             PropertyInfo property,
-            object desiredValue)
+            object? desiredValue)
             : this(
                 ownerNodeId,
                 slot,
@@ -2799,12 +2959,12 @@ public sealed partial class AkburaRenderState
 
         public override void ApplyValue(object? value)
         {
-            _property.SetValue(Target, value);
+            SetClrRenderPropertyValue(Target, _property, value);
         }
 
         public override void RestoreBaseline()
         {
-            _property.SetValue(Target, _baselineValue);
+            SetClrRenderPropertyValue(Target, _property, _baselineValue);
         }
 
         public override RenderRevisionMutation CreateMutation()
@@ -2841,7 +3001,7 @@ public sealed partial class AkburaRenderState
             string slot,
             AvaloniaObject target,
             AvaloniaProperty property,
-            object desiredValue)
+            object? desiredValue)
             : this(
                 ownerNodeId,
                 slot,
@@ -3354,7 +3514,7 @@ public sealed partial class AkburaRenderState
 
         public override void Rollback()
         {
-            _property.SetValue(_target, _value);
+            SetClrRenderPropertyValue(_target, _property, _value);
         }
     }
 

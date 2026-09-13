@@ -1,7 +1,6 @@
 using Akbura.ComponentTree;
 using Akbura.Engine;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
@@ -12,7 +11,7 @@ public sealed class ComponentTreeTests
     [Fact]
     public async Task AkburaControl_MaintainsComponentTreeAcrossVisualAttachment()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             () =>
             {

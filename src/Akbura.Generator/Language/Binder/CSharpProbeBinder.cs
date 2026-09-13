@@ -91,12 +91,7 @@ internal sealed partial class CSharpProbeBinder : Binder
 #endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
         var semanticModel = CreateSemanticModel(syntaxTree);
-        var probeExpression = syntaxTree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.ReturnStatementSyntax>()
-            .Single()
-            .Expression;
+        var probeExpression = CSharpProbeBuilder.GetReturnProbeExpression(syntaxTree.GetCompilationUnitRoot());
 
         var binding = probeExpression == null
             ? CSharpBindingResult.Empty
@@ -139,12 +134,7 @@ internal sealed partial class CSharpProbeBinder : Binder
                     expression,
                     targetType));
         var semanticModel = CreateSemanticModel(syntaxTree);
-        var probeExpression = syntaxTree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.ReturnStatementSyntax>()
-            .Single()
-            .Expression;
+        var probeExpression = CSharpProbeBuilder.GetReturnProbeExpression(syntaxTree.GetCompilationUnitRoot());
 
         var boundExpression = probeExpression == null
             ? new BoundCSharpExpression(syntax, this, CSharpBindingResult.Empty)

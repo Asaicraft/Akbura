@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -392,5 +392,23 @@
   </data>
   <data name="AKBURA_SEMANTIC_MarkupContentAddMethodAmbiguous" xml:space="preserve">
     <value>Markup child '{0}' matches more than one equally applicable Add overload.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupConditionalHookNotSupported" xml:space="preserve">
+    <value>Parent hooks cannot be invoked in conditional markup until branch-local hook frames are supported.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_MarkupConditionalContentCardinality" xml:space="preserve">
+    <value>Scalar markup content permits at most one active contribution, but this sequence can contribute {0}.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_UnsupportedConditionalContentDestination" xml:space="preserve">
+    <value>Conditional markup requires a reversible mutable IList destination, a dictionary, or an owned Style subtree. An Add-only destination cannot remove an inactive branch.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_UnsupportedConditionalTemplateRoot" xml:space="preserve">
+    <value>Conditional root replacement requires a supported IDataTemplate or native DataTemplate/ControlTemplate host contract. For other template destinations, place conditional markup inside an unconditional root control.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_UnsupportedConditionalTemplateCapture" xml:space="preserve">
+    <value>Render local '{0}' cannot be captured by a conditional template: {1}.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_ConditionalTemplateItemOutsideBuild" xml:space="preserve">
+    <value>Template item '{0}' is only available while building its template instance. Expressions selecting or configuring complete IDataTemplate objects are outside this item's Build scope and cannot read it.</value>
   </data>
 </root>

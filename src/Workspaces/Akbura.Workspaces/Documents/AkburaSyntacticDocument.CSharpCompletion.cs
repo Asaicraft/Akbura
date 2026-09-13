@@ -175,6 +175,18 @@ public sealed partial class AkburaSyntacticDocument
 
         bool IsCSharpExpressionContext(CSharpExpressionSyntax expression)
         {
+            if (expression.Parent is MarkupIfStatementSyntax markupIf)
+            {
+                return !markupIf.OpenParenToken.IsMissing && position >= markupIf.OpenParenToken.Span.End &&
+                    (markupIf.CloseParenToken.IsMissing || position <= markupIf.CloseParenToken.Span.Start);
+            }
+
+            if (expression.Parent is MarkupElseIfClauseSyntax markupElseIf)
+            {
+                return !markupElseIf.OpenParenToken.IsMissing && position >= markupElseIf.OpenParenToken.Span.End &&
+                    (markupElseIf.CloseParenToken.IsMissing || position <= markupElseIf.CloseParenToken.Span.Start);
+            }
+
             if ((expression.Parent is AkcssAssignmentSyntax assignment &&
                  ReferenceEquals(assignment.Expression, expression)) ||
                 (expression.Parent is AkcssIfDirectiveSyntax ifDirective &&

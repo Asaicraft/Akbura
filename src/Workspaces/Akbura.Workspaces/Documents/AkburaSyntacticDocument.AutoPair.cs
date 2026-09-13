@@ -51,6 +51,8 @@ public sealed partial class AkburaSyntacticDocument
 
         return token.Parent switch
         {
+            MarkupBlockSyntax block =>
+                block.OpenBraceToken.Span == token.Span,
             AkcssStyleRuleSyntax rule =>
                 rule.OpenBrace.Span == token.Span,
             AkcssUtilitiesSectionSyntax section =>

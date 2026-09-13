@@ -75,7 +75,7 @@ internal sealed class ComponentWriter : IDisposable
         _sourceMap = new ComponentGenerationSourceMap(syntaxTree);
         _ownerTypeName = GetGeneratedOwnerTypeName(component);
         _resourcePath = NormalizeResourcePath(resourcePath);
-        _generationMode = generationMode;
+        _generationMode = generationMode.ForComponent(component);
 
         if (_resourcePath.Length == 0)
         {
@@ -214,7 +214,7 @@ internal sealed class ComponentWriter : IDisposable
 
     public bool WriteElementFields()
     {
-        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        if (_generationMode.UsesStructuralRuntime())
         {
             var structuralWriter = new ComponentStructuralHotReloadWriter(_writer);
             structuralWriter.WriteFields(_plan);
@@ -265,7 +265,7 @@ internal sealed class ComponentWriter : IDisposable
 
     public bool WriteStructuralHotReloadMembers()
     {
-        if (_generationMode != ComponentGenerationMode.DebugStructural)
+        if (!_generationMode.UsesStructuralRuntime())
         {
             return false;
         }
@@ -407,7 +407,7 @@ internal sealed class ComponentWriter : IDisposable
 
     public bool WriteDeferredContentBuilders()
     {
-        if (_plan.DeferredContents.IsDefaultOrEmpty)
+        if (_plan.DeferredContents.IsDefaultOrEmpty && _plan.Templates.IsDefaultOrEmpty)
         {
             return false;
         }
@@ -442,6 +442,22 @@ internal sealed class ComponentWriter : IDisposable
                 wroteAny |= wroteBuilder;
             }
 
+            var templates = new TemplateWriter(_writer, in _bindingEnvironment, _sourceMap,
+                _ownerTypeName, _generationMode);
+            foreach (var template in _plan.Templates)
+            {
+                if (ComponentLocalScopeWriter.CanWrite(_plan, _plan.Scopes.ItemRef(template.ScopeId)))
+                {
+                    if (wroteAny)
+                    {
+                        _writer.WriteLine();
+                    }
+
+                    templates.WriteConditionalBuilder(_plan, template);
+                    wroteAny = true;
+                }
+            }
+
             return wroteAny;
         }
         finally
@@ -452,7 +468,7 @@ internal sealed class ComponentWriter : IDisposable
 
     public bool WritePropertySubscriptionHandlers()
     {
-        if (_generationMode == ComponentGenerationMode.DebugStructural)
+        if (_generationMode.UsesStructuralRuntime())
         {
             return false;
         }
@@ -500,7 +516,7 @@ internal sealed class ComponentWriter : IDisposable
         var indent = _writer.CurrentIndent;
         try
         {
-            if (_generationMode == ComponentGenerationMode.DebugStructural)
+            if (_generationMode.UsesStructuralRuntime())
             {
                 return false;
             }
@@ -537,7 +553,7 @@ internal sealed class ComponentWriter : IDisposable
 
         try
         {
-            if (_generationMode == ComponentGenerationMode.DebugStructural)
+            if (_generationMode.UsesStructuralRuntime())
             {
                 return false;
             }

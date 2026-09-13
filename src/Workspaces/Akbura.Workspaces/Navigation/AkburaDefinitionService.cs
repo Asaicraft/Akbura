@@ -122,6 +122,11 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
 
             switch (node)
             {
+                case CSharpExpressionSyntax condition when condition.Parent is
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax:
+                    return GetCSharpDefinition(context,
+                        semanticModel.GetCSharpSymbolReferences(condition), position, cancellationToken);
+
                 case CSharpStatementSyntax statement:
                     return GetCSharpDefinition(
                         context,

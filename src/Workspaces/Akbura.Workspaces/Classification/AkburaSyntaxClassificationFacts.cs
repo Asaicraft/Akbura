@@ -23,6 +23,12 @@ internal static class AkburaSyntaxClassificationFacts
             return AkburaClassificationKind.EmbeddedCSharp;
         }
 
+        if (token.Kind == SyntaxKind.DollarToken &&
+            token.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupElseClauseSyntax)
+        {
+            return AkburaClassificationKind.Directive;
+        }
+
         var markupExtensionClassification = GetMarkupExtensionClassification(token);
 
         if (markupExtensionClassification is not null)

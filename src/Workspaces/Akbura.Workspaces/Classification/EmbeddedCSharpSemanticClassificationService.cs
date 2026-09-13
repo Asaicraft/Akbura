@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -468,6 +468,11 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
 
             switch (node)
             {
+                case CSharpExpressionSyntax condition when condition.Parent is
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax:
+                    references = semanticModel.GetCSharpSymbolReferences(condition);
+                    break;
+
                 case CSharpStatementSyntax statement:
                     references =
                         semanticModel

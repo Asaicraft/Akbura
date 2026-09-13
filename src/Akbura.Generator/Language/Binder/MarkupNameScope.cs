@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System;
@@ -53,8 +53,7 @@ internal sealed class MarkupNameScope
 
                 var attachedAttribute = Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(attribute);
                 var owner =
-                    (AkburaSyntax?)templateContentResolver.GetLocalNameScopeOwner(element) ??
-                    root;
+                    FindScopeOwner(element, templateContentResolver, root);
                 if (!scopes.TryGetValue(owner, out var scope))
                 {
                     scope = new ScopeBuilder(owner);
@@ -155,11 +154,7 @@ internal sealed class MarkupNameScope
                 break;
             }
 
-            owner = owner is MarkupElementSyntax element
-                ? (AkburaSyntax?)_templateContentResolver
-                      .GetLocalNameScopeOwner(element) ??
-                  _root
-                : _root;
+            owner = owner.Parent == null ? _root : GetScopeOwner(owner.Parent);
         }
 
         symbol = null!;
@@ -178,8 +173,22 @@ internal sealed class MarkupNameScope
 
     private AkburaSyntax GetScopeOwner(AkburaSyntax syntax)
     {
-        return (AkburaSyntax?)_templateContentResolver.GetLocalNameScopeOwner(syntax) ??
-               _root;
+        return FindScopeOwner(syntax, _templateContentResolver, _root);
+    }
+
+    private static AkburaSyntax FindScopeOwner(AkburaSyntax syntax,
+        MarkupTemplateContentResolver templates, MarkupRootSyntax root)
+    {
+        var templateOwner = templates.GetLocalNameScopeOwner(syntax);
+        for (var current = syntax; current != null; current = current.Parent)
+        {
+            if (current is MarkupBlockSyntax || ReferenceEquals(current, templateOwner))
+            {
+                return current;
+            }
+        }
+
+        return root;
     }
 
     public bool TryGetDeclaration(

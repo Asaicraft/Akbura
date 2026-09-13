@@ -4,7 +4,6 @@ using Akbura.Hooks;
 using Akbura.HotReload;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
@@ -15,7 +14,7 @@ public sealed class HookStateHotReloadLifecycleTests
     [Fact]
     public async Task SuspendedRefresh_IsAcknowledgedOnlyAfterItsHookFrameCommits()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(() =>
         {
             var component = new SuspendedRefreshComponent();

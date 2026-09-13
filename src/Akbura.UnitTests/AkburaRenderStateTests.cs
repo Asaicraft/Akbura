@@ -6,7 +6,6 @@ using Avalonia;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Data;
-using Avalonia.Headless;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Collections.Specialized;
@@ -1727,8 +1726,7 @@ public sealed class AkburaRenderStateTests
 
     private static async Task RunOnAvaloniaThread(Action action)
     {
-        using var session = HeadlessUnitTestSession.StartNew(
-            typeof(AvaloniaTestAppBuilder));
+        var session = AvaloniaHeadlessTestSession.GetSession();
         await session.Dispatch(
             action,
             CancellationToken.None);

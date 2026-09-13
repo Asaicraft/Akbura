@@ -15,6 +15,11 @@ public sealed partial class AkburaRenderState
         ArgumentNullException.ThrowIfNull(dictionary);
         var pending = _pendingRevision == null ? null : GetMutablePendingRevision();
         var key = new RenderSlotKey(GetNode(ownerLocalId).NodeId, slot);
+        if (pending != null)
+        {
+            PrepareConditionalCollectionSlot(pending, key);
+        }
+
         var states = pending?.Collections ?? _collections;
         if (pending != null && states.ContainsKey(key))
         {
@@ -62,6 +67,11 @@ public sealed partial class AkburaRenderState
         ArgumentNullException.ThrowIfNull(dictionary);
         var pending = _pendingRevision == null ? null : GetMutablePendingRevision();
         var key = new RenderSlotKey(GetNode(ownerLocalId).NodeId, slot);
+        if (pending != null)
+        {
+            PrepareConditionalCollectionSlot(pending, key);
+        }
+
         var states = pending?.Collections ?? _collections;
         if (pending != null && states.ContainsKey(key))
         {

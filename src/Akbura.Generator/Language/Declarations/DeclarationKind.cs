@@ -16,6 +16,7 @@ internal enum DeclarationKind : byte
     Command,
     MarkupRoot,
     MarkupElement,
+    MarkupConditionalBranch,
     AkcssModule,
     AkcssUsing,
     AkcssStyle,

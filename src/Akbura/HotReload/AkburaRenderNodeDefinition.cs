@@ -9,6 +9,18 @@ namespace Akbura.HotReload;
 [Browsable(false)]
 public readonly struct AkburaRenderNodeDefinition
 {
+    /// <summary>Initializes an unconditional render node definition.</summary>
+    public AkburaRenderNodeDefinition(
+        int localId,
+        int parentId,
+        string slot,
+        Type type,
+        string? explicitKey,
+        string syntaxIdentity)
+        : this(localId, parentId, slot, type, explicitKey, syntaxIdentity, -1, -1)
+    {
+    }
+
     /// <summary>
     /// Initializes a render node definition.
     /// </summary>
@@ -18,13 +30,17 @@ public readonly struct AkburaRenderNodeDefinition
     /// <param name="type">The exact runtime type created for the node.</param>
     /// <param name="explicitKey">An optional explicit source identity.</param>
     /// <param name="syntaxIdentity">The normalized identity of the node declaration.</param>
+    /// <param name="conditionalRegionId">The containing conditional region, or <c>-1</c>.</param>
+    /// <param name="conditionalBranchId">The current-plan branch ordinal, or <c>-1</c>.</param>
     public AkburaRenderNodeDefinition(
         int localId,
         int parentId,
         string slot,
         Type type,
         string? explicitKey,
-        string syntaxIdentity)
+        string syntaxIdentity,
+        int conditionalRegionId,
+        int conditionalBranchId)
     {
         if (localId < 0)
         {
@@ -66,6 +82,14 @@ public readonly struct AkburaRenderNodeDefinition
         Type = type;
         ExplicitKey = explicitKey;
         SyntaxIdentity = syntaxIdentity;
+        if (conditionalRegionId < -1 || conditionalBranchId < -1 ||
+            (conditionalRegionId < 0) != (conditionalBranchId < 0))
+        {
+            throw new ArgumentException("A conditional node must identify both its region and branch.");
+        }
+
+        ConditionalRegionId = conditionalRegionId;
+        ConditionalBranchId = conditionalBranchId;
     }
 
     /// <summary>
@@ -97,4 +121,10 @@ public readonly struct AkburaRenderNodeDefinition
     /// Gets the normalized identity of the node declaration.
     /// </summary>
     public string SyntaxIdentity { get; }
+
+    /// <summary>Gets the containing conditional region, or <c>-1</c>.</summary>
+    public int ConditionalRegionId { get; }
+
+    /// <summary>Gets the branch ordinal in the current source plan, or <c>-1</c>.</summary>
+    public int ConditionalBranchId { get; }
 }

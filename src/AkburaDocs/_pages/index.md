@@ -137,6 +137,10 @@ state bool isOpen = false;
 
 Attributes may contain literals, C# expressions, bindings, and markup extensions.
 
+[Conditional Markup](/akbura/conditional-markup) describes `$if`, `$else if`,
+and `$else` inside content, including branch-local C# scope and the feature's
+current availability.
+
 ## Dictionary Resources
 
 Use `x.key` to insert a child into a dictionary content slot, such as an

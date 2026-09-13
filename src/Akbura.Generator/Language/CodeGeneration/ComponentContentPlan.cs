@@ -13,6 +13,7 @@ internal enum ComponentContentValueKind : byte
     CSharpExpression,
     DeferredContent,
     Template,
+    Conditional,
 }
 
 internal readonly struct ComponentContentValueReference
@@ -137,6 +138,7 @@ internal enum ComponentContentTargetKind : byte
     None,
     Property,
     Collection,
+    Conditional,
 }
 
 internal readonly struct ComponentContentTargetReference
